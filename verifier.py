@@ -1,9 +1,9 @@
 
 
 class Verifier:
-    def __init__(self, jpype, filename):
-        self.silicon = jpype.viper.silicon.Silicon()
-        args = jpype.scala.collection.mutable.ArraySeq(1)
+    def __init__(self, jvm, filename):
+        self.silicon = jvm.viper.silicon.Silicon()
+        args = jvm.scala.collection.mutable.ArraySeq(1)
         args.update(0, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()

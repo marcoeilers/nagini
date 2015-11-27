@@ -1,6 +1,5 @@
 import ast
-import builtins
-from constants import ViperAST
+from viper_ast import ViperAST
 
 
 contract_funcs = ['Requires', 'Ensures']
@@ -8,10 +7,10 @@ contract_keywords = set(["Requires", "Ensures", "Invariant", "Assume",
                          "Assert", "Old", "Result", "Pure"])
 
 class Translator:
-    def __init__(self, jpype, sourcefile, typeinfo):
-        self.java = jpype.java
-        self.scala = jpype.scala
-        self.viper = jpype.viper
+    def __init__(self, jvm, sourcefile, typeinfo):
+        self.java = jvm.java
+        self.scala = jvm.scala
+        self.viper = jvm.viper
         self.types = typeinfo
         self.index = 0
         self.prefix = []
@@ -21,16 +20,16 @@ class Translator:
         viper = ViperAST(self.java, self.scala, self.viper, sourcefile)
         self.viper = viper
 
-        self.builtins = {'builtins.int' : viper.typeint,
-                         'builtins.bool' : viper.typebool}
+        self.builtins = {'builtins.int' : viper.Int,
+                         'builtins.bool' : viper.Bool}
 
         def translate_num(slf : ast.Num):
-            return viper.intlit(slf.n, viper.toposition(slf), viper.noinfo)
+            return viper.IntLit(slf.n, viper.toposition(slf), viper.NoInfo)
         ast.Num.translate_expr = translate_num
 
         def translate_compare(slf : ast.Compare):
             if len(slf.ops) == 1 and isinstance(slf.ops[0], ast.Eq) and len(slf.comparators) == 1:
-                return viper.eqcmp(slf.left.translate_expr(), slf.comparators[0].translate_expr(), viper.toposition(slf), viper.noinfo)
+                return viper.EqCmp(slf.left.translate_expr(), slf.comparators[0].translate_expr(), viper.toposition(slf), viper.NoInfo)
         ast.Compare.translate_expr = translate_compare
 
         def translate_return(slf : ast.Return):
@@ -42,11 +41,11 @@ class Translator:
                 raise Exception()
             elif self.is_funccall(slf) == "Result":
                 type = self.types.getfunctype(self.prefix)
-                return viper.result(self.gettype(type), viper.toposition(slf), viper.noinfo)
+                return viper.Result(self.gettype(type), viper.toposition(slf), viper.NoInfo)
             else:
                 args = viper.emptyseq()
                 formalargs = viper.emptyseq()
-                return viper.funcapp(self.is_funccall(slf), args, viper.toposition(slf), viper.noinfo, viper.typeint, formalargs)
+                return viper.FuncApp(self.is_funccall(slf), args, viper.toposition(slf), viper.NoInfo, viper.Int, formalargs)
 
         def translate_call_contract(slf : ast.Call):
             if self.is_funccall(slf) in contract_funcs:
@@ -67,7 +66,7 @@ class Translator:
         ast.Expr.translate_contract = translate_expr_contract
 
         def translate_name(slf : ast.Name):
-            return viper.localvar(slf.id, viper.typeint, viper.toposition(slf), viper.noinfo)
+            return viper.LocalVar(slf.id, viper.Int, viper.toposition(slf), viper.NoInfo)
         ast.Name.translate_expr = translate_name
 
     def gettype(self, pytype):
@@ -95,7 +94,7 @@ class Translator:
 
     def translate_parameter(self, param):
         type = self.types.gettype(self.prefix, param.arg)
-        return self.viper.localvardecl(param.arg, self.gettype(type), self.viper.toposition(param), self.viper.noinfo)
+        return self.viper.LocalVarDecl(param.arg, self.gettype(type), self.viper.toposition(param), self.viper.NoInfo)
 
     def translate_function(self, func : ast.FunctionDef):
         if func.name in contract_keywords:
@@ -119,7 +118,7 @@ class Translator:
                 bodyindex += 1
             body = func.body[bodyindex].translate_expr()
             self.prefix = oldprefix
-            return self.viper.function(func.name, args, type, pres, posts, body, self.viper.noposition, self.viper.noinfo)
+            return self.viper.Function(func.name, args, type, pres, posts, body, self.viper.NoPosition, self.viper.NoInfo)
 
     def translate_module(self, module : ast.Module):
         domains = self.viper.emptyseq()
@@ -130,7 +129,7 @@ class Translator:
         for stmt in module.body:
             if isinstance(stmt, ast.FunctionDef):
                 self.append(functions, self.translate_function(stmt))
-        prog = self.viper.program(domains, fields, functions, predicates, methods, self.viper.noposition, self.viper.noinfo)
+        prog = self.viper.Program(domains, fields, functions, predicates, methods, self.viper.NoPosition, self.viper.NoInfo)
         return prog
 
 
