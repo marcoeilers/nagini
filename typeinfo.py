@@ -6,6 +6,7 @@ import os
 def func_children(func : mypy.nodes.FuncDef, index):
     return (index, [(func.name(), func.body.body)])
 
+
 def func_vars(func : mypy.nodes.FuncDef):
     functype = func.type
     if isinstance(functype, mypy.types.FunctionLike):
@@ -15,6 +16,7 @@ def func_vars(func : mypy.nodes.FuncDef):
 
 children_funcs = {mypy.nodes.FuncDef : func_children}
 vars_funcs = {mypy.nodes.FuncDef : func_vars}
+
 
 class TypeInfo:
     def __init__(self):
@@ -34,8 +36,6 @@ class TypeInfo:
                 sys.stderr.write('Mypy error: ' + m + '\n')
             return False
 
-
-
     def traverse(self, node, index, prefix):
         vars_func = vars_funcs.get(node.__class__)
         if vars_func:
@@ -53,8 +53,6 @@ class TypeInfo:
                 newprefix = prefix + [contextname]
                 for c in childs:
                     self.traverse(c, 0, newprefix)
-
-
 
     def gettype(self, prefix, name):
         result = self.allTypes.get(tuple(prefix + [name]))

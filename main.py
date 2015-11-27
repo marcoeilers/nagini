@@ -1,7 +1,7 @@
 from typeinfo import *
 from translator import *
 from verifier import *
-from jpypeaccess import *
+from jvmaccess import *
 import ast
 import astpp
 
