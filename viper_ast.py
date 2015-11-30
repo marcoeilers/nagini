@@ -36,7 +36,6 @@ class ViperAST:
         self.sourcefile = sourcefile
         self.none = getobject(scala, "None")
 
-
     def emptyseq(self):
         return self.scala.collection.mutable.ListBuffer()
 
@@ -45,14 +44,34 @@ class ViperAST:
         result.update(0, element)
         return result
 
+    def append(self, list, toappend):
+        if not toappend is None:
+            lsttoappend = self.singletonseq(toappend)
+            list.append(lsttoappend)
+
+    def toSeq(self, list):
+        result = self.scala.collection.mutable.ArraySeq(len(list))
+        for index in range(0, len(list)):
+            result.update(index, list[index])
+        return result
+
     def toBigInt(self, num):
         return self.scala.math.BigInt(self.java.math.BigInteger.valueOf(num))
 
     def Program(self, domains, fields, functions, predicates, methods, position, info):
-        return self.ast.Program(domains, fields, functions, predicates, methods, position, info)
+        return self.ast.Program(self.toSeq(domains), self.toSeq(fields), self.toSeq(functions), self.toSeq(predicates), self.toSeq(methods), position, info)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
-        return self.ast.Function(name, args, type, pres, posts, self.scala.Some(body), position, info)
+        return self.ast.Function(name, self.toSeq(args), type, self.toSeq(pres), self.toSeq(posts), self.scala.Some(body), position, info)
+
+    def Method(self, name, args, returns, pres, posts, locals, body, position, info):
+        return self.ast.Method(name, self.toSeq(args), self.toSeq(returns), self.toSeq(pres), self.toSeq(posts), self.toSeq(locals), body, position, info)
+
+    def Seqn(self, body, position, info):
+        return self.ast.Seqn(self.toSeq(body), position, info)
+
+    def LocalVarAssign(self, lhs, rhs, position, info):
+        return self.ast.LocalVarAssign(lhs, rhs, position, info)
 
     def EqCmp(self, left, right, position, info):
         return self.ast.EqCmp(left, right, position, info)
@@ -61,7 +80,7 @@ class ViperAST:
         return self.ast.IntLit(self.toBigInt(num), position, info)
 
     def FuncApp(self, name, args, position, info, type, formalargs):
-        return self.ast.FuncApp(name, args, position, info, type, formalargs)
+        return self.ast.FuncApp(name, self.toSeq(args), position, info, type, self.toSeq(formalargs))
 
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)
@@ -71,6 +90,15 @@ class ViperAST:
 
     def Result(self, type, position, info):
         return self.ast.Result(type, position, info)
+
+    def Add(self, left, right, position, info):
+        return self.ast.Add(left, right, position, info)
+
+    def Sub(self, left, right, position, info):
+        return self.ast.Sub(left, right, position, info)
+
+    def And(self, left, right, position, info):
+        return self.ast.And(left, right, position, info)
 
     def toposition(self, expr):
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
