@@ -6,6 +6,9 @@ import os
 def func_children(func : mypy.nodes.FuncDef, index):
     return (index, [(func.name(), func.body.body)])
 
+def decorator_children(dec : mypy.nodes.Decorator, index):
+    return func_children(dec.func, index)
+
 
 def func_vars(func : mypy.nodes.FuncDef):
     functype = func.type
@@ -13,9 +16,14 @@ def func_vars(func : mypy.nodes.FuncDef):
         functype = functype.ret_type
     return [([func.name()], functype)] + [([func.name(), arg._name], arg.type) for arg in func.args]
 
+def decorator_vars(dec : mypy.nodes.Decorator):
+    return func_vars(dec.func)
 
-children_funcs = {mypy.nodes.FuncDef : func_children}
-vars_funcs = {mypy.nodes.FuncDef : func_vars}
+
+children_funcs = {mypy.nodes.FuncDef : func_children,
+                  mypy.nodes.Decorator : decorator_children}
+vars_funcs = {mypy.nodes.FuncDef : func_vars,
+              mypy.nodes.Decorator : decorator_vars}
 
 
 class TypeInfo:
@@ -60,7 +68,7 @@ class TypeInfo:
             if not prefix:
                 return None
             else:
-                return self.get_type_for_node(prefix[:len(prefix)-1], name)
+                return self.gettype(prefix[:len(prefix)-1], name)
         else:
             return result
 

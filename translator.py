@@ -14,7 +14,9 @@ class Translator:
         self.types = typeinfo
         self.index = 0
         self.prefix = []
+        self.methodcontext = False
 
+        self.funcsAndMethods = {}
 
 
         viper = ViperAST(self.java, self.scala, self.viper, sourcefile)
@@ -34,17 +36,31 @@ class Translator:
 
         def translate_return(slf : ast.Return):
             return slf.value.translate_expr()
+        def translate_stmt_return(slf : ast.Return):
+            print(self.prefix)
+            type = self.types.getfunctype(self.prefix)
+            return viper.LocalVarAssign(viper.LocalVar('_res', self.gettype(type), viper.NoPosition, viper.NoInfo), slf.value.translate_expr(), viper.toposition(slf), viper.NoInfo)
         ast.Return.translate_expr = translate_return
+        ast.Return.translate_stmt = translate_stmt_return
 
         def translate_call(slf : ast.Call):
             if self.is_funccall(slf) in contract_funcs:
                 raise Exception()
             elif self.is_funccall(slf) == "Result":
                 type = self.types.getfunctype(self.prefix)
-                return viper.Result(self.gettype(type), viper.toposition(slf), viper.NoInfo)
+                if self.methodcontext:
+                    return viper.LocalVar('_res', self.gettype(type), viper.NoPosition, viper.NoInfo)
+                else:
+                    return viper.Result(self.gettype(type), viper.toposition(slf), viper.NoInfo)
             else:
-                args = viper.emptyseq()
-                formalargs = viper.emptyseq()
+                args = []
+                formalargs = []
+                for arg in slf.args:
+                    args.append(arg.translate_expr())
+                name = self.is_funccall(slf)
+                target = self.funcsAndMethods[name]
+                for arg in target.args.args:
+                    formalargs.append(self.translate_parameter_prefix(arg, [name]))
                 return viper.FuncApp(self.is_funccall(slf), args, viper.toposition(slf), viper.NoInfo, viper.Int, formalargs)
 
         def translate_call_contract(slf : ast.Call):
@@ -69,6 +85,19 @@ class Translator:
             return viper.LocalVar(slf.id, viper.Int, viper.toposition(slf), viper.NoInfo)
         ast.Name.translate_expr = translate_name
 
+        def translate_binop(slf : ast.BinOp):
+            if isinstance(slf.op, ast.Add):
+                return viper.Add(slf.left.translate_expr(), slf.right.translate_expr(), viper.toposition(slf), viper.NoInfo)
+            elif isinstance(slf.op, ast.Sub):
+                return viper.Sub(slf.left.translate_expr(), slf.right.translate_expr(), viper.toposition(slf), viper.NoInfo)
+        ast.BinOp.translate_expr = translate_binop
+
+        def translate_boolop(slf : ast.BoolOp):
+            if len(slf.values) == 2:
+                if isinstance(slf.op, ast.And):
+                    return viper.And(slf.values[0].translate_expr(), slf.values[1].translate_expr(), viper.toposition(slf), viper.NoInfo)
+        ast.BoolOp.translate_expr = translate_boolop
+
     def gettype(self, pytype):
         return self.builtins[pytype.type.fullname()]
 
@@ -87,48 +116,87 @@ class Translator:
     def is_post(self, stmt):
         return self.is_funccall(stmt) == 'Ensures'
 
-    def append(self, list, toappend):
-        if not toappend is None:
-            lsttoappend = self.viper.singletonseq(toappend)
-            list.append(lsttoappend)
+    def is_pure(self, func):
+        return len(func.decorator_list) == 1 and func.decorator_list[0].id == 'Pure'
 
     def translate_parameter(self, param):
-        type = self.types.gettype(self.prefix, param.arg)
+        return self.translate_parameter_prefix(param, self.prefix)
+
+    def translate_parameter_prefix(self, param, prefix):
+        type = self.types.gettype(prefix, param.arg)
         return self.viper.LocalVarDecl(param.arg, self.gettype(type), self.viper.toposition(param), self.viper.NoInfo)
 
     def translate_function(self, func : ast.FunctionDef):
         if func.name in contract_keywords:
             return None
         else:
+            self.methodcontext = False
             oldprefix = self.prefix
             self.prefix = self.prefix + [func.name]
-            args = self.viper.emptyseq()
+            args = []
             for arg in func.args.args:
-                self.append(args, self.translate_parameter(arg))
+                print(arg.arg)
+                args.append(self.translate_parameter(arg))
             type = self.gettype(self.types.gettype(oldprefix, func.name)) #self.viper.typeint
-            pres = self.viper.emptyseq()
-            posts = self.viper.emptyseq()
+            pres = []
+            posts = []
             bodyindex = 0
             while self.is_pre(func.body[bodyindex]):
-                self.append(pres, func.body[bodyindex].translate_contract())
+                pres.append(func.body[bodyindex].translate_contract())
                 bodyindex += 1
             while self.is_post(func.body[bodyindex]):
                 postcond = func.body[bodyindex].translate_contract()
-                self.append(posts, postcond)
+                posts.append(postcond)
                 bodyindex += 1
+            assert len(func.body) == bodyindex + 1
             body = func.body[bodyindex].translate_expr()
             self.prefix = oldprefix
             return self.viper.Function(func.name, args, type, pres, posts, body, self.viper.NoPosition, self.viper.NoInfo)
 
+    def translate_method(self, func : ast.FunctionDef):
+        if func.name in contract_keywords:
+            return None
+        else:
+            self.methodcontext = True
+            oldprefix = self.prefix
+            self.prefix = self.prefix + [func.name]
+            args = []
+            for arg in func.args.args:
+                args.append(self.translate_parameter(arg))
+            type = self.gettype(self.types.gettype(oldprefix, func.name)) #self.viper.typeint
+            results = [self.viper.LocalVarDecl('_res', type, self.viper.toposition(func), self.viper.NoInfo)]
+            pres = []
+            posts = []
+            locals = []
+            bodyindex = 0
+            while self.is_pre(func.body[bodyindex]):
+                pres.append(func.body[bodyindex].translate_contract())
+                bodyindex += 1
+            while self.is_post(func.body[bodyindex]):
+                postcond = func.body[bodyindex].translate_contract()
+                posts.append(postcond)
+                bodyindex += 1
+            body = []
+            for stmt in func.body[bodyindex:]:
+                body.append(stmt.translate_stmt())
+            self.prefix = oldprefix
+            return self.viper.Method(func.name, args, results, pres, posts, locals, self.viper.Seqn(body, self.viper.toposition(func), self.viper.NoInfo), self.viper.toposition(func), self.viper.NoInfo)
+
     def translate_module(self, module : ast.Module):
-        domains = self.viper.emptyseq()
-        fields = self.viper.emptyseq()
-        functions = self.viper.emptyseq()
-        predicates = self.viper.emptyseq()
-        methods = self.viper.emptyseq()
+        domains = []
+        fields = []
+        functions = []
+        predicates = []
+        methods = []
         for stmt in module.body:
             if isinstance(stmt, ast.FunctionDef):
-                self.append(functions, self.translate_function(stmt))
+                self.funcsAndMethods[stmt.name] = stmt
+        for stmt in module.body:
+            if isinstance(stmt, ast.FunctionDef):
+                if self.is_pure(stmt):
+                    functions.append(self.translate_function(stmt))
+                else:
+                    methods.append(self.translate_method(stmt))
         prog = self.viper.Program(domains, fields, functions, predicates, methods, self.viper.NoPosition, self.viper.NoInfo)
         return prog
 
