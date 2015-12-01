@@ -9,6 +9,11 @@ def func_children(func : mypy.nodes.FuncDef, index):
 def decorator_children(dec : mypy.nodes.Decorator, index):
     return func_children(dec.func, index)
 
+def if_children(ifelse : mypy.nodes.IfStmt, index):
+    return (index + 1, [('then' + str(index), ifelse.body), ('else' + str(index), ifelse.else_body.body)])
+
+def block_children(block : mypy.nodes.Block, index):
+    return (index, [('', block.body)])
 
 def func_vars(func : mypy.nodes.FuncDef):
     functype = func.type
@@ -19,11 +24,18 @@ def func_vars(func : mypy.nodes.FuncDef):
 def decorator_vars(dec : mypy.nodes.Decorator):
     return func_vars(dec.func)
 
+def assignment_vars(ass : mypy.nodes.AssignmentStmt):
+    return map(lambda var : ([var.name], var.node.type), ass.lvalues)
+
 
 children_funcs = {mypy.nodes.FuncDef : func_children,
-                  mypy.nodes.Decorator : decorator_children}
+                  mypy.nodes.Decorator : decorator_children,
+                  mypy.nodes.IfStmt : if_children,
+                  mypy.nodes.Block : block_children}
+
 vars_funcs = {mypy.nodes.FuncDef : func_vars,
-              mypy.nodes.Decorator : decorator_vars}
+              mypy.nodes.Decorator : decorator_vars,
+              mypy.nodes.AssignmentStmt : assignment_vars}
 
 
 class TypeInfo:
@@ -57,8 +69,11 @@ class TypeInfo:
             index, children = children__func(node, index)
             for child in children:
                 (name, childs) = child
-                contextname = name + str(index)
-                newprefix = prefix + [contextname]
+                if not name == '':
+                    contextname = name
+                    newprefix = prefix + [contextname]
+                else:
+                    newprefix = prefix
                 for c in childs:
                     self.traverse(c, 0, newprefix)
 
@@ -73,5 +88,8 @@ class TypeInfo:
             return result
 
     def getfunctype(self, prefix):
-        return self.allTypes.get(tuple(prefix))
-
+        result = self.allTypes.get(tuple(prefix))
+        if result is None:
+            return self.getfunctype(prefix[:len(prefix)-1])
+        else:
+            return result

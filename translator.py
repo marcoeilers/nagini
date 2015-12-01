@@ -37,7 +37,6 @@ class Translator:
         def translate_return(slf : ast.Return):
             return slf.value.translate_expr()
         def translate_stmt_return(slf : ast.Return):
-            print(self.prefix)
             type = self.types.getfunctype(self.prefix)
             return viper.LocalVarAssign(viper.LocalVar('_res', self.gettype(type), viper.NoPosition, viper.NoInfo), slf.value.translate_expr(), viper.toposition(slf), viper.NoInfo)
         ast.Return.translate_expr = translate_return
@@ -98,6 +97,24 @@ class Translator:
                     return viper.And(slf.values[0].translate_expr(), slf.values[1].translate_expr(), viper.toposition(slf), viper.NoInfo)
         ast.BoolOp.translate_expr = translate_boolop
 
+        def translate_stmt_if(slf : ast.If):
+            cond = slf.test.translate_expr()
+            oldprefix = self.prefix
+            currentindex = self.index
+            self.prefix = oldprefix + ['then' + str(currentindex)]
+            thn = self.translate_block(slf.body, viper.toposition(slf), viper.NoInfo)
+            self.prefix = oldprefix + ['else' + str(currentindex)]
+            els = self.translate_block(slf.orelse, viper.toposition(slf), viper.NoInfo)
+            self.prefix = oldprefix
+            return viper.If(cond, thn, els, viper.toposition(slf), viper.NoInfo)
+        ast.If.translate_stmt = translate_stmt_if
+
+        def translate_stmt_assign(slf : ast.Assign):
+            if len(slf.targets) == 1:
+                type = self.types.gettype(self.prefix, slf.targets[0].id)
+                return viper.LocalVarAssign(viper.LocalVar(slf.targets[0].id, self.gettype(type), viper.toposition(slf), viper.NoInfo), slf.value.translate_expr(), viper.toposition(slf), viper.NoInfo)
+        ast.Assign.translate_stmt = translate_stmt_assign
+
     def gettype(self, pytype):
         return self.builtins[pytype.type.fullname()]
 
@@ -135,7 +152,6 @@ class Translator:
             self.prefix = self.prefix + [func.name]
             args = []
             for arg in func.args.args:
-                print(arg.arg)
                 args.append(self.translate_parameter(arg))
             type = self.gettype(self.types.gettype(oldprefix, func.name)) #self.viper.typeint
             pres = []
@@ -176,11 +192,15 @@ class Translator:
                 postcond = func.body[bodyindex].translate_contract()
                 posts.append(postcond)
                 bodyindex += 1
-            body = []
-            for stmt in func.body[bodyindex:]:
-                body.append(stmt.translate_stmt())
+            body = self.translate_block(func.body[bodyindex:], self.viper.toposition(func), self.viper.NoInfo)
             self.prefix = oldprefix
-            return self.viper.Method(func.name, args, results, pres, posts, locals, self.viper.Seqn(body, self.viper.toposition(func), self.viper.NoInfo), self.viper.toposition(func), self.viper.NoInfo)
+            return self.viper.Method(func.name, args, results, pres, posts, locals, body, self.viper.toposition(func), self.viper.NoInfo)
+
+    def translate_block(self, stmtlist, position, info):
+        body = []
+        for stmt in stmtlist:
+            body.append(stmt.translate_stmt())
+        return self.viper.Seqn(body, position, info)
 
     def translate_module(self, module : ast.Module):
         domains = []
