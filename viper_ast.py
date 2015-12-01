@@ -100,6 +100,9 @@ class ViperAST:
     def And(self, left, right, position, info):
         return self.ast.And(left, right, position, info)
 
+    def If(self, cond, thn, els, position, info):
+        return self.ast.If(cond, thn, els, position, info)
+
     def toposition(self, expr):
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
