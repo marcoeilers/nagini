@@ -1,3 +1,4 @@
+#pylint: skip-file
 """
 A pretty-printing dump function for the ast module.  The code was copied from
 the ast.dump function and modified slightly to pretty-print.
