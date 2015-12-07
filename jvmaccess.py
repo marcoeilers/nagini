@@ -12,3 +12,6 @@ class JVM:
         self.java = jpype.JPackage('java')
         self.scala = jpype.JPackage('scala')
         self.viper = jpype.JPackage('viper')
+
+    def __del__(self):
+        jpype.shutdownJVM()
