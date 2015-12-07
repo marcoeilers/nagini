@@ -78,8 +78,8 @@ class TypeInfo:
                 # print(df)
                 self.traverse(df, [])
 
-            print("alltypes:")
-            print(self.allTypes)
+            #print("alltypes:")
+            #print(self.allTypes)
             return True
         except mypy.errors.CompileError as e:
             for m in e.messages:

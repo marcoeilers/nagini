@@ -1,0 +1,3 @@
+function test_func() : Int {
+	17
+}

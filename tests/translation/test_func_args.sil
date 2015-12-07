@@ -1,0 +1,3 @@
+function test_func(a : Int, b : Bool) : Int {
+	a
+}
