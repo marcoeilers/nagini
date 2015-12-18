@@ -40,7 +40,7 @@ class VerificationTests(unittest.TestCase):
         vresult = verify(prog, path, jvm)
         self.evaluate_result(vresult, path, jvm)
 
-    def test_all(self):
+    def test_verification(self):
         test_files = [join(test_verification_dir, f) for f in
                       os.listdir(test_verification_dir) if
                       isfile(join(test_verification_dir, f)) and f.endswith(
@@ -118,7 +118,7 @@ class TranslationTests(unittest.TestCase):
         sil_path = path[:len(path) - 3] + '.sil'
         self.compare_translation(sil_path, path, jvm, mypydir)
 
-    def test_all(self):
+    def test_translation(self):
         test_files = [join(test_translation_dir, f) for f in
                       os.listdir(test_translation_dir) if
                       isfile(join(test_translation_dir, f)) and f.endswith(

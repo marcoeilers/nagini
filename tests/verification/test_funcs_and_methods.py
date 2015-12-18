@@ -1,4 +1,4 @@
-from contracts import *
+from contracts.contracts import *
 
 @Pure
 def func1(b : int) -> int:

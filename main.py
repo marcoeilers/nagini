@@ -1,24 +1,28 @@
 import ast
 import sys
+import os
+from os.path import expanduser
 
 from jpype import JavaException
 
 from typeinfo import TypeInfo
 from translator import Translator
-from verifier import Verifier,VerificationResult
+from verifier import Verifier, VerificationResult
 from jvmaccess import JVM
-import os
-from os.path import expanduser, isdir
+
 
 def get_mypy_dir() -> str:
     (first, second, _, _, _) = sys.version_info
     userdir = expanduser('~')
-    possible_dirs = [userdir + '/.local/bin', 'usr/local/bin'] if os.name == 'posix' else ['C:\Python' + str(first) + str(second) + '\Scripts']
+    possible_dirs = [userdir + '/.local/bin',
+                     'usr/local/bin'] if os.name == 'posix' else [
+        'C:\Python' + str(first) + str(second) + '\Scripts']
     for dir in possible_dirs:
         if os.path.isdir(dir):
             if 'mypy' in os.listdir(dir):
                 return os.path.join(dir, 'mypy')
     return None
+
 
 def translate(path: str, jvm: JVM, mypydir: str):
     """
@@ -42,7 +46,8 @@ def translate(path: str, jvm: JVM, mypydir: str):
         print(je.stacktrace())
 
 
-def verify(prog: 'viper.silver.ast.Program', path: str, jvm: JVM) -> VerificationResult:
+def verify(prog: 'viper.silver.ast.Program', path: str,
+           jvm: JVM) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -70,7 +75,8 @@ def main_translate() -> None:
     except IndexError:
         mypydir = get_mypy_dir()
         if mypydir is None:
-            print("Could not find mypy. Please provide path to mypy as third argument.")
+            print(
+                "Could not find mypy. Please provide path to mypy as third argument.")
             exit()
     jvm = JVM(viperjar)
     prog = translate(path, jvm, mypydir)
