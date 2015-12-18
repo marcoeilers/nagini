@@ -1,14 +1,15 @@
+import ast
+import sys
+
+from jpype import JavaException
+
 from typeinfo import TypeInfo
 from translator import Translator
 from verifier import Verifier
 from jvmaccess import JVM
-from jpype import JavaException
-import ast
-import astpp
-import sys
 
 
-def translate(path, jvm, mypydir):
+def translate(path: str, jvm: JVM, mypydir: str):
     """
     Translates the Python module at the given path to a Viper program
     :param path:
@@ -52,10 +53,7 @@ def verify(prog, path, jvm):
 
 def main_translate() -> None:
     path = sys.argv[1]
-    try:
-        viperjar = sys.argv[2]
-    except IndexError:
-        viperjar = '/viper/git/silicon_qp/target/scala-2.11/silicon-quantified-permissions.jar'
+    viperjar = sys.argv[2]
     try:
         mypydir = sys.argv[3]
     except IndexError:
