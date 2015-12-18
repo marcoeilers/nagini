@@ -1,21 +1,20 @@
 import unittest
 import tokenize
 import io
-from os import listdir
+import os
 from os.path import isfile, join
 
 from typing import List, Tuple
 
 from jvmaccess import JVM
 from verifier import VerificationResult
-
 import jvmaccess
-from main import translate, verify
+from main import translate, verify, get_mypy_dir
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
-viperjar = '/viper/git/silicon_qp/target/scala-2.11/silicon-quantified-permissions.jar'
-mypydir = '/home/marco/.local/bin/mypy'
+viperjar = os.environ['VIPERJAR']
+mypydir = get_mypy_dir()
 jvm = jvmaccess.JVM(viperjar)
 
 
@@ -43,7 +42,7 @@ class VerificationTests(unittest.TestCase):
 
     def test_all(self):
         test_files = [join(test_verification_dir, f) for f in
-                      listdir(test_verification_dir) if
+                      os.listdir(test_verification_dir) if
                       isfile(join(test_verification_dir, f)) and f.endswith(
                           '.py')]
         for f in test_files:
@@ -55,7 +54,7 @@ class VerificationTests(unittest.TestCase):
         return (token.start, stripped[19:len(stripped) - 1])
 
     def failure_to_actual(self, error: 'viper.silver.verifier.AbstractError') -> \
-    Tuple[int, int, str, str]:
+            Tuple[int, int, str, str]:
         return ((error.pos().line(), error.pos().column()), error.fullId(),
                 error.readableMessage())
 
@@ -121,7 +120,7 @@ class TranslationTests(unittest.TestCase):
 
     def test_all(self):
         test_files = [join(test_translation_dir, f) for f in
-                      listdir(test_translation_dir) if
+                      os.listdir(test_translation_dir) if
                       isfile(join(test_translation_dir, f)) and f.endswith(
                           '.py')]
         for f in test_files:
