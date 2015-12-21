@@ -1,14 +1,13 @@
 import ast
-import sys
 import os
-from os.path import expanduser
+import sys
 
 from jpype import JavaException
-
-from typeinfo import TypeInfo
-from translator import Translator
-from verifier import Verifier, VerificationResult
 from jvmaccess import JVM
+from os.path import expanduser
+from translator import Translator
+from typeinfo import TypeInfo
+from verifier import Verifier, VerificationResult
 
 
 def get_mypy_dir() -> str:
@@ -29,12 +28,11 @@ def translate(path: str, jvm: JVM, mypydir: str):
     Translates the Python module at the given path to a Viper program
     """
     types = TypeInfo()
-    typecorrect = types.init(path, mypydir)
+    typecorrect = types.check(path, mypydir)
     try:
         if typecorrect:
-            file = open(path, 'r')
-            text = file.read()
-            file.close()
+            with open(path, 'r') as file:
+                text = file.read()
             parseresult = ast.parse(text)
             # print(astpp.dump(parseresult))
             translator = Translator(jvm, path, types)
@@ -60,16 +58,11 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
 
 
 def main_translate() -> None:
-    try:
-        path = sys.argv[1]
-    except IndexError:
-        print("Please provide name of file to verify.")
-        exit()
-    try:
-        viperjar = sys.argv[2]
-    except IndexError:
-        print("Please provide path to viper jar as second argument")
-        exit()
+    if len(sys.argv) < 3:
+        print("Usage: py2viper py_file_path viper_jar_path [mypy_path]")
+        exit(1)
+    path = sys.argv[1]
+    viperjar = sys.argv[2]
     try:
         mypydir = sys.argv[3]
     except IndexError:

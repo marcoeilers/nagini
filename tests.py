@@ -1,15 +1,13 @@
-import unittest
-import tokenize
 import io
-import os
-from os.path import isfile, join
-
-from typing import List, Tuple
-
-from jvmaccess import JVM
-from verifier import VerificationResult
 import jvmaccess
+import os
+import tokenize
+import unittest
+
 from main import translate, verify, get_mypy_dir
+from os.path import isfile, join
+from typing import List, Tuple
+from verifier import VerificationResult
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
@@ -19,19 +17,23 @@ jvm = jvmaccess.JVM(viperjar)
 
 
 class VerificationTests(unittest.TestCase):
+    def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
+        """
+        A test annotation is a comment starting with #::
+        """
+        return (tk.type is tokenize.COMMENT
+                and tk.string.strip().startswith('#:: ')
+                and tk.string.strip().endswith(')'))
+
     def get_test_annotations(self, path: str) -> List:
         """
         Retrieves test annotations from the given Python source file
         """
-        file = open(path, 'r')
-        text = file.read()
-        file.close()
+        with open(path, 'r') as file:
+            text = file.read()
         filebytes = io.BytesIO(bytes(text, 'utf-8'))
         tokens = tokenize.tokenize(filebytes.readline)
-        test_annotations = [tk for tk in tokens if
-                            tk.type is tokenize.COMMENT
-                            and tk.string.strip().startswith(
-                                '#:: ') and tk.string.strip().endswith(')')]
+        test_annotations = [tk for tk in tokens if self._is_annotation(tk)]
         return test_annotations
 
     def _test_file(self, path: str):
@@ -40,11 +42,16 @@ class VerificationTests(unittest.TestCase):
         vresult = verify(prog, path, jvm)
         self.evaluate_result(vresult, path, jvm)
 
+    def _get_py_files(self):
+        result = []
+        for f in os.listdir(test_verification_dir):
+            joined = join(test_verification_dir, f)
+            if isfile(joined) and f.endswith('.py'):
+                result.append(joined)
+        return result
+
     def test_verification(self):
-        test_files = [join(test_verification_dir, f) for f in
-                      os.listdir(test_verification_dir) if
-                      isfile(join(test_verification_dir, f)) and f.endswith(
-                          '.py')]
+        test_files = self._get_py_files()
         for f in test_files:
             with self.subTest(i=str(f)):
                 self._test_file(f)
@@ -53,13 +60,13 @@ class VerificationTests(unittest.TestCase):
         stripped = token.string.strip()
         return (token.start, stripped[19:len(stripped) - 1])
 
-    def failure_to_actual(self, error: 'viper.silver.verifier.AbstractError') -> \
-            Tuple[int, int, str, str]:
+    def failure_to_actual(self, error: 'silver.verifier.AbstractError') \
+            -> Tuple[int, int, str, str]:
         return ((error.pos().line(), error.pos().column()), error.fullId(),
                 error.readableMessage())
 
     def evaluate_result(self, vresult: VerificationResult, file_path: str,
-                        jvm: JVM):
+                        jvm: jvmaccess.JVM):
         """
         Evaluates the verification result w.r.t. the test annotations in
         the file
@@ -75,8 +82,7 @@ class VerificationTests(unittest.TestCase):
                             not isinstance(error.pos(),
                                            jvm.viper.silver.ast.HasLineColumn)]
             actual = [self.failure_to_actual(error) for error in vresult.errors
-                      if
-                      not error in missing_info]
+                      if not error in missing_info]
             actual_lo = [(line, id) for ((line, col), id, msg) in actual]
             self.assertFalse(missing_info)
             actual_unexpected = []
@@ -94,13 +100,12 @@ class VerificationTests(unittest.TestCase):
 
 
 class TranslationTests(unittest.TestCase):
-    def compare_translation(self, sil_path: str, py_path: str, jvm: JVM,
-                            mypydir: str):
+    def compare_translation(self, sil_path: str, py_path: str,
+                            jvm: jvmaccess.JVM, mypydir: str):
         prog = translate(py_path, jvm, mypydir)
         parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
-        file = open(sil_path, 'r')
-        text = file.read()
-        file.close()
+        with open(sil_path, 'r') as file:
+            text = file.read()
         parsed = parser.parse(text, None)
         self.assertTrue(
             isinstance(parsed, getattr(jvm.scala.util.parsing.combinator,
@@ -114,7 +119,7 @@ class TranslationTests(unittest.TestCase):
 
     def _test_file(self, path: str):
         if not path.endswith('.py'):
-            raise Exception()
+            raise ValueError("Path does not specify a .py file.")
         sil_path = path[:len(path) - 3] + '.sil'
         self.compare_translation(sil_path, path, jvm, mypydir)
 

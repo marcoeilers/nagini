@@ -1,8 +1,8 @@
-import sys
+import mypy.build
 import os
+import sys
 
 from typing import List, Tuple
-import mypy.build
 
 
 def func_children(func: mypy.nodes.FuncDef) -> List[
@@ -68,7 +68,7 @@ class TypeInfo:
     def __init__(self):
         self.allTypes = {}
 
-    def init(self, filename: str, mypydir: str) -> bool:
+    def check(self, filename: str, mypydir: str) -> bool:
         """
         Typechecks the given file and collects all type information needed for
         the translation to Viper
@@ -96,9 +96,9 @@ class TypeInfo:
                 (name, type) = var
                 fullname = prefix + name
                 self.allTypes[tuple(fullname)] = type
-        children__func = children_funcs.get(node.__class__)
-        if children__func:
-            children = children__func(node)
+        children_func = children_funcs.get(node.__class__)
+        if children_func:
+            children = children_func(node)
             for child in children:
                 (name, childs) = child
                 if not name == '':
