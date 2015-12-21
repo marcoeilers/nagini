@@ -15,3 +15,6 @@ class JVM:
 
     def __del__(self):
         jpype.shutdownJVM()
+
+    def get_proxy(self, supertype, instance):
+        return jpype.JProxy(supertype, inst=instance)
