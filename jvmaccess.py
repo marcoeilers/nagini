@@ -6,7 +6,7 @@ class JVM:
     Encapsulates access to a JVM
     """
 
-    def __init__(self, classpath):
+    def __init__(self, classpath: str):
         jpype.startJVM(jpype.getDefaultJVMPath(),
                        '-Djava.class.path=' + classpath)
         self.java = jpype.JPackage('java')
