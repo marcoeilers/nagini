@@ -52,10 +52,11 @@ class Translator:
         self.viper = jvm.viper
         self.types = typeinfo
         self.prefix = []
+        self.typedomain = "PyType"
         self.methodcontext = False
         self.funcsAndMethods = {}
 
-        viper = ViperAST(self.java, self.scala, self.viper, sourcefile)
+        viper = ViperAST(jvm, self.java, self.scala, self.viper, sourcefile)
         self.viper = viper
 
         self.builtins = {'builtins.int': viper.Int,
@@ -158,32 +159,28 @@ class Translator:
         left = self.translate_expr(node.left)
         right = self.translate_expr(node.right)
         if isinstance(node.op, ast.Add):
-            return self.viper.Add(left,
-                                  right,
+            return self.viper.Add(left, right,
                                   self.viper.to_position(node),
                                   self.viper.NoInfo)
         elif isinstance(node.op, ast.Sub):
-            return self.viper.Sub(left,
-                                  right,
+            return self.viper.Sub(left, right,
                                   self.viper.to_position(node),
                                   self.viper.NoInfo)
         elif isinstance(node.op, ast.Mult):
-            return self.viper.Mul(left,
-                                  right,
+            return self.viper.Mul(left, right,
                                   self.viper.to_position(node),
                                   self.viper.NoInfo)
         elif isinstance(node.op, ast.FloorDiv):
-            return self.viper.Div(left,
-                                  right,
+            return self.viper.Div(left, right,
                                   self.viper.to_position(node),
                                   self.viper.NoInfo)
         elif isinstance(node.op, ast.Mod):
-            return self.viper.Mod(left,
-                                  right,
+            return self.viper.Mod(left, right,
                                   self.viper.to_position(node),
                                   self.viper.NoInfo)
         else:
             raise UnsupportedException(node)
+
 
     def translate_Compare(self, node: ast.Compare) -> 'silver.ast.Exp':
         if len(node.ops) != 1 or len(node.comparators) != 1:
@@ -316,8 +313,7 @@ class Translator:
             self.viper.NoInfo)
         jmp_to_end = self.viper.Goto("__end", self.viper.to_position(node),
                                      self.viper.NoInfo)
-        return (
-            [],
+        return ([],
             self.viper.Seqn([assign, jmp_to_end], self.viper.to_position(node),
                             self.viper.NoInfo))
 
@@ -349,6 +345,10 @@ class Translator:
         return (len(func.decorator_list) == 1
                 and func.decorator_list[0].id == 'Pure')
 
+    def is_predicate(self, func) -> bool:
+        return len(func.decorator_list) == 1 and func.decorator_list[
+                                                     0].id == 'Predicate'
+
     def translate_parameter(self, param: str) -> 'viper.ast.LocalVarDecl':
         return self.translate_parameter_prefix(param, self.prefix)
 
@@ -358,6 +358,10 @@ class Translator:
         return self.viper.LocalVarDecl(param.arg, self.getvipertype(type),
                                        self.viper.to_position(param),
                                        self.viper.NoInfo)
+
+    def translate_fields(self, clazz: ast.ClassDef) \
+            -> List['silver.ast.Field']:
+        pass
 
     def translate_function(self, func: ast.FunctionDef) \
             -> Optional['silver.ast.Function']:
@@ -449,6 +453,68 @@ class Translator:
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
+    def create_type(self, clazz: ast.ClassDef) -> Tuple[
+        'DomainFunc', 'DomainAxiom']:
+        if len(clazz.bases) > 1:
+            raise UnsupportedException(clazz)
+        supertype = clazz.bases[0].id if len(clazz.bases) == 1 else 'object'
+        position = self.viper.to_position(clazz)
+        info = self.viper.NoInfo
+        return (self.create_type_function(clazz.name, position, info),
+                self.create_subtype_axiom(clazz.name, supertype, position,
+                                          info))
+
+    def create_type_function(self, name, position, info):
+        return self.viper.DomainFunc(name, [], self.typetype(), True, position,
+                                     info)
+
+    def typetype(self):
+        """
+        Creates a reference to the domain type we use for the Python types
+        """
+        return self.viper.DomainType(self.typedomain, {}, [])
+
+    def create_subtype_axiom(self, type, supertype, position, info):
+        """
+        Creates a domain axiom that indicates a subtype relationship
+        between type and supertype
+        """
+        arg = self.viper.LocalVarDecl('obj', self.viper.Ref, position, info)
+        var = self.viper.LocalVar('obj', self.viper.Ref, position, info)
+        typevar = self.viper.LocalVar('class', self.typetype(), position, info)
+        typefunc = self.viper.DomainFuncApp(type, [], {}, self.typetype(), [],
+                                            position, info)
+        supertypefunc = self.viper.DomainFuncApp(supertype, [], {},
+                                                 self.typetype(), [], position,
+                                                 info)
+
+        def instanceof(typefunc):
+            return self.viper.DomainFuncApp('isinstance', [var, typefunc], {},
+                                            self.viper.Bool, [var, typevar],
+                                            position, info)
+
+        instanceofsub = instanceof(typefunc)
+        instanceofsuper = instanceof(supertypefunc)
+        triggerexp = instanceofsub
+        trigger = self.viper.Trigger([triggerexp], position, info)
+        exp = self.viper.Implies(instanceofsub, instanceofsuper, position, info)
+        body = self.viper.Forall([arg], [trigger], exp, position, info)
+        return self.viper.DomainAxiom('subtype_' + type, body, position, info)
+
+    def isinstance_func(self):
+        """
+        Creates the isinstance domain function
+        """
+        objvar = self.viper.LocalVarDecl('obj', self.viper.Ref,
+                                         self.viper.NoPosition,
+                                         self.viper.NoInfo)
+        classvar = self.viper.LocalVarDecl('class', self.typetype(),
+                                           self.viper.NoPosition,
+                                           self.viper.NoInfo)
+        return self.viper.DomainFunc('isinstance', [objvar, classvar],
+                                     self.viper.Bool, False,
+                                     self.viper.NoPosition, self.viper.NoInfo)
+    
     def translate_module(self, module: ast.Module) -> 'silver.ast.Program':
         """
         Translates a Python module to a Viper program
@@ -458,6 +524,12 @@ class Translator:
         functions = []
         predicates = []
         methods = []
+
+        isinstancefunc = self.isinstance_func()
+        objectfunc = self.create_type_function('object', self.viper.NoPosition,
+                                               self.viper.NoInfo)
+        typefuncs = [objectfunc, isinstancefunc]
+        typeaxioms = []
         for stmt in module.body:
             if isinstance(stmt, ast.FunctionDef):
                 self.funcsAndMethods[stmt.name] = stmt
@@ -467,6 +539,19 @@ class Translator:
                     functions.append(self.translate_function(stmt))
                 else:
                     methods.append(self.translate_method(stmt))
+            elif isinstance(stmt, ast.ClassDef):
+                funcs, axioms = self.create_type(stmt)
+                typefuncs.append(funcs)
+                typeaxioms.append(axioms)
+                # add domain function to type domain
+                # possibly add subtype axiom to type domain
+                # add fields
+                # add methods/functions
+                pass
+
+        domains.append(
+            self.viper.Domain(self.typedomain, typefuncs, typeaxioms, [],
+                              self.viper.NoPosition, self.viper.NoInfo))
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.viper.NoPosition,
                                   self.viper.NoInfo)

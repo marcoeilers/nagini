@@ -1,6 +1,14 @@
+import types
+
+
 # pylint: disable=invalid-name
 def getobject(package, name):
     return getattr(getattr(package, name + '$'), 'MODULE$')
+
+
+class Function0:
+    def apply(self):
+        pass
 
 
 class ViperAST:
@@ -9,11 +17,13 @@ class ViperAST:
     All constructors convert Python lists to Scala sequences, Python ints
     to Scala BigInts, and wrap Scala Option types where necessary.
     """
-    def __init__(self, java, scala, viper, sourcefile):
+
+    def __init__(self, jvm, java, scala, viper, sourcefile):
         ast = viper.silver.ast
         self.ast = ast
         self.java = java
         self.scala = scala
+        self.jvm = jvm
 
         def getconst(name):
             return getobject(ast, name)
@@ -40,6 +50,7 @@ class ViperAST:
         self.NoInfo = getconst("NoInfo")
         self.Int = getconst("Int")
         self.Bool = getconst("Bool")
+        self.Ref = getconst("Ref")
         self.sourcefile = sourcefile
         self.none = getobject(scala, "None")
 
@@ -62,6 +73,12 @@ class ViperAST:
             result.update(index, list[index])
         return result
 
+    def to_map(self, dict):
+        result = self.scala.collection.immutable.HashMap()
+        for k, v in dict.items():
+            result = result.updated(k, v)
+        return result
+
     def to_big_int(self, num):
         return self.scala.math.BigInt(self.java.math.BigInteger.valueOf(num))
 
@@ -72,7 +89,8 @@ class ViperAST:
                                 self.to_seq(methods), position, info)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
-        return self.ast.Function(name, self.to_seq(args), type, self.to_seq(pres),
+        return self.ast.Function(name, self.to_seq(args), type,
+                                 self.to_seq(pres),
                                  self.to_seq(posts),
                                  self.scala.Some(body), position, info)
 
@@ -81,6 +99,46 @@ class ViperAST:
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
                                self.to_seq(locals), body, position, info)
+
+    def Field(self, name, type, position, info):
+        return self.ast.Field(name, type, position, info)
+
+    def Predicate(self, name, args, body, position, info):
+        return self.ast.Predicate(name, self.to_seq(args),
+                                  self.scala.Some(body), position, info)
+
+    def Domain(self, name, functions, axioms, typevars, position, info):
+        return self.ast.Domain(name, self.to_seq(functions),
+                               self.to_seq(axioms), self.to_seq(typevars),
+                               position, info)
+
+    def DomainFunc(self, name, args, type, unique, position, info):
+        return self.ast.DomainFunc(name, self.to_seq(args), type, unique,
+                                   position, info)
+
+    def DomainAxiom(self, name, expr, position, info):
+        return self.ast.DomainAxiom(name, expr, position, info)
+
+    def DomainType(self, name, typevarsmap, typevars):
+        map = self.to_map(typevarsmap)
+        seq = self.to_seq(typevars)
+        return self.ast.DomainType(name, map,
+                                   seq)
+
+    def DomainFuncApp(self, funcname, args, typevarmap, typepassed, argspassed,
+                      position, info):
+        def typepassedapply(slf):
+            return typepassed
+
+        def argspassedapply(slf):
+            return self.to_seq(argspassed)
+
+        typepassedfunc = self.to_function0(typepassedapply)
+        argspassedfunc = self.to_function0(argspassedapply)
+        result = self.ast.DomainFuncApp(funcname, self.to_seq(args),
+                                        self.to_map(typevarmap), position, info,
+                                        typepassedfunc, argspassedfunc)
+        return result
 
     def Label(self, name, position, info):
         return self.ast.Label(name, position, info)
@@ -114,6 +172,9 @@ class ViperAST:
 
     def IntLit(self, num, position, info):
         return self.ast.IntLit(self.to_big_int(num), position, info)
+
+    def Implies(self, left, right, position, info):
+        return self.ast.Implies(left, right, position, info)
 
     def FuncApp(self, name, args, position, info, type, formalargs):
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
@@ -158,9 +219,23 @@ class ViperAST:
     def FalseLit(self, position, info):
         return self.ast.FalseLit(position, info)
 
+    def Forall(self, variables, triggers, exp, position, info):
+        return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
+                               exp, position, info)
+
+    def Trigger(self, exps, position, info):
+        return self.ast.Trigger(self.to_seq(exps), position, info)
+
     def While(self, cond, invariants, locals, body, position, info):
-        return self.ast.While(cond, self.to_seq(invariants), self.to_seq(locals),
+        return self.ast.While(cond, self.to_seq(invariants),
+                              self.to_seq(locals),
                               body, position, info)
+
+    def to_function0(self, func):
+        func0 = Function0()
+        func0.apply = types.MethodType(func, func0)
+        result = self.jvm.get_proxy('scala.Function0', func0)
+        return result
 
     def to_position(self, expr):
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
