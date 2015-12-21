@@ -1,5 +1,4 @@
 from abc import ABCMeta
-
 from jvmaccess import JVM
 
 
@@ -7,7 +6,7 @@ class VerificationResult(metaclass=ABCMeta):
     pass
 
 
-class Success:
+class Success(VerificationResult):
     """
     Encodes a verification success
     """
@@ -19,15 +18,12 @@ class Success:
         return "Verification successful."
 
 
-VerificationResult.register(Success)
-
-
-class Failure:
+class Failure(VerificationResult):
     """
     Encodes a verification failure and provides access to the errors
     """
 
-    def __init__(self, errors: 'viper.silver.verifier.AbstractError'):
+    def __init__(self, errors: 'silver.verifier.AbstractError'):
         self.errors = errors
 
     def __bool__(self):
@@ -36,9 +32,6 @@ class Failure:
     def __str__(self):
         return "Verification failed.\nErrors:\n" + '\n'.join(
             [str(error) for error in self.errors])
-
-
-VerificationResult.register(Failure)
 
 
 class Verifier:
@@ -55,7 +48,7 @@ class Verifier:
         self.silicon.start()
         self.ready = True
 
-    def verify(self, prog: 'viper.silver.ast.Program') \
+    def verify(self, prog: 'silver.ast.Program') \
             -> VerificationResult:
         """
         Verifies the given program using Silicon

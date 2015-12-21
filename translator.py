@@ -1,20 +1,18 @@
 import ast
-
-from typing import TypeVar, List, Tuple, Optional
 import mypy
 
-from viper_ast import ViperAST
+from contracts.transformer import contract_keywords
 from jvmaccess import JVM
 from typeinfo import TypeInfo
+from typing import TypeVar, List, Tuple, Optional
+from viper_ast import ViperAST
 
 CONTRACT_FUNCS = ['Requires', 'Ensures', 'Invariant']
-
-contract_keywords = set(["Requires", "Ensures", "Invariant", "Assume",
-                         "Assert", "Old", "Result", "Pure"])
 
 T = TypeVar('T')
 V = TypeVar('V')
 
+VarsAndStmt = Tuple[List[Tuple[str, mypy.types.Type]], 'silver.ast.Stmt']
 
 class UnsupportedException(Exception):
     """
@@ -23,24 +21,24 @@ class UnsupportedException(Exception):
     """
 
     def __init__(self, astElement: ast.AST):
-        super(UnsupportedException, self).__init__(str(astElement))
+        super().__init__(str(astElement))
 
 
-def unzip(list_of_pairs: List[Tuple[T, V]]) -> Tuple[List[T], List[V]]:
+def unzip(pairs: List[Tuple[T, V]]) -> Tuple[List[T], List[V]]:
     """
     Unzips a list of pairs into two lists
     """
-    vars_and_body = [list(t) for t in zip(*list_of_pairs)]
+    vars_and_body = [list(t) for t in zip(*pairs)]
     vars = vars_and_body[0]
     body = vars_and_body[1]
     return vars, body
 
 
-def flatten(list_of_lists: List[List[T]]) -> List[T]:
+def flatten(lists: List[List[T]]) -> List[T]:
     """
     Flattens a list of lists into a flat list
     """
-    return [item for sublist in list_of_lists for item in sublist]
+    return [item for sublist in lists for item in sublist]
 
 
 class Translator:
@@ -63,7 +61,7 @@ class Translator:
         self.builtins = {'builtins.int': viper.Int,
                          'builtins.bool': viper.Bool}
 
-    def translate_expr(self, node: ast.AST) -> 'viper.silver.ast.Node':
+    def translate_expr(self, node: ast.AST) -> 'silver.ast.Node':
         """
         Generic visitor function for translating an expression
         """
@@ -71,14 +69,14 @@ class Translator:
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node)
 
-    def translate_generic(self, node: ast.AST) -> 'viper.silver.ast.Node':
+    def translate_generic(self, node: ast.AST) -> 'silver.ast.Node':
         """
         Visitor that is used if no other visitor is implemented.
         Simply raises an exception.
         """
         raise UnsupportedException(node)
 
-    def translate_contract(self, node: ast.AST) -> 'viper.silver.ast.Node':
+    def translate_contract(self, node: ast.AST) -> 'silver.ast.Node':
         """
         Generic visitor function for translating contracts (i.e. calls to
         contract functions)
@@ -87,15 +85,7 @@ class Translator:
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node)
 
-    def translate_contract_generic(self,
-                                   node: ast.AST) -> 'viper.silver.ast.Node':
-        """
-        Contract visitor that is used if no other visitor is implemented.
-        Simply raises an exception.
-        """
-        raise UnsupportedException(node)
-
-    def translate_stmt(self, node: ast.AST) -> 'viper.silver.ast.Node':
+    def translate_stmt(self, node: ast.AST) -> 'silver.ast.Node':
         """
         Generic visitor function for translating statements
         """
@@ -104,30 +94,30 @@ class Translator:
         return visitor(node)
 
     def translate_contract_Call(self,
-                                node: ast.Call) -> 'viper.silver.ast.Node':
-        if self.is_funccall(node) in CONTRACT_FUNCS:
+                                node: ast.Call) -> 'silver.ast.Node':
+        if self.get_func_name(node) in CONTRACT_FUNCS:
             return self.translate_expr(node.args[0])
         else:
             raise UnsupportedException(node)
 
     def translate_contract_Expr(self,
-                                node: ast.Expr) -> 'viper.silver.ast.Node':
+                                node: ast.Expr) -> 'silver.ast.Node':
         if isinstance(node.value, ast.Call):
             return self.translate_contract(node.value)
         else:
             raise UnsupportedException(node)
 
-    def translate_Num(self, node: ast.Num) -> 'viper.silver.ast.IntLit':
+    def translate_Num(self, node: ast.Num) -> 'silver.ast.IntLit':
         return self.viper.IntLit(node.n, self.viper.to_position(node),
                                  self.viper.NoInfo)
 
-    def translate_Return(self, node: ast.Return) -> 'viper.silver.ast.Exp':
+    def translate_Return(self, node: ast.Return) -> 'silver.ast.Exp':
         return self.translate_expr(node.value)
 
-    def translate_Call(self, node: ast.Call) -> 'viper.silver.ast.Exp':
-        if self.is_funccall(node) in CONTRACT_FUNCS:
-            raise Exception()
-        elif self.is_funccall(node) == "Result":
+    def translate_Call(self, node: ast.Call) -> 'silver.ast.Exp':
+        if self.get_func_name(node) in CONTRACT_FUNCS:
+            raise ValueError("Contract call translated as normal call.")
+        elif self.get_func_name(node) == "Result":
             type = self.types.getfunctype(self.prefix)
             if self.methodcontext:
                 return self.viper.LocalVar('_res', self.getvipertype(type),
@@ -142,29 +132,29 @@ class Translator:
             formalargs = []
             for arg in node.args:
                 args.append(self.translate_expr(arg))
-            name = self.is_funccall(node)
+            name = self.get_func_name(node)
             target = self.funcsAndMethods[name]
             for arg in target.args.args:
                 formalargs.append(
                     self.translate_parameter_prefix(arg, [name]))
-            return self.viper.FuncApp(self.is_funccall(node), args,
+            return self.viper.FuncApp(self.get_func_name(node), args,
                                       self.viper.to_position(node),
                                       self.viper.NoInfo,
                                       self.viper.Int, formalargs)
 
-    def translate_Expr(self, node: ast.Expr) -> 'viper.silver.ast.Exp':
+    def translate_Expr(self, node: ast.Expr) -> 'silver.ast.Exp':
         if isinstance(node.value, ast.Call):
             return self.translate_expr(node.value)
         else:
             raise UnsupportedException(node)
 
-    def translate_Name(self, node: ast.Name) -> 'viper.silver.ast.Exp':
+    def translate_Name(self, node: ast.Name) -> 'silver.ast.Exp':
         type = self.types.gettype(self.prefix, node.id)
         return self.viper.LocalVar(node.id, self.getvipertype(type),
                                    self.viper.to_position(node),
                                    self.viper.NoInfo)
 
-    def translate_BinOp(self, node: ast.BinOp) -> 'viper.silver.ast.Exp':
+    def translate_BinOp(self, node: ast.BinOp) -> 'silver.ast.Exp':
         left = self.translate_expr(node.left)
         right = self.translate_expr(node.right)
         if isinstance(node.op, ast.Add):
@@ -195,75 +185,67 @@ class Translator:
         else:
             raise UnsupportedException(node)
 
-    def translate_Compare(self, node: ast.Compare) -> 'viper.silver.ast.Exp':
-        if len(node.ops) == 1 and len(node.comparators) == 1:
-            left = self.translate_expr(node.left)
-            right = self.translate_expr(node.comparators[0])
-            if isinstance(node.ops[0], ast.Eq):
-                return self.viper.EqCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            elif isinstance(node.ops[0], ast.Gt):
-                return self.viper.GtCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            elif isinstance(node.ops[0], ast.GtE):
-                return self.viper.GeCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            elif isinstance(node.ops[0], ast.Lt):
-                return self.viper.LtCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            elif isinstance(node.ops[0], ast.LtE):
-                return self.viper.LeCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            elif isinstance(node.ops[0], ast.NotEq):
-                return self.viper.NeCmp(left,
-                                        right,
-                                        self.viper.to_position(node),
-                                        self.viper.NoInfo)
-            else:
-                raise UnsupportedException(node)
+    def translate_Compare(self, node: ast.Compare) -> 'silver.ast.Exp':
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            raise UnsupportedException(node)
+        left = self.translate_expr(node.left)
+        right = self.translate_expr(node.comparators[0])
+        if isinstance(node.ops[0], ast.Eq):
+            return self.viper.EqCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
+        elif isinstance(node.ops[0], ast.Gt):
+            return self.viper.GtCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
+        elif isinstance(node.ops[0], ast.GtE):
+            return self.viper.GeCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
+        elif isinstance(node.ops[0], ast.Lt):
+            return self.viper.LtCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
+        elif isinstance(node.ops[0], ast.LtE):
+            return self.viper.LeCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
+        elif isinstance(node.ops[0], ast.NotEq):
+            return self.viper.NeCmp(left, right,
+                                    self.viper.to_position(node),
+                                    self.viper.NoInfo)
         else:
             raise UnsupportedException(node)
 
     def translate_NameConstant(self,
-                               node: ast.NameConstant) -> 'viper.silver.ast.Exp':
-        if node.value == True:
+                               node: ast.NameConstant) -> 'silver.ast.Exp':
+        if node.value is True:
             return self.viper.TrueLit(self.viper.to_position(node),
                                       self.viper.NoInfo)
-        elif node.value == False:
+        elif node.value is False:
             return self.viper.FalseLit(self.viper.to_position(node),
                                        self.viper.NoInfo)
         else:
             raise UnsupportedException(node)
 
-    def translate_BoolOp(self, node: ast.BoolOp) -> 'viper.silver.ast.Exp':
-        if len(node.values) == 2:
-            if isinstance(node.op, ast.And):
-                return self.viper.And(self.translate_expr(node.values[0]),
-                                      self.translate_expr(node.values[1]),
-                                      self.viper.to_position(node),
-                                      self.viper.NoInfo)
-            elif isinstance(node.op, ast.Or):
-                return self.viper.Or(self.translate_expr(node.values[0]),
-                                     self.translate_expr(node.values[1]),
-                                     self.viper.to_position(node),
-                                     self.viper.NoInfo)
-            else:
-                raise UnsupportedException(node)
+    def translate_BoolOp(self, node: ast.BoolOp) -> 'silver.ast.Exp':
+        if len(node.values) != 2:
+            raise UnsupportedException(node)
+        if isinstance(node.op, ast.And):
+            return self.viper.And(self.translate_expr(node.values[0]),
+                                  self.translate_expr(node.values[1]),
+                                  self.viper.to_position(node),
+                                  self.viper.NoInfo)
+        elif isinstance(node.op, ast.Or):
+            return self.viper.Or(self.translate_expr(node.values[0]),
+                                 self.translate_expr(node.values[1]),
+                                 self.viper.to_position(node),
+                                 self.viper.NoInfo)
         else:
             raise UnsupportedException(node)
 
     def translate_stmt_AugAssign(self,
-                                 node: ast.AugAssign) -> 'viper.silver.ast.Stmt':
+                                 node: ast.AugAssign) -> VarsAndStmt:
         type = self.types.gettype(self.prefix, node.target.id)
         var = self.viper.LocalVar(node.target.id, self.getvipertype(type),
                                   self.viper.to_position(node),
@@ -276,12 +258,11 @@ class Translator:
             newval = self.viper.Sub(var, self.translate_expr(node.value),
                                     self.viper.to_position(node),
                                     self.viper.NoInfo)
-        return (
-            [],
+        return ([],
             self.viper.LocalVarAssign(var, newval, self.viper.to_position(node),
                                       self.viper.NoInfo))
 
-    def translate_stmt_If(self, node: ast.If) -> 'viper.silver.ast.Stmt':
+    def translate_stmt_If(self, node: ast.If) -> VarsAndStmt:
         cond = self.translate_expr(node.test)
         thnvars, thnbody = unzip(
             [self.translate_stmt(stmt) for stmt in node.body])
@@ -297,20 +278,18 @@ class Translator:
                 self.viper.If(cond, thn, els, self.viper.to_position(node),
                               self.viper.NoInfo))
 
-    def translate_stmt_Assign(self,
-                              node: ast.Assign) -> 'viper.silver.ast.Stmt':
-        if len(node.targets) == 1:
-            type = self.types.gettype(self.prefix, node.targets[0].id)
-            return ([(node.targets[0].id, type)], self.viper.LocalVarAssign(
-                self.viper.LocalVar(node.targets[0].id, self.getvipertype(type),
-                                    self.viper.to_position(node),
-                                    self.viper.NoInfo),
-                self.translate_expr(node.value), self.viper.to_position(node),
-                self.viper.NoInfo))
-        else:
+    def translate_stmt_Assign(self, node: ast.Assign) -> VarsAndStmt:
+        if len(node.targets) != 1:
             raise UnsupportedException(node)
+        type = self.types.gettype(self.prefix, node.targets[0].id)
+        var = self.viper.LocalVar(node.targets[0].id, self.getvipertype(type),
+            self.viper.to_position(node), self.viper.NoInfo)
+        assign = self.viper.LocalVarAssign(var,
+            self.translate_expr(node.value), self.viper.to_position(node),
+            self.viper.NoInfo)
+        return ([(node.targets[0].id, type)], assign)
 
-    def translate_stmt_While(self, node: ast.While) -> 'viper.silver.ast.Stmt':
+    def translate_stmt_While(self, node: ast.While) -> VarsAndStmt:
         cond = self.translate_expr(node.test)
         invariants = []
         locals = []
@@ -328,7 +307,7 @@ class Translator:
                                        self.viper.NoInfo))
 
     def translate_stmt_Return(self,
-                              node: ast.Return) -> 'viper.silver.ast.Stmt':
+                              node: ast.Return) -> VarsAndStmt:
         type = self.types.getfunctype(self.prefix)
         assign = self.viper.LocalVarAssign(
             self.viper.LocalVar('_res', self.getvipertype(type),
@@ -342,10 +321,10 @@ class Translator:
             self.viper.Seqn([assign, jmp_to_end], self.viper.to_position(node),
                             self.viper.NoInfo))
 
-    def getvipertype(self, pytype: mypy.types.Type) -> 'viper.silver.ast.Type':
+    def getvipertype(self, pytype: mypy.types.Type) -> VarsAndStmt:
         return self.builtins[pytype.type.fullname()]
 
-    def is_funccall(self, stmt: ast.AST) -> Optional[str]:
+    def get_func_name(self, stmt: ast.AST) -> Optional[str]:
         """
         Checks if stmt is a function call and returns its name if it is, None
         otherwise.
@@ -358,30 +337,30 @@ class Translator:
             return None
 
     def is_pre(self, stmt: ast.AST) -> bool:
-        return self.is_funccall(stmt) == 'Requires'
+        return self.get_func_name(stmt) == 'Requires'
 
     def is_post(self, stmt: ast.AST) -> bool:
-        return self.is_funccall(stmt) == 'Ensures'
+        return self.get_func_name(stmt) == 'Ensures'
 
     def is_invariant(self, stmt: ast.AST) -> bool:
-        return self.is_funccall(stmt) == 'Invariant'
+        return self.get_func_name(stmt) == 'Invariant'
 
     def is_pure(self, func) -> bool:
-        return len(func.decorator_list) == 1 and func.decorator_list[
-                                                     0].id == 'Pure'
+        return (len(func.decorator_list) == 1
+                and func.decorator_list[0].id == 'Pure')
 
     def translate_parameter(self, param: str) -> 'viper.ast.LocalVarDecl':
         return self.translate_parameter_prefix(param, self.prefix)
 
-    def translate_parameter_prefix(self, param: str, prefix: List[
-        str]) -> 'viper.ast.LocalVarDecl':
+    def translate_parameter_prefix(self, param: str, prefix: List[str]) \
+            -> 'viper.ast.LocalVarDecl':
         type = self.types.gettype(prefix, param.arg)
         return self.viper.LocalVarDecl(param.arg, self.getvipertype(type),
                                        self.viper.to_position(param),
                                        self.viper.NoInfo)
 
-    def translate_function(self, func: ast.FunctionDef) -> Optional[
-        'viper.silver.ast.Function']:
+    def translate_function(self, func: ast.FunctionDef) \
+            -> Optional['silver.ast.Function']:
         """
         Translates a Python function annotated as Pure to a Viper function
         """
@@ -412,8 +391,8 @@ class Translator:
             return self.viper.Function(func.name, args, type, pres, posts, body,
                                        self.viper.NoPosition, self.viper.NoInfo)
 
-    def translate_method(self, func: ast.FunctionDef) -> Optional[
-        'viper.silver.ast.Method']:
+    def translate_method(self, func: ast.FunctionDef) \
+            -> Optional['silver.ast.Method']:
         """
         Translates an impure Python function to a Viper method
         """
@@ -459,9 +438,9 @@ class Translator:
                                      self.viper.to_position(func),
                                      self.viper.NoInfo)
 
-    def translate_block(self, stmtlist: List['viper.silver.ast.Stmt'],
-                        position: 'viper.silver.ast.Position',
-                        info: 'viper.silver.ast.Info') -> 'viper.silver.ast.Seqn':
+    def translate_block(self, stmtlist: List['silver.ast.Stmt'],
+                        position: 'silver.ast.Position',
+                        info: 'silver.ast.Info') -> 'silver.ast.Seqn':
         """
         Wraps a (Python) list of (Viper) statements into a Viper block
         """
@@ -470,8 +449,7 @@ class Translator:
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
-    def translate_module(self,
-                         module: ast.Module) -> 'viper.silver.ast.Program':
+    def translate_module(self, module: ast.Module) -> 'silver.ast.Program':
         """
         Translates a Python module to a Viper program
         """
