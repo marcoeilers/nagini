@@ -1,28 +1,38 @@
-from typeinfo import TypeInfo
-from translator import Translator
-from verifier import Verifier
-from jvmaccess import JVM
-from jpype import JavaException
 import ast
-import astpp
+import os
 import sys
 
+from jpype import JavaException
+from jvmaccess import JVM
+from os.path import expanduser
+from translator import Translator
+from typeinfo import TypeInfo
+from verifier import Verifier, VerificationResult
 
-def translate(path, jvm, mypydir):
+
+def get_mypy_dir() -> str:
+    (first, second, _, _, _) = sys.version_info
+    userdir = expanduser('~')
+    possible_dirs = [userdir + '/.local/bin',
+                     'usr/local/bin'] if os.name == 'posix' else [
+        'C:\Python' + str(first) + str(second) + '\Scripts']
+    for dir in possible_dirs:
+        if os.path.isdir(dir):
+            if 'mypy' in os.listdir(dir):
+                return os.path.join(dir, 'mypy')
+    return None
+
+
+def translate(path: str, jvm: JVM, mypydir: str):
     """
     Translates the Python module at the given path to a Viper program
-    :param path:
-    :param jvm:
-    :param mypydir:
-    :return:
     """
     types = TypeInfo()
-    typecorrect = types.init(path, mypydir)
+    typecorrect = types.check(path, mypydir)
     try:
         if typecorrect:
-            file = open(path, 'r')
-            text = file.read()
-            file.close()
+            with open(path, 'r') as file:
+                text = file.read()
             parseresult = ast.parse(text)
             # print(astpp.dump(parseresult))
             translator = Translator(jvm, path, types)
@@ -34,13 +44,10 @@ def translate(path, jvm, mypydir):
         print(je.stacktrace())
 
 
-def verify(prog, path, jvm):
+def verify(prog: 'viper.silver.ast.Program', path: str,
+           jvm: JVM) -> VerificationResult:
     """
     Verifies the given Viper program
-    :param prog:
-    :param path:
-    :param jvm:
-    :return:
     """
     try:
         verifier = Verifier(jvm, path)
@@ -51,15 +58,19 @@ def verify(prog, path, jvm):
 
 
 def main_translate() -> None:
+    if len(sys.argv) < 3:
+        print("Usage: py2viper py_file_path viper_jar_path [mypy_path]")
+        exit(1)
     path = sys.argv[1]
-    try:
-        viperjar = sys.argv[2]
-    except IndexError:
-        viperjar = '/viper/git/silicon_qp/target/scala-2.11/silicon-quantified-permissions.jar'
+    viperjar = sys.argv[2]
     try:
         mypydir = sys.argv[3]
     except IndexError:
-        mypydir = '/home/marco/.local/bin/mypy'
+        mypydir = get_mypy_dir()
+        if mypydir is None:
+            print(
+                "Could not find mypy. Please provide path to mypy as third argument.")
+            exit()
     jvm = JVM(viperjar)
     prog = translate(path, jvm, mypydir)
     if prog is None:
