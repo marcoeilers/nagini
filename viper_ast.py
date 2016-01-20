@@ -89,6 +89,10 @@ class ViperAST:
                                 self.to_seq(methods), position, info)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
+        print(name)
+        print(args)
+        print(type)
+        print(pres)
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
                                  self.to_seq(posts),
@@ -150,9 +154,19 @@ class ViperAST:
         return self.ast.Seqn(self.to_seq(body), position, info)
 
     def LocalVarAssign(self, lhs, rhs, position, info):
+        print(lhs)
+        print(rhs)
         return self.ast.LocalVarAssign(lhs, rhs, position, info)
 
+    def FieldAssign(self, lhs ,rhs, position, info):
+        return self.ast.FieldAssign(lhs, rhs, position, info)
+
+    def FieldAccess(self, receiver, field, position, info):
+        return self.ast.FieldAccess(receiver, field, position, info)
+
     def EqCmp(self, left, right, position, info):
+        print(left)
+        print(right)
         return self.ast.EqCmp(left, right, position, info)
 
     def NeCmp(self, left, right, position, info):
@@ -231,6 +245,9 @@ class ViperAST:
                               self.to_seq(locals),
                               body, position, info)
 
+    def Let(self, variable, exp, body, position, info):
+        return self.ast.Let(variable, exp, body, position, info)
+
     def to_function0(self, func):
         func0 = Function0()
         func0.apply = types.MethodType(func, func0)
@@ -238,6 +255,8 @@ class ViperAST:
         return result
 
     def to_position(self, expr):
+        if expr is None:
+            return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
         end = self.none

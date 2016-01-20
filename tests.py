@@ -131,7 +131,3 @@ class TranslationTests(unittest.TestCase):
         for f in test_files:
             with self.subTest(i=str(f)):
                 self._test_file(f)
-
-
-if __name__ == '__main__':
-    unittest.main()
