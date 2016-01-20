@@ -1,4 +1,5 @@
 import ast
+import astpp
 import os
 import sys
 
@@ -34,7 +35,7 @@ def translate(path: str, jvm: JVM, mypydir: str):
             with open(path, 'r') as file:
                 text = file.read()
             parseresult = ast.parse(text)
-            # print(astpp.dump(parseresult))
+            print(astpp.dump(parseresult))
             translator = Translator(jvm, path, types)
             prog = translator.translate_module(parseresult)
             return prog
