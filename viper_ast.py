@@ -89,14 +89,11 @@ class ViperAST:
                                 self.to_seq(methods), position, info)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
-        print(name)
-        print(args)
-        print(type)
-        print(pres)
+        body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
                                  self.to_seq(posts),
-                                 self.scala.Some(body), position, info)
+                                 body, position, info)
 
     def Method(self, name, args, returns, pres, posts, locals, body, position,
                info):
@@ -144,6 +141,13 @@ class ViperAST:
                                         typepassedfunc, argspassedfunc)
         return result
 
+    def MethodCall(self, methodname, args, targets, position, info):
+        return self.ast.MethodCall(methodname, self.to_seq(args),
+                                   self.to_seq(targets), position, info)
+
+    def NewStmt(self, lhs, fields, position, info):
+        return self.ast.NewStmt(lhs, self.to_seq(fields), position, info)
+
     def Label(self, name, position, info):
         return self.ast.Label(name, position, info)
 
@@ -154,19 +158,42 @@ class ViperAST:
         return self.ast.Seqn(self.to_seq(body), position, info)
 
     def LocalVarAssign(self, lhs, rhs, position, info):
-        print(lhs)
-        print(rhs)
         return self.ast.LocalVarAssign(lhs, rhs, position, info)
 
-    def FieldAssign(self, lhs ,rhs, position, info):
+    def FieldAssign(self, lhs, rhs, position, info):
         return self.ast.FieldAssign(lhs, rhs, position, info)
 
     def FieldAccess(self, receiver, field, position, info):
         return self.ast.FieldAccess(receiver, field, position, info)
 
+    def FieldAccessPredicate(self, fieldacc, perm, position, info):
+        return self.ast.FieldAccessPredicate(fieldacc, perm, position, info)
+
+    def Inhale(self, expr, position, info):
+        return self.ast.Inhale(expr, position, info)
+
+    def Exhale(self, expr, position, info):
+        return self.ast.Exhale(expr, position, info)
+
+    def Assert(self, expr, position, info):
+        return self.ast.Assert(expr, position, info)
+
+    def FullPerm(self, position, info):
+        return self.ast.FullPerm(position, info)
+
+    def FractionalPerm(self, left, right, position, info):
+        return self.ast.FractionalPerm(left, right, position, info)
+
+    def Not(self, expr, position, info):
+        return self.ast.Not(expr, position, info)
+
+    def Minus(self, expr, position, info):
+        return self.ast.Minus(expr, position, info)
+
+    def CondExp(self, cond, then, els, position, info):
+        return self.ast.CondExp(cond, then, els, position, info)
+
     def EqCmp(self, left, right, position, info):
-        print(left)
-        print(right)
         return self.ast.EqCmp(left, right, position, info)
 
     def NeCmp(self, left, right, position, info):
@@ -232,6 +259,9 @@ class ViperAST:
 
     def FalseLit(self, position, info):
         return self.ast.FalseLit(position, info)
+
+    def NullLit(self, position, info):
+        return self.ast.NullLit(position, info)
 
     def Forall(self, variables, triggers, exp, position, info):
         return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
