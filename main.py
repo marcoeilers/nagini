@@ -3,12 +3,14 @@ import astpp
 import os
 import sys
 
+from analyzer import Analyzer
 from jpype import JavaException
 from jvmaccess import JVM
 from os.path import expanduser
 from translator import Translator
 from typeinfo import TypeInfo
 from verifier import Verifier, VerificationResult
+from viper_ast import ViperAST
 
 
 def get_mypy_dir() -> str:
@@ -36,8 +38,12 @@ def translate(path: str, jvm: JVM, mypydir: str):
                 text = file.read()
             parseresult = ast.parse(text)
             print(astpp.dump(parseresult))
-            translator = Translator(jvm, path, types)
-            prog = translator.translate_module(parseresult)
+            viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+            translator = Translator(jvm, path, types, viperast)
+            analyzer = Analyzer(jvm, viperast, types)
+            analyzer.visit_default(parseresult)
+            analyzer.process(translator)
+            prog = translator.translate_program(analyzer.program)
             return prog
         else:
             return None
