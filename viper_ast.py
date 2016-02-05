@@ -169,6 +169,9 @@ class ViperAST:
     def FieldAccessPredicate(self, fieldacc, perm, position, info):
         return self.ast.FieldAccessPredicate(fieldacc, perm, position, info)
 
+    def Old(self, expr, position, info):
+        return self.ast.Old(expr, position, info)
+
     def Inhale(self, expr, position, info):
         return self.ast.Inhale(expr, position, info)
 
@@ -185,6 +188,7 @@ class ViperAST:
         return self.ast.FractionalPerm(left, right, position, info)
 
     def Not(self, expr, position, info):
+        print(expr)
         return self.ast.Not(expr, position, info)
 
     def Minus(self, expr, position, info):
@@ -222,6 +226,9 @@ class ViperAST:
                                 self.to_seq(formalargs))
 
     def LocalVarDecl(self, name, type, position, info):
+        print('LocalVarDecl')
+        print(name)
+        print(type)
         return self.ast.LocalVarDecl(name, type, position, info)
 
     def LocalVar(self, name, type, position, info):
@@ -231,6 +238,8 @@ class ViperAST:
         return self.ast.Result(type, position, info)
 
     def Add(self, left, right, position, info):
+        print(left)
+        print(right)
         return self.ast.Add(left, right, position, info)
 
     def Sub(self, left, right, position, info):
@@ -283,6 +292,9 @@ class ViperAST:
         func0.apply = types.MethodType(func, func0)
         result = self.jvm.get_proxy('scala.Function0', func0)
         return result
+
+    def SimpleInfo(self, comments):
+        return self.ast.SimpleInfo(self.to_seq(comments))
 
     def to_position(self, expr):
         if expr is None:

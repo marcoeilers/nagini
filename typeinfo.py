@@ -2,16 +2,24 @@ import mypy.build
 import os
 import sys
 
-from typing import List, Tuple
+from typing import List
 
+class TypeException(Exception):
+    def __init__(self, messages):
+        self.messages = messages
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, typeMap):
+    def __init__(self, typeMap, path):
         self.prefix = []
         self.allTypes = {}
         self.typeMap = typeMap
+        self.path = path
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
+        print("visit member")
+        print(o.name)
+        print('type of whole thing')
+
         self.set_type([self.typeOf(o.expr).type.name(), o.name], self.typeOf(o))
         super().visit_member_expr(o)
 
@@ -42,11 +50,16 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = oldprefix
 
     def set_type(self, fqn, type):
+        if isinstance(type, mypy.types.AnyType):
+            return # just ignore??
         key = tuple(fqn)
         if key in self.allTypes:
             if self.allTypes[key] != type:
                 if not isinstance(self.allTypes[key], mypy.types.AnyType):
                     # Different types for same var? what is happening here?
+                    print(key)
+                    print(type)
+                    print(self.allTypes[key])
                     raise Exception()
         self.allTypes[key] = type
 
@@ -55,9 +68,20 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             a.accept(self)
 
     def typeOf(self, node):
+        print("typeof")
+        print(node)
         if isinstance(node, mypy.nodes.FuncDef):
             return node.type
-        return self.typeMap[node]
+        elif isinstance(node, mypy.nodes.CallExpr):
+            if node.callee.name == 'Result':
+                type = self.allTypes[tuple(self.prefix)].ret_type
+                return type
+        if node in self.typeMap:
+            return self.typeMap[node]
+        else:
+            msg = 'File "' + self.path + '", line ' + str(node.get_line()) + ' :'
+            msg += 'dead.code'
+            raise TypeException([msg])
 
 
 class TypeInfo:
@@ -77,7 +101,7 @@ class TypeInfo:
         try:
             res = mypy.build.build(filename, target=mypy.build.TYPE_CHECK,
                                    bin_dir=os.path.dirname(mypydir))
-            visitor = TypeVisitor(res.types)
+            visitor = TypeVisitor(res.types, filename)
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
@@ -87,7 +111,7 @@ class TypeInfo:
         except mypy.errors.CompileError as e:
             for m in e.messages:
                 sys.stderr.write('Mypy error: ' + m + '\n')
-            return False
+            raise TypeException(e.messages)
 
     def gettype(self, prefix: List[str], name: str):
         """
