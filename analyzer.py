@@ -2,7 +2,7 @@ import ast
 import collections
 import mypy
 
-from constants import CONTRACT_WRAPPER_FUNCS, PRIMITIVES, LITERALS
+from constants import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS, PRIMITIVES, LITERALS
 from util import UnsupportedException
 from typeinfo import TypeInfo
 from typing import List, Optional
@@ -178,9 +178,8 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             raise UnsupportedException(functype)
         if self.clazz is not None and self.clazz.superclass is not None:
-            self.overrides = self.clazz.superclass.get_function(
-                self.name) if self.pure else self.clazz.superclass.get_method(
-                self.name)
+            self.overrides = self.clazz.superclass.get_func_or_method(self.name)
+
         for arg in self.args:
             self.args[arg].process(self.get_fresh_name(arg), translator)
         for local in self.locals:
@@ -318,10 +317,21 @@ class Analyzer:
             container = scopecontainer.methods
         if name in container:
             func = container[name]
+            func.clazz = self.currentClass
+            func.pure = self.is_pure(node)
+            func.node = node
+            func.superscope = scopecontainer
         else:
             func = PythonMethod(name, node, self.currentClass, scopecontainer,
                                 self.is_pure(node))
             container[name] = func
+        functype = self.types.getfunctype(func.get_scope_prefix())
+        if isinstance(functype, mypy.types.Void):
+            func.type = None
+        elif isinstance(functype, mypy.types.Instance):
+            func.type = self.get_class(functype.type.name())
+        else:
+            raise UnsupportedException(functype)
         self.currentFunction = func
         self.visit_default(node)
         self.currentFunction = None
@@ -413,6 +423,8 @@ class Analyzer:
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         self.visit_default(node)
+        print('------------')
+        print(node.value)
         if not isinstance(node._parent, ast.Call):
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
@@ -441,6 +453,13 @@ class Analyzer:
             context.append(self.currentFunction.name)
             type = self.types.gettype(context, node.arg)
             return self.get_class(type.name())
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in CONTRACT_FUNCS:
+            if node.func.id == 'Result':
+                print("GOT RESULT")
+                print(self.currentFunction.type.name)
+                return self.currentFunction.type
+            else:
+                raise UnsupportedException(node)
         else:
             raise UnsupportedException(node)
 

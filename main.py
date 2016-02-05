@@ -2,13 +2,14 @@ import ast
 import astpp
 import os
 import sys
+import traceback
 
 from analyzer import Analyzer
 from jpype import JavaException
 from jvmaccess import JVM
 from os.path import expanduser
-from translator import Translator
-from typeinfo import TypeInfo
+from translator import Translator, InvalidProgramException
+from typeinfo import TypeInfo, TypeException
 from verifier import Verifier, VerificationResult
 from viper_ast import ViperAST
 
@@ -49,6 +50,7 @@ def translate(path: str, jvm: JVM, mypydir: str):
             return None
     except JavaException as je:
         print(je.stacktrace())
+        print(traceback.format_exc(je))
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
@@ -79,15 +81,19 @@ def main_translate() -> None:
                 "Could not find mypy. Please provide path to mypy as third argument.")
             exit()
     jvm = JVM(viperjar)
-    prog = translate(path, jvm, mypydir)
-    if prog is None:
-        print("Translation failed")
-    else:
+    try:
+        prog = translate(path, jvm, mypydir)
         print("Translation successful. Result:")
         print(prog)
         vresult = verify(prog, path, jvm)
         print("Verification completed.")
         print(vresult)
+    except (TypeException, InvalidProgramException) as e:
+        print("Translation failed")
+        if isinstance(e, InvalidProgramException):
+            print('Line ' + str(e.node.lineno) + ': ' + e.code)
+            if e.message:
+                print(e.message)
 
 
 if __name__ == '__main__':
