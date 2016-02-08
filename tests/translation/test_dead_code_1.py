@@ -1,5 +1,6 @@
 from contracts.contracts import *
 
+
 @Pure
 def f1(i: int) -> int:
     a = i + 67

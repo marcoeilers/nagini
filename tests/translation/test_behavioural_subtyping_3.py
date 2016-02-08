@@ -1,5 +1,3 @@
-
-
 class SuperA:
     def __init__(self) -> None:
         self.intfield = 14
@@ -13,15 +11,18 @@ class SubA(SuperA):
     def someMethod(self, b: int) -> int:
         return b + 5
 
+
 class SubSubA(SubA):
     def someMethod(self, b: int) -> int:
         return b + 9
+
 
 class SuperF:
     def someMethod(self, b: SubA, a: SubSubA) -> SubA:
         return a
 
+
 class SubF1(SuperF):
     #:: ExpectedOutput(type.error:Argument 1 of "someMethod" incompatible with supertype "SuperF");ExpectedOutput(type.error:Return type of "someMethod" incompatible with supertype "SuperF")
-    def someMethod(self, a : int, b : SubSubA) -> int:
+    def someMethod(self, a: int, b: SubSubA) -> int:
         return 16

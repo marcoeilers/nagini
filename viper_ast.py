@@ -188,7 +188,6 @@ class ViperAST:
         return self.ast.FractionalPerm(left, right, position, info)
 
     def Not(self, expr, position, info):
-        print(expr)
         return self.ast.Not(expr, position, info)
 
     def Minus(self, expr, position, info):
@@ -226,9 +225,6 @@ class ViperAST:
                                 self.to_seq(formalargs))
 
     def LocalVarDecl(self, name, type, position, info):
-        print('LocalVarDecl')
-        print(name)
-        print(type)
         return self.ast.LocalVarDecl(name, type, position, info)
 
     def LocalVar(self, name, type, position, info):
@@ -238,8 +234,6 @@ class ViperAST:
         return self.ast.Result(type, position, info)
 
     def Add(self, left, right, position, info):
-        print(left)
-        print(right)
         return self.ast.Add(left, right, position, info)
 
     def Sub(self, left, right, position, info):

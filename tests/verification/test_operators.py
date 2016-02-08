@@ -1,9 +1,11 @@
 from contracts.contracts import *
 
+
 class Container:
     def __init__(self) -> None:
-        Ensures(Acc(self.value) and self.value == 0) # type: ignore
+        Ensures(Acc(self.value) and self.value == 0)  # type: ignore
         self.value = 0
+
 
 def updatingId(b: bool, c: Container) -> bool:
     Requires(Acc(c.value))
@@ -11,6 +13,7 @@ def updatingId(b: bool, c: Container) -> bool:
     Ensures(Result() == b)
     c.value += 1
     return b
+
 
 def testAnd(b1: bool, b2: bool) -> bool:
     Ensures(Implies(Result(), b1))
@@ -21,6 +24,7 @@ def testAnd(b1: bool, b2: bool) -> bool:
     Assert(Implies(not b1, c.value == 1))
     return res
 
+
 def testOr(b1: bool, b2: bool) -> bool:
     Ensures(Implies(b1, Result()))
     Ensures(Implies(b2, Result()))
@@ -29,6 +33,7 @@ def testOr(b1: bool, b2: bool) -> bool:
     Assert(Implies(not b1, c.value == 2))
     Assert(Implies(b1, c.value == 1))
     return res
+
 
 def testAndFail(b1: bool, b2: bool) -> bool:
     Ensures(Implies(Result(), b1))
@@ -41,6 +46,7 @@ def testAndFail(b1: bool, b2: bool) -> bool:
     Assert(c.value == 2 or c.value == 0)
     return res
 
+
 def testOrFail(b1: bool, b2: bool) -> bool:
     Ensures(Implies(b1, Result()))
     Ensures(Implies(b2, Result()))
@@ -52,6 +58,7 @@ def testOrFail(b1: bool, b2: bool) -> bool:
     Assert(c.value == 2 or c.value == 0)
     return res
 
+
 def updatingIdInt(b: int, c: Container) -> int:
     Requires(Acc(c.value))
     Ensures(Acc(c.value) and c.value == Old(c.value) + 1)
@@ -59,7 +66,8 @@ def updatingIdInt(b: int, c: Container) -> int:
     c.value += 1
     return b
 
-def testTernary(b : bool) -> int:
+
+def testTernary(b: bool) -> int:
     Ensures(Implies(b, Result() == 15))
     Ensures(Implies(not b, Result() == 32))
     c1 = Container()
@@ -72,7 +80,8 @@ def testTernary(b : bool) -> int:
     Assert(Implies(not b, c2.value == 1))
     return res
 
-def testTernaryFail(b : bool) -> int:
+
+def testTernaryFail(b: bool) -> int:
     Ensures(Implies(b, Result() == 15))
     Ensures(Implies(not b, Result() == 32))
     c1 = Container()

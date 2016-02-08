@@ -1,7 +1,9 @@
 from contracts.contracts import *
 
+
 def m1(a: int) -> int:
     return 56
+
 
 @Pure
 def f1(b: int) -> int:

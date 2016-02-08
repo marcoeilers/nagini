@@ -1,15 +1,18 @@
 from contracts.contracts import *
 
+
 @Pure
 def func1() -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 16)
-    return  15
+    return 15
+
 
 @Pure
 def func2() -> int:
     Ensures(Result() == 16)
-    return  16
+    return 16
+
 
 @Pure
 def func3() -> bool:
@@ -17,15 +20,18 @@ def func3() -> bool:
     Ensures(Result())
     return False
 
+
 @Pure
 def func4() -> bool:
     Ensures(Result() == True)
     return True
 
+
 @Pure
 def func5(a: int) -> int:
     Ensures(Result() == a)
     return a
+
 
 @Pure
 def func6(otherName: int) -> int:
@@ -33,11 +39,13 @@ def func6(otherName: int) -> int:
     Ensures(Result() == otherName)
     return 17
 
+
 @Pure
 def func7(otherName: int) -> int:
     Requires(otherName > 5)
     Ensures(Result() > 7)
     return otherName + 2
+
 
 @Pure
 def func8(otherName: int) -> int:
@@ -46,8 +54,9 @@ def func8(otherName: int) -> int:
     Ensures(Result() > 7)
     return otherName - 2
 
+
 @Pure
-def func9(someName: int, otherName: int, thirdName : bool) -> bool:
+def func9(someName: int, otherName: int, thirdName: bool) -> bool:
     Requires(otherName > 5)
     Requires(someName > 17)
     Requires(thirdName)
@@ -56,15 +65,17 @@ def func9(someName: int, otherName: int, thirdName : bool) -> bool:
     Ensures(Result() == False)
     return thirdName == (someName + otherName > 22)
 
+
 @Pure
-def func10(someName: int, otherName: int, thirdName : bool) -> bool:
+def func10(someName: int, otherName: int, thirdName: bool) -> bool:
     Requires(otherName > 5)
     Requires(someName > 17)
     Ensures(Result() == thirdName)
     return thirdName == (someName + otherName > 22)
 
+
 @Pure
-def func11(someName: int, otherName: int, thirdName : bool) -> bool:
+def func11(someName: int, otherName: int, thirdName: bool) -> bool:
     Requires(otherName > 5)
     Requires(someName > 17)
     Requires(thirdName)
@@ -77,8 +88,9 @@ def func11(someName: int, otherName: int, thirdName : bool) -> bool:
     res = thirdName == b
     return res
 
+
 @Pure
-def func12(someName: int, otherName: int, thirdName : bool) -> bool:
+def func12(someName: int, otherName: int, thirdName: bool) -> bool:
     Requires(otherName > 5)
     Requires(someName > 17)
     Ensures(Result() == thirdName)

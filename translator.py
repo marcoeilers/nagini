@@ -18,6 +18,10 @@ StmtAndExpr = Tuple[List[Stmt], Expr]
 
 
 class LetWrapper:
+    """
+    Represents a let-expression to be created later.
+    Used so we can set/exchange expr later, which we cannot with the AST element
+    """
     def __init__(self, vardecl: 'silver.ast.VarDecl', expr: 'silver.ast.Exp',
                  node: ast.AST):
         self.vardecl = vardecl
@@ -26,6 +30,9 @@ class LetWrapper:
 
 
 class InvalidProgramException(Exception):
+    """
+    Signals that the input program is invalid and cannot be translated
+    """
     def __init__(self, node: ast.AST, code: str, message: str = None):
         self.node = node
         self.code = code
@@ -54,6 +61,10 @@ class Translator:
                          'builtins.bool': viperast.Bool}
 
     def translate_exprs(self, nodes: List[ast.AST], function) -> Expr:
+        """
+        Translates a list of nodes to a single (let-)expression if all
+        nodes are assignments and the last is a return
+        """
         results = []
         for node in nodes:
             stmts, expr = self.translate_expr(node)
@@ -69,13 +80,15 @@ class Translator:
                 result = letOrExpr
             else:
                 if not isinstance(letOrExpr, LetWrapper):
-                    raise InvalidProgramException(function.node, 'function.dead.code')
+                    raise InvalidProgramException(function.node,
+                                                  'function.dead.code')
                 result = self.viper.Let(letOrExpr.vardecl, letOrExpr.expr,
                                         result,
                                         self.to_position(letOrExpr.node),
                                         self.noinfo())
         if result is None:
-            raise InvalidProgramException(function.node, 'function.return.missing')
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
         return result
 
     def translate_expr(self, node: ast.AST) -> StmtAndExpr:
@@ -87,6 +100,9 @@ class Translator:
         return visitor(node)
 
     def translate_perm(self, node: ast.AST) -> Expr:
+        """
+        Generic visitor function for translating a permission amount
+        """
         method = 'translate_perm_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node)
@@ -118,7 +134,7 @@ class Translator:
     def translate_Assign(self, node: ast.Assign) -> StmtAndExpr:
         if len(node.targets) != 1:
             raise UnsupportedException(node)
-        target = self.currentFunction.get_variable(node.targets[0].id).decl
+        target = self.currentfunction.get_variable(node.targets[0].id).decl
         stmt, expr = self.translate_expr(node.value)
         return (stmt, LetWrapper(target, expr, node))
 
@@ -164,14 +180,17 @@ class Translator:
         return self.translate_expr(node.value)
 
     def translate_contractfunc_call(self, node: ast.Call) -> StmtAndExpr:
+        """
+        Translates calls to contract functions like Result() and Acc()
+        """
         if self.get_func_name(node) == "Result":
             assert len(node.args) == 0
-            type = self.currentFunction.type
-            if not self.currentFunction.pure:
+            type = self.currentfunction.type
+            if not self.currentfunction.pure:
                 return (
-                [], self.viper.LocalVar('_res', self.translate_type(type),
-                                        self.noposition(),
-                                        self.noinfo()))
+                    [], self.viper.LocalVar('_res', self.translate_type(type),
+                                            self.noposition(),
+                                            self.noinfo()))
             else:
                 return ([], self.viper.Result(self.translate_type(type),
                                               self.to_position(node),
@@ -212,6 +231,12 @@ class Translator:
             raise ValueError('Contract call translated as normal call.')
         elif self.get_func_name(node) in CONTRACT_FUNCS:
             return self.translate_contractfunc_call(node)
+        elif self.get_func_name(node) == 'isinstance':
+            assert len(node.args) == 2
+            assert isinstance(node.args[1], ast.Name)
+            stmt, obj = self.translate_expr(node.args[0])
+            clazz = self.program.classes[node.args[1].id]
+            return (stmt, self.hastype(obj, clazz))
         args = []
         formalargs = []
         argstmts = []
@@ -224,14 +249,14 @@ class Translator:
             # this is a constructor call
             targetClass = self.program.classes[name]
             targets = []
-            resultVar = self.currentFunction.create_variable(name + '_res',
+            resultVar = self.currentfunction.create_variable(name + '_res',
                                                              targetClass,
                                                              self)
             targets.append(resultVar.ref)
             target = targetClass.get_method('__init__')
             if target is not None:
                 if len(target.declaredexceptions) > 0:
-                    errorVar = self.currentFunction.create_variable(
+                    errorVar = self.currentfunction.create_variable(
                         target.name + '_err',
                         self.program.classes['Exception'], self)
                     targets.append(errorVar.ref)
@@ -241,7 +266,7 @@ class Translator:
                                           self.noinfo())]
             if target is not None and len(target.declaredexceptions) > 0:
                 call = call + self.create_exception_catchers(errorVar,
-                                                             self.currentFunction.handlers,
+                                                             self.currentfunction.handlers,
                                                              node)
             return (argstmts + call, resultVar.ref)
         if isinstance(node.func, ast.Attribute):
@@ -249,6 +274,7 @@ class Translator:
             recstmt, receiver = self.translate_expr(node.func.value)
             receiverclass = self.get_type(node.func.value)
             target = receiverclass.get_func_or_method(node.func.attr)
+            receiverclass = target.clazz
             argstmts = recstmt + argstmts
             args = [receiver] + args
         else:
@@ -271,19 +297,19 @@ class Translator:
         else:
             targets = []
             resultvar = None
-            if self.currentFunction is None:
-                if self.currentClass is None:
+            if self.currentfunction is None:
+                if self.currentclass is None:
                     # global variable
                     raise InvalidProgramException(node, 'purity.violated')
                 else:
                     # static field
                     raise UnsupportedException(node)
             if target.type is not None:
-                resultvar = self.currentFunction.create_variable(
+                resultvar = self.currentfunction.create_variable(
                     target.name + '_res', target.type, self)
                 targets.append(resultvar.ref)
             if len(target.declaredexceptions) > 0:
-                errorvar = self.currentFunction.create_variable(
+                errorvar = self.currentfunction.create_variable(
                     target.name + '_err',
                     self.program.classes['Exception'], self)
                 targets.append(errorvar.ref)
@@ -292,7 +318,7 @@ class Translator:
                                           self.noinfo())]
             if len(target.declaredexceptions) > 0:
                 call = call + self.create_exception_catchers(errorvar,
-                                                             self.currentFunction.handlers,
+                                                             self.currentfunction.handlers,
                                                              node)
             return (
                 argstmts + call, resultvar.ref if resultvar else None)
@@ -300,25 +326,30 @@ class Translator:
     def create_exception_catchers(self, var: PythonVar,
                                   handlers: List[PythonExceptionHandler],
                                   call: ast.Call) -> List[Stmt]:
+        """
+        Creates the code for catching an exception, i.e. redirecting control
+        flow to the handlers or giving the exception to the caller function
+        """
         cases = []
         position = self.to_position(call)
         errVar = self.viper.LocalVar('_err', self.viper.Ref,
                                      self.noposition(),
                                      self.noinfo())
-        if len(self.currentFunction.declaredexceptions) > 0:
+        if len(self.currentfunction.declaredexceptions) > 0:
             assignerror = self.viper.LocalVarAssign(errVar, var.ref, position,
-                                             self.noinfo())
+                                                    self.noinfo())
             gotoend = self.viper.Goto('__end', position,
-                                             self.noinfo())
-            uncaughtoption = self.translate_block([assignerror, gotoend], position,
-                                             self.noinfo())
+                                      self.noinfo())
+            uncaughtoption = self.translate_block([assignerror, gotoend],
+                                                  position,
+                                                  self.noinfo())
         else:
             uncaughtoption = self.viper.Exhale(
                 self.viper.FalseLit(position, self.noinfo()), position,
                 self.noinfo())
         for handler in handlers:
             if self.contains_stmt(handler.region, call):
-                condition = self.hasType(var.silname, handler.type)
+                condition = self.varhastype(var.silname, handler.type)
                 goto = self.viper.Goto(handler.name,
                                        self.to_position(handler.node),
                                        self.noinfo())
@@ -348,6 +379,9 @@ class Translator:
         return [errcheck]
 
     def contains_stmt(self, container: Any, contained: ast.AST) -> bool:
+        """
+        Checks if contained a part of the partial AST whose root is container
+        """
         if container is contained:
             return True
         if isinstance(container, list):
@@ -375,7 +409,7 @@ class Translator:
                                          self.noinfo(), type, [])
             return ([], funcapp)
         else:
-            return ([], self.currentFunction.get_variable(node.id).ref)
+            return ([], self.currentfunction.get_variable(node.id).ref)
 
     def translate_Attribute(self, node: ast.Attribute) -> StmtAndExpr:
         stmt, receiver = self.translate_expr(node.value)
@@ -383,22 +417,28 @@ class Translator:
         result = rectype.get_field(node.attr)
         while result.inherited is not None:
             result = result.inherited
+        if result.is_mangled():
+            if result.clazz is not self.currentclass:
+                raise InvalidProgramException(node, 'private.field.access')
         return (stmt, self.viper.FieldAccess(receiver, result.field,
                                              self.to_position(node),
                                              self.noinfo()))
 
     def get_type(self, node: ast.AST) -> PythonClass:
+        """
+        Returns the type of the expression represented by node as a PythonClass
+        """
         if isinstance(node, ast.Attribute):
             receiver = self.get_type(node.value)
             return receiver.get_field(node.attr).type
         elif isinstance(node, ast.Name):
-            return self.currentFunction.get_variable(node.id).clazz
+            return self.currentfunction.get_variable(node.id).clazz
         elif isinstance(node, ast.Call):
 
             if isinstance(node.func, ast.Name):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
-                        return self.currentFunction.type
+                        return self.currentfunction.type
                     else:
                         raise UnsupportedException(node)
                 if node.func.id in self.program.classes:
@@ -430,7 +470,8 @@ class Translator:
         if len(thenstmt) + len(elsstmt) > 0:
             thenblock = self.translate_block(thenstmt, position, self.noinfo())
             elsblock = self.translate_block(elsstmt, position, self.noinfo())
-            ifstmt = self.viper.If(cond, thenblock, elsblock, position, self.noinfo())
+            ifstmt = self.viper.If(cond, thenblock, elsblock, position,
+                                   self.noinfo())
             bodystmt = [ifstmt]
         else:
             bodystmt = []
@@ -508,7 +549,8 @@ class Translator:
             return ([], self.viper.FalseLit(self.to_position(node),
                                             self.noinfo()))
         elif node.value is None:
-            return ([], self.viper.NullLit(self.to_position(node), self.noinfo()))
+            return (
+            [], self.viper.NullLit(self.to_position(node), self.noinfo()))
         else:
             raise UnsupportedException(node)
 
@@ -524,7 +566,8 @@ class Translator:
                 cond = self.viper.Not(cond, position, self.noinfo())
             thenblock = self.translate_block(rstmt, position, self.noinfo())
             elsblock = self.translate_block([], position, self.noinfo())
-            ifstmt = self.viper.If(cond, thenblock, elsblock, position, self.noinfo())
+            ifstmt = self.viper.If(cond, thenblock, elsblock, position,
+                                   self.noinfo())
             stmt = lstmt + [ifstmt]
         else:
             stmt = []
@@ -559,9 +602,11 @@ class Translator:
             raise UnsupportedException(node)
         position = self.to_position(node)
         if isinstance(node.target, ast.Name):
-            assign = self.viper.LocalVarAssign(lhs, newval, position, self.noinfo())
+            assign = self.viper.LocalVarAssign(lhs, newval, position,
+                                               self.noinfo())
         elif isinstance(node.target, ast.Attribute):
-            assign = self.viper.FieldAssign(lhs, newval, position, self.noinfo())
+            assign = self.viper.FieldAssign(lhs, newval, position,
+                                            self.noinfo())
         return rstmt + [assign]
 
     def translate_stmt_Try(self, node: ast.Try) -> List[Stmt]:
@@ -572,7 +617,7 @@ class Translator:
         return body + [endlabel]
 
     def translate_stmt_Raise(self, node: ast.Raise) -> List[Stmt]:
-        var = self.currentFunction.create_variable('raise',
+        var = self.currentfunction.create_variable('raise',
                                                    self.get_type(node.exc),
                                                    self)
         stmt, exception = self.translate_expr(node.exc)
@@ -580,7 +625,7 @@ class Translator:
                                                self.to_position(node),
                                                self.noinfo())
         catchers = self.create_exception_catchers(var,
-                                                  self.currentFunction.handlers,
+                                                  self.currentfunction.handlers,
                                                   node)
         return stmt + [assignment] + catchers
 
@@ -614,7 +659,7 @@ class Translator:
             elsbody,
             self.to_position(node), self.noinfo())
         return condstmt + [self.viper.If(cond, thn, els, self.to_position(node),
-                              self.noinfo())]
+                                         self.noinfo())]
 
     def translate_stmt_Assign(self, node: ast.Assign) -> List[Stmt]:
         if len(node.targets) != 1:
@@ -649,7 +694,7 @@ class Translator:
 
     def translate_stmt_Return(self,
                               node: ast.Return) -> List[Stmt]:
-        type = self.currentFunction.type
+        type = self.currentfunction.type
         rhsstmt, rhs = self.translate_expr(node.value)
         assign = self.viper.LocalVarAssign(
             self.viper.LocalVar('_res', self.translate_type(type),
@@ -709,8 +754,11 @@ class Translator:
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
-    def create_type(self, clazz: PythonClass) -> Tuple[
-        'silver.ast.DomainFunc', 'silver.ast.DomainAxiom']:
+    def create_type(self, clazz: PythonClass) -> Tuple['silver.ast.DomainFunc',
+                                                     'silver.ast.DomainAxiom']:
+        """
+        Creates the type domain function and subtype axiom for this class
+        """
         supertype = clazz.superclass.silname if clazz.superclass is not None else 'object'
         position = self.to_position(clazz.node)
         info = self.noinfo()
@@ -747,56 +795,10 @@ class Translator:
                                         position, info)
         return self.viper.DomainAxiom('subtype_' + type, body, position, info)
 
-    def create_exclusion_axiom(self):
-        argsub1 = self.viper.LocalVarDecl('sub1', self.typetype(),
-                                         self.noposition(),
-                                         self.noinfo())
-        varsub1 = self.viper.LocalVar('sub1', self.typetype(),
-                                     self.noposition(), self.noinfo())
-        argsub2 = self.viper.LocalVarDecl('sub2', self.typetype(),
-                                            self.noposition(),
-                                            self.noinfo())
-        varsub2 = self.viper.LocalVar('sub2', self.typetype(),
-                                        self.noposition(),
-                                        self.noinfo())
-        argsuper = self.viper.LocalVarDecl('super', self.typetype(),
-                                           self.noposition(),
-                                           self.noinfo())
-        varsuper = self.viper.LocalVar('super', self.typetype(),
-                                       self.noposition(), self.noinfo())
-        sub1super = self.viper.DomainFuncApp('issubtype', [varsub1, varsuper],
-                                             {},
-                                             self.viper.Bool,
-                                             [varsub1, varsuper],
-                                             self.noposition(),
-                                             self.noinfo())
-        sub2super = self.viper.DomainFuncApp('issubtype',
-                                               [varsub2, varsuper], {},
-                                               self.viper.Bool,
-                                               [varsub2, varsuper],
-                                               self.noposition(),
-                                               self.noinfo())
-        sub1sub2 = self.viper.DomainFuncApp('issubtype', [varsub1, varsub2], {},
-                                            self.viper.Bool, [varsub1, varsub2],
-                                            self.noposition(),
-                                            self.noinfo())
-        notequal = self.viper.And(self.viper.And(self.viper.NeCmp(varsub1, varsub2, self.noposition(), self.noinfo()),
-                                  self.viper.NeCmp(varsub1, varsuper, self.noposition(), self.noinfo()), self.noposition(), self.noinfo()),
-                                  self.viper.NeCmp(varsub2, varsuper, self.noposition(), self.noinfo()), self.noposition(), self.noinfo())
-        subtypes = self.viper.And(sub1super, sub2super, self.noposition(),
-                           self.noinfo())
-        implication = self.viper.Implies(self.viper.And(subtypes, notequal, self.noposition(), self.noinfo()), self.viper.Not(sub1sub2, self.noposition(), self.noinfo()), self.noposition(),
-            self.noinfo())
-        trigger = self.viper.Trigger([sub1super, sub1sub2, sub2super],
-                                     self.noposition(), self.noinfo())
-        body = self.viper.Forall([argsub1, argsub2, argsuper], [trigger],
-                                 implication, self.noposition(),
-                                 self.noinfo())
-        return self.viper.DomainAxiom('issubtype_exclusion', body,
-                                      self.noposition(), self.noinfo())
-
-
     def create_transitivity_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the transitivity axiom for the PyType domain
+        """
         argsub = self.viper.LocalVarDecl('sub', self.typetype(),
                                          self.noposition(),
                                          self.noinfo())
@@ -843,6 +845,9 @@ class Translator:
                                       self.noposition(), self.noinfo())
 
     def create_reflexivity_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the reflexivity axiom for the PyType domain
+        """
         arg = self.viper.LocalVarDecl('type', self.typetype(),
                                       self.noposition(), self.noinfo())
         var = self.viper.LocalVar('type', self.typetype(),
@@ -884,13 +889,24 @@ class Translator:
                                      self.viper.Bool, False,
                                      self.noposition(), self.noinfo())
 
-    def hasType(self, name: str,
-                type: PythonClass) -> 'silver.ast.DomainFuncApp':
+    def varhastype(self, name: str,
+                   type: PythonClass) -> 'silver.ast.DomainFuncApp':
+        """
+        Creates an expression checking if the var with the given name
+        is of the given type
+        """
         objvar = self.viper.LocalVar(name, self.viper.Ref,
                                      self.noposition(),
                                      self.noinfo())
-        typefunc = self.viper.DomainFuncApp('typeof', [objvar], {},
-                                            self.typetype(), [objvar],
+        return self.hastype(objvar, type)
+
+    def hastype(self, lhs: Expr, type: PythonClass):
+        """
+        Creates an expression checking if the given lhs expression
+        is of the given type
+        """
+        typefunc = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                            self.typetype(), [lhs],
                                             self.noposition(),
                                             self.noinfo())
         supertypefunc = self.viper.DomainFuncApp(type.silname, [], {},
@@ -911,16 +927,27 @@ class Translator:
 
     def translate_pythonvar_decl(self,
                                  var: PythonVar) -> 'silver.ast.LocalVarDecl':
+        """
+        Creates a variable declaration for the given PythonVar.
+        To be called during the processing phase by the Analyzer.
+        """
         return self.viper.LocalVarDecl(var.silname,
                                        self.translate_type(var.clazz),
                                        self.noposition(), self.noinfo())
 
     def translate_pythonvar_ref(self, var: PythonVar) -> Expr:
+        """
+        Creates a variable reference for the given PythonVar.
+        To be called during the processing phase by the Analyzer.
+        """
         return self.viper.LocalVar(var.silname,
                                    self.translate_type(var.clazz),
                                    self.noposition(), self.noinfo())
 
     def translate_type(self, clazz: PythonClass) -> 'silver.ast.Type':
+        """
+        Translates the given type to the corresponding Viper type (Int, Ref, ..)
+        """
         if 'builtins.' + clazz.name in self.builtins:
             return self.builtins['builtins.' + clazz.name]
         else:
@@ -928,7 +955,7 @@ class Translator:
 
     def get_parameter_typeof(self,
                              param: PythonVar) -> 'silver.ast.DomainFuncApp':
-        return self.hasType(param.silname, param.clazz)
+        return self.varhastype(param.silname, param.clazz)
 
     def translate_field(self, field: PythonField) -> 'silver.ast.Field':
         return self.viper.Field(field.clazz.silname + '_' + field.silname,
@@ -937,6 +964,9 @@ class Translator:
                                 self.noinfo())
 
     def get_body_start_index(self, statements: List[ast.AST]) -> int:
+        """
+        Returns the index of the first statement that is not a method contract
+        """
         bodyindex = 0
         while self.is_pre(statements[bodyindex]):
             bodyindex += 1
@@ -947,14 +977,19 @@ class Translator:
         return bodyindex
 
     def translate_function(self, func: PythonMethod) -> 'silver.ast.Function':
-        oldfunction = self.currentFunction
-        self.currentFunction = func
+        """
+        Translates a pure Python function (may or not belong to a class) to a
+        Viper function
+        """
+        oldfunction = self.currentfunction
+        self.currentfunction = func
         type = self.translate_type(func.type)
         args = []
         for arg in func.args:
             args.append(func.args[arg].decl)
         if len(func.declaredexceptions) != 0:
-            raise InvalidProgramException(func.node, 'function.throws.exception')
+            raise InvalidProgramException(func.node,
+                                          'function.throws.exception')
         # create preconditions
         pres = []
         for pre in func.precondition:
@@ -977,7 +1012,7 @@ class Translator:
         bodyindex = self.get_body_start_index(statements)
         # translate body
         body = self.translate_exprs(statements[bodyindex:], func)
-        self.currentFunction = oldfunction
+        self.currentfunction = oldfunction
         name = func.silname
         if func.clazz is not None:
             name = func.clazz.silname + '_' + name
@@ -985,6 +1020,10 @@ class Translator:
                                    self.noposition(), self.noinfo())
 
     def translate_handler(self, handler: PythonExceptionHandler) -> List[Stmt]:
+        """
+        Creates a code block representing an exception handler, to be put at
+        the end of a Viper method
+        """
         label = self.viper.Label(handler.name,
                                  self.to_position(handler.node),
                                  self.noinfo())
@@ -1001,6 +1040,9 @@ class Translator:
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          isconstructor: bool) -> Tuple[List[Expr], List[Expr]]:
+        """
+        Extracts the pre and postcondition from a given method
+        """
         errorvarref = self.viper.LocalVar(errorvarname, self.viper.Ref,
                                           self.noposition(),
                                           self.noinfo())
@@ -1037,7 +1079,7 @@ class Translator:
             oldpos = self.position
             if self.position is None:
                 self.position = errortypepos
-            hastype = self.hasType('_err', self.program.classes[exception])
+            hastype = self.varhastype('_err', self.program.classes[exception])
             errorTypeConds.append(hastype)
             self.position = oldpos
             condition = self.viper.And(error, hastype, self.noposition(),
@@ -1071,6 +1113,10 @@ class Translator:
         return (pres, posts)
 
     def to_position(self, node):
+        """
+        Extracts the position from a node.
+        If self.position is set to override the actual position, returns that.
+        """
         if self.position is not None:
             return self.position
         else:
@@ -1080,6 +1126,10 @@ class Translator:
         return self.to_position(None)
 
     def to_info(self, comments):
+        """
+        Wraps the given comments into an Info object.
+        If self.info is set to override the given info, returns that.
+        """
         if self.info is not None:
             return self.info
         if len(comments) > 0:
@@ -1092,16 +1142,29 @@ class Translator:
 
     def create_subtyping_check(self,
                                method: PythonMethod) -> 'silver.ast.Callable':
-        oldfunction = self.currentFunction
-        self.currentFunction = method.overrides
+        """
+        Creates a Viper function/method with the contract of the overridden
+        function which calls the overriding function, to check behavioural
+        subtyping.
+        """
+        oldfunction = self.currentfunction
+        self.currentfunction = method.overrides
         assert self.position is None
         self.position = self.viper.to_position(method.node)
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         if len(method.args) != len(method.overrides.args):
             raise InvalidProgramException(method.node, 'invalid.override')
-        if len(method.declaredexceptions) > 0:
-            if len(method.overrides.declaredexceptions) == 0:
+        for exc in method.declaredexceptions:
+            excclass = self.program.classes[exc]
+            allowed = False
+            for superexc in method.overrides.declaredexceptions:
+                superexcclass = self.program.classes[superexc]
+                if excclass.issubtype(superexcclass):
+                    allowed = True
+                    break
+            if not allowed:
                 raise InvalidProgramException(method.node, 'invalid.override')
+                # TODO check if exceptional postconditions imply super postconds
         params = []
         args = []
         type = self.translate_type(method.type)
@@ -1113,7 +1176,7 @@ class Translator:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
         selfarg = method.overrides.args[next(iter(method.overrides.args))]
-        hassubtype = self.hasType(selfarg.silname, method.clazz)
+        hassubtype = self.varhastype(selfarg.silname, method.clazz)
         calledname = method.clazz.silname + '_' + method.silname
         if method.pure:
             if not method.overrides.pure:
@@ -1124,10 +1187,10 @@ class Translator:
                 formalargs.append(method.args[arg].decl)
             funcapp = self.viper.FuncApp(calledname, args, self.noposition(),
                                          self.noinfo(), type, formalargs)
-            self.currentFunction = oldfunction
+            self.currentfunction = oldfunction
             result = self.viper.Function(mname, params, type, pres, posts,
-                                       funcapp, self.noposition(),
-                                       self.noinfo())
+                                         funcapp, self.noposition(),
+                                         self.noinfo())
             self.position = None
             self.info = None
             return result
@@ -1164,17 +1227,21 @@ class Translator:
             body = [subtypeassume, call]
             bodyblock = self.translate_block(body, self.noposition(),
                                              self.noinfo())
-            self.currentFunction = oldfunction
+            self.currentfunction = oldfunction
             result = self.viper.Method(mname, params, results, pres, posts, [],
-                                     bodyblock, self.noposition(),
-                                     self.noinfo())
+                                       bodyblock, self.noposition(),
+                                       self.noinfo())
             self.position = None
             self.info = None
             return result
 
     def translate_method(self, method: PythonMethod) -> 'silver.ast.Method':
-        oldfunction = self.currentFunction
-        self.currentFunction = method
+        """
+        Translates an impure Python function (may or not belong to a class) to
+        a Viper method
+        """
+        oldfunction = self.currentfunction
+        self.currentfunction = method
         results = []
         if method.type is not None:
             type = self.translate_type(method.type)
@@ -1186,8 +1253,8 @@ class Translator:
                                                self.noposition(),
                                                self.noinfo())
         errorvarref = self.viper.LocalVar('_err', self.viper.Ref,
-                                               self.noposition(),
-                                               self.noinfo())
+                                          self.noposition(),
+                                          self.noinfo())
         pres, posts = self.extract_contract(method, '_err', False)
         if len(method.declaredexceptions) > 0:
             results.append(errorvardecl)
@@ -1200,9 +1267,12 @@ class Translator:
         # translate body
         body = []
         if len(method.declaredexceptions) > 0:
-            body.append(self.viper.LocalVarAssign(errorvarref, self.viper.NullLit(self.noposition(),
-                                               self.noinfo()), self.noposition(),
-                                               self.noinfo()))
+            body.append(self.viper.LocalVarAssign(errorvarref,
+                                                  self.viper.NullLit(
+                                                      self.noposition(),
+                                                      self.noinfo()),
+                                                  self.noposition(),
+                                                  self.noinfo()))
         body += flatten(
             [self.translate_stmt(stmt) for stmt in
              method.node.body[bodyindex:]])
@@ -1216,7 +1286,7 @@ class Translator:
         bodyblock = self.translate_block(body,
                                          self.to_position(method.node),
                                          self.noinfo())
-        self.currentFunction = oldfunction
+        self.currentfunction = oldfunction
         name = method.silname
         if method.clazz is not None:
             name = method.clazz.silname + '_' + name
@@ -1226,6 +1296,10 @@ class Translator:
                                  self.noinfo())
 
     def create_constructor(self, clazz: PythonClass) -> 'silver.ast.Method':
+        """
+        Creates a constructor method for the given class. Either creates a
+        default constructor or translates the explicit one in the program.
+        """
         method = clazz.get_method('__init__')
         name = method.silname if method is not None else '__init__'
         name = clazz.silname + '_' + name
@@ -1238,32 +1312,45 @@ class Translator:
         results.append(self.viper.LocalVarDecl(selfvarname, self.viper.Ref,
                                                position,
                                                self.noinfo()))
+        selfvar = self.viper.LocalVar(selfvarname, self.viper.Ref,
+                                      self.noposition(), self.noinfo())
         locals = []
         body = []
         pres = []
         posts = []
         fields = []
         clz = clazz
+        accs = []
         while clz is not None:
             for fieldname in clz.fields:
                 field = clz.fields[fieldname]
                 if field.inherited is None:
                     fields.append(field.field)
+                    if method is None:
+                        acc = self.viper.FieldAccess(selfvar, field.field,
+                                                     position, self.noinfo())
+                        accs.append(self.viper.FieldAccessPredicate(acc,
+                                                                    self.viper.FullPerm(
+                                                                        position,
+                                                                        self.noinfo()),
+                                                                    position,
+                                                                    self.noinfo()))
             clz = clz.superclass
-        selfvar = self.viper.LocalVar(selfvarname, self.viper.Ref,
-                                      self.noposition(), self.noinfo())
+
         body.append(self.viper.NewStmt(selfvar, fields, self.noposition(),
                                        self.noinfo()))
-        resulthastype = self.hasType(selfvarname, clazz)
+        resulthastype = self.varhastype(selfvarname, clazz)
         body.append(self.viper.Inhale(resulthastype, self.noposition(),
                                       self.noinfo()))
-        notnull = self.viper.NeCmp(selfvar, self.viper.NullLit(self.noposition(),
-                                            self.noinfo()), self.noposition(),
-                                            self.noinfo())
+        notnull = self.viper.NeCmp(selfvar,
+                                   self.viper.NullLit(self.noposition(),
+                                                      self.noinfo()),
+                                   self.noposition(),
+                                   self.noinfo())
         posts.append(notnull)
         if method is not None:
-            oldfunction = self.currentFunction
-            self.currentFunction = method
+            oldfunction = self.currentfunction
+            self.currentfunction = method
             for arg in method.args:
                 if arg == next(iter(method.args)):
                     continue
@@ -1287,12 +1374,13 @@ class Translator:
                 body += self.translate_handler(handler)
             for local in method.locals:
                 locals.append(method.locals[local].decl)
-            self.currentFunction = oldfunction
+            self.currentfunction = oldfunction
 
         body += [self.viper.Label("__end", self.noposition(),
                                   self.noinfo())]
         bodyblock = self.translate_block(body, position, self.noinfo())
         posts.append(resulthastype)
+        posts += accs
         return self.viper.Method(name, args, results, pres, posts,
                                  locals, bodyblock,
                                  position,
@@ -1300,6 +1388,9 @@ class Translator:
 
     def create_global_var_function(self,
                                    var: PythonVar) -> 'silver.ast.Function':
+        """
+        Creates a Viper function representing the given global variable
+        """
         type = self.translate_type(var.clazz)
         if type == self.viper.Ref:
             raise UnsupportedException(var.node)
@@ -1316,8 +1407,11 @@ class Translator:
                                    self.noinfo())
 
     def translate_program(self, program: PythonProgram) -> 'silver.ast.Program':
-        self.currentClass = None
-        self.currentFunction = None
+        """
+        Translates a PythonProgram created by the analyzer to a Viper program.
+        """
+        self.currentclass = None
+        self.currentfunction = None
         self.program = program
         domains = []
         fields = []
@@ -1357,6 +1451,8 @@ class Translator:
             if clazzname in PRIMITIVES:
                 continue
             clazz = program.classes[clazzname]
+            oldclass = self.currentclass
+            self.currentclass = clazz
             funcs, axioms = self.create_type(clazz)
             typefuncs.append(funcs)
             typeaxioms.append(axioms)
@@ -1372,6 +1468,7 @@ class Translator:
                     if method.overrides:
                         methods.append(self.create_subtyping_check(method))
             methods.append(self.create_constructor(clazz))
+            self.currentclass = oldclass
 
         domains.append(
             self.viper.Domain(self.typedomain, typefuncs, typeaxioms, [],
