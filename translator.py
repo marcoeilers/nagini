@@ -22,6 +22,7 @@ class LetWrapper:
     Represents a let-expression to be created later.
     Used so we can set/exchange expr later, which we cannot with the AST element
     """
+
     def __init__(self, vardecl: 'silver.ast.VarDecl', expr: 'silver.ast.Exp',
                  node: ast.AST):
         self.vardecl = vardecl
@@ -33,6 +34,7 @@ class InvalidProgramException(Exception):
     """
     Signals that the input program is invalid and cannot be translated
     """
+
     def __init__(self, node: ast.AST, code: str, message: str = None):
         self.node = node
         self.code = code
@@ -362,7 +364,9 @@ class Translator:
                                        self.to_position(handler.node),
                                        self.noinfo())
             else:
-                result = self.viper.If(cond, goto, result)
+                result = self.viper.If(cond, goto, result,
+                                       self.to_position(handler.node),
+                                       self.noinfo())
         if result is None:
             errcase = uncaughtoption
         else:
@@ -550,7 +554,7 @@ class Translator:
                                             self.noinfo()))
         elif node.value is None:
             return (
-            [], self.viper.NullLit(self.to_position(node), self.noinfo()))
+                [], self.viper.NullLit(self.to_position(node), self.noinfo()))
         else:
             raise UnsupportedException(node)
 
@@ -596,6 +600,10 @@ class Translator:
                                     self.noinfo())
         elif isinstance(node.op, ast.Sub):
             newval = self.viper.Sub(lhs, rhs,
+                                    self.to_position(node),
+                                    self.noinfo())
+        elif isinstance(node.op, ast.Mult):
+            newval = self.viper.Mul(lhs, rhs,
                                     self.to_position(node),
                                     self.noinfo())
         else:
@@ -755,7 +763,7 @@ class Translator:
         return self.viper.Seqn(body, position, info)
 
     def create_type(self, clazz: PythonClass) -> Tuple['silver.ast.DomainFunc',
-                                                     'silver.ast.DomainAxiom']:
+                                                       'silver.ast.DomainAxiom']:
         """
         Creates the type domain function and subtype axiom for this class
         """
@@ -1277,7 +1285,7 @@ class Translator:
             [self.translate_stmt(stmt) for stmt in
              method.node.body[bodyindex:]])
         body.append(self.viper.Goto('__end', self.noposition(),
-                                      self.noinfo()))
+                                    self.noinfo()))
         for handler in method.handlers:
             body += self.translate_handler(handler)
         locals = []
