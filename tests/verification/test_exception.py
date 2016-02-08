@@ -22,7 +22,7 @@ class Container:
 def raisedAndDeclared(input: int, inCon: Container) -> Container:
     Requires(inCon != None and Acc(inCon.value))
     Ensures(Acc(inCon.value) and (
-    Result() != None and (Acc(Result().value) and Result().value == input)))
+        Result() != None and (Acc(Result().value) and Result().value == input)))
     Exsures(MyException, Acc(inCon.value) and inCon.value == -1)
     res = Container()
     inCon.value = -1
@@ -35,7 +35,7 @@ def raisedAndDeclared(input: int, inCon: Container) -> Container:
 def raisedAndDeclared2(input: int, inCon: Container) -> Container:
     Requires(inCon != None and Acc(inCon.value))
     Ensures(Acc(inCon.value) and (
-    Result() != None and (Acc(Result().value) and Result().value == input)))
+        Result() != None and (Acc(Result().value) and Result().value == input)))
     Exsures(Exception, Acc(inCon.value) and inCon.value == -1)
     res = Container()
     inCon.value = -1
@@ -74,7 +74,7 @@ def raisedAndDeclared5(input: int, inCon: Container) -> None:
 def raisedAndUndeclared(input: int, inCon: Container) -> Container:
     Requires(inCon != None and Acc(inCon.value))
     Ensures(Acc(inCon.value) and (
-    Result() != None and (Acc(Result().value) and Result().value == input)))
+        Result() != None and (Acc(Result().value) and Result().value == input)))
     res = Container()
     inCon.value = -1
     if input == 22:
@@ -97,7 +97,7 @@ def raisedAndUndeclared(input: int, inCon: Container) -> Container:
 #     else:
 #         raise MyOtherException()
 
-def helper(out: Container, i : int) -> None:
+def helper(out: Container, i: int) -> None:
     Requires(Acc(out.value))
     Ensures(Acc(out.value) and out.value == 12)
     Exsures(MyException, Acc(out.value) and out.value == 13)
@@ -107,23 +107,23 @@ def helper(out: Container, i : int) -> None:
     else:
         out.value = 12
 
-# TODO: This results in a stack overflow, there may be a bug in Silicon ??
-# def raisedAndCaught(out: Container) -> None:
-#     Requires(Acc(out.value))
-#     Ensures(Acc(out.value) and out.value == 12)
-#     Exsures(MyException, False)
-#     try:
-#         raise MyException()
-#     except MyException:
-#         out.value = 12
+
+def raisedAndCaught(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 12)
+    Exsures(MyException, False)
+    try:
+        raise MyException()
+    except MyException:
+        out.value = 12
 
 
-# def raisedAndCaught2(out: Container) -> None:
-#     Requires(Acc(out.value))
-#     Ensures(Acc(out.value) and (out.value == 24 or out.value == 39))
-#     tmp = Container()
-#     try:
-#         helper(tmp, 45)
-#         out.value = 2 * tmp.value
-#     except MyException:
-#         out.value = 3 * tmp.value
+def raisedAndCaught2(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and (out.value == 24 or out.value == 39))
+    tmp = Container()
+    try:
+        helper(tmp, 45)
+        out.value = 2 * tmp.value
+    except MyException:
+        out.value = 3 * tmp.value

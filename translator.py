@@ -1276,6 +1276,8 @@ class Translator:
         body += flatten(
             [self.translate_stmt(stmt) for stmt in
              method.node.body[bodyindex:]])
+        body.append(self.viper.Goto('__end', self.noposition(),
+                                      self.noinfo()))
         for handler in method.handlers:
             body += self.translate_handler(handler)
         locals = []
