@@ -4,23 +4,26 @@ import sys
 
 from typing import List
 
+
 class TypeException(Exception):
     def __init__(self, messages):
         self.messages = messages
 
+
 class TypeVisitor(mypy.traverser.TraverserVisitor):
     def __init__(self, typeMap, path):
         self.prefix = []
-        self.allTypes = {}
-        self.typeMap = typeMap
+        self.alltypes = {}
+        self.typemap = typeMap
         self.path = path
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
         print("visit member")
         print(o.name)
         print('type of whole thing')
-
-        self.set_type([self.typeOf(o.expr).type.name(), o.name], self.typeOf(o))
+        rectype = self.typeOf(o.expr)
+        if not isinstance(rectype, mypy.types.AnyType):
+            self.set_type([rectype.type.name(), o.name], self.typeOf(o))
         super().visit_member_expr(o)
 
     def visit_try_stmt(self, o: mypy.nodes.TryStmt):
@@ -51,17 +54,17 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def set_type(self, fqn, type):
         if isinstance(type, mypy.types.AnyType):
-            return # just ignore??
+            return  # just ignore??
         key = tuple(fqn)
-        if key in self.allTypes:
-            if self.allTypes[key] != type:
-                if not isinstance(self.allTypes[key], mypy.types.AnyType):
+        if key in self.alltypes:
+            if self.alltypes[key] != type:
+                if not isinstance(self.alltypes[key], mypy.types.AnyType):
                     # Different types for same var? what is happening here?
                     print(key)
                     print(type)
-                    print(self.allTypes[key])
+                    print(self.alltypes[key])
                     raise Exception()
-        self.allTypes[key] = type
+        self.alltypes[key] = type
 
     def visit_call_expr(self, o: mypy.nodes.CallExpr):
         for a in o.args:
@@ -74,12 +77,14 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             return node.type
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
-                type = self.allTypes[tuple(self.prefix)].ret_type
+                type = self.alltypes[tuple(self.prefix)].ret_type
                 return type
-        if node in self.typeMap:
-            return self.typeMap[node]
+        if node in self.typemap:
+            result = self.typemap[node]
+            return result
         else:
-            msg = 'File "' + self.path + '", line ' + str(node.get_line()) + ' :'
+            msg = 'File "' + self.path + '", line ' + str(
+                node.get_line()) + ' :'
             msg += 'dead.code'
             raise TypeException([msg])
 
@@ -105,7 +110,7 @@ class TypeInfo:
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
-            self.allTypes = visitor.allTypes
+            self.allTypes = visitor.alltypes
             print(self.allTypes)
             return True
         except mypy.errors.CompileError as e:

@@ -1,8 +1,10 @@
 from contracts.contracts import *
 
+
 def m1(a: int) -> bool:
     Ensures(Result() == (a > 5))
     return a != 5
+
 
 def methodWithLoop() -> int:
     Ensures(Result() == 10)

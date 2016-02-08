@@ -1,7 +1,9 @@
 from contracts.contracts import *
 
+
 class MyException(Exception):
     pass
+
 
 #:: ExpectedOutput(invalid.program:function.throws.exception)
 @Pure

@@ -2,7 +2,6 @@ import ast
 import astpp
 import os
 import sys
-import traceback
 
 from analyzer import Analyzer
 from jpype import JavaException
@@ -50,7 +49,6 @@ def translate(path: str, jvm: JVM, mypydir: str):
             return None
     except JavaException as je:
         print(je.stacktrace())
-        print(traceback.format_exc(je))
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,

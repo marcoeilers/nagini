@@ -1,5 +1,6 @@
 from contracts.contracts import *
 
+
 #:: ExpectedOutput(invalid.program:function.dead.code)
 @Pure
 def f1(i: int) -> int:

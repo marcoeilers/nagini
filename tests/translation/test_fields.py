@@ -11,7 +11,7 @@ class SuperClass:
         Ensures(Acc(
             self.__privatefield) and self.__privatefield == 15)  # type: ignore
         Ensures(Acc(self.typedfield)  # type: ignore
-                and isinstance(self.typedfield, SuperClass))  # type: ignore
+                and isinstance(self.typedfield, superClass))  # type: ignore
         self.superfield = 12
         self.__privatefield = 15
         self.typedfield = SuperClass()
@@ -62,20 +62,6 @@ class SubClass(SuperClass):
 def main() -> None:
     sub = SubClass()
     sub.construct()
-    Assert(sub.getprivate() == 15)
-    Assert(sub.getpublic() == 12)
-    Assert(sub.getpublic() == sub.getpublicsub())
     sub.constructsub()
-    Assert(sub.getprivate() == 15)
-    Assert(sub.getprivatesub() == 35)
-    Assert(sub.getprivate() != sub.getprivatesub())
-    Assert(sub.getpublic() == 45)
-    Assert(sub.getpublic() == sub.getpublicsub())
-    Assert(sub.getpublic() == sub.superfield)
-    sub.superfield = 77
-    Assert(sub.getpublic() == 77)
-    Assert(sub.getpublicsub() == 77)
-    sub.setprivate(15)
-    Assert(sub.getprivate() == sub.getprivatesub())
-    #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(sub.getprivate() == 99)
+    #:: ExpectedOutput(invalid.program:private.field.access)
+    Assert(sub.__privatefield == 35)

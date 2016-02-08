@@ -1,5 +1,6 @@
 from contracts.contracts import *
 
+
 #:: ExpectedOutput(invalid.program:function.return.missing)
 @Pure
 def someFunc(a: bool, b: int) -> bool:
