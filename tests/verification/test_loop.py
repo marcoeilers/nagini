@@ -1,7 +1,7 @@
 from contracts.contracts import *
 
 
-def methodWithLoop() -> int:
+def method_with_loop() -> int:
     Ensures(Result() == 4 * 99)
     i = 0
     j = 99
@@ -12,7 +12,7 @@ def methodWithLoop() -> int:
     return i + 198
 
 
-def invariantNotPreserved() -> int:
+def invariant_not_preserved() -> int:
     Ensures(Result() == 4 * 99)
     i = 0
     j = 99
@@ -24,7 +24,7 @@ def invariantNotPreserved() -> int:
     return i + 198
 
 
-def invariantNotEstablished() -> int:
+def invariant_not_established() -> int:
     Ensures(Result() == 4 * 99)
     i = -3
     j = 99
@@ -36,7 +36,7 @@ def invariantNotEstablished() -> int:
     return i + 198
 
 
-def assertionNotValid() -> int:
+def assertion_not_valid() -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 4 * 99)
     i = 0
@@ -54,7 +54,7 @@ def helper(a: int) -> bool:
     return a != 5
 
 
-def functionCondition() -> int:
+def function_condition() -> int:
     Ensures(Result() == 10)
     i = 15
     sum = 0
@@ -65,7 +65,7 @@ def functionCondition() -> int:
     return sum
 
 
-def nestedLoop(arg: int) -> int:
+def nested_loop(arg: int) -> int:
     Ensures(Result() == (2 * arg) * 99)
     i = 0
     j = 99
@@ -82,7 +82,7 @@ def nestedLoop(arg: int) -> int:
     return i
 
 
-def nestedLoopFail(arg: int) -> int:
+def nested_loop_fail(arg: int) -> int:
     Ensures(Result() == (2 * arg) * 99)
     i = 0
     j = 99

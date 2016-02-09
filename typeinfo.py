@@ -18,9 +18,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.path = path
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
-        print("visit member")
-        print(o.name)
-        print('type of whole thing')
         rectype = self.typeOf(o.expr)
         if not isinstance(rectype, mypy.types.AnyType):
             self.set_type([rectype.type.name(), o.name], self.typeOf(o))
@@ -60,9 +57,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if self.alltypes[key] != type:
                 if not isinstance(self.alltypes[key], mypy.types.AnyType):
                     # Different types for same var? what is happening here?
-                    print(key)
-                    print(type)
-                    print(self.alltypes[key])
                     raise Exception()
         self.alltypes[key] = type
 
@@ -71,8 +65,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             a.accept(self)
 
     def typeOf(self, node):
-        print("typeof")
-        print(node)
         if isinstance(node, mypy.nodes.FuncDef):
             return node.type
         elif isinstance(node, mypy.nodes.CallExpr):

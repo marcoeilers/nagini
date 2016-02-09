@@ -4,6 +4,7 @@ from typing import TypeVar, List, Tuple, Optional, Dict
 T = TypeVar('T')
 V = TypeVar('V')
 
+
 def unzip(pairs: List[Tuple[T, V]]) -> Tuple[List[T], List[V]]:
     """
     Unzips a list of pairs into two lists
@@ -19,6 +20,7 @@ def flatten(lists: List[List[T]]) -> List[T]:
     Flattens a list of lists into a flat list
     """
     return [item for sublist in lists for item in sublist]
+
 
 class UnsupportedException(Exception):
     """
