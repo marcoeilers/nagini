@@ -18,6 +18,7 @@ viperjar = os.environ['VIPERJAR']
 mypydir = get_mypy_dir()
 jvm = jvmaccess.JVM(viperjar)
 
+
 class AnnotatedTests():
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
         """
@@ -47,7 +48,8 @@ class AnnotatedTests():
     def token_to_expected(self, token):
         content = token.string.strip()[4:]
         strippedlist = content.split(';')
-        return [(token.start, stripped[15:len(stripped) - 1]) for stripped in strippedlist]
+        return [(token.start, stripped[15:len(stripped) - 1]) for stripped in
+                strippedlist]
 
     def failure_to_actual(self, error: 'silver.verifier.AbstractError') \
             -> Tuple[int, int, str, str]:
@@ -77,8 +79,9 @@ class VerificationTests(AnnotatedTests):
         the file
         """
         test_annotations = self.get_test_annotations(file_path)
-        expected = flatten([self.token_to_expected(ann) for ann in test_annotations if
-                    ann.string.strip().startswith('#:: ExpectedOutput(')])
+        expected = flatten(
+            [self.token_to_expected(ann) for ann in test_annotations if
+             ann.string.strip().startswith('#:: ExpectedOutput(')])
         expected_lo = [(line, id) for ((line, col), id) in expected]
         if vresult:
             assert not expected
@@ -92,7 +95,9 @@ class VerificationTests(AnnotatedTests):
             assert not missing_info
             self.compare_actual_expected(actual_lo, expected_lo)
 
-verificationTester = VerificationTests()
+
+verification_tester = VerificationTests()
+
 
 def verification_test_files():
     result = []
@@ -102,9 +107,10 @@ def verification_test_files():
             result.append(joined)
     return result
 
+
 @pytest.mark.parametrize('path', verification_test_files())
 def test_verification(path):
-    verificationTester.test_file(path)
+    verification_tester.test_file(path)
 
 
 class TranslationTests(AnnotatedTests):
@@ -115,8 +121,9 @@ class TranslationTests(AnnotatedTests):
 
     def test_file(self, path: str):
         test_annotations = self.get_test_annotations(path)
-        expected = flatten([self.token_to_expected(ann) for ann in test_annotations if
-                    ann.string.strip().startswith('#:: ExpectedOutput(')])
+        expected = flatten(
+            [self.token_to_expected(ann) for ann in test_annotations if
+             ann.string.strip().startswith('#:: ExpectedOutput(')])
         expected_lo = [(line, id) for ((line, col), id) in expected]
         try:
             translate(path, jvm, mypydir)
@@ -126,12 +133,14 @@ class TranslationTests(AnnotatedTests):
             line = e1.node.lineno
             actual = [(line, code)]
         except TypeException as e2:
-            actual = [self.extract_mypy_error(msg) for msg in e2.messages if ', line ' in msg]
+            actual = [self.extract_mypy_error(msg) for msg in e2.messages if
+                      ', line ' in msg]
 
         self.compare_actual_expected(actual, expected_lo)
 
 
-translationTester = TranslationTests()
+translation_tester = TranslationTests()
+
 
 def translation_test_files():
     test_files = [join(test_translation_dir, f) for f in
@@ -140,6 +149,7 @@ def translation_test_files():
                       '.py')]
     return test_files
 
+
 @pytest.mark.parametrize('path', translation_test_files())
 def test_translation(path):
-    translationTester.test_file(path)
+    translation_tester.test_file(path)

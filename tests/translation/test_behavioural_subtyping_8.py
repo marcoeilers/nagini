@@ -10,7 +10,7 @@ class MyOtherException(Exception):
     pass
 
 class Super:
-    def someFunction(self, a: int) -> int:
+    def somefunction(self, a: int) -> int:
         Requires(a >= 0)
         Ensures(Result() > 17)
         Exsures(MyException, True)
@@ -18,7 +18,7 @@ class Super:
 
 class Sub(Super):
     #:: ExpectedOutput(invalid.program:invalid.override)
-    def someFunction(self, c: int) -> int:
+    def somefunction(self, c: int) -> int:
         Requires(True)
         Ensures(Result() > 17)
         Exsures(MySpecialException, True)

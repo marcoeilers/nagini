@@ -58,6 +58,9 @@ class Translator:
         self.viper = viperast
         self.position = None
         self.info = None
+        self.currentclass = None
+        self.currentfunction = None
+        self.program = None
 
         self.builtins = {'builtins.int': viperast.Int,
                          'builtins.bool': viperast.Bool}
@@ -74,19 +77,19 @@ class Translator:
                 raise InvalidProgramException(node, 'purity.violated')
             results.insert(0, expr)
         result = None
-        for letOrExpr in results:
+        for let_or_expr in results:
             if result is None:
-                if isinstance(letOrExpr, LetWrapper):
+                if isinstance(let_or_expr, LetWrapper):
                     raise InvalidProgramException(function.node,
                                                   'function.return.missing')
-                result = letOrExpr
+                result = let_or_expr
             else:
-                if not isinstance(letOrExpr, LetWrapper):
+                if not isinstance(let_or_expr, LetWrapper):
                     raise InvalidProgramException(function.node,
                                                   'function.dead.code')
-                result = self.viper.Let(letOrExpr.vardecl, letOrExpr.expr,
+                result = self.viper.Let(let_or_expr.vardecl, let_or_expr.expr,
                                         result,
-                                        self.to_position(letOrExpr.node),
+                                        self.to_position(let_or_expr.node),
                                         self.noinfo())
         if result is None:
             raise InvalidProgramException(function.node,
@@ -211,7 +214,7 @@ class Translator:
             pred = self.viper.FieldAccessPredicate(fieldacc, perm,
                                                    self.to_position(node),
                                                    self.noinfo())
-            return ([], pred)
+            return [], pred
         elif self.get_func_name(node) == 'Implies':
             assert len(node.args) == 2
             condstmt, cond = self.translate_expr(node.args[0])
@@ -249,28 +252,28 @@ class Translator:
         name = self.get_func_name(node)
         if name in self.program.classes:
             # this is a constructor call
-            targetClass = self.program.classes[name]
+            targetclass = self.program.classes[name]
             targets = []
-            resultVar = self.currentfunction.create_variable(name + '_res',
-                                                             targetClass,
+            resultvar = self.currentfunction.create_variable(name + '_res',
+                                                             targetclass,
                                                              self)
-            targets.append(resultVar.ref)
-            target = targetClass.get_method('__init__')
+            targets.append(resultvar.ref)
+            target = targetclass.get_method('__init__')
             if target is not None:
                 if len(target.declaredexceptions) > 0:
-                    errorVar = self.currentfunction.create_variable(
+                    errorvar = self.currentfunction.create_variable(
                         target.name + '_err',
                         self.program.classes['Exception'], self)
-                    targets.append(errorVar.ref)
-            call = [self.viper.MethodCall(targetClass.silname + '___init__',
+                    targets.append(errorvar.ref)
+            call = [self.viper.MethodCall(targetclass.silname + '___init__',
                                           args, targets,
                                           self.to_position(node),
                                           self.noinfo())]
             if target is not None and len(target.declaredexceptions) > 0:
-                call = call + self.create_exception_catchers(errorVar,
+                call = call + self.create_exception_catchers(errorvar,
                                                              self.currentfunction.handlers,
                                                              node)
-            return (argstmts + call, resultVar.ref)
+            return (argstmts + call, resultvar.ref)
         if isinstance(node.func, ast.Attribute):
             # method called on an object
             recstmt, receiver = self.translate_expr(node.func.value)
@@ -411,9 +414,9 @@ class Translator:
             funcapp = self.viper.FuncApp(var.silname, [],
                                          self.to_position(node),
                                          self.noinfo(), type, [])
-            return ([], funcapp)
+            return [], funcapp
         else:
-            return ([], self.currentfunction.get_variable(node.id).ref)
+            return [], self.currentfunction.get_variable(node.id).ref
 
     def translate_Attribute(self, node: ast.Attribute) -> StmtAndExpr:
         stmt, receiver = self.translate_expr(node.value)
@@ -482,7 +485,7 @@ class Translator:
         condexp = self.viper.CondExp(cond, then, els,
                                      self.to_position(node),
                                      self.noinfo())
-        return (condstmt + bodystmt, condexp)
+        return condstmt + bodystmt, condexp
 
     def translate_BinOp(self, node: ast.BinOp) -> StmtAndExpr:
         lstmt, left = self.translate_expr(node.left)
@@ -553,8 +556,8 @@ class Translator:
             return ([], self.viper.FalseLit(self.to_position(node),
                                             self.noinfo()))
         elif node.value is None:
-            return (
-                [], self.viper.NullLit(self.to_position(node), self.noinfo()))
+            return ([],
+                    self.viper.NullLit(self.to_position(node), self.noinfo()))
         else:
             raise UnsupportedException(node)
 
@@ -1081,14 +1084,14 @@ class Translator:
                                           self.noinfo())
             posts.append(expr)
         # create exceptional postconditions
-        errorTypeConds = []
+        errortypeconds = []
         errortypepos = self.to_position(method.node)
         for exception in method.declaredexceptions:
             oldpos = self.position
             if self.position is None:
                 self.position = errortypepos
             hastype = self.varhastype('_err', self.program.classes[exception])
-            errorTypeConds.append(hastype)
+            errortypeconds.append(hastype)
             self.position = oldpos
             condition = self.viper.And(error, hastype, self.noposition(),
                                        self.noinfo())
@@ -1101,16 +1104,16 @@ class Translator:
                                           self.noinfo())
                 posts.append(expr)
 
-        errorTypeCond = None
-        for type in errorTypeConds:
-            if errorTypeCond is None:
-                errorTypeCond = type
+        errortypecond = None
+        for type in errortypeconds:
+            if errortypecond is None:
+                errortypecond = type
             else:
-                errorTypeCond = self.viper.Or(errorTypeCond, type,
+                errortypecond = self.viper.Or(errortypecond, type,
                                               errortypepos,
                                               self.noinfo())
-        if errorTypeCond is not None:
-            posts.append(self.viper.Implies(error, errorTypeCond,
+        if errortypecond is not None:
+            posts.append(self.viper.Implies(error, errortypecond,
                                             self.to_position(post),
                                             self.noinfo()))
         # create typeof preconditions
@@ -1118,7 +1121,7 @@ class Translator:
             if not (method.args[arg].clazz.name in PRIMITIVES
                     or (isconstructor and arg == next(iter(method.args)))):
                 pres.append(self.get_parameter_typeof(method.args[arg]))
-        return (pres, posts)
+        return pres, posts
 
     def to_position(self, node):
         """
@@ -1318,10 +1321,9 @@ class Translator:
         selfvarname = 'self' if method is None else method.args[
             next(iter(method.args))].silname
         args = []
-        results = []
-        results.append(self.viper.LocalVarDecl(selfvarname, self.viper.Ref,
-                                               position,
-                                               self.noinfo()))
+        results = [self.viper.LocalVarDecl(selfvarname, self.viper.Ref,
+                                           position,
+                                           self.noinfo())]
         selfvar = self.viper.LocalVar(selfvarname, self.viper.Ref,
                                       self.noposition(), self.noinfo())
         locals = []
@@ -1339,12 +1341,12 @@ class Translator:
                     if method is None:
                         acc = self.viper.FieldAccess(selfvar, field.field,
                                                      position, self.noinfo())
-                        accs.append(self.viper.FieldAccessPredicate(acc,
-                                                                    self.viper.FullPerm(
-                                                                        position,
-                                                                        self.noinfo()),
-                                                                    position,
-                                                                    self.noinfo()))
+                        perm = self.viper.FullPerm(position, self.noinfo())
+                        pred = self.viper.FieldAccessPredicate(acc,
+                                                               perm,
+                                                               position,
+                                                               self.noinfo())
+                        accs.append(pred)
             clz = clz.superclass
 
         body.append(self.viper.NewStmt(selfvar, fields, self.noposition(),
@@ -1448,9 +1450,9 @@ class Translator:
             for fieldname in clazz.fields:
                 field = clazz.fields[fieldname]
                 if field.inherited is None:
-                    silField = self.translate_field(field)
-                    field.field = silField
-                    fields.append(silField)
+                    silfield = self.translate_field(field)
+                    field.field = silfield
+                    fields.append(silfield)
 
         for function in program.functions:
             functions.append(

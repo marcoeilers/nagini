@@ -6,7 +6,7 @@ def m1(a: int) -> bool:
     return a != 5
 
 
-def methodWithLoop() -> int:
+def method_with_loop() -> int:
     Ensures(Result() == 10)
     i = 15
     sum = 0
