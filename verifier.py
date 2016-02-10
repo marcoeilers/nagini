@@ -1,5 +1,11 @@
 from abc import ABCMeta
+from enum import Enum
 from jvmaccess import JVM
+
+
+class ViperVerifier(Enum):
+    silicon = 'silicon'
+    carbon = 'carbon'
 
 
 class VerificationResult(metaclass=ABCMeta):
@@ -34,7 +40,7 @@ class Failure(VerificationResult):
             [str(error) for error in self.errors])
 
 
-class Verifier:
+class Silicon:
     """
     Provides access to the Silicon verifier
     """
@@ -56,6 +62,40 @@ class Verifier:
         if not self.ready:
             self.silicon.restart()
         result = self.silicon.verify(prog)
+        self.ready = False
+        if isinstance(result, self.silver.verifier.Failure):
+            it = result.errors().toIterator()
+            errors = []
+            while it.hasNext():
+                errors += [it.next()]
+            return Failure(errors)
+        else:
+            return Success()
+
+
+class Carbon:
+    """
+    Provides access to the Carbon verifier
+    """
+
+    def __init__(self, jvm: JVM, filename: str):
+        self.silver = jvm.viper.silver
+        self.carbon = jvm.viper.carbon.CarbonVerifier()
+        args = jvm.scala.collection.mutable.ArraySeq(1)
+        args.update(0, filename)
+        self.carbon.parseCommandLine(args)
+        self.carbon.config().initialize(None)
+        self.carbon.start()
+        self.ready = True
+
+    def verify(self, prog: 'silver.ast.Program') \
+            -> VerificationResult:
+        """
+        Verifies the given program using Carbon
+        """
+        if not self.ready:
+            self.carbon.restart()
+        result = self.carbon.verify(prog)
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
