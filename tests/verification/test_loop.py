@@ -83,7 +83,7 @@ def nested_loop(arg: int) -> int:
 
 
 def nested_loop_fail(arg: int) -> int:
-    Ensures(Result() == (2 * arg) * 99)
+    Ensures(Result() == (2 * (arg + 1)) * 99)
     i = 0
     j = 99
     while j != 0:

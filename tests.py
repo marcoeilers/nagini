@@ -10,14 +10,24 @@ from translator import InvalidProgramException
 from typeinfo import TypeException
 from typing import List, Tuple
 from util import flatten
-from verifier import VerificationResult
+from verifier import VerificationResult, ViperVerifier
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
-viperjar = os.environ['VIPERJAR']
+classpath = ''
+siliconjar = os.environ.get('SILICONJAR')
+carbonjar = os.environ.get('CARBONJAR')
+verifiers = []
 mypydir = get_mypy_dir()
-jvm = jvmaccess.JVM(viperjar)
-
+if siliconjar is not None:
+    classpath += siliconjar
+    verifiers.append(ViperVerifier.silicon)
+if carbonjar is not None:
+    if classpath != '':
+        classpath += os.pathsep
+    classpath += carbonjar
+    verifiers.append(ViperVerifier.carbon)
+jvm = jvmaccess.JVM(classpath)
 
 class AnnotatedTests():
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
@@ -38,12 +48,6 @@ class AnnotatedTests():
         tokens = tokenize.tokenize(filebytes.readline)
         test_annotations = [tk for tk in tokens if self._is_annotation(tk)]
         return test_annotations
-
-    def test_file(self, path: str):
-        prog = translate(path, jvm, mypydir)
-        assert prog is not None
-        vresult = verify(prog, path, jvm)
-        self.evaluate_result(vresult, path, jvm)
 
     def token_to_expected(self, token):
         content = token.string.strip()[4:]
@@ -72,6 +76,12 @@ class AnnotatedTests():
 
 
 class VerificationTests(AnnotatedTests):
+    def test_file(self, path: str, jvm, verifier):
+        prog = translate(path, jvm, mypydir)
+        assert prog is not None
+        vresult = verify(prog, path, jvm, verifier)
+        self.evaluate_result(vresult, path, jvm)
+
     def evaluate_result(self, vresult: VerificationResult, file_path: str,
                         jvm: jvmaccess.JVM):
         """
@@ -104,13 +114,13 @@ def verification_test_files():
     for f in os.listdir(test_verification_dir):
         joined = join(test_verification_dir, f)
         if isfile(joined) and f.endswith('.py'):
-            result.append(joined)
+            result += [(joined, verifier) for verifier in verifiers]
     return result
 
 
-@pytest.mark.parametrize('path', verification_test_files())
-def test_verification(path):
-    verification_tester.test_file(path)
+@pytest.mark.parametrize('path,verifier', verification_test_files())
+def test_verification(path, verifier):
+    verification_tester.test_file(path, jvm, verifier)
 
 
 class TranslationTests(AnnotatedTests):
@@ -119,7 +129,7 @@ class TranslationTests(AnnotatedTests):
         parts = message[start:].split(':', 1)
         return (int(parts[0]), 'type.error:' + parts[1].strip())
 
-    def test_file(self, path: str):
+    def test_file(self, path: str, jvm):
         test_annotations = self.get_test_annotations(path)
         expected = flatten(
             [self.token_to_expected(ann) for ann in test_annotations if
@@ -152,4 +162,4 @@ def translation_test_files():
 
 @pytest.mark.parametrize('path', translation_test_files())
 def test_translation(path):
-    translation_tester.test_file(path)
+    translation_tester.test_file(path, jvm)

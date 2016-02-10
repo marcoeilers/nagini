@@ -9,7 +9,7 @@ from jvmaccess import JVM
 from os.path import expanduser
 from translator import Translator, InvalidProgramException
 from typeinfo import TypeInfo, TypeException
-from verifier import Verifier, VerificationResult
+from verifier import Carbon, Silicon, VerificationResult, ViperVerifier
 from viper_ast import ViperAST
 
 
@@ -52,12 +52,15 @@ def translate(path: str, jvm: JVM, mypydir: str):
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
-        verifier = Verifier(jvm, path)
+        if backend == ViperVerifier.silicon:
+            verifier = Silicon(jvm, path)
+        elif backend == ViperVerifier.carbon:
+            verifier = Carbon(jvm, path)
         vresult = verifier.verify(prog)
         return vresult
     except JavaException as je:
