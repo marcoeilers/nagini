@@ -19,14 +19,15 @@ siliconjar = os.environ.get('SILICONJAR')
 carbonjar = os.environ.get('CARBONJAR')
 verifiers = []
 mypydir = get_mypy_dir()
-if siliconjar is not None:
+if siliconjar is not None and os.path.isfile(siliconjar):
     classpath += siliconjar
     verifiers.append(ViperVerifier.silicon)
-if carbonjar is not None:
+if carbonjar is not None and os.path.isfile(carbonjar):
     if classpath != '':
         classpath += os.pathsep
     classpath += carbonjar
     verifiers.append(ViperVerifier.carbon)
+assert classpath != ''
 jvm = jvmaccess.JVM(classpath)
 
 class AnnotatedTests():
