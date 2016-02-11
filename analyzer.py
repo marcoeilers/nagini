@@ -1,12 +1,12 @@
 import ast
-import collections
 import mypy
 
-from constants import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS, PRIMITIVES, \
-    LITERALS
-from util import UnsupportedException
+from collections import OrderedDict
+from constants import PRIMITIVES, LITERALS
+from contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from typeinfo import TypeInfo
 from typing import List, Optional
+from util import UnsupportedException
 
 
 class PythonScope:
@@ -48,10 +48,10 @@ class PythonScope:
 
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo):
-        self.classes = collections.OrderedDict()
-        self.functions = collections.OrderedDict()
-        self.methods = collections.OrderedDict()
-        self.global_vars = collections.OrderedDict()
+        self.classes = OrderedDict()
+        self.functions = OrderedDict()
+        self.methods = OrderedDict()
+        self.global_vars = OrderedDict()
         self.silnames = []
         self.superscope = None
         self.types = types
@@ -59,8 +59,8 @@ class PythonProgram(PythonScope):
             self.classes[primitive] = PythonClass(primitive, self)
 
     def process(self, translator: 'Translator') -> None:
-        for clazz in self.classes:
-            self.classes[clazz].process(self.get_fresh_name(clazz), translator)
+        for cls in self.classes:
+            self.classes[cls].process(self.get_fresh_name(cls), translator)
         for function in self.functions:
             self.functions[function].process(self.get_fresh_name(function),
                                              translator)
@@ -91,12 +91,10 @@ class PythonClass(PythonNode, PythonScope):
     def __init__(self, name: str, superscope: PythonScope, node: ast.AST = None,
                  superclass: 'PythonClass' = None):
         super().__init__(name, node)
-        if name == 'None' or name == None:
-            raise Exception()
         self.superclass = superclass
-        self.functions = collections.OrderedDict()
-        self.methods = collections.OrderedDict()
-        self.fields = collections.OrderedDict()
+        self.functions = OrderedDict()
+        self.methods = OrderedDict()
+        self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.superscope = superscope
         self.silnames = []
@@ -152,12 +150,12 @@ class PythonClass(PythonNode, PythonScope):
         for field in self.fields:
             self.fields[field].process(self.get_fresh_name(field))
 
-    def issubtype(self, clazz: 'PythonClass') -> bool:
-        if clazz is self:
+    def issubtype(self, cls: 'PythonClass') -> bool:
+        if cls is self:
             return True
         if self.superclass is None:
             return False
-        return self.superclass.issubtype(clazz)
+        return self.superclass.issubtype(cls)
 
 
 class PythonMethod(PythonNode, PythonScope):
@@ -166,18 +164,18 @@ class PythonMethod(PythonNode, PythonScope):
     to a class or not
     """
 
-    def __init__(self, name: str, node: ast.AST, clazz: PythonClass,
+    def __init__(self, name: str, node: ast.AST, cls: PythonClass,
                  superscope: PythonScope, pure: bool):
         super().__init__(name, node=node)
-        if clazz is not None:
-            if not isinstance(clazz, PythonClass):
-                raise Exception(clazz)
-        self.clazz = clazz
+        if cls is not None:
+            if not isinstance(cls, PythonClass):
+                raise Exception(cls)
+        self.cls = cls
         self.overrides = None  # infer
-        self.locals = collections.OrderedDict()  # direct
-        self.args = collections.OrderedDict()  # direct
+        self.locals = OrderedDict()  # direct
+        self.args = OrderedDict()  # direct
         self.type = None  # infer
-        self.declaredexceptions = collections.OrderedDict()  # direct
+        self.declared_exceptions = OrderedDict()  # direct
         self.precondition = []
         self.postcondition = []
         self.handlers = []  # direct
@@ -194,8 +192,8 @@ class PythonMethod(PythonNode, PythonScope):
             self.type = self.get_program().classes[functype.type.name()]
         else:
             raise UnsupportedException(functype)
-        if self.clazz is not None and self.clazz.superclass is not None:
-            self.overrides = self.clazz.superclass.get_func_or_method(self.name)
+        if self.cls is not None and self.cls.superclass is not None:
+            self.overrides = self.cls.superclass.get_func_or_method(self.name)
 
         for arg in self.args:
             self.args[arg].process(self.get_fresh_name(arg), translator)
@@ -210,23 +208,23 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             return self.get_program().global_vars[name]
 
-    def create_variable(self, name: str, clazz: PythonClass,
+    def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator') -> 'PythonVar':
         silname = self.get_fresh_name(name)
-        result = PythonVar(silname, None, clazz)
+        result = PythonVar(silname, None, cls)
         result.process(silname, translator)
         self.locals[silname] = result
         return result
 
 
 class PythonExceptionHandler(PythonNode):
-    def __init__(self, node: ast.AST, type: PythonClass, tryname: str,
+    def __init__(self, node: ast.AST, exception_type: PythonClass, tryname: str,
                  handlername: str, body: ast.AST, protectedRegion: ast.AST):
         super().__init__(handlername, node=node)
         self.tryname = tryname
         self.body = body
         self.region = protectedRegion
-        self.type = type
+        self.exception = exception_type
 
 
 class PythonVar(PythonNode):
@@ -235,9 +233,9 @@ class PythonVar(PythonNode):
     or a function parameter.
     """
 
-    def __init__(self, name: str, node: ast.AST, clazz: PythonClass):
+    def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
-        self.clazz = clazz
+        self.type = type
         self.writes = []
         self.reads = []
 
@@ -249,9 +247,9 @@ class PythonVar(PythonNode):
 
 class PythonField(PythonNode):
     def __init__(self, name: str, node: ast.AST, type: PythonClass,
-                 clazz: PythonClass):
+                 cls: PythonClass):
         super().__init__(name, node)
-        self.clazz = clazz
+        self.cls = cls
         self.inherited = None  # infer
         self.type = type
         self.reads = []  # direct
@@ -260,16 +258,16 @@ class PythonField(PythonNode):
     def process(self, silname: str) -> None:
         self.silname = silname
         if not self.is_mangled():
-            if self.clazz.superclass is not None:
-                self.inherited = self.clazz.superclass.get_field(self.name)
+            if self.cls.superclass is not None:
+                self.inherited = self.cls.superclass.get_field(self.name)
 
     def is_mangled(self) -> bool:
         return self.name.startswith('__') and not self.name.endswith('__')
 
 
-class Analyzer:
+class Analyzer(ast.NodeVisitor):
     """
-    Walks through the Python AST and collects the structures to be translated
+    Walks through the Python AST and collects the structures to be translated.
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo):
@@ -279,8 +277,8 @@ class Analyzer:
         self.viper = jvm.viper
         self.types = types
         self.program = PythonProgram(types)
-        self.currentclass = None
-        self.currentfunction = None
+        self.current_class = None
+        self.current_function = None
 
     def process(self, translator: 'Translator') -> None:
         self.program.process(translator)
@@ -302,49 +300,47 @@ class Analyzer:
 
     def get_class(self, name: str) -> PythonClass:
         if name in self.program.classes:
-            clazz = self.program.classes[name]
+            cls = self.program.classes[name]
         else:
-            clazz = PythonClass(name, self.program)
-            self.program.classes[name] = clazz
-        return clazz
+            cls = PythonClass(name, self.program)
+            self.program.classes[name] = cls
+        return cls
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        assert self.currentclass is None
-        assert self.currentfunction is None
+        assert self.current_class is None
+        assert self.current_function is None
         name = node.name
-        if not isinstance(name, str):
-            raise Exception(name)
-        clazz = self.get_class(name)
+        cls = self.get_class(name)
         if len(node.bases) > 1:
             raise UnsupportedException(node)
         if len(node.bases) == 1:
-            clazz.superclass = self.get_class(node.bases[0].id)
-        self.currentclass = clazz
+            cls.superclass = self.get_class(node.bases[0].id)
+        self.current_class = cls
         for member in node.body:
             self.visit(member, node)
-        self.currentclass = None
+        self.current_class = None
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        assert self.currentfunction is None
+        assert self.current_function is None
         name = node.name
         if not isinstance(name, str):
             raise Exception(name)
-        if self.currentclass is None:
-            scopecontainer = self.program
+        if self.current_class is None:
+            scope_container = self.program
         else:
-            scopecontainer = self.currentclass
+            scope_container = self.current_class
         if self.is_pure(node):
-            container = scopecontainer.functions
+            container = scope_container.functions
         else:
-            container = scopecontainer.methods
+            container = scope_container.methods
         if name in container:
             func = container[name]
-            func.clazz = self.currentclass
+            func.cls = self.current_class
             func.pure = self.is_pure(node)
             func.node = node
-            func.superscope = scopecontainer
+            func.superscope = scope_container
         else:
-            func = PythonMethod(name, node, self.currentclass, scopecontainer,
+            func = PythonMethod(name, node, self.current_class, scope_container,
                                 self.is_pure(node))
             container[name] = func
         functype = self.types.getfunctype(func.get_scope_prefix())
@@ -354,37 +350,38 @@ class Analyzer:
             func.type = self.get_class(functype.type.name())
         else:
             raise UnsupportedException(functype)
-        self.currentfunction = func
+        self.current_function = func
         self.visit_default(node)
-        self.currentfunction = None
+        self.current_function = None
 
     def visit_arg(self, node: ast.arg) -> None:
-        assert self.currentfunction is not None
-        self.currentfunction.args[node.arg] = PythonVar(node.arg, node,
+        assert self.current_function is not None
+        self.current_function.args[node.arg] = PythonVar(node.arg, node,
                                                         self.typeof(node))
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
-        if var is not None:
-            if isinstance(node.ctx, ast.Load):
-                var.reads.append(node)
-            elif isinstance(node.ctx, ast.Store):
-                var.writes.append(node)
-            else:
-                raise UnsupportedException(node)
+        if var is None:
+            return
+        if isinstance(node.ctx, ast.Load):
+            var.reads.append(node)
+        elif isinstance(node.ctx, ast.Store):
+            var.writes.append(node)
+        else:
+            raise UnsupportedException(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        if isinstance(node.func,
-                      ast.Name) and node.func.id in CONTRACT_WRAPPER_FUNCS:
-            assert self.currentfunction is not None
+        if (isinstance(node.func, ast.Name)
+                and node.func.id in CONTRACT_WRAPPER_FUNCS):
+            assert self.current_function is not None
             if node.func.id == 'Requires':
-                self.currentfunction.precondition.append(node.args[0])
+                self.current_function.precondition.append(node.args[0])
             elif node.func.id == 'Ensures':
-                self.currentfunction.postcondition.append(node.args[0])
+                self.current_function.postcondition.append(node.args[0])
             elif node.func.id == 'Exsures':
                 exception = node.args[0].id
-                if exception not in self.currentfunction.declaredexceptions:
-                    self.currentfunction.declaredexceptions[exception] = []
-                self.currentfunction.declaredexceptions[exception].append(
+                if exception not in self.current_function.declared_exceptions:
+                    self.current_function.declared_exceptions[exception] = []
+                self.current_function.declared_exceptions[exception].append(
                     node.args[1])
         self.visit_default(node)
 
@@ -404,43 +401,42 @@ class Analyzer:
         if isinstance(node._parent, ast.ExceptHandler):
             if node._parent.type is node:
                 return
-        # could be global declaration or global reference or static member
-        # or local var or func arg
-        if self.currentfunction is None:
-            # this is global in some way
-            if self.currentclass is None:
-                # global var
+        # node could be global reference or static member
+        # or local variable or function argument.
+        if self.current_function is None:
+            # node is global in some way.
+            if self.current_class is None:
+                # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     type = self.types.gettype([], node.id)
-                    clazz = self.get_class(type.name())
-                    var = PythonVar(node.id, node, clazz)
+                    cls = self.get_class(type.name())
+                    var = PythonVar(node.id, node, cls)
                     assign = node._parent
-                    if not isinstance(assign, ast.Assign) or len(
-                            assign.targets) != 1:
+                    if (not isinstance(assign, ast.Assign)
+                        or len(assign.targets) != 1):
                         raise UnsupportedException(assign)
                     var.value = assign.value
                     self.program.global_vars[node.id] = var
                 var = self.program.global_vars[node.id]
                 self.track_access(node, var)
             else:
-                # static field
+                # node is a static field.
                 raise UnsupportedException(node)
-        # this is a global or a local var or a static field
-        if not node.id in self.program.global_vars:
-            # must be local for static field
-            if self.currentfunction is None:
-                # must be static field
+        if node.id not in self.program.global_vars:
+            # node is a local variable or a static field.
+            if self.current_function is None:
+                # node is a static field.
                 raise UnsupportedException(node)
             else:
-                # must be local var?
+                # node refers to a local variable.
                 var = None
-                if node.id in self.currentfunction.locals:
-                    var = self.currentfunction.locals[node.id]
-                elif node.id in self.currentfunction.args:
+                if node.id in self.current_function.locals:
+                    var = self.current_function.locals[node.id]
+                elif node.id in self.current_function.args:
                     pass
                 else:
                     var = PythonVar(node.id, node, self.typeof(node))
-                    self.currentfunction.locals[node.id] = var
+                    self.current_function.locals[node.id] = var
                 self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
@@ -455,10 +451,10 @@ class Analyzer:
             if node.id in LITERALS:
                 raise UnsupportedException(node)
             context = []
-            if self.currentclass is not None:
-                context.append(self.currentclass.name)
-            if self.currentfunction is not None:
-                context.append(self.currentfunction.name)
+            if self.current_class is not None:
+                context.append(self.current_class.name)
+            if self.current_function is not None:
+                context.append(self.current_function.name)
             type = self.types.gettype(context, node.id)
             return self.get_class(type.name())
         elif isinstance(node, ast.Attribute):
@@ -468,15 +464,16 @@ class Analyzer:
             return self.get_class(type.name())
         elif isinstance(node, ast.arg):
             context = []
-            if self.currentclass is not None:
-                context.append(self.currentclass.name)
-            context.append(self.currentfunction.name)
+            if self.current_class is not None:
+                context.append(self.current_class.name)
+            context.append(self.current_function.name)
             type = self.types.gettype(context, node.arg)
             return self.get_class(type.name())
-        elif isinstance(node, ast.Call) and isinstance(node.func,
-                                                       ast.Name) and node.func.id in CONTRACT_FUNCS:
+        elif (isinstance(node, ast.Call)
+              and isinstance(node.func, ast.Name)
+              and node.func.id in CONTRACT_FUNCS):
             if node.func.id == 'Result':
-                return self.currentfunction.type
+                return self.current_function.type
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,
@@ -488,18 +485,18 @@ class Analyzer:
             raise UnsupportedException(node)
 
     def visit_Try(self, node: ast.Try) -> None:
-        assert self.currentfunction is not None
+        assert self.current_function is not None
         self.visit_default(node)
-        tryname = self.currentfunction.get_fresh_name('try')
+        tryname = self.current_function.get_fresh_name('try')
         node.silname = tryname
         for handler in node.handlers:
-            handlername = self.currentfunction.get_fresh_name(
+            handlername = self.current_function.get_fresh_name(
                 'handler' + handler.type.id)
             type = self.get_class(handler.type.id)
             pyhndlr = PythonExceptionHandler(handler, type, tryname,
                                              handlername, handler.body,
                                              node.body)
-            self.currentfunction.handlers.append(pyhndlr)
+            self.current_function.handlers.append(pyhndlr)
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return (len(func.decorator_list) == 1
