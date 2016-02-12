@@ -15,7 +15,7 @@ class PythonScope:
     """
 
     def contains_name(self, name: str) -> bool:
-        result = name in self.silnames
+        result = name in self.sil_names
         if self.superscope is not None:
             result = result or self.superscope.contains_name(name)
         return result
@@ -27,10 +27,10 @@ class PythonScope:
             while self.contains_name(newname):
                 counter = counter + 1
                 newname = name + '_' + str(counter)
-            self.silnames.append(newname)
+            self.sil_names.append(newname)
             return newname
         else:
-            self.silnames.append(name)
+            self.sil_names.append(name)
             return name
 
     def get_scope_prefix(self) -> List[str]:
@@ -52,7 +52,7 @@ class PythonProgram(PythonScope):
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.global_vars = OrderedDict()
-        self.silnames = []
+        self.sil_names = []
         self.superscope = None
         self.types = types
         for primitive in PRIMITIVES:
@@ -84,7 +84,7 @@ class PythonNode:
     def __init__(self, name: str, node=None):
         self.node = node
         self.name = name
-        self.silname = None
+        self.sil_name = None
 
 
 class PythonClass(PythonNode, PythonScope):
@@ -97,7 +97,7 @@ class PythonClass(PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.superscope = superscope
-        self.silnames = []
+        self.sil_names = []
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonClass') -> 'PythonField':
@@ -139,8 +139,8 @@ class PythonClass(PythonNode, PythonScope):
         else:
             return self.get_method(name)
 
-    def process(self, silname: str, translator: 'Translator') -> None:
-        self.silname = silname
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        self.sil_name = sil_name
         for function in self.functions:
             self.functions[function].process(self.get_fresh_name(function),
                                              translator)
@@ -181,10 +181,10 @@ class PythonMethod(PythonNode, PythonScope):
         self.handlers = []  # direct
         self.superscope = superscope
         self.pure = pure
-        self.silnames = ['_res', '_err', '__end']
+        self.sil_names = ['_res', '_err', '__end']
 
-    def process(self, silname: str, translator: 'Translator') -> None:
-        self.silname = silname
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        self.sil_name = sil_name
         functype = self.get_program().types.getfunctype(self.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             self.type = None
@@ -210,10 +210,10 @@ class PythonMethod(PythonNode, PythonScope):
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator') -> 'PythonVar':
-        silname = self.get_fresh_name(name)
-        result = PythonVar(silname, None, cls)
-        result.process(silname, translator)
-        self.locals[silname] = result
+        sil_name = self.get_fresh_name(name)
+        result = PythonVar(sil_name, None, cls)
+        result.process(sil_name, translator)
+        self.locals[sil_name] = result
         return result
 
 
@@ -239,8 +239,8 @@ class PythonVar(PythonNode):
         self.writes = []
         self.reads = []
 
-    def process(self, silname: str, translator: 'Translator') -> None:
-        self.silname = silname
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        self.sil_name = sil_name
         self.decl = translator.translate_pythonvar_decl(self)
         self.ref = translator.translate_pythonvar_ref(self)
 
@@ -255,8 +255,8 @@ class PythonField(PythonNode):
         self.reads = []  # direct
         self.writes = []  # direct
 
-    def process(self, silname: str) -> None:
-        self.silname = silname
+    def process(self, sil_name: str) -> None:
+        self.sil_name = sil_name
         if not self.is_mangled():
             if self.cls.superclass is not None:
                 self.inherited = self.cls.superclass.get_field(self.name)
@@ -292,11 +292,11 @@ class Analyzer(ast.NodeVisitor):
                 for item in fieldval:
                     self.visit(item, node)
 
-    def visit(self, childnode: ast.AST, parent: ast.AST) -> None:
-        childnode._parent = parent
-        method = 'visit_' + childnode.__class__.__name__
+    def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
+        child_node._parent = parent
+        method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
-        visitor(childnode)
+        visitor(child_node)
 
     def get_class(self, name: str) -> PythonClass:
         if name in self.program.classes:
@@ -487,16 +487,16 @@ class Analyzer(ast.NodeVisitor):
     def visit_Try(self, node: ast.Try) -> None:
         assert self.current_function is not None
         self.visit_default(node)
-        tryname = self.current_function.get_fresh_name('try')
-        node.silname = tryname
+        try_name = self.current_function.get_fresh_name('try')
+        node.sil_name = try_name
         for handler in node.handlers:
-            handlername = self.current_function.get_fresh_name(
+            handler_name = self.current_function.get_fresh_name(
                 'handler' + handler.type.id)
             type = self.get_class(handler.type.id)
-            pyhndlr = PythonExceptionHandler(handler, type, tryname,
-                                             handlername, handler.body,
-                                             node.body)
-            self.current_function.handlers.append(pyhndlr)
+            py_handler = PythonExceptionHandler(handler, type, try_name,
+                                                handler_name, handler.body,
+                                                node.body)
+            self.current_function.handlers.append(py_handler)
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return (len(func.decorator_list) == 1
