@@ -21,10 +21,10 @@ def func2(arg: int) -> int:
     arg2 = arg
     while arg2 > 0:
         Invariant(True)
-        localvar12 = False
+        local_var12 = False
         arg2 -= 5
-    if localvar12 and localvar12:
-        localvar = func1(15)
-        return localvar + 10
+    if local_var12 and local_var12:
+        local_var = func1(15)
+        return local_var + 10
     else:
         return 42
