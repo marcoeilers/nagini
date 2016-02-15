@@ -4,64 +4,64 @@ from contracts.contracts import *
 class SuperClass:
     def construct(self) -> None:
         Requires(self != None)
-        Requires(Acc(self.superfield))  # type: ignore
-        Requires(Acc(self.__privatefield))  # type: ignore
-        Requires(Acc(self.typedfield))  # type: ignore
-        Ensures(Acc(self.superfield) and self.superfield == 12)  # type: ignore
+        Requires(Acc(self.super_field))  # type: ignore
+        Requires(Acc(self.__private_field))  # type: ignore
+        Requires(Acc(self.typed_field))  # type: ignore
+        Ensures(Acc(self.super_field) and self.super_field == 12)  # type: ignore
         Ensures(Acc(
-            self.__privatefield) and self.__privatefield == 15)  # type: ignore
-        Ensures(Acc(self.typedfield)  # type: ignore
-                and isinstance(self.typedfield, superClass))  # type: ignore
-        self.superfield = 12
-        self.__privatefield = 15
-        self.typedfield = SuperClass()
+            self.__private_field) and self.__private_field == 15)  # type: ignore
+        Ensures(Acc(self.typed_field)  # type: ignore
+                and isinstance(self.typed_field, SuperClass))  # type: ignore
+        self.super_field = 12
+        self.__private_field = 15
+        self.typed_field = SuperClass()
 
     @Pure
-    def getprivate(self) -> int:
+    def get_private(self) -> int:
         Requires(self != None)
-        Requires(Acc(self.__privatefield))
-        return self.__privatefield
+        Requires(Acc(self.__private_field))
+        return self.__private_field
 
     @Pure
-    def getpublic(self) -> int:
+    def get_public(self) -> int:
         Requires(self != None)
-        Requires(Acc(self.superfield))
-        return self.superfield
+        Requires(Acc(self.super_field))
+        return self.super_field
 
 
 class SubClass(SuperClass):
-    def constructsub(self) -> None:
+    def construct_sub(self) -> None:
         Requires(self != None)
-        Requires(Acc(self.__privatefield))  # type: ignore
-        Requires(Acc(self.superfield))  # type: ignore
+        Requires(Acc(self.__private_field))  # type: ignore
+        Requires(Acc(self.super_field))  # type: ignore
         Ensures(Acc(
-            self.__privatefield) and self.__privatefield == 35)  # type: ignore
-        Ensures(Acc(self.superfield) and self.superfield == 45)  # type: ignore
-        self.__privatefield = 35
-        self.superfield = 45
+            self.__private_field) and self.__private_field == 35)  # type: ignore
+        Ensures(Acc(self.super_field) and self.super_field == 45)  # type: ignore
+        self.__private_field = 35
+        self.super_field = 45
 
-    def setprivate(self, i: int) -> None:
+    def set_private(self, i: int) -> None:
         Requires(self != None)
-        Requires(Acc(self.__privatefield))
-        Ensures(Acc(self.__privatefield) and self.__privatefield == i)
-        self.__privatefield = i
-
-    @Pure
-    def getprivatesub(self) -> int:
-        Requires(self != None)
-        Requires(Acc(self.__privatefield))
-        return self.__privatefield
+        Requires(Acc(self.__private_field))
+        Ensures(Acc(self.__private_field) and self.__private_field == i)
+        self.__private_field = i
 
     @Pure
-    def getpublicsub(self) -> int:
+    def get_private_sub(self) -> int:
         Requires(self != None)
-        Requires(Acc(self.superfield))
-        return self.superfield
+        Requires(Acc(self.__private_field))
+        return self.__private_field
+
+    @Pure
+    def get_public_sub(self) -> int:
+        Requires(self != None)
+        Requires(Acc(self.super_field))
+        return self.super_field
 
 
 def main() -> None:
     sub = SubClass()
     sub.construct()
-    sub.constructsub()
+    sub.construct_sub()
     #:: ExpectedOutput(invalid.program:private.field.access)
-    Assert(sub.__privatefield == 35)
+    Assert(sub.__private_field == 35)

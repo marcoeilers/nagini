@@ -34,68 +34,68 @@ def func5(a: int) -> int:
 
 
 @Pure
-def func6(othername: int) -> int:
+def func6(other_name: int) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Result() == othername)
+    Ensures(Result() == other_name)
     return 17
 
 
 @Pure
-def func7(othername: int) -> int:
-    Requires(othername > 5)
+def func7(other_name: int) -> int:
+    Requires(other_name > 5)
     Ensures(Result() > 7)
-    return othername + 2
+    return other_name + 2
 
 
 @Pure
-def func8(othername: int) -> int:
-    Requires(othername > 5)
+def func8(other_name: int) -> int:
+    Requires(other_name > 5)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() > 7)
-    return othername - 2
+    return other_name - 2
 
 
 @Pure
-def func9(somename: int, othername: int, otherthird: bool) -> bool:
-    Requires(othername > 5)
-    Requires(somename > 17)
-    Requires(otherthird)
-    Ensures(Result() == otherthird)
+def func9(some_name: int, other_name: int, other_third: bool) -> bool:
+    Requires(other_name > 5)
+    Requires(some_name > 17)
+    Requires(other_third)
+    Ensures(Result() == other_third)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == False)
-    return otherthird == (somename + othername > 22)
+    return other_third == (some_name + other_name > 22)
 
 
 @Pure
-def func10(somename: int, othername: int, otherthird: bool) -> bool:
-    Requires(othername > 5)
-    Requires(somename > 17)
-    Ensures(Result() == otherthird)
-    return otherthird == (somename + othername > 22)
+def func10(some_name: int, other_name: int, other_third: bool) -> bool:
+    Requires(other_name > 5)
+    Requires(some_name > 17)
+    Ensures(Result() == other_third)
+    return other_third == (some_name + other_name > 22)
 
 
 @Pure
-def func11(somename: int, othername: int, otherthird: bool) -> bool:
-    Requires(othername > 5)
-    Requires(somename > 17)
-    Requires(otherthird)
-    Ensures(Result() == otherthird)
+def func11(some_name: int, other_name: int, other_third: bool) -> bool:
+    Requires(other_name > 5)
+    Requires(some_name > 17)
+    Requires(other_third)
+    Ensures(Result() == other_third)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == False)
-    a = somename
+    a = some_name
     c = 22
-    b = (a + othername > c)
-    res = otherthird == b
+    b = (a + other_name > c)
+    res = other_third == b
     return res
 
 
 @Pure
-def func12(somename: int, othername: int, otherthird: bool) -> bool:
-    Requires(othername > 5)
-    Requires(somename > 17)
-    Ensures(Result() == otherthird)
-    a = somename
+def func12(some_name: int, other_name: int, other_third: bool) -> bool:
+    Requires(other_name > 5)
+    Requires(some_name > 17)
+    Ensures(Result() == other_third)
+    a = some_name
     c = 22
-    b = (a + othername > c)
-    res = otherthird == b
-    return otherthird == b
+    b = (a + other_name > c)
+    res = other_third == b
+    return other_third == b
