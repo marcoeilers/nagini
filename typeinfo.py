@@ -2,6 +2,7 @@ import mypy.build
 import os
 import sys
 
+from mypy.build import BuildSource
 from typing import List
 
 
@@ -38,8 +39,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = self.prefix + [o.name()]
         functype = self.typeOf(o)
         self.set_type(self.prefix, functype)
-        for arg in o.args:
-            self.set_type(self.prefix + [arg.name()], arg.type)
+        for arg in o.arguments:
+            self.set_type(self.prefix + [arg.variable.name()],
+                          arg.variable.type)
         super().visit_func_def(o)
         self.prefix = oldprefix
 
@@ -96,7 +98,7 @@ class TypeInfo:
         the translation to Viper
         """
         try:
-            res = mypy.build.build(filename, target=mypy.build.TYPE_CHECK,
+            res = mypy.build.build([BuildSource(filename, None, None)], target=mypy.build.TYPE_CHECK,
                                    bin_dir=os.path.dirname(mypydir))
             visitor = TypeVisitor(res.types, filename)
             # for df in res.files['__main__'].defs:
