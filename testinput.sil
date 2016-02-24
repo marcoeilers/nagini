@@ -1,0 +1,28 @@
+field list_seq : Seq[Int]
+
+method list___init__() returns (res: Ref)
+    ensures res != null
+    ensures acc(res.list_seq)
+    ensures |res.list_seq| == 0
+{
+    assume false
+}
+
+method list_append(lst: Ref, el: Int)
+    requires lst != null
+    requires acc(lst.list_seq)
+    ensures acc(lst.list_seq)
+    ensures |lst.list_seq| == old(|lst.list_seq|) + 1
+    ensures forall ind: Int :: ind >= 0 && ind < old(|lst.list_seq|) ==> lst.list_seq[ind] == old(lst.list_seq[ind])
+    ensures lst.list_seq[old(|lst.list_seq|)] == el
+{
+    assume false
+}
+
+method list_get(lst: Ref, ind: Int) returns (res : Int)
+    requires acc(lst.list_seq, 1/10)
+    ensures acc(lst.list_seq, 1/10)
+    ensures res == lst.list_seq[ind]
+{
+    assume false
+}

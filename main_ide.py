@@ -3,7 +3,6 @@ import astpp
 import os
 import re
 import sys
-import traceback
 
 from analyzer import Analyzer
 from jpype import JavaException
@@ -50,8 +49,8 @@ def translate(path: str, jvm: JVM, mypydir: str):
     """
     try:
         builtins = ['/home/marco/scion/git/py2viper/contracts/bltns.py']
-        native_sil = ['/home/marco/scion/git/py2viper/translation/testinput.sil']
-        list = "{'list': {'methods': {'__init__': {'args': [],'type': None},'append': {'args': ['list', 'int'],'type': None},'get': {'args': ['list', 'int'],'type': 'int'}}}}"
+        native_sil =  ['/home/marco/scion/git/py2viper/translation/testinput.sil']
+        list = "{'list': {'methods': {'__init__': {'args': [],'type': None},'append': {'args': ['List', 'int'],'type': None},'get': {'args': ['List', 'int'],'type': 'int'}}}}"
         sil_interface = [list]
         sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
         modules = [path] + builtins
@@ -77,7 +76,6 @@ def translate(path: str, jvm: JVM, mypydir: str):
         return prog
     except JavaException as je:
         print(je.stacktrace())
-        traceback.print_exc()
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
@@ -94,7 +92,6 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
         return vresult
     except JavaException as je:
         print(je.stacktrace())
-        traceback.print_exc()
 
 def to_list(seq):
     result = []
@@ -122,7 +119,7 @@ def main_translate() -> None:
     try:
         prog = translate(path, jvm, mypydir)
         # print("Translation successful. Result:")
-        print(prog)
+        # print(prog)
         vresult = verify(prog, path, jvm)
         # print("Verification completed.")
         with open("/home/marco/.config/sublime-text-3/Packages/User/Py2Viper/tmp/errors.log", "w+") as f:

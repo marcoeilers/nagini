@@ -6,14 +6,24 @@ def func1(b: int) -> int:
     Requires(b == 15)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 32)
-    return b + 16
+    a = 16
+    return b + a
+
+def method1(b: int) -> int:
+    Requires(b == 15)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() == 32)
+    a = 16
+    return b + a
 
 
 @Pure
 def func3(x: int, y: int, z: bool) -> bool:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == (x != y))
-    return x == y and (y == x or x == x)
+    eq = x == y
+    something = (y == x or x == x)
+    return eq and something
 
 
 def func2(arg: int) -> int:
@@ -28,3 +38,4 @@ def func2(arg: int) -> int:
         return local_var + 10
     else:
         return 42
+
