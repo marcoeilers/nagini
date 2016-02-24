@@ -17,7 +17,7 @@ def get_mypy_dir() -> str:
     (first, second, _, _, _) = sys.version_info
     userdir = expanduser('~')
     possible_dirs = [userdir + '/.local/bin',
-                     'usr/local/bin'] if os.name == 'posix' else [
+                     '/usr/local/bin'] if os.name == 'posix' else [
         'C:\Python' + str(first) + str(second) + '\Scripts']
     for dir in possible_dirs:
         if os.path.isdir(dir):

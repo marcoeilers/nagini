@@ -2,6 +2,7 @@ import io
 import jvmaccess
 import os
 import pytest
+import re
 import tokenize
 
 from main import translate, verify, get_mypy_dir
@@ -29,6 +30,9 @@ if carbonjar is not None and os.path.isfile(carbonjar):
     verifiers.append(ViperVerifier.carbon)
 assert classpath != ''
 jvm = jvmaccess.JVM(classpath)
+
+type_error_pattern = "^(.*):(\\d+): error: (.*)$"
+mypy_error_matcher = re.compile(type_error_pattern)
 
 class AnnotatedTests():
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
@@ -126,9 +130,10 @@ def test_verification(path, verifier):
 
 class TranslationTests(AnnotatedTests):
     def extract_mypy_error(self, message):
-        start = message.index(', line ') + 7
-        parts = message[start:].split(':', 1)
-        return (int(parts[0]), 'type.error:' + parts[1].strip())
+        parts = mypy_error_matcher.match(message).groups()
+        offset = 3 if parts[0] is None else 0
+        return (int(parts[1 + offset]),
+                'type.error:' + parts[2 + offset].strip())
 
     def test_file(self, path: str, jvm):
         test_annotations = self.get_test_annotations(path)
@@ -145,7 +150,7 @@ class TranslationTests(AnnotatedTests):
             actual = [(line, code)]
         except TypeException as e2:
             actual = [self.extract_mypy_error(msg) for msg in e2.messages if
-                      ', line ' in msg]
+                      mypy_error_matcher.match(msg)]
 
         self.compare_actual_expected(actual, expected_lo)
 
