@@ -102,8 +102,8 @@ class TypeInfo:
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
-            self.allTypes = visitor.alltypes
-            print(self.allTypes)
+            self.allTypes.update(visitor.alltypes)
+            # print(self.allTypes)
             return True
         except mypy.errors.CompileError as e:
             for m in e.messages:
