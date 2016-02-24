@@ -19,7 +19,9 @@ classpath = ''
 siliconjar = os.environ.get('SILICONJAR')
 carbonjar = os.environ.get('CARBONJAR')
 verifiers = []
-mypydir = get_mypy_dir()
+mypydir = os.environ.get('MYPYDIR')
+if not mypydir:
+    mypydir = get_mypy_dir()
 if siliconjar is not None and os.path.isfile(siliconjar):
     classpath += siliconjar
     verifiers.append(ViperVerifier.silicon)
