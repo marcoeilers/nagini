@@ -185,7 +185,7 @@ class PythonMethod(PythonNode, PythonScope):
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         self.sil_name = sil_name
-        functype = self.get_program().types.getfunctype(self.get_scope_prefix())
+        functype = self.get_program().types.get_func_type(self.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             self.type = None
         elif isinstance(functype, mypy.types.Instance):
@@ -343,7 +343,7 @@ class Analyzer(ast.NodeVisitor):
             func = PythonMethod(name, node, self.current_class, scope_container,
                                 self.is_pure(node))
             container[name] = func
-        functype = self.types.getfunctype(func.get_scope_prefix())
+        functype = self.types.get_func_type(func.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             func.type = None
         elif isinstance(functype, mypy.types.Instance):
@@ -408,7 +408,7 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is None:
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
-                    type = self.types.gettype([], node.id)
+                    type = self.types.get_type([], node.id)
                     cls = self.get_class(type.name())
                     var = PythonVar(node.id, node, cls)
                     assign = node._parent
@@ -455,19 +455,19 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
-            type = self.types.gettype(context, node.id)
+            type = self.types.get_type(context, node.id)
             return self.get_class(type.name())
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             context = [receiver.name]
-            type = self.types.gettype(context, node.attr)
+            type = self.types.get_type(context, node.attr)
             return self.get_class(type.name())
         elif isinstance(node, ast.arg):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
-            type = self.types.gettype(context, node.arg)
+            type = self.types.get_type(context, node.arg)
             return self.get_class(type.name())
         elif (isinstance(node, ast.Call)
               and isinstance(node.func, ast.Name)

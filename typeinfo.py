@@ -2,6 +2,7 @@ import mypy.build
 import os
 import sys
 
+from mypy.build import BuildSource
 from typing import List
 
 
@@ -11,35 +12,36 @@ class TypeException(Exception):
 
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, typeMap, path):
+    def __init__(self, type_map, path):
         self.prefix = []
-        self.alltypes = {}
-        self.typemap = typeMap
+        self.all_types = {}
+        self.type_map = type_map
         self.path = path
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
-        rectype = self.typeOf(o.expr)
+        rectype = self.type_of(o.expr)
         if not isinstance(rectype, mypy.types.AnyType):
-            self.set_type([rectype.type.name(), o.name], self.typeOf(o))
+            self.set_type([rectype.type.name(), o.name], self.type_of(o))
         super().visit_member_expr(o)
 
     def visit_try_stmt(self, o: mypy.nodes.TryStmt):
         for var in o.vars:
             if var is not None:
-                self.set_type(self.prefix + [var.name], self.typeOf(var))
+                self.set_type(self.prefix + [var.name], self.type_of(var))
         for block in o.handlers:
             block.accept(self)
 
     def visit_name_expr(self, o: mypy.nodes.NameExpr):
-        self.set_type(self.prefix + [o.name], self.typeOf(o))
+        self.set_type(self.prefix + [o.name], self.type_of(o))
 
     def visit_func_def(self, o: mypy.nodes.FuncDef):
         oldprefix = self.prefix
         self.prefix = self.prefix + [o.name()]
-        functype = self.typeOf(o)
+        functype = self.type_of(o)
         self.set_type(self.prefix, functype)
-        for arg in o.args:
-            self.set_type(self.prefix + [arg.name()], arg.type)
+        for arg in o.arguments:
+            self.set_type(self.prefix + [arg.variable.name()],
+                          arg.variable.type)
         super().visit_func_def(o)
         self.prefix = oldprefix
 
@@ -52,31 +54,32 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def set_type(self, fqn, type):
         if isinstance(type, mypy.types.AnyType):
             return  # just ignore??
+        if isinstance(type, mypy.types.Instance):
+            type = type.type
         key = tuple(fqn)
-        if key in self.alltypes:
-            if self.alltypes[key] != type:
-                if not isinstance(self.alltypes[key], mypy.types.AnyType):
+        if key in self.all_types:
+            if self.all_types[key] != type:
+                if not isinstance(self.all_types[key], mypy.types.AnyType):
                     # Different types for same var? what is happening here?
                     raise Exception()
-        self.alltypes[key] = type
+        self.all_types[key] = type
 
     def visit_call_expr(self, o: mypy.nodes.CallExpr):
         for a in o.args:
             a.accept(self)
 
-    def typeOf(self, node):
+    def type_of(self, node):
         if isinstance(node, mypy.nodes.FuncDef):
             return node.type
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
-                type = self.alltypes[tuple(self.prefix)].ret_type
+                type = self.all_types[tuple(self.prefix)].ret_type
                 return type
-        if node in self.typemap:
-            result = self.typemap[node]
+        if node in self.type_map:
+            result = self.type_map[node]
             return result
         else:
-            msg = 'File "' + self.path + '", line ' + str(
-                node.get_line()) + ' :'
+            msg = self.path + ':' + str(node.get_line()) + ': error: '
             msg += 'dead.code'
             raise TypeException([msg])
 
@@ -96,13 +99,13 @@ class TypeInfo:
         the translation to Viper
         """
         try:
-            res = mypy.build.build(filename, target=mypy.build.TYPE_CHECK,
+            res = mypy.build.build([BuildSource(filename, None, None)], target=mypy.build.TYPE_CHECK,
                                    bin_dir=os.path.dirname(mypydir))
             visitor = TypeVisitor(res.types, filename)
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
-            self.allTypes = visitor.alltypes
+            self.allTypes = visitor.all_types
             print(self.allTypes)
             return True
         except mypy.errors.CompileError as e:
@@ -110,7 +113,7 @@ class TypeInfo:
                 sys.stderr.write('Mypy error: ' + m + '\n')
             raise TypeException(e.messages)
 
-    def gettype(self, prefix: List[str], name: str):
+    def get_type(self, prefix: List[str], name: str):
         """
         Looks up the inferred or annotated type for the given name in the given
         prefix
@@ -120,13 +123,13 @@ class TypeInfo:
             if not prefix:
                 return None
             else:
-                return self.gettype(prefix[:len(prefix) - 1], name)
+                return self.get_type(prefix[:len(prefix) - 1], name)
         else:
             if isinstance(result, mypy.types.Instance):
                 result = result.type
             return result
 
-    def getfunctype(self, prefix: List[str]):
+    def get_func_type(self, prefix: List[str]):
         """
         Looks up the type of the function which creates the given context
         """
@@ -135,7 +138,7 @@ class TypeInfo:
             if len(prefix) == 0:
                 return None
             else:
-                return self.getfunctype(prefix[:len(prefix) - 1])
+                return self.get_func_type(prefix[:len(prefix) - 1])
         else:
             if isinstance(result, mypy.types.FunctionLike):
                 result = result.ret_type
