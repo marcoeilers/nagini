@@ -9,3 +9,4 @@ __pycache__
 .mr.developer.cfg
 *.egg-info
 *.egg-link
+tmp

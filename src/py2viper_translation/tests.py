@@ -1,17 +1,18 @@
 import io
-import jvmaccess
+from py2viper_translation import jvmaccess
 import os
 import pytest
 import re
 import tokenize
+import glob
 
-from main import translate, verify, get_mypy_dir
+from py2viper_translation.main import translate, verify, get_mypy_dir
 from os.path import isfile, join
-from translator import InvalidProgramException
-from typeinfo import TypeException
+from py2viper_translation.translator import InvalidProgramException
+from py2viper_translation.typeinfo import TypeException
 from typing import List, Tuple
-from util import flatten
-from verifier import VerificationResult, ViperVerifier
+from py2viper_translation.util import flatten
+from py2viper_translation.verifier import VerificationResult, ViperVerifier
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
@@ -19,9 +20,6 @@ classpath = ''
 siliconjar = os.environ.get('SILICONJAR')
 carbonjar = os.environ.get('CARBONJAR')
 verifiers = []
-mypydir = os.environ.get('MYPYDIR')
-if not mypydir:
-    mypydir = get_mypy_dir()
 if siliconjar is not None and os.path.isfile(siliconjar):
     classpath += siliconjar
     verifiers.append(ViperVerifier.silicon)
@@ -30,7 +28,12 @@ if carbonjar is not None and os.path.isfile(carbonjar):
         classpath += os.pathsep
     classpath += carbonjar
     verifiers.append(ViperVerifier.carbon)
-assert classpath != ''
+if not classpath:
+    verifiers = [ViperVerifier.silicon]
+    classpath = os.pathsep.join(
+            glob.glob('/usr/lib/viper/*.jar')
+            )
+assert classpath
 jvm = jvmaccess.JVM(classpath)
 
 type_error_pattern = "^(.*):(\\d+): error: (.*)$"
@@ -84,7 +87,7 @@ class AnnotatedTests():
 
 class VerificationTests(AnnotatedTests):
     def test_file(self, path: str, jvm, verifier):
-        prog = translate(path, jvm, mypydir)
+        prog = translate(path, jvm)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
         self.evaluate_result(vresult, path, jvm)
@@ -144,7 +147,7 @@ class TranslationTests(AnnotatedTests):
              ann.string.strip().startswith('#:: ExpectedOutput(')])
         expected_lo = [(line, id) for ((line, col), id) in expected]
         try:
-            translate(path, jvm, mypydir)
+            translate(path, jvm)
             assert False
         except InvalidProgramException as e1:
             code = 'invalid.program:' + e1.code

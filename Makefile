@@ -1,5 +1,9 @@
+export MYPYPATH=deps/py2viper-contracts/src/
+export Z3_EXE=/usr/bin/viper-z3
+export BOOGIE_EXE=/usr/lib/boogie/Boogie.exe
+
 test: buildout
-	bin/py.test -x tests.py
+	bin/py.test -x src/py2viper_translation/tests.py
 
 buildout: bin/buildout
 	bin/buildout -v
@@ -13,6 +17,7 @@ deps/py2viper-contracts:
 
 env: .virtualenv
 	python3 .virtualenv/source/virtualenv.py env
+	env/bin/pip install mypy-lang==0.3.1
 
 .virtualenv:
 	mkdir -p .virtualenv
@@ -21,3 +26,8 @@ env: .virtualenv
 		-O .virtualenv/archive.tar.gz
 	tar -xvf .virtualenv/archive.tar.gz
 	mv virtualenv-* .virtualenv/source
+
+clean:
+	rm -rf \
+		.virtualenv bin deps/JPype1 develop-eggs env parts \
+		.installed.cfg .mr.developer.cfg tmp
