@@ -1,6 +1,6 @@
 from abc import ABCMeta
 from enum import Enum
-from jvmaccess import JVM
+from py2viper_translation.jvmaccess import JVM
 
 
 class ViperVerifier(Enum):

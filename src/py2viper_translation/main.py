@@ -1,16 +1,20 @@
 import ast
-import astpp
+from py2viper_translation import astpp
 import os
 import sys
 
-from analyzer import Analyzer
+from py2viper_translation.analyzer import Analyzer
 from jpype import JavaException
-from jvmaccess import JVM
+from py2viper_translation.jvmaccess import JVM
 from os.path import expanduser
-from translator import Translator, InvalidProgramException
-from typeinfo import TypeInfo, TypeException
-from verifier import Carbon, Silicon, VerificationResult, ViperVerifier
-from viper_ast import ViperAST
+from py2viper_translation.translator import Translator, InvalidProgramException
+from py2viper_translation.typeinfo import TypeInfo, TypeException
+from py2viper_translation.verifier import (
+    Carbon,
+    Silicon,
+    VerificationResult,
+    ViperVerifier)
+from py2viper_translation.viper_ast import ViperAST
 
 
 def get_mypy_dir() -> str:
@@ -26,12 +30,12 @@ def get_mypy_dir() -> str:
     return None
 
 
-def translate(path: str, jvm: JVM, mypydir: str):
+def translate(path: str, jvm: JVM):
     """
     Translates the Python module at the given path to a Viper program
     """
     types = TypeInfo()
-    typecorrect = types.check(path, mypydir)
+    typecorrect = types.check(path)
     try:
         if typecorrect:
             with open(path, 'r') as file:

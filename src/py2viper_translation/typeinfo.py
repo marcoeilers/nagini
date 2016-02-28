@@ -93,14 +93,16 @@ class TypeInfo:
     def __init__(self):
         self.allTypes = {}
 
-    def check(self, filename: str, mypydir: str) -> bool:
+    def check(self, filename: str) -> bool:
         """
         Typechecks the given file and collects all type information needed for
         the translation to Viper
         """
         try:
-            res = mypy.build.build([BuildSource(filename, None, None)], target=mypy.build.TYPE_CHECK,
-                                   bin_dir=os.path.dirname(mypydir))
+            res = mypy.build.build(
+                [BuildSource(filename, None, None)],
+                target=mypy.build.TYPE_CHECK,
+                )
             visitor = TypeVisitor(res.types, filename)
             # for df in res.files['__main__'].defs:
             # print(df)
