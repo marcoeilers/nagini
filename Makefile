@@ -1,6 +1,4 @@
 export MYPYPATH=deps/py2viper-contracts/src/
-export Z3_EXE=/usr/bin/viper-z3
-export BOOGIE_EXE=/usr/lib/boogie/Boogie.exe
 
 test: buildout
 	bin/py.test -x src/py2viper_translation/tests.py
