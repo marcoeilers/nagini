@@ -18,3 +18,9 @@ If fails with error::
 Try to set::
 
     export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+Known Issues
+============
+
+``mypy-lang`` version is hard-coded in ``Makefile`` because of
+`this issue <https://github.com/python/mypy/issues/1252>`_.
