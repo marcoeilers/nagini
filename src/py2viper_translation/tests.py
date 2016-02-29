@@ -13,28 +13,17 @@ from py2viper_translation.typeinfo import TypeException
 from typing import List, Tuple
 from py2viper_translation.util import flatten
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
+from py2viper_translation import config
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
-classpath = ''
-siliconjar = os.environ.get('SILICONJAR')
-carbonjar = os.environ.get('CARBONJAR')
-verifiers = []
-if siliconjar is not None and os.path.isfile(siliconjar):
-    classpath += siliconjar
-    verifiers.append(ViperVerifier.silicon)
-if carbonjar is not None and os.path.isfile(carbonjar):
-    if classpath != '':
-        classpath += os.pathsep
-    classpath += carbonjar
+
+verifiers = [ViperVerifier.silicon]
+if config.boogie_path:
     verifiers.append(ViperVerifier.carbon)
-if not classpath:
-    verifiers = [ViperVerifier.silicon]
-    classpath = os.pathsep.join(
-            glob.glob('/usr/lib/viper/*.jar')
-            )
-assert classpath
-jvm = jvmaccess.JVM(classpath)
+
+assert config.classpath
+jvm = jvmaccess.JVM(config.classpath)
 
 type_error_pattern = "^(.*):(\\d+): error: (.*)$"
 mypy_error_matcher = re.compile(type_error_pattern)
