@@ -84,7 +84,7 @@ class Carbon:
     def __init__(self, jvm: JVM, filename: str):
         self.silver = jvm.viper.silver
         self.carbon = jvm.viper.carbon.CarbonVerifier()
-        args = jvm.scala.collection.mutable.ArraySeq(1)
+        args = jvm.scala.collection.mutable.ArraySeq(5)
         args.update(0, '--boogieExe')
         args.update(1, config.boogie_path)
         args.update(2, '--z3Exe')
