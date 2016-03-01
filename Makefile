@@ -15,9 +15,6 @@ deps/py2viper-contracts:
 
 env: .virtualenv
 	python3 .virtualenv/source/virtualenv.py env
-	# This one is needed because of
-	# https://github.com/python/mypy/issues/1252
-	env/bin/pip install mypy-lang==0.3.1
 
 .virtualenv:
 	mkdir -p .virtualenv
