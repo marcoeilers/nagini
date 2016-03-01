@@ -22,5 +22,5 @@ Try to set::
 Known Issues
 ============
 
-``mypy-lang`` version is hard-coded in ``Makefile`` because of
+``mypy-lang`` is downloaded from different source because of
 `this issue <https://github.com/python/mypy/issues/1252>`_.
