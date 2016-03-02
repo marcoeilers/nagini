@@ -108,7 +108,6 @@ class TypeInfo:
             # print(df)
             res.files['__main__'].accept(visitor)
             self.allTypes = visitor.all_types
-            print(self.allTypes)
             return True
         except mypy.errors.CompileError as e:
             for m in e.messages:

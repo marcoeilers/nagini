@@ -20,7 +20,7 @@ setup(
             ],
         entry_points = {
              'console_scripts': [
-                 'py2viper = py2viper_translation:main',
+                 'py2viper = py2viper_translation.main:main',
                  ]
              },
         url='http://www.pm.inf.ethz.ch/research/viper.html',
