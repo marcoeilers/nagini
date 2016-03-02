@@ -72,9 +72,25 @@ def _get_z3_path():
             return '/usr/bin/z3'
 
 
+def _get_mypy_path():
+    """ Construct MYPYPATH.
+
+    If MYPYPATH environment variable is not defined, then sets it to
+    ``py2viper-contracts`` directory.
+    """
+
+    mypy_path = os.environ.get('MYPYPATH')
+    if not mypy_path:
+        import py2viper_contracts
+        mypy_path = os.path.dirname(os.path.dirname(
+            py2viper_contracts.__file__))
+    return mypy_path
+
+
 classpath = _construct_classpath()
 boogie_path = _get_boogie_path()
 z3_path = _get_z3_path()
+mypy_path = _get_mypy_path()
 
 
-__all__ = [classpath, boogie_path, z3_path]
+__all__ = [classpath, boogie_path, z3_path, mypy_path]

@@ -18,6 +18,8 @@ from py2viper_translation import config
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
 
+os.environ['MYPYPATH'] = config.mypy_path
+
 verifiers = [ViperVerifier.silicon]
 if config.boogie_path:
     verifiers.append(ViperVerifier.carbon)
