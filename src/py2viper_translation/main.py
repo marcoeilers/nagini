@@ -17,19 +17,6 @@ from py2viper_translation.verifier import (
 from py2viper_translation.viper_ast import ViperAST
 
 
-def get_mypy_dir() -> str:
-    (first, second, _, _, _) = sys.version_info
-    userdir = expanduser('~')
-    possible_dirs = [userdir + '/.local/bin',
-                     '/usr/local/bin'] if os.name == 'posix' else [
-        'C:\Python' + str(first) + str(second) + '\Scripts']
-    for dir in possible_dirs:
-        if os.path.isdir(dir):
-            if 'mypy' in os.listdir(dir):
-                return os.path.join(dir, 'mypy')
-    return None
-
-
 def translate(path: str, jvm: JVM):
     """
     Translates the Python module at the given path to a Viper program
