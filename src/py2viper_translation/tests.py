@@ -6,7 +6,7 @@ import re
 import tokenize
 import glob
 
-from py2viper_translation.main import translate, verify, get_mypy_dir
+from py2viper_translation.main import translate, verify
 from os.path import isfile, join
 from py2viper_translation.translator import InvalidProgramException
 from py2viper_translation.typeinfo import TypeException
