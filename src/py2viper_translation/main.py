@@ -113,12 +113,17 @@ def main() -> None:
         if args.verbose:
             print("Verification completed.")
         print(vresult)
+        if vresult:
+            sys.exit(0)
+        else:
+            sys.exit(1)
     except (TypeException, InvalidProgramException) as e:
         print("Translation failed")
         if isinstance(e, InvalidProgramException):
             print('Line ' + str(e.node.lineno) + ': ' + e.code)
             if e.message:
                 print(e.message)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
