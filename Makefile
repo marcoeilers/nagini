@@ -1,5 +1,3 @@
-export MYPYPATH=deps/py2viper-contracts/src/
-
 test: buildout
 	bin/py.test -x src/py2viper_translation/tests.py
 
