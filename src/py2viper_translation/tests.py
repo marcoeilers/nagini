@@ -1,19 +1,21 @@
 import io
-from py2viper_translation import jvmaccess
 import os
 import pytest
 import re
 import tokenize
 import glob
 
-from py2viper_translation.main import translate, verify
+from typing import List, Tuple
 from os.path import isfile, join
+
+from py2viper_translation import config
+from py2viper_translation import jvmaccess
+from py2viper_translation.main import translate, verify
 from py2viper_translation.translator import InvalidProgramException
 from py2viper_translation.typeinfo import TypeException
-from typing import List, Tuple
 from py2viper_translation.util import flatten
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
-from py2viper_translation import config
+
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'

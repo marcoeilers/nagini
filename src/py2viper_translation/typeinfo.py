@@ -1,6 +1,6 @@
-import mypy.build
 import os
 import sys
+import mypy.build
 
 from mypy.build import BuildSource
 from typing import List

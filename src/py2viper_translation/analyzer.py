@@ -2,10 +2,11 @@ import ast
 import mypy
 
 from collections import OrderedDict
+from typing import List, Optional
+
 from py2viper_translation.constants import PRIMITIVES, LITERALS
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.typeinfo import TypeInfo
-from typing import List, Optional
 from py2viper_translation.util import UnsupportedException
 
 
