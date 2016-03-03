@@ -3,12 +3,13 @@ import os
 import sys
 import argparse
 
+from jpype import JavaException
+from os.path import expanduser
+
 from py2viper_translation import astpp
 from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
-from jpype import JavaException
 from py2viper_translation.jvmaccess import JVM
-from os.path import expanduser
 from py2viper_translation.translator import Translator, InvalidProgramException
 from py2viper_translation.typeinfo import TypeInfo, TypeException
 from py2viper_translation.verifier import (

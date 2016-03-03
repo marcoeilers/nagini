@@ -1,5 +1,11 @@
 import ast
 
+from typing import Any, TypeVar, List, Tuple, Optional
+
+from py2viper_contracts.contracts import (
+    CONTRACT_FUNCS,
+    CONTRACT_WRAPPER_FUNCS
+    )
 from py2viper_translation.analyzer import (
     PythonVar,
     PythonMethod,
@@ -7,17 +13,17 @@ from py2viper_translation.analyzer import (
     PythonField,
     PythonProgram,
     PythonExceptionHandler
-)
+    )
 from py2viper_translation.constants import PRIMITIVES
-from py2viper_contracts.contracts import  CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
-from typing import Any, TypeVar, List, Tuple, Optional
 from py2viper_translation.viper_ast import ViperAST
 from py2viper_translation.util import flatten, UnsupportedException
 
+
 T = TypeVar('T')
 V = TypeVar('V')
+
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
