@@ -15,7 +15,7 @@ def _construct_classpath():
     specific locations.
     """
 
-    viper_java_path = os.environ.get('SILICONJAR')
+    viper_java_path = os.environ.get('VIPERJAVAPATH')
     silicon_jar = os.environ.get('SILICONJAR')
     carbon_jar = os.environ.get('CARBONJAR')
 
@@ -80,6 +80,7 @@ def _get_mypy_path():
     """
 
     mypy_path = os.environ.get('MYPYDIR')
+    print("---" + str(mypy_path))
     if not mypy_path:
         import py2viper_contracts
         mypy_path = os.path.dirname(os.path.dirname(
