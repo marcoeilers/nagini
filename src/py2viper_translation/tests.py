@@ -20,7 +20,7 @@ from py2viper_translation.verifier import VerificationResult, ViperVerifier
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
 
-os.environ['MYPYPATH'] = config.mypy_path
+# os.environ['MYPYPATH'] = config.mypy_path
 
 verifiers = [ViperVerifier.silicon]
 if config.boogie_path:
