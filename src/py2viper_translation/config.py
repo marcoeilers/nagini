@@ -80,6 +80,7 @@ def _get_mypy_path():
     """
 
     mypy_path = os.environ.get('MYPYDIR')
+    mypy_path = os.environ.get('MPDIR')
     print("---" + str(mypy_path))
     if not mypy_path:
         import py2viper_contracts
