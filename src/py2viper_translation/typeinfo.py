@@ -102,6 +102,7 @@ class TypeInfo:
         try:
             print("!!!!!!!--- " + config.mypy_path)
             print(config.__file__)
+            print(os.environ.get('MYPYDIR'))
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
