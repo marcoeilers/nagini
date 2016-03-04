@@ -100,7 +100,8 @@ class TypeInfo:
         the translation to Viper
         """
         try:
-            print("!!! " + config.mypy_path)
+            print("!!!!!!!--- " + config.mypy_path)
+            print(config.__file__)
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
