@@ -79,7 +79,7 @@ def _get_mypy_path():
     ``py2viper-contracts`` directory.
     """
 
-    mypy_path = os.environ.get('MYPYPATH')
+    mypy_path = os.environ.get('MYPYDIR')
     if not mypy_path:
         import py2viper_contracts
         mypy_path = os.path.dirname(os.path.dirname(

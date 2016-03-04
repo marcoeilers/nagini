@@ -113,12 +113,12 @@ class ViperAST:
                                self.to_seq(axioms), self.to_seq(typevars),
                                position, info)
 
-    def DomainFunc(self, name, args, type, unique, position, info):
+    def DomainFunc(self, name, args, type, unique, position, info, domain_name):
         return self.ast.DomainFunc(name, self.to_seq(args), type, unique,
-                                   position, info)
+                                   position, info, domain_name)
 
-    def DomainAxiom(self, name, expr, position, info):
-        return self.ast.DomainAxiom(name, expr, position, info)
+    def DomainAxiom(self, name, expr, position, info, domain_name):
+        return self.ast.DomainAxiom(name, expr, position, info, domain_name)
 
     def DomainType(self, name, typevarsmap, typevars):
         map = self.to_map(typevarsmap)
@@ -127,7 +127,7 @@ class ViperAST:
                                    seq)
 
     def DomainFuncApp(self, funcname, args, typevarmap, typepassed, argspassed,
-                      position, info):
+                      position, info, domain_name):
         def typepassedapply(slf):
             return typepassed
 
@@ -138,7 +138,7 @@ class ViperAST:
         argspassedfunc = self.to_function0(argspassedapply)
         result = self.ast.DomainFuncApp(funcname, self.to_seq(args),
                                         self.to_map(typevarmap), position, info,
-                                        typepassedfunc, argspassedfunc)
+                                        typepassedfunc, argspassedfunc, domain_name)
         return result
 
     def MethodCall(self, methodname, args, targets, position, info):
