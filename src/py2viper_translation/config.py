@@ -92,6 +92,7 @@ classpath = _construct_classpath()
 boogie_path = _get_boogie_path()
 z3_path = _get_z3_path()
 mypy_path = _get_mypy_path()
+print("GOT MYPY DIR" + str(mypy_path))
 
 
 __all__ = [classpath, boogie_path, z3_path, mypy_path]
