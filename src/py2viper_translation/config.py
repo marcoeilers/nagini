@@ -88,9 +88,29 @@ def _get_mypy_path():
 
 
 classpath = _construct_classpath()
+"""
+JAVA class path. Initialized by calling
+:py:func:`_construct_classpath`.
+"""
+
+
 boogie_path = _get_boogie_path()
+"""
+Path to Boogie executable. Initialized by calling
+:py:func:`_get_boogie_path`.
+"""
+
+
 z3_path = _get_z3_path()
+"""
+Path to Z3 executable. Initialized by calling :py:func:`_get_z3_path`.
+"""
+
+
 mypy_path = _get_mypy_path()
+"""
+MYPY search path. Initialized by calling :py:func:`_get_mypy_path`.
+"""
 
 
-__all__ = [classpath, boogie_path, z3_path, mypy_path]
+__all__ = ['classpath', 'boogie_path', 'z3_path', 'mypy_path']
