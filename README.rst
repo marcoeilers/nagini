@@ -28,6 +28,10 @@ To build HTML documentation, use::
 
 The documentation is outputted to ``docs/build/html/index.html``.
 
+To run doctests::
+
+    make doctest
+
 Known Issues
 ============
 
