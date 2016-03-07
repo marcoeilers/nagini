@@ -1,6 +1,9 @@
 test: buildout
 	bin/py.test -x src/py2viper_translation/tests.py
 
+docs: buildout
+	bin/sphinxbuilder
+
 buildout: bin/buildout
 	bin/buildout -v
 
