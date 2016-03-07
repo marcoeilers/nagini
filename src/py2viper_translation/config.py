@@ -1,5 +1,14 @@
 """
 A singleton configuration object.
+
+>>> from py2viper_translation import config
+>>> config.classpath is None
+False
+>>> config.z3_path is None
+False
+>>> config.mypy_path is None
+False
+
 """
 
 import os
