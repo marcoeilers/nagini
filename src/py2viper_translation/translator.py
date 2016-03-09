@@ -833,7 +833,8 @@ class Translator:
                                         [type_func, supertype_func], {},
                                         self.viper.Bool, [type_var, type_var],
                                         position, info, self.typedomain)
-        return self.viper.DomainAxiom('subtype_' + type, body, position, info, self.typedomain)
+        return self.viper.DomainAxiom('subtype_' + type, body, position, info, 
+                                      self.typedomain)
 
     def create_transitivity_axiom(self) -> 'silver.ast.DomainAxiom':
         """
@@ -883,7 +884,8 @@ class Translator:
                                  implication, self.noposition(),
                                  self.noinfo())
         return self.viper.DomainAxiom('issubtype_transitivity', body,
-                                      self.noposition(), self.noinfo(), self.typedomain)
+                                      self.noposition(), self.noinfo(), 
+                                      self.typedomain)
 
     def create_reflexivity_axiom(self) -> 'silver.ast.DomainAxiom':
         """
@@ -897,14 +899,16 @@ class Translator:
                                                      {}, self.viper.Bool,
                                                      [var, var],
                                                      self.noposition(),
-                                                     self.noinfo(), self.typedomain)
+                                                     self.noinfo(), 
+                                                     self.typedomain)
         trigger_exp = reflexive_subtype
         trigger = self.viper.Trigger([trigger_exp], self.noposition(),
                                      self.noinfo())
         body = self.viper.Forall([arg], [trigger], reflexive_subtype,
                                  self.noposition(), self.noinfo())
         return self.viper.DomainAxiom('issubtype_reflexivity', body,
-                                      self.noposition(), self.noinfo(), self.typedomain)
+                                      self.noposition(), self.noinfo(), 
+                                      self.typedomain)
 
     def typeof_func(self) -> 'silver.ast.DomainFunc':
         """
@@ -915,7 +919,8 @@ class Translator:
                                           self.noinfo())
         return self.viper.DomainFunc('typeof', [obj_var],
                                      self.typetype(), False,
-                                     self.noposition(), self.noinfo(), self.typedomain)
+                                     self.noposition(), self.noinfo(), 
+                                     self.typedomain)
 
     def issubtype_func(self) -> 'silver.ast.DomainFunc':
         """
@@ -929,7 +934,8 @@ class Translator:
                                             self.noinfo())
         return self.viper.DomainFunc('issubtype', [sub_var, super_var],
                                      self.viper.Bool, False,
-                                     self.noposition(), self.noinfo(), self.typedomain)
+                                     self.noposition(), self.noinfo(), 
+                                     self.typedomain)
 
     def var_has_type(self, name: str,
                    type: PythonClass) -> 'silver.ast.DomainFuncApp':
@@ -954,7 +960,8 @@ class Translator:
         supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
                                                   self.typetype(), [],
                                                   self.noposition(),
-                                                  self.noinfo(), self.typedomain)
+                                                  self.noinfo(), 
+                                                  self.typedomain)
         var_sub = self.viper.LocalVar('sub', self.typetype(),
                                       self.noposition(), self.noinfo())
         var_super = self.viper.LocalVar('super', self.typetype(),
