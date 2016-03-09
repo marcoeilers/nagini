@@ -79,9 +79,7 @@ def _get_mypy_path():
     ``py2viper-contracts`` directory.
     """
 
-    mypy_path = os.environ.get('MYPYDIR')
-    mypy_path = os.environ.get('MPDIR')
-    print("---" + str(mypy_path))
+    mypy_path = os.environ.get('MYPYPATH')
     if not mypy_path:
         import py2viper_contracts
         mypy_path = os.path.dirname(os.path.dirname(
@@ -93,7 +91,6 @@ classpath = _construct_classpath()
 boogie_path = _get_boogie_path()
 z3_path = _get_z3_path()
 mypy_path = _get_mypy_path()
-print("GOT MYPY DIR" + str(mypy_path))
 
 
 __all__ = [classpath, boogie_path, z3_path, mypy_path]

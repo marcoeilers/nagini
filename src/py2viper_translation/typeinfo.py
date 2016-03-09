@@ -3,7 +3,6 @@ import sys
 import mypy.build
 
 from mypy.build import BuildSource
-from py2viper_translation import config
 from typing import List
 
 
@@ -100,13 +99,9 @@ class TypeInfo:
         the translation to Viper
         """
         try:
-            print("!!!!!!!--- " + config.mypy_path)
-            print(config.__file__)
-            print(os.environ.get('MYPYDIR'))
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
-                bin_dir=os.path.dirname(config.mypy_path)
                 )
             visitor = TypeVisitor(res.types, filename)
             # for df in res.files['__main__'].defs:
