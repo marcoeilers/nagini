@@ -85,7 +85,25 @@ def _get_mypy_path():
         mypy_path = os.path.dirname(os.path.dirname(
             py2viper_contracts.__file__))
     return mypy_path
+    
+    
+def _get_mypy_dir():
+    """ Construct MYPYDIR.
 
+    If MYPYDIR environment variable is not defined, just returns None.
+    """
+
+    mypy_dir = os.environ.get('MYPYDIR')
+    if mypy_dir:
+        return os.path.dirname(mypy_dir)
+    return None
+
+
+mypy_dir = _get_mypy_dir()
+"""
+Mypy executable dir. Initialized by calling
+:py:func:`_get_mypy_dir`.
+"""
 
 classpath = _construct_classpath()
 boogie_path = _get_boogie_path()
@@ -93,4 +111,5 @@ z3_path = _get_z3_path()
 mypy_path = _get_mypy_path()
 
 
-__all__ = [classpath, boogie_path, z3_path, mypy_path]
+
+__all__ = [classpath, boogie_path, z3_path, mypy_path, mypy_dir]
