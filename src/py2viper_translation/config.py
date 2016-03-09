@@ -112,4 +112,4 @@ mypy_path = _get_mypy_path()
 
 
 
-__all__ = ['classpath', 'boogie_path', 'z3_path', 'mypy_path']
+__all__ = [classpath, boogie_path, z3_path, mypy_path]
