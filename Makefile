@@ -1,6 +1,15 @@
 test: buildout
 	bin/py.test -x src/py2viper_translation/tests.py
 
+docs: buildout
+	bin/sphinxbuilder
+
+docs_coverage: buildout
+	bin/python bin/sphinx-build -b coverage docs/source docs/build/coverage
+
+doctest: buildout
+	bin/python bin/sphinx-build -b doctest docs/source docs/build/doctest
+
 buildout: bin/buildout
 	bin/buildout -v
 

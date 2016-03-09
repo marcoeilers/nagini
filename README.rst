@@ -19,6 +19,19 @@ Try to set::
 
     export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
+Documentation
+=============
+
+To build HTML documentation, use::
+
+    make docs
+
+The documentation is outputted to ``docs/build/html/index.html``.
+
+To run doctests::
+
+    make doctest
+
 Known Issues
 ============
 
