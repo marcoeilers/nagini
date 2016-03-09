@@ -100,7 +100,7 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
 
-    # os.environ['MYPYPATH'] = config.mypy_path
+    os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
     try:
         prog = translate(python_file, jvm)
