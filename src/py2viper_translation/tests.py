@@ -1,34 +1,36 @@
 import io
-import jvmaccess
 import os
 import pytest
+import re
 import tokenize
+import glob
 
-from main import translate, verify, get_mypy_dir
-from os.path import isfile, join
-from translator import InvalidProgramException
-from typeinfo import TypeException
 from typing import List, Tuple
-from util import flatten
-from verifier import VerificationResult, ViperVerifier
+from os.path import isfile, join
+
+from py2viper_translation import config
+from py2viper_translation import jvmaccess
+from py2viper_translation.main import translate, verify
+from py2viper_translation.translator import InvalidProgramException
+from py2viper_translation.typeinfo import TypeException
+from py2viper_translation.util import flatten
+from py2viper_translation.verifier import VerificationResult, ViperVerifier
+
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
-classpath = ''
-siliconjar = os.environ.get('SILICONJAR')
-carbonjar = os.environ.get('CARBONJAR')
-verifiers = []
-mypydir = get_mypy_dir()
-if siliconjar is not None and os.path.isfile(siliconjar):
-    classpath += siliconjar
-    verifiers.append(ViperVerifier.silicon)
-if carbonjar is not None and os.path.isfile(carbonjar):
-    if classpath != '':
-        classpath += os.pathsep
-    classpath += carbonjar
+
+os.environ['MYPYPATH'] = config.mypy_path
+
+verifiers = [ViperVerifier.silicon]
+if config.boogie_path:
     verifiers.append(ViperVerifier.carbon)
-assert classpath != ''
-jvm = jvmaccess.JVM(classpath)
+
+assert config.classpath
+jvm = jvmaccess.JVM(config.classpath)
+
+type_error_pattern = "^(.*):(\\d+): error: (.*)$"
+mypy_error_matcher = re.compile(type_error_pattern)
 
 class AnnotatedTests():
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
@@ -78,7 +80,7 @@ class AnnotatedTests():
 
 class VerificationTests(AnnotatedTests):
     def test_file(self, path: str, jvm, verifier):
-        prog = translate(path, jvm, mypydir)
+        prog = translate(path, jvm)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
         self.evaluate_result(vresult, path, jvm)
@@ -126,9 +128,10 @@ def test_verification(path, verifier):
 
 class TranslationTests(AnnotatedTests):
     def extract_mypy_error(self, message):
-        start = message.index(', line ') + 7
-        parts = message[start:].split(':', 1)
-        return (int(parts[0]), 'type.error:' + parts[1].strip())
+        parts = mypy_error_matcher.match(message).groups()
+        offset = 3 if parts[0] is None else 0
+        return (int(parts[1 + offset]),
+                'type.error:' + parts[2 + offset].strip())
 
     def test_file(self, path: str, jvm):
         test_annotations = self.get_test_annotations(path)
@@ -137,7 +140,7 @@ class TranslationTests(AnnotatedTests):
              ann.string.strip().startswith('#:: ExpectedOutput(')])
         expected_lo = [(line, id) for ((line, col), id) in expected]
         try:
-            translate(path, jvm, mypydir)
+            translate(path, jvm)
             assert False
         except InvalidProgramException as e1:
             code = 'invalid.program:' + e1.code
@@ -145,7 +148,7 @@ class TranslationTests(AnnotatedTests):
             actual = [(line, code)]
         except TypeException as e2:
             actual = [self.extract_mypy_error(msg) for msg in e2.messages if
-                      ', line ' in msg]
+                      mypy_error_matcher.match(msg)]
 
         self.compare_actual_expected(actual, expected_lo)
 

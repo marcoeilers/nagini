@@ -2,12 +2,12 @@ import ast
 import mypy
 
 from collections import OrderedDict
-from constants import PRIMITIVES, LITERALS
-from contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from typeinfo import TypeInfo
 from typing import List, Optional, Dict
-from util import UnsupportedException
 
+from py2viper_translation.constants import PRIMITIVES, LITERALS
+from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_translation.typeinfo import TypeInfo
+from py2viper_translation.util import UnsupportedException
 
 class PythonScope:
     """
@@ -209,7 +209,7 @@ class PythonMethod(PythonNode, PythonScope):
             self.args[arg].process(self.get_fresh_name(arg), translator)
         if self.interface:
             return
-        functype = self.get_program().types.getfunctype(self.get_scope_prefix())
+        functype = self.get_program().types.get_func_type(self.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             self.type = None
         elif isinstance(functype, mypy.types.Instance):
@@ -395,7 +395,7 @@ class Analyzer(ast.NodeVisitor):
                                 self.is_pure(node), self.contract_only)
             container[name] = func
         func.predicate = self.is_predicate(node)
-        functype = self.types.getfunctype(func.get_scope_prefix())
+        functype = self.types.get_func_type(func.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             func.type = None
         elif isinstance(functype, mypy.types.Instance):
@@ -460,7 +460,7 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is None:
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
-                    type = self.types.gettype([], node.id)
+                    type = self.types.get_type([], node.id)
                     cls = self.get_class(type.name())
                     var = PythonVar(node.id, node, cls)
                     assign = node._parent
@@ -507,19 +507,19 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
-            type = self.types.gettype(context, node.id)
+            type = self.types.get_type(context, node.id)
             return self.get_class(type.name())
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             context = [receiver.name]
-            type = self.types.gettype(context, node.attr)
+            type = self.types.get_type(context, node.attr)
             return self.get_class(type.name())
         elif isinstance(node, ast.arg):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
-            type = self.types.gettype(context, node.arg)
+            type = self.types.get_type(context, node.arg)
             return self.get_class(type.name())
         elif (isinstance(node, ast.Call)
               and isinstance(node.func, ast.Name)

@@ -1,6 +1,8 @@
 from abc import ABCMeta
 from enum import Enum
-from jvmaccess import JVM
+
+from py2viper_translation import config
+from py2viper_translation.jvmaccess import JVM
 
 
 class ViperVerifier(Enum):
@@ -48,8 +50,10 @@ class Silicon:
     def __init__(self, jvm: JVM, filename: str):
         self.silver = jvm.viper.silver
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(1)
-        args.update(0, filename)
+        args = jvm.scala.collection.mutable.ArraySeq(3)
+        args.update(0, '--z3Exe')
+        args.update(1, config.z3_path)
+        args.update(2, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.ready = True
@@ -81,8 +85,12 @@ class Carbon:
     def __init__(self, jvm: JVM, filename: str):
         self.silver = jvm.viper.silver
         self.carbon = jvm.viper.carbon.CarbonVerifier()
-        args = jvm.scala.collection.mutable.ArraySeq(1)
-        args.update(0, filename)
+        args = jvm.scala.collection.mutable.ArraySeq(5)
+        args.update(0, '--boogieExe')
+        args.update(1, config.boogie_path)
+        args.update(2, '--z3Exe')
+        args.update(3, config.z3_path)
+        args.update(4, filename)
         self.carbon.parseCommandLine(args)
         self.carbon.config().initialize(None)
         self.carbon.start()

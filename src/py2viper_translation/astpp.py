@@ -8,6 +8,7 @@ Alex Leone (acleone ~AT~ gmail.com), 2010-01-30
 
 from ast import *
 
+
 def dump(node, annotate_fields=True, include_attributes=False, indent='  '):
     """
     Return a formatted dump of the tree in *node*.  This is mainly useful for

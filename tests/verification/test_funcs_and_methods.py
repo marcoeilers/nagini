@@ -1,4 +1,4 @@
-from contracts.contracts import *
+from py2viper_contracts.contracts import *
 
 
 @Pure
@@ -38,4 +38,34 @@ def func2(arg: int) -> int:
         return local_var + 10
     else:
         return 42
+
+@Pure
+def func(b: int, c: int) -> int:
+    Ensures(Implies(b > 2, Result() == b))
+    Ensures(Implies((b <= 2 and b + c > 2) and b + c <= 4, Result() == b + c + 4))
+    Ensures(Implies(b <= 2 and b + c > 4, Result() == b + c + 6))
+    if b > 2:
+        return b
+    a = b + c
+    if a > 2:
+        a = a + 2
+        a = a + 2
+    if a > 8:
+        a = a + 2
+    return a
+
+@Pure
+def func_wrong(b: int, c: int) -> int:
+    Ensures(Implies(b > 2, Result() == b))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Implies(b <= 2 and b + c > 2, Result() == b + c + 6))
+    if b > 2:
+        return b
+    a = b + c
+    if a > 2:
+        a = a + 2
+        a = a + 2
+    if a > 8:
+        a = a + 2
+    return a
 

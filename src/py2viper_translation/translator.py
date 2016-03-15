@@ -1,6 +1,11 @@
 import ast
 
-from analyzer import (
+from collections import OrderedDict
+from py2viper_contracts.contracts import (
+    CONTRACT_FUNCS,
+    CONTRACT_WRAPPER_FUNCS
+    )
+from py2viper_translation.analyzer import (
     PythonVar,
     PythonMethod,
     PythonClass,
@@ -8,19 +13,19 @@ from analyzer import (
     PythonProgram,
     PythonExceptionHandler
 )
-from collections import OrderedDict
-from constants import PRIMITIVES
-from contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from jvmaccess import JVM
+from py2viper_translation.constants import PRIMITIVES
+from py2viper_translation.jvmaccess import JVM
+from py2viper_translation.type_domain_factory import TypeDomainFactory
+from py2viper_translation.typeinfo import TypeInfo
+from py2viper_translation.viper_ast import ViperAST
+from py2viper_translation.util import flatten, UnsupportedException
 from toposort import toposort_flatten
-from type_domain_factory import TypeDomainFactory
-from typeinfo import TypeInfo
 from typing import Any, TypeVar, List, Tuple, Optional, Union
-from viper_ast import ViperAST
-from util import flatten, UnsupportedException
+
 
 T = TypeVar('T')
 V = TypeVar('V')
+
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
@@ -33,23 +38,31 @@ class LetWrapper:
     Used so we can set/exchange expr later, which we cannot with the AST element
     """
 
-    def __init__2(self, name: str, cond: List, expr: ast.AST, node: ast.AST):
+    def __init__(self, name: str, cond: List, expr: ast.AST, node: ast.AST):
         self.name = name
         self.cond = cond
         self.expr = expr
         self.node = node
+        self.names = {}
 
-    def __init__(self, vardecl: 'silver.ast.VarDecl', expr: 'silver.ast.Exp',
+    def __init__2(self, vardecl: 'silver.ast.VarDecl', expr: 'silver.ast.Exp',
                  node: ast.AST):
         self.vardecl = vardecl
         self.expr = expr
         self.node = node
+
 
 class ReturnWrapper:
     def __init__(self, cond: List, expr: ast.AST, node: ast.AST):
         self.cond = cond
         self.expr = expr
         self.node = node
+        self.names = {}
+
+
+class NotWrapper:
+    def __init__(self, cond):
+        self.cond = cond
 
 Wrapper = Union[LetWrapper, ReturnWrapper]
 
@@ -82,25 +95,112 @@ class Translator:
         self.current_function = None
         self.program = None
         self.type_factory = TypeDomainFactory(viperast, self)
-
+        self.var_aliases = None
         self.builtins = {'builtins.int': viperast.Int,
                          'builtins.bool': viperast.Bool}
 
-    def translate_pure(self, node: ast.AST) -> List[Wrapper]:
+    def translate_pure(self, conds: List, node: ast.AST) -> List[Wrapper]:
         method = 'translate_pure_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        return visitor(node)
+        return visitor(conds, node)
 
-    def translate_pure_If(self, node: ast.If):
-        pass
+    def translate_pure_If(self, conds, node: ast.If):
+        cond = node.test
+        cond_var = self.current_function.create_variable('cond',
+            self.program.classes['bool'], self)
+        cond_let = LetWrapper(cond_var.name, conds, cond, node)
+        then_cond = conds + [cond_var.name]
+        else_cond = conds + [NotWrapper(cond_var.name)]
+        then = flatten([self.translate_pure(then_cond, stmt) for stmt in node.body])
+        else_ = []
+        if node.orelse:
+            else_ = flatten([self.translate_pure(else_cond, stmt) for stmt in node.orelse])
+        return [cond_let] + then + else_
 
-    def translate_pure_Return(self, node: ast.Return):
-        pass
+    def translate_pure_Return(self, conds: List, node: ast.Return):
+        wrapper = ReturnWrapper(conds, node.value, node)
+        return [wrapper]
 
-    def translate_pure_Assign(self, node: ast.Assign):
-        pass
+    def translate_pure_Assign(self, conds: List, node: ast.Assign):
+        assert len(node.targets) == 1
+        assert isinstance(node.targets[0], ast.Name)
+        wrapper = LetWrapper(node.targets[0].id, conds, node.value, node)
+        return [wrapper]
 
-    def translate_exprs(self, nodes: List[ast.AST], function: PythonMethod) \
+    def translate_exprs(self, nodes: List[ast.AST], function: PythonMethod) -> Expr:
+        wrappers = flatten([self.translate_pure([], node) for node in nodes])
+        previous = None
+        added = {}
+        for wrapper in wrappers:
+            if previous:
+                wrapper.names.update(previous.names)
+            if added:
+                wrapper.names.update(added)
+            added = {}
+            if isinstance(wrapper, LetWrapper):
+                name = wrapper.name
+                cls = function.get_variable(name).type
+                new_name = function.create_variable(name, cls, self)
+                added[name] = new_name
+                wrapper.variable = new_name
+            previous = wrapper
+        previous = None
+        info = self.noinfo()
+        assert not self.var_aliases
+        for wrapper in reversed(wrappers):
+            position = self.to_position(wrapper.node)
+            self.var_aliases = wrapper.names
+            if isinstance(wrapper, ReturnWrapper):
+                if wrapper.cond:
+                    cond = self._translate_condition(wrapper.cond, wrapper.names)
+                    stmt, val = self.translate_expr(wrapper.expr)
+                    assert not stmt
+                    previous = self.viper.CondExp(cond, val, previous, position,
+                                                  info)
+                else:
+                    stmt, val = self.translate_expr(wrapper.expr)
+                    if stmt:
+                        raise InvalidProgramException(wrapper.expr, 'purity.violated')
+                    previous = val
+            elif isinstance(wrapper, LetWrapper):
+                if wrapper.cond:
+                    cond = self._translate_condition(wrapper.cond, wrapper.names)
+                    stmt, val = self.translate_expr(wrapper.expr)
+                    assert not stmt
+                    old_val = wrapper.names[wrapper.name].ref
+                    new_val = self.viper.CondExp(cond, val, old_val, position,
+                                                 info)
+                    let = self.viper.Let(wrapper.variable.decl, new_val,
+                                         previous, position, info)
+                    previous = let
+                else:
+                    cond = self._translate_condition(wrapper.cond, wrapper.names)
+                    stmt, val = self.translate_expr(wrapper.expr)
+                    assert not stmt
+                    let = self.viper.Let(wrapper.variable.decl, val,
+                                         previous, position, info)
+                    previous = let
+            else:
+                raise UnsupportedException(wrapper)
+        self.var_aliases = None
+        return previous
+
+
+    def _translate_condition(self, conds, names) -> Expr:
+        previous = self.viper.TrueLit(self.noposition(), self.noinfo())
+        for cond in conds:
+            if isinstance(cond, NotWrapper):
+                current = names.get(cond.cond).ref
+                current = self.viper.Not(current, self.noposition(),
+                                         self.noinfo())
+            else:
+                current = names.get(cond).ref
+            previous = self.viper.And(previous, current, self.noposition(),
+                                      self.noinfo())
+        return previous
+
+
+    def translate_exprs2(self, nodes: List[ast.AST], function: PythonMethod) \
             -> Expr:
         """
         Translates a list of nodes to a single (let-)expression if all
@@ -613,7 +713,10 @@ class Translator:
                                          self.noinfo(), type, [])
             return [], func_app
         else:
-            return [], self.current_function.get_variable(node.id).ref
+            if self.var_aliases and node.id in self.var_aliases:
+                return [], self.var_aliases[node.id].ref
+            else:
+                return [], self.current_function.get_variable(node.id).ref
 
     def translate_Attribute(self, node: ast.Attribute) -> StmtAndExpr:
         stmt, receiver = self.translate_expr(node.value)
@@ -976,8 +1079,6 @@ class Translator:
         for stmt in stmtlist:
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
-
-
 
     def var_has_type(self, name: str,
                    type: PythonClass) -> 'silver.ast.DomainFuncApp':
