@@ -83,17 +83,16 @@ def raised_and_undeclared(input: int, incon: Container) -> Container:
     res.value = input
     return res
 
-# TODO: subtype axioms too weak
-# def raised_and_declared_6(input: int, incon: Container) -> None:
-#     Requires(incon != None and Acc(incon.value))
-#     Ensures(False)
-#     Exsures(MyException, Acc(incon.value) and incon.value == -3)
-#     Exsures(MyOtherException, True)
-#     if input > 2:
-#         incon.value = -3
-#         raise MyException()
-#     else:
-#         raise MyOtherException()
+def raised_and_declared_6(input: int, incon: Container) -> None:
+    Requires(incon != None and Acc(incon.value))
+    Ensures(False)
+    Exsures(MyException, Acc(incon.value) and incon.value == -3)
+    Exsures(MyOtherException, True)
+    if input > 2:
+        incon.value = -3
+        raise MyException()
+    else:
+        raise MyOtherException()
 
 def helper(out: Container, i: int) -> None:
     Requires(Acc(out.value))

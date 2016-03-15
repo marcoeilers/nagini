@@ -73,6 +73,13 @@ class ViperAST:
             result.update(index, list[index])
         return result
 
+    def to_list(self, seq):
+        result = []
+        iterator = seq.toIterator()
+        while iterator.hasNext():
+            result.append(iterator.next())
+        return result
+
     def to_map(self, dict):
         result = self.scala.collection.immutable.HashMap()
         for k, v in dict.items():
@@ -107,6 +114,22 @@ class ViperAST:
     def Predicate(self, name, args, body, position, info):
         return self.ast.Predicate(name, self.to_seq(args),
                                   self.scala.Some(body), position, info)
+
+    def PredicateAccess(self, args, pred_name, position, info):
+        return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
+                                        info)
+
+    def PredicateAccessPredicate(self, loc, perm, position, info):
+        return self.ast.PredicateAccessPredicate(loc, perm, position, info)
+
+    def Fold(self, predicate, position, info):
+        return self.ast.Fold(predicate, position, info)
+
+    def Unfold(self, predicate, position, info):
+        return self.ast.Unfold(predicate, position, info)
+
+    def Unfolding(self, predicate, expr, position, info):
+        return self.ast.Unfolding(predicate, expr, position, info)
 
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
@@ -194,6 +217,9 @@ class ViperAST:
         return self.ast.Minus(expr, position, info)
 
     def CondExp(self, cond, then, els, position, info):
+        print(cond)
+        print(then)
+        print(els)
         return self.ast.CondExp(cond, then, els, position, info)
 
     def EqCmp(self, left, right, position, info):
@@ -295,5 +321,10 @@ class ViperAST:
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
-        end = self.none
+        if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
+            end = self.ast.LineColumnPosition(expr.end_lineno,
+                                              expr.end_col_offset)
+            end = self.scala.Some(end)
+        else:
+            end = self.none
         return self.ast.SourcePosition(path, start, end)

@@ -2,13 +2,12 @@ import ast
 import mypy
 
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from py2viper_translation.constants import PRIMITIVES, LITERALS
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.util import UnsupportedException
-
 
 class PythonScope:
     """
@@ -48,10 +47,11 @@ class PythonScope:
 
 
 class PythonProgram(PythonScope):
-    def __init__(self, types: TypeInfo):
+    def __init__(self, types: TypeInfo) -> None:
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.predicates = OrderedDict()
         self.global_vars = OrderedDict()
         self.sil_names = []
         self.superscope = None
@@ -68,6 +68,9 @@ class PythonProgram(PythonScope):
         for method in self.methods:
             self.methods[method].process(self.get_fresh_name(method),
                                          translator)
+        for predicate in self.predicates:
+            self.predicates[predicate].process(self.get_fresh_name(predicate),
+                                               translator)
         for var in self.global_vars:
             self.global_vars[var].process(self.get_fresh_name(var), translator)
 
@@ -95,6 +98,7 @@ class PythonClass(PythonNode, PythonScope):
         self.superclass = superclass
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.predicates = OrderedDict()
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.superscope = superscope
@@ -140,6 +144,14 @@ class PythonClass(PythonNode, PythonScope):
         else:
             return self.get_method(name)
 
+    def get_predicate(self, name: str) -> Optional['PythonMethod']:
+        if name in self.predicates:
+            return self.predicates[name]
+        elif self.superclass is not None:
+            return self.superclass.get_predicate(name)
+        else:
+            return None
+
     def process(self, sil_name: str, translator: 'Translator') -> None:
         self.sil_name = sil_name
         for function in self.functions:
@@ -148,6 +160,9 @@ class PythonClass(PythonNode, PythonScope):
         for method in self.methods:
             self.methods[method].process(self.get_fresh_name(method),
                                          translator)
+        for predicate in self.predicates:
+            self.predicates[predicate].process(self.get_fresh_name(predicate),
+                                               translator)
         for field in self.fields:
             self.fields[field].process(self.get_fresh_name(field))
 
@@ -166,7 +181,8 @@ class PythonMethod(PythonNode, PythonScope):
     """
 
     def __init__(self, name: str, node: ast.AST, cls: PythonClass,
-                 superscope: PythonScope, pure: bool):
+                 superscope: PythonScope, pure: bool, contract_only: bool,
+                 interface: bool = False):
         super().__init__(name, node=node)
         if cls is not None:
             if not isinstance(cls, PythonClass):
@@ -182,10 +198,17 @@ class PythonMethod(PythonNode, PythonScope):
         self.handlers = []  # direct
         self.superscope = superscope
         self.pure = pure
+        self.predicate = False
         self.sil_names = ['_res', '_err', '__end']
+        self.contract_only = contract_only
+        self.interface = interface
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         self.sil_name = sil_name
+        for arg in self.args:
+            self.args[arg].process(self.get_fresh_name(arg), translator)
+        if self.interface:
+            return
         functype = self.get_program().types.get_func_type(self.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             self.type = None
@@ -194,10 +217,10 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             raise UnsupportedException(functype)
         if self.cls is not None and self.cls.superclass is not None:
-            self.overrides = self.cls.superclass.get_func_or_method(self.name)
-
-        for arg in self.args:
-            self.args[arg].process(self.get_fresh_name(arg), translator)
+            if self.predicate:
+                self.overrides = self.cls.superclass.get_predicate(self.name)
+            else:
+                self.overrides = self.cls.superclass.get_func_or_method(self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
 
@@ -220,11 +243,11 @@ class PythonMethod(PythonNode, PythonScope):
 
 class PythonExceptionHandler(PythonNode):
     def __init__(self, node: ast.AST, exception_type: PythonClass, tryname: str,
-                 handlername: str, body: ast.AST, protectedRegion: ast.AST):
+                 handlername: str, body: ast.AST, protected_region: ast.AST):
         super().__init__(handlername, node=node)
         self.tryname = tryname
         self.body = body
-        self.region = protectedRegion
+        self.region = protected_region
         self.exception = exception_type
 
 
@@ -280,9 +303,33 @@ class Analyzer(ast.NodeVisitor):
         self.program = PythonProgram(types)
         self.current_class = None
         self.current_function = None
+        self.contract_only = False
 
     def process(self, translator: 'Translator') -> None:
         self.program.process(translator)
+
+    def set_contract_only(self, val: bool) -> None:
+        self.contract_only = val
+
+    def add_interface(self, interface: Dict) -> None:
+        for class_name in interface:
+            if_cls = interface[class_name]
+            cls = self.get_class(class_name)
+            for method_name in if_cls['methods']:
+                if_method = if_cls['methods'][method_name]
+                method = PythonMethod(method_name, None, cls, self.program,
+                                      False, False, True)
+                method.args = OrderedDict()
+                ctr = 0
+                for arg_type in if_method['args']:
+                    name = 'arg_' + str(ctr)
+                    arg = PythonVar(name, None,
+                                    self.get_class(arg_type))
+                    ctr += 1
+                    method.args[name] = arg
+                if if_method['type']:
+                    method.type = self.get_class(if_method['type'])
+                cls.methods[method_name] = method
 
     def visit_default(self, node: ast.AST) -> None:
         for field in node._fields:
@@ -330,9 +377,12 @@ class Analyzer(ast.NodeVisitor):
             scope_container = self.program
         else:
             scope_container = self.current_class
-        if self.is_pure(node):
+        if self.is_predicate(node):
+            container = scope_container.predicates
+        elif self.is_pure(node):
             container = scope_container.functions
         else:
+            assert not node.decorator_list
             container = scope_container.methods
         if name in container:
             func = container[name]
@@ -342,8 +392,9 @@ class Analyzer(ast.NodeVisitor):
             func.superscope = scope_container
         else:
             func = PythonMethod(name, node, self.current_class, scope_container,
-                                self.is_pure(node))
+                                self.is_pure(node), self.contract_only)
             container[name] = func
+        func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
         if isinstance(functype, mypy.types.Void):
             func.type = None
@@ -502,3 +553,7 @@ class Analyzer(ast.NodeVisitor):
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return (len(func.decorator_list) == 1
                 and func.decorator_list[0].id == 'Pure')
+
+    def is_predicate(self, func: ast.FunctionDef) -> bool:
+        return (len(func.decorator_list) == 1
+                and func.decorator_list[0].id == 'Predicate')

@@ -1,3 +1,6 @@
+from py2viper_contracts.contracts import *
+
+
 class SuperA:
     def __init__(self) -> None:
         self.int_field = 14

@@ -92,7 +92,7 @@ class TypeInfo:
     """
 
     def __init__(self):
-        self.allTypes = {}
+        self.all_types = {}
 
     def check(self, filename: str) -> bool:
         """
@@ -109,7 +109,7 @@ class TypeInfo:
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
-            self.allTypes = visitor.all_types
+            self.all_types.update(visitor.all_types)
             return True
         except mypy.errors.CompileError as e:
             for m in e.messages:
@@ -121,7 +121,7 @@ class TypeInfo:
         Looks up the inferred or annotated type for the given name in the given
         prefix
         """
-        result = self.allTypes.get(tuple(prefix + [name]))
+        result = self.all_types.get(tuple(prefix + [name]))
         if result is None:
             if not prefix:
                 return None
@@ -136,7 +136,7 @@ class TypeInfo:
         """
         Looks up the type of the function which creates the given context
         """
-        result = self.allTypes.get(tuple(prefix))
+        result = self.all_types.get(tuple(prefix))
         if result is None:
             if len(prefix) == 0:
                 return None
