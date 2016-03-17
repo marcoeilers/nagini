@@ -10,7 +10,7 @@ class Super:
     def meh(self, val: int) -> bool:
         return Acc(self.field) and self.field == val
 
-    def set(self, old_val: int, new_val: int) -> None:
+    def set_sth(self, old_val: int, new_val: int) -> None:
         Requires(self.meh(old_val))
         Ensures(Acc(self.meh(new_val)))
         Unfold(Acc(self.meh(old_val)))
@@ -42,5 +42,5 @@ class Other:
 def main() -> None:
     ss = Sub(25)
     Fold(ss.meh(25))
-    ss.set(25, 35)
+    ss.set_sth(25, 35)
     Unfold(ss.meh(35))

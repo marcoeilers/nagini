@@ -9,4 +9,5 @@ class SomeClass:
     #:: ExpectedOutput(invalid.program:invalid.predicate)
     @Predicate
     def meh(self, val: int) -> bool:
-        return Acc(self.field) and self.field == val
+        a = self.field == val
+        return Acc(self.field) and a

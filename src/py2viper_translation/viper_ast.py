@@ -71,7 +71,7 @@ class ViperAST:
         result = self.scala.collection.mutable.ArraySeq(len(list))
         for index in range(0, len(list)):
             result.update(index, list[index])
-        return result
+        return result.toList()
 
     def to_list(self, seq):
         result = []
@@ -217,9 +217,6 @@ class ViperAST:
         return self.ast.Minus(expr, position, info)
 
     def CondExp(self, cond, then, els, position, info):
-        print(cond)
-        print(then)
-        print(els)
         return self.ast.CondExp(cond, then, els, position, info)
 
     def EqCmp(self, left, right, position, info):

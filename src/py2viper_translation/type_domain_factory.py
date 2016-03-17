@@ -32,12 +32,12 @@ class TypeDomainFactory:
 
     def get_default_functions(self) -> List['silver.ast.DomainFunc']:
         return [
-            self.create_null_type(),
+            # self.create_null_type(),
             self.extends_func(),
             self.issubtype_func(),
             self.isnotsubtype_func(),
             self.typeof_func(),
-            self.create_object_type()
+            # self.create_object_type()
         ]
 
     def create_type(self, cls: 'PythonClass') -> Tuple['silver.ast.DomainFunc',
@@ -49,9 +49,18 @@ class TypeDomainFactory:
         supertype = 'object' if not cls.superclass else cls.superclass.sil_name
         position = self.to_position(cls.node)
         info = self.noinfo()
-        return (self.create_type_function(cls.sil_name, position, info),
-                self.create_subtype_axiom(cls.sil_name, supertype, position,
-                                          info))
+        type_func = self.create_type_function(cls.sil_name, position, info)
+        if cls.interface:
+            if cls.superclass:
+                subtype_axiom = self.create_subtype_axiom(cls.sil_name,
+                                                          supertype,
+                                                          position, info)
+            else:
+                subtype_axiom = None
+        else:
+            subtype_axiom = self.create_subtype_axiom(cls.sil_name, supertype,
+                                                      position, info)
+        return type_func, subtype_axiom
 
     def create_type_function(self, name: str, position: 'silver.ast.Position',
                              info: 'silver.ast.Info') -> 'silver.ast.DomainFunc':

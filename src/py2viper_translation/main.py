@@ -1,15 +1,13 @@
 import argparse
 import ast
+import inspect
 import os
-import re
 import sys
 import traceback
 
 from jpype import JavaException
-from py2viper_translation import astpp
 from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
-from py2viper_translation.ast_util import mark_text_ranges
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.translator import Translator, InvalidProgramException
 from py2viper_translation.typeinfo import TypeInfo, TypeException
@@ -41,31 +39,25 @@ def translate(path: str, jvm: JVM):
     """
     Translates the Python module at the given path to a Viper program
     """
-    builtins = [] # ['/home/marco/scion/git/py2viper/contracts/bltns.py']
-    native_sil = [] # ['/home/marco/scion/git/py2viper/translation/testinput.sil']
-    list = "{'list': {'methods': {'__init__': {'args': [],'type': None},'append': {'args': ['list', 'int'],'type': None},'get': {'args': ['list', 'int'],'type': 'int'}}}}"
-    sil_interface = [] # [list]
+    current_path = os.path.dirname(inspect.stack()[0][1])
+    resources_path = current_path + os.sep + 'resources' + os.sep
+    builtins = []
+    native_sil = [resources_path + 'preamble.sil']
+    with open(resources_path + 'preamble.index', 'r') as file:
+        sil_interface = [file.read()]
     sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
     modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    analyzer = Analyzer(jvm, viperast, types)
+    analyzer = Analyzer(jvm, viperast, types, path)
     for si in sil_interface:
         analyzer.add_interface(ast.literal_eval(si))
-    for module in modules:
+    for module in analyzer.modules:
+        analyzer.collect_imports(module)
         typecorrect = types.check(module)
         if typecorrect:
-            with open(module, 'r') as file:
-                text = file.read()
-            parseresult = ast.parse(text)
-            #try:
-            mark_text_ranges(parseresult, text)
-            #except Exception:
-                # ignore
-            #    pass
-            # print(astpp.dump(parseresult))
-            analyzer.set_contract_only(module != path)
-            analyzer.visit_default(parseresult)
+            analyzer.set_contract_only(module != os.path.abspath(path))
+            analyzer.visit_module(module)
         else:
             return None
     translator = Translator(jvm, path, types, viperast)
@@ -175,6 +167,9 @@ def main() -> None:
                 print(e.message)
             raise e
         sys.exit(1)
+    except JavaException as e:
+        print(e.stacktrace())
+        raise e
 
 
 if __name__ == '__main__':
