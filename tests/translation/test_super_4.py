@@ -1,4 +1,3 @@
-# TODO invalid super call, i.e. not super(class, self) or class is not superclass or one arg
 from py2viper_contracts.contracts import *
 
 
@@ -11,5 +10,6 @@ class Super:
 class Sub(Super):
     def some_method(self) -> int:
         Ensures(Result() >= 15)
+        a = self
         #:: ExpectedOutput(invalid.program:invalid.super.call)
-        return 1 + super(self).some_method()
+        return 1 + super(a, Sub).some_method()

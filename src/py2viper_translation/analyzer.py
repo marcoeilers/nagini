@@ -1,13 +1,16 @@
 import ast
 import mypy
+import os
 
 from collections import OrderedDict
+from py2viper_translation import astpp
+from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_translation.ast_util import mark_text_ranges
+from py2viper_translation.constants import PRIMITIVES, LITERALS
+from py2viper_translation.typeinfo import TypeInfo
+from py2viper_translation.util import get_func_name, UnsupportedException
 from typing import List, Optional, Dict
 
-from py2viper_translation.constants import PRIMITIVES, LITERALS
-from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import UnsupportedException
 
 class PythonScope:
     """
@@ -93,7 +96,7 @@ class PythonNode:
 
 class PythonClass(PythonNode, PythonScope):
     def __init__(self, name: str, superscope: PythonScope, node: ast.AST = None,
-                 superclass: 'PythonClass' = None):
+                 superclass: 'PythonClass' = None, interface = False):
         super().__init__(name, node)
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -103,6 +106,7 @@ class PythonClass(PythonNode, PythonScope):
         self.type = None  # infer, domain type
         self.superscope = superscope
         self.sil_names = []
+        self.interface = interface
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonClass') -> 'PythonField':
@@ -294,7 +298,8 @@ class Analyzer(ast.NodeVisitor):
     Walks through the Python AST and collects the structures to be translated.
     """
 
-    def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo):
+    def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
+                 path: str):
         self.viper = viperast
         self.java = jvm.java
         self.scala = jvm.scala
@@ -304,6 +309,37 @@ class Analyzer(ast.NodeVisitor):
         self.current_class = None
         self.current_function = None
         self.contract_only = False
+        self.modules = [os.path.abspath(path)]
+        self.asts = {}
+
+    def collect_imports(self, abs_path: str) -> None:
+        with open(abs_path, 'r') as file:
+            text = file.read()
+        parseresult = ast.parse(text)
+        try:
+            mark_text_ranges(parseresult, text)
+        except Exception:
+            # ignore
+            pass
+        self.asts[abs_path] = parseresult
+        # print(astpp.dump(parseresult))
+        assert isinstance(parseresult, ast.Module)
+        for stmt in parseresult.body:
+            if get_func_name(stmt) != 'Import':
+                continue
+            if isinstance(stmt, ast.Expr):
+                call = stmt.value
+            else:
+                call = stmt
+            if len(call.args) != 1 or not isinstance(call.args[0], ast.Str):
+                raise UnsupportedException(call)
+            imported = call.args[0].s
+            imp_path = os.path.dirname(abs_path) + os.sep + imported
+            self.add_module(imp_path)
+
+    def add_module(self, abs_path: str) -> None:
+        if abs_path not in self.modules:
+            self.modules.append(abs_path)
 
     def process(self, translator: 'Translator') -> None:
         self.program.process(translator)
@@ -314,22 +350,36 @@ class Analyzer(ast.NodeVisitor):
     def add_interface(self, interface: Dict) -> None:
         for class_name in interface:
             if_cls = interface[class_name]
-            cls = self.get_class(class_name)
-            for method_name in if_cls['methods']:
+            cls = self.get_class(class_name, interface=True)
+            if 'extends' in if_cls:
+                cls.superclass = self.get_class(if_cls['extends'])
+            for method_name in if_cls.get('methods', []):
                 if_method = if_cls['methods'][method_name]
-                method = PythonMethod(method_name, None, cls, self.program,
-                                      False, False, True)
-                method.args = OrderedDict()
-                ctr = 0
-                for arg_type in if_method['args']:
-                    name = 'arg_' + str(ctr)
-                    arg = PythonVar(name, None,
-                                    self.get_class(arg_type))
-                    ctr += 1
-                    method.args[name] = arg
-                if if_method['type']:
-                    method.type = self.get_class(if_method['type'])
-                cls.methods[method_name] = method
+                self._add_interface_method(method_name, if_method, cls, False)
+            for method_name in if_cls.get('functions', []):
+                if_method = if_cls['functions'][method_name]
+                self._add_interface_method(method_name, if_method, cls, True)
+
+    def _add_interface_method(self, method_name, if_method, cls, pure):
+        method = PythonMethod(method_name, None, cls, self.program,
+                              pure, False, True)
+        method.args = OrderedDict()
+        ctr = 0
+        for arg_type in if_method['args']:
+            name = 'arg_' + str(ctr)
+            arg = PythonVar(name, None,
+                            self.get_class(arg_type))
+            ctr += 1
+            method.args[name] = arg
+        if if_method['type']:
+            method.type = self.get_class(if_method['type'])
+        if pure:
+            cls.functions[method_name] = method
+        else:
+            cls.methods[method_name] = method
+
+    def visit_module(self, module: str) -> None:
+        self.visit_default(self.asts[module])
 
     def visit_default(self, node: ast.AST) -> None:
         for field in node._fields:
@@ -346,11 +396,13 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def get_class(self, name: str) -> PythonClass:
+    def get_class(self, name: str, interface=False) -> PythonClass:
         if name in self.program.classes:
             cls = self.program.classes[name]
+            if interface:
+                cls.interface = interface
         else:
-            cls = PythonClass(name, self.program)
+            cls = PythonClass(name, self.program, interface=interface)
             self.program.classes[name] = cls
         return cls
 
@@ -363,6 +415,8 @@ class Analyzer(ast.NodeVisitor):
             raise UnsupportedException(node)
         if len(node.bases) == 1:
             cls.superclass = self.get_class(node.bases[0].id)
+        else:
+            cls.superclass = self.get_class('object')
         self.current_class = cls
         for member in node.body:
             self.visit(member, node)

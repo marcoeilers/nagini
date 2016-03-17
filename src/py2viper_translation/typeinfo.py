@@ -59,11 +59,28 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             type = type.type
         key = tuple(fqn)
         if key in self.all_types:
-            if self.all_types[key] != type:
+            if not self.type_equals(self.all_types[key], type):
                 if not isinstance(self.all_types[key], mypy.types.AnyType):
                     # Different types for same var? what is happening here?
+                    print(type)
+                    print(self.all_types[key])
                     raise Exception()
         self.all_types[key] = type
+
+    def type_equals(self, t1, t2):
+        if str(t1) == str(t2):
+            return True
+        if (isinstance(t1, mypy.types.FunctionLike) and
+            isinstance(t2, mypy.types.FunctionLike)):
+            if self.type_equals(t1.ret_type, t2.ret_type):
+                all_eq = True
+                for i in range(len(t1.arg_types)):
+                    arg1 = t1.arg_types[i]
+                    arg2 = t2.arg_types[i]
+                    all_eq = all_eq and self.type_equals(arg1, arg2)
+                return all_eq
+        return t1 == t2
+
 
     def visit_call_expr(self, o: mypy.nodes.CallExpr):
         for a in o.args:

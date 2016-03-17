@@ -32,3 +32,22 @@ class UnsupportedException(Exception):
 
     def __init__(self, astElement: ast.AST):
         super().__init__(str(astElement))
+
+
+def get_func_name(stmt: ast.AST) -> Optional[str]:
+    """
+    Checks if stmt is a function call and returns its name if it is, None
+    otherwise.
+    """
+    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+        call = stmt.value
+    elif isinstance(stmt, ast.Call):
+        call = stmt
+    else:
+        return None
+    if isinstance(call.func, ast.Name):
+        return call.func.id
+    elif isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    else:
+        raise UnsupportedException(stmt)
