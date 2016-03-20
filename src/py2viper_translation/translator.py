@@ -11,7 +11,8 @@ from py2viper_translation.analyzer import (
     PythonClass,
     PythonField,
     PythonProgram,
-    PythonExceptionHandler
+    PythonExceptionHandler,
+    PythonTryBlock
 )
 from py2viper_translation.constants import PRIMITIVES, BUILTINS
 from py2viper_translation.jvmaccess import JVM
@@ -23,7 +24,7 @@ from py2viper_translation.util import (
     get_func_name, 
     UnsupportedException
 )
-from toposort import toposort_flatten
+from toposort import toposort_flatten, toposort
 from typing import Any, TypeVar, List, Tuple, Optional, Union
 
 
@@ -446,7 +447,7 @@ class Translator:
                 while (family_root.superclass and
                        family_root.superclass.get_predicate(name)):
                     family_root = family_root.superclass
-                pred_name = family_root.sil_name + '_' + pred_name
+                pred_name = family_root.get_predicate(name).sil_name
             return [], self._create_predicate_access(pred_name, args, perm,
                                                      node)
         stmt, fieldacc = self.translate_expr(node.args[0])
@@ -523,7 +524,7 @@ class Translator:
         for arg in func.args:
             formal_args.append(func.args[arg].decl)
         type = self.translate_type(func.type)
-        sil_name = func.cls.sil_name + '_' + func.sil_name
+        sil_name = func.sil_name
         call = self.viper.FuncApp(sil_name, args, self.to_position(node),
                                   self.noinfo(), type, formal_args)
         return call
@@ -585,18 +586,17 @@ class Translator:
             target_class = target.cls
             targets = []
             if target.declared_exceptions:
-                error_var = self.current_function.create_variable(
-                    target.name + '_err',
-                    self.program.classes['Exception'], self)
-                targets.append(error_var.ref)
-            init = self.viper.MethodCall(target_class.sil_name + '___init__',
+                error_var = self._get_error_var(node)
+                targets.append(error_var)
+            method_name = target_class.get_method('__init__').sil_name
+            init = self.viper.MethodCall(method_name,
                                          args, targets,
                                          self.to_position(node),
                                          self.noinfo())
             stmts.append(init)
             if target.declared_exceptions:
                 catchers = self.create_exception_catchers(error_var,
-                    self.current_function.handlers, node)
+                    self.current_function.try_blocks, node)
                 stmts = stmts + catchers
         return arg_stmts + stmts, res_var.ref
 
@@ -661,15 +661,13 @@ class Translator:
         for arg in target.args:
             formal_args.append(target.args[arg].decl)
         target_name = target.sil_name
-        if receiver_class:
-            target_name = receiver_class.sil_name + '_' + target_name
         if is_predicate:
             if receiver_class:
                 family_root = receiver_class
                 while (family_root.superclass and
                        family_root.superclass.get_predicate(name)):
                     family_root = family_root.superclass
-                target_name = family_root.sil_name + '_' + target.sil_name
+                target_name = family_root.get_predicate(name).sil_name
             perm = self.viper.FullPerm(position, self.noinfo())
             return arg_stmts, self._create_predicate_access(target_name, args,
                                                             perm, node)
@@ -704,41 +702,67 @@ class Translator:
                                           self.noinfo())]
             if target.declared_exceptions:
                 call = call + self.create_exception_catchers(errorvar,
-                    self.current_function.handlers, node)
+                    self.current_function.try_blocks, node)
             return (arg_stmts + call,
                     result_var.ref if result_var else None)
 
+    def _get_surrounding_try_blocks(self, try_blocks, stmt) \
+            -> List[PythonTryBlock]:
+        tb = try_blocks
+        blocks = [b for b in tb if self.contains_stmt(b.protected_region, stmt)]
+        deps = {(b, len({1 for b2 in blocks if self.contains_stmt(b2.protected_region, b.node)})) for b in blocks}
+        deps = sorted(deps,key=lambda k: -k[1])
+        deps = [b for (b, r) in deps]
+        return deps
+
+
+    def create_exception_catchers_2(self, var: PythonVar):
+        pass
+
+
     def create_exception_catchers(self, var: PythonVar,
-                                  handlers: List[PythonExceptionHandler],
+                                  try_blocks: List[PythonTryBlock],
                                   call: ast.Call) -> List[Stmt]:
         """
         Creates the code for catching an exception, i.e. redirecting control
         flow to the handlers or giving the exception to the caller function
         """
+        if isinstance(var, PythonVar):
+            var = var.ref
         cases = []
         position = self.to_position(call)
         err_var = self.viper.LocalVar('_err', self.viper.Ref,
                                       self.noposition(),
                                       self.noinfo())
-        if self.current_function.declared_exceptions:
-            assignerror = self.viper.LocalVarAssign(err_var, var.ref, position,
-                                                    self.noinfo())
-            gotoend = self.viper.Goto('__end', position,
-                                      self.noinfo())
-            uncaught_option = self.translate_block([assignerror, gotoend],
-                                                   position,
-                                                   self.noinfo())
+
+        relevant_try_blocks = self._get_surrounding_try_blocks(try_blocks, call)
+        goto_finally = self._create_goto_finally(relevant_try_blocks, var)
+        if goto_finally:
+            uncaught_option = goto_finally
         else:
-            uncaught_option = self.viper.Exhale(
-                self.viper.FalseLit(position, self.noinfo()), position,
-                self.noinfo())
-        for handler in handlers:
-            if self.contains_stmt(handler.region, call):
-                condition = self.var_has_type(var.sil_name, handler.exception)
+            if self.current_function.declared_exceptions:
+                assignerror = self.viper.LocalVarAssign(err_var, var, position,
+                                                        self.noinfo())
+                gotoend = self.viper.Goto('__end', position,
+                                          self.noinfo())
+                uncaught_option = self.translate_block([assignerror, gotoend],
+                                                       position,
+                                                       self.noinfo())
+            else:
+                uncaught_option = self.viper.Exhale(
+                    self.viper.FalseLit(position, self.noinfo()), position,
+                    self.noinfo())
+
+        for block in relevant_try_blocks:
+            for handler in block.handlers:
+                condition = self.type_factory.has_type(var, handler.exception)
                 goto = self.viper.Goto(handler.name,
                                        self.to_position(handler.node),
                                        self.noinfo())
                 cases.insert(0, (condition, goto))
+            if block.finally_block:
+                break
+
         result = None
         for cond, goto in cases:
             if result is None:
@@ -754,7 +778,7 @@ class Translator:
             error_case = uncaught_option
         else:
             error_case = result
-        errnotnull = self.viper.NeCmp(var.ref,
+        errnotnull = self.viper.NeCmp(var,
                                       self.viper.NullLit(self.noposition(),
                                                          self.noinfo()),
                                       position, self.noinfo())
@@ -1074,22 +1098,34 @@ class Translator:
         return rhs_stmt + [assign]
 
     def translate_stmt_Try(self, node: ast.Try) -> List[Stmt]:
+        try_block = None
+        for block in self.current_function.try_blocks:
+            if block.node is node:
+                try_block = block
+                break
+        assert try_block
         body = flatten([self.translate_stmt(stmt) for stmt in node.body])
+        if try_block.else_block:
+            goto = self.viper.Goto(try_block.else_block.name,
+                                   self.to_position(node), self.noinfo())
+            body += [goto]
+        elif try_block.finally_block:
+            goto = self.viper.Goto(try_block.finally_name,
+                                   self.to_position(node), self.noinfo())
+            body += [goto]
         end_label = self.viper.Label('post_' + node.sil_name,
                                      self.to_position(node),
                                      self.noinfo())
         return body + [end_label]
 
     def translate_stmt_Raise(self, node: ast.Raise) -> List[Stmt]:
-        var = self.current_function.create_variable('raise',
-                                                   self.get_type(node.exc),
-                                                   self)
+        var = self._get_error_var(node)
         stmt, exception = self.translate_expr(node.exc)
-        assignment = self.viper.LocalVarAssign(var.ref, exception,
+        assignment = self.viper.LocalVarAssign(var, exception,
                                                self.to_position(node),
                                                self.noinfo())
         catchers = self.create_exception_catchers(var,
-            self.current_function.handlers, node)
+            self.current_function.try_blocks, node)
         return stmt + [assignment] + catchers
 
     def translate_stmt_Call(self, node: ast.Call) -> List[Stmt]:
@@ -1134,7 +1170,7 @@ class Translator:
             lhs_stmt, target = self.translate_expr(node.targets[0].value)
             ind_stmt, index = self.translate_expr(node.targets[0].slice.value)
             func = target_cls.get_method('__setitem__')
-            func_name = func.cls.sil_name + '_' + func.sil_name
+            func_name = func.sil_name
             rhs_stmt, rhs = self.translate_expr(node.value)
             args = [target, index, rhs]
             targets = []
@@ -1180,6 +1216,15 @@ class Translator:
                                 self.noposition(), self.noinfo()),
             rhs, self.to_position(node),
             self.noinfo())
+        tries = self._get_surrounding_try_blocks(self.current_function.try_blocks, node)
+        for try_block in tries:
+            if try_block.finally_block:
+                lhs = try_block.get_finally_var(self).ref
+                rhs = self.viper.IntLit(1, self.noposition(), self.noinfo())
+                finally_assign = self.viper.LocalVarAssign(lhs, rhs, self.noposition(), self.noinfo())
+                jmp = self.viper.Goto(try_block.finally_name, self.to_position(node),
+                                      self.noinfo())
+                return rhs_stmt + [assign, finally_assign, jmp]
         jmp_to_end = self.viper.Goto("__end", self.to_position(node),
                                      self.noinfo())
         return rhs_stmt + [assign, jmp_to_end]
@@ -1270,7 +1315,7 @@ class Translator:
         return self.var_has_type(param.sil_name, param.type)
 
     def translate_field(self, field: PythonField) -> 'silver.ast.Field':
-        return self.viper.Field(field.cls.sil_name + '_' + field.sil_name,
+        return self.viper.Field(field.sil_name,
                                 self.translate_type(field.type),
                                 self.to_position(field.node),
                                 self.noinfo())
@@ -1326,10 +1371,111 @@ class Translator:
         body = self.translate_exprs(statements[body_index:], func)
         self.current_function = old_function
         name = func.sil_name
-        if func.cls is not None:
-            name = func.cls.sil_name + '_' + name
         return self.viper.Function(name, args, type, pres, posts, body,
                                    self.noposition(), self.noinfo())
+
+    def _get_error_var(self, stmt) -> 'LocalVarRef':
+        tries = self._get_surrounding_try_blocks(self.current_function.try_blocks,
+                                         stmt)
+        if tries:
+            return tries[0].get_error_var(self).ref
+        else:
+            if self.current_function.declared_exceptions:
+                return self.current_function.error_var
+            else:
+                new_var = self.current_function.create_variable('error', self.program.classes['Exception'], self)
+                return new_var.ref
+
+    def _create_goto_finally(self, tries, error_var: 'LocalVar') -> Optional[Stmt]:
+        index = 0
+        while index < len(tries):
+            current = tries[index]
+            if current.finally_block:
+                # propagate return value
+                var_next = current.get_finally_var(self)
+                var_next_error = current.get_error_var(self)
+                next_error_assign = self.viper.LocalVarAssign(var_next_error.ref,
+                                                        error_var,
+                                                        self.noposition(), self.noinfo())
+                next_assign = self.viper.LocalVarAssign(var_next.ref,
+                                                        self.viper.IntLit(2, self.noposition(), self.noinfo()),
+                                                        self.noposition(), self.noinfo())
+                # goto finally block
+                goto_next = self.viper.Goto(current.finally_name, self.noposition(), self.noinfo())
+                return_block = [next_assign, goto_next]
+                result = self.translate_block(return_block, self.noposition(), self.noinfo())
+                return result
+            index += 1
+        return None
+
+
+
+    def translate_finally(self, block: PythonTryBlock) \
+            -> List[Stmt]:
+        pos = self.to_position(block.node)
+        info = self.noinfo()
+        label = self.viper.Label(block.finally_name,
+                                 self.to_position(block.node), self.noinfo())
+        body = [label]
+        for stmt in block.finally_block:
+            body += self.translate_stmt(stmt)
+        finally_var = block.get_finally_var(self)
+        tries = self._get_surrounding_try_blocks(self.current_function.try_blocks,
+                                         block.node)
+        goto_post = self.viper.Goto('post_' + block.name, pos, info)
+        goto_end = self.viper.Goto('__end', pos, info)
+        empty_stmt = self.translate_block([], pos, info)
+        # assert tries
+        index = 0
+        if block in tries:
+            assert tries[0] == block
+            index = 1
+        except_block = []
+        return_block = []
+        while index < len(tries):
+            current = tries[index]
+            if not return_block:
+                if current.finally_block:
+                    # propagate return value
+                    var_next = current.get_finally_var(self)
+                    next_assign = self.viper.LocalVarAssign(var_next.ref,
+                                                            finally_var.ref,
+                                                            pos, info)
+                    # goto finally block
+                    goto_next = self.viper.Goto(current.finally_name, pos, info)
+                    return_block = [next_assign, goto_next]
+            for handler in current.handlers:
+                # if handler applies
+                # goto handler
+                condition = self.var_has_type(block.get_error_var(self).sil_name,
+                                              handler.exception)
+                goto = self.viper.Goto(handler.name, pos, info)
+                if_handler = self.viper.If(condition, goto, empty_stmt, pos, info)
+                except_block.append(if_handler)
+            if current.finally_block:
+                # propagate return value
+                # goto finally block
+                except_block += return_block
+                break
+            index += 1
+        if not return_block:
+            return_block = [goto_end]
+        if self.current_function.declared_exceptions:
+            return_block.append(goto_end)
+        else:
+            false = self.viper.FalseLit(pos, info)
+            assert_false = self.viper.Exhale(false, pos, info)
+            return_block.append(assert_false)
+
+        except_block = self.translate_block(except_block, pos, info)
+        return_block = self.translate_block(return_block, pos, info)
+
+
+        if_return = self.viper.If(self.viper.GtCmp(finally_var.ref, self.viper.IntLit(0, pos, info), pos, info), return_block, goto_post, pos, info)
+        if_except = self.viper.If(self.viper.GtCmp(finally_var.ref, self.viper.IntLit(1, pos, info), pos, info), except_block, if_return, pos, info)
+        body += [if_except]
+        return body
+
 
     def translate_handler(self, handler: PythonExceptionHandler) -> List[Stmt]:
         """
@@ -1345,10 +1491,19 @@ class Translator:
         body_block = self.translate_block(body,
                                           self.to_position(handler.node),
                                           self.noinfo())
-        goto_end = self.viper.Goto('post_' + handler.tryname,
+        if handler.try_block.finally_block:
+            next = handler.try_block.finally_name
+            lhs = handler.try_block.get_finally_var(self).ref
+            rhs = self.viper.IntLit(0, self.noposition(), self.noinfo())
+            var_set = self.viper.LocalVarAssign(lhs, rhs, self.noposition(), self.noinfo())
+            next_var_set = [var_set]
+        else:
+            next = 'post_' + handler.try_block.name
+            next_var_set = []
+        goto_end = self.viper.Goto(next,
                                    self.to_position(handler.node),
                                    self.noinfo())
-        return [label, body_block, goto_end]
+        return [label, body_block] + next_var_set + [goto_end]
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          isconstructor: bool) -> Tuple[List[Expr], List[Expr]]:
@@ -1469,16 +1624,14 @@ class Translator:
         params = []
         args = []
 
-        mname = method.sil_name + '_subtyping'
+        mname = self.program.get_fresh_name(method.sil_name + '_subtyping')
         pres, posts = self.extract_contract(method.overrides, '_err', False)
-        if method.cls:
-            mname = method.cls.sil_name + '_' + mname
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
         has_subtype = self.var_has_type(self_arg.sil_name, method.cls)
-        called_name = method.cls.sil_name + '_' + method.sil_name
+        called_name = method.sil_name
         if method.pure:
             pres = pres + [has_subtype]
             formal_args = []
@@ -1583,7 +1736,7 @@ class Translator:
             dependencies[pred] = value
         sorted = toposort_flatten(dependencies)
 
-        name = root.cls.sil_name + '_' + root.sil_name
+        name = root.sil_name
         args = []
         self_var_ref = root.args[next(iter(root.args))].ref
         for arg in root.args:
@@ -1641,6 +1794,7 @@ class Translator:
         error_var_ref = self.viper.LocalVar('_err', self.viper.Ref,
                                             self.noposition(),
                                             self.noinfo())
+        method.error_var = error_var_ref
         pres, posts = self.extract_contract(method, '_err', False)
         if method.cls and method.name == '__init__':
             self_var = method.args[next(iter(method.args))].ref
@@ -1676,8 +1830,13 @@ class Translator:
                  method.node.body[body_index:]])
             body.append(self.viper.Goto('__end', self.noposition(),
                                         self.noinfo()))
-            for handler in method.handlers:
-                body += self.translate_handler(handler)
+            for block in method.try_blocks:
+                for handler in block.handlers:
+                    body += self.translate_handler(handler)
+                if block.else_block:
+                    body += self.translate_handler(block.else_block)
+                if block.finally_block:
+                    body += self.translate_finally(block)
             locals = []
             for local in method.locals:
                 locals.append(method.locals[local].decl)
@@ -1688,8 +1847,6 @@ class Translator:
                                          self.noinfo())
         self.current_function = old_function
         name = method.sil_name
-        if method.cls is not None:
-            name = method.cls.sil_name + '_' + name
         return self.viper.Method(name, args, results, pres, posts,
                                  locals, body_block,
                                  self.to_position(method.node),

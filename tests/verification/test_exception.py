@@ -191,3 +191,181 @@ def nested_2(out: Container) -> None:
     except MyOtherException:
         out.value = -1
     out.value *= out.value
+
+
+def nested_else_finally(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 1 )
+    try:
+
+        try:
+            raise MyException()
+            Assert(False)
+        except MyException as e:
+            out.value = 33
+        except Exception:
+            Assert(False)
+        else:
+            Assert(False)
+        finally:
+            out.value += 1
+        if out.value == 34:
+            raise MyOtherException()
+            Assert(False)
+        else:
+            Assert(False)
+        Assert(False)
+    except MyOtherException:
+        out.value = -1
+    out.value *= out.value
+
+
+def nested_else_finally_2(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 1 )
+    try:
+
+        try:
+            raise MyException()
+            Assert(False)
+        except MyException as e:
+            out.value = 33
+        except Exception:
+            Assert(False)
+        else:
+            Assert(False)
+        finally:
+            out.value += 1
+        if out.value == 33:
+            raise MyOtherException()
+            Assert(False)
+        else:
+            #:: ExpectedOutput(assert.failed:assertion.false)
+            Assert(False)
+        Assert(False)
+    except MyOtherException:
+        out.value = -1
+    out.value *= out.value
+
+
+def nested_try_finally(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 1 )
+    try:
+
+        try:
+            try:
+                raise MyException()
+            finally:
+                out.value = 30
+            Assert(False)
+        except MyException as e:
+            out.value = out.value + 3
+        except Exception:
+            Assert(False)
+        else:
+            Assert(False)
+        finally:
+            out.value += 1
+        if out.value == 34:
+            raise MyOtherException()
+            Assert(False)
+        else:
+            Assert(False)
+        Assert(False)
+    except MyOtherException:
+        out.value = -1
+    out.value *= out.value
+
+def nested_try_finally_2(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 1 )
+    try:
+
+        try:
+            try:
+                raise MyException()
+            finally:
+                out.value = 30
+            Assert(False)
+        except MyException as e:
+            out.value = out.value + 3
+        except Exception:
+            Assert(False)
+        else:
+            Assert(False)
+        finally:
+            out.value += 1
+        if out.value == 33:
+            raise MyOtherException()
+            Assert(False)
+        else:
+            #:: ExpectedOutput(assert.failed:assertion.false)
+            Assert(False)
+        Assert(False)
+    except MyOtherException:
+        out.value = -1
+    out.value *= out.value
+
+
+def return_finally(out: Container) -> int:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 5)
+    Ensures(Result() == 15)
+    out.value = 1
+    try:
+        try:
+            return 15
+        finally:
+            out.value = out.value * 3
+    except MyException:
+        out.value = out.value + 1000
+    finally:
+        out.value = out.value + 2
+
+def return_finally_2(out: Container) -> int:
+    Requires(Acc(out.value))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(out.value) and out.value == 1)
+    Ensures(Result() == 15)
+    out.value = 1
+    try:
+        try:
+            return 15
+        finally:
+            out.value = out.value * 3
+    except MyException:
+        out.value = out.value + 1000
+    finally:
+        out.value = out.value + 2
+
+def double_return_finally(out: Container) -> int:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 3)
+    Ensures(Result() == 5)
+    out.value = 1
+    try:
+        try:
+            return 15
+        finally:
+            out.value = out.value * 3
+    except MyException:
+        out.value = out.value + 1000
+    finally:
+        return out.value + 2
+
+def double_return_finally_2(out: Container) -> int:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 3)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() == 15)
+    out.value = 1
+    try:
+        try:
+            return 15
+        finally:
+            out.value = out.value * 3
+    except MyException:
+        out.value = out.value + 1000
+    finally:
+        return out.value + 2
