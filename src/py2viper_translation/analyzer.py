@@ -159,16 +159,20 @@ class PythonClass(PythonNode, PythonScope):
     def process(self, sil_name: str, translator: 'Translator') -> None:
         self.sil_name = sil_name
         for function in self.functions:
-            self.functions[function].process(self.get_fresh_name(function),
+            func_name = self.name + '_' + function
+            self.functions[function].process(self.get_fresh_name(func_name),
                                              translator)
         for method in self.methods:
-            self.methods[method].process(self.get_fresh_name(method),
+            method_name = self.name + '_' + method
+            self.methods[method].process(self.get_fresh_name(method_name),
                                          translator)
         for predicate in self.predicates:
-            self.predicates[predicate].process(self.get_fresh_name(predicate),
+            pred_name = self.name + '_' + predicate
+            self.predicates[predicate].process(self.get_fresh_name(pred_name),
                                                translator)
         for field in self.fields:
-            self.fields[field].process(self.get_fresh_name(field))
+            field_name = self.name + '_' + field
+            self.fields[field].process(self.get_fresh_name(field_name))
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -199,7 +203,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.declared_exceptions = OrderedDict()  # direct
         self.precondition = []
         self.postcondition = []
-        self.handlers = []  # direct
+        self.try_blocks = []  # direct
         self.superscope = superscope
         self.pure = pure
         self.predicate = False
@@ -246,13 +250,49 @@ class PythonMethod(PythonNode, PythonScope):
 
 
 class PythonExceptionHandler(PythonNode):
-    def __init__(self, node: ast.AST, exception_type: PythonClass, tryname: str,
-                 handlername: str, body: ast.AST, protected_region: ast.AST):
-        super().__init__(handlername, node=node)
-        self.tryname = tryname
+    def __init__(self, node: ast.AST, exception_type: PythonClass,
+                 try_block: 'PythonTryBlock', handler_name: str, body: ast.AST,
+                 exception_name: str):
+        super().__init__(handler_name, node=node)
+        self.try_block = try_block
         self.body = body
-        self.region = protected_region
         self.exception = exception_type
+        self.exception_name = exception_name
+
+
+class PythonTryBlock(PythonNode):
+    def __init__(self, node: ast.AST, try_name: str, method: PythonMethod,
+                 protected_region: ast.AST):
+        super().__init__(try_name, node=node)
+        self.handlers = []
+        self.else_block = None
+        self.finally_block = None
+        self.protected_region = protected_region
+        self.finally_var = None
+        self.error_var = None
+        self.method = method
+
+    def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+        if self.finally_var:
+            return self.finally_var
+        sil_name = self.method.get_fresh_name('try_finally')
+        bool_type = self.method.get_program().classes['int']
+        result = PythonVar(sil_name, None, bool_type)
+        result.process(sil_name, translator)
+        self.method.locals[sil_name] = result
+        self.finally_var = result
+        return result
+
+    def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+        if self.error_var:
+            return self.error_var
+        sil_name = self.method.get_fresh_name('error')
+        exc_type = self.method.get_program().classes['Exception']
+        result = PythonVar(sil_name, None, exc_type)
+        result.process(sil_name, translator)
+        self.method.locals[sil_name] = result
+        self.error_var = result
+        return result
 
 
 class PythonVar(PythonNode):
@@ -322,7 +362,7 @@ class Analyzer(ast.NodeVisitor):
             # ignore
             pass
         self.asts[abs_path] = parseresult
-        # print(astpp.dump(parseresult))
+        print(astpp.dump(parseresult))
         assert isinstance(parseresult, ast.Module)
         for stmt in parseresult.body:
             if get_func_name(stmt) != 'Import':
@@ -594,15 +634,27 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function is not None
         self.visit_default(node)
         try_name = self.current_function.get_fresh_name('try')
+        try_block = PythonTryBlock(node, try_name, self.current_function,
+                                   node.body)
         node.sil_name = try_name
         for handler in node.handlers:
             handler_name = self.current_function.get_fresh_name(
                 'handler' + handler.type.id)
             type = self.get_class(handler.type.id)
-            py_handler = PythonExceptionHandler(handler, type, try_name,
+            py_handler = PythonExceptionHandler(handler, type, try_block,
                                                 handler_name, handler.body,
-                                                node.body)
-            self.current_function.handlers.append(py_handler)
+                                                handler.name)
+            try_block.handlers.append(py_handler)
+        if node.orelse:
+            handler_name = self.current_function.get_fresh_name('try_else')
+            py_handler = PythonExceptionHandler(node, None, try_block,
+                                                handler_name, node.orelse, None)
+            try_block.else_block = py_handler
+        if node.finalbody:
+            finally_name = self.current_function.get_fresh_name('try_finally')
+            try_block.finally_block = node.finalbody
+            try_block.finally_name = finally_name
+        self.current_function.try_blocks.append(try_block)
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return (len(func.decorator_list) == 1
