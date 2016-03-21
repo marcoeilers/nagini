@@ -6,7 +6,10 @@ import tokenize
 import traceback
 
 
-# all of this is taken from https://bitbucket.org/plas/thonny/src/master/thonny/ast_utils.py?fileviewer=file-view-default
+# all of this is taken from
+# https://bitbucket.org/plas/thonny/src/master/thonny/ast_utils.py?fileviewer=file-view-default
+# I'm not sure how well it works, but it promises to find out the end line/
+# column of Python AST nodes, which the normal AST doesn't contain.
 
 def _get_ordered_child_nodes(node):
     if isinstance(node, ast.Dict):

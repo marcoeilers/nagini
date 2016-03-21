@@ -5,6 +5,10 @@ from py2viper_translation.viper_ast import ViperAST
 
 
 class TypeDomainFactory:
+    """
+    Creates domain functions and axioms that represent the Python/mypy type
+    system within Viper.
+    """
     def __init__(self, viper: ViperAST, translator: 'Translator'):
         self.viper = viper
         self.typedomain = 'PyType'
