@@ -217,18 +217,20 @@ class PythonMethod(PythonNode, PythonScope):
             self.args[arg].process(self.get_fresh_name(arg), translator)
         if self.interface:
             return
-        functype = self.get_program().types.get_func_type(self.get_scope_prefix())
-        if isinstance(functype, mypy.types.Void):
+        func_type = self.get_program().types.get_func_type(
+            self.get_scope_prefix())
+        if isinstance(func_type, mypy.types.Void):
             self.type = None
-        elif isinstance(functype, mypy.types.Instance):
-            self.type = self.get_program().classes[functype.type.name()]
+        elif isinstance(func_type, mypy.types.Instance):
+            self.type = self.get_program().classes[func_type.type.name()]
         else:
-            raise UnsupportedException(functype)
+            raise UnsupportedException(func_type)
         if self.cls is not None and self.cls.superclass is not None:
             if self.predicate:
                 self.overrides = self.cls.superclass.get_predicate(self.name)
             else:
-                self.overrides = self.cls.superclass.get_func_or_method(self.name)
+                self.overrides = self.cls.superclass.get_func_or_method(
+                    self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
 
@@ -273,6 +275,14 @@ class PythonTryBlock(PythonNode):
         self.method = method
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable in which we store the
+        information how control flow should proceed after the execution
+        of a finally block. We use a value of 0 to say normal flow, 1 to say
+        we returned normally, i.e. jump to the end of the function asap, 2
+        to say we returned exceptionally, i.e. jump to the end of the function
+        moving through exception handlers.
+        """
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
@@ -284,6 +294,10 @@ class PythonTryBlock(PythonNode):
         return result
 
     def get_error_var(self, translator: 'Translator') -> 'PythonVar':
+        """
+        Lazily creates and returns the variable in which any exceptions thrown
+        within the block will be stored.
+        """
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')

@@ -13,6 +13,13 @@ class MyOtherException(Exception):
     pass
 
 
+class ParameterizedException(Exception):
+    def __init__(self, num: int) -> None:
+        Ensures(Acc(self.num))  # type: ignore
+        Ensures(self.num == num)  # type: ignore
+        self.num = num
+
+
 class Container:
     def __init__(self) -> None:
         Ensures(Acc(self.value))  # type: ignore
@@ -369,3 +376,55 @@ def double_return_finally_2(out: Container) -> int:
         out.value = out.value + 1000
     finally:
         return out.value + 2
+
+def exception_use(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value) and out.value == 104)
+    try:
+        raise ParameterizedException(52)
+        Assert(False)
+    except MyException as e:
+        Assert(False)
+    except ParameterizedException as e2:
+        out.value = e2.num
+    finally:
+        out.value *= 2
+
+def exception_use_2(out: Container, inp: bool) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value))
+    Ensures(Implies(not inp, out.value == 72))
+    Ensures(Implies(inp, out.value == 74))
+    try:
+        if inp:
+            out.value = 14
+            raise ParameterizedException(23)
+        else:
+            raise MyException()
+        Assert(False)
+    except MyException as e:
+        out.value = 36
+    except ParameterizedException as e2:
+        out.value += e2.num
+    finally:
+        out.value *= 2
+
+def exception_use_3(out: Container, inp: bool) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value))
+    Ensures(Implies(not inp, out.value == 72))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Implies(inp, out.value == 74))
+    try:
+        if inp:
+            out.value = 14
+            raise ParameterizedException(45)
+        else:
+            raise MyException()
+        Assert(False)
+    except MyException as e:
+        out.value = 36
+    except ParameterizedException as e2:
+        out.value += e2.num
+    finally:
+        out.value *= 2
