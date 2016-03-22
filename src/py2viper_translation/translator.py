@@ -729,12 +729,15 @@ class Translator:
         """
         tb = try_blocks
         blocks = [b for b in tb if self.contains_stmt(b.protected_region, stmt)]
-        deps = {(b, len({1 for b2 in blocks
-                         if self.contains_stmt(b2.protected_region, b.node)}))
-                for b in blocks}
-        deps = sorted(deps,key=lambda k: -k[1])
-        deps = [b for (b, r) in deps]
-        return deps
+
+        def rank(b: PythonTryBlock) -> int:
+            result = 0
+            for b2 in blocks:
+                if self.contains_stmt(b2.protected_region, b.node):
+                    result += 1
+            return -result
+        inner_to_outer = sorted(blocks,key=lambda b: rank(b))
+        return inner_to_outer
 
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],
