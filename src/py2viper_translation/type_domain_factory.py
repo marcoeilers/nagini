@@ -81,7 +81,9 @@ class TypeDomainFactory:
                              info) -> 'silver.ast.DomainAxiom':
         """
         Creates a domain axiom that indicates a subtype relationship
-        between type and supertype
+        between type and supertype:
+
+        extends_(type(), supertype())
         """
         type_var = self.viper.LocalVar('class', self.typetype(), position, info)
         type_func = self.viper.DomainFuncApp(type, [], {}, self.typetype(), [],
@@ -97,6 +99,15 @@ class TypeDomainFactory:
                                       self.typedomain)
 
     def create_extends_implies_subtype_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that states that an extends-relationship between two
+        types implies a subtype-relationship:
+
+        forall sub: PyType, sub2: PyType :: { extends_(sub, sub2) }
+        extends_(sub, sub2)
+        ==>
+        issubtype(sub, sub2)
+        """
         arg_sub = self.viper.LocalVarDecl('sub', self.typetype(),
                                           self.noposition(),
                                           self.noinfo())
@@ -131,6 +142,16 @@ class TypeDomainFactory:
                                       self.typedomain)
 
     def create_subtype_exclusion_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that states that two types that directly extend
+        another type cannot be subtypes of each other:
+
+        forall sub: PyType, sub2: PyType, super: PyType ::
+        { extends_(sub, super),extends_(sub2, super) }
+        extends_(sub, super) && extends_(sub2, super) && (sub != sub2)
+        ==>
+        isnotsubtype(sub, sub2) && isnotsubtype(sub2, sub))
+        """
         arg_sub = self.viper.LocalVarDecl('sub', self.typetype(),
                                           self.noposition(),
                                           self.noinfo())
@@ -191,6 +212,16 @@ class TypeDomainFactory:
 
     def create_subtype_exclusion_propagation_axiom(self) \
             -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that propagates the information that two types
+        are not subtypes down the type hierarchy:
+
+        forall sub: PyType, middle: PyType, super: PyType ::
+        { issubtype(sub, middle),isnotsubtype(middle, super) }
+        issubtype(sub, middle) && isnotsubtype(middle, super)
+        ==>
+        !issubtype(sub, super))
+        """
         arg_sub = self.viper.LocalVarDecl('sub', self.typetype(),
                                           self.noposition(),
                                           self.noinfo())
@@ -240,6 +271,11 @@ class TypeDomainFactory:
                                       self.typedomain)
 
     def create_null_type_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that states that the type of null is None:
+
+        typeof(null) == NoneType()
+        """
         null = self.viper.NullLit(self.noposition(), self.noinfo())
         type_func = self.viper.DomainFuncApp('typeof', [null], {},
                                              self.typetype(), [null],
@@ -255,6 +291,13 @@ class TypeDomainFactory:
                                       self.noinfo(), self.typedomain)
 
     def create_none_type_subtype_axiom(self) -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that states that no type is a subtype of NoneType:
+
+        forall sub: PyType ::
+        { issubtype(sub, NoneType()) }
+        !issubtype(sub, NoneType())
+        """
         arg_sub = self.viper.LocalVarDecl('sub', self.typetype(),
                                           self.noposition(),
                                           self.noinfo())
@@ -289,7 +332,12 @@ class TypeDomainFactory:
 
     def create_transitivity_axiom(self) -> 'silver.ast.DomainAxiom':
         """
-        Creates the transitivity axiom for the PyType domain
+        Creates the transitivity axiom for the PyType domain:
+        forall sub: PyType, middle: PyType, super: PyType ::
+            { issubtype(sub, middle),issubtype(middle, super) }
+            issubtype(sub, middle) && issubtype(middle, super)
+            ==>
+            issubtype(sub, super)
         """
         arg_sub = self.viper.LocalVarDecl('sub', self.typetype(),
                                           self.noposition(),
@@ -340,7 +388,8 @@ class TypeDomainFactory:
 
     def create_reflexivity_axiom(self) -> 'silver.ast.DomainAxiom':
         """
-        Creates the reflexivity axiom for the PyType domain
+        Creates the reflexivity axiom for the PyType domain:
+        forall type: PyType :: { issubtype(type, type) } issubtype(type, type)
         """
         arg = self.viper.LocalVarDecl('type', self.typetype(),
                                       self.noposition(), self.noinfo())

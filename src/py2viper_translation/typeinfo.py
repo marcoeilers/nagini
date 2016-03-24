@@ -74,7 +74,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             isinstance(t2, mypy.types.FunctionLike)):
             if self.type_equals(t1.ret_type, t2.ret_type):
                 all_eq = True
-                for i in range(len(t1.arg_types)):
+                for arg1, arg2 in zip(t1.arg_types, t2.arg_types):
                     arg1 = t1.arg_types[i]
                     arg2 = t2.arg_types[i]
                     all_eq = all_eq and self.type_equals(arg1, arg2)

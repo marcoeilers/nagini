@@ -1,6 +1,7 @@
 import argparse
 import ast
 import inspect
+import json
 import os
 import sys
 import traceback
@@ -40,10 +41,11 @@ def translate(path: str, jvm: JVM):
     Translates the Python module at the given path to a Viper program
     """
     current_path = os.path.dirname(inspect.stack()[0][1])
-    resources_path = current_path + os.sep + 'resources' + os.sep
+    resources_path = os.path.join(current_path, 'resources')
     builtins = []
-    native_sil = [resources_path + 'preamble.sil']
-    with open(resources_path + 'preamble.index', 'r') as file:
+    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil']
+    native_sil = [os.path.join(resources_path, f) for f in sil_files]
+    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
     sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
     modules = [path] + builtins
@@ -51,12 +53,12 @@ def translate(path: str, jvm: JVM):
     types = TypeInfo()
     analyzer = Analyzer(jvm, viperast, types, path)
     for si in sil_interface:
-        analyzer.add_interface(ast.literal_eval(si))
+        analyzer.add_interface(json.loads(si))
     for module in analyzer.modules:
         analyzer.collect_imports(module)
         typecorrect = types.check(module)
         if typecorrect:
-            analyzer.set_contract_only(module != os.path.abspath(path))
+            analyzer.contract_only = module != os.path.abspath(path)
             analyzer.visit_module(module)
         else:
             return None

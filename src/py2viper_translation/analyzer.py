@@ -63,19 +63,16 @@ class PythonProgram(PythonScope):
             self.classes[primitive] = PythonClass(primitive, self)
 
     def process(self, translator: 'Translator') -> None:
-        for cls in self.classes:
-            self.classes[cls].process(self.get_fresh_name(cls), translator)
-        for function in self.functions:
-            self.functions[function].process(self.get_fresh_name(function),
-                                             translator)
-        for method in self.methods:
-            self.methods[method].process(self.get_fresh_name(method),
-                                         translator)
-        for predicate in self.predicates:
-            self.predicates[predicate].process(self.get_fresh_name(predicate),
-                                               translator)
-        for var in self.global_vars:
-            self.global_vars[var].process(self.get_fresh_name(var), translator)
+        for name, cls in self.classes.items():
+            cls.process(self.get_fresh_name(name), translator)
+        for name, function in self.functions.items():
+            function.process(self.get_fresh_name(name), translator)
+        for name, method in self.methods.items():
+            method.process(self.get_fresh_name(name), translator)
+        for name, predicate in self.predicates.items():
+            predicate.process(self.get_fresh_name(name), translator)
+        for name, var in self.global_vars.items():
+            var.process(self.get_fresh_name(name), translator)
 
     def get_scope_prefix(self) -> List[str]:
         return []
@@ -95,8 +92,17 @@ class PythonNode:
 
 
 class PythonClass(PythonNode, PythonScope):
+    """
+    Represents a class in the Python program.
+    """
+
     def __init__(self, name: str, superscope: PythonScope, node: ast.AST = None,
-                 superclass: 'PythonClass' = None, interface = False):
+                 superclass: 'PythonClass' = None, interface=False):
+        """
+        :param superscope: The scope, usually program, this belongs to.
+        :param interface: True iff the class implementation is provided in
+        native Silver.
+        """
         super().__init__(name, node)
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -110,6 +116,10 @@ class PythonClass(PythonNode, PythonScope):
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonClass') -> 'PythonField':
+        """
+        Adds a field with the given name and type if it doesn't exist yet in
+        this class.
+        """
         if name in self.fields:
             field = self.fields[name]
             assert field.type == type
@@ -119,6 +129,9 @@ class PythonClass(PythonNode, PythonScope):
         return field
 
     def get_field(self, name: str) -> Optional['PythonField']:
+        """
+        Returns the field with the given name in this class or a superclass.
+        """
         if name in self.fields:
             return self.fields[name]
         elif self.superclass is not None:
@@ -127,6 +140,9 @@ class PythonClass(PythonNode, PythonScope):
             return None
 
     def get_method(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the method with the given name in this class or a superclass.
+        """
         if name in self.methods:
             return self.methods[name]
         elif self.superclass is not None:
@@ -135,6 +151,9 @@ class PythonClass(PythonNode, PythonScope):
             return None
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the function with the given name in this class or a superclass.
+        """
         if name in self.functions:
             return self.functions[name]
         elif self.superclass is not None:
@@ -143,12 +162,19 @@ class PythonClass(PythonNode, PythonScope):
             return None
 
     def get_func_or_method(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the function or method with the given name in this class or a
+        superclass.
+        """
         if self.get_function(name) is not None:
             return self.get_function(name)
         else:
             return self.get_method(name)
 
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the predicate with the given name in this class or a superclass.
+        """
         if name in self.predicates:
             return self.predicates[name]
         elif self.superclass is not None:
@@ -157,22 +183,23 @@ class PythonClass(PythonNode, PythonScope):
             return None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for all class members and initializes all
+        of them.
+        """
         self.sil_name = sil_name
-        for function in self.functions:
-            func_name = self.name + '_' + function
-            self.functions[function].process(self.get_fresh_name(func_name),
-                                             translator)
-        for method in self.methods:
-            method_name = self.name + '_' + method
-            self.methods[method].process(self.get_fresh_name(method_name),
-                                         translator)
-        for predicate in self.predicates:
-            pred_name = self.name + '_' + predicate
-            self.predicates[predicate].process(self.get_fresh_name(pred_name),
-                                               translator)
-        for field in self.fields:
-            field_name = self.name + '_' + field
-            self.fields[field].process(self.get_fresh_name(field_name))
+        for name, function in self.functions.items():
+            func_name = self.name + '_' + name
+            function.process(self.get_fresh_name(func_name), translator)
+        for name, method in self.methods.items():
+            method_name = self.name + '_' + name
+            method.process(self.get_fresh_name(method_name), translator)
+        for name, predicate in self.predicates.items():
+            pred_name = self.name + '_' + name
+            predicate.process(self.get_fresh_name(pred_name), translator)
+        for name, field in self.fields.items():
+            field_name = self.name + '_' + name
+            field.process(self.get_fresh_name(field_name))
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -191,6 +218,15 @@ class PythonMethod(PythonNode, PythonScope):
     def __init__(self, name: str, node: ast.AST, cls: PythonClass,
                  superscope: PythonScope, pure: bool, contract_only: bool,
                  interface: bool = False):
+        """
+        :param cls: Class this method belongs to, if any.
+        :param superscope: The scope (class or program) this method belongs to
+        :param pure: True iff ir's a pure function, not an impure method
+        :param contract_only: True iff we're not generating the method's
+        implementation, just its contract
+        :param interface: True iff the method implementation is provided in
+        native Silver.
+        """
         super().__init__(name, node=node)
         if cls is not None:
             if not isinstance(cls, PythonClass):
@@ -212,6 +248,11 @@ class PythonMethod(PythonNode, PythonScope):
         self.interface = interface
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for all parameters and initializes them,
+        same for local variables. Also sets the method type and
+        checks if this method overrides one from a superclass,
+        """
         self.sil_name = sil_name
         for arg in self.args:
             self.args[arg].process(self.get_fresh_name(arg), translator)
@@ -235,6 +276,10 @@ class PythonMethod(PythonNode, PythonScope):
             self.locals[local].process(self.get_fresh_name(local), translator)
 
     def get_variable(self, name: str) -> 'PythonVar':
+        """
+        Returns the variable (local variable or method parameter) with the
+        given name.
+        """
         if name in self.locals:
             return self.locals[name]
         elif name in self.args:
@@ -244,6 +289,10 @@ class PythonMethod(PythonNode, PythonScope):
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator') -> 'PythonVar':
+        """
+        Creates a new local variable with the given name and type and performs
+        all necessary processing/initialization
+        """
         sil_name = self.get_fresh_name(name)
         result = PythonVar(sil_name, None, cls)
         result.process(sil_name, translator)
@@ -252,9 +301,19 @@ class PythonMethod(PythonNode, PythonScope):
 
 
 class PythonExceptionHandler(PythonNode):
+    """
+    Represents an except-block belonging to a try-block.
+    """
+
     def __init__(self, node: ast.AST, exception_type: PythonClass,
                  try_block: 'PythonTryBlock', handler_name: str, body: ast.AST,
                  exception_name: str):
+        """
+        :param exception_type: The type of exception this handler catches
+        :param try_block: The try-block this handler belongs to
+        :param handler_name: Label that this handler will get in Silver
+        :param exception_name: Variable name for the exception in the block
+        """
         super().__init__(handler_name, node=node)
         self.try_block = try_block
         self.body = body
@@ -263,8 +322,17 @@ class PythonExceptionHandler(PythonNode):
 
 
 class PythonTryBlock(PythonNode):
+    """
+    Represents a try-block, which may include except-blocks, an else-block
+    and/or a finally-block.
+    """
+
     def __init__(self, node: ast.AST, try_name: str, method: PythonMethod,
                  protected_region: ast.AST):
+        """
+        :param method: Method this block is in
+        :param protected_region: Statements protected by the try
+        """
         super().__init__(try_name, node=node)
         self.handlers = []
         self.else_block = None
@@ -322,14 +390,25 @@ class PythonVar(PythonNode):
         self.reads = []
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates a Silver variable declaration and reference representing this
+        Python variable.
+        """
         self.sil_name = sil_name
         self.decl = translator.translate_pythonvar_decl(self)
         self.ref = translator.translate_pythonvar_ref(self)
 
 
 class PythonField(PythonNode):
+    """
+    Represents a field of a Python class.
+    """
     def __init__(self, name: str, node: ast.AST, type: PythonClass,
                  cls: PythonClass):
+        """
+        :param type: The type of the field.
+        :param cls: The class this field belongs to
+        """
         super().__init__(name, node)
         self.cls = cls
         self.inherited = None  # infer
@@ -338,6 +417,9 @@ class PythonField(PythonNode):
         self.writes = []  # direct
 
     def process(self, sil_name: str) -> None:
+        """
+        Checks if this field is inherited from a superclass.
+        """
         self.sil_name = sil_name
         if not self.is_mangled():
             if self.cls.superclass is not None:
@@ -367,6 +449,11 @@ class Analyzer(ast.NodeVisitor):
         self.asts = {}
 
     def collect_imports(self, abs_path: str) -> None:
+        """
+        Parses the file at the given location, puts the result into self.asts.
+        Scans the parsed file for Import-statements and adds all imported paths
+        to self.modules.
+        """
         with open(abs_path, 'r') as file:
             text = file.read()
         parseresult = ast.parse(text)
@@ -396,12 +483,19 @@ class Analyzer(ast.NodeVisitor):
             self.modules.append(abs_path)
 
     def process(self, translator: 'Translator') -> None:
+        """
+        Performs preprocessing on the result of the analysis, which infers some
+        things, creates some data structures for the translation etc.
+        """
         self.program.process(translator)
 
-    def set_contract_only(self, val: bool) -> None:
-        self.contract_only = val
-
     def add_interface(self, interface: Dict) -> None:
+        """
+        Adds the classes, methods and functions in the interface-dict to
+        the program. Meant to be used with a dict containing all methods/...
+        that have native Silver representations and won't be created by the
+        translator.
+        """
         for class_name in interface:
             if_cls = interface[class_name]
             cls = self.get_class(class_name, interface=True)
@@ -517,7 +611,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         self.current_function.args[node.arg] = PythonVar(node.arg, node,
-                                                        self.typeof(node))
+                                                         self.typeof(node))
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
         if var is None:
@@ -531,7 +625,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         if (isinstance(node.func, ast.Name)
-                and node.func.id in CONTRACT_WRAPPER_FUNCS):
+            and node.func.id in CONTRACT_WRAPPER_FUNCS):
             assert self.current_function is not None
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])

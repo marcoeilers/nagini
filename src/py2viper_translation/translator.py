@@ -110,8 +110,8 @@ class Translator:
         visitor = getattr(self, method, self.translate_pure_generic)
         return visitor(conds, node)
 
-    def translate_pure_generic(self, conds: List, node: ast.AST) \
-            -> List[Wrapper]:
+    def translate_pure_generic(self, conds: List,
+                               node: ast.AST) -> List[Wrapper]:
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If) -> List[Wrapper]:
@@ -134,16 +134,16 @@ class Translator:
             else_ = flatten(else_)
         return [cond_let] + then + else_
 
-    def translate_pure_Return(self, conds: List, node: ast.Return) \
-            -> List[Wrapper]:
+    def translate_pure_Return(self, conds: List,
+                              node: ast.Return) -> List[Wrapper]:
         """
         Translates a return statement to a ReturnWrapper
         """
         wrapper = ReturnWrapper(conds, node.value, node)
         return [wrapper]
 
-    def translate_pure_Assign(self, conds: List, node: ast.Assign) \
-            -> List[Wrapper]:
+    def translate_pure_Assign(self, conds: List,
+                              node: ast.Assign) -> List[Wrapper]:
         """
         Translates an assign statement to an AssignWrapper
         """
@@ -152,8 +152,8 @@ class Translator:
         wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
         return [wrapper]
 
-    def translate_exprs(self, nodes: List[ast.AST], function: PythonMethod) \
-            -> Expr:
+    def translate_exprs(self, nodes: List[ast.AST],
+                        function: PythonMethod) -> Expr:
         """
         Translates a list of nodes to a single (let-)expression if the nodes
         are only returns, assignments and if-blocks. First translates them to
@@ -161,9 +161,14 @@ class Translator:
         if-blocks (if any), then creates one big expression out of a list
         of wrappers.
         """
+        # Translate to wrapper objects
         wrappers = flatten([self.translate_pure([], node) for node in nodes])
         previous = None
         added = {}
+        # First walk through wrappers. For every assignment, we create a new
+        # variable with a different name. Future references to the original
+        # name need to refer to the new name, so we create dicts that map old
+        # to new names.
         for wrapper in wrappers:
             if previous:
                 wrapper.names.update(previous.names)
@@ -180,6 +185,10 @@ class Translator:
         previous = None
         info = self.noinfo()
         assert not self.var_aliases
+        # Second walk through wrappers, starting at the end. Translate all of
+        # them into one big expression. Assigns become a let, returns just the
+        # returned value, and if something happens in an if block, we put it
+        # into an if-expression.
         for wrapper in reversed(wrappers):
             position = self.to_position(wrapper.node)
             self.var_aliases = wrapper.names
@@ -224,8 +233,8 @@ class Translator:
         return previous
 
 
-    def _translate_condition(self, conds: List, names: Dict[str, PythonVar]) \
-            -> Expr:
+    def _translate_condition(self, conds: List,
+                             names: Dict[str, PythonVar]) -> Expr:
         """
         Translates the conditions in conds to a big conjunctive expression,
         using the renamings in names.
@@ -336,9 +345,7 @@ class Translator:
                                             self.to_position(node),
                                             self.noinfo())
         stmt = [constr_call]
-        for index in range(len(node.keys)):
-            key = node.keys[index]
-            val = node.values[index]
+        for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key)
             val_stmt, val_val = self.translate_expr(val)
             append_call = self.viper.MethodCall('dict___setitem__',
@@ -409,6 +416,35 @@ class Translator:
                                           self.to_position(node),
                                           self.noinfo()))
 
+    def translate_acc_predicate(self, node: ast.Call, perm: Expr) -> StmtAndExpr:
+        call = node.args[0]
+        args = []
+        arg_stmts = []
+        for arg in call.args:
+            arg_stmt, arg_expr = self.translate_expr(arg)
+            arg_stmts = arg_stmts + arg_stmt
+            args.append(arg_expr)
+        if isinstance(call.func, ast.Name):
+            pred = self.program.get_predicate(call.func.id)
+        elif isinstance(call.func, ast.Attribute):
+            rec_stmt, receiver = self.translate_expr(call.func.value)
+            assert not rec_stmt
+            receiver_class = self.get_type(call.func.value)
+            name = call.func.attr
+            pred = receiver_class.get_predicate(name)
+            args = [receiver] + args
+        else:
+            raise UnsupportedException(node)
+        pred_name = pred.sil_name
+        if pred.cls:
+            family_root = pred.cls
+            while (family_root.superclass and
+                   family_root.superclass.get_predicate(name)):
+                family_root = family_root.superclass
+            pred_name = family_root.get_predicate(name).sil_name
+        return [], self._create_predicate_access(pred_name, args, perm,
+                                                 node)
+
     def translate_acc(self, node: ast.Call) -> StmtAndExpr:
         if len(node.args) == 1:
             perm = self.viper.FullPerm(self.to_position(node),
@@ -418,34 +454,8 @@ class Translator:
         else:
             raise UnsupportedException(node)
         if isinstance(node.args[0], ast.Call):
-            call = node.args[0]
             # this is a predicate.
-            args = []
-            arg_stmts = []
-            for arg in call.args:
-                arg_stmt, arg_expr = self.translate_expr(arg)
-                arg_stmts = arg_stmts + arg_stmt
-                args.append(arg_expr)
-            if isinstance(call.func, ast.Name):
-                pred = self.program.get_predicate(call.func.id)
-            elif isinstance(call.func, ast.Attribute):
-                rec_stmt, receiver = self.translate_expr(call.func.value)
-                assert not rec_stmt
-                receiver_class = self.get_type(call.func.value)
-                name = call.func.attr
-                pred = receiver_class.get_predicate(name)
-                args = [receiver] + args
-            else:
-                raise UnsupportedException(node)
-            pred_name = pred.sil_name
-            if pred.cls:
-                family_root = pred.cls
-                while (family_root.superclass and
-                       family_root.superclass.get_predicate(name)):
-                    family_root = family_root.superclass
-                pred_name = family_root.get_predicate(name).sil_name
-            return [], self._create_predicate_access(pred_name, args, perm,
-                                                     node)
+            return self.translate_acc_predicate(node, perm)
         stmt, fieldacc = self.translate_expr(node.args[0])
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
@@ -496,7 +506,7 @@ class Translator:
         """
         Translates calls to contract functions like Result() and Acc()
         """
-        if get_func_name(node) == "Result":
+        if get_func_name(node) == 'Result':
             return self.translate_result(node)
         elif get_func_name(node) == 'Acc':
             return self.translate_acc(node)
@@ -539,12 +549,17 @@ class Translator:
         call = self._get_function_call(node.args[0], '__len__', args, node)
         return stmt, call
 
+    def _is_two_arg_super_call(self, node: ast.Call) -> bool:
+        # two-arg super call: first arg must be a class, second a reference
+        # to self
+        return (isinstance(node.args[0], ast.Name) and
+            (node.args[0].id in self.program.classes) and
+            isinstance(node.args[1], ast.Name) and
+            (node.args[1].id == next(iter(self.current_function.args))))
+
     def translate_super(self, node: ast.Call) -> StmtAndExpr:
         if len(node.args) == 2:
-            if (isinstance(node.args[0], ast.Name) and
-                    (node.args[0].id in self.program.classes) and
-                    isinstance(node.args[1], ast.Name) and
-                    (node.args[1].id == next(iter(self.current_function.args)))):
+            if self._is_two_arg_super_call(node):
                 return self.translate_expr(node.args[1])
             else:
                 raise InvalidProgramException(node, 'invalid.super.call')
@@ -578,6 +593,8 @@ class Translator:
         new = self.viper.NewStmt(res_var.ref, fields, self.noposition(),
                                  self.noinfo())
         result_has_type = self.var_has_concrete_type(res_var.name, target_class)
+        # inhale the type information about the newly created object
+        # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.noposition(),
                                         self.noinfo())
         args = [res_var.ref] + args
@@ -727,16 +744,15 @@ class Translator:
         """
         Finds the try blocks in try_blocks that protect the statement stmt.
         """
-        tb = try_blocks
-        blocks = [b for b in tb if self.contains_stmt(b.protected_region, stmt)]
-
-        def rank(b: PythonTryBlock) -> int:
+        def rank(b: PythonTryBlock, blocks: List[PythonTryBlock]) -> int:
             result = 0
             for b2 in blocks:
                 if self.contains_stmt(b2.protected_region, b.node):
                     result += 1
             return -result
-        inner_to_outer = sorted(blocks,key=lambda b: rank(b))
+        tb = try_blocks
+        blocks = [b for b in tb if self.contains_stmt(b.protected_region, stmt)]
+        inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
         return inner_to_outer
 
     def create_exception_catchers(self, var: PythonVar,
@@ -911,11 +927,7 @@ class Translator:
         elif isinstance(node, ast.Call):
             if get_func_name(node) == 'super':
                 if len(node.args) == 2:
-                    assert isinstance(node.args[0], ast.Name)
-                    assert node.args[0].id in self.program.classes
-                    assert isinstance(node.args[1], ast.Name)
-                    assert (node.args[1].id ==
-                            next(iter(self.current_function.args)))
+                    assert self._is_two_arg_super_call(node)
                     return self.program.classes[node.args[0].id].superclass
                 elif not node.args:
                     return self.current_class.superclass
@@ -1299,8 +1311,8 @@ class Translator:
                                      self.noinfo())
         return self.type_factory.has_type(obj_var, type)
 
-    def var_has_concrete_type(self, name: str, type: PythonClass) \
-            -> 'silver.ast.DomainFuncApp':
+    def var_has_concrete_type(self, name: str,
+                              type: PythonClass) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
         is of exactly the given type.
@@ -1412,13 +1424,12 @@ class Translator:
                                          stmt)
         if tries:
             return tries[0].get_error_var(self).ref
+        if self.current_function.declared_exceptions:
+            return self.current_function.error_var
         else:
-            if self.current_function.declared_exceptions:
-                return self.current_function.error_var
-            else:
-                new_var = self.current_function.create_variable('error',
-                    self.program.classes['Exception'], self)
-                return new_var.ref
+            new_var = self.current_function.create_variable('error',
+                self.program.classes['Exception'], self)
+            return new_var.ref
 
     def _create_goto_finally(self, tries: List[PythonTryBlock],
                              error_var: 'LocalVar') -> Optional[Stmt]:
@@ -1426,13 +1437,11 @@ class Translator:
         If any of the blocks in tries has a finally-block, creates and
         returns the statements to jump there.
         """
-        index = 0
-        while index < len(tries):
-            current = tries[index]
-            if current.finally_block:
+        for try_ in tries:
+            if try_.finally_block:
                 # propagate return value
-                var_next = current.get_finally_var(self)
-                var_next_error = current.get_error_var(self)
+                var_next = try_.get_finally_var(self)
+                var_next_error = try_.get_error_var(self)
                 next_error_assign = self.viper.LocalVarAssign(var_next_error.ref,
                                                               error_var,
                                                               self.noposition(),
@@ -1444,18 +1453,16 @@ class Translator:
                                                         self.noposition(),
                                                         self.noinfo())
                 # goto finally block
-                goto_next = self.viper.Goto(current.finally_name,
+                goto_next = self.viper.Goto(try_.finally_name,
                                             self.noposition(),
                                             self.noinfo())
                 return_block = [next_assign, goto_next]
                 result = self.translate_block(return_block, self.noposition(),
                                               self.noinfo())
                 return result
-            index += 1
         return None
 
-    def translate_finally(self, block: PythonTryBlock) \
-            -> List[Stmt]:
+    def translate_finally(self, block: PythonTryBlock) -> List[Stmt]:
         """
         Creates a code block representing the finally-block belonging to block,
         to be put at the end of a Viper method.
@@ -1469,29 +1476,23 @@ class Translator:
             body += self.translate_stmt(stmt)
         finally_var = block.get_finally_var(self)
         tries = self._get_surrounding_try_blocks(self.current_function.try_blocks,
-                                         block.node)
+                                                 block.node)
         goto_post = self.viper.Goto('post_' + block.name, pos, info)
         goto_end = self.viper.Goto('__end', pos, info)
         empty_stmt = self.translate_block([], pos, info)
         # assert tries
-        index = 0
-        if block in tries:
-            assert tries[0] == block
-            index = 1
         except_block = []
         return_block = []
-        while index < len(tries):
-            current = tries[index]
-            if not return_block:
-                if current.finally_block:
-                    # propagate return value
-                    var_next = current.get_finally_var(self)
-                    next_assign = self.viper.LocalVarAssign(var_next.ref,
-                                                            finally_var.ref,
-                                                            pos, info)
-                    # goto finally block
-                    goto_next = self.viper.Goto(current.finally_name, pos, info)
-                    return_block = [next_assign, goto_next]
+        for current in tries:
+            if not return_block and current.finally_block:
+                # propagate return value
+                var_next = current.get_finally_var(self)
+                next_assign = self.viper.LocalVarAssign(var_next.ref,
+                                                        finally_var.ref,
+                                                        pos, info)
+                # goto finally block
+                goto_next = self.viper.Goto(current.finally_name, pos, info)
+                return_block = [next_assign, goto_next]
             for handler in current.handlers:
                 # if handler applies
                 # goto handler
@@ -1506,7 +1507,6 @@ class Translator:
                 # goto finally block
                 except_block += return_block
                 break
-            index += 1
         if not return_block:
             return_block = [goto_end]
         if self.current_function.declared_exceptions:
@@ -1746,8 +1746,9 @@ class Translator:
                 raise InvalidProgramException(method.node, 'invalid.override')
 
     def _create_subtyping_check_body_impure(self, method: PythonMethod,
-            has_subtype: Expr, calledname: str, args: List[Expr]) -> \
-            Tuple[List['ast.LocalVarDecl'], List['ast.LocalVar'], Stmt]:
+            has_subtype: Expr, calledname: str,
+            args: List[Expr]) -> Tuple[List['ast.LocalVarDecl'],
+                                       List['ast.LocalVar'], Stmt]:
         results = []
         targets = []
         if method.type:
@@ -1823,10 +1824,9 @@ class Translator:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             self.current_function = instance
-            for i in range(len(root.args)):
-                root_name = list(root.args.keys())[i]
+            for root_name, current_name in zip(root.args.keys(),
+                                               instance.args.keys()):
                 root_var = root.args[root_name]
-                current_name = list(instance.args.keys())[i]
                 self.var_aliases[current_name] = root_var
             if len(instance.node.body) != 1:
                 raise InvalidProgramException(instance.node, 'invalid.predicate')
@@ -1925,7 +1925,7 @@ class Translator:
                                  self.noinfo())
 
     def _get_all_fields(self, cls: PythonClass, selfvar: 'silver.ast.LocalVar',
-            position: 'silver.ast.Position') \
+                        position: 'silver.ast.Position') \
             -> Tuple['silver.ast.Field', 'silver.ast.FieldAccessPredicate']:
         accs = []
         fields = []
@@ -1965,8 +1965,8 @@ class Translator:
                                    self.to_position(var.node),
                                    self.noinfo())
 
-    def translate_program(self, program: PythonProgram, sil_progs: List) \
-            -> 'silver.ast.Program':
+    def translate_program(self, program: PythonProgram,
+                          sil_progs: List) -> 'silver.ast.Program':
         """
         Translates a PythonProgram created by the analyzer to a Viper program.
         """
@@ -2006,17 +2006,15 @@ class Translator:
                     field.field = silfield
                     fields.append(silfield)
 
-        for function in program.functions:
-            functions.append(
-                self.translate_function(program.functions[function]))
-        for method in program.methods:
-            methods.append(self.translate_method(program.methods[method]))
-        for pred in program.predicates:
-            predicates.append(self.translate_predicate(program.predicates[pred]))
-        for class_name in program.classes:
+        for function in program.functions.values():
+            functions.append(self.translate_function(function))
+        for method in program.methods.values():
+            methods.append(self.translate_method(method))
+        for pred in program.predicates.values():
+            predicates.append(self.translate_predicate(pred))
+        for class_name, cls in program.classes.items():
             if class_name in PRIMITIVES:
                 continue
-            cls = program.classes[class_name]
             old_class = self.current_class
             self.current_class = cls
             funcs, axioms = self.type_factory.create_type(cls)
