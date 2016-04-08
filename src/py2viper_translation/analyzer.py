@@ -3,8 +3,8 @@ import mypy
 import os
 
 from collections import OrderedDict
-from py2viper_translation import astpp
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_translation import astpp
 from py2viper_translation.ast_util import mark_text_ranges
 from py2viper_translation.constants import PRIMITIVES, LITERALS
 from py2viper_translation.typeinfo import TypeInfo

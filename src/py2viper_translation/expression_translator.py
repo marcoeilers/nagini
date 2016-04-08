@@ -2,14 +2,11 @@ import ast
 
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
-    TranslatorConfig,
     Expr,
     StmtAndExpr,
     Stmt
 )
 from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonMethod,
     PythonVar,
     PythonTryBlock
 )
@@ -17,7 +14,8 @@ from py2viper_translation.util import (
     InvalidProgramException,
     get_surrounding_try_blocks
 )
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import List, Optional
+
 
 class ExpressionTranslator(CommonTranslator):
 
@@ -67,8 +65,8 @@ class ExpressionTranslator(CommonTranslator):
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
             append_call = self.viper.MethodCall('set_add',
-                                                [res_var.ref, el_val],
-                                                [], self.to_position(node, ctx),
+                                                [res_var.ref, el_val], [],
+                                                self.to_position(node, ctx),
                                                 self.noinfo(ctx))
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
@@ -97,7 +95,8 @@ class ExpressionTranslator(CommonTranslator):
         target_stmt, target = self.translate_expr(node.value, ctx)
         index_stmt, index = self.translate_expr(node.slice.value, ctx)
         args = [target, index]
-        call = self.get_function_call(node.value, '__getitem__', args, node, ctx)
+        call = self.get_function_call(node.value, '__getitem__', args, node,
+                                      ctx)
         return target_stmt + index_stmt, call
 
     def create_exception_catchers(self, var: PythonVar,
@@ -136,7 +135,8 @@ class ExpressionTranslator(CommonTranslator):
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
-                condition = self.type_factory.has_type(var, handler.exception, ctx)
+                condition = self.type_factory.has_type(var, handler.exception,
+                                                       ctx)
                 goto = self.viper.Goto(handler.name,
                                        self.to_position(handler.node, ctx),
                                        self.noinfo(ctx))
@@ -182,9 +182,7 @@ class ExpressionTranslator(CommonTranslator):
                 var_next = try_.get_finally_var(self.translator)
                 var_next_error = try_.get_error_var(self.translator)
                 next_error_assign = self.viper.LocalVarAssign(var_next_error.ref,
-                                                              error_var,
-                                                              self.noposition(ctx),
-                                                              self.noinfo(ctx))
+                    error_var, self.noposition(ctx), self.noinfo(ctx))
                 number_two = self.viper.IntLit(2, self.noposition(ctx),
                                                self.noinfo(ctx))
                 next_assign = self.viper.LocalVarAssign(var_next.ref,
@@ -196,7 +194,8 @@ class ExpressionTranslator(CommonTranslator):
                                             self.noposition(ctx),
                                             self.noinfo(ctx))
                 return_block = [next_assign, goto_next]
-                result = self.translate_block(return_block, self.noposition(ctx),
+                result = self.translate_block(return_block,
+                                              self.noposition(ctx),
                                               self.noinfo(ctx))
                 return result
         return None

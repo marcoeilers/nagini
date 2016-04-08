@@ -120,10 +120,13 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_If(self, node: ast.If, ctx) -> List[Stmt]:
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
-        then_body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
-        then_block = self.translate_block(then_body, self.to_position(node, ctx),
+        then_body = flatten([self.translate_stmt(stmt, ctx)
+                             for stmt in node.body])
+        then_block = self.translate_block(then_body,
+                                          self.to_position(node, ctx),
                                           self.noinfo(ctx))
-        else_body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.orelse])
+        else_body = flatten([self.translate_stmt(stmt, ctx)
+                             for stmt in node.orelse])
         else_block = self.translate_block(
             else_body,
             self.to_position(node, ctx), self.noinfo(ctx))
@@ -139,14 +142,16 @@ class StatementTranslator(CommonTranslator):
                 raise UnsupportedException(node)
             target_cls = self.get_type(node.targets[0].value, ctx)
             lhs_stmt, target = self.translate_expr(node.targets[0].value, ctx)
-            ind_stmt, index = self.translate_expr(node.targets[0].slice.value, ctx)
+            ind_stmt, index = self.translate_expr(node.targets[0].slice.value,
+                                                  ctx)
             func = target_cls.get_method('__setitem__')
             func_name = func.sil_name
             rhs_stmt, rhs = self.translate_expr(node.value, ctx)
             args = [target, index, rhs]
             targets = []
             call = self.viper.MethodCall(func_name, args, targets,
-                                         self.to_position(node, ctx), self.noinfo(ctx))
+                                         self.to_position(node, ctx),
+                                         self.noinfo(ctx))
             return lhs_stmt + ind_stmt + rhs_stmt + [call]
         target = node.targets[0]
         lhs_stmt, var = self.translate_expr(target, ctx)
@@ -171,7 +176,8 @@ class StatementTranslator(CommonTranslator):
         locals = []
         bodyindex = 0
         while self.is_invariant(node.body[bodyindex]):
-            invariants.append(self.translate_contract(node.body[bodyindex], ctx))
+            invariants.append(self.translate_contract(node.body[bodyindex],
+                                                      ctx))
             bodyindex += 1
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
@@ -195,7 +201,8 @@ class StatementTranslator(CommonTranslator):
         for try_block in tries:
             if try_block.finally_block:
                 lhs = try_block.get_finally_var(self.translator).ref
-                rhs = self.viper.IntLit(1, self.noposition(ctx), self.noinfo(ctx))
+                rhs = self.viper.IntLit(1, self.noposition(ctx),
+                                        self.noinfo(ctx))
                 finally_assign = self.viper.LocalVarAssign(lhs, rhs,
                                                            self.noposition(ctx),
                                                            self.noinfo(ctx))

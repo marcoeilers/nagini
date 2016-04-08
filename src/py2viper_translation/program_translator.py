@@ -34,8 +34,8 @@ class ProgramTranslator(CommonTranslator):
                                 self.to_position(field.node, ctx),
                                 self.noinfo(ctx))
 
-    def create_global_var_function(self,
-                                   var: PythonVar, ctx) -> 'silver.ast.Function':
+    def create_global_var_function(self, var: PythonVar,
+                                   ctx) -> 'silver.ast.Function':
         """
         Creates a Viper function representing the given global variable.
         """
@@ -54,8 +54,8 @@ class ProgramTranslator(CommonTranslator):
                                    self.to_position(var.node, ctx),
                                    self.noinfo(ctx))
 
-    def create_subtyping_check(self,
-                               method: PythonMethod, ctx) -> 'silver.ast.Callable':
+    def create_subtyping_check(self, method: PythonMethod,
+                               ctx) -> 'silver.ast.Callable':
         """
         Creates a Viper function/method with the contract of the overridden
         function which calls the overriding function, to check behavioural
@@ -71,7 +71,8 @@ class ProgramTranslator(CommonTranslator):
         args = []
 
         mname = ctx.program.get_fresh_name(method.sil_name + '_subtyping')
-        pres, posts = self.extract_contract(method.overrides, '_err', False, ctx)
+        pres, posts = self.extract_contract(method.overrides, '_err',
+                                            False, ctx)
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
@@ -84,7 +85,8 @@ class ProgramTranslator(CommonTranslator):
             for arg in method.args:
                 formal_args.append(method.args[arg].decl)
             type = self.translate_type(method.type, ctx)
-            func_app = self.viper.FuncApp(called_name, args, self.noposition(ctx),
+            func_app = self.viper.FuncApp(called_name, args,
+                                          self.noposition(ctx),
                                           self.noinfo(ctx), type, formal_args)
             ctx.current_function = old_function
             result = self.viper.Function(mname, params, type, pres, posts,
@@ -113,12 +115,9 @@ class ProgramTranslator(CommonTranslator):
         if method.type:
             type = self.translate_type(method.type, ctx)
             result_var_decl = self.viper.LocalVarDecl('_res', type,
-                                                      self.to_position(method.node, ctx),
-                                                      self.noinfo(ctx))
+                self.to_position(method.node, ctx), self.noinfo(ctx))
             result_var_ref = self.viper.LocalVar('_res', type,
-                                                 self.to_position(
-                                                    method.node, ctx),
-                                                 self.noinfo(ctx))
+                self.to_position(method.node, ctx), self.noinfo(ctx))
             results.append(result_var_decl)
             targets.append(result_var_ref)
         error_var_decl = self.viper.LocalVarDecl('_err', self.viper.Ref,
@@ -250,10 +249,12 @@ class ProgramTranslator(CommonTranslator):
             ctx.current_class = old_class
 
         for root in predicate_families:
-            pf = self.translate_predicate_family(root, predicate_families[root], ctx)
+            pf = self.translate_predicate_family(root, predicate_families[root],
+                                                 ctx)
             predicates.append(pf)
 
-        domains += [self.type_factory.create_type_domain(type_funcs, type_axioms, ctx)]
+        domains += [self.type_factory.create_type_domain(type_funcs,
+                                                         type_axioms, ctx)]
 
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.noposition(ctx),

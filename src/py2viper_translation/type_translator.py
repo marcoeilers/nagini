@@ -1,7 +1,5 @@
 import ast
 
-from py2viper_translation.constants import BUILTINS
-from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
     TranslatorConfig,
@@ -15,16 +13,19 @@ from py2viper_translation.analyzer import (
     PythonVar,
     PythonTryBlock
 )
-from typing import List, Tuple, Optional, Union, Dict, Any
+from py2viper_translation.constants import BUILTINS
+from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.util import get_func_name, is_two_arg_super_call
 from py2viper_translation.viper_ast import ViperAST
+from typing import List, Tuple, Optional, Union, Dict, Any
+
 
 class TypeTranslator(CommonTranslator):
 
-    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str, typeinfo: TypeInfo,
-                 viperast: ViperAST) -> None:
+    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str,
+                 typeinfo: TypeInfo, viperast: ViperAST) -> None:
         super().__init__(config, jvm, sourcefile, typeinfo, viperast)
         self.builtins = {'builtins.int': viperast.Int,
                          'builtins.bool': viperast.Bool}
