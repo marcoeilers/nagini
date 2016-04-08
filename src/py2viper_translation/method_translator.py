@@ -17,7 +17,9 @@ from py2viper_translation.constants import PRIMITIVES
 from py2viper_translation.util import (
     InvalidProgramException,
     get_func_name,
-    flatten
+    flatten,
+    get_all_fields,
+    get_surrounding_try_blocks
 )
 from typing import Tuple, List
 
@@ -78,7 +80,8 @@ class MethodTranslator(CommonTranslator):
                                    self.noposition(ctx), self.noinfo(ctx))
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
-                         isconstructor: bool, ctx) -> Tuple[List[Expr], List[Expr]]:
+                         is_constructor: bool,
+                         ctx) -> Tuple[List[Expr], List[Expr]]:
         """
         Extracts the pre and postcondition from a given method
         """
@@ -148,121 +151,23 @@ class MethodTranslator(CommonTranslator):
         # create typeof preconditions
         for arg in method.args:
             if not (method.args[arg].type.name in PRIMITIVES
-                    or (isconstructor and arg == next(iter(method.args)))):
+                    or (is_constructor and arg == next(iter(method.args)))):
                 pres.append(self.get_parameter_typeof(method.args[arg], ctx))
         return pres, posts
 
-    def create_subtyping_check(self,
-                               method: PythonMethod, ctx) -> 'silver.ast.Callable':
-        """
-        Creates a Viper function/method with the contract of the overridden
-        function which calls the overriding function, to check behavioural
-        subtyping.
-        """
-        old_function = ctx.current_function
-        ctx.current_function = method.overrides
-        assert ctx.position is None
-        ctx.position = self.viper.to_position(method.node)
-        self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
-        self._check_override_validity(method, ctx)
-        params = []
-        args = []
-
-        mname = ctx.program.get_fresh_name(method.sil_name + '_subtyping')
-        pres, posts = self.extract_contract(method.overrides, '_err', False, ctx)
-        for arg in method.overrides.args:
-            params.append(method.overrides.args[arg].decl)
-            args.append(method.overrides.args[arg].ref)
-        self_arg = method.overrides.args[next(iter(method.overrides.args))]
-        has_subtype = self.var_has_type(self_arg.sil_name, method.cls, ctx)
-        called_name = method.sil_name
-        if method.pure:
-            pres = pres + [has_subtype]
-            formal_args = []
-            for arg in method.args:
-                formal_args.append(method.args[arg].decl)
-            type = self.translate_type(method.type, ctx)
-            func_app = self.viper.FuncApp(called_name, args, self.noposition(ctx),
-                                          self.noinfo(ctx), type, formal_args)
-            ctx.current_function = old_function
-            result = self.viper.Function(mname, params, type, pres, posts,
-                                         func_app, self.noposition(ctx),
-                                         self.noinfo(ctx))
-            ctx.position = None
-            self.info = None
-            return result
-        else:
-            results, targets, body = self._create_subtyping_check_body_impure(
-                method, has_subtype, called_name, args, ctx)
-            ctx.current_function = old_function
-            result = self.viper.Method(mname, params, results, pres, posts, [],
-                                       body, self.noposition(ctx),
-                                       self.noinfo(ctx))
-            ctx.position = None
-            self.info = None
-            return result
-
-    def _check_override_validity(self, method: PythonMethod, ctx) -> None:
-        """
-        Checks if the given method overrides its equivalent in a superclass
-        in a valid way, otherwise raises an InvalidProgramException.
-        """
-        if len(method.args) != len(method.overrides.args):
-            raise InvalidProgramException(method.node, 'invalid.override')
-        for exc in method.declared_exceptions:
-            exc_class = ctx.program.classes[exc]
-            allowed = False
-            for superexc in method.overrides.declared_exceptions:
-                superexcclass = ctx.program.classes[superexc]
-                if exc_class.issubtype(superexcclass):
-                    allowed = True
-                    break
-            if not allowed:
-                raise InvalidProgramException(method.node, 'invalid.override')
-                # TODO check if exceptional postconditions imply super postconds
-        if method.pure:
-            if not method.overrides.pure:
-                raise InvalidProgramException(method.node, 'invalid.override')
-        else:
-            if method.overrides.pure:
-                raise InvalidProgramException(method.node, 'invalid.override')
-
-    def _create_subtyping_check_body_impure(self, method: PythonMethod,
-            has_subtype: Expr, calledname: str,
-            args: List[Expr], ctx) -> Tuple[List['ast.LocalVarDecl'],
-                                       List['ast.LocalVar'], Stmt]:
-        results = []
-        targets = []
-        if method.type:
-            type = self.translate_type(method.type, ctx)
-            result_var_decl = self.viper.LocalVarDecl('_res', type,
-                                                      self.to_position(method.node, ctx),
-                                                      self.noinfo(ctx))
-            result_var_ref = self.viper.LocalVar('_res', type,
-                                                 self.to_position(
-                                                    method.node, ctx),
-                                                 self.noinfo(ctx))
-            results.append(result_var_decl)
-            targets.append(result_var_ref)
-        error_var_decl = self.viper.LocalVarDecl('_err', self.viper.Ref,
-                                                 self.noposition(ctx),
-                                                 self.noinfo(ctx))
-        error_var_ref = self.viper.LocalVar('_err', self.viper.Ref,
-                                            self.noposition(ctx),
-                                            self.noinfo(ctx))
-        if method.overrides.declared_exceptions:
-            results.append(error_var_decl)
-        if method.declared_exceptions:
-            targets.append(error_var_ref)
-        call = self.viper.MethodCall(calledname, args, targets,
-                                     self.noposition(ctx),
-                                     self.noinfo(ctx))
-        subtype_assume = self.viper.Inhale(has_subtype, self.noposition(ctx),
-                                           self.noinfo(ctx))
-        body = [subtype_assume, call]
-        body_block = self.translate_block(body, self.noposition(ctx),
-                                          self.noinfo(ctx))
-        return results, targets, body_block
+    def get_all_field_accs(self, fields: List['silver.ast.Field'],
+                           self_var: 'silver.ast.LocalVar',
+                           position: 'silver.ast.Position',
+                           ctx) -> List['silver.ast.FieldAccessPredicate']:
+        accs = []
+        for field in fields:
+            acc = self.viper.FieldAccess(self_var, field,
+                                         position, self.noinfo(ctx))
+            perm = self.viper.FullPerm(position, self.noinfo(ctx))
+            pred = self.viper.FieldAccessPredicate(acc, perm, position,
+                                                   self.noinfo(ctx))
+            accs.append(pred)
+        return accs
 
     def translate_method(self, method: PythonMethod, ctx) -> 'silver.ast.Method':
         """
@@ -288,8 +193,10 @@ class MethodTranslator(CommonTranslator):
         pres, posts = self.extract_contract(method, '_err', False, ctx)
         if method.cls and method.name == '__init__':
             self_var = method.args[next(iter(method.args))].ref
-            _, accs = self._get_all_fields(method.cls, self_var,
-                                           self.to_position(method.node, ctx), ctx)
+            fields = get_all_fields(method.cls)
+            accs = self.get_all_field_accs(fields, self_var,
+                                           self.to_position(method.node, ctx),
+                                           ctx)
             null = self.viper.NullLit(self.noposition(ctx), self.noinfo(ctx))
             not_null = self.viper.NeCmp(self_var, null, self.noposition(ctx),
                                         self.noinfo(ctx))
@@ -368,8 +275,8 @@ class MethodTranslator(CommonTranslator):
         for stmt in block.finally_block:
             body += self.translate_stmt(stmt, ctx)
         finally_var = block.get_finally_var(self.translator)
-        tries = self._get_surrounding_try_blocks(ctx.current_function.try_blocks,
-                                                 block.node)
+        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+                                           block.node)
         goto_post = self.viper.Goto('post_' + block.name, pos, info)
         goto_end = self.viper.Goto('__end', pos, info)
         empty_stmt = self.translate_block([], pos, info)
@@ -403,12 +310,16 @@ class MethodTranslator(CommonTranslator):
         if not return_block:
             return_block = [goto_end]
         if ctx.current_function.declared_exceptions:
-            return_block.append(goto_end)
+            # assign error to error output var
+            error_var = ctx.current_function.error_var
+            assign = self.viper.LocalVarAssign(
+                error_var, block.get_error_var(self.translator).ref, pos, info)
+            except_block.append(assign)
+            except_block.append(goto_end)
         else:
             false = self.viper.FalseLit(pos, info)
             assert_false = self.viper.Exhale(false, pos, info)
-            return_block.append(assert_false)
-
+            except_block.append(assert_false)
         except_block = self.translate_block(except_block, pos, info)
         return_block = self.translate_block(return_block, pos, info)
 

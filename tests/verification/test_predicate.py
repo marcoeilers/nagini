@@ -16,6 +16,10 @@ class Super:
 def some_pred(r: Super, a: int, b: int) -> bool:
     return (Acc(r.field) and Acc(r.field2)) and (r.field == a and r.field2 == b)
 
+@Predicate
+def other_pred(r: Super) -> bool:
+    return Acc(r.field3, 1/2)
+
 def main() -> None:
     s = Super(34, 99)
     Unfold(some_pred(s, 34, 12))
@@ -42,3 +46,21 @@ def main_3() -> None:
     Assert(s.field3 == 99)
     #:: ExpectedOutput(fold.failed:assertion.false)
     Fold(some_pred(s, 34, 13))
+
+def main_4() -> int:
+    Ensures(Result() == 34)
+    s = Super(34, 99)
+    return Unfolding(some_pred(s, 34, 12), s.field)
+
+def main_5() -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() == 34)
+    s = Super(34, 99)
+    return Unfolding(some_pred(s, 34, 12), s.field2)
+
+def main_6() -> int:
+    Ensures(Result() == 34)
+    s = Super(34, 99)
+    Fold(other_pred(s))
+    #:: ExpectedOutput(assignment.failed:insufficient.permission)
+    return Unfolding(some_pred(s, 34, 34), s.field3)

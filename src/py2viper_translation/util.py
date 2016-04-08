@@ -1,6 +1,6 @@
 import ast
 
-from typing import TypeVar, List, Tuple, Optional, Dict
+from typing import TypeVar, List, Tuple, Optional, Dict, Any
 
 
 T = TypeVar('T')
@@ -62,3 +62,61 @@ def get_func_name(stmt: ast.AST) -> Optional[str]:
         return call.func.attr
     else:
         raise UnsupportedException(stmt)
+
+def contains_stmt(container: Any, contained: ast.AST) -> bool:
+    """
+    Checks if 'contained' is a part of the partial AST
+    whose root is 'container'.
+    """
+    if container is contained:
+        return True
+    if isinstance(container, list):
+        for stmt in container:
+            if contains_stmt(stmt, contained):
+                return True
+        return False
+    elif isinstance(container, ast.AST):
+        for field in container._fields:
+            if contains_stmt(getattr(container, field), contained):
+                return True
+        return False
+    else:
+        return False
+
+def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
+                               stmt: ast.AST) -> List['PythonTryBlock']:
+    """
+    Finds the try blocks in try_blocks that protect the statement stmt.
+    """
+    def rank(b: 'PythonTryBlock', blocks: List['PythonTryBlock']) -> int:
+        result = 0
+        for b2 in blocks:
+            if contains_stmt(b2.protected_region, b.node):
+                result += 1
+        return -result
+    tb = try_blocks
+    blocks = [b for b in tb if contains_stmt(b.protected_region, stmt)]
+    inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
+    return inner_to_outer
+
+def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
+    # two-arg super call: first arg must be a class, second a reference
+    # to self
+    return (isinstance(node.args[0], ast.Name) and
+        (node.args[0].id in ctx.program.classes) and
+        isinstance(node.args[1], ast.Name) and
+        (node.args[1].id == next(iter(ctx.current_function.args))))
+
+def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
+    """
+    Returns a list of fields defined in the given class or its superclasses.
+    """
+    accs = []
+    fields = []
+    while cls is not None:
+        for fieldname in cls.fields:
+            field = cls.fields[fieldname]
+            if field.inherited is None:
+                fields.append(field.field)
+        cls = cls.superclass
+    return fields

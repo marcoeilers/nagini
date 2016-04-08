@@ -4,6 +4,7 @@ import mypy.build
 
 from mypy.build import BuildSource
 from py2viper_translation import config
+from py2viper_translation.constants import LITERALS
 from typing import List
 
 
@@ -33,7 +34,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             block.accept(self)
 
     def visit_name_expr(self, o: mypy.nodes.NameExpr):
-        self.set_type(self.prefix + [o.name], self.type_of(o))
+        if not o.name in LITERALS:
+            self.set_type(self.prefix + [o.name], self.type_of(o))
 
     def visit_func_def(self, o: mypy.nodes.FuncDef):
         oldprefix = self.prefix

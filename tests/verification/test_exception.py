@@ -428,3 +428,67 @@ def exception_use_3(out: Container, inp: bool) -> None:
         out.value += e2.num
     finally:
         out.value *= 2
+
+def finally_declared(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value))
+    Ensures(out.value == 24)
+    Exsures(MyException, Acc(out.value) and out.value == 26)
+    try:
+        helper(out, 22)
+    finally:
+        out.value *= 2
+
+def finally_declared_2(out: Container) -> None:
+    Requires(Acc(out.value))
+    Ensures(Acc(out.value))
+    Ensures(out.value == 24)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Exsures(MyException, Acc(out.value) and out.value == 13)
+    try:
+        helper(out, 22)
+    finally:
+        out.value *= 2
+
+
+class ExceptionClass:
+
+    def __init__(self, b: bool) -> None:
+        Ensures(Acc(self.a_field) and self.a_field == 4)  # type: ignore
+        Exsures(MyOtherException, Acc(self.a_field, 1/2) and self.a_field == 12)  # type: ignore
+        if b:
+            self.a_field = 4
+        else:
+            self.a_field = 12
+            raise MyOtherException()
+
+
+def class_client() -> ExceptionClass:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() is not None)
+    try:
+        res = ExceptionClass(False)
+    except MyOtherException:
+        pass
+    return res
+
+def join_paths(c: Container) -> Container:
+    Requires(Acc(c.value))
+    Ensures(Acc(c.value) and c.value == 13)
+    try:
+        helper(c, 45)
+        c.value += 1
+    except MyException:
+        pass
+    return c
+
+def join_paths_2(c: Container) -> Container:
+    Requires(Acc(c.value))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Acc(c.value) and c.value == 13)
+    try:
+        helper(c, 45)
+        c.value -= 1
+    except MyException:
+        pass
+    return c

@@ -10,7 +10,10 @@ from py2viper_translation.analyzer import (
 )
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import UnsupportedException
+from py2viper_translation.util import (
+    UnsupportedException,
+    get_surrounding_try_blocks
+)
 from py2viper_translation.viper_ast import ViperAST
 from typing import List, Tuple, Optional, Any
 
@@ -43,7 +46,7 @@ class Context:
 
 class TranslatorConfig:
 
-    def __init__(self, translator):
+    def __init__(self, translator: 'Translator'):
         self.expr_translator = None
         self.stmt_translator = None
         self.call_translator = None
@@ -110,7 +113,8 @@ class AbstractTranslator:
     def translate_method(self, method: PythonMethod, ctx) -> 'silver.ast.Method':
         return self.config.method_translator.translate_method(method, ctx)
 
-    def translate_function(self, func: PythonMethod, ctx) -> 'silver.ast.Function':
+    def translate_function(self,
+                           func: PythonMethod, ctx) -> 'silver.ast.Function':
         return self.config.method_translator.translate_function(func, ctx)
 
     def translate_predicate_family(self, root: PythonMethod,
@@ -126,9 +130,14 @@ class AbstractTranslator:
                                                                      try_blocks,
                                                                      call, ctx)
 
-    def create_subtyping_check(self,
-                               method: PythonMethod, ctx) -> 'silver.ast.Callable':
-        return self.config.method_translator.create_subtyping_check(method, ctx)
+    def extract_contract(self, method: PythonMethod, errorvarname: str,
+                         is_constructor: bool,
+                         ctx) -> Tuple[List[Expr], List[Expr]]:
+        return self.config.method_translator.extract_contract(method,
+                                                              errorvarname,
+                                                              is_constructor,
+                                                              ctx)
+
 
 class CommonTranslator(AbstractTranslator):
 
@@ -178,7 +187,11 @@ class CommonTranslator(AbstractTranslator):
     def noinfo(self, ctx):
         return self.to_info([], ctx)
 
-    def _get_function_call(self, receiver, func_name, args, node, ctx):
+    def get_function_call(self, receiver, func_name, args, node, ctx):
+        """
+        Creates a function application of the function called func_name, with
+        the given receiver and arguments.
+        """
         target_cls = self.get_type(receiver, ctx)
         func = target_cls.get_function(func_name)
         formal_args = []
@@ -190,71 +203,14 @@ class CommonTranslator(AbstractTranslator):
                                   self.noinfo(ctx), type, formal_args)
         return call
 
-    def contains_stmt(self, container: Any, contained: ast.AST) -> bool:
-        """
-        Checks if 'contained' is a part of the partial AST
-        whose root is 'container'.
-        """
-        if container is contained:
-            return True
-        if isinstance(container, list):
-            for stmt in container:
-                if self.contains_stmt(stmt, contained):
-                    return True
-            return False
-        elif isinstance(container, ast.AST):
-            for field in container._fields:
-                if self.contains_stmt(getattr(container, field), contained):
-                    return True
-            return False
-        else:
-            return False
-
-    def _get_surrounding_try_blocks(self, try_blocks: List[PythonTryBlock],
-                                    stmt: ast.AST) -> List[PythonTryBlock]:
-        """
-        Finds the try blocks in try_blocks that protect the statement stmt.
-        """
-        def rank(b: PythonTryBlock, blocks: List[PythonTryBlock]) -> int:
-            result = 0
-            for b2 in blocks:
-                if self.contains_stmt(b2.protected_region, b.node):
-                    result += 1
-            return -result
-        tb = try_blocks
-        blocks = [b for b in tb if self.contains_stmt(b.protected_region, stmt)]
-        inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
-        return inner_to_outer
-
-    def _get_all_fields(self, cls: PythonClass, selfvar: 'silver.ast.LocalVar',
-                        position: 'silver.ast.Position', ctx) \
-            -> Tuple['silver.ast.Field', 'silver.ast.FieldAccessPredicate']:
-        accs = []
-        fields = []
-        while cls is not None:
-            for fieldname in cls.fields:
-                field = cls.fields[fieldname]
-                if field.inherited is None:
-                    fields.append(field.field)
-                    acc = self.viper.FieldAccess(selfvar, field.field,
-                                                 position, self.noinfo(ctx))
-                    perm = self.viper.FullPerm(position, self.noinfo(ctx))
-                    pred = self.viper.FieldAccessPredicate(acc,
-                                                           perm,
-                                                           position,
-                                                           self.noinfo(ctx))
-                    accs.append(pred)
-            cls = cls.superclass
-        return fields, accs
-
-    def _get_error_var(self, stmt: ast.AST, ctx) -> 'LocalVarRef':
+    def get_error_var(self, stmt: ast.AST, ctx) -> 'LocalVarRef':
         """
         Returns the error variable of the try-block protecting stmt, otherwise
         the error return variable of the surrounding function, otherwise
         creates a new local variable of type Exception.
         """
-        tries = self._get_surrounding_try_blocks(ctx.current_function.try_blocks,
-                                         stmt)
+        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+                                           stmt)
         if tries:
             return tries[0].get_error_var(self.translator).ref
         if ctx.current_function.declared_exceptions:
@@ -263,14 +219,6 @@ class CommonTranslator(AbstractTranslator):
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
             return new_var.ref
-
-    def _is_two_arg_super_call(self, node: ast.Call, ctx) -> bool:
-        # two-arg super call: first arg must be a class, second a reference
-        # to self
-        return (isinstance(node.args[0], ast.Name) and
-            (node.args[0].id in ctx.program.classes) and
-            isinstance(node.args[1], ast.Name) and
-            (node.args[1].id == next(iter(ctx.current_function.args))))
 
     def var_has_type(self, name: str,
                      type: PythonClass, ctx) -> 'silver.ast.DomainFuncApp':

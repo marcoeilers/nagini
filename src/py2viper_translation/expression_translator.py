@@ -13,7 +13,10 @@ from py2viper_translation.analyzer import (
     PythonVar,
     PythonTryBlock
 )
-from py2viper_translation.util import InvalidProgramException
+from py2viper_translation.util import (
+    InvalidProgramException,
+    get_surrounding_try_blocks
+)
 from typing import List, Tuple, Optional, Union, Dict, Any
 
 class ExpressionTranslator(CommonTranslator):
@@ -94,7 +97,7 @@ class ExpressionTranslator(CommonTranslator):
         target_stmt, target = self.translate_expr(node.value, ctx)
         index_stmt, index = self.translate_expr(node.slice.value, ctx)
         args = [target, index]
-        call = self._get_function_call(node.value, '__getitem__', args, node, ctx)
+        call = self.get_function_call(node.value, '__getitem__', args, node, ctx)
         return target_stmt + index_stmt, call
 
     def create_exception_catchers(self, var: PythonVar,
@@ -113,7 +116,7 @@ class ExpressionTranslator(CommonTranslator):
                                       self.noposition(ctx),
                                       self.noinfo(ctx))
 
-        relevant_try_blocks = self._get_surrounding_try_blocks(try_blocks, call)
+        relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
         goto_finally = self._create_goto_finally(relevant_try_blocks, var, ctx)
         if goto_finally:
             uncaught_option = goto_finally
@@ -177,7 +180,7 @@ class ExpressionTranslator(CommonTranslator):
             if try_.finally_block:
                 # propagate return value
                 var_next = try_.get_finally_var(self.translator)
-                var_next_error = try_.get_error_var(self)
+                var_next_error = try_.get_error_var(self.translator)
                 next_error_assign = self.viper.LocalVarAssign(var_next_error.ref,
                                                               error_var,
                                                               self.noposition(ctx),
@@ -208,7 +211,7 @@ class ExpressionTranslator(CommonTranslator):
         if type is ctx.program.classes['bool']:
             return stmt, res
         args = [res]
-        call = self._get_function_call(node, '__bool__', args, node, ctx)
+        call = self.get_function_call(node, '__bool__', args, node, ctx)
         return stmt, call
 
     def translate_Expr(self, node: ast.Expr, ctx) -> StmtAndExpr:
@@ -310,6 +313,10 @@ class ExpressionTranslator(CommonTranslator):
             return (stmts, self.viper.EqCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.noinfo(ctx)))
+        elif isinstance(node.ops[0], ast.Is):
+            return (stmts, self.viper.EqCmp(left, right,
+                                            self.to_position(node, ctx),
+                                            self.noinfo(ctx)))
         elif isinstance(node.ops[0], ast.Gt):
             return (stmts, self.viper.GtCmp(left, right,
                                             self.to_position(node, ctx),
@@ -330,9 +337,13 @@ class ExpressionTranslator(CommonTranslator):
             return (stmts, self.viper.NeCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.noinfo(ctx)))
+        elif isinstance(node.ops[0], ast.IsNot):
+            return (stmts, self.viper.NeCmp(left, right,
+                                            self.to_position(node, ctx),
+                                            self.noinfo(ctx)))
         elif isinstance(node.ops[0], ast.In):
             args = [right, left]
-            app = self._get_function_call(node.comparators[0], '__contains__',
+            app = self.get_function_call(node.comparators[0], '__contains__',
                                           args, node, ctx)
             return stmts, app
         else:
