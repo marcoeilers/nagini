@@ -40,4 +40,4 @@ Known Issues
 
 **Build Status**
 
-[![Build Status](https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation)](https://pmbuilds.inf.ethz.ch/job/py2viper-translation/)
+[![Build Status](https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation)](https://pmbuilds.inf.ethz.ch/job/py2viper-translation)
