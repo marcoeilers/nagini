@@ -395,8 +395,9 @@ class PythonVar(PythonNode):
         Python variable.
         """
         self.sil_name = sil_name
-        self.decl = translator.translate_pythonvar_decl(self)
-        self.ref = translator.translate_pythonvar_ref(self)
+        prog = self.type.get_program()
+        self.decl = translator.translate_pythonvar_decl(self, prog)
+        self.ref = translator.translate_pythonvar_ref(self, prog)
 
 
 class PythonField(PythonNode):

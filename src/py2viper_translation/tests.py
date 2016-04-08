@@ -11,9 +11,8 @@ from os.path import isfile, join
 from py2viper_translation import config
 from py2viper_translation import jvmaccess
 from py2viper_translation.main import translate, verify
-from py2viper_translation.translator import InvalidProgramException
 from py2viper_translation.typeinfo import TypeException
-from py2viper_translation.util import flatten
+from py2viper_translation.util import InvalidProgramException, flatten
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
 
 
