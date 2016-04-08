@@ -90,3 +90,21 @@ def test_ternary_fail(b: bool) -> int:
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(c1.value + c2.value != 2)
     return res
+
+def test_mod(i: int) -> bool:
+    Ensures(Implies(i == 2, Result()))
+    return i % 2 == 0
+
+def test_mod_fail(i: int) -> bool:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Implies(i == 3, Result()))
+    return i % 2 == 0
+
+def test_div(i: int) -> int:
+    Ensures(Implies(i == 16 or i == 17, Result() == 8))
+    return i // 2
+
+def test_div_fail(i: int) -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Implies(i == 18, Result() == 8))
+    return i // 2

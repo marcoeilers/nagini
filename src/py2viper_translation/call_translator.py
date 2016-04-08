@@ -12,7 +12,12 @@ from py2viper_translation.abstract_translator import (
     StmtAndExpr
 )
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
-from py2viper_translation.util import InvalidProgramException, get_func_name
+from py2viper_translation.util import (
+    InvalidProgramException,
+    get_func_name,
+    get_all_fields,
+    is_two_arg_super_call
+)
 from typing import List, Tuple, Optional, Union, Dict
 
 class CallTranslator(CommonTranslator):
@@ -148,12 +153,12 @@ class CallTranslator(CommonTranslator):
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         args = [target]
-        call = self._get_function_call(node.args[0], '__len__', args, node, ctx)
+        call = self.get_function_call(node.args[0], '__len__', args, node, ctx)
         return stmt, call
 
     def translate_super(self, node: ast.Call, ctx) -> StmtAndExpr:
         if len(node.args) == 2:
-            if self._is_two_arg_super_call(node, ctx):
+            if is_two_arg_super_call(node, ctx):
                 return self.translate_expr(node.args[1], ctx)
             else:
                 raise InvalidProgramException(node, 'invalid.super.call')
@@ -194,7 +199,7 @@ class CallTranslator(CommonTranslator):
         res_var = ctx.current_function.create_variable(target_class.name +'_res',
                                                         target_class,
                                                         self.translator)
-        fields, _ = self._get_all_fields(target_class, res_var.ref, position, ctx)
+        fields = get_all_fields(target_class)
         new = self.viper.NewStmt(res_var.ref, fields, self.noposition(ctx),
                                  self.noinfo(ctx))
         result_has_type = self.var_has_concrete_type(res_var.name, target_class, ctx)
@@ -209,7 +214,7 @@ class CallTranslator(CommonTranslator):
             target_class = target.cls
             targets = []
             if target.declared_exceptions:
-                error_var = self._get_error_var(node)
+                error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
             method_name = target_class.get_method('__init__').sil_name
             init = self.viper.MethodCall(method_name,
@@ -331,10 +336,11 @@ class CallTranslator(CommonTranslator):
                     target.name + '_res', target.type, self.translator)
                 targets.append(result_var.ref)
             if target.declared_exceptions:
-                errorvar = ctx.current_function.create_variable(
-                    target.name + '_err',
-                    ctx.program.classes['Exception'], self.translator)
-                targets.append(errorvar.ref)
+                errorvar = self.get_error_var(node, ctx)
+                # ctx.current_function.create_variable(
+                #     target.name + '_err',
+                #     ctx.program.classes['Exception'], self.translator)
+                targets.append(errorvar)
             call = [self.viper.MethodCall(target_name, args, targets,
                                           position,
                                           self.noinfo(ctx))]

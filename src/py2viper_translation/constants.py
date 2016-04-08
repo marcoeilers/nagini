@@ -1,6 +1,6 @@
 
 PRIMITIVES = ['int', 'bool']
 
-LITERALS = ['True', 'False']
+LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super']

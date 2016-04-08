@@ -48,6 +48,15 @@ class NotWrapper:
     def __init__(self, cond):
         self.cond = cond
 
+class BinOpWrapper:
+    """
+    Represents a binary operation to be performed on a variable;
+    used to encode augmented assignments
+    """
+    def __init__(self, op: ast.BinOp, rhs: ast.AST):
+        self.op = op
+        self.rhs = rhs
+
 Wrapper = Union[AssignWrapper, ReturnWrapper]
 
 class PureTranslator(CommonTranslator):
@@ -87,6 +96,16 @@ class PureTranslator(CommonTranslator):
         Translates a return statement to a ReturnWrapper
         """
         wrapper = ReturnWrapper(conds, node.value, node)
+        return [wrapper]
+
+    def translate_pure_AugAssign(self, conds: List,
+                                 node: ast.AugAssign, ctx) -> List[Wrapper]:
+        """
+        Translates an augmented assign statement to an AssignWrapper
+        """
+        assert isinstance(node.target, ast.Name)
+        val = BinOpWrapper(node.op, node.value)
+        wrapper = AssignWrapper(node.target.id, conds, val, node)
         return [wrapper]
 
     def translate_pure_Assign(self, conds: List,
@@ -139,7 +158,20 @@ class PureTranslator(CommonTranslator):
         for wrapper in reversed(wrappers):
             position = self.to_position(wrapper.node, ctx)
             ctx.var_aliases = wrapper.names
-            stmt, val = self.translate_expr(wrapper.expr, ctx)
+            if isinstance(wrapper.expr, BinOpWrapper):
+                assert isinstance(wrapper, AssignWrapper)
+                stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
+                var = wrapper.names[wrapper.name].ref
+                if isinstance(wrapper.expr.op, ast.Add):
+                    val = self.viper.Add(var, val, position, info)
+                elif isinstance(wrapper.expr.op, ast.Sub):
+                    val = self.viper.Sub(var, val, position, info)
+                elif isinstance(wrapper.expr.op, ast.Mult):
+                    val = self.viper.Mul(var, val, position, info)
+                else:
+                    raise UnsupportedException(wrapper.node)
+            else:
+                stmt, val = self.translate_expr(wrapper.expr, ctx)
             if stmt:
                 raise InvalidProgramException(wrapper.expr,
                                               'purity.violated')

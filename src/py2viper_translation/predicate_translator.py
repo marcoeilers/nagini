@@ -31,9 +31,10 @@ class PredicateTranslator(CommonTranslator):
         for arg in pred.args:
             args.append(pred.args[arg].decl)
         body = self.translate_exprs(pred.node.body, pred, ctx)
-        ctx.current_function = pred
+        ctx.current_function = None
         return self.viper.Predicate(pred.sil_name, args, body,
-                                    self.to_position(pred.node, ctx), self.noinfo(ctx))
+                                    self.to_position(pred.node, ctx),
+                                    self.noinfo(ctx))
 
     def translate_predicate_family(self, root: PythonMethod,
             preds: List[PythonMethod], ctx) -> 'ast.silver.Predicate':

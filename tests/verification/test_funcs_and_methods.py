@@ -50,8 +50,10 @@ def func(b: int, c: int) -> int:
     if a > 2:
         a = a + 2
         a = a + 2
+    tmp = 8
+    tmp -= 6
     if a > 8:
-        a = a + 2
+        a = a + tmp
     return a
 
 @Pure
@@ -61,6 +63,43 @@ def func_wrong(b: int, c: int) -> int:
     Ensures(Implies(b <= 2 and b + c > 2, Result() == b + c + 6))
     if b > 2:
         return b
+    a = b + c
+    if a > 2:
+        a = a + 2
+        a = a + 2
+    if a > 8:
+        a = a + 2
+    return a
+
+@Pure
+def func_2(b: int, c: int) -> int:
+    Ensures(Implies(b > 2, Result() == b))
+    Ensures(Implies((b <= 2 and b + c > 2) and b + c <= 4, Result() == b + c + 4))
+    Ensures(Implies(b <= 2 and b + c > 4, Result() == b + c + 6))
+    a = b + c - 13
+    if b > 2:
+        return b
+    else:
+        a = a + 13
+    tmp = 1
+    tmp *= 2
+    if a > 2:
+        a = a + 2
+        a = a + tmp
+    if a > 8:
+        a = a + 2
+    return a
+
+@Pure
+def func_2_wrong(b: int, c: int) -> int:
+    Ensures(Implies(b > 2, Result() == b))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Implies(b <= 2 and b + c > 2, Result() == b + c + 6))
+    a = b + c - 13
+    if b > 2:
+        return b
+    else:
+        a += 13
     a = b + c
     if a > 2:
         a = a + 2

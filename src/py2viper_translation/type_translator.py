@@ -18,7 +18,7 @@ from py2viper_translation.analyzer import (
 from typing import List, Tuple, Optional, Union, Dict, Any
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import get_func_name
+from py2viper_translation.util import get_func_name, is_two_arg_super_call
 from py2viper_translation.viper_ast import ViperAST
 
 class TypeTranslator(CommonTranslator):
@@ -77,7 +77,7 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.Call):
             if get_func_name(node) == 'super':
                 if len(node.args) == 2:
-                    assert self._is_two_arg_super_call(node, ctx)
+                    assert is_two_arg_super_call(node, ctx)
                     return ctx.program.classes[node.args[0].id].superclass
                 elif not node.args:
                     return ctx.current_class.superclass

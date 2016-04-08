@@ -16,7 +16,8 @@ from py2viper_translation.analyzer import (
 from py2viper_translation.util import (
     InvalidProgramException,
     get_func_name,
-    flatten
+    flatten,
+    get_surrounding_try_blocks
 )
 from typing import List, Tuple, Optional, Union, Dict, Any
 
@@ -59,6 +60,9 @@ class StatementTranslator(CommonTranslator):
                                             self.noinfo(ctx))
         return rhs_stmt + [assign]
 
+    def translate_stmt_Pass(self, node: ast.Pass, ctx) -> List[Stmt]:
+        return []
+
     def translate_stmt_Try(self, node: ast.Try, ctx) -> List[Stmt]:
         try_block = None
         for block in ctx.current_function.try_blocks:
@@ -66,7 +70,12 @@ class StatementTranslator(CommonTranslator):
                 try_block = block
                 break
         assert try_block
-        body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        code_var = try_block.get_finally_var(self.translator).ref
+        zero = self.viper.IntLit(0, self.noposition(ctx), self.noinfo(ctx))
+        assign = self.viper.LocalVarAssign(code_var, zero, self.noposition(ctx),
+                                           self.noinfo(ctx))
+        body = [assign]
+        body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
         if try_block.else_block:
             goto = self.viper.Goto(try_block.else_block.name,
                                    self.to_position(node, ctx), self.noinfo(ctx))
@@ -81,7 +90,7 @@ class StatementTranslator(CommonTranslator):
         return body + [end_label]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx) -> List[Stmt]:
-        var = self._get_error_var(node, ctx)
+        var = self.get_error_var(node, ctx)
         stmt, exception = self.translate_expr(node.exc, ctx)
         assignment = self.viper.LocalVarAssign(var, exception,
                                                self.to_position(node, ctx),
@@ -181,8 +190,8 @@ class StatementTranslator(CommonTranslator):
                                 self.noposition(ctx), self.noinfo(ctx)),
             rhs, self.to_position(node, ctx),
             self.noinfo(ctx))
-        tries = self._get_surrounding_try_blocks(
-            ctx.current_function.try_blocks, node)
+        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+                                           node)
         for try_block in tries:
             if try_block.finally_block:
                 lhs = try_block.get_finally_var(self.translator).ref
