@@ -10,7 +10,7 @@ from jpype import JavaException
 from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.jvmaccess import JVM
-from py2viper_translation.translator import Translator, InvalidProgramException
+from py2viper_translation.translator import Translator
 from py2viper_translation.typeinfo import TypeInfo, TypeException
 from py2viper_translation.verifier import (
     Carbon,
@@ -21,7 +21,7 @@ from py2viper_translation.verifier import (
 from py2viper_translation.viper_ast import ViperAST
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
+    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")  # TODO: Meeting at 15:00 on Thursday
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
@@ -62,6 +62,8 @@ def translate(path: str, jvm: JVM):
             analyzer.visit_module(module)
         else:
             return None
+    
+
     translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
     prog = translator.translate_program(analyzer.program, sil_programs)
@@ -78,6 +80,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
+        print(prog)
         vresult = verifier.verify(prog)
         return vresult
     except JavaException as je:

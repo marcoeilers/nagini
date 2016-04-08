@@ -34,6 +34,17 @@ class UnsupportedException(Exception):
         super().__init__(str(astElement))
 
 
+class InvalidProgramException(Exception):
+    """
+    Signals that the input program is invalid and cannot be translated
+    """
+
+    def __init__(self, node: ast.AST, code: str, message: str = None):
+        self.node = node
+        self.code = code
+        self.message = message
+
+
 def get_func_name(stmt: ast.AST) -> Optional[str]:
     """
     Checks if stmt is a function call and returns its name if it is, None
