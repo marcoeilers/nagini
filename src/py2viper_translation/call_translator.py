@@ -5,7 +5,12 @@ from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
     )
-from py2viper_translation.abstract_translator import CommonTranslator, TranslatorConfig, Expr, StmtAndExpr
+from py2viper_translation.abstract_translator import (
+    CommonTranslator,
+    TranslatorConfig,
+    Expr,
+    StmtAndExpr
+)
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
 from py2viper_translation.util import InvalidProgramException, get_func_name
 from typing import List, Tuple, Optional, Union, Dict

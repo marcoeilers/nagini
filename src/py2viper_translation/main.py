@@ -17,7 +17,9 @@ from py2viper_translation.verifier import (
     Silicon,
     VerificationResult,
     ViperVerifier,
-    Failure)
+    Failure
+)
+from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.viper_ast import ViperAST
 
 def parse_sil_file(sil_path: str, jvm):

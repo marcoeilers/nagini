@@ -1,7 +1,13 @@
 import ast
 import copy
 
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonTryBlock, PythonProgram, PythonVar
+from py2viper_translation.analyzer import (
+    PythonClass,
+    PythonMethod,
+    PythonTryBlock,
+    PythonProgram,
+    PythonVar
+)
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.util import UnsupportedException
@@ -47,22 +53,15 @@ class TranslatorConfig:
         self.type_translator = None
         self.pred_translator = None
         self.prog_translator = None
+        self.method_translator = None
         self.type_factory = None
         self.translator = translator
 
 class AbstractTranslator:
 
-    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str, typeinfo: TypeInfo,
-                 viperast: ViperAST) -> None:
+    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str,
+                 typeinfo: TypeInfo, viperast: ViperAST) -> None:
         self.config = config
-        self.expr_translator = config.expr_translator
-        self.stmt_translator = config.stmt_translator
-        self.call_translator = config.call_translator
-        self.contract_translator = config.contract_translator
-        self.perm_translator = config.perm_translator
-        self.pure_translator = config.pure_translator
-        self.type_translator = config.type_translator
-        self.pred_translator = config.pred_translator
         self.viper = viperast
         self.jvm = jvm
 
@@ -76,45 +75,60 @@ class AbstractTranslator:
 
     translator = property(_get_translator)
 
-    def translate_expr(self, node: ast.AST, ctx):
+    def translate_expr(self, node: ast.AST, ctx) -> StmtAndExpr:
         return self.config.expr_translator.translate_expr(node, ctx)
 
     def translate_to_bool(self, node: ast.AST, ctx) -> StmtAndExpr:
         return self.config.expr_translator.translate_to_bool(node, ctx)
 
-    def translate_stmt(self, node: ast.AST, ctx):
+    def translate_stmt(self, node: ast.AST, ctx) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
 
-    def translate_contract(self, node: ast.AST, ctx):
+    def translate_contract(self, node: ast.AST, ctx) -> Expr:
         return self.config.contract_translator.translate_contract(node, ctx)
 
-    def translate_perm(self, node: ast.AST, ctx):
+    def translate_perm(self, node: ast.AST, ctx) -> Expr:
         return self.config.perm_translator.translate_perm(node, ctx)
 
     def translate_exprs(self, nodes: List[ast.AST],
                         function: PythonMethod, ctx) -> Expr:
         return self.config.pure_translator.translate_exprs(nodes, function, ctx)
 
-    def get_type(self, node: ast.AST, ctx):
+    def get_type(self, node: ast.AST, ctx) -> PythonClass:
         return self.config.type_translator.get_type(node, ctx)
 
-    def translate_type(self, cls: PythonClass, ctx):
+    def translate_type(self, cls: PythonClass, ctx) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx):
+    def translate_Call(self, node: ast.Call, ctx) -> StmtAndExpr:
         return self.config.call_translator.translate_Call(node, ctx)
 
-    def translate_predicate(self, pred: PythonMethod, ctx):
+    def translate_predicate(self, pred: PythonMethod,
+                            ctx) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
 
+    def translate_method(self, method: PythonMethod, ctx) -> 'silver.ast.Method':
+        return self.config.method_translator.translate_method(method, ctx)
+
+    def translate_function(self, func: PythonMethod, ctx) -> 'silver.ast.Function':
+        return self.config.method_translator.translate_function(func, ctx)
+
     def translate_predicate_family(self, root: PythonMethod,
-            preds: List[PythonMethod], ctx):
-        return self.config.pred_translator.translate_predicate_family(root, preds, ctx)
+            preds: List[PythonMethod], ctx) -> 'ast.silver.Predicate':
+        return self.config.pred_translator.translate_predicate_family(root,
+                                                                      preds,
+                                                                      ctx)
 
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],
                                   call: ast.Call, ctx) -> List[Stmt]:
-        return self.config.expr_translator.create_exception_catchers(var, try_blocks, call, ctx)
+        return self.config.expr_translator.create_exception_catchers(var,
+                                                                     try_blocks,
+                                                                     call, ctx)
+
+    def create_subtyping_check(self,
+                               method: PythonMethod, ctx) -> 'silver.ast.Callable':
+        return self.config.method_translator.create_subtyping_check(method, ctx)
 
 class CommonTranslator(AbstractTranslator):
 
@@ -257,3 +271,14 @@ class CommonTranslator(AbstractTranslator):
             (node.args[0].id in ctx.program.classes) and
             isinstance(node.args[1], ast.Name) and
             (node.args[1].id == next(iter(ctx.current_function.args))))
+
+    def var_has_type(self, name: str,
+                     type: PythonClass, ctx) -> 'silver.ast.DomainFuncApp':
+        """
+        Creates an expression checking if the var with the given name
+        is of the given type.
+        """
+        obj_var = self.viper.LocalVar(name, self.viper.Ref,
+                                     self.noposition(ctx),
+                                     self.noinfo(ctx))
+        return self.type_factory.has_type(obj_var, type, ctx)

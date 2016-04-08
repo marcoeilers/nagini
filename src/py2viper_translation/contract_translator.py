@@ -1,7 +1,12 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.abstract_translator import CommonTranslator, TranslatorConfig, Expr, StmtAndExpr
+from py2viper_translation.abstract_translator import (
+    CommonTranslator,
+    TranslatorConfig,
+    Expr,
+    StmtAndExpr
+)
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
 from py2viper_translation.util import get_func_name
 from typing import List, Tuple, Optional, Union, Dict
