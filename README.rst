@@ -41,6 +41,6 @@ Known Issues
 Build Status
 ============
 
-.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation&style=plastic to the URL.
+.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation&style=plastic
    :alt: Build Status
    :target: https://pmbuilds.inf.ethz.ch/job/py2viper-translation
