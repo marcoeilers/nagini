@@ -70,14 +70,13 @@ method dict___setitem__(self: Ref, key: Int, item: Ref) returns ()
     ensures acc(self.dict_acc)
     ensures self.dict_acc == old(self.dict_acc) union Set(key)
     ensures dict___getitem__(self, key) == item
-    ensures forall k : Int :: {dict___getitem__(self, k)} //{old(dict___getitem__(self, k))}
-            ((old(dict___contains__(self, k)) &&
-                k != key)
-                    ==>
-                        (dict___contains__(self, k) &&
-                        (dict___getitem__(self, k) == old(dict___getitem__(self, k)))
-                        )
-                        )
+    ensures forall k : Int ::
+        {dict___getitem__(self, k)}
+        {old(dict___getitem__(self, k))}
+        ((old(dict___contains__(self, k)) && k != key)
+        ==>
+        (dict___contains__(self, k) &&
+        (dict___getitem__(self, k) == old(dict___getitem__(self, k)))))
 {
     assume false
 }
