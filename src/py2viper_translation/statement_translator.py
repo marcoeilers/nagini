@@ -1,8 +1,23 @@
 import ast
 
-from py2viper_translation.abstract_translator import CommonTranslator, TranslatorConfig, Expr, StmtAndExpr, Stmt
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar, PythonTryBlock
-from py2viper_translation.util import InvalidProgramException, get_func_name, flatten
+from py2viper_translation.abstract_translator import (
+    CommonTranslator,
+    TranslatorConfig,
+    Expr,
+    StmtAndExpr,
+    Stmt
+)
+from py2viper_translation.analyzer import (
+    PythonClass,
+    PythonMethod,
+    PythonVar,
+    PythonTryBlock
+)
+from py2viper_translation.util import (
+    InvalidProgramException,
+    get_func_name,
+    flatten
+)
 from typing import List, Tuple, Optional, Union, Dict, Any
 
 class StatementTranslator(CommonTranslator):

@@ -2,8 +2,19 @@ import ast
 
 from py2viper_translation.constants import BUILTINS
 from py2viper_contracts.contracts import CONTRACT_FUNCS
-from py2viper_translation.abstract_translator import CommonTranslator, TranslatorConfig, Expr, StmtAndExpr, Stmt
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar, PythonTryBlock
+from py2viper_translation.abstract_translator import (
+    CommonTranslator,
+    TranslatorConfig,
+    Expr,
+    StmtAndExpr,
+    Stmt
+)
+from py2viper_translation.analyzer import (
+    PythonClass,
+    PythonMethod,
+    PythonVar,
+    PythonTryBlock
+)
 from typing import List, Tuple, Optional, Union, Dict, Any
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo

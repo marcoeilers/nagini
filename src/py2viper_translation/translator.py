@@ -12,6 +12,7 @@ from py2viper_translation.perm_translator import PermTranslator
 from py2viper_translation.type_translator import TypeTranslator
 from py2viper_translation.type_domain_factory import TypeDomainFactory
 from py2viper_translation.program_translator import ProgramTranslator
+from py2viper_translation.method_translator import MethodTranslator
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.viper_ast import ViperAST
@@ -35,6 +36,7 @@ class Translator:
         config.perm_translator = PermTranslator(config, jvm, sourcefile, typeinfo, viperast)
         config.type_translator = TypeTranslator(config, jvm, sourcefile, typeinfo, viperast)
         config.prog_translator = ProgramTranslator(config, jvm, sourcefile, typeinfo, viperast)
+        config.method_translator = MethodTranslator(config, jvm, sourcefile, typeinfo, viperast)
         config.type_factory = TypeDomainFactory(viperast, self)
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
@@ -42,7 +44,6 @@ class Translator:
     def translate_program(self, program: PythonProgram,
                           sil_progs: List) -> 'silver.ast.Program':
         return self.prog_translator.translate_program(program, sil_progs)
-
 
     def translate_pythonvar_decl(self,
                                  var: PythonVar, program: PythonProgram) -> 'silver.ast.LocalVarDecl':

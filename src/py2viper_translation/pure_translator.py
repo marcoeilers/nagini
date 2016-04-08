@@ -1,8 +1,17 @@
 import ast
 
-from py2viper_translation.abstract_translator import CommonTranslator, TranslatorConfig, Expr, StmtAndExpr
+from py2viper_translation.abstract_translator import (
+    CommonTranslator,
+    TranslatorConfig,
+    Expr,
+    StmtAndExpr
+)
 from py2viper_translation.analyzer import PythonMethod, PythonVar
-from py2viper_translation.util import UnsupportedException, InvalidProgramException, flatten
+from py2viper_translation.util import (
+    UnsupportedException,
+    InvalidProgramException,
+    flatten
+)
 from typing import List, Tuple, Optional, Union, Dict
 
 
