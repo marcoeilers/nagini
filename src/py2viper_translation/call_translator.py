@@ -1,10 +1,5 @@
 import ast
 
-from py2viper_translation.constants import BUILTINS
-from py2viper_contracts.contracts import (
-    CONTRACT_FUNCS,
-    CONTRACT_WRAPPER_FUNCS
-    )
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
     TranslatorConfig,
@@ -12,6 +7,11 @@ from py2viper_translation.abstract_translator import (
     StmtAndExpr
 )
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
+from py2viper_translation.constants import BUILTINS
+from py2viper_contracts.contracts import (
+    CONTRACT_FUNCS,
+    CONTRACT_WRAPPER_FUNCS
+)
 from py2viper_translation.util import (
     InvalidProgramException,
     get_func_name,
@@ -35,7 +35,8 @@ class CallTranslator(CommonTranslator):
                                           self.to_position(node, ctx),
                                           self.noinfo(ctx)))
 
-    def translate_acc_predicate(self, node: ast.Call, perm: Expr, ctx) -> StmtAndExpr:
+    def translate_acc_predicate(self, node: ast.Call, perm: Expr,
+                                ctx) -> StmtAndExpr:
         call = node.args[0]
         args = []
         arg_stmts = []
@@ -102,14 +103,16 @@ class CallTranslator(CommonTranslator):
         assert len(node.args) == 1
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
         assert not pred_stmt
-        fold = self.viper.Fold(pred, self.to_position(node, ctx), self.noinfo(ctx))
+        fold = self.viper.Fold(pred, self.to_position(node, ctx),
+                               self.noinfo(ctx))
         return [fold], None
 
     def translate_unfold(self, node: ast.Call, ctx) -> StmtAndExpr:
         assert len(node.args) == 1
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
         assert not pred_stmt
-        unfold = self.viper.Unfold(pred, self.to_position(node, ctx), self.noinfo(ctx))
+        unfold = self.viper.Unfold(pred, self.to_position(node, ctx),
+                                   self.noinfo(ctx))
         return [unfold], None
 
     def translate_unfolding(self, node: ast.Call, ctx) -> StmtAndExpr:
@@ -177,8 +180,8 @@ class CallTranslator(CommonTranslator):
             self.to_position(node, ctx), self.noinfo(ctx))
         return pred_acc_pred
 
-    def var_has_concrete_type(self, name: str,
-                              type: PythonClass, ctx) -> 'silver.ast.DomainFuncApp':
+    def var_has_concrete_type(self, name: str, type: PythonClass,
+                              ctx) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
         is of exactly the given type.
@@ -197,12 +200,13 @@ class CallTranslator(CommonTranslator):
         """
         position = self.to_position(node, ctx)
         res_var = ctx.current_function.create_variable(target_class.name +'_res',
-                                                        target_class,
-                                                        self.translator)
+                                                       target_class,
+                                                       self.translator)
         fields = get_all_fields(target_class)
         new = self.viper.NewStmt(res_var.ref, fields, self.noposition(ctx),
                                  self.noinfo(ctx))
-        result_has_type = self.var_has_concrete_type(res_var.name, target_class, ctx)
+        result_has_type = self.var_has_concrete_type(res_var.name, target_class,
+                                                     ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.noposition(ctx),

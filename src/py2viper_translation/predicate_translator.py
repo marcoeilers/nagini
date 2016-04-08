@@ -19,7 +19,8 @@ from typing import List, Tuple, Optional, Union, Dict, Any
 
 class PredicateTranslator(CommonTranslator):
 
-    def translate_predicate(self, pred: PythonMethod, ctx) -> 'ast.silver.Predicate':
+    def translate_predicate(self, pred: PythonMethod,
+                            ctx) -> 'ast.silver.Predicate':
         """
         Translates pred to a Silver predicate.
         """
@@ -67,11 +68,14 @@ class PredicateTranslator(CommonTranslator):
                 root_var = root.args[root_name]
                 ctx.var_aliases[current_name] = root_var
             if len(instance.node.body) != 1:
-                raise InvalidProgramException(instance.node, 'invalid.predicate')
+                raise InvalidProgramException(instance.node,
+                                              'invalid.predicate')
             stmt, current = self.translate_expr(instance.node.body[0], ctx)
             if stmt:
-                raise InvalidProgramException(instance.node, 'invalid.predicate')
-            has_type = self.type_factory.has_type(self_var_ref, instance.cls, ctx)
+                raise InvalidProgramException(instance.node,
+                                              'invalid.predicate')
+            has_type = self.type_factory.has_type(self_var_ref, instance.cls,
+                                                  ctx)
             implication = self.viper.Implies(has_type, current,
                 self.to_position(instance.node, ctx), self.noinfo(ctx))
             ctx.current_function = None
@@ -82,4 +86,5 @@ class PredicateTranslator(CommonTranslator):
                 body = implication
         ctx.var_aliases = None
         return self.viper.Predicate(name, args, body,
-                                    self.to_position(root.node, ctx), self.noinfo(ctx))
+                                    self.to_position(root.node, ctx),
+                                    self.noinfo(ctx))

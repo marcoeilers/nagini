@@ -1,11 +1,11 @@
 import ast
 import copy
 
+from abc import ABCMeta
 from py2viper_translation.analyzer import (
     PythonClass,
     PythonMethod,
     PythonTryBlock,
-    PythonProgram,
     PythonVar
 )
 from py2viper_translation.jvmaccess import JVM
@@ -15,14 +15,17 @@ from py2viper_translation.util import (
     get_surrounding_try_blocks
 )
 from py2viper_translation.viper_ast import ViperAST
-from typing import List, Tuple, Optional, Any
-
+from typing import List, Tuple
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
 StmtAndExpr = Tuple[List[Stmt], Expr]
 
 class Context:
+    """
+    Contains the current state of the entire translation process.
+    """
+
     def __init__(self) -> None:
         self.current_function = None
         self.current_class = None
@@ -45,6 +48,10 @@ class Context:
         return result
 
 class TranslatorConfig:
+    """
+    Contains the configuration of the translator, i.e. all the parts
+    (specialized translates) it consists of.
+    """
 
     def __init__(self, translator: 'Translator'):
         self.expr_translator = None
@@ -60,7 +67,12 @@ class TranslatorConfig:
         self.type_factory = None
         self.translator = translator
 
-class AbstractTranslator:
+class AbstractTranslator(metaclass=ABCMeta):
+    """
+    Abstract class which all specialized translators extend. Provides a number
+    of interface methods through which spcialized translators can interact, and
+    forwards calls to those methods to the respective translators.
+    """
 
     def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str,
                  typeinfo: TypeInfo, viperast: ViperAST) -> None:
@@ -139,7 +151,11 @@ class AbstractTranslator:
                                                               ctx)
 
 
-class CommonTranslator(AbstractTranslator):
+class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
+    """
+    Abstract class which all specialized translators extend. Provides some
+    functionality which is needed by many or all specialized translators.
+    """
 
     def translate_generic(self, node: ast.AST, ctx) -> None:
         """

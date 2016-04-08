@@ -58,8 +58,7 @@ class Silicon:
         self.silicon.start()
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program') \
-            -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
@@ -96,8 +95,7 @@ class Carbon:
         self.carbon.start()
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program') \
-            -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
         """
         Verifies the given program using Carbon
         """

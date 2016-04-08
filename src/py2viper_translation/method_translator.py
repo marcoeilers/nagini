@@ -23,6 +23,7 @@ from py2viper_translation.util import (
 )
 from typing import Tuple, List
 
+
 class MethodTranslator(CommonTranslator):
 
     def is_pre(self, stmt: ast.AST) -> bool:
@@ -35,10 +36,12 @@ class MethodTranslator(CommonTranslator):
         return get_func_name(stmt) == 'Exsures'
 
     def get_parameter_typeof(self,
-                             param: PythonVar, ctx) -> 'silver.ast.DomainFuncApp':
+                             param: PythonVar,
+                             ctx) -> 'silver.ast.DomainFuncApp':
         return self.var_has_type(param.sil_name, param.type, ctx)
 
-    def translate_function(self, func: PythonMethod, ctx) -> 'silver.ast.Function':
+    def translate_function(self, func: PythonMethod,
+                           ctx) -> 'silver.ast.Function':
         """
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
@@ -159,6 +162,9 @@ class MethodTranslator(CommonTranslator):
                            self_var: 'silver.ast.LocalVar',
                            position: 'silver.ast.Position',
                            ctx) -> List['silver.ast.FieldAccessPredicate']:
+        """
+        Creates access predicates for all fields in fields.
+        """
         accs = []
         for field in fields:
             acc = self.viper.FieldAccess(self_var, field,
@@ -270,7 +276,8 @@ class MethodTranslator(CommonTranslator):
         pos = self.to_position(block.node, ctx)
         info = self.noinfo(ctx)
         label = self.viper.Label(block.finally_name,
-                                 self.to_position(block.node, ctx), self.noinfo(ctx))
+                                 self.to_position(block.node, ctx),
+                                 self.noinfo(ctx))
         body = [label]
         for stmt in block.finally_block:
             body += self.translate_stmt(stmt, ctx)
@@ -296,8 +303,8 @@ class MethodTranslator(CommonTranslator):
             for handler in current.handlers:
                 # if handler applies
                 # goto handler
-                condition = self.var_has_type(block.get_error_var(self.translator).sil_name,
-                                              handler.exception, ctx)
+                condition = self.var_has_type(block.get_error_var(
+                    self.translator).sil_name, handler.exception, ctx)
                 goto = self.viper.Goto(handler.name, pos, info)
                 if_handler = self.viper.If(condition, goto, empty_stmt, pos,
                                            info)
@@ -335,7 +342,8 @@ class MethodTranslator(CommonTranslator):
         return body
 
 
-    def translate_handler(self, handler: PythonExceptionHandler, ctx) -> List[Stmt]:
+    def translate_handler(self, handler: PythonExceptionHandler,
+                          ctx) -> List[Stmt]:
         """
         Creates a code block representing an exception handler, to be put at
         the end of a Viper method
@@ -346,7 +354,8 @@ class MethodTranslator(CommonTranslator):
         assert not ctx.var_aliases
         if handler.exception_name:
             ctx.var_aliases = {
-                handler.exception_name: handler.try_block.get_error_var(self.translator)
+                handler.exception_name:
+                    handler.try_block.get_error_var(self.translator)
             }
         body = []
         for stmt in handler.body:

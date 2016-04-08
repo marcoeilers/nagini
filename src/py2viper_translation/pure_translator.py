@@ -70,7 +70,8 @@ class PureTranslator(CommonTranslator):
                                node: ast.AST, ctx) -> List[Wrapper]:
         raise UnsupportedException(node)
 
-    def translate_pure_If(self, conds: List, node: ast.If, ctx) -> List[Wrapper]:
+    def translate_pure_If(self, conds: List, node: ast.If,
+                          ctx) -> List[Wrapper]:
         """
         Translates an if-block to a list of Return- and AssignWrappers which
         contain the condition(s) introduced by the if-block.

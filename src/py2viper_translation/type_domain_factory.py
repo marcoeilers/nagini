@@ -1,7 +1,7 @@
 import ast
 
-from typing import List, Tuple
 from py2viper_translation.viper_ast import ViperAST
+from typing import List, Tuple
 
 
 class TypeDomainFactory:
@@ -9,6 +9,7 @@ class TypeDomainFactory:
     Creates domain functions and axioms that represent the Python/mypy type
     system within Viper.
     """
+
     def __init__(self, viper: ViperAST, translator: 'Translator'):
         self.viper = viper
         self.typedomain = 'PyType'
@@ -44,8 +45,9 @@ class TypeDomainFactory:
             # self.create_object_type(ctx)
         ]
 
-    def create_type(self, cls: 'PythonClass', ctx) -> Tuple['silver.ast.DomainFunc',
-                                                     'silver.ast.DomainAxiom']:
+    def create_type(self, cls: 'PythonClass',
+                    ctx) -> Tuple['silver.ast.DomainFunc',
+                                  'silver.ast.DomainAxiom']:
         """
         Creates the type domain function and subtype axiom for this class
         """
@@ -67,7 +69,8 @@ class TypeDomainFactory:
         return type_func, subtype_axiom
 
     def create_type_function(self, name: str, position: 'silver.ast.Position',
-                             info: 'silver.ast.Info', ctx) -> 'silver.ast.DomainFunc':
+                             info: 'silver.ast.Info',
+                             ctx) -> 'silver.ast.DomainFunc':
         return self.viper.DomainFunc(name, [], self.typetype(), True, position,
                                      info, self.typedomain)
 
@@ -102,7 +105,8 @@ class TypeDomainFactory:
         return self.viper.DomainAxiom('subtype_' + type, body, position, info,
                                       self.typedomain)
 
-    def create_extends_implies_subtype_axiom(self, ctx) -> 'silver.ast.DomainAxiom':
+    def create_extends_implies_subtype_axiom(self,
+                                             ctx) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that states that an extends-relationship between two
         types implies a subtype-relationship:
@@ -137,7 +141,8 @@ class TypeDomainFactory:
                                            self.noinfo(ctx), self.typedomain)
         implication = self.viper.Implies(extends, subtype, self.noposition(ctx),
                                          self.noinfo(ctx))
-        trigger = self.viper.Trigger([extends], self.noposition(ctx), self.noinfo(ctx))
+        trigger = self.viper.Trigger([extends], self.noposition(ctx),
+                                     self.noinfo(ctx))
         body = self.viper.Forall([arg_sub, arg_super], [trigger],
                                  implication, self.noposition(ctx),
                                  self.noinfo(ctx))
@@ -197,15 +202,18 @@ class TypeDomainFactory:
                                             self.noinfo(ctx), self.typedomain)
         not_subtypes = self.viper.And(sub_sub2, sub2_sub, self.noposition(ctx),
                                       self.noinfo(ctx))
-        subs_not_equal = self.viper.NeCmp(var_sub, var_sub2, self.noposition(ctx),
+        subs_not_equal = self.viper.NeCmp(var_sub, var_sub2,
+                                          self.noposition(ctx),
                                           self.noinfo(ctx))
         extends = self.viper.And(sub_super, sub2_super, self.noposition(ctx),
                                  self.noinfo(ctx))
         lhs = self.viper.And(extends, subs_not_equal, self.noposition(ctx),
                              self.noinfo(ctx))
-        implication = self.viper.Implies(lhs, not_subtypes, self.noposition(ctx),
+        implication = self.viper.Implies(lhs, not_subtypes,
+                                         self.noposition(ctx),
                                          self.noinfo(ctx))
-        trigger = self.viper.Trigger([sub_super, sub2_super], self.noposition(ctx),
+        trigger = self.viper.Trigger([sub_super, sub2_super],
+                                     self.noposition(ctx),
                                      self.noinfo(ctx))
         body = self.viper.Forall([arg_sub, arg_sub2, arg_super], [trigger],
                                  implication, self.noposition(ctx),
@@ -214,8 +222,8 @@ class TypeDomainFactory:
                                       self.noposition(ctx), self.noinfo(ctx),
                                       self.typedomain)
 
-    def create_subtype_exclusion_propagation_axiom(self, ctx) \
-            -> 'silver.ast.DomainAxiom':
+    def create_subtype_exclusion_propagation_axiom(self,
+            ctx) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that propagates the information that two types
         are not subtypes down the type hierarchy:
@@ -254,7 +262,8 @@ class TypeDomainFactory:
                                                 self.viper.Bool,
                                                 [var_middle, var_super],
                                                 self.noposition(ctx),
-                                                self.noinfo(ctx), self.typedomain)
+                                                self.noinfo(ctx),
+                                                self.typedomain)
         sub_super = self.viper.DomainFuncApp('issubtype', [var_sub, var_super],
                                              {}, self.viper.Bool,
                                              [var_sub, var_super],
@@ -264,9 +273,11 @@ class TypeDomainFactory:
                                        self.noinfo(ctx))
         implication = self.viper.Implies(
             self.viper.And(sub_middle, middle_super, self.noposition(ctx),
-                           self.noinfo(ctx)), not_sub_super, self.noposition(ctx),
+                           self.noinfo(ctx)), not_sub_super,
+            self.noposition(ctx),
             self.noinfo(ctx))
-        trigger = self.viper.Trigger([sub_middle, middle_super], self.noposition(ctx), self.noinfo(ctx))
+        trigger = self.viper.Trigger([sub_middle, middle_super],
+                                     self.noposition(ctx), self.noinfo(ctx))
         body = self.viper.Forall([arg_sub, arg_middle, arg_super], [trigger],
                                  implication, self.noposition(ctx),
                                  self.noinfo(ctx))
@@ -287,7 +298,8 @@ class TypeDomainFactory:
                                              self.noinfo(ctx), self.typedomain)
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.typetype(), [],
-                                             self.noposition(ctx), self.noinfo(ctx),
+                                             self.noposition(ctx),
+                                             self.noinfo(ctx),
                                              self.typedomain)
         eq = self.viper.EqCmp(type_func, none_type, self.noposition(ctx),
                               self.noinfo(ctx))
@@ -309,7 +321,8 @@ class TypeDomainFactory:
                                       self.noposition(ctx), self.noinfo(ctx))
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.typetype(), [],
-                                             self.noposition(ctx), self.noinfo(ctx),
+                                             self.noposition(ctx),
+                                             self.noinfo(ctx),
                                              self.typedomain)
         subtype = self.viper.DomainFuncApp('issubtype',
                                            [var_sub, none_type], {},
@@ -317,8 +330,10 @@ class TypeDomainFactory:
                                            [var_sub, none_type],
                                            self.noposition(ctx),
                                            self.noinfo(ctx), self.typedomain)
-        not_subtype = self.viper.Not(subtype, self.noposition(ctx), self.noinfo(ctx))
-        trigger = self.viper.Trigger([subtype], self.noposition(ctx), self.noinfo(ctx))
+        not_subtype = self.viper.Not(subtype, self.noposition(ctx),
+                                     self.noinfo(ctx))
+        trigger = self.viper.Trigger([subtype], self.noposition(ctx),
+                                     self.noinfo(ctx))
         body = self.viper.Forall([arg_sub], [trigger],
                                  not_subtype, self.noposition(ctx),
                                  self.noinfo(ctx))
@@ -371,7 +386,8 @@ class TypeDomainFactory:
                                                 self.viper.Bool,
                                                 [var_middle, var_super],
                                                 self.noposition(ctx),
-                                                self.noinfo(ctx), self.typedomain)
+                                                self.noinfo(ctx),
+                                                self.typedomain)
         sub_super = self.viper.DomainFuncApp('issubtype', [var_sub, var_super],
                                              {}, self.viper.Bool,
                                              [var_sub, var_super],
@@ -473,7 +489,8 @@ class TypeDomainFactory:
                                                 self.viper.Bool,
                                                 [var_sub, var_super],
                                                 self.noposition(ctx),
-                                                self.noinfo(ctx), self.typedomain)
+                                                self.noinfo(ctx),
+                                                self.typedomain)
         return subtype_func
 
     def has_concrete_type(self, lhs: 'Expr', type: 'PythonClass', ctx):

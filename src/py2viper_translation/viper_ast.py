@@ -1,7 +1,6 @@
 import types
 
 
-# pylint: disable=invalid-name
 def getobject(package, name):
     return getattr(getattr(package, name + '$'), 'MODULE$')
 
@@ -161,7 +160,8 @@ class ViperAST:
         argspassedfunc = self.to_function0(argspassedapply)
         result = self.ast.DomainFuncApp(funcname, self.to_seq(args),
                                         self.to_map(typevarmap), position, info,
-                                        typepassedfunc, argspassedfunc, domain_name)
+                                        typepassedfunc, argspassedfunc,
+                                        domain_name)
         return result
 
     def MethodCall(self, methodname, args, targets, position, info):
