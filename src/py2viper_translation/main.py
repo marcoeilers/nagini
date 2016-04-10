@@ -23,14 +23,16 @@ from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.viper_ast import ViperAST
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")  # TODO: Meeting at 15:00 on Thursday
+    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
     parsed = parser.parse(text, None)
     assert (isinstance(parsed, getattr(jvm.scala.util.parsing.combinator,
                               'Parsers$Success')))
-    resolver = jvm.viper.silver.parser.Resolver(parsed.result())
+    parse_result = parsed.result()
+    parse_result.initTreeProperties()
+    resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
     translator = jvm.viper.silver.parser.Translator(resolved)
