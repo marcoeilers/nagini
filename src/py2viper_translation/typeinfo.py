@@ -73,7 +73,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if str(t1) == str(t2):
             return True
         if (isinstance(t1, mypy.types.FunctionLike) and
-            isinstance(t2, mypy.types.FunctionLike)):
+                isinstance(t2, mypy.types.FunctionLike)):
             if self.type_equals(t1.ret_type, t2.ret_type):
                 all_eq = True
                 for arg1, arg2 in zip(t1.arg_types, t2.arg_types):
@@ -82,7 +82,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                     all_eq = all_eq and self.type_equals(arg1, arg2)
                 return all_eq
         return t1 == t2
-
 
     def visit_call_expr(self, o: mypy.nodes.CallExpr):
         for a in o.args:

@@ -2,28 +2,31 @@ import ast
 
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
-    TranslatorConfig,
+    Context,
     Expr,
-    StmtAndExpr,
-    Stmt
+    Stmt,
+    StmtAndExprs,
+    Stmt,
+    TranslatorConfig
 )
 from py2viper_translation.analyzer import (
     PythonClass,
     PythonMethod,
+    PythonTryBlock,
     PythonVar,
-    PythonTryBlock
 )
 from py2viper_translation.util import (
-    InvalidProgramException,
     get_func_name,
+    get_surrounding_try_blocks,
     flatten,
-    get_surrounding_try_blocks
+    InvalidProgramException
 )
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 
 class StatementTranslator(CommonTranslator):
 
-    def translate_stmt(self, node: ast.AST, ctx) -> List[Stmt]:
+    def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         """
         Generic visitor function for translating statements
         """
@@ -31,8 +34,8 @@ class StatementTranslator(CommonTranslator):
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node, ctx)
 
-    def translate_stmt_AugAssign(self,
-                                 node: ast.AugAssign, ctx) -> List[Stmt]:
+    def translate_stmt_AugAssign(self, node: ast.AugAssign,
+                                 ctx: Context) -> List[Stmt]:
         lhs_stmt, lhs = self.translate_expr(node.target, ctx)
         if lhs_stmt:
             raise InvalidProgramException(node, 'purity.violated')
@@ -40,30 +43,30 @@ class StatementTranslator(CommonTranslator):
         if isinstance(node.op, ast.Add):
             newval = self.viper.Add(lhs, rhs,
                                     self.to_position(node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))
         elif isinstance(node.op, ast.Sub):
             newval = self.viper.Sub(lhs, rhs,
                                     self.to_position(node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))
         elif isinstance(node.op, ast.Mult):
             newval = self.viper.Mul(lhs, rhs,
                                     self.to_position(node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))
         else:
             raise UnsupportedException(node)
         position = self.to_position(node, ctx)
         if isinstance(node.target, ast.Name):
             assign = self.viper.LocalVarAssign(lhs, newval, position,
-                                               self.noinfo(ctx))
+                                               self.no_info(ctx))
         elif isinstance(node.target, ast.Attribute):
             assign = self.viper.FieldAssign(lhs, newval, position,
-                                            self.noinfo(ctx))
+                                            self.no_info(ctx))
         return rhs_stmt + [assign]
 
-    def translate_stmt_Pass(self, node: ast.Pass, ctx) -> List[Stmt]:
+    def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
 
-    def translate_stmt_Try(self, node: ast.Try, ctx) -> List[Stmt]:
+    def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
         for block in ctx.current_function.try_blocks:
             if block.node is node:
@@ -71,40 +74,40 @@ class StatementTranslator(CommonTranslator):
                 break
         assert try_block
         code_var = try_block.get_finally_var(self.translator).ref
-        zero = self.viper.IntLit(0, self.noposition(ctx), self.noinfo(ctx))
-        assign = self.viper.LocalVarAssign(code_var, zero, self.noposition(ctx),
-                                           self.noinfo(ctx))
+        zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
+        assign = self.viper.LocalVarAssign(code_var, zero, self.no_position(ctx),
+                                           self.no_info(ctx))
         body = [assign]
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
         if try_block.else_block:
             goto = self.viper.Goto(try_block.else_block.name,
-                                   self.to_position(node, ctx), self.noinfo(ctx))
+                                   self.to_position(node, ctx), self.no_info(ctx))
             body += [goto]
         elif try_block.finally_block:
             goto = self.viper.Goto(try_block.finally_name,
-                                   self.to_position(node, ctx), self.noinfo(ctx))
+                                   self.to_position(node, ctx), self.no_info(ctx))
             body += [goto]
         end_label = self.viper.Label('post_' + node.sil_name,
                                      self.to_position(node, ctx),
-                                     self.noinfo(ctx))
+                                     self.no_info(ctx))
         return body + [end_label]
 
-    def translate_stmt_Raise(self, node: ast.Raise, ctx) -> List[Stmt]:
+    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         var = self.get_error_var(node, ctx)
         stmt, exception = self.translate_expr(node.exc, ctx)
         assignment = self.viper.LocalVarAssign(var, exception,
                                                self.to_position(node, ctx),
-                                               self.noinfo(ctx))
+                                               self.no_info(ctx))
         catchers = self.create_exception_catchers(var,
             ctx.current_function.try_blocks, node, ctx)
         return stmt + [assignment] + catchers
 
-    def translate_stmt_Call(self, node: ast.Call, ctx) -> List[Stmt]:
+    def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
         if get_func_name(node) == 'Assert':
             assert len(node.args) == 1
             stmt, expr = self.translate_expr(node.args[0], ctx)
             assertion = self.viper.Assert(expr, self.to_position(node, ctx),
-                                          self.noinfo(ctx))
+                                          self.no_info(ctx))
             return stmt + [assertion]
         else:
             stmt, expr = self.translate_Call(node, ctx)
@@ -112,29 +115,30 @@ class StatementTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'no.effect')
             return stmt
 
-    def translate_stmt_Expr(self, node: ast.Expr, ctx) -> List[Stmt]:
+    def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
             return self.translate_stmt(node.value, ctx)
         else:
             raise UnsupportedException(node)
 
-    def translate_stmt_If(self, node: ast.If, ctx) -> List[Stmt]:
+    def translate_stmt_If(self, node: ast.If, ctx: Context) -> List[Stmt]:
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
         then_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.body])
         then_block = self.translate_block(then_body,
                                           self.to_position(node, ctx),
-                                          self.noinfo(ctx))
+                                          self.no_info(ctx))
         else_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.orelse])
         else_block = self.translate_block(
             else_body,
-            self.to_position(node, ctx), self.noinfo(ctx))
+            self.to_position(node, ctx), self.no_info(ctx))
         position = self.to_position(node, ctx)
         return cond_stmt + [self.viper.If(cond, then_block, else_block,
-                                          position, self.noinfo(ctx))]
+                                          position, self.no_info(ctx))]
 
-    def translate_stmt_Assign(self, node: ast.Assign, ctx) -> List[Stmt]:
+    def translate_stmt_Assign(self, node: ast.Assign,
+                              ctx: Context) -> List[Stmt]:
         if len(node.targets) != 1:
             raise UnsupportedException(node)
         if isinstance(node.targets[0], ast.Subscript):
@@ -151,7 +155,7 @@ class StatementTranslator(CommonTranslator):
             targets = []
             call = self.viper.MethodCall(func_name, args, targets,
                                          self.to_position(node, ctx),
-                                         self.noinfo(ctx))
+                                         self.no_info(ctx))
             return lhs_stmt + ind_stmt + rhs_stmt + [call]
         target = node.targets[0]
         lhs_stmt, var = self.translate_expr(target, ctx)
@@ -162,13 +166,14 @@ class StatementTranslator(CommonTranslator):
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = assignment(var,
                             rhs, self.to_position(node, ctx),
-                            self.noinfo(ctx))
+                            self.no_info(ctx))
         return lhs_stmt + rhs_stmt + [assign]
 
     def is_invariant(self, stmt: ast.AST) -> bool:
         return get_func_name(stmt) == 'Invariant'
 
-    def translate_stmt_While(self, node: ast.While, ctx) -> List[Stmt]:
+    def translate_stmt_While(self, node: ast.While,
+                             ctx: Context) -> List[Stmt]:
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
@@ -182,34 +187,34 @@ class StatementTranslator(CommonTranslator):
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         body = self.translate_block(body, self.to_position(node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))
         return [self.viper.While(cond, invariants, locals, body,
                                  self.to_position(node, ctx),
-                                 self.noinfo(ctx))]
+                                 self.no_info(ctx))]
 
-    def translate_stmt_Return(self,
-                              node: ast.Return, ctx) -> List[Stmt]:
+    def translate_stmt_Return(self, node: ast.Return,
+                              ctx: Context) -> List[Stmt]:
         type = ctx.current_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
             self.viper.LocalVar('_res', self.translate_type(type, ctx),
-                                self.noposition(ctx), self.noinfo(ctx)),
+                                self.no_position(ctx), self.no_info(ctx)),
             rhs, self.to_position(node, ctx),
-            self.noinfo(ctx))
+            self.no_info(ctx))
         tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
                                            node)
         for try_block in tries:
             if try_block.finally_block:
                 lhs = try_block.get_finally_var(self.translator).ref
-                rhs = self.viper.IntLit(1, self.noposition(ctx),
-                                        self.noinfo(ctx))
+                rhs = self.viper.IntLit(1, self.no_position(ctx),
+                                        self.no_info(ctx))
                 finally_assign = self.viper.LocalVarAssign(lhs, rhs,
-                                                           self.noposition(ctx),
-                                                           self.noinfo(ctx))
+                                                           self.no_position(ctx),
+                                                           self.no_info(ctx))
                 jmp = self.viper.Goto(try_block.finally_name,
                                       self.to_position(node, ctx),
-                                      self.noinfo(ctx))
+                                      self.no_info(ctx))
                 return rhs_stmt + [assign, finally_assign, jmp]
         jmp_to_end = self.viper.Goto("__end", self.to_position(node, ctx),
-                                     self.noinfo(ctx))
+                                     self.no_info(ctx))
         return rhs_stmt + [assign, jmp_to_end]

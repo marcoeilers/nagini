@@ -2,18 +2,18 @@ import ast
 
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
-    TranslatorConfig,
+    Context,
     Expr,
-    StmtAndExpr
+    StmtAndExprs,
+    TranslatorConfig
 )
 from py2viper_translation.analyzer import PythonMethod, PythonVar
 from py2viper_translation.util import (
-    UnsupportedException,
+    flatten,
     InvalidProgramException,
-    flatten
+    UnsupportedException
 )
-from typing import List, Tuple, Optional, Union, Dict
-
+from typing import Dict, List, Optional, Tuple, Union
 
 
 class AssignWrapper:
@@ -48,6 +48,7 @@ class NotWrapper:
     def __init__(self, cond):
         self.cond = cond
 
+
 class BinOpWrapper:
     """
     Represents a binary operation to be performed on a variable;
@@ -59,19 +60,21 @@ class BinOpWrapper:
 
 Wrapper = Union[AssignWrapper, ReturnWrapper]
 
+
 class PureTranslator(CommonTranslator):
 
-    def translate_pure(self, conds: List, node: ast.AST, ctx) -> List[Wrapper]:
+    def translate_pure(self, conds: List, node: ast.AST,
+                       ctx: Context) -> List[Wrapper]:
         method = 'translate_pure_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_pure_generic)
         return visitor(conds, node, ctx)
 
     def translate_pure_generic(self, conds: List,
-                               node: ast.AST, ctx) -> List[Wrapper]:
+                               node: ast.AST, ctx: Context) -> List[Wrapper]:
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If,
-                          ctx) -> List[Wrapper]:
+                          ctx: Context) -> List[Wrapper]:
         """
         Translates an if-block to a list of Return- and AssignWrappers which
         contain the condition(s) introduced by the if-block.
@@ -91,16 +94,16 @@ class PureTranslator(CommonTranslator):
             else_ = flatten(else_)
         return [cond_let] + then + else_
 
-    def translate_pure_Return(self, conds: List,
-                              node: ast.Return, ctx) -> List[Wrapper]:
+    def translate_pure_Return(self, conds: List, node: ast.Return,
+                              ctx: Context) -> List[Wrapper]:
         """
         Translates a return statement to a ReturnWrapper
         """
         wrapper = ReturnWrapper(conds, node.value, node)
         return [wrapper]
 
-    def translate_pure_AugAssign(self, conds: List,
-                                 node: ast.AugAssign, ctx) -> List[Wrapper]:
+    def translate_pure_AugAssign(self, conds: List, node: ast.AugAssign,
+                                 ctx: Context) -> List[Wrapper]:
         """
         Translates an augmented assign statement to an AssignWrapper
         """
@@ -109,8 +112,8 @@ class PureTranslator(CommonTranslator):
         wrapper = AssignWrapper(node.target.id, conds, val, node)
         return [wrapper]
 
-    def translate_pure_Assign(self, conds: List,
-                              node: ast.Assign, ctx) -> List[Wrapper]:
+    def translate_pure_Assign(self, conds: List, node: ast.Assign,
+                              ctx: Context) -> List[Wrapper]:
         """
         Translates an assign statement to an AssignWrapper
         """
@@ -120,7 +123,7 @@ class PureTranslator(CommonTranslator):
         return [wrapper]
 
     def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx) -> Expr:
+                        function: PythonMethod, ctx: Context) -> Expr:
         """
         Translates a list of nodes to a single (let-)expression if the nodes
         are only returns, assignments and if-blocks. First translates them to
@@ -150,7 +153,7 @@ class PureTranslator(CommonTranslator):
                 wrapper.variable = new_name
             previous = wrapper
         previous = None
-        info = self.noinfo(ctx)
+        info = self.no_info(ctx)
         assert not ctx.var_aliases
         # Second walk through wrappers, starting at the end. Translate all of
         # them into one big expression. Assigns become a let, returns just the
@@ -212,21 +215,20 @@ class PureTranslator(CommonTranslator):
         ctx.var_aliases = None
         return previous
 
-
-    def _translate_condition(self, conds: List,
-                             names: Dict[str, PythonVar], ctx) -> Expr:
+    def _translate_condition(self, conds: List, names: Dict[str, PythonVar],
+                             ctx: Context) -> Expr:
         """
         Translates the conditions in conds to a big conjunctive expression,
         using the renamings in names.
         """
-        previous = self.viper.TrueLit(self.noposition(ctx), self.noinfo(ctx))
+        previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         for cond in conds:
             if isinstance(cond, NotWrapper):
                 current = names.get(cond.cond).ref
-                current = self.viper.Not(current, self.noposition(ctx),
-                                         self.noinfo(ctx))
+                current = self.viper.Not(current, self.no_position(ctx),
+                                         self.no_info(ctx))
             else:
                 current = names.get(cond).ref
-            previous = self.viper.And(previous, current, self.noposition(ctx),
-                                      self.noinfo(ctx))
+            previous = self.viper.And(previous, current, self.no_position(ctx),
+                                      self.no_info(ctx))
         return previous

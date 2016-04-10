@@ -63,6 +63,7 @@ def get_func_name(stmt: ast.AST) -> Optional[str]:
     else:
         raise UnsupportedException(stmt)
 
+
 def contains_stmt(container: Any, contained: ast.AST) -> bool:
     """
     Checks if 'contained' is a part of the partial AST
@@ -83,6 +84,7 @@ def contains_stmt(container: Any, contained: ast.AST) -> bool:
     else:
         return False
 
+
 def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
                                stmt: ast.AST) -> List['PythonTryBlock']:
     """
@@ -99,13 +101,17 @@ def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
     inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
     return inner_to_outer
 
+
 def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
-    # two-arg super call: first arg must be a class, second a reference
-    # to self
+    """
+    Checks if a super() call with two arguments is valid:
+    first arg must be a class, second a reference to self.
+    """
     return (isinstance(node.args[0], ast.Name) and
         (node.args[0].id in ctx.program.classes) and
         isinstance(node.args[1], ast.Name) and
         (node.args[1].id == next(iter(ctx.current_function.args))))
+
 
 def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
     """

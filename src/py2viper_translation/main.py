@@ -11,16 +11,17 @@ from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.translator import Translator
-from py2viper_translation.typeinfo import TypeInfo, TypeException
+from py2viper_translation.typeinfo import TypeException, TypeInfo
 from py2viper_translation.verifier import (
     Carbon,
+    Failure,
     Silicon,
     VerificationResult,
-    ViperVerifier,
-    Failure
+    ViperVerifier
 )
 from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.viper_ast import ViperAST
+
 
 def parse_sil_file(sil_path: str, jvm):
     parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
@@ -29,7 +30,7 @@ def parse_sil_file(sil_path: str, jvm):
     file.close()
     parsed = parser.parse(text, None)
     assert (isinstance(parsed, getattr(jvm.scala.util.parsing.combinator,
-                              'Parsers$Success')))
+                                       'Parsers$Success')))
     parse_result = parsed.result()
     parse_result.initTreeProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
@@ -66,8 +67,6 @@ def translate(path: str, jvm: JVM):
             analyzer.visit_module(module)
         else:
             return None
-    
-
     translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
     prog = translator.translate_program(analyzer.program, sil_programs)
@@ -90,13 +89,6 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
     except JavaException as je:
         print(je.stacktrace())
         traceback.print_exc()
-
-def to_list(seq):
-    result = []
-    iterator = seq.toIterator()
-    while iterator.hasNext():
-        result.append(iterator.next())
-    return result
 
 
 def main() -> None:
