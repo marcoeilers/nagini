@@ -2,25 +2,27 @@ import ast
 
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
-    TranslatorConfig,
+    Context,
     Expr,
-    StmtAndExpr,
-    Stmt
+    Stmt,
+    StmtAndExprs,
+    TranslatorConfig
 )
 from py2viper_translation.analyzer import (
     PythonClass,
     PythonMethod,
+    PythonTryBlock,
     PythonVar,
-    PythonTryBlock
 )
 from py2viper_translation.util import InvalidProgramException
 from toposort import toposort_flatten
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 
 class PredicateTranslator(CommonTranslator):
 
     def translate_predicate(self, pred: PythonMethod,
-                            ctx) -> 'ast.silver.Predicate':
+                            ctx: Context) -> 'ast.silver.Predicate':
         """
         Translates pred to a Silver predicate.
         """
@@ -35,10 +37,11 @@ class PredicateTranslator(CommonTranslator):
         ctx.current_function = None
         return self.viper.Predicate(pred.sil_name, args, body,
                                     self.to_position(pred.node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))
 
     def translate_predicate_family(self, root: PythonMethod,
-            preds: List[PythonMethod], ctx) -> 'ast.silver.Predicate':
+                                   preds: List[PythonMethod],
+                                   ctx: Context) -> 'ast.silver.Predicate':
         """
         Translates the methods in preds, whose root (which they all override)
         is root, to a family-predicate in Silver.
@@ -74,17 +77,17 @@ class PredicateTranslator(CommonTranslator):
             if stmt:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
-            has_type = self.type_factory.has_type(self_var_ref, instance.cls,
+            has_type = self.type_factory.type_check(self_var_ref, instance.cls,
                                                   ctx)
             implication = self.viper.Implies(has_type, current,
-                self.to_position(instance.node, ctx), self.noinfo(ctx))
+                self.to_position(instance.node, ctx), self.no_info(ctx))
             ctx.current_function = None
             if body:
                 body = self.viper.And(body, implication,
-                    self.to_position(root.node, ctx), self.noinfo(ctx))
+                    self.to_position(root.node, ctx), self.no_info(ctx))
             else:
                 body = implication
         ctx.var_aliases = None
         return self.viper.Predicate(name, args, body,
                                     self.to_position(root.node, ctx),
-                                    self.noinfo(ctx))
+                                    self.no_info(ctx))

@@ -2,16 +2,17 @@ import ast
 
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
-    TranslatorConfig,
+    Context,
     Expr,
-    StmtAndExpr,
-    Stmt
+    Stmt,
+    StmtAndExprs,
+    TranslatorConfig
 )
 from py2viper_translation.analyzer import (
     PythonClass,
     PythonMethod,
+    PythonTryBlock,
     PythonVar,
-    PythonTryBlock
 )
 from py2viper_translation.constants import BUILTINS
 from py2viper_contracts.contracts import CONTRACT_FUNCS
@@ -19,18 +20,19 @@ from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.util import get_func_name, is_two_arg_super_call
 from py2viper_translation.viper_ast import ViperAST
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class TypeTranslator(CommonTranslator):
 
-    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str,
-                 typeinfo: TypeInfo, viperast: ViperAST) -> None:
-        super().__init__(config, jvm, sourcefile, typeinfo, viperast)
-        self.builtins = {'builtins.int': viperast.Int,
-                         'builtins.bool': viperast.Bool}
+    def __init__(self, config: TranslatorConfig, jvm: JVM, source_file: str,
+                 type_info: TypeInfo, viper_ast: ViperAST) -> None:
+        super().__init__(config, jvm, source_file, type_info, viper_ast)
+        self.builtins = {'builtins.int': viper_ast.Int,
+                         'builtins.bool': viper_ast.Bool}
 
-    def translate_type(self, cls: PythonClass, ctx) -> 'silver.ast.Type':
+    def translate_type(self, cls: PythonClass,
+                       ctx: Context) -> 'silver.ast.Type':
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
@@ -39,7 +41,7 @@ class TypeTranslator(CommonTranslator):
         else:
             return self.viper.Ref
 
-    def get_type(self, node: ast.AST, ctx) -> PythonClass:
+    def get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
         """
         Returns the type of the expression represented by node as a PythonClass
         """

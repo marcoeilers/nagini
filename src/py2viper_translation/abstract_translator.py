@@ -11,15 +11,16 @@ from py2viper_translation.analyzer import (
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.typeinfo import TypeInfo
 from py2viper_translation.util import (
-    UnsupportedException,
-    get_surrounding_try_blocks
+    get_surrounding_try_blocks,
+    UnsupportedException
 )
 from py2viper_translation.viper_ast import ViperAST
 from typing import List, Tuple
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
-StmtAndExpr = Tuple[List[Stmt], Expr]
+StmtAndExprs = Tuple[List[Stmt], Expr]
+
 
 class Context:
     """
@@ -34,18 +35,6 @@ class Context:
         self.info = None
         self.program = None
 
-    def _clone(self) -> 'Context':
-        return copy.copy(self)
-
-    def set_current_function(self, func: PythonMethod) -> 'Context':
-        result = self._clone()
-        result.current_function = func
-        return result
-
-    def set_current_function(self, func: PythonMethod) -> 'Context':
-        result = self._clone()
-        result.current_function = func
-        return result
 
 class TranslatorConfig:
     """
@@ -67,6 +56,7 @@ class TranslatorConfig:
         self.type_factory = None
         self.translator = translator
 
+
 class AbstractTranslator(metaclass=ABCMeta):
     """
     Abstract class which all specialized translators extend. Provides a number
@@ -74,81 +64,86 @@ class AbstractTranslator(metaclass=ABCMeta):
     forwards calls to those methods to the respective translators.
     """
 
-    def __init__(self, config: TranslatorConfig, jvm: JVM, sourcefile: str,
-                 typeinfo: TypeInfo, viperast: ViperAST) -> None:
+    def __init__(self, config: TranslatorConfig, jvm: JVM, source_file: str,
+                 type_info: TypeInfo, viper_ast: ViperAST) -> None:
         self.config = config
-        self.viper = viperast
+        self.viper = viper_ast
         self.jvm = jvm
 
-    def _get_type_factory(self):
+    @property
+    def type_factory(self):
         return self.config.type_factory
 
-    type_factory = property(_get_type_factory)
-
-    def _get_translator(self):
+    @property
+    def translator(self):
         return self.config.translator
 
-    translator = property(_get_translator)
-
-    def translate_expr(self, node: ast.AST, ctx) -> StmtAndExpr:
+    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
         return self.config.expr_translator.translate_expr(node, ctx)
 
-    def translate_to_bool(self, node: ast.AST, ctx) -> StmtAndExpr:
+    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
         return self.config.expr_translator.translate_to_bool(node, ctx)
 
-    def translate_stmt(self, node: ast.AST, ctx) -> List[Stmt]:
+    def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
 
-    def translate_contract(self, node: ast.AST, ctx) -> Expr:
+    def translate_contract(self, node: ast.AST, ctx: Context) -> Expr:
         return self.config.contract_translator.translate_contract(node, ctx)
 
-    def translate_perm(self, node: ast.AST, ctx) -> Expr:
+    def translate_perm(self, node: ast.AST, ctx: Context) -> Expr:
         return self.config.perm_translator.translate_perm(node, ctx)
 
     def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx) -> Expr:
+                        function: PythonMethod, ctx: Context) -> Expr:
         return self.config.pure_translator.translate_exprs(nodes, function, ctx)
 
-    def get_type(self, node: ast.AST, ctx) -> PythonClass:
+    def get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
         return self.config.type_translator.get_type(node, ctx)
 
-    def translate_type(self, cls: PythonClass, ctx) -> 'silver.ast.Type':
+    def translate_type(self, cls: PythonClass,
+                       ctx: Context) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx) -> StmtAndExpr:
+    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
         return self.config.call_translator.translate_Call(node, ctx)
 
     def translate_predicate(self, pred: PythonMethod,
-                            ctx) -> 'ast.silver.Predicate':
+                            ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
 
-    def translate_method(self, method: PythonMethod, ctx) -> 'silver.ast.Method':
+    def translate_method(self, method: PythonMethod,
+                         ctx: Context) -> 'silver.ast.Method':
         return self.config.method_translator.translate_method(method, ctx)
 
-    def translate_function(self,
-                           func: PythonMethod, ctx) -> 'silver.ast.Function':
+    def translate_function(self, func: PythonMethod,
+                           ctx: Context) -> 'silver.ast.Function':
         return self.config.method_translator.translate_function(func, ctx)
 
     def translate_predicate_family(self, root: PythonMethod,
-            preds: List[PythonMethod], ctx) -> 'ast.silver.Predicate':
+            preds: List[PythonMethod], ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate_family(root,
                                                                       preds,
                                                                       ctx)
 
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],
-                                  call: ast.Call, ctx) -> List[Stmt]:
+                                  call: ast.Call, ctx: Context) -> List[Stmt]:
         return self.config.expr_translator.create_exception_catchers(var,
                                                                      try_blocks,
                                                                      call, ctx)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
-                         ctx) -> Tuple[List[Expr], List[Expr]]:
+                         ctx: Context) -> Tuple[List[Expr], List[Expr]]:
         return self.config.method_translator.extract_contract(method,
                                                               errorvarname,
                                                               is_constructor,
                                                               ctx)
+
+    def translate_contractfunc_call(self, node: ast.Call,
+                                    ctx: Context) -> StmtAndExprs:
+        return self.config.contract_translator.translate_contractfunc_call(node,
+                                                                           ctx)
 
 
 class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
@@ -157,7 +152,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     functionality which is needed by many or all specialized translators.
     """
 
-    def translate_generic(self, node: ast.AST, ctx) -> None:
+    def translate_generic(self, node: ast.AST, ctx: Context) -> None:
         """
         Visitor that is used if no other visitor is implemented.
         Simply raises an exception.
@@ -175,7 +170,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
-    def to_position(self, node, ctx):
+    def to_position(self, node: ast.AST, ctx: Context) -> 'silver.ast.Position':
         """
         Extracts the position from a node.
         If ctx.position is set to override the actual position, returns that.
@@ -185,10 +180,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             return self.viper.to_position(node)
 
-    def noposition(self, ctx):
+    def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.to_position(None, ctx)
 
-    def to_info(self, comments, ctx):
+    def to_info(self, comments: List[str], ctx: Context) -> 'silver.ast.Info':
         """
         Wraps the given comments into an Info object.
         If ctx.info is set to override the given info, returns that.
@@ -200,10 +195,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             return self.viper.NoInfo
 
-    def noinfo(self, ctx):
+    def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
 
-    def get_function_call(self, receiver, func_name, args, node, ctx):
+    def get_function_call(self, receiver: ast.AST, func_name: str,
+                          args: List[Expr], node: ast.AST,
+                          ctx: Context) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments.
@@ -211,15 +208,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         target_cls = self.get_type(receiver, ctx)
         func = target_cls.get_function(func_name)
         formal_args = []
-        for arg in func.args:
-            formal_args.append(func.args[arg].decl)
+        for arg in func.args.values():
+            formal_args.append(arg.decl)
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name
         call = self.viper.FuncApp(sil_name, args, self.to_position(node, ctx),
-                                  self.noinfo(ctx), type, formal_args)
+                                  self.no_info(ctx), type, formal_args)
         return call
 
-    def get_error_var(self, stmt: ast.AST, ctx) -> 'LocalVarRef':
+    def get_error_var(self, stmt: ast.AST,
+                      ctx: Context) -> 'silver.ast.LocalVarRef':
         """
         Returns the error variable of the try-block protecting stmt, otherwise
         the error return variable of the surrounding function, otherwise
@@ -236,13 +234,26 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 ctx.program.classes['Exception'], self.translator)
             return new_var.ref
 
-    def var_has_type(self, name: str,
-                     type: PythonClass, ctx) -> 'silver.ast.DomainFuncApp':
+    def var_type_check(self, name: str, type: PythonClass,
+                       ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
         is of the given type.
         """
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
-                                     self.noposition(ctx),
-                                     self.noinfo(ctx))
-        return self.type_factory.has_type(obj_var, type, ctx)
+                                      self.no_position(ctx),
+                                      self.no_info(ctx))
+        return self.type_factory.type_check(obj_var, type, ctx)
+
+    def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
+                                 node: ast.AST, ctx: Context) -> Expr:
+        """
+        Creates a predicate access for the predicate with the given name,
+        with the given args and permission.
+        """
+        pred_acc = self.viper.PredicateAccess(args, pred_name,
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx))
+        pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
+            self.to_position(node, ctx), self.no_info(ctx))
+        return pred_acc_pred

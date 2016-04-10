@@ -1,9 +1,9 @@
 import ast
 
 from py2viper_translation.abstract_translator import (
-    TranslatorConfig,
+    Context,
     Expr,
-    Context
+    TranslatorConfig,
 )
 from py2viper_translation.analyzer import PythonProgram, PythonVar
 from py2viper_translation.call_translator import CallTranslator
@@ -32,30 +32,30 @@ class Translator:
     the public interface to the responsible specialized translators.
     """
 
-    def __init__(self, jvm: JVM, sourcefile: str, typeinfo: TypeInfo,
-                 viperast: ViperAST):
+    def __init__(self, jvm: JVM, source_file: str, type_info: TypeInfo,
+                 viper_ast: ViperAST):
         config = TranslatorConfig(self)
-        config.pure_translator = PureTranslator(config, jvm, sourcefile,
-                                                typeinfo, viperast)
-        config.call_translator = CallTranslator(config, jvm, sourcefile,
-                                                typeinfo, viperast)
-        config.contract_translator = ContractTranslator(config, jvm, sourcefile,
-                                                        typeinfo, viperast)
-        config.expr_translator = ExpressionTranslator(config, jvm, sourcefile,
-                                                      typeinfo, viperast)
-        config.pred_translator = PredicateTranslator(config, jvm, sourcefile,
-                                                     typeinfo, viperast)
-        config.stmt_translator = StatementTranslator(config, jvm, sourcefile,
-                                                     typeinfo, viperast)
-        config.perm_translator = PermTranslator(config, jvm, sourcefile,
-                                                typeinfo, viperast)
-        config.type_translator = TypeTranslator(config, jvm, sourcefile,
-                                                typeinfo, viperast)
-        config.prog_translator = ProgramTranslator(config, jvm, sourcefile,
-                                                   typeinfo, viperast)
-        config.method_translator = MethodTranslator(config, jvm, sourcefile,
-                                                    typeinfo, viperast)
-        config.type_factory = TypeDomainFactory(viperast, self)
+        config.pure_translator = PureTranslator(config, jvm, source_file,
+                                                type_info, viper_ast)
+        config.call_translator = CallTranslator(config, jvm, source_file,
+                                                type_info, viper_ast)
+        config.contract_translator = ContractTranslator(config, jvm, source_file,
+                                                        type_info, viper_ast)
+        config.expr_translator = ExpressionTranslator(config, jvm, source_file,
+                                                      type_info, viper_ast)
+        config.pred_translator = PredicateTranslator(config, jvm, source_file,
+                                                     type_info, viper_ast)
+        config.stmt_translator = StatementTranslator(config, jvm, source_file,
+                                                     type_info, viper_ast)
+        config.perm_translator = PermTranslator(config, jvm, source_file,
+                                                type_info, viper_ast)
+        config.type_translator = TypeTranslator(config, jvm, source_file,
+                                                type_info, viper_ast)
+        config.prog_translator = ProgramTranslator(config, jvm, source_file,
+                                                   type_info, viper_ast)
+        config.method_translator = MethodTranslator(config, jvm, source_file,
+                                                    type_info, viper_ast)
+        config.type_factory = TypeDomainFactory(viper_ast, self)
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
@@ -77,14 +77,14 @@ class Translator:
         ctx.program = program
         return self.expr_translator.translate_pythonvar_ref(var, ctx)
 
-    def to_position(self, node, ctx):
+    def to_position(self, node: ast.AST, ctx: Context) -> 'silver.ast.Position':
         return self.expr_translator.to_position(node, ctx)
 
-    def noposition(self, ctx):
+    def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.to_position(None, ctx)
 
-    def to_info(self, comments, ctx):
+    def to_info(self, comments: List[str], ctx: Context) -> 'silver.ast.Info':
         return self.expr_translator.to_info(comments, ctx)
 
-    def noinfo(self, ctx):
+    def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
