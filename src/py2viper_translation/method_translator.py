@@ -4,7 +4,7 @@ from py2viper_translation.abstract_translator import (
     Expr,
     CommonTranslator,
     Context,
-    StmtAndExprs,
+    StmtsAndExpr,
     Stmt
 )
 from py2viper_translation.analyzer import (

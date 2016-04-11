@@ -5,7 +5,7 @@ from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
-    StmtAndExprs,
+    StmtsAndExpr,
     TranslatorConfig
 )
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
@@ -39,7 +39,7 @@ class ContractTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_result(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_result(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Result() contract function to a result
         expression.
@@ -57,7 +57,7 @@ class ContractTranslator(CommonTranslator):
                                           self.no_info(ctx)))
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
-                                ctx: Context) -> StmtAndExprs:
+                                ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Acc() contract function with a predicate call
         inside to a predicate access.
@@ -93,7 +93,7 @@ class ContractTranslator(CommonTranslator):
         return [], self.create_predicate_access(pred_name, args, perm,
                                                 node, ctx)
 
-    def translate_acc(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_acc(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Acc() contract function, whether there is
         a field inside or a predicate.
@@ -118,7 +118,7 @@ class ContractTranslator(CommonTranslator):
                                                self.no_info(ctx))
         return [], pred
 
-    def translate_implies(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_implies(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Implies() contract function.
         """
@@ -131,7 +131,7 @@ class ContractTranslator(CommonTranslator):
                                          self.no_info(ctx))
         return (cond_stmt + then_stmt, implication)
 
-    def translate_old(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_old(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Old() contract function.
         """
@@ -141,7 +141,7 @@ class ContractTranslator(CommonTranslator):
         res = self.viper.Old(exp, self.to_position(node, ctx), self.no_info(ctx))
         return (stmt, res)
 
-    def translate_fold(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Fold() contract function.
         """
@@ -154,7 +154,7 @@ class ContractTranslator(CommonTranslator):
                                self.no_info(ctx))
         return [fold], None
 
-    def translate_unfold(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_unfold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Unfold() contract function.
         """
@@ -167,7 +167,7 @@ class ContractTranslator(CommonTranslator):
                                    self.no_info(ctx))
         return [unfold], None
 
-    def translate_unfolding(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_unfolding(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Unfolding() contract function.
         """
@@ -182,7 +182,7 @@ class ContractTranslator(CommonTranslator):
         return expr_stmt, unfold
 
     def translate_contractfunc_call(self, node: ast.Call,
-                                    ctx: Context) -> StmtAndExprs:
+                                    ctx: Context) -> StmtsAndExpr:
         """
         Translates calls to contract functions like Result() and Acc()
         """

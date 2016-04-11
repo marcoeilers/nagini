@@ -19,7 +19,7 @@ from typing import List, Tuple
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
-StmtAndExprs = Tuple[List[Stmt], Expr]
+StmtsAndExpr = Tuple[List[Stmt], Expr]
 
 
 class Context:
@@ -78,10 +78,10 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translator(self):
         return self.config.translator
 
-    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
+    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
         return self.config.expr_translator.translate_expr(node, ctx)
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
+    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
         return self.config.expr_translator.translate_to_bool(node, ctx)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
@@ -104,7 +104,7 @@ class AbstractTranslator(metaclass=ABCMeta):
                        ctx: Context) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         return self.config.call_translator.translate_Call(node, ctx)
 
     def translate_predicate(self, pred: PythonMethod,
@@ -141,7 +141,7 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                               ctx)
 
     def translate_contractfunc_call(self, node: ast.Call,
-                                    ctx: Context) -> StmtAndExprs:
+                                    ctx: Context) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node,
                                                                            ctx)
 

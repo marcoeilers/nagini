@@ -4,7 +4,7 @@ from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
-    StmtAndExprs,
+    StmtsAndExpr,
     Stmt
 )
 from py2viper_translation.analyzer import (
@@ -20,7 +20,7 @@ from typing import List, Optional
 
 class ExpressionTranslator(CommonTranslator):
 
-    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
+    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression
         """
@@ -28,14 +28,14 @@ class ExpressionTranslator(CommonTranslator):
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node, ctx)
 
-    def translate_Return(self, node: ast.Return, ctx: Context) -> StmtAndExprs:
+    def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
-    def translate_Num(self, node: ast.Num, ctx: Context) -> StmtAndExprs:
+    def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
         return ([], self.viper.IntLit(node.n, self.to_position(node, ctx),
                                       self.no_info(ctx)))
 
-    def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtAndExprs:
+    def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('dict',
             ctx.program.classes['dict'], self.translator)
@@ -54,7 +54,7 @@ class ExpressionTranslator(CommonTranslator):
             stmt += key_stmt + val_stmt + [append_call]
         return stmt, res_var.ref
 
-    def translate_Set(self, node: ast.Set, ctx: Context) -> StmtAndExprs:
+    def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('set',
             ctx.program.classes['set'], self.translator)
@@ -72,7 +72,7 @@ class ExpressionTranslator(CommonTranslator):
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
 
-    def translate_List(self, node: ast.List, ctx: Context) -> StmtAndExprs:
+    def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('list',
             ctx.program.classes['list'], self.translator)
@@ -91,7 +91,7 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref
 
     def translate_Subscript(self, node: ast.Subscript,
-                            ctx: Context) -> StmtAndExprs:
+                            ctx: Context) -> StmtsAndExpr:
         if not isinstance(node.slice, ast.Index):
             raise UnsupportedException(node)
         target_stmt, target = self.translate_expr(node.value, ctx)
@@ -203,7 +203,7 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtAndExprs:
+    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
         """
         Translates node as a normal expression, then applies Python's auto-
         conversion to a boolean value (using the __bool__ function)
@@ -216,10 +216,10 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(node, '__bool__', args, node, ctx)
         return stmt, call
 
-    def translate_Expr(self, node: ast.Expr, ctx) -> StmtAndExprs:
+    def translate_Expr(self, node: ast.Expr, ctx) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
-    def translate_Name(self, node: ast.Name, ctx) -> StmtAndExprs:
+    def translate_Name(self, node: ast.Name, ctx) -> StmtsAndExpr:
         if node.id in ctx.program.global_vars:
             var = ctx.program.global_vars[node.id]
             type = self.translate_type(var.type, ctx)
@@ -234,7 +234,7 @@ class ExpressionTranslator(CommonTranslator):
                 return [], ctx.current_function.get_variable(node.id).ref
 
     def translate_Attribute(self, node: ast.Attribute,
-                            ctx: Context) -> StmtAndExprs:
+                            ctx: Context) -> StmtsAndExpr:
         stmt, receiver = self.translate_expr(node.value, ctx)
         rec_type = self.get_type(node.value, ctx)
         result = rec_type.get_field(node.attr)
@@ -248,7 +248,7 @@ class ExpressionTranslator(CommonTranslator):
                                              self.no_info(ctx)))
 
     def translate_UnaryOp(self, node: ast.UnaryOp,
-                          ctx: Context) -> StmtAndExprs:
+                          ctx: Context) -> StmtsAndExpr:
         if isinstance(node.op, ast.Not):
             stmt, expr = self.translate_to_bool(node.operand, ctx)
             return (stmt, self.viper.Not(expr, self.to_position(node, ctx),
@@ -260,7 +260,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> StmtAndExprs:
+    def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
         then_stmt, then = self.translate_expr(node.body, ctx)
@@ -280,7 +280,7 @@ class ExpressionTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return cond_stmt + bodystmt, cond_exp
 
-    def translate_BinOp(self, node: ast.BinOp, ctx: Context) -> StmtAndExprs:
+    def translate_BinOp(self, node: ast.BinOp, ctx: Context) -> StmtsAndExpr:
         left_stmt, left = self.translate_expr(node.left, ctx)
         right_stmt, right = self.translate_expr(node.right, ctx)
         stmt = left_stmt + right_stmt
@@ -307,7 +307,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_Compare(self, node: ast.Compare, ctx: Context) -> StmtAndExprs:
+    def translate_Compare(self, node: ast.Compare, ctx: Context) -> StmtsAndExpr:
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)
@@ -354,7 +354,7 @@ class ExpressionTranslator(CommonTranslator):
             raise UnsupportedException(node.ops[0])
 
     def translate_NameConstant(self, node: ast.NameConstant,
-                               ctx: Context) -> StmtAndExprs:
+                               ctx: Context) -> StmtsAndExpr:
         if node.value is True:
             return ([], self.viper.TrueLit(self.to_position(node, ctx),
                                            self.no_info(ctx)))
@@ -368,7 +368,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_BoolOp(self, node: ast.BoolOp, ctx: Context) -> StmtAndExprs:
+    def translate_BoolOp(self, node: ast.BoolOp, ctx: Context) -> StmtsAndExpr:
         if len(node.values) != 2:
             raise UnsupportedException(node)
         position = self.to_position(node, ctx)
