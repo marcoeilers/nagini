@@ -37,3 +37,10 @@ Known Issues
 
 ``mypy-lang`` is downloaded from different source because of
 `this issue <https://github.com/python/mypy/issues/1252>`_.
+
+Build Status
+============
+
+.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation&style=plastic
+   :alt: Build Status
+   :target: https://pmbuilds.inf.ethz.ch/job/py2viper-translation
