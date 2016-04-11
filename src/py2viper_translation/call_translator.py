@@ -5,7 +5,7 @@ from py2viper_translation.abstract_translator import (
     Context,
     Expr,
     Stmt,
-    StmtAndExprs,
+    StmtsAndExpr,
     TranslatorConfig
 )
 from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
@@ -26,21 +26,21 @@ from typing import Dict, List, Optional, Tuple, Union
 class CallTranslator(CommonTranslator):
 
     def translate_isinstance(self, node: ast.Call,
-                             ctx: Context) -> StmtAndExprs:
+                             ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         assert isinstance(node.args[1], ast.Name)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         cls = ctx.program.classes[node.args[1].id]
         return stmt, self.type_factory.type_check(obj, cls, ctx)
 
-    def translate_len(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         args = [target]
         call = self.get_function_call(node.args[0], '__len__', args, node, ctx)
         return stmt, call
 
-    def translate_super(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
             if is_two_arg_super_call(node, ctx):
                 return self.translate_expr(node.args[1], ctx)
@@ -65,7 +65,7 @@ class CallTranslator(CommonTranslator):
 
     def _translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
-            ctx: Context) -> StmtAndExprs:
+            ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the constructor of target_class with args, where
         node is the call node and arg_stmts are statements related to argument
@@ -106,7 +106,7 @@ class CallTranslator(CommonTranslator):
                 stmts = stmts + catchers
         return arg_stmts + stmts, res_var.ref
 
-    def translate_set(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if node.args:
             raise UnsupportedException(node)
         args = []
@@ -119,7 +119,7 @@ class CallTranslator(CommonTranslator):
         return [constr_call], res_var.ref
 
     def translate_builtin_func(self, node: ast.Call,
-                               ctx: Context) -> StmtAndExprs:
+                               ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to a builtin function like len() or isinstance()
         """
@@ -138,7 +138,7 @@ class CallTranslator(CommonTranslator):
     def translate_method_call(self, target: PythonMethod, args: List[Expr],
                               arg_stmts: List[Stmt],
                               position: 'silver.ast.Position', node: ast.AST,
-                              ctx: Context) -> StmtAndExprs:
+                              ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to an impure method.
         """
@@ -168,7 +168,7 @@ class CallTranslator(CommonTranslator):
                 result_var.ref if result_var else None)
 
     def translate_normal_call(self, node: ast.Call,
-                              ctx: Context) -> StmtAndExprs:
+                              ctx: Context) -> StmtsAndExpr:
         """
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
@@ -230,7 +230,7 @@ class CallTranslator(CommonTranslator):
             return self.translate_method_call(target, args, arg_stmts,
                                               position, node, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtAndExprs:
+    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
         like Assert, a builtin Python function like isinstance, a

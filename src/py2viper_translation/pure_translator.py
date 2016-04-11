@@ -4,7 +4,6 @@ from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
-    StmtAndExprs,
     TranslatorConfig
 )
 from py2viper_translation.analyzer import PythonMethod, PythonVar
