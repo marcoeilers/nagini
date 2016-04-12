@@ -6,11 +6,12 @@ from py2viper_translation.abstract_translator import (
     Context,
     Expr,
     StmtsAndExpr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
-from py2viper_translation.util import get_func_name, InvalidProgramException
-from typing import Dict, List, Optional, Tuple, Union
+from py2viper_translation.util import (
+    get_func_name,
+    InvalidProgramException,
+    UnsupportedException,
+)
 
 
 class ContractTranslator(CommonTranslator):

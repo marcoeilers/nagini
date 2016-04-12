@@ -5,25 +5,19 @@ from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
-    Stmt,
-    TranslatorConfig
+    Stmt
 )
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonExceptionHandler,
+from py2viper_translation.constants import PRIMITIVES
+from py2viper_translation.containers import (
     PythonField,
     PythonMethod,
     PythonProgram,
-    PythonTryBlock,
     PythonVar
 )
-from py2viper_translation.constants import BUILTINS, PRIMITIVES
 from py2viper_translation.util import (
-    flatten,
-    get_func_name,
     InvalidProgramException
 )
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import List, Tuple
 
 
 class ProgramTranslator(CommonTranslator):

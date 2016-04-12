@@ -4,17 +4,15 @@ from py2viper_translation.abstract_translator import (
     Expr,
     CommonTranslator,
     Context,
-    StmtsAndExpr,
     Stmt
 )
-from py2viper_translation.analyzer import (
-    PythonClass,
+from py2viper_translation.constants import PRIMITIVES
+from py2viper_translation.containers import (
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
     PythonVar
 )
-from py2viper_translation.constants import PRIMITIVES
 from py2viper_translation.util import (
     flatten,
     get_all_fields,

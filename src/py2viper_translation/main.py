@@ -1,5 +1,4 @@
 import argparse
-import ast
 import inspect
 import json
 import os
@@ -7,19 +6,20 @@ import sys
 import traceback
 
 from jpype import JavaException
+
 from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
+from py2viper_translation.containers import ContainerFactory
 from py2viper_translation.jvmaccess import JVM
 from py2viper_translation.translator import Translator
 from py2viper_translation.typeinfo import TypeException, TypeInfo
+from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.verifier import (
     Carbon,
-    Failure,
     Silicon,
     VerificationResult,
     ViperVerifier
 )
-from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.viper_ast import ViperAST
 
 
@@ -56,7 +56,8 @@ def translate(path: str, jvm: JVM):
     modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    analyzer = Analyzer(jvm, viperast, types, path)
+    container_factory = ContainerFactory()
+    analyzer = Analyzer(jvm, viperast, types, path, container_factory)
     for si in sil_interface:
         analyzer.add_interface(json.loads(si))
     for module in analyzer.modules:

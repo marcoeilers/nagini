@@ -4,15 +4,14 @@ from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import PythonMethod, PythonVar
+from py2viper_translation.containers import PythonMethod, PythonVar
 from py2viper_translation.util import (
     flatten,
     InvalidProgramException,
-    UnsupportedException
+    UnsupportedException,
 )
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Union
 
 
 class AssignWrapper:
@@ -131,7 +130,8 @@ class PureTranslator(CommonTranslator):
         of wrappers.
         """
         # Translate to wrapper objects
-        wrappers = flatten([self.translate_pure([], node, ctx) for node in nodes])
+        wrappers = flatten([self.translate_pure([], node, ctx)
+                            for node in nodes])
         previous = None
         added = {}
         # First walk through wrappers. For every assignment, we create a new

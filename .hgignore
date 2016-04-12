@@ -9,5 +9,7 @@ __pycache__
 .mr.developer.cfg
 *.egg-info
 *.egg-link
+eggs/
 tmp
 docs/build
+.idea

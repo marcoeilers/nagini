@@ -3,23 +3,16 @@ import ast
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
-    Expr,
     Stmt,
-    TranslatorConfig
-)
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonMethod,
-    PythonTryBlock,
-    PythonVar,
 )
 from py2viper_translation.util import (
+    flatten,
     get_func_name,
     get_surrounding_try_blocks,
-    flatten,
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException,
 )
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import List
 
 
 class StatementTranslator(CommonTranslator):

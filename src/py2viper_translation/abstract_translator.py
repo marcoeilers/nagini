@@ -1,8 +1,7 @@
 import ast
-import copy
 
 from abc import ABCMeta
-from py2viper_translation.analyzer import (
+from py2viper_translation.containers import (
     PythonClass,
     PythonMethod,
     PythonTryBlock,

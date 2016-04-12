@@ -1,26 +1,25 @@
 import ast
 
+from py2viper_contracts.contracts import (
+    CONTRACT_FUNCS,
+    CONTRACT_WRAPPER_FUNCS
+)
 from py2viper_translation.abstract_translator import (
     CommonTranslator,
     Context,
     Expr,
     Stmt,
     StmtsAndExpr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
 from py2viper_translation.constants import BUILTINS
-from py2viper_contracts.contracts import (
-    CONTRACT_FUNCS,
-    CONTRACT_WRAPPER_FUNCS
-)
+from py2viper_translation.containers import PythonClass, PythonMethod
 from py2viper_translation.util import (
     get_all_fields,
     get_func_name,
     InvalidProgramException,
     is_two_arg_super_call
 )
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List
 
 
 class CallTranslator(CommonTranslator):
