@@ -13,3 +13,4 @@ eggs/
 tmp
 docs/build
 .idea
+*.pyc
