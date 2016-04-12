@@ -1,7 +1,7 @@
 import ast
 
-from py2viper_translation.abstract_translator import Context, Expr
-from py2viper_translation.viper_ast import ViperAST
+from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.translators.abstract import Context, Expr
 from typing import List, Tuple
 
 

@@ -3,17 +3,14 @@ import os
 import pytest
 import re
 import tokenize
-import glob
-
 
 from os.path import isfile, join
-from py2viper_translation import config, jvmaccess
+from py2viper_translation.lib import config, jvmaccess
+from py2viper_translation.lib.typeinfo import TypeException
+from py2viper_translation.lib.util import InvalidProgramException, flatten
 from py2viper_translation.main import translate, verify
-from py2viper_translation.typeinfo import TypeException
-from py2viper_translation.util import InvalidProgramException, flatten
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
 from typing import List, Tuple
-
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'

@@ -1,21 +1,21 @@
 import ast
 
 from collections import OrderedDict
-from py2viper_translation.abstract_translator import (
-    CommonTranslator,
-    Context,
-    Expr,
-    Stmt
-)
-from py2viper_translation.constants import PRIMITIVES
-from py2viper_translation.containers import (
+from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.containers import (
     PythonField,
     PythonMethod,
     PythonProgram,
     PythonVar
 )
-from py2viper_translation.util import (
+from py2viper_translation.lib.util import (
     InvalidProgramException
+)
+from py2viper_translation.translators.abstract import (
+    CommonTranslator,
+    Context,
+    Expr,
+    Stmt
 )
 from typing import List, Tuple
 

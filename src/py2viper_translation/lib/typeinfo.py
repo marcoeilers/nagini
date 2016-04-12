@@ -1,10 +1,9 @@
-import os
-import sys
 import mypy.build
+import sys
 
 from mypy.build import BuildSource
-from py2viper_translation import config
-from py2viper_translation.constants import LITERALS
+from py2viper_translation.lib import config
+from py2viper_translation.lib.constants import LITERALS
 from typing import List
 
 
@@ -77,8 +76,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if self.type_equals(t1.ret_type, t2.ret_type):
                 all_eq = True
                 for arg1, arg2 in zip(t1.arg_types, t2.arg_types):
-                    arg1 = t1.arg_types[i]
-                    arg2 = t2.arg_types[i]
                     all_eq = all_eq and self.type_equals(arg1, arg2)
                 return all_eq
         return t1 == t2

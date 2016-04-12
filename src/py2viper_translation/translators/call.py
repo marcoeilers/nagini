@@ -4,20 +4,20 @@ from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.constants import BUILTINS
+from py2viper_translation.lib.containers import PythonClass, PythonMethod
+from py2viper_translation.lib.util import (
+    get_all_fields,
+    get_func_name,
+    InvalidProgramException,
+    is_two_arg_super_call
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
     Stmt,
     StmtsAndExpr,
-)
-from py2viper_translation.constants import BUILTINS
-from py2viper_translation.containers import PythonClass, PythonMethod
-from py2viper_translation.util import (
-    get_all_fields,
-    get_func_name,
-    InvalidProgramException,
-    is_two_arg_super_call
 )
 from typing import List
 

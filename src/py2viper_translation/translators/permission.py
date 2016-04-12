@@ -1,13 +1,13 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
-)
-from py2viper_translation.util import (
-    InvalidProgramException,
-    UnsupportedException,
 )
 
 
