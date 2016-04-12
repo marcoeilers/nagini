@@ -1,16 +1,16 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.util import (
+    get_func_name,
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
     StmtsAndExpr,
-)
-from py2viper_translation.util import (
-    get_func_name,
-    InvalidProgramException,
-    UnsupportedException,
 )
 
 

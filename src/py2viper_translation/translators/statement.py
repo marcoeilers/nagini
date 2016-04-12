@@ -1,16 +1,17 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
-    CommonTranslator,
-    Context,
-    Stmt,
-)
-from py2viper_translation.util import (
+
+from py2viper_translation.lib.util import (
     flatten,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException,
+)
+from py2viper_translation.translators.abstract import (
+    CommonTranslator,
+    Context,
+    Stmt,
 )
 from typing import List
 

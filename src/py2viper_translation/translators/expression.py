@@ -1,20 +1,20 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.containers import (
+    PythonTryBlock,
+    PythonVar
+)
+from py2viper_translation.lib.util import (
+    get_surrounding_try_blocks,
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
     StmtsAndExpr,
     Stmt
-)
-from py2viper_translation.containers import (
-    PythonTryBlock,
-    PythonVar
-)
-from py2viper_translation.util import (
-    get_surrounding_try_blocks,
-    InvalidProgramException,
-    UnsupportedException,
 )
 from typing import List, Optional
 

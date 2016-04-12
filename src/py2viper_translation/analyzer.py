@@ -1,9 +1,12 @@
 import ast
-import mypy
 import os
-
 from collections import OrderedDict
-from py2viper_translation.containers import (
+
+import mypy
+from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_translation.lib.ast_util import mark_text_ranges
+from py2viper_translation.lib.constants import LITERALS
+from py2viper_translation.lib.containers import (
     PythonClass,
     PythonExceptionHandler,
     PythonProgram,
@@ -11,12 +14,8 @@ from py2viper_translation.containers import (
     PythonVar,
     ContainerFactory,
     PythonMethod)
-from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from py2viper_translation import astpp
-from py2viper_translation.ast_util import mark_text_ranges
-from py2viper_translation.constants import LITERALS
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import get_func_name, UnsupportedException
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import get_func_name, UnsupportedException
 from typing import Dict
 
 

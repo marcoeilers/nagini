@@ -1,25 +1,25 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.analyzer import PythonProgram, PythonVar
+from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.type_domain_factory import TypeDomainFactory
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.translators.abstract import (
     Context,
     Expr,
     TranslatorConfig,
 )
-from py2viper_translation.analyzer import PythonProgram, PythonVar
-from py2viper_translation.call_translator import CallTranslator
-from py2viper_translation.contract_translator import ContractTranslator
-from py2viper_translation.expression_translator import ExpressionTranslator
-from py2viper_translation.jvmaccess import JVM
-from py2viper_translation.method_translator import MethodTranslator
-from py2viper_translation.perm_translator import PermTranslator
-from py2viper_translation.predicate_translator import PredicateTranslator
-from py2viper_translation.program_translator import ProgramTranslator
-from py2viper_translation.pure_translator import PureTranslator
-from py2viper_translation.statement_translator import StatementTranslator
-from py2viper_translation.type_domain_factory import TypeDomainFactory
-from py2viper_translation.type_translator import TypeTranslator
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.viper_ast import ViperAST
+from py2viper_translation.translators.call import CallTranslator
+from py2viper_translation.translators.contract import ContractTranslator
+from py2viper_translation.translators.expression import ExpressionTranslator
+from py2viper_translation.translators.method import MethodTranslator
+from py2viper_translation.translators.permission import PermTranslator
+from py2viper_translation.translators.predicate import PredicateTranslator
+from py2viper_translation.translators.program import ProgramTranslator
+from py2viper_translation.translators.pure import PureTranslator
+from py2viper_translation.translators.statement import StatementTranslator
+from py2viper_translation.translators.type import TypeTranslator
 from typing import List
 
 
@@ -39,7 +39,8 @@ class Translator:
                                                 type_info, viper_ast)
         config.call_translator = CallTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
-        config.contract_translator = ContractTranslator(config, jvm, source_file,
+        config.contract_translator = ContractTranslator(config, jvm,
+                                                        source_file,
                                                         type_info, viper_ast)
         config.expr_translator = ExpressionTranslator(config, jvm, source_file,
                                                       type_info, viper_ast)

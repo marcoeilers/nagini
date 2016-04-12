@@ -6,21 +6,20 @@ import sys
 import traceback
 
 from jpype import JavaException
-
-from py2viper_translation import config
 from py2viper_translation.analyzer import Analyzer
-from py2viper_translation.containers import ContainerFactory
-from py2viper_translation.jvmaccess import JVM
+from py2viper_translation.lib import config
+from py2viper_translation.lib.containers import ContainerFactory
+from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
+from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translator import Translator
-from py2viper_translation.typeinfo import TypeException, TypeInfo
-from py2viper_translation.util import InvalidProgramException
 from py2viper_translation.verifier import (
     Carbon,
     Silicon,
     VerificationResult,
     ViperVerifier
 )
-from py2viper_translation.viper_ast import ViperAST
 
 
 def parse_sil_file(sil_path: str, jvm):

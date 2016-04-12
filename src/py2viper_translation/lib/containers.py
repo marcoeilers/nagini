@@ -2,9 +2,9 @@ import ast
 import mypy
 
 from collections import OrderedDict
-from py2viper_translation.constants import PRIMITIVES
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import UnsupportedException
+from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import UnsupportedException
 from typing import List, Optional
 
 

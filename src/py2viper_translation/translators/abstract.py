@@ -1,20 +1,21 @@
 import ast
 
 from abc import ABCMeta
-from py2viper_translation.containers import (
+from py2viper_translation.lib.containers import (
     PythonClass,
     PythonMethod,
     PythonTryBlock,
     PythonVar
 )
-from py2viper_translation.jvmaccess import JVM
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import (
+from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     UnsupportedException
 )
-from py2viper_translation.viper_ast import ViperAST
+from py2viper_translation.lib.viper_ast import ViperAST
 from typing import List, Tuple
+
 
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'

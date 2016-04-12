@@ -1,24 +1,24 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
-    Expr,
-    CommonTranslator,
-    Context,
-    Stmt
-)
-from py2viper_translation.constants import PRIMITIVES
-from py2viper_translation.containers import (
+from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.containers import (
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
     PythonVar
 )
-from py2viper_translation.util import (
+from py2viper_translation.lib.util import (
     flatten,
     get_all_fields,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException
+)
+from py2viper_translation.translators.abstract import (
+    Expr,
+    CommonTranslator,
+    Context,
+    Stmt
 )
 from typing import List, Tuple
 
