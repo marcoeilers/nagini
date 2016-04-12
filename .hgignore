@@ -1,0 +1,15 @@
+syntax: glob
+env
+bin
+deps/JPype1
+__pycache__
+.virtualenv
+.cache
+.installed.cfg
+.mr.developer.cfg
+*.egg-info
+*.egg-link
+eggs/
+tmp
+docs/build
+.idea
