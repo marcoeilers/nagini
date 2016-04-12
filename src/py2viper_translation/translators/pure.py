@@ -2,7 +2,7 @@ import ast
 
 from typing import Dict, List, Union
 
-from py2viper_translation.lib.containers import PythonMethod, PythonVar
+from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
 from py2viper_translation.lib.util import (
     flatten,
     InvalidProgramException,

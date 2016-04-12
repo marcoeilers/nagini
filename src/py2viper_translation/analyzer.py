@@ -1,19 +1,20 @@
 import ast
-import os
-from collections import OrderedDict
-
 import mypy
+import os
+
+from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.lib.ast_util import mark_text_ranges
+from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS
-from py2viper_translation.lib.containers import (
+from py2viper_translation.lib.program_nodes import (
+    ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
     PythonProgram,
     PythonTryBlock,
     PythonVar,
-    ContainerFactory,
-    PythonMethod)
+    PythonMethod,
+)
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import get_func_name, UnsupportedException
 from typing import Dict
@@ -25,7 +26,7 @@ class Analyzer(ast.NodeVisitor):
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str, container_factory: ContainerFactory):
+                 path: str, node_factory: ProgramNodeFactory):
         self.viper = viperast
         self.java = jvm.java
         self.scala = jvm.scala
@@ -37,7 +38,7 @@ class Analyzer(ast.NodeVisitor):
         self.contract_only = False
         self.modules = [os.path.abspath(path)]
         self.asts = {}
-        self.container_factory = container_factory
+        self.node_factory = node_factory
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -101,13 +102,13 @@ class Analyzer(ast.NodeVisitor):
 
     def _add_interface_method(self, method_name, if_method, cls, pure):
         method = PythonMethod(method_name, None, cls, self.program,
-                              pure, False, self.container_factory, True)
+                              pure, False, self.node_factory, True)
         method.args = OrderedDict()
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
-            arg = self.container_factory.create_python_var(name, None,
-                self.get_class(arg_type))
+            arg = self.node_factory.create_python_var(name, None,
+                                                      self.get_class(arg_type))
             ctr += 1
             method.args[name] = arg
         if if_method['type']:
@@ -184,9 +185,9 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            func = self.container_factory.create_python_method(name, node,
+            func = self.node_factory.create_python_method(name, node,
                 self.current_class, scope_container, self.is_pure(node),
-                self.contract_only, self.container_factory)
+                self.contract_only, self.node_factory)
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
@@ -203,8 +204,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         self.current_function.args[node.arg] = \
-            self.container_factory.create_python_var(node.arg, node,
-                                                     self.typeof(node))
+            self.node_factory.create_python_var(node.arg, node,
+                                                self.typeof(node))
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
         if var is None:
@@ -257,8 +258,8 @@ class Analyzer(ast.NodeVisitor):
                 if isinstance(node.ctx, ast.Store):
                     type = self.types.get_type([], node.id)
                     cls = self.get_class(type.name())
-                    var = self.container_factory.create_python_var(node.id,
-                                                                   node, cls)
+                    var = self.node_factory.create_python_var(node.id,
+                                                              node, cls)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):
@@ -283,8 +284,8 @@ class Analyzer(ast.NodeVisitor):
                 elif node.id in self.current_function.args:
                     pass
                 else:
-                    var = self.container_factory.create_python_var(node.id,
-                        node, self.typeof(node))
+                    var = self.node_factory.create_python_var(node.id,
+                                                              node, self.typeof(node))
                     self.current_function.locals[node.id] = var
                 self.track_access(node, var)
 
@@ -337,7 +338,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function is not None
         self.visit_default(node)
         try_name = self.current_function.get_fresh_name('try')
-        try_block = PythonTryBlock(node, try_name, self.container_factory,
+        try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
         node.sil_name = try_name
         for handler in node.handlers:

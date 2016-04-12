@@ -215,7 +215,7 @@ class PythonMethod(PythonNode, PythonScope):
     def __init__(self, name: str, node: ast.AST, cls: PythonClass,
                  superscope: PythonScope,
                  pure: bool, contract_only: bool,
-                 container_factory: 'ContainerFactory',
+                 node_factory: 'ProgramNodeFactory',
                  interface: bool = False):
         """
         :param cls: Class this method belongs to, if any.
@@ -244,7 +244,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
-        self.container_factory = container_factory
+        self.node_factory = node_factory
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -295,7 +295,7 @@ class PythonMethod(PythonNode, PythonScope):
         all necessary processing/initialization
         """
         sil_name = self.get_fresh_name(name)
-        result = self.container_factory.create_python_var(sil_name, None, cls)
+        result = self.node_factory.create_python_var(sil_name, None, cls)
         result.process(sil_name, translator)
         self.locals[sil_name] = result
         return result
@@ -329,11 +329,11 @@ class PythonTryBlock(PythonNode):
     """
 
     def __init__(self, node: ast.AST, try_name: str,
-                 container_factory: 'ContainerFactory',
+                 node_factory: 'ProgramNodeFactory',
                  method: PythonMethod,
                  protected_region: ast.AST):
         """
-        :param container_factory: Factory to create PythonVar objects.
+        :param node_factory: Factory to create PythonVar objects.
         :param method: Method this block is in
         :param protected_region: Statements protected by the try
         """
@@ -345,7 +345,7 @@ class PythonTryBlock(PythonNode):
         self.finally_var = None
         self.error_var = None
         self.method = method
-        self.container_factory = container_factory
+        self.node_factory = node_factory
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
         """
@@ -360,8 +360,8 @@ class PythonTryBlock(PythonNode):
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
         bool_type = self.method.get_program().classes['int']
-        result = self.container_factory.create_python_var(sil_name, None,
-                                                          bool_type)
+        result = self.node_factory.create_python_var(sil_name, None,
+                                                     bool_type)
         result.process(sil_name, translator)
         self.method.locals[sil_name] = result
         self.finally_var = result
@@ -376,8 +376,8 @@ class PythonTryBlock(PythonNode):
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
         exc_type = self.method.get_program().classes['Exception']
-        result = self.container_factory.create_python_var(sil_name, None,
-                                                          exc_type)
+        result = self.node_factory.create_python_var(sil_name, None,
+                                                     exc_type)
         result.process(sil_name, translator)
         self.method.locals[sil_name] = result
         self.error_var = result
@@ -437,9 +437,9 @@ class PythonField(PythonNode):
         return self.name.startswith('__') and not self.name.endswith('__')
 
 
-class ContainerFactory:
+class ProgramNodeFactory:
     """
-    Factory to create Python Containers.
+    Factory to create Python ProgramNodes.
     
     TODO: Add more interfaces for other types of containers if needed.
     """
@@ -450,7 +450,7 @@ class ContainerFactory:
     def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
                              superscope: PythonScope,
                              pure: bool, contract_only: bool,
-                             container_factory: 'ContainerFactory',
+                             container_factory: 'ProgramNodeFactory',
                              interface: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface)
