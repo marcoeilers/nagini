@@ -8,8 +8,8 @@ import traceback
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
-from py2viper_translation.lib.containers import ContainerFactory
 from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.viper_ast import ViperAST
@@ -55,8 +55,8 @@ def translate(path: str, jvm: JVM):
     modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    container_factory = ContainerFactory()
-    analyzer = Analyzer(jvm, viperast, types, path, container_factory)
+    node_factory = ProgramNodeFactory()
+    analyzer = Analyzer(jvm, viperast, types, path, node_factory)
     for si in sil_interface:
         analyzer.add_interface(json.loads(si))
     for module in analyzer.modules:

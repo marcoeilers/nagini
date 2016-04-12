@@ -2,7 +2,7 @@ import ast
 
 from collections import OrderedDict
 from py2viper_translation.lib.constants import PRIMITIVES
-from py2viper_translation.lib.containers import (
+from py2viper_translation.lib.program_nodes import (
     PythonField,
     PythonMethod,
     PythonProgram,

@@ -1,7 +1,7 @@
 import ast
 
 from py2viper_translation.lib.util import InvalidProgramException
-from py2viper_translation.lib.containers import PythonMethod
+from py2viper_translation.lib.program_nodes import PythonMethod
 from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,

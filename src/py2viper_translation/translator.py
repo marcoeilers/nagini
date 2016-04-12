@@ -1,8 +1,9 @@
 import ast
 
+from typing import List
+
 from py2viper_translation.analyzer import PythonProgram, PythonVar
 from py2viper_translation.lib.jvmaccess import JVM
-from py2viper_translation.lib.type_domain_factory import TypeDomainFactory
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (
@@ -20,7 +21,7 @@ from py2viper_translation.translators.program import ProgramTranslator
 from py2viper_translation.translators.pure import PureTranslator
 from py2viper_translation.translators.statement import StatementTranslator
 from py2viper_translation.translators.type import TypeTranslator
-from typing import List
+from py2viper_translation.translators.type_domain_factory import TypeDomainFactory
 
 
 class Translator:

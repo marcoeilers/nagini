@@ -2,7 +2,7 @@ import ast
 
 from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_translation.lib.constants import BUILTINS
-from py2viper_translation.lib.containers import PythonClass
+from py2viper_translation.lib.program_nodes import PythonClass
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
