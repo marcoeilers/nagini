@@ -49,7 +49,8 @@ class PythonScope:
 
 
 class PythonProgram(PythonScope):
-    def __init__(self, types: TypeInfo) -> None:
+    def __init__(self, types: TypeInfo,
+                 node_factory: 'ProgramNodeFactory') -> None:
         super().__init__([], None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
@@ -58,7 +59,7 @@ class PythonProgram(PythonScope):
         self.global_vars = OrderedDict()
         self.types = types
         for primitive in PRIMITIVES:
-            self.classes[primitive] = PythonClass(primitive, self)
+            self.classes[primitive] = PythonClass(primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():
@@ -94,7 +95,8 @@ class PythonClass(PythonNode, PythonScope):
     Represents a class in the Python program.
     """
 
-    def __init__(self, name: str, superscope: PythonScope, node: ast.AST = None,
+    def __init__(self, name: str, superscope: PythonScope,
+                 node_factory: 'ProgramNodeFactory', node: ast.AST = None,
                  superclass: 'PythonClass' = None, interface=False):
         """
         :param superscope: The scope, usually program, this belongs to.
@@ -103,6 +105,7 @@ class PythonClass(PythonNode, PythonScope):
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, [], superscope)
+        self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -121,7 +124,8 @@ class PythonClass(PythonNode, PythonScope):
             field = self.fields[name]
             assert field.type == type
         else:
-            field = PythonField(name, node, type, self)
+            field = self.node_factory.create_python_field(name, node,
+                                                          type, self)
             self.fields[name] = field
         return field
 
@@ -178,6 +182,31 @@ class PythonClass(PythonNode, PythonScope):
             return self.superclass.get_predicate(name)
         else:
             return None
+
+    def get_all_fields(self) -> List['PythonField']:
+        fields = []
+        cls = self
+        while cls is not None:
+            for field in cls.fields.values():
+                if field.inherited is None:
+                    fields.append(field)
+            cls = cls.superclass
+
+        return fields
+
+    def get_all_sil_fields(self) -> List['silver.ast.Field']:
+        """
+        Returns a list of fields defined in the given class or its superclasses.
+        """
+        fields = []
+        cls = self
+        while cls is not None:
+            for field in cls.fields.values():
+                if field.inherited is None:
+                    fields.append(field.sil_field)
+            cls = cls.superclass
+
+        return fields
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -257,8 +286,6 @@ class PythonMethod(PythonNode, PythonScope):
             self.args[arg].process(self.get_fresh_name(arg), translator)
         if self.interface:
             return
-        scope_prefix = self.get_scope_prefix()
-        print("Scope-Prefix: " + str(scope_prefix))
         func_type = self.get_program().types.get_func_type(
             self.get_scope_prefix())
         if isinstance(func_type, mypy.types.Void):
@@ -393,6 +420,8 @@ class PythonVar(PythonNode):
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
         self.type = type
+        self.decl = None
+        self.ref = None
         self.writes = []
         self.reads = []
 
@@ -421,8 +450,20 @@ class PythonField(PythonNode):
         self.cls = cls
         self.inherited = None  # infer
         self.type = type
+        self._sil_field = None
         self.reads = []  # direct
         self.writes = []  # direct
+
+    @property
+    def sil_field(self) -> 'silver.ast.Field':
+        return self._sil_field
+
+    @sil_field.setter
+    def sil_field(self, field: 'silver.ast.Field'):
+        self._set_sil_field(field)
+
+    def _set_sil_field(self, field: 'silver.ast.Field'):
+        self._sil_field = field
 
     def process(self, sil_name: str) -> None:
         """
@@ -454,3 +495,15 @@ class ProgramNodeFactory:
                              interface: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface)
+
+    def create_python_field(self, name: str, node: ast.AST, type_: PythonClass,
+                            cls: PythonClass) -> PythonField:
+        return PythonField(name, node, type_, cls)
+
+    def create_python_class(self, name: str, superscope: PythonScope,
+                            node_factory: 'ProgramNodeFactory',
+                            node: ast.AST = None,
+                            superclass: PythonClass = None,
+                            interface=False):
+        return PythonClass(name, superscope, node_factory, node,
+                           superclass, interface)

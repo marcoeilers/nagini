@@ -57,12 +57,29 @@ class ContractTranslator(CommonTranslator):
                                           self.to_position(node, ctx),
                                           self.no_info(ctx)))
 
+    def _get_perm(self, node: ast.Call, ctx: Context) -> Expr:
+        """
+        Returns the permission for a Acc() contract function.
+        """
+        # only one argument means implicit full permission
+        if len(node.args) == 1:
+            perm = self.viper.FullPerm(self.to_position(node, ctx),
+                                       self.no_info(ctx))
+        elif len(node.args) == 2:
+            perm = self.translate_perm(node.args[1], ctx)
+        else:
+            # more than two arguments are invalid
+            raise InvalidProgramException(node, 'invalid.contract.call')
+
+        return perm
+
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Acc() contract function with a predicate call
         inside to a predicate access.
         """
+        assert isinstance(node.args[0], ast.Call)
         call = node.args[0]
         # the predicate inside is a function call in python.
         args = []
@@ -94,23 +111,9 @@ class ContractTranslator(CommonTranslator):
         return [], self.create_predicate_access(pred_name, args, perm,
                                                 node, ctx)
 
-    def translate_acc(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """
-        Translates a call to the Acc() contract function, whether there is
-        a field inside or a predicate.
-        """
-        # only one argument means implicit full permission
-        if len(node.args) == 1:
-            perm = self.viper.FullPerm(self.to_position(node, ctx),
-                                       self.no_info(ctx))
-        elif len(node.args) == 2:
-            perm = self.translate_perm(node.args[1], ctx)
-        else:
-            # more than two arguments are invalid
-            raise InvalidProgramException(node, 'invalid.contract.call')
-        if isinstance(node.args[0], ast.Call):
-            # this is a predicate.
-            return self.translate_acc_predicate(node, perm, ctx)
+    def translate_acc_field(self, node: ast.Call, perm: Expr,
+                            ctx: Context) -> StmtsAndExpr:
+        assert isinstance(node.args[0], ast.Attribute)
         stmt, fieldacc = self.translate_expr(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
@@ -140,7 +143,7 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.call')
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx), self.no_info(ctx))
-        return (stmt, res)
+        return stmt, res
 
     def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -191,7 +194,11 @@ class ContractTranslator(CommonTranslator):
         if func_name == 'Result':
             return self.translate_result(node, ctx)
         elif func_name == 'Acc':
-            return self.translate_acc(node, ctx)
+            perm = self._get_perm(node, ctx)
+            if isinstance(node.args[0], ast.Call):
+                return self.translate_acc_predicate(node, perm, ctx)
+            else:
+                return self.translate_acc_field(node, perm, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx)
         elif func_name == 'Old':

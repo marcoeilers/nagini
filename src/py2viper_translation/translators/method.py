@@ -9,16 +9,16 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.util import (
     flatten,
-    get_all_fields,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException
 )
 from py2viper_translation.translators.abstract import (
-    Expr,
     CommonTranslator,
     Context,
-    Stmt
+    Expr,
+    Stmt,
+    VarDecl,
 )
 from typing import List, Tuple
 
@@ -172,6 +172,43 @@ class MethodTranslator(CommonTranslator):
             accs.append(pred)
         return accs
 
+    def _get_results(self, method: PythonMethod,
+                     ctx: Context) -> List['viper.ast.LocalVarDecl']:
+        """
+        Returns a list of LocalVarDecls for the results of a method.
+        """
+        results = []
+        if method.type is not None:
+            type_ = self.translate_type(method.type, ctx)
+            results.append(self.viper.LocalVarDecl('_res', type_,
+                                                   self.to_position(
+                                                       method.node, ctx),
+                                                   self.no_info(ctx)))
+        return results
+
+    def _get_method_args(self, method: PythonMethod,
+                         ctx: Context) -> List[VarDecl]:
+        args = []
+        for arg in method.args.values():
+            args.append(arg.decl)
+
+        return args
+
+    def _handle_init(self, method: PythonMethod, ctx: Context) -> List[Expr]:
+        """
+        Generates preconditions specific to the '__init__' method.
+        """
+        self_var = method.args[next(iter(method.args))].ref
+        fields = method.cls.get_all_sil_fields()
+        accs = self.get_all_field_accs(fields, self_var,
+                                       self.to_position(method.node, ctx),
+                                       ctx)
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        return [not_null] + accs
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -180,13 +217,7 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
-        results = []
-        if method.type is not None:
-            type = self.translate_type(method.type, ctx)
-            results.append(self.viper.LocalVarDecl('_res', type,
-                                                   self.to_position(
-                                                       method.node, ctx),
-                                                   self.no_info(ctx)))
+        results = self._get_results(method, ctx)
         error_var_decl = self.viper.LocalVarDecl('_err', self.viper.Ref,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
@@ -196,20 +227,12 @@ class MethodTranslator(CommonTranslator):
         method.error_var = error_var_ref
         pres, posts = self.extract_contract(method, '_err', False, ctx)
         if method.cls and method.name == '__init__':
-            self_var = method.args[next(iter(method.args))].ref
-            fields = get_all_fields(method.cls)
-            accs = self.get_all_field_accs(fields, self_var,
-                                           self.to_position(method.node, ctx),
-                                           ctx)
-            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-            not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
-                                        self.no_info(ctx))
-            pres = [not_null] + accs + pres
+            init_pres = self._handle_init(method, ctx)
+            pres = init_pres + pres
         if method.declared_exceptions:
             results.append(error_var_decl)
-        args = []
-        for arg in method.args:
-            args.append(method.args[arg].decl)
+
+        args = self._get_method_args(method, ctx)
 
         statements = method.node.body
         body_index = self.get_body_start_index(statements)
