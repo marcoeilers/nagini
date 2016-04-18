@@ -48,10 +48,7 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.current_function.type
         if not ctx.current_function.pure:
-            return (
-                [], self.viper.LocalVar('_res', self.translate_type(type, ctx),
-                                        self.no_position(ctx),
-                                        self.no_info(ctx)))
+            return [], ctx.current_function.result.ref
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
                                           self.to_position(node, ctx),

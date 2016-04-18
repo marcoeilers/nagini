@@ -2,6 +2,7 @@ import ast
 
 from py2viper_translation.lib.util import UnsupportedException
 from py2viper_translation.sif.lib.context import SIFContext
+from py2viper_translation.sif.lib.program_nodes import SIF_VAR_SUFFIX
 from py2viper_translation.translators.abstract import Stmt
 from py2viper_translation.translators.statement import StatementTranslator
 from typing import List
@@ -21,17 +22,32 @@ class SIFStatementTranslator(StatementTranslator):
         
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
-        # Create aliases dict.
-        all_vars = ctx.get_all_vars()
-        ctx.var_aliases = {k: v.var_prime for (k, v) in all_vars}
         ctx.use_prime = True
         # Translate assignment for prime variables.
         stmts += super().translate_stmt_Assign(node, ctx)
-        # Reset alias dict.
-        ctx.var_aliases = {}
         ctx.use_prime = False
 
         return stmts
+
+    def _handle_return(self, node: ast.Return, ctx: SIFContext) -> List[Stmt]:
+        if isinstance(node.value, ast.Call):
+            raise UnsupportedException(node)
+
+        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        ctx.use_prime = True
+        rhs_stmt_p, rhs_p = self.translate_expr(node.value, ctx)
+        sil_type = self.translate_type(ctx.current_function.type, ctx)
+        assign = self.viper.LocalVarAssign(
+            self.viper.LocalVar('_res', sil_type,
+                                self.no_position(ctx), self.no_info(ctx)),
+            rhs, self.to_position(node, ctx), self.no_info(ctx))
+        assign_p = self.viper.LocalVarAssign(
+            self.viper.LocalVar('_res' + SIF_VAR_SUFFIX, sil_type,
+                                self.no_position(ctx), self.no_info(ctx)),
+            rhs_p, self.to_position(node, ctx), self.no_info(ctx))
+
+        return rhs_stmt + [assign] + rhs_stmt_p + [assign_p]
+
 
 
 
