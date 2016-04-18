@@ -165,15 +165,14 @@ def main() -> None:
             backend = ViperVerifier.carbon
         else:
             raise ValueError('Unknown verifier specified: ' + args.backend)
-        if True:
-            vresult = verify(prog, python_file, jvm, backend=backend)
-            if args.verbose:
-                print("Verification completed.")
-            print(vresult)
-            if vresult:
-                sys.exit(0)
-            else:
-                sys.exit(1)
+        vresult = verify(prog, python_file, jvm, backend=backend)
+        if args.verbose:
+            print("Verification completed.")
+        print(vresult)
+        if vresult:
+            sys.exit(0)
+        else:
+            sys.exit(1)
     except (TypeException, InvalidProgramException) as e:
         print("Translation failed")
         if isinstance(e, InvalidProgramException):

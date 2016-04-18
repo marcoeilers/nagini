@@ -184,15 +184,20 @@ class StatementTranslator(CommonTranslator):
                                  self.to_position(node, ctx),
                                  self.no_info(ctx))]
 
-    def translate_stmt_Return(self, node: ast.Return,
-                              ctx: Context) -> List[Stmt]:
-        type = ctx.current_function.type
+    def _handle_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
+        type_ = ctx.current_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
-            self.viper.LocalVar('_res', self.translate_type(type, ctx),
+            self.viper.LocalVar('_res', self.translate_type(type_, ctx),
                                 self.no_position(ctx), self.no_info(ctx)),
             rhs, self.to_position(node, ctx),
             self.no_info(ctx))
+
+        return rhs_stmt + [assign]
+
+    def translate_stmt_Return(self, node: ast.Return,
+                              ctx: Context) -> List[Stmt]:
+        return_stmts = self._handle_return(node, ctx)
         tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
                                            node)
         for try_block in tries:
@@ -201,12 +206,11 @@ class StatementTranslator(CommonTranslator):
                 rhs = self.viper.IntLit(1, self.no_position(ctx),
                                         self.no_info(ctx))
                 finally_assign = self.viper.LocalVarAssign(lhs, rhs,
-                                                           self.no_position(ctx),
-                                                           self.no_info(ctx))
+                    self.no_position(ctx), self.no_info(ctx))
                 jmp = self.viper.Goto(try_block.finally_name,
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
-                return rhs_stmt + [assign, finally_assign, jmp]
+                return return_stmts + [finally_assign, jmp]
         jmp_to_end = self.viper.Goto("__end", self.to_position(node, ctx),
                                      self.no_info(ctx))
-        return rhs_stmt + [assign, jmp_to_end]
+        return return_stmts + [jmp_to_end]

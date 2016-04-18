@@ -265,6 +265,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.locals = OrderedDict()  # direct
         self.args = OrderedDict()  # direct
         self.type = None  # infer
+        self.result = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.precondition = []
         self.postcondition = []
@@ -294,6 +295,10 @@ class PythonMethod(PythonNode, PythonScope):
             self.type = self.get_program().classes[func_type.type.name()]
         else:
             raise UnsupportedException(func_type)
+        if self.type is not None:
+            self.result = self.node_factory.create_python_var("_res", None,
+                                                              self.type)
+            self.result.process("_res", translator)
         if self.cls is not None and self.cls.superclass is not None:
             if self.predicate:
                 self.overrides = self.cls.superclass.get_predicate(self.name)
@@ -326,6 +331,27 @@ class PythonMethod(PythonNode, PythonScope):
         result.process(sil_name, translator)
         self.locals[sil_name] = result
         return result
+
+    def get_locals(self) -> List['PythonVar']:
+        """
+        Returns all method locals as a list of PythonVars.
+        """
+        return list(self.locals.values())
+
+    def get_args(self) -> List['PythonVar']:
+        """
+        Returns all method args as a list of PythonVars.
+        """
+        return list(self.args.values())
+
+    def get_results(self) -> List['PythonVar']:
+        """
+        Returns all results as a list of PythonVars.
+        """
+        if self.result:
+            return [self.result]
+        else:
+            return []
 
 
 class PythonExceptionHandler(PythonNode):

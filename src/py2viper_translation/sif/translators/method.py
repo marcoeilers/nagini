@@ -1,7 +1,14 @@
-from py2viper_translation.lib.program_nodes import PythonMethod
+from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.sif.lib.program_nodes import SIF_VAR_SUFFIX
-from py2viper_translation.translators.abstract import Expr, VarDecl
+from py2viper_translation.sif.lib.program_nodes import (
+    SIFPythonMethod,
+    SIFPythonVar,
+)
+from py2viper_translation.translators.abstract import (
+    DomainFuncApp,
+    Expr,
+    Stmt,
+)
 from py2viper_translation.translators.method import MethodTranslator
 from typing import List
 
@@ -10,36 +17,45 @@ class SIFMethodTranslator(MethodTranslator):
     """
     SIF version of the MethodTranslator.
     """
-    def _get_results(self, method: PythonMethod,
-                     ctx: SIFContext) -> List['viper.ast.LocalVarDecl']:
-        results = []
-        if method.type is not None:
-            type_ = self.translate_type(method.type, ctx)
-            results.append(self.viper.LocalVarDecl("_res", type_,
-                self.to_position(method.node, ctx), self.no_info(ctx)))
-            results.append(self.viper.LocalVarDecl("_res" + SIF_VAR_SUFFIX,
-                type_, self.to_position(method.node, ctx), self.no_info(ctx)))
-        # Add timeLevel to results.
-        results.append(self.viper.LocalVarDecl("newTimeLevel", self.viper.Bool,
-            self.no_position(ctx), self.no_info(ctx)))
+    def _translate_pres(self, method: SIFPythonMethod,
+                        ctx: SIFContext):
+        pres = super()._translate_pres(method, ctx)
+        ctx.use_prime = True
+        pres += super()._translate_pres(method, ctx)
+        ctx.use_prime = False
+        return pres
 
-        return results
+    def _translate_posts(self, method: SIFPythonMethod,
+                         err_var: 'viper.ast.LocalVar',
+                         ctx: SIFContext):
+        posts = super()._translate_posts(method, err_var, ctx)
+        ctx.use_prime = True
+        posts += super()._translate_posts(method, err_var, ctx)
+        ctx.use_prime = False
+        return posts
 
-    def _get_method_args(self, method: PythonMethod,
-                         ctx: SIFContext) -> List[VarDecl]:
-        args = []
-        for arg in method.args.values():
-            args.append(arg.decl)
-            args.append(arg.var_prime.decl)
+    def _create_typeof_pres(self, args: List[SIFPythonVar],
+                            is_constructor: bool,
+                            ctx: SIFContext) -> List[DomainFuncApp]:
+        pres = []
+        for arg in args.values():
+            if not (arg.type.name in PRIMITIVES or
+                        (is_constructor and arg == next(iter(args)))):
+                pres.append(self.get_parameter_typeof(arg, ctx))
+                pres.append(self.get_parameter_typeof(arg.var_prime, ctx))
 
-        # Append timeLevel arg.
-        args.append(self.viper.LocalVarDecl("timeLevel", self.viper.Bool,
+        return pres
+
+    def _create_method_epilog(self, method: SIFPythonMethod,
+                              ctx: SIFContext) -> List[Stmt]:
+        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref,
+                                            method.tl_var.ref,
                                             self.no_position(ctx),
-                                            self.no_info(ctx)))
+                                            self.no_info(ctx))
+        return super()._create_method_epilog(method, ctx) + [tl_stmt]
 
-        return args
-
-    def _handle_init(self, method: PythonMethod, ctx: SIFContext) -> List[Expr]:
+    def _handle_init(self, method: SIFPythonMethod,
+                     ctx: SIFContext) -> List[Expr]:
         self_var = method.args[next(iter(method.args))]
         self_ref = self_var.ref
         self_ref_prime = self_var.var_prime.ref
