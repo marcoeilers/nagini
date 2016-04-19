@@ -19,8 +19,9 @@ from py2viper_translation.translators.program import ProgramTranslator
 from py2viper_translation.translators.pure import PureTranslator
 from py2viper_translation.translators.statement import StatementTranslator
 from py2viper_translation.translators.type import TypeTranslator
-from py2viper_translation.translators.type_domain_factory import \
-    TypeDomainFactory
+from py2viper_translation.translators.type_domain_factory import (
+    TypeDomainFactory,
+)
 from typing import List
 
 class Translator:

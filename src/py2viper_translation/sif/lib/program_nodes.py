@@ -15,30 +15,6 @@ from typing import List
 SIF_VAR_SUFFIX = "_p"
 
 
-class SIFPythonClass(PythonClass):
-    def get_all_fields(self) -> List['SIFPythonField']:
-        fields = []
-        cls = self
-        while cls is not None:
-            for field in cls.fields.values():
-                if field.inherited is None:
-                    fields.append(field)
-            cls = cls.superclass
-
-        return fields
-
-    def get_all_sil_fields(self) -> List['silver.ast.Field']:
-        fields = []
-        cls = self
-        while cls is not None:
-            for field in cls.fields.values():
-                if field.inherited is None:
-                    fields.append(field.sil_field)
-            cls = cls.superclass
-
-        return fields
-
-
 class SIFPythonMethod(PythonMethod):
     """
     SIF version of a PythonMethod.
@@ -99,7 +75,7 @@ class SIFPythonVar(PythonVar):
     """
     SIF version of a PythonVar. Has a reference to the corresponding ghost var.
     """
-    def __init__(self, name: str, node: ast.AST, type_: SIFPythonClass):
+    def __init__(self, name: str, node: ast.AST, type_: PythonClass):
         super().__init__(name, node, type_)
         self.var_prime = PythonVar(name + SIF_VAR_SUFFIX, node, type_)
 
@@ -147,11 +123,3 @@ class SIFProgramNodeFactory(ProgramNodeFactory):
                              interface: bool = False) -> SIFPythonMethod:
         return SIFPythonMethod(name, node, cls, superscope, pure, contract_only,
                                container_factory, interface)
-
-    def create_python_class(self, name: str, superscope: PythonScope,
-                            node_factory: 'SIFProgramNodeFactory',
-                            node: ast.AST = None,
-                            superclass: SIFPythonClass = None,
-                            interface=False):
-        return SIFPythonClass(name, superscope, node_factory, node,
-                              superclass, interface)

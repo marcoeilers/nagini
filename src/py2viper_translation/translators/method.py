@@ -214,7 +214,7 @@ class MethodTranslator(CommonTranslator):
         return [self.viper.Label("__end", self.no_position(ctx),
                                  self.no_info(ctx))]
 
-    def _handle_init(self, method: PythonMethod, ctx: Context) -> List[Expr]:
+    def _create_init_pres(self, method: PythonMethod, ctx: Context) -> List[Expr]:
         """
         Generates preconditions specific to the '__init__' method.
         """
@@ -247,7 +247,7 @@ class MethodTranslator(CommonTranslator):
         method.error_var = error_var_ref
         pres, posts = self.extract_contract(method, '_err', False, ctx)
         if method.cls and method.name == '__init__':
-            init_pres = self._handle_init(method, ctx)
+            init_pres = self._create_init_pres(method, ctx)
             pres = init_pres + pres
         if method.declared_exceptions:
             results.append(error_var_decl)
