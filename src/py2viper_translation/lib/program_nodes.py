@@ -59,7 +59,8 @@ class PythonProgram(PythonScope):
         self.global_vars = OrderedDict()
         self.types = types
         for primitive in PRIMITIVES:
-            self.classes[primitive] = PythonClass(primitive, self, node_factory)
+            self.classes[primitive] = node_factory.create_python_class(
+                primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():

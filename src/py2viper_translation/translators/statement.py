@@ -184,7 +184,7 @@ class StatementTranslator(CommonTranslator):
                                  self.to_position(node, ctx),
                                  self.no_info(ctx))]
 
-    def _handle_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
+    def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
         type_ = ctx.current_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
@@ -197,7 +197,7 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Return(self, node: ast.Return,
                               ctx: Context) -> List[Stmt]:
-        return_stmts = self._handle_return(node, ctx)
+        return_stmts = self._translate_return(node, ctx)
         tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
                                            node)
         for try_block in tries:

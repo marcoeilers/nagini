@@ -29,21 +29,19 @@ class SIFStatementTranslator(StatementTranslator):
 
         return stmts
 
-    def _handle_return(self, node: ast.Return, ctx: SIFContext) -> List[Stmt]:
+    def _translate_return(self, node: ast.Return, ctx: SIFContext) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
             raise UnsupportedException(node)
 
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         ctx.use_prime = True
         rhs_stmt_p, rhs_p = self.translate_expr(node.value, ctx)
-        sil_type = self.translate_type(ctx.current_function.type, ctx)
+        ctx.use_prime = False
         assign = self.viper.LocalVarAssign(
-            self.viper.LocalVar('_res', sil_type,
-                                self.no_position(ctx), self.no_info(ctx)),
+            ctx.current_function.result.ref,
             rhs, self.to_position(node, ctx), self.no_info(ctx))
         assign_p = self.viper.LocalVarAssign(
-            self.viper.LocalVar('_res' + SIF_VAR_SUFFIX, sil_type,
-                                self.no_position(ctx), self.no_info(ctx)),
+            ctx.current_function.result.var_prime.ref,
             rhs_p, self.to_position(node, ctx), self.no_info(ctx))
 
         return rhs_stmt + [assign] + rhs_stmt_p + [assign_p]
