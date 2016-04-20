@@ -32,7 +32,7 @@ class Analyzer(ast.NodeVisitor):
         self.scala = jvm.scala
         self.viper = jvm.viper
         self.types = types
-        self.program = PythonProgram(types)
+        self.program = PythonProgram(types, node_factory)
         self.current_class = None
         self.current_function = None
         self.contract_only = False
@@ -142,7 +142,8 @@ class Analyzer(ast.NodeVisitor):
             if interface:
                 cls.interface = interface
         else:
-            cls = PythonClass(name, self.program, interface=interface)
+            cls = self.node_factory.create_python_class(name, self.program,
+                self.node_factory, interface=interface)
             self.program.classes[name] = cls
         return cls
 

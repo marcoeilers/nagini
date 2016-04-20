@@ -13,6 +13,8 @@ from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.sif.lib.program_nodes import SIFProgramNodeFactory
+from py2viper_translation.sif_translator import SIFTranslator
 from py2viper_translation.translator import Translator
 from py2viper_translation.verifier import (
     Carbon,
@@ -40,7 +42,7 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-def translate(path: str, jvm: JVM):
+def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -55,19 +57,25 @@ def translate(path: str, jvm: JVM):
     modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    node_factory = ProgramNodeFactory()
+    if sif:
+        node_factory = SIFProgramNodeFactory()
+    else:
+        node_factory = ProgramNodeFactory()
     analyzer = Analyzer(jvm, viperast, types, path, node_factory)
     for si in sil_interface:
         analyzer.add_interface(json.loads(si))
     for module in analyzer.modules:
         analyzer.collect_imports(module)
-        typecorrect = types.check(module)
-        if typecorrect:
+        type_correct = types.check(module)
+        if type_correct:
             analyzer.contract_only = module != os.path.abspath(path)
             analyzer.visit_module(module)
         else:
             return None
-    translator = Translator(jvm, path, types, viperast)
+    if sif:
+        translator = SIFTranslator(jvm, path, types, viperast)
+    else:
+        translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
     prog = translator.translate_program(analyzer.program, sil_programs)
     return prog
@@ -128,6 +136,11 @@ def main() -> None:
         help='verifier to be used (carbon or silicon)',
         default='silicon'
     )
+    parser.add_argument(
+        '--sif',
+        action='store_true',
+        help='Verify secure information flow'
+    )
     args = parser.parse_args()
 
     python_file = args.python_file
@@ -139,7 +152,7 @@ def main() -> None:
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
     try:
-        prog = translate(python_file, jvm)
+        prog = translate(python_file, jvm, args.sif)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:

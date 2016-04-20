@@ -123,6 +123,6 @@ def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
         for fieldname in cls.fields:
             field = cls.fields[fieldname]
             if field.inherited is None:
-                fields.append(field.field)
+                fields.append(field.sil_field)
         cls = cls.superclass
     return fields
