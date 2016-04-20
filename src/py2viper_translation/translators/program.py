@@ -163,14 +163,11 @@ class ProgramTranslator(CommonTranslator):
                 raise InvalidProgramException(method.node, 'invalid.override')
 
     def translate_program(self, program: PythonProgram,
-                          sil_progs: List) -> 'silver.ast.Program':
+                          sil_progs: List,
+                          ctx: Context) -> 'silver.ast.Program':
         """
         Translates a PythonProgram created by the analyzer to a Viper program.
         """
-        ctx = Context()
-        ctx.current_class = None
-        ctx.current_function = None
-        ctx.program = program
         domains = []
         fields = []
         functions = []
@@ -197,12 +194,12 @@ class ProgramTranslator(CommonTranslator):
             if class_name in PRIMITIVES:
                 continue
             cls = program.classes[class_name]
-            for fieldname in cls.fields:
-                field = cls.fields[fieldname]
+            for field_name in cls.fields:
+                field = cls.fields[field_name]
                 if field.inherited is None:
-                    silfield = self.translate_field(field, ctx)
-                    field.field = silfield
-                    fields.append(silfield)
+                    sil_field = self.translate_field(field, ctx)
+                    field.sil_field = sil_field
+                    fields.append(sil_field)
 
         for function in program.functions.values():
             functions.append(self.translate_function(function, ctx))
