@@ -9,7 +9,8 @@ from py2viper_translation.lib.program_nodes import PythonClass, PythonMethod
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
-    is_two_arg_super_call
+    is_two_arg_super_call,
+    UnsupportedException,
 )
 from py2viper_translation.translators.abstract import (
     CommonTranslator,
@@ -18,7 +19,7 @@ from py2viper_translation.translators.abstract import (
     Stmt,
     StmtsAndExpr,
 )
-from typing import List
+from typing import List, Tuple
 
 
 class CallTranslator(CommonTranslator):
@@ -166,19 +167,25 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + call,
                 result_var.ref if result_var else None)
 
+    def _translate_args(self, node: ast.Call,
+                        ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        args = []
+        arg_stmts = []
+        for arg in node.args:
+            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+            arg_stmts += arg_stmt
+            args.append(arg_expr)
+
+        return arg_stmts, args
+
     def translate_normal_call(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         """
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
         """
-        args = []
         formal_args = []
-        arg_stmts = []
-        for arg in node.args:
-            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
-            arg_stmts = arg_stmts + arg_stmt
-            args.append(arg_expr)
+        arg_stmts, args = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         if name in ctx.program.classes:
