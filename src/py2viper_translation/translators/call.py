@@ -1,26 +1,24 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_contracts.contracts import (
+    CONTRACT_FUNCS,
+    CONTRACT_WRAPPER_FUNCS
+)
+from py2viper_translation.lib.constants import BUILTINS
+from py2viper_translation.lib.program_nodes import PythonClass, PythonMethod
+from py2viper_translation.lib.util import (
+    get_func_name,
+    InvalidProgramException,
+    is_two_arg_super_call
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
     Stmt,
     StmtsAndExpr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import PythonClass, PythonMethod, PythonVar
-from py2viper_translation.constants import BUILTINS
-from py2viper_contracts.contracts import (
-    CONTRACT_FUNCS,
-    CONTRACT_WRAPPER_FUNCS
-)
-from py2viper_translation.util import (
-    get_all_fields,
-    get_func_name,
-    InvalidProgramException,
-    is_two_arg_super_call
-)
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List
 
 
 class CallTranslator(CommonTranslator):
@@ -76,7 +74,8 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        fields = get_all_fields(target_class)
+        # fields = get_all_fields(target_class)
+        fields = target_class.get_all_sil_fields()
         new = self.viper.NewStmt(res_var.ref, fields, self.no_position(ctx),
                                  self.no_info(ctx))
         result_has_type = self.var_concrete_type_check(res_var.name, target_class,

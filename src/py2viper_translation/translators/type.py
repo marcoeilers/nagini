@@ -1,25 +1,21 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_contracts.contracts import CONTRACT_FUNCS
+from py2viper_translation.lib.constants import BUILTINS
+from py2viper_translation.lib.program_nodes import PythonClass
+from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import (
+    get_func_name,
+    is_two_arg_super_call,
+    UnsupportedException,
+)
+from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
-    Expr,
-    Stmt,
-    TranslatorConfig
+    TranslatorConfig,
 )
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonMethod,
-    PythonTryBlock,
-    PythonVar,
-)
-from py2viper_translation.constants import BUILTINS
-from py2viper_contracts.contracts import CONTRACT_FUNCS
-from py2viper_translation.jvmaccess import JVM
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import get_func_name, is_two_arg_super_call
-from py2viper_translation.viper_ast import ViperAST
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class TypeTranslator(CommonTranslator):

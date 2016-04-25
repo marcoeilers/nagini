@@ -1,22 +1,13 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.program_nodes import PythonMethod
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
-    Expr,
-    Stmt,
-    StmtsAndExpr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonMethod,
-    PythonTryBlock,
-    PythonVar,
-)
-from py2viper_translation.util import InvalidProgramException
 from toposort import toposort_flatten
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import List
 
 
 class PredicateTranslator(CommonTranslator):

@@ -1,7 +1,7 @@
 """
 A singleton configuration object.
 
->>> from py2viper_translation import config
+>>> from py2viper_translation.lib import config
 >>> config.classpath is None
 False
 >>> config.z3_path is None
@@ -10,10 +10,9 @@ False
 False
 
 """
-
+import glob
 import os
 import sys
-import glob
 
 
 def _construct_classpath():
