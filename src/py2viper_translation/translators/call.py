@@ -70,12 +70,10 @@ class CallTranslator(CommonTranslator):
         node is the call node and arg_stmts are statements related to argument
         evaluation.
         """
-        position = self.to_position(node, ctx)
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        # fields = get_all_fields(target_class)
         fields = target_class.get_all_sil_fields()
         new = self.viper.NewStmt(res_var.ref, fields, self.no_position(ctx),
                                  self.no_info(ctx))
@@ -178,8 +176,6 @@ class CallTranslator(CommonTranslator):
             args.append(arg_expr)
 
         return arg_stmts, args
-
-    #def _translate_receiver(self, node: ast.AST, ):
 
     def translate_normal_call(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
