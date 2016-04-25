@@ -484,7 +484,8 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
-    def type_check(self, lhs: 'Expr', type: 'PythonClass', ctx: Context) -> Expr:
+    def type_check(self, lhs: 'Expr', type: 'PythonClass',
+                   ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
         is of the given type
@@ -513,7 +514,7 @@ class TypeDomainFactory:
                                                 self.type_domain)
         return subtype_func
 
-    def concrete_type_check(self, lhs: 'Expr', type: 'PythonClass',
+    def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
                           ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
@@ -522,7 +523,8 @@ class TypeDomainFactory:
         type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
                                              self.type_type(), [lhs],
                                              self.no_position(ctx),
-                                             self.no_info(ctx), self.type_domain)
+                                             self.no_info(ctx),
+                                             self.type_domain)
         supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
                                                   self.type_type(), [],
                                                   self.no_position(ctx),
@@ -531,3 +533,20 @@ class TypeDomainFactory:
         cmp = self.viper.EqCmp(type_func, supertype_func, self.no_position(ctx),
                                self.no_info(ctx))
         return cmp
+
+    def type_equivalent(self, lhs: Expr, rhs: Expr, ctx: Context) -> Expr:
+        """
+        Creates an expression of the from 'typeof(lhs) == typeof(rhs)'.
+        """
+        type_func_lhs = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                                self.type_type(), [lhs],
+                                                self.no_position(ctx),
+                                                self.no_info(ctx),
+                                                self.type_domain)
+        type_func_rhs = self.viper.DomainFuncApp('typeof', [rhs], {},
+                                                 self.type_type(), [lhs],
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx),
+                                                 self.type_domain)
+        return self.viper.EqCmp(type_func_lhs, type_func_rhs,
+                                self.no_position(ctx), self.no_info(ctx))

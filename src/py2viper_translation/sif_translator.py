@@ -4,6 +4,7 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonVar
+from py2viper_translation.sif.translators.call import SIFCallTranslator
 from py2viper_translation.sif.translators.contract import SIFContractTranslator
 from py2viper_translation.sif.translators.expression import (
     SIFExpressionTranslator,
@@ -14,7 +15,6 @@ from py2viper_translation.sif.translators.statement import (
 )
 from py2viper_translation.translator import Translator
 from py2viper_translation.translators.abstract import Expr, TranslatorConfig
-from py2viper_translation.translators.call import CallTranslator
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
 from py2viper_translation.translators.program import ProgramTranslator
@@ -33,8 +33,8 @@ class SIFTranslator(Translator):
         config = TranslatorConfig(self)
         config.pure_translator = PureTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
-        config.call_translator = CallTranslator(config, jvm, source_file,
-                                                type_info, viper_ast)
+        config.call_translator = SIFCallTranslator(config, jvm, source_file,
+                                                   type_info, viper_ast)
         config.contract_translator = SIFContractTranslator(config, jvm,
                                                             source_file,
                                                             type_info,

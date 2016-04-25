@@ -26,7 +26,7 @@ class SIFPythonMethod(PythonMethod):
                  interface: bool = False):
         super().__init__(name, node, cls, superscope, pure, contract_only,
                          node_factory, interface)
-        bool_type = cls.get_program().classes['bool']
+        bool_type = superscope.get_program().classes['bool']
         self.tl_var = PythonVar("timeLevel", None, bool_type)
         self.new_tl_var = PythonVar("newTimeLevel", None, bool_type)
 
