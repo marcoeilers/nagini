@@ -95,17 +95,10 @@ class StatementTranslator(CommonTranslator):
         return stmt + [assignment] + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
-        if get_func_name(node) == 'Assert':
-            assert len(node.args) == 1
-            stmt, expr = self.translate_expr(node.args[0], ctx)
-            assertion = self.viper.Assert(expr, self.to_position(node, ctx),
-                                          self.no_info(ctx))
-            return stmt + [assertion]
-        else:
-            stmt, expr = self.translate_Call(node, ctx)
-            if not stmt:
-                raise InvalidProgramException(node, 'no.effect')
-            return stmt
+        stmt, expr = self.translate_Call(node, ctx)
+        if not stmt:
+            raise InvalidProgramException(node, 'no.effect')
+        return stmt
 
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):

@@ -119,6 +119,16 @@ class ContractTranslator(CommonTranslator):
                                                self.no_info(ctx))
         return [], pred
 
+    def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Assert().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx)
+        assertion = self.viper.Assert(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_implies(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Implies() contract function.
@@ -196,6 +206,8 @@ class ContractTranslator(CommonTranslator):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
                 return self.translate_acc_field(node, perm, ctx)
+        elif func_name == 'Assert':
+            return self.translate_assert(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx)
         elif func_name == 'Old':

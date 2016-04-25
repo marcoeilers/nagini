@@ -30,8 +30,11 @@ class UnsupportedException(Exception):
     currently supported
     """
 
-    def __init__(self, astElement: ast.AST):
-        super().__init__(str(astElement))
+    def __init__(self, astElement: ast.AST, desc=""):
+        ex_str = str(astElement)
+        if desc:
+            ex_str += ": " + desc
+        super().__init__(ex_str)
 
 
 class InvalidProgramException(Exception):
