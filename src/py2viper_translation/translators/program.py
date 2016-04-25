@@ -1,29 +1,23 @@
 import ast
 
 from collections import OrderedDict
-from py2viper_translation.abstract_translator import (
-    CommonTranslator,
-    Context,
-    Expr,
-    Stmt,
-    TranslatorConfig
-)
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonExceptionHandler,
+from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.program_nodes import (
     PythonField,
     PythonMethod,
     PythonProgram,
-    PythonTryBlock,
     PythonVar
 )
-from py2viper_translation.constants import BUILTINS, PRIMITIVES
-from py2viper_translation.util import (
-    flatten,
-    get_func_name,
+from py2viper_translation.lib.util import (
     InvalidProgramException
 )
-from typing import Any, Dict, List, Optional, Tuple, Union
+from py2viper_translation.translators.abstract import (
+    CommonTranslator,
+    Context,
+    Expr,
+    Stmt
+)
+from typing import List, Tuple
 
 
 class ProgramTranslator(CommonTranslator):
@@ -169,14 +163,11 @@ class ProgramTranslator(CommonTranslator):
                 raise InvalidProgramException(method.node, 'invalid.override')
 
     def translate_program(self, program: PythonProgram,
-                          sil_progs: List) -> 'silver.ast.Program':
+                          sil_progs: List,
+                          ctx: Context) -> 'silver.ast.Program':
         """
         Translates a PythonProgram created by the analyzer to a Viper program.
         """
-        ctx = Context()
-        ctx.current_class = None
-        ctx.current_function = None
-        ctx.program = program
         domains = []
         fields = []
         functions = []
@@ -203,12 +194,12 @@ class ProgramTranslator(CommonTranslator):
             if class_name in PRIMITIVES:
                 continue
             cls = program.classes[class_name]
-            for fieldname in cls.fields:
-                field = cls.fields[fieldname]
+            for field_name in cls.fields:
+                field = cls.fields[field_name]
                 if field.inherited is None:
-                    silfield = self.translate_field(field, ctx)
-                    field.field = silfield
-                    fields.append(silfield)
+                    sil_field = self.translate_field(field, ctx)
+                    field.sil_field = sil_field
+                    fields.append(sil_field)
 
         for function in program.functions.values():
             functions.append(self.translate_function(function, ctx))

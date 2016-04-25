@@ -1,20 +1,14 @@
 import ast
 
-from py2viper_translation.abstract_translator import (
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
     Expr,
-    Stmt,
-    StmtsAndExpr,
-    TranslatorConfig
 )
-from py2viper_translation.analyzer import (
-    PythonClass,
-    PythonMethod,
-    PythonTryBlock,
-    PythonVar
-)
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class PermTranslator(CommonTranslator):

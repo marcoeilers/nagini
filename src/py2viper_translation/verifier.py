@@ -1,8 +1,8 @@
 from abc import ABCMeta
 from enum import Enum
 
-from py2viper_translation import config
-from py2viper_translation.jvmaccess import JVM
+from py2viper_translation.lib import config
+from py2viper_translation.lib.jvmaccess import JVM
 
 
 class ViperVerifier(Enum):

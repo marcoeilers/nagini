@@ -1,39 +1,29 @@
 import ast
-import copy
 
 from abc import ABCMeta
-from py2viper_translation.analyzer import (
+from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonMethod,
     PythonTryBlock,
-    PythonVar
+    PythonVar,
 )
-from py2viper_translation.jvmaccess import JVM
-from py2viper_translation.typeinfo import TypeInfo
-from py2viper_translation.util import (
+from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     UnsupportedException
 )
-from py2viper_translation.viper_ast import ViperAST
+from py2viper_translation.lib.viper_ast import ViperAST
 from typing import List, Tuple
 
+
+# TODO: Move these typedefs to separate file and add more of them.
 Expr = 'silver.ast.Exp'
 Stmt = 'silver.ast.Stmt'
 StmtsAndExpr = Tuple[List[Stmt], Expr]
-
-
-class Context:
-    """
-    Contains the current state of the entire translation process.
-    """
-
-    def __init__(self) -> None:
-        self.current_function = None
-        self.current_class = None
-        self.var_aliases = None
-        self.position = None
-        self.info = None
-        self.program = None
+VarDecl = 'silver.ast.LocalVarDecl'
+DomainFuncApp = 'silver.ast.DomainFuncApp'
 
 
 class TranslatorConfig:
