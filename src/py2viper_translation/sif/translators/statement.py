@@ -16,8 +16,7 @@ class SIFStatementTranslator(StatementTranslator):
                               ctx: SIFContext) -> List[Stmt]:
         if len(node.targets) != 1:
             raise UnsupportedException(node)
-        if (isinstance(node.value, ast.Call) or
-            isinstance(node.targets[0], ast.Subscript)):
+        if isinstance(node.targets[0], ast.Subscript):
             raise UnsupportedException(node)
         
         # First translate assignment for normal variables.

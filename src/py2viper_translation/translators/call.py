@@ -79,8 +79,9 @@ class CallTranslator(CommonTranslator):
         fields = target_class.get_all_sil_fields()
         new = self.viper.NewStmt(res_var.ref, fields, self.no_position(ctx),
                                  self.no_info(ctx))
-        result_has_type = self.var_concrete_type_check(res_var.name, target_class,
-                                                     ctx)
+        result_has_type = self.var_concrete_type_check(res_var.name,
+                                                       target_class,
+                                                       ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),
@@ -152,7 +153,7 @@ class CallTranslator(CommonTranslator):
                 # static field
                 raise UnsupportedException(node)
         if target.type is not None:
-            result_var = ctx.current_function.create_variable(
+            result_var = result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref)
         if target.declared_exceptions:
@@ -177,6 +178,8 @@ class CallTranslator(CommonTranslator):
             args.append(arg_expr)
 
         return arg_stmts, args
+
+    #def _translate_receiver(self, node: ast.AST, ):
 
     def translate_normal_call(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
