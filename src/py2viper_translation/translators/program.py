@@ -1,8 +1,13 @@
 import ast
 
 from collections import OrderedDict
-from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.constants import (
+    ERROR_NAME,
+    PRIMITIVES,
+    RESULT_NAME
+)
 from py2viper_translation.lib.program_nodes import (
+    PythonClass,
     PythonField,
     PythonMethod,
     PythonProgram,
@@ -49,6 +54,53 @@ class ProgramTranslator(CommonTranslator):
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
+    def create_inherit_check(self, method: PythonMethod, cls: PythonClass,
+                             ctx: Context) -> 'silver.ast.Callable':
+        """
+        Creates a Viper function/method with the contract of the overridden
+        function which calls the overriding function, to check behavioural
+        subtyping.
+        """
+        old_function = ctx.current_function
+        ctx.current_function = method
+        assert ctx.position is None
+        ctx.position = self.viper.to_position(method.node)
+        self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
+        params = []
+        results = []
+        args = []
+
+        results.append(method.result.decl)
+
+        error_var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception']) # method.create_variable(error_var_name, ctx.program.classes['Exception'], self.translator)
+        error_var.process(ERROR_NAME, self.translator)
+        optional_error_var = error_var if method.declared_exceptions else None
+
+        if method.declared_exceptions:
+            results.append(error_var.decl)
+
+        mname = ctx.program.get_fresh_name(method.sil_name + '_subtyping')
+        pres, posts = self.extract_contract(method.overrides, ERROR_NAME,
+                                            False, ctx)
+        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)), self.no_position(ctx), self.no_info(ctx))
+        new_type = self.type_factory.concrete_type_check(next(iter(method.args.values())).ref, cls, ctx)
+        pres = [not_null, new_type] + pres
+
+        for arg in method.overrides.args:
+            args.append(method.overrides.args[arg])
+            params.append(method.overrides.args[arg].decl)
+
+        stmts = self.inline_method(method, args, method.result, error_var, ctx)
+
+        body = self.translate_block(stmts, self.no_position(ctx), self.no_info(ctx))
+        ctx.current_function = old_function
+        result = self.viper.Method(mname, params, results, pres, posts, [],
+                                   body, self.no_position(ctx),
+                                   self.no_info(ctx))
+        ctx.position = None
+        self.info = None
+        return result
+
     def create_subtyping_check(self, method: PythonMethod,
                                ctx: Context) -> 'silver.ast.Callable':
         """
@@ -68,6 +120,9 @@ class ProgramTranslator(CommonTranslator):
         mname = ctx.program.get_fresh_name(method.sil_name + '_subtyping')
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
+        if method.cls:
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)), self.no_position(ctx), self.no_info(ctx))
+            pres = [not_null] + pres
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
@@ -110,16 +165,16 @@ class ProgramTranslator(CommonTranslator):
         targets = []
         if method.type:
             type = self.translate_type(method.type, ctx)
-            result_var_decl = self.viper.LocalVarDecl('_res', type,
+            result_var_decl = self.viper.LocalVarDecl(RESULT_NAME, type,
                 self.to_position(method.node, ctx), self.no_info(ctx))
-            result_var_ref = self.viper.LocalVar('_res', type,
+            result_var_ref = self.viper.LocalVar(RESULT_NAME, type,
                 self.to_position(method.node, ctx), self.no_info(ctx))
             results.append(result_var_decl)
             targets.append(result_var_ref)
-        error_var_decl = self.viper.LocalVarDecl('_err', self.viper.Ref,
+        error_var_decl = self.viper.LocalVarDecl(ERROR_NAME, self.viper.Ref,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
-        error_var_ref = self.viper.LocalVar('_err', self.viper.Ref,
+        error_var_ref = self.viper.LocalVar(ERROR_NAME, self.viper.Ref,
                                             self.no_position(ctx),
                                             self.no_info(ctx))
         if method.overrides.declared_exceptions:
@@ -230,6 +285,11 @@ class ProgramTranslator(CommonTranslator):
                 methods.append(self.translate_method(method, ctx))
                 if method_name != '__init__' and method.overrides:
                     methods.append(self.create_subtyping_check(method, ctx))
+            for method_name in cls.get_all_methods():
+                method = cls.get_method(method_name)
+                if method.cls != cls and method_name != '__init__' and not cls.name.startswith('Dummy_Sub'):
+                    # inherited
+                    methods.append(self.create_inherit_check(method, cls, ctx))
             for pred_name in cls.predicates:
                 pred = cls.predicates[pred_name]
                 cpred = pred

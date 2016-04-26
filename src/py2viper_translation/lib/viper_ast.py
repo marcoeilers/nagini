@@ -223,6 +223,8 @@ class ViperAST:
         return self.ast.EqCmp(left, right, position, info)
 
     def NeCmp(self, left, right, position, info):
+        print(left)
+        print(right)
         return self.ast.NeCmp(left, right, position, info)
 
     def GtCmp(self, left, right, position, info):

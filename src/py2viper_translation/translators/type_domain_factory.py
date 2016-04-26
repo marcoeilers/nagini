@@ -515,7 +515,7 @@ class TypeDomainFactory:
         return subtype_func
 
     def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
-                          ctx: Context) -> Expr:
+                            ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
         is of the given type

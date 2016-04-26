@@ -44,3 +44,78 @@ def main() -> None:
     Fold(ss.meh(25))
     ss.set_sth(25, 35)
     Unfold(ss.meh(35))
+
+class A:
+
+    def __init__(self) -> None:
+        Ensures(Acc(self.afield))  # type: ignore
+        self.afield = 14
+
+    @Predicate
+    def pred1(self, a: int) -> bool:
+        return Acc(self.afield) and self.afield == a
+
+    def set1(self, _old: int) -> None:
+        Requires(self.pred1(_old))
+        Ensures(self.pred1(_old + 1))
+        self.set2(_old)
+
+    def set2(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        self.afield += 1
+        res_val = self.afield
+        Fold(self.pred1(oold + 1))
+        return res_val
+
+    def set3(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        self.afield += 1
+        res_val = self.afield
+        Fold(self.pred1(oold + 1))
+        return res_val
+
+    def set4(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        self.afield += 1
+        res_val = self.afield
+        Fold(self.pred1(oold + 1))
+        return res_val
+
+
+class B(A):
+
+    def __init__(self) -> None:
+        Ensures(self.pred1(14))
+        super().__init__()
+        self.bfield = 14
+        Fold(self.pred1(14))
+
+    @Predicate
+    def pred1(self, b: int) -> bool:
+        return Acc(self.bfield) and self.bfield == self.afield
+
+    def set2(self, ooold: int) -> int:
+        Requires(self.pred1(ooold))
+        Ensures(self.pred1(ooold + 1))
+        Unfold(self.pred1(ooold))
+        super().set2(ooold)
+        self.bfield = ooold + 1
+        res_val = self.afield
+        Fold(self.pred1(ooold + 1))
+        return res_val
+
+    def set4(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        super().set2(oold)
+        self.afield = oold + 1
+        res_val = self.afield
+        Fold(self.pred1(oold + 1))
+        return res_val

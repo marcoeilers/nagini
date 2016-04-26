@@ -130,6 +130,13 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                               is_constructor,
                                                               ctx)
 
+    def inline_method(self, method: PythonMethod, args: List[PythonVar],
+                      result_var: PythonVar, error_var: PythonVar,
+                      ctx: Context) -> List[Stmt]:
+        return self.config.call_translator.inline_method(method, args,
+                                                         result_var, error_var,
+                                                         ctx)
+
     def translate_contractfunc_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node,
@@ -213,12 +220,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         the error return variable of the surrounding function, otherwise
         creates a new local variable of type Exception.
         """
-        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            stmt)
         if tries:
             return tries[0].get_error_var(self.translator).ref
-        if ctx.current_function.declared_exceptions:
-            return ctx.current_function.error_var
+        if ctx.actual_function.declared_exceptions:
+            return ctx.error_var
         else:
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
@@ -230,13 +237,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Creates an expression checking if the var with the given name
         is of the given type.
         """
-        obj_var = self.viper.LocalVar(name, self.viper.Ref,
-                                      self.no_position(ctx),
-                                      self.no_info(ctx))
+        if ctx.var_aliases and name in ctx.var_aliases:
+            obj_var = ctx.var_aliases[name].ref
+        else:
+            obj_var = self.viper.LocalVar(name, self.viper.Ref,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
         return self.type_factory.type_check(obj_var, type, ctx)
 
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
-                                 node: ast.AST, ctx: Context) -> Expr:
+                                node: ast.AST, ctx: Context) -> Expr:
         """
         Creates a predicate access for the predicate with the given name,
         with the given args and permission.
