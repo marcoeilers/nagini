@@ -2,10 +2,15 @@ import ast
 import mypy
 
 from collections import OrderedDict
-from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.constants import (
+    END_LABEL,
+    ERROR_NAME,
+    PRIMITIVES,
+    RESULT_NAME
+)
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import UnsupportedException
-from typing import List, Optional
+from typing import List, Optional, Set
 
 
 class PythonScope:
@@ -114,6 +119,13 @@ class PythonClass(PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+
+    def get_all_methods(self) -> Set['PythonMethod']:
+        result = set()
+        if self.superclass:
+            result |= self.superclass.get_all_methods()
+        result |= set(self.methods.keys())
+        return result
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonClass') -> 'PythonField':
@@ -257,7 +269,8 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, ['_res', '_err', '__end'], superscope)
+        PythonScope.__init__(self, [RESULT_NAME, ERROR_NAME, END_LABEL],
+                             superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
@@ -267,6 +280,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.args = OrderedDict()  # direct
         self.type = None  # infer
         self.result = None  # infer
+        self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.precondition = []
         self.postcondition = []
@@ -276,6 +290,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.contract_only = contract_only
         self.interface = interface
         self.node_factory = node_factory
+        self.labels = [END_LABEL]
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -400,6 +415,9 @@ class PythonTryBlock(PythonNode):
         self.error_var = None
         self.method = method
         self.node_factory = node_factory
+        self.finally_name = None
+        self.post_name = None
+        method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
         """

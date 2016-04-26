@@ -1,6 +1,6 @@
 import ast
 
-
+from py2viper_translation.lib.constants import END_LABEL
 from py2viper_translation.lib.util import (
     flatten,
     get_func_name,
@@ -60,7 +60,7 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
-        for block in ctx.current_function.try_blocks:
+        for block in ctx.actual_function.try_blocks:
             if block.node is node:
                 try_block = block
                 break
@@ -72,14 +72,17 @@ class StatementTranslator(CommonTranslator):
         body = [assign]
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
         if try_block.else_block:
-            goto = self.viper.Goto(try_block.else_block.name,
+            else_label = ctx.get_label_name(try_block.else_block.name)
+            goto = self.viper.Goto(else_label,
                                    self.to_position(node, ctx), self.no_info(ctx))
             body += [goto]
         elif try_block.finally_block:
-            goto = self.viper.Goto(try_block.finally_name,
+            finally_name = ctx.get_label_name(try_block.finally_name)
+            goto = self.viper.Goto(finally_name,
                                    self.to_position(node, ctx), self.no_info(ctx))
             body += [goto]
-        end_label = self.viper.Label('post_' + node.sil_name,
+        label_name = ctx.get_label_name(try_block.post_name)
+        end_label = self.viper.Label(label_name,
                                      self.to_position(node, ctx),
                                      self.no_info(ctx))
         return body + [end_label]
@@ -91,7 +94,7 @@ class StatementTranslator(CommonTranslator):
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
         catchers = self.create_exception_catchers(var,
-            ctx.current_function.try_blocks, node, ctx)
+            ctx.actual_function.try_blocks, node, ctx)
         return stmt + [assignment] + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
@@ -178,11 +181,10 @@ class StatementTranslator(CommonTranslator):
                                  self.no_info(ctx))]
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
-        type_ = ctx.current_function.type
+        type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
-            self.viper.LocalVar('_res', self.translate_type(type_, ctx),
-                                self.no_position(ctx), self.no_info(ctx)),
+            ctx.result_var,
             rhs, self.to_position(node, ctx),
             self.no_info(ctx))
 
@@ -191,7 +193,7 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Return(self, node: ast.Return,
                               ctx: Context) -> List[Stmt]:
         return_stmts = self._translate_return(node, ctx)
-        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            node)
         for try_block in tries:
             if try_block.finally_block:
@@ -200,10 +202,12 @@ class StatementTranslator(CommonTranslator):
                                         self.no_info(ctx))
                 finally_assign = self.viper.LocalVarAssign(lhs, rhs,
                     self.no_position(ctx), self.no_info(ctx))
-                jmp = self.viper.Goto(try_block.finally_name,
+                label_name = ctx.get_label_name(try_block.finally_name)
+                jmp = self.viper.Goto(label_name,
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
                 return return_stmts + [finally_assign, jmp]
-        jmp_to_end = self.viper.Goto("__end", self.to_position(node, ctx),
+        end_label = ctx.get_label_name(END_LABEL)
+        jmp_to_end = self.viper.Goto(end_label, self.to_position(node, ctx),
                                      self.no_info(ctx))
         return return_stmts + [jmp_to_end]

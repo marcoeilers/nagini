@@ -129,3 +129,29 @@ def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
                 fields.append(field.sil_field)
         cls = cls.superclass
     return fields
+
+
+def is_pre(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Requires'
+
+
+def is_post(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Ensures'
+
+
+def is_exception_decl(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Exsures'
+
+
+def get_body_start_index(statements: List[ast.AST]) -> int:
+    """
+    Returns the index of the first statement that is not a method contract
+    """
+    body_index = 0
+    while is_pre(statements[body_index]):
+        body_index += 1
+    while is_post(statements[body_index]):
+        body_index += 1
+    while is_exception_decl(statements[body_index]):
+        body_index += 1
+    return body_index

@@ -47,7 +47,7 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                return ctx.current_function.get_variable(node.id).type
+                return ctx.actual_function.get_variable(node.id).type
         elif isinstance(node, ast.Compare):
             return ctx.program.classes['bool']
         elif isinstance(node, ast.BoolOp):
@@ -84,7 +84,7 @@ class TypeTranslator(CommonTranslator):
             if isinstance(node.func, ast.Name):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
-                        return ctx.current_function.type
+                        return ctx.actual_function.type
                     elif node.func.id == 'Acc':
                         return ctx.program.classes['bool']
                     else:
