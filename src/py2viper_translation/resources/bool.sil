@@ -1,0 +1,11 @@
+function object___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function NoneType___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function bool___bool__(self: Bool) : Bool
+    ensures result == self
+
+function int___bool__(self: Int) : Bool
+    ensures result == (self != 0)
