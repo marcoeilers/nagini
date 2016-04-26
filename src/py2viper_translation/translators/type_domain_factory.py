@@ -534,7 +534,7 @@ class TypeDomainFactory:
                                self.no_info(ctx))
         return cmp
 
-    def type_equivalent(self, lhs: Expr, rhs: Expr, ctx: Context) -> Expr:
+    def type_comp(self, lhs: Expr, rhs: Expr, ctx: Context, eq=False) -> Expr:
         """
         Creates an expression of the from 'typeof(lhs) == typeof(rhs)'.
         """
@@ -548,5 +548,9 @@ class TypeDomainFactory:
                                                  self.no_position(ctx),
                                                  self.no_info(ctx),
                                                  self.type_domain)
-        return self.viper.EqCmp(type_func_lhs, type_func_rhs,
-                                self.no_position(ctx), self.no_info(ctx))
+        if eq:
+            return self.viper.EqCmp(type_func_lhs, type_func_rhs,
+                                    self.no_position(ctx), self.no_info(ctx))
+        else:
+            return self.viper.NeCmp(type_func_lhs, type_func_rhs,
+                                    self.no_position(ctx), self.no_info(ctx))

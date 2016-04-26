@@ -115,10 +115,11 @@ class SIFCallTranslator(CallTranslator):
         if ctx.current_function is None:
             if ctx.current_class is None:
                 # global variable
-                raise InvalidProgramException(node, 'purity.violated')
+                raise UnsupportedException(node, "Global function call "
+                                           "not supported.")
             else:
                 # static field
-                raise UnsupportedException(node)
+                raise UnsupportedException(node, "Static fields not supported.")
 
         if target.type is not None:
             result_var = ctx.current_function.create_variable(
@@ -166,9 +167,7 @@ class SIFCallTranslator(CallTranslator):
         ctx.use_prime = False
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
-        type_expr = self.type_factory.type_equivalent(recv, recv_p, ctx)
-        type_expr = self.viper.Not(type_expr, type_expr.pos(),
-                                   type_expr.info())
+        type_expr = self.type_factory.type_comp(recv, recv_p, ctx)
         rhs = self.viper.Or(ctx.current_function.tl_var.ref,
                             type_expr,
                             self.no_position(ctx),
