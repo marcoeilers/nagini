@@ -152,6 +152,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function is None
         name = node.name
         cls = self.get_class(name)
+        cls.node = node
         if len(node.bases) > 1:
             raise UnsupportedException(node)
         if len(node.bases) == 1:
@@ -298,9 +299,12 @@ class Analyzer(ast.NodeVisitor):
             self.track_access(node, field)
 
     def typeof(self, node: ast.AST) -> PythonClass:
+        print(node)
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)
+            if node.id in self.program.classes:
+                return self.program.classes[node.id]
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)

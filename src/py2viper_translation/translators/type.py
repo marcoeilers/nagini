@@ -9,6 +9,7 @@ from py2viper_translation.lib.util import (
     get_func_name,
     is_two_arg_super_call,
     UnsupportedException,
+    InvalidProgramException
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (
@@ -75,7 +76,8 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.Call):
             if get_func_name(node) == 'super':
                 if len(node.args) == 2:
-                    assert is_two_arg_super_call(node, ctx)
+                    if not is_two_arg_super_call(node, ctx):
+                        raise InvalidProgramException(node, 'invalid.super.call')
                     return ctx.program.classes[node.args[0].id].superclass
                 elif not node.args:
                     return ctx.current_class.superclass
