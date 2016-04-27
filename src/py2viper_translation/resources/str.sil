@@ -1,0 +1,8 @@
+function str___len__(self: Ref): Int
+	ensures result >= 0
+
+function str___create__(len: Int, random: Int) : Ref
+	ensures str___len__(result) == len
+
+function str___bool__(self: Ref) : Bool
+	ensures result == str___len__(self) != 0

@@ -194,8 +194,14 @@ class CallTranslator(CommonTranslator):
 
         return arg_stmts, args
 
-    def inline_method(self, method: PythonMethod, args: List[PythonVar], result_var: PythonVar, error_var: PythonVar, ctx: Context) -> List[Stmt]:
-        print("inline method for " + method.name)
+    def inline_method(self, method: PythonMethod, args: List[PythonVar],
+                      result_var: PythonVar, error_var: PythonVar,
+                      ctx: Context) -> List[Stmt]:
+        """
+        Inlines a call to the given method, if the given argument vars contain
+        the values of the arguments. Saves the result in result_var and any
+        uncaught exceptions in error_var.
+        """
         old_label_aliases = ctx.label_aliases
         old_var_aliases = ctx.var_aliases
         var_aliases = {}
@@ -206,26 +212,28 @@ class CallTranslator(CommonTranslator):
         var_aliases[RESULT_NAME] = result_var
         if error_var:
             var_aliases[ERROR_NAME] = error_var
-        print("done with args for " + method.name)
         ctx.inlined_calls.append(method)
         ctx.var_aliases = var_aliases
         ctx.label_aliases = {}
 
         locals_to_copy = method.locals.copy()
         for local_name, local in locals_to_copy.items():
-            local_var = ctx.current_function.create_variable(local_name, local.type, self.translator)
+            local_var = ctx.current_function.create_variable(local_name,
+                                                             local.type,
+                                                             self.translator)
             ctx.var_aliases[local_name] = local_var
-        print("doing locals for " + method.name)
+
         # create label aliases
         for label in method.labels:
             new_label = ctx.current_function.get_fresh_name(label)
             ctx.label_aliases[label] = new_label
         end_label_name = ctx.label_aliases[END_LABEL]
-        end_label = self.viper.Label(end_label_name, self.no_position(ctx), self.no_info(ctx))
+        end_label = self.viper.Label(end_label_name, self.no_position(ctx),
+                                     self.no_info(ctx))
         # translate body
         index = get_body_start_index(method.node.body)
         stmts = []
-        print("translating stmts for " + method.name)
+
         for stmt in method.node.body[index:]:
             stmts += self.translate_stmt(stmt, ctx)
         stmts.append(end_label)
@@ -235,7 +243,13 @@ class CallTranslator(CommonTranslator):
         ctx.label_aliases = old_label_aliases
         return stmts
 
-    def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool, ctx: Context) -> StmtsAndExpr:
+    def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
+                    ctx: Context) -> StmtsAndExpr:
+        """
+        Inlines a statically bound call to the given method. If is_super is set,
+        adds self to the arguments, since this will not be part of the args
+        of the call node.
+        """
         assert ctx.current_function
         if method in ctx.inlined_calls:
             raise InvalidProgramException(node, 'recursive.static.call')
@@ -244,41 +258,46 @@ class CallTranslator(CommonTranslator):
         ctx.position = position
         args = []
         stmts = []
-        all_args = node.args
+
+        all_arg = node.args
         if is_super:
-            # args.append(next(iter(ctx.actual_function.args.values())))
-            all_args = [next(iter(ctx.actual_function.args.values()))] + all_args
-        for arg_val, (_, arg) in zip(all_args, method.args.items()):
+            all_arg = [next(iter(ctx.actual_function.args.values()))] + all_arg
+        for arg_val, (_, arg) in zip(all_arg, method.args.items()):
             if isinstance(arg_val, PythonVar):
                 arg_stmt = []
                 arg_val = arg_val.ref
             else:
                 arg_stmt, arg_val = self.translate_expr(arg_val, ctx)
             stmts += arg_stmt
-            arg_var = ctx.current_function.create_variable('arg', arg.type, self.translator)
-            print('------created var' + arg_var.sil_name + ' with type ' + arg.type.name)
-            assign = self.viper.LocalVarAssign(arg_var.ref, arg_val, self.to_position(node, ctx), self.no_info(ctx))
+            arg_var = ctx.current_function.create_variable('arg', arg.type,
+                                                           self.translator)
+            assign = self.viper.LocalVarAssign(arg_var.ref, arg_val,
+                                               self.to_position(node, ctx),
+                                               self.no_info(ctx))
             stmts.append(assign)
             args.append(arg_var)
-        print([arg.sil_name + ' ' + arg.type.name for arg in args])
 
         # create target vars
         res_var = None
         if method.type:
-            res_var = ctx.current_function.create_variable(RESULT_NAME, method.type, self.translator)
+            res_var = ctx.current_function.create_variable(RESULT_NAME,
+                                                           method.type,
+                                                           self.translator)
         optional_error_var = None
         error_var = self.get_error_var(node, ctx)
         if method.declared_exceptions:
-            optional_error_var = error_var
+            var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
+            var.ref = error_var
+            optional_error_var = var
         old_fold = ctx.ignore_family_folds
         ctx.ignore_family_folds = True
-        inline_stmts = self.inline_method(method, args, res_var, optional_error_var, ctx)
+        inline_stmts = self.inline_method(method, args, res_var,
+                                          optional_error_var, ctx)
         ctx.ignore_family_folds = old_fold
         stmts += inline_stmts
         if method.declared_exceptions:
             stmts += self.create_exception_catchers(error_var,
-                                                    ctx.actual_function.try_blocks,
-                                                    node, ctx)
+                ctx.actual_function.try_blocks, node, ctx)
         # return result
         result = res_var.ref if method.type else None
         ctx.position = old_position

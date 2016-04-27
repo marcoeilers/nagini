@@ -319,7 +319,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_Compare(self, node: ast.Compare, ctx: Context) -> StmtsAndExpr:
+    def translate_Compare(self, node: ast.Compare,
+                          ctx: Context) -> StmtsAndExpr:
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

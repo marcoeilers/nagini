@@ -77,7 +77,8 @@ class TypeTranslator(CommonTranslator):
             if get_func_name(node) == 'super':
                 if len(node.args) == 2:
                     if not is_two_arg_super_call(node, ctx):
-                        raise InvalidProgramException(node, 'invalid.super.call')
+                        raise InvalidProgramException(node,
+                                                      'invalid.super.call')
                     return ctx.program.classes[node.args[0].id].superclass
                 elif not node.args:
                     return ctx.current_class.superclass
