@@ -287,7 +287,8 @@ class Analyzer(ast.NodeVisitor):
                     pass
                 else:
                     var = self.node_factory.create_python_var(node.id,
-                                                              node, self.typeof(node))
+                                                              node,
+                                                              self.typeof(node))
                     self.current_function.locals[node.id] = var
                 self.track_access(node, var)
 
@@ -299,7 +300,6 @@ class Analyzer(ast.NodeVisitor):
             self.track_access(node, field)
 
     def typeof(self, node: ast.AST) -> PythonClass:
-        print(node)
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)

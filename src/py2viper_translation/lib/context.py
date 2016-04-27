@@ -31,23 +31,40 @@ class Context:
 
     @property
     def actual_function(self):
+        """
+        Returns the function/method which is actually currently being
+        translated, i.e. if a function is currently being inlined, that
+        function and not the one it is being inlined into.
+        """
         if not self.inlined_calls:
             return self.current_function
         return self.inlined_calls[-1]
 
     @property
     def result_var(self):
+        """
+        Returns the result var of the current function or the current alias for
+        it.
+        """
         if self.var_aliases and RESULT_NAME in self.var_aliases:
             return self.var_aliases[RESULT_NAME].ref
         return self.current_function.result.ref
 
     @property
     def error_var(self):
+        """
+        Returns the error var of the current function or the current alias for
+        it.
+        """
         if self.var_aliases and ERROR_NAME in self.var_aliases:
             return self.var_aliases[ERROR_NAME].ref
         return self.current_function.error_var
 
     def get_label_name(self, name: str) -> str:
+        """
+        Returns the actual name of the given label in the current context, i.e.,
+        looks for aliases.
+        """
         if name in self.label_aliases:
             return self.label_aliases[name]
         return name

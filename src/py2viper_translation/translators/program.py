@@ -61,7 +61,6 @@ class ProgramTranslator(CommonTranslator):
         function which calls the overriding function, to check behavioural
         subtyping.
         """
-        print("inherit check for " + method.name + " for class " + cls.name)
         old_function = ctx.current_function
         ctx.current_function = method
         assert ctx.position is None
@@ -91,9 +90,7 @@ class ProgramTranslator(CommonTranslator):
         for arg_name, arg in method.args.items():
             args.append(arg)
             params.append(arg.decl)
-        print("now inlining check for " + method.name + " for class " + cls.name)
         stmts = self.inline_method(method, args, method.result, error_var, ctx)
-        print("done inlining check for " + method.name + " for class " + cls.name)
         body = self.translate_block(stmts, self.no_position(ctx), self.no_info(ctx))
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
@@ -126,7 +123,11 @@ class ProgramTranslator(CommonTranslator):
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)), self.no_position(ctx), self.no_info(ctx))
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+                                        self.viper.NullLit(self.no_position(ctx),
+                                                           self.no_info(ctx)),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
             pres = [not_null] + pres
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
@@ -282,7 +283,8 @@ class ProgramTranslator(CommonTranslator):
                     continue
                 functions.append(self.translate_function(func, ctx))
                 if func.overrides:
-                    functions.append(self.create_override_check(func, ctx))
+                    raise InvalidProgramException(func.node,
+                                                  'invalid.override')
             for method_name in cls.methods:
                 method = cls.methods[method_name]
                 if method.interface:
@@ -292,7 +294,8 @@ class ProgramTranslator(CommonTranslator):
                     methods.append(self.create_override_check(method, ctx))
             for method_name in cls.get_all_methods():
                 method = cls.get_method(method_name)
-                if method.cls != cls and method_name != '__init__' and not cls.name.startswith('Dummy_Sub'):
+                if (method.cls != cls and method_name != '__init__' and
+                        not cls.name.startswith('Dummy_Sub')):
                     # inherited
                     methods.append(self.create_inherit_check(method, cls, ctx))
             for pred_name in cls.predicates:

@@ -99,6 +99,14 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
         stmt, expr = self.translate_Call(node, ctx)
+        if expr:
+            type = self.get_type(node, ctx)
+            var = ctx.current_function.create_variable('expr', type,
+                                                       self.translator)
+            assign = self.viper.LocalVarAssign(var.ref, expr,
+                                               self.to_position(node, ctx),
+                                               self.no_info(ctx))
+            stmt.append(assign)
         return stmt
 
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
@@ -150,11 +158,6 @@ class StatementTranslator(CommonTranslator):
         else:
             assignment = self.viper.FieldAssign
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        print("+++")
-        print(node.value)
-        if isinstance(node.value, ast.Name):
-            print(node.value.id)
-        print(ctx.var_aliases)
         assign = assignment(var,
                             rhs, self.to_position(node, ctx),
                             self.no_info(ctx))

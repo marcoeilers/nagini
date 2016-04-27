@@ -145,6 +145,11 @@ class MethodTranslator(CommonTranslator):
                                           'function.throws.exception')
         # create preconditions
         pres = self._translate_pres(func, ctx)
+        if func.cls:
+            not_null = self.viper.NeCmp(next(iter(func.args.values())).ref,
+                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx))
+            pres = [not_null] + pres
         # create postconditions
         posts = []
         for post in func.postcondition:
@@ -245,7 +250,9 @@ class MethodTranslator(CommonTranslator):
         if method.declared_exceptions:
             results.append(error_var_decl)
         if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)), self.no_position(ctx), self.no_info(ctx))
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx))
             pres = [not_null] + pres
 
         args = [arg.decl for arg in method.get_args()]
@@ -255,7 +262,10 @@ class MethodTranslator(CommonTranslator):
         body = []
         # translate body
         if method.cls:
-            inhale_type = self.viper.Inhale(self.type_factory.concrete_type_check(next(iter(method.args.values())).ref, method.cls, ctx), self.no_position(ctx), self.no_info(ctx))
+            type_check = self.type_factory.concrete_type_check(
+                next(iter(method.args.values())).ref, method.cls, ctx)
+            inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
+                                            self.no_info(ctx))
             body.append(inhale_type)
         if method.contract_only:
             false = self.viper.FalseLit(self.no_position(ctx),
