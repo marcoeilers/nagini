@@ -17,6 +17,7 @@ class Context:
         self.info = None
         self.program = None
         self.inlined_calls = []
+        self.ignore_family_folds = False
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []

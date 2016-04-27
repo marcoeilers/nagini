@@ -87,7 +87,16 @@ class A:
         Fold(self.pred1(oold + 1))
         return res_val
 
+    def set5(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        self.afield += 1
+        res_val = self.afield
+        Fold(self.pred1(oold + 1))
+        return res_val
 
+#:: ExpectedOutput(fold.failed:assertion.false)
 class B(A):
 
     def __init__(self) -> None:
@@ -114,8 +123,21 @@ class B(A):
         Requires(self.pred1(oold))
         Ensures(self.pred1(oold + 1))
         Unfold(self.pred1(oold))
-        super().set2(oold)
+        super().set4(oold)
         self.afield = oold + 1
         res_val = self.afield
+        #:: ExpectedOutput(fold.failed:assertion.false)
         Fold(self.pred1(oold + 1))
+        return res_val
+
+    #:: ExpectedOutput(postcondition.violated:insufficient.permission)
+    def set5(self, ooold: int) -> int:
+        Requires(self.pred1(ooold))
+        Ensures(self.pred1(ooold + 2))
+        Unfold(self.pred1(ooold))
+        super().set5(ooold)
+        self.afield += 1
+        self.bfield = ooold + 2
+        res_val = self.afield
+        Fold(self.pred1(ooold + 2))
         return res_val

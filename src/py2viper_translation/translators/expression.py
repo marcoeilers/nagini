@@ -245,7 +245,8 @@ class ExpressionTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'field.nonexistant')
         while field.inherited is not None:
             field = field.inherited
-        if field.is_mangled() and field.cls is not ctx.current_class:
+        if field.is_mangled() and (field.cls is not ctx.current_class and
+                                   field.cls is not ctx.actual_function.cls):
             raise InvalidProgramException(node, 'private.field.access')
 
         return field
