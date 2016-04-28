@@ -43,6 +43,7 @@ class Super:
         finally:
             c.value += 3
 
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     def some_func_2(self, c: Container) -> int:
         Requires(Acc(c.value))
         Ensures(False)
@@ -74,6 +75,7 @@ class Super:
             c1.value += 7
 
 
+#:: ExpectedOutput(postcondition.violated:assertion.false)
 class Sub(Super):
     def so_many_methods(self, ca: Container, cb: Container) -> Container:
         Requires(Acc(ca.value))
@@ -84,10 +86,10 @@ class Sub(Super):
             Super.other_func(self, ca, False)
         except MySpecialException:
             ca.value = 77
-        loc = Super.return_func(ca)
+        loc = Super.return_func(self, ca)
         Assert(loc == 77)
         try:
-            Super.some_func(cb)
+            Super.some_func(self, cb)
         except MyOtherException:
             cb.value += 9
         return cb
@@ -95,15 +97,16 @@ class Sub(Super):
     def so_many_methods_2(self, ca: Container, cb: Container) -> Container:
         Requires(Acc(ca.value))
         Requires(Acc(cb.value))
+        #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(Acc(Result().value) and Result().value == Old(cb.value) + 4)
         try:
             Super.other_func(self, ca, False)
         except MySpecialException:
             ca.value = 77
-        loc = Super.return_func(ca)
+        loc = Super.return_func(self, ca)
         Assert(loc == 77)
         try:
-            Super.some_func(cb)
+            Super.some_func(self, cb)
         except MyOtherException:
             cb.value += 9
         return cb

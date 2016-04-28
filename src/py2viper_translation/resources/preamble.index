@@ -132,21 +132,5 @@
         }
     }
 },
-"Exception": {},
-"str": {
-    "functions": {
-        "__len__": {
-            "args": ["str"],
-            "type": "int"
-        },
-        "__bool__": {
-            "args": ["str"],
-            "type": "bool"
-        },
-        "__create__": {
-            "args": ["int", "int"],
-            "type": "str"
-        }
-    }
-}
+"Exception": {}
 }
