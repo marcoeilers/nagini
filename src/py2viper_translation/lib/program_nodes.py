@@ -312,9 +312,9 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             raise UnsupportedException(func_type)
         if self.type is not None:
-            self.result = self.node_factory.create_python_var("_res", None,
+            self.result = self.node_factory.create_python_var(RESULT_NAME, None,
                                                               self.type)
-            self.result.process("_res", translator)
+            self.result.process(RESULT_NAME, translator)
         if self.cls is not None and self.cls.superclass is not None:
             if self.predicate:
                 self.overrides = self.cls.superclass.get_predicate(self.name)
