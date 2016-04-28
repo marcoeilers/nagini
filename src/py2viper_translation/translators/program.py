@@ -73,25 +73,55 @@ class ProgramTranslator(CommonTranslator):
         if method.type:
             results.append(method.result.decl)
 
-        error_var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception']) # method.create_variable(error_var_name, ctx.program.classes['Exception'], self.translator)
+        error_var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
         if method.declared_exceptions:
             results.append(error_var.decl)
 
-        mname = ctx.program.get_fresh_name(method.sil_name + '_inherit_check')
+        mname = ctx.program.get_fresh_name(cls.name + '_' + method.name +
+                                           '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
-        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)), self.no_position(ctx), self.no_info(ctx))
-        new_type = self.type_factory.concrete_type_check(next(iter(method.args.values())).ref, cls, ctx)
+        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+                                    self.viper.NullLit(self.no_position(ctx),
+                                                       self.no_info(ctx)),
+                                    self.no_position(ctx), self.no_info(ctx))
+        new_type = self.type_factory.concrete_type_check(
+            next(iter(method.args.values())).ref, cls, ctx)
         pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
             args.append(arg)
             params.append(arg.decl)
-        stmts = self.inline_method(method, args, method.result, error_var, ctx)
-        body = self.translate_block(stmts, self.no_position(ctx), self.no_info(ctx))
+
+        stmts, end_lbl = self.inline_method(method, args, method.result,
+                                            error_var, ctx)
+        goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
+                                   self.no_info(ctx))
+        stmts.append(goto_end)
+        old_var_valiases = ctx.var_aliases
+        old_lbl_aliases = ctx.label_aliases
+        for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
+            ctx.var_aliases = var_aliases
+            ctx.label_aliases = lbl_aliases
+            ctx.inlined_calls.append(added_method)
+            for block in added_method.try_blocks:
+                for handler in block.handlers:
+                    stmts += self.translate_handler(handler, ctx)
+                if block.else_block:
+                    stmts += self.translate_handler(block.else_block, ctx)
+                if block.finally_block:
+                    stmts += self.translate_finally(block, ctx)
+            ctx.inlined_calls.remove(added_method)
+        ctx.added_handlers = []
+        ctx.var_aliases = old_var_valiases
+        ctx.label_aliases = old_lbl_aliases
+
+        stmts.append(end_lbl)
+        body = self.translate_block(stmts, self.no_position(ctx),
+                                    self.no_info(ctx))
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]

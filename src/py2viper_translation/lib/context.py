@@ -1,5 +1,5 @@
 from py2viper_translation.lib.constants import ERROR_NAME, RESULT_NAME
-from py2viper_translation.lib.program_nodes import PythonVar
+from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
 from typing import List
 
 
@@ -18,6 +18,7 @@ class Context:
         self.program = None
         self.inlined_calls = []
         self.ignore_family_folds = False
+        self.added_handlers = []
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []
@@ -30,7 +31,7 @@ class Context:
         return res
 
     @property
-    def actual_function(self):
+    def actual_function(self) -> PythonMethod:
         """
         Returns the function/method which is actually currently being
         translated, i.e. if a function is currently being inlined, that

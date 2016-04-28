@@ -196,7 +196,7 @@ class CallTranslator(CommonTranslator):
 
     def inline_method(self, method: PythonMethod, args: List[PythonVar],
                       result_var: PythonVar, error_var: PythonVar,
-                      ctx: Context) -> List[Stmt]:
+                      ctx: Context) -> Tuple[List[Stmt], 'silver.ast.Label']:
         """
         Inlines a call to the given method, if the given argument vars contain
         the values of the arguments. Saves the result in result_var and any
@@ -230,18 +230,20 @@ class CallTranslator(CommonTranslator):
         end_label_name = ctx.label_aliases[END_LABEL]
         end_label = self.viper.Label(end_label_name, self.no_position(ctx),
                                      self.no_info(ctx))
+        ctx.added_handlers.append((method, ctx.var_aliases, ctx.label_aliases))
+
         # translate body
         index = get_body_start_index(method.node.body)
         stmts = []
 
         for stmt in method.node.body[index:]:
             stmts += self.translate_stmt(stmt, ctx)
-        stmts.append(end_label)
+
         # check for exceptions
         ctx.inlined_calls.remove(method)
         ctx.var_aliases = old_var_aliases
         ctx.label_aliases = old_label_aliases
-        return stmts
+        return stmts, end_label
 
     def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
                     ctx: Context) -> StmtsAndExpr:
@@ -291,10 +293,11 @@ class CallTranslator(CommonTranslator):
             optional_error_var = var
         old_fold = ctx.ignore_family_folds
         ctx.ignore_family_folds = True
-        inline_stmts = self.inline_method(method, args, res_var,
-                                          optional_error_var, ctx)
+        inline_stmts, end_lbl = self.inline_method(method, args, res_var,
+                                                   optional_error_var, ctx)
         ctx.ignore_family_folds = old_fold
         stmts += inline_stmts
+        stmts.append(end_lbl)
         if method.declared_exceptions:
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)

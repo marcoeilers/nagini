@@ -185,6 +185,8 @@ class ExpressionTranslator(CommonTranslator):
             if try_.finally_block:
                 # propagate return value
                 var_next = try_.get_finally_var(self.translator)
+                if ctx.var_aliases and var_next.sil_name in ctx.var_aliases:
+                    var_next = ctx.var_aliases[var_next.sil_name]
                 number_two = self.viper.IntLit(2, self.no_position(ctx),
                                                self.no_info(ctx))
                 next_assign = self.viper.LocalVarAssign(var_next.ref,
@@ -229,8 +231,6 @@ class ExpressionTranslator(CommonTranslator):
             return [], func_app
         else:
             if ctx.var_aliases and node.id in ctx.var_aliases:
-                print(node.id)
-                print(ctx.current_function.name)
                 return [], ctx.var_aliases[node.id].ref
             else:
                 return [], ctx.current_function.get_variable(node.id).ref

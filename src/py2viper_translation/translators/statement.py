@@ -65,7 +65,10 @@ class StatementTranslator(CommonTranslator):
                 try_block = block
                 break
         assert try_block
-        code_var = try_block.get_finally_var(self.translator).ref
+        code_var = try_block.get_finally_var(self.translator)
+        if ctx.var_aliases and code_var.sil_name in ctx.var_aliases:
+            code_var = ctx.var_aliases[code_var.sil_name]
+        code_var = code_var.ref
         zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
         assign = self.viper.LocalVarAssign(code_var, zero, self.no_position(ctx),
                                            self.no_info(ctx))

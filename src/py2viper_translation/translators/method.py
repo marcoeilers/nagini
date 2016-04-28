@@ -286,6 +286,7 @@ class MethodTranslator(CommonTranslator):
             end_label = ctx.get_label_name(END_LABEL)
             body.append(self.viper.Goto(end_label, self.no_position(ctx),
                                         self.no_info(ctx)))
+            assert not ctx.var_aliases
             for block in method.try_blocks:
                 for handler in block.handlers:
                     body += self.translate_handler(handler, ctx)
@@ -293,6 +294,23 @@ class MethodTranslator(CommonTranslator):
                     body += self.translate_handler(block.else_block, ctx)
                 if block.finally_block:
                     body += self.translate_finally(block, ctx)
+            old_var_valiases = ctx.var_aliases
+            old_lbl_aliases = ctx.label_aliases
+            for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
+                ctx.var_aliases = var_aliases
+                ctx.label_aliases = lbl_aliases
+                ctx.inlined_calls.append(added_method)
+                for block in added_method.try_blocks:
+                    for handler in block.handlers:
+                        body += self.translate_handler(handler, ctx)
+                    if block.else_block:
+                        body += self.translate_handler(block.else_block, ctx)
+                    if block.finally_block:
+                        body += self.translate_finally(block, ctx)
+                ctx.inlined_calls.remove(added_method)
+            ctx.added_handlers = []
+            ctx.var_aliases = old_var_valiases
+            ctx.label_aliases = old_lbl_aliases
             locals = [local.decl for local in method.get_locals()]
             body += self._create_method_epilog(method, ctx)
         body_block = self.translate_block(body,
@@ -321,6 +339,8 @@ class MethodTranslator(CommonTranslator):
         for stmt in block.finally_block:
             body += self.translate_stmt(stmt, ctx)
         finally_var = block.get_finally_var(self.translator)
+        if ctx.var_aliases and finally_var.sil_name in ctx.var_aliases:
+            finally_var = ctx.var_aliases[finally_var.sil_name]
         tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            block.node)
         post_label = ctx.get_label_name(block.post_name)
@@ -335,6 +355,8 @@ class MethodTranslator(CommonTranslator):
             if not return_block and current.finally_block:
                 # propagate return value
                 var_next = current.get_finally_var(self.translator)
+                if ctx.var_aliases and var_next.sil_name in ctx.var_aliases:
+                    var_next = ctx.var_aliases[var_next.sil_name]
                 next_assign = self.viper.LocalVarAssign(var_next.ref,
                                                         finally_var.ref,
                                                         pos, info)
@@ -345,8 +367,11 @@ class MethodTranslator(CommonTranslator):
             for handler in current.handlers:
                 # if handler applies
                 # goto handler
-                condition = self.var_type_check(block.get_error_var(
-                    self.translator).sil_name, handler.exception, ctx)
+                err_var = block.get_error_var(self.translator)
+                if ctx.var_aliases and err_var.sil_name in ctx.var_aliases:
+                    err_var = ctx.var_aliases[err_var.sil_name]
+                condition = self.var_type_check(err_var.sil_name,
+                                                handler.exception, ctx)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
                 if_handler = self.viper.If(condition, goto, empty_stmt, pos,
@@ -362,8 +387,11 @@ class MethodTranslator(CommonTranslator):
         if ctx.actual_function.declared_exceptions:
             # assign error to error output var
             error_var = ctx.error_var
+            block_error_var = block.get_error_var(self.translator)
+            if ctx.var_aliases and block_error_var.sil_name in ctx.var_aliases:
+                block_error_var = ctx.var_aliases[block_error_var.sil_name]
             assign = self.viper.LocalVarAssign(
-                error_var, block.get_error_var(self.translator).ref, pos, info)
+                error_var, block_error_var.ref, pos, info)
             except_block.append(assign)
             except_block.append(goto_end)
         else:
@@ -394,12 +422,14 @@ class MethodTranslator(CommonTranslator):
         label = self.viper.Label(label_name,
                                  self.to_position(handler.node, ctx),
                                  self.no_info(ctx))
-        assert not ctx.var_aliases
+        old_var_aliases = ctx.var_aliases
         if handler.exception_name:
-            ctx.var_aliases = {
-                handler.exception_name:
-                    handler.try_block.get_error_var(self.translator)
-            }
+            if not ctx.var_aliases:
+                ctx.var_aliases = {}
+            err_var = handler.try_block.get_error_var(self.translator)
+            if err_var.sil_name in ctx.var_aliases:
+                err_var = ctx.var_aliases[err_var.sil_name]
+            ctx.var_aliases[handler.exception_name] = err_var
         body = []
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)
@@ -408,7 +438,10 @@ class MethodTranslator(CommonTranslator):
                                           self.no_info(ctx))
         if handler.try_block.finally_block:
             next = handler.try_block.finally_name
-            lhs = handler.try_block.get_finally_var(self.translator).ref
+            finally_var = handler.try_block.get_finally_var(self.translator)
+            if ctx.var_aliases and finally_var.sil_name in ctx.var_aliases:
+                finally_var = ctx.var_aliases[finally_var.sil_name]
+            lhs = finally_var.ref
             rhs = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
             var_set = self.viper.LocalVarAssign(lhs, rhs, self.no_position(ctx),
                                                 self.no_info(ctx))
@@ -420,5 +453,5 @@ class MethodTranslator(CommonTranslator):
         goto_end = self.viper.Goto(label_name,
                                    self.to_position(handler.node, ctx),
                                    self.no_info(ctx))
-        ctx.var_aliases = None
+        ctx.var_aliases = old_var_aliases
         return [label, body_block] + next_var_set + [goto_end]

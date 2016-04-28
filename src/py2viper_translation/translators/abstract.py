@@ -4,6 +4,7 @@ from abc import ABCMeta
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
+    PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
     PythonVar,
@@ -142,6 +143,14 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.contract_translator.translate_contractfunc_call(node,
                                                                            ctx)
 
+    def translate_handler(self, handler: PythonExceptionHandler,
+                          ctx: Context) -> List[Stmt]:
+        return self.config.method_translator.translate_handler(handler, ctx)
+
+    def translate_finally(self, block: PythonTryBlock,
+                          ctx: Context) -> List[Stmt]:
+        return self.config.method_translator.translate_finally(block, ctx)
+
 
 class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     """
@@ -223,7 +232,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            stmt)
         if tries:
-            return tries[0].get_error_var(self.translator).ref
+            err_var = tries[0].get_error_var(self.translator)
+            if ctx.var_aliases and err_var.sil_name in ctx.var_aliases:
+                err_var = ctx.var_aliases[err_var.sil_name]
+            return err_var.ref
         if ctx.actual_function.declared_exceptions:
             return ctx.error_var
         else:

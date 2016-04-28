@@ -323,6 +323,8 @@ class PythonMethod(PythonNode, PythonScope):
                     self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
+        for try_block in self.try_blocks:
+            try_block.process(translator)
 
     def get_variable(self, name: str) -> 'PythonVar':
         """
@@ -454,6 +456,10 @@ class PythonTryBlock(PythonNode):
         self.method.locals[sil_name] = result
         self.error_var = result
         return result
+
+    def process(self, translator: 'Translator') -> None:
+        self.get_error_var(translator)
+        self.get_finally_var(translator)
 
 
 class PythonVar(PythonNode):
