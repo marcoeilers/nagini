@@ -173,10 +173,10 @@ class ContractTranslator(CommonTranslator):
         if isinstance(fold.args[0], ast.Call) and \
                 isinstance(fold.args[0].func, ast.Attribute):
             return True
-        if isinstance(fold.args[0], ast.Call) and \
-            isinstance(fold.args[0].func, ast.Name) and \
-            fold.args[0].func.id == 'Acc' and \
-            isinstance(fold.args[0].args[0], ast.Attribute):
+        if (isinstance(fold.args[0], ast.Call) and
+                isinstance(fold.args[0].func, ast.Name) and
+                fold.args[0].func.id == 'Acc' and
+                isinstance(fold.args[0].args[0], ast.Attribute)):
             return True
         return False
 

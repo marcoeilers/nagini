@@ -294,23 +294,7 @@ class MethodTranslator(CommonTranslator):
                     body += self.translate_handler(block.else_block, ctx)
                 if block.finally_block:
                     body += self.translate_finally(block, ctx)
-            old_var_valiases = ctx.var_aliases
-            old_lbl_aliases = ctx.label_aliases
-            for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
-                ctx.var_aliases = var_aliases
-                ctx.label_aliases = lbl_aliases
-                ctx.inlined_calls.append(added_method)
-                for block in added_method.try_blocks:
-                    for handler in block.handlers:
-                        body += self.translate_handler(handler, ctx)
-                    if block.else_block:
-                        body += self.translate_handler(block.else_block, ctx)
-                    if block.finally_block:
-                        body += self.translate_finally(block, ctx)
-                ctx.inlined_calls.remove(added_method)
-            ctx.added_handlers = []
-            ctx.var_aliases = old_var_valiases
-            ctx.label_aliases = old_lbl_aliases
+            body += self.add_handlers_for_inlines(ctx)
             locals = [local.decl for local in method.get_locals()]
             body += self._create_method_epilog(method, ctx)
         body_block = self.translate_block(body,
@@ -339,7 +323,7 @@ class MethodTranslator(CommonTranslator):
         for stmt in block.finally_block:
             body += self.translate_stmt(stmt, ctx)
         finally_var = block.get_finally_var(self.translator)
-        if ctx.var_aliases and finally_var.sil_name in ctx.var_aliases:
+        if finally_var.sil_name in ctx.var_aliases:
             finally_var = ctx.var_aliases[finally_var.sil_name]
         tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            block.node)
@@ -355,7 +339,7 @@ class MethodTranslator(CommonTranslator):
             if not return_block and current.finally_block:
                 # propagate return value
                 var_next = current.get_finally_var(self.translator)
-                if ctx.var_aliases and var_next.sil_name in ctx.var_aliases:
+                if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
                 next_assign = self.viper.LocalVarAssign(var_next.ref,
                                                         finally_var.ref,
@@ -368,7 +352,7 @@ class MethodTranslator(CommonTranslator):
                 # if handler applies
                 # goto handler
                 err_var = block.get_error_var(self.translator)
-                if ctx.var_aliases and err_var.sil_name in ctx.var_aliases:
+                if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
                 condition = self.var_type_check(err_var.sil_name,
                                                 handler.exception, ctx)
@@ -388,7 +372,7 @@ class MethodTranslator(CommonTranslator):
             # assign error to error output var
             error_var = ctx.error_var
             block_error_var = block.get_error_var(self.translator)
-            if ctx.var_aliases and block_error_var.sil_name in ctx.var_aliases:
+            if block_error_var.sil_name in ctx.var_aliases:
                 block_error_var = ctx.var_aliases[block_error_var.sil_name]
             assign = self.viper.LocalVarAssign(
                 error_var, block_error_var.ref, pos, info)
@@ -439,7 +423,7 @@ class MethodTranslator(CommonTranslator):
         if handler.try_block.finally_block:
             next = handler.try_block.finally_name
             finally_var = handler.try_block.get_finally_var(self.translator)
-            if ctx.var_aliases and finally_var.sil_name in ctx.var_aliases:
+            if finally_var.sil_name in ctx.var_aliases:
                 finally_var = ctx.var_aliases[finally_var.sil_name]
             lhs = finally_var.ref
             rhs = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))

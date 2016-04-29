@@ -78,7 +78,7 @@ class PredicateTranslator(CommonTranslator):
                     self.to_position(root.node, ctx), self.no_info(ctx))
             else:
                 body = implication
-        ctx.var_aliases = None
+        ctx.var_aliases = {}
         return self.viper.Predicate(name, args, body,
                                     self.to_position(root.node, ctx),
                                     self.no_info(ctx))

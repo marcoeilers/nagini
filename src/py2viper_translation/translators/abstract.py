@@ -233,7 +233,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                            stmt)
         if tries:
             err_var = tries[0].get_error_var(self.translator)
-            if ctx.var_aliases and err_var.sil_name in ctx.var_aliases:
+            if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             return err_var.ref
         if ctx.actual_function.declared_exceptions:
@@ -249,7 +249,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Creates an expression checking if the var with the given name
         is of the given type.
         """
-        if ctx.var_aliases and name in ctx.var_aliases:
+        if name in ctx.var_aliases:
             obj_var = ctx.var_aliases[name].ref
         else:
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
@@ -269,3 +269,24 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
             self.to_position(node, ctx), self.no_info(ctx))
         return pred_acc_pred
+
+    def add_handlers_for_inlines(self, ctx: Context) -> List[Stmt]:
+        stmts = []
+        old_var_valiases = ctx.var_aliases
+        old_lbl_aliases = ctx.label_aliases
+        for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
+            ctx.var_aliases = var_aliases
+            ctx.label_aliases = lbl_aliases
+            ctx.inlined_calls.append(added_method)
+            for block in added_method.try_blocks:
+                for handler in block.handlers:
+                    stmts += self.translate_handler(handler, ctx)
+                if block.else_block:
+                    stmts += self.translate_handler(block.else_block, ctx)
+                if block.finally_block:
+                    stmts += self.translate_finally(block, ctx)
+            ctx.inlined_calls.remove(added_method)
+        ctx.added_handlers = []
+        ctx.var_aliases = old_var_valiases
+        ctx.label_aliases = old_lbl_aliases
+        return stmts

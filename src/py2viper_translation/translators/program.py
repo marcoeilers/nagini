@@ -101,23 +101,7 @@ class ProgramTranslator(CommonTranslator):
         goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
                                    self.no_info(ctx))
         stmts.append(goto_end)
-        old_var_valiases = ctx.var_aliases
-        old_lbl_aliases = ctx.label_aliases
-        for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
-            ctx.var_aliases = var_aliases
-            ctx.label_aliases = lbl_aliases
-            ctx.inlined_calls.append(added_method)
-            for block in added_method.try_blocks:
-                for handler in block.handlers:
-                    stmts += self.translate_handler(handler, ctx)
-                if block.else_block:
-                    stmts += self.translate_handler(block.else_block, ctx)
-                if block.finally_block:
-                    stmts += self.translate_finally(block, ctx)
-            ctx.inlined_calls.remove(added_method)
-        ctx.added_handlers = []
-        ctx.var_aliases = old_var_valiases
-        ctx.label_aliases = old_lbl_aliases
+        stmts += self.add_handlers_for_inlines(ctx)
 
         stmts.append(end_lbl)
         body = self.translate_block(stmts, self.no_position(ctx),
