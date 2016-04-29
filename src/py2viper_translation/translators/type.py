@@ -7,9 +7,9 @@ from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
+    InvalidProgramException,
     is_two_arg_super_call,
     UnsupportedException,
-    InvalidProgramException
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (

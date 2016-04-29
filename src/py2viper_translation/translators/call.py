@@ -57,12 +57,9 @@ class CallTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'invalid.super.call')
         elif not node.args:
             arg_name = next(iter(ctx.actual_function.args))
-            if ctx.var_aliases and arg_name in ctx.var_aliases:
+            if arg_name in ctx.var_aliases:
                 replacement = ctx.var_aliases[arg_name]
-                if isinstance(replacement, PythonVar):
-                    return replacement.ref
-                else:
-                    return replacement
+                return replacement.ref
             return [], ctx.current_function.args[arg_name].ref
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
@@ -216,6 +213,7 @@ class CallTranslator(CommonTranslator):
         ctx.var_aliases = var_aliases
         ctx.label_aliases = {}
 
+        # create local var aliases
         locals_to_copy = method.locals.copy()
         for local_name, local in locals_to_copy.items():
             local_var = ctx.current_function.create_variable(local_name,
@@ -239,7 +237,6 @@ class CallTranslator(CommonTranslator):
         for stmt in method.node.body[index:]:
             stmts += self.translate_stmt(stmt, ctx)
 
-        # check for exceptions
         ctx.inlined_calls.remove(method)
         ctx.var_aliases = old_var_aliases
         ctx.label_aliases = old_label_aliases
@@ -261,6 +258,7 @@ class CallTranslator(CommonTranslator):
         args = []
         stmts = []
 
+        # create local vars for parameters and assign args to them
         all_arg = node.args
         if is_super:
             all_arg = [next(iter(ctx.actual_function.args.values()))] + all_arg

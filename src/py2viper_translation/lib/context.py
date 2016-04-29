@@ -11,7 +11,7 @@ class Context:
     def __init__(self) -> None:
         self.current_function = None
         self.current_class = None
-        self.var_aliases = None
+        self.var_aliases = {}
         self.label_aliases = {}
         self.position = None
         self.info = None
@@ -49,7 +49,9 @@ class Context:
         """
         if self.var_aliases and RESULT_NAME in self.var_aliases:
             return self.var_aliases[RESULT_NAME].ref
-        return self.current_function.result.ref
+        if self.current_function.result:
+            return self.current_function.result.ref
+        return None
 
     @property
     def error_var(self):

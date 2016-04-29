@@ -66,7 +66,7 @@ class StatementTranslator(CommonTranslator):
                 break
         assert try_block
         code_var = try_block.get_finally_var(self.translator)
-        if ctx.var_aliases and code_var.sil_name in ctx.var_aliases:
+        if code_var.sil_name in ctx.var_aliases:
             code_var = ctx.var_aliases[code_var.sil_name]
         code_var = code_var.ref
         zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
