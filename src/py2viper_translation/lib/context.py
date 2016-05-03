@@ -42,25 +42,25 @@ class Context:
         return self.inlined_calls[-1]
 
     @property
-    def result_var(self):
+    def result_var(self) -> PythonVar:
         """
         Returns the result var of the current function or the current alias for
         it.
         """
         if self.var_aliases and RESULT_NAME in self.var_aliases:
-            return self.var_aliases[RESULT_NAME].ref
+            return self.var_aliases[RESULT_NAME]
         if self.current_function.result:
-            return self.current_function.result.ref
+            return self.current_function.result
         return None
 
     @property
-    def error_var(self):
+    def error_var(self) -> PythonVar:
         """
         Returns the error var of the current function or the current alias for
         it.
         """
         if self.var_aliases and ERROR_NAME in self.var_aliases:
-            return self.var_aliases[ERROR_NAME].ref
+            return self.var_aliases[ERROR_NAME]
         return self.current_function.error_var
 
     def get_label_name(self, name: str) -> str:

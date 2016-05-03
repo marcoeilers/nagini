@@ -221,7 +221,7 @@ class StatementTranslator(CommonTranslator):
         type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
-            ctx.result_var,
+            ctx.result_var.ref,
             rhs, self.to_position(node, ctx),
             self.no_info(ctx))
 

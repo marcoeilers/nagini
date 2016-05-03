@@ -162,7 +162,7 @@ class ExpressionTranslator(CommonTranslator):
             var = var.ref
         cases = []
         position = self.to_position(call, ctx)
-        err_var = ctx.error_var
+        err_var = ctx.error_var.ref
         relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
         goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
         if goto_finally:
