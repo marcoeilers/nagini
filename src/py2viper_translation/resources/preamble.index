@@ -1,0 +1,136 @@
+{
+"list": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "append": {
+            "args": ["list", "object"],
+            "type": null
+        },
+        "__setitem__": {
+            "args": ["list", "int", "object"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__getitem__": {
+            "args": ["list", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["list", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["list"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["list"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"set":{
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "add": {
+            "args": ["set", "int"],
+            "type": null
+        },
+        "clear": {
+            "args": ["set"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "int"],
+            "type": "bool"
+        },
+        "__bool__": {
+            "args": ["set"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"dict": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "keys": {
+            "args": ["dict"],
+            "type": "set"
+        },
+        "__setitem__": {
+            "args": ["dict", "int", "object"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "int"],
+            "type": "bool"
+        },
+        "__getitem__": {
+            "args": ["dict", "int"],
+            "type": "object"
+        },
+        "get": {
+            "args": ["dict", "int"],
+            "type": "object"
+        },
+        "keys": {
+            "args": ["dict"],
+            "type": "set"
+        },
+        "__bool__": {
+            "args": ["dict"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"object": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        }
+    }
+},
+"int": {
+    "functions": {
+        "__bool__": {
+            "args": ["int"],
+            "type": "bool"
+        }
+    }
+},
+"bool": {
+    "functions": {
+        "__bool__": {
+            "args": ["bool"],
+            "type": "bool"
+        }
+    }
+},
+"NoneType": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        }
+    }
+},
+"Exception": {}
+}
