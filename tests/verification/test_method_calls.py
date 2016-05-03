@@ -79,3 +79,19 @@ def nested_calls2() -> None:
     Assert(c1_1.c2.c1.c2.c1 == c1_1)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(c1_1.c2.c1 == c1_1)
+
+
+def null_test(b: bool) -> None:
+    c1 = Class1()
+    c2 = c1 if b else None
+    c1.get_c2_impure()
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    c2.get_c2_impure()
+
+
+def null_test_pure(b: bool) -> None:
+    c1 = Class1()
+    c2 = c1 if b else None
+    c1.get_c2()
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    c2.get_c2()

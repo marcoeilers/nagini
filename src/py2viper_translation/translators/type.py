@@ -7,6 +7,7 @@ from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
+    InvalidProgramException,
     is_two_arg_super_call,
     UnsupportedException,
 )
@@ -47,7 +48,7 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                return ctx.current_function.get_variable(node.id).type
+                return ctx.actual_function.get_variable(node.id).type
         elif isinstance(node, ast.Compare):
             return ctx.program.classes['bool']
         elif isinstance(node, ast.BoolOp):
@@ -75,7 +76,9 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.Call):
             if get_func_name(node) == 'super':
                 if len(node.args) == 2:
-                    assert is_two_arg_super_call(node, ctx)
+                    if not is_two_arg_super_call(node, ctx):
+                        raise InvalidProgramException(node,
+                                                      'invalid.super.call')
                     return ctx.program.classes[node.args[0].id].superclass
                 elif not node.args:
                     return ctx.current_class.superclass
@@ -84,7 +87,7 @@ class TypeTranslator(CommonTranslator):
             if isinstance(node.func, ast.Name):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
-                        return ctx.current_function.type
+                        return ctx.actual_function.type
                     elif node.func.id == 'Acc':
                         return ctx.program.classes['bool']
                     else:

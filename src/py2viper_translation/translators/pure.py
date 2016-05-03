@@ -212,7 +212,7 @@ class PureTranslator(CommonTranslator):
                     previous = let
             else:
                 raise UnsupportedException(wrapper)
-        ctx.var_aliases = None
+        ctx.var_aliases = {}
         return previous
 
     def _translate_condition(self, conds: List, names: Dict[str, PythonVar],

@@ -152,6 +152,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function is None
         name = node.name
         cls = self.get_class(name)
+        cls.node = node
         if len(node.bases) > 1:
             raise UnsupportedException(node)
         if len(node.bases) == 1:
@@ -286,7 +287,8 @@ class Analyzer(ast.NodeVisitor):
                     pass
                 else:
                     var = self.node_factory.create_python_var(node.id,
-                                                              node, self.typeof(node))
+                                                              node,
+                                                              self.typeof(node))
                     self.current_function.locals[node.id] = var
                 self.track_access(node, var)
 
@@ -301,6 +303,8 @@ class Analyzer(ast.NodeVisitor):
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)
+            if node.id in self.program.classes:
+                return self.program.classes[node.id]
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
@@ -341,7 +345,11 @@ class Analyzer(ast.NodeVisitor):
         try_name = self.current_function.get_fresh_name('try')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
-        node.sil_name = try_name
+        try_block.sil_name = try_name
+        self.current_function.labels.append(try_name)
+        post_name = self.current_function.get_fresh_name('post_try')
+        try_block.post_name = post_name
+        self.current_function.labels.append(post_name)
         for handler in node.handlers:
             handler_name = self.current_function.get_fresh_name(
                 'handler' + handler.type.id)
@@ -349,6 +357,7 @@ class Analyzer(ast.NodeVisitor):
             py_handler = PythonExceptionHandler(handler, type, try_block,
                                                 handler_name, handler.body,
                                                 handler.name)
+            self.current_function.labels.append(handler_name)
             try_block.handlers.append(py_handler)
         if node.orelse:
             handler_name = self.current_function.get_fresh_name('try_else')
@@ -359,6 +368,7 @@ class Analyzer(ast.NodeVisitor):
             finally_name = self.current_function.get_fresh_name('try_finally')
             try_block.finally_block = node.finalbody
             try_block.finally_name = finally_name
+            self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
     def is_pure(self, func: ast.FunctionDef) -> bool:

@@ -4,6 +4,7 @@ from abc import ABCMeta
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
+    PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
     PythonVar,
@@ -130,10 +131,25 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                               is_constructor,
                                                               ctx)
 
+    def inline_method(self, method: PythonMethod, args: List[PythonVar],
+                      result_var: PythonVar, error_var: PythonVar,
+                      ctx: Context) -> List[Stmt]:
+        return self.config.call_translator.inline_method(method, args,
+                                                         result_var, error_var,
+                                                         ctx)
+
     def translate_contractfunc_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node,
                                                                            ctx)
+
+    def translate_handler(self, handler: PythonExceptionHandler,
+                          ctx: Context) -> List[Stmt]:
+        return self.config.method_translator.translate_handler(handler, ctx)
+
+    def translate_finally(self, block: PythonTryBlock,
+                          ctx: Context) -> List[Stmt]:
+        return self.config.method_translator.translate_finally(block, ctx)
 
 
 class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
@@ -213,12 +229,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         the error return variable of the surrounding function, otherwise
         creates a new local variable of type Exception.
         """
-        tries = get_surrounding_try_blocks(ctx.current_function.try_blocks,
+        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            stmt)
         if tries:
-            return tries[0].get_error_var(self.translator).ref
-        if ctx.current_function.declared_exceptions:
-            return ctx.current_function.error_var
+            err_var = tries[0].get_error_var(self.translator)
+            if err_var.sil_name in ctx.var_aliases:
+                err_var = ctx.var_aliases[err_var.sil_name]
+            return err_var.ref
+        if ctx.actual_function.declared_exceptions:
+            return ctx.error_var
         else:
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
@@ -230,13 +249,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Creates an expression checking if the var with the given name
         is of the given type.
         """
-        obj_var = self.viper.LocalVar(name, self.viper.Ref,
-                                      self.no_position(ctx),
-                                      self.no_info(ctx))
+        if name in ctx.var_aliases:
+            obj_var = ctx.var_aliases[name].ref
+        else:
+            obj_var = self.viper.LocalVar(name, self.viper.Ref,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
         return self.type_factory.type_check(obj_var, type, ctx)
 
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
-                                 node: ast.AST, ctx: Context) -> Expr:
+                                node: ast.AST, ctx: Context) -> Expr:
         """
         Creates a predicate access for the predicate with the given name,
         with the given args and permission.
@@ -247,3 +269,24 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
             self.to_position(node, ctx), self.no_info(ctx))
         return pred_acc_pred
+
+    def add_handlers_for_inlines(self, ctx: Context) -> List[Stmt]:
+        stmts = []
+        old_var_valiases = ctx.var_aliases
+        old_lbl_aliases = ctx.label_aliases
+        for (added_method, var_aliases, lbl_aliases) in ctx.added_handlers:
+            ctx.var_aliases = var_aliases
+            ctx.label_aliases = lbl_aliases
+            ctx.inlined_calls.append(added_method)
+            for block in added_method.try_blocks:
+                for handler in block.handlers:
+                    stmts += self.translate_handler(handler, ctx)
+                if block.else_block:
+                    stmts += self.translate_handler(block.else_block, ctx)
+                if block.finally_block:
+                    stmts += self.translate_finally(block, ctx)
+            ctx.inlined_calls.remove(added_method)
+        ctx.added_handlers = []
+        ctx.var_aliases = old_var_valiases
+        ctx.label_aliases = old_lbl_aliases
+        return stmts

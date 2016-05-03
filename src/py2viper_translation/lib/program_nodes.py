@@ -2,10 +2,15 @@ import ast
 import mypy
 
 from collections import OrderedDict
-from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.constants import (
+    END_LABEL,
+    ERROR_NAME,
+    PRIMITIVES,
+    RESULT_NAME
+)
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import UnsupportedException
-from typing import List, Optional
+from typing import List, Optional, Set
 
 
 class PythonScope:
@@ -114,6 +119,13 @@ class PythonClass(PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+
+    def get_all_methods(self) -> Set['PythonMethod']:
+        result = set()
+        if self.superclass:
+            result |= self.superclass.get_all_methods()
+        result |= set(self.methods.keys())
+        return result
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonClass') -> 'PythonField':
@@ -257,7 +269,8 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, ['_res', '_err', '__end'], superscope)
+        PythonScope.__init__(self, [RESULT_NAME, ERROR_NAME, END_LABEL],
+                             superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
@@ -267,6 +280,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.args = OrderedDict()  # direct
         self.type = None  # infer
         self.result = None  # infer
+        self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.precondition = []
         self.postcondition = []
@@ -276,6 +290,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.contract_only = contract_only
         self.interface = interface
         self.node_factory = node_factory
+        self.labels = [END_LABEL]
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -297,9 +312,9 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             raise UnsupportedException(func_type)
         if self.type is not None:
-            self.result = self.node_factory.create_python_var("_res", None,
+            self.result = self.node_factory.create_python_var(RESULT_NAME, None,
                                                               self.type)
-            self.result.process("_res", translator)
+            self.result.process(RESULT_NAME, translator)
         if self.cls is not None and self.cls.superclass is not None:
             if self.predicate:
                 self.overrides = self.cls.superclass.get_predicate(self.name)
@@ -308,6 +323,8 @@ class PythonMethod(PythonNode, PythonScope):
                     self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
+        for try_block in self.try_blocks:
+            try_block.process(translator)
 
     def get_variable(self, name: str) -> 'PythonVar':
         """
@@ -400,6 +417,9 @@ class PythonTryBlock(PythonNode):
         self.error_var = None
         self.method = method
         self.node_factory = node_factory
+        self.finally_name = None
+        self.post_name = None
+        method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
         """
@@ -436,6 +456,10 @@ class PythonTryBlock(PythonNode):
         self.method.locals[sil_name] = result
         self.error_var = result
         return result
+
+    def process(self, translator: 'Translator') -> None:
+        self.get_error_var(translator)
+        self.get_finally_var(translator)
 
 
 class PythonVar(PythonNode):

@@ -46,9 +46,9 @@ class ContractTranslator(CommonTranslator):
         expression.
         """
         assert len(node.args) == 0
-        type = ctx.current_function.type
-        if not ctx.current_function.pure:
-            return [], ctx.current_function.result.ref
+        type = ctx.actual_function.type
+        if not ctx.actual_function.pure:
+            return [], ctx.result_var
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
                                           self.to_position(node, ctx),
@@ -159,11 +159,26 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        if self._is_family_fold(node):
+            # predicate called on receiver, so it belongs to a family
+            if ctx.ignore_family_folds:
+                return [], None
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         fold = self.viper.Fold(pred, self.to_position(node, ctx),
                                self.no_info(ctx))
         return [fold], None
+
+    def _is_family_fold(self, fold: ast.AST) -> bool:
+        if isinstance(fold.args[0], ast.Call) and \
+                isinstance(fold.args[0].func, ast.Attribute):
+            return True
+        if (isinstance(fold.args[0], ast.Call) and
+                isinstance(fold.args[0].func, ast.Name) and
+                fold.args[0].func.id == 'Acc' and
+                isinstance(fold.args[0].args[0], ast.Attribute)):
+            return True
+        return False
 
     def translate_unfold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -172,6 +187,10 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        if self._is_family_fold(node):
+            # predicate called on receiver, so it belongs to a family
+            if ctx.ignore_family_folds:
+                return [], None
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         unfold = self.viper.Unfold(pred, self.to_position(node, ctx),
