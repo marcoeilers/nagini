@@ -132,5 +132,39 @@
         }
     }
 },
-"Exception": {}
+"Exception": {},
+"str": {
+    "functions": {
+        "__len__": {
+            "args": ["str"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["str"],
+            "type": "bool"
+        },
+        "__eq__": {
+            "args": ["str", "object"],
+            "type": "bool"
+        },
+        "__add__": {
+            "args": ["str", "str"],
+            "type": "str"
+        }
+    }
+},
+"Tuple": {
+    "functions": {
+        "__getitem__": {
+            "args": ["Tuple", "int"],
+            "type": "object"
+        },
+        "__len__": {
+            "args": ["Tuple"],
+            "type": "int"
+        }
+    }
+},
+"__boxed_int": {},
+"__boxed_bool": {}
 }

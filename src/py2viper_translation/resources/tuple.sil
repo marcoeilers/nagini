@@ -1,0 +1,16 @@
+field int_value___: Int
+field bool_value___: Bool
+
+
+function Tuple___init__(seq : Seq[Ref]): Ref
+    ensures Tuple___val__(result) == seq
+
+function Tuple___val__(self: Ref): Seq[Ref]
+
+function Tuple___len__(self: Ref) : Int
+    ensures result == |Tuple___val__(self)|
+
+function Tuple___getitem__(self: Ref, key: Int): Ref
+    requires key >= 0
+    requires key < Tuple___len__(self)
+    ensures result == Tuple___val__(self)[key]

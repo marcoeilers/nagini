@@ -130,6 +130,9 @@ class ViperAST:
     def Unfolding(self, predicate, expr, position, info):
         return self.ast.Unfolding(predicate, expr, position, info)
 
+    def SeqType(self, element_type):
+        return self.ast.SeqType(element_type)
+
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
                                self.to_seq(axioms), self.to_seq(typevars),
@@ -184,6 +187,8 @@ class ViperAST:
         return self.ast.LocalVarAssign(lhs, rhs, position, info)
 
     def FieldAssign(self, lhs, rhs, position, info):
+        print(lhs)
+        print(rhs)
         return self.ast.FieldAssign(lhs, rhs, position, info)
 
     def FieldAccess(self, receiver, field, position, info):
@@ -246,6 +251,14 @@ class ViperAST:
     def FuncApp(self, name, args, position, info, type, formalargs):
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.to_seq(formalargs))
+
+    def ExplicitSeq(self, elems, position, info):
+        print(elems)
+        print(position)
+        print(info)
+        elems_list = self.to_seq(elems)
+        print(elems_list)
+        return self.ast.ExplicitSeq(elems_list, position, info)
 
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)

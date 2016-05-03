@@ -1,6 +1,7 @@
 import ast
 
 from py2viper_translation.lib.constants import END_LABEL
+from py2viper_translation.lib.program_nodes import PythonType
 from py2viper_translation.lib.util import (
     flatten,
     get_func_name,
@@ -11,9 +12,10 @@ from py2viper_translation.lib.util import (
 from py2viper_translation.translators.abstract import (
     CommonTranslator,
     Context,
+    Expr,
     Stmt,
 )
-from typing import List
+from typing import List, Optional
 
 
 class StatementTranslator(CommonTranslator):
@@ -134,37 +136,63 @@ class StatementTranslator(CommonTranslator):
         return cond_stmt + [self.viper.If(cond, then_block, else_block,
                                           position, self.no_info(ctx))]
 
-    def translate_stmt_Assign(self, node: ast.Assign,
-                              ctx: Context) -> List[Stmt]:
-        if len(node.targets) != 1:
-            raise UnsupportedException(node)
-        if isinstance(node.targets[0], ast.Subscript):
+    def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
+                  rhs_type: PythonType, node: ast.AST,
+                  ctx: Context) -> List[Stmt]:
+        if rhs_index is not None:
+            index_lit = self.viper.IntLit(rhs_index, self.no_position(ctx),
+                                          self.no_info(ctx))
+            args = [rhs, index_lit]
+            rhs = self.get_function_call(rhs_type, '__getitem__', args, node,
+                                         ctx)
+        if isinstance(lhs, ast.Subscript):
             if not isinstance(node.targets[0].slice, ast.Index):
                 raise UnsupportedException(node)
-            target_cls = self.get_type(node.targets[0].value, ctx)
-            lhs_stmt, target = self.translate_expr(node.targets[0].value, ctx)
-            ind_stmt, index = self.translate_expr(node.targets[0].slice.value,
+            target_cls = self.get_type(lhs.value, ctx)
+            lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+            ind_stmt, index = self.translate_expr(lhs.slice.value,
                                                   ctx)
             func = target_cls.get_method('__setitem__')
             func_name = func.sil_name
-            rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+            # rhs_stmt, rhs = self.translate_expr(node.value, ctx)
             args = [target, index, rhs]
             targets = []
             call = self.viper.MethodCall(func_name, args, targets,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
-            return lhs_stmt + ind_stmt + rhs_stmt + [call]
-        target = node.targets[0]
+            return lhs_stmt + ind_stmt + [call]
+        target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
         if isinstance(target, ast.Name):
             assignment = self.viper.LocalVarAssign
         else:
             assignment = self.viper.FieldAssign
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = assignment(var,
                             rhs, self.to_position(node, ctx),
                             self.no_info(ctx))
-        return lhs_stmt + rhs_stmt + [assign]
+        return lhs_stmt + [assign]
+
+    def translate_stmt_Assign(self, node: ast.Assign,
+                              ctx: Context) -> List[Stmt]:
+        if len(node.targets) != 1:
+            # TODO: When does this actually happen?
+            raise UnsupportedException(node)
+        if isinstance(node.targets[0], ast.Tuple):
+            rhs_type = self.get_type(node.value, ctx)
+            if (rhs_type.name != 'Tuple' or
+                    len(rhs_type.type_args) != len(node.targets[0].elts)):
+                raise InvalidProgramException(node, 'invalid.assign')
+            # translate rhs
+            rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+            stmt = rhs_stmt
+            for index in range(len(node.targets)):
+                stmt += self.assign_to(node.targets[0].elts[index], rhs,
+                                       index, rhs_type,
+                                       node, ctx)
+            return stmt
+        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        lhs_stmt = self.assign_to(node.targets[0], rhs, None, None, node, ctx)
+        return rhs_stmt + lhs_stmt
 
     def is_invariant(self, stmt: ast.AST) -> bool:
         return get_func_name(stmt) == 'Invariant'

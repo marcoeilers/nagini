@@ -1,22 +1,25 @@
 import ast
 
 from abc import ABCMeta
+from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
+    PythonType,
     PythonVar,
 )
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
+    InvalidProgramException,
     UnsupportedException
 )
 from py2viper_translation.lib.viper_ast import ViperAST
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 
 # TODO: Move these typedefs to separate file and add more of them.
@@ -204,15 +207,23 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
 
-    def get_function_call(self, receiver: ast.AST, func_name: str,
-                          args: List[Expr], node: ast.AST,
+    def get_function_call(self, receiver: Union[ast.AST, PythonType],
+                          func_name: str, args: List[Expr], node: ast.AST,
                           ctx: Context) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments.
         """
-        target_cls = self.get_type(receiver, ctx)
-        func = target_cls.get_function(func_name)
+        if receiver:
+            if isinstance(receiver, ast.AST):
+                target_cls = self.get_type(receiver, ctx)
+            else:
+                target_cls = receiver
+            func = target_cls.get_function(func_name)
+        else:
+            func = ctx.program.functions[func_name]
+        if not func:
+            raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
         for arg in func.args.values():
             formal_args.append(arg.decl)
@@ -243,8 +254,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 ctx.program.classes['Exception'], self.translator)
             return new_var.ref
 
-    def var_type_check(self, name: str, type: PythonClass,
-                       ctx: Context) -> 'silver.ast.DomainFuncApp':
+    def var_type_check(self, name: str, type: PythonType, perms: bool,
+                       ctx: Context) -> Expr:
         """
         Creates an expression checking if the var with the given name
         is of the given type.
@@ -255,7 +266,39 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                           self.no_position(ctx),
                                           self.no_info(ctx))
-        return self.type_factory.type_check(obj_var, type, ctx)
+        return self.type_check(obj_var, type, perms, ctx)
+
+    # TODO: move to type translator, reference in abstract translator
+    def type_check(self, lhs: Expr, type: PythonType, perms: bool,
+                   ctx: Context) -> Expr:
+        if type.name in PRIMITIVES:
+            # do we need some boxed integer type?
+            if perms:
+                # access to field
+                field = self.viper.Field(type.name + '_value___', self.config.type_translator.translate_type(type, ctx), self.no_position(ctx), self.no_info(ctx))
+                field_acc = self.viper.FieldAccess(lhs, field, self.no_position(ctx), self.no_info(ctx))
+                one = self.viper.IntLit(1, self.no_position(ctx), self.no_info(ctx))
+                hundred = self.viper.IntLit(100, self.no_position(ctx), self.no_info(ctx))
+                perm = self.viper.FractionalPerm(one, hundred, self.no_position(ctx), self.no_info(ctx))
+                pred = self.viper.FieldAccessPredicate(field_acc, perm, self.no_position(ctx), self.no_info(ctx))
+                return pred
+            return self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        result = self.type_factory.type_check(lhs, type, ctx)
+        if type.name == 'Tuple':
+            # length
+            length = self.viper.IntLit(len(type.type_args), self.no_position(ctx), self.no_info(ctx))
+            len_call = self.get_function_call(type, '__len__', [lhs], None, ctx)
+            eq = self.viper.EqCmp(len_call, length, self.no_position(ctx), self.no_info(ctx))
+            result = self.viper.And(result, eq, self.no_position(ctx), self.no_info(ctx))
+            # types of contents
+            for index in range(len(type.type_args)):
+                # typeof getitem lessorequal type
+                item = type.type_args[index]
+                index_lit = self.viper.IntLit(index, self.no_position(ctx), self.no_info(ctx))
+                item_call = self.get_function_call(type, '__getitem__', [lhs, index_lit], None, ctx)
+                type_check = self.type_check(item_call, item, perms, ctx)
+                result = result = self.viper.And(result, type_check, self.no_position(ctx), self.no_info(ctx))
+        return result
 
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
                                 node: ast.AST, ctx: Context) -> Expr:
