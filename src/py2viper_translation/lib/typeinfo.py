@@ -161,3 +161,15 @@ class TypeInfo:
             if isinstance(result, mypy.types.FunctionLike):
                 result = result.ret_type
             return result
+
+    def is_normal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.nodes.TypeInfo)
+
+    def is_instance_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Instance)
+
+    def is_tuple_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.TupleType)
+
+    def is_void_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Void)

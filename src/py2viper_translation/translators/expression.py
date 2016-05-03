@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL
+from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
@@ -93,6 +93,51 @@ class ExpressionTranslator(CommonTranslator):
                                                 self.no_info(ctx))
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
+
+    def _get_string_value(self, string: str) -> int:
+        result = 0
+        for index in range(len(string)):
+            result += pow(256, index) * ord(string[index])
+        return result
+
+    def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
+        length = len(node.s)
+        length_arg = self.viper.IntLit(length, self.no_position(ctx),
+                                       self.no_info(ctx))
+        val_arg = self.viper.IntLit(self._get_string_value(node.s),
+                                    self.no_position(ctx), self.no_info(ctx))
+        args = [length_arg, val_arg]
+        type = self.viper.Ref
+        length_param = self.viper.LocalVarDecl('length', self.viper.Int,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+        val_param = self.viper.LocalVarDecl('val', self.viper.Int,
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
+        formal_args = [length_param, val_param]
+        call = self.viper.FuncApp('str___create__', args,
+                                  self.to_position(node, ctx),
+                                  self.no_info(ctx), type, formal_args)
+        return [], call
+
+    def translate_Tuple(self, node: ast.Tuple, ctx: Context) -> StmtsAndExpr:
+        stmts = []
+        vals = []
+        for el in node.elts:
+            el_stmt, el_val = self.translate_to_reference(el, ctx)
+            stmts += el_stmt
+            vals.append(el_val)
+        elements = self.viper.ExplicitSeq(vals, self.to_position(node, ctx),
+                                          self.no_info(ctx))
+        type = self.viper.Ref
+        el_arg = self.viper.LocalVarDecl('seq',
+                                         self.viper.SeqType(self.viper.Ref),
+                                         self.no_position(ctx),
+                                         self.no_info(ctx))
+        call = self.viper.FuncApp('Tuple___init__', [elements],
+                                  self.to_position(node, ctx),
+                                  self.no_info(ctx), type, [el_arg])
+        return stmts, call
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
@@ -218,6 +263,30 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(node, '__bool__', args, node, ctx)
         return stmt, call
 
+    def translate_to_reference(self, node: ast.AST,
+                               ctx: Context) -> StmtsAndExpr:
+        stmt, val = self.translate_expr(node, ctx)
+        type = self.get_type(node, ctx)
+        if type.name in PRIMITIVES:
+            var = ctx.current_function.create_variable('box',
+                ctx.program.classes['__boxed_' + type.name], self.translator)
+            field = self.viper.Field(type.name + '_value___',
+                                     self.translate_type(type, ctx),
+                                     self.no_position(ctx), self.no_info(ctx))
+            new = self.viper.NewStmt(var.ref, [field],
+                                     self.to_position(node, ctx),
+                                     self.no_info(ctx))
+            field_acc = self.viper.FieldAccess(var.ref, field,
+                                               self.to_position(node, ctx),
+                                               self.no_info(ctx))
+            assign = self.viper.FieldAssign(field_acc, val,
+                                            self.to_position(node, ctx),
+                                            self.no_info(ctx))
+            stmt.append(new)
+            stmt.append(assign)
+            val = var.ref
+        return stmt, val
+
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
@@ -296,6 +365,11 @@ class ExpressionTranslator(CommonTranslator):
         left_stmt, left = self.translate_expr(node.left, ctx)
         right_stmt, right = self.translate_expr(node.right, ctx)
         stmt = left_stmt + right_stmt
+        left_type = self.get_type(node.left, ctx)
+        if left_type.name != 'int':
+            call = self.get_function_call(node.left, '__add__', [left, right],
+                                          node, ctx)
+            return stmt, call
         if isinstance(node.op, ast.Add):
             return (stmt, self.viper.Add(left, right,
                                          self.to_position(node, ctx),
@@ -327,6 +401,12 @@ class ExpressionTranslator(CommonTranslator):
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
         stmts = left_stmt + right_stmt
         if isinstance(node.ops[0], ast.Eq):
+            # TODO: because get_type doesn't work on all expressions, this
+            # currently breaks everything
+            # if self.get_type(node.left, ctx).name not in PRIMITIVES:
+            #     call = self.get_function_call(node.left, '__eq__',
+            #                                   [left, right], node, ctx)
+            #     return stmts, call
             return (stmts, self.viper.EqCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))

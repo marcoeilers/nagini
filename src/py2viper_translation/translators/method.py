@@ -29,7 +29,7 @@ class MethodTranslator(CommonTranslator):
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
-        return self.var_type_check(param.sil_name, param.type, ctx)
+        return self.var_type_check(param.sil_name, param.type, True, ctx)
 
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
@@ -86,7 +86,8 @@ class MethodTranslator(CommonTranslator):
             if ctx.position is None:
                 ctx.position = error_type_pos
             has_type = self.var_type_check(ERROR_NAME,
-                                           ctx.program.classes[exception], ctx)
+                                           ctx.program.classes[exception],
+                                           False, ctx)
             error_type_conds.append(has_type)
             ctx.position = oldpos
             condition = self.viper.And(error, has_type, self.no_position(ctx),
@@ -355,7 +356,7 @@ class MethodTranslator(CommonTranslator):
                 if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
                 condition = self.var_type_check(err_var.sil_name,
-                                                handler.exception, ctx)
+                                                handler.exception, False, ctx)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
                 if_handler = self.viper.If(condition, goto, empty_stmt, pos,

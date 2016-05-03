@@ -2,7 +2,7 @@ import ast
 
 from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_translation.lib.constants import BUILTINS
-from py2viper_translation.lib.program_nodes import PythonClass
+from py2viper_translation.lib.program_nodes import GenericType, PythonClass
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
@@ -49,6 +49,20 @@ class TypeTranslator(CommonTranslator):
                 return ctx.program.global_vars[node.id].type
             else:
                 return ctx.actual_function.get_variable(node.id).type
+        elif isinstance(node, ast.Num):
+            return ctx.program.classes['int']
+        elif isinstance(node, ast.Tuple):
+            args = [self.get_type(arg, ctx) for arg in node.elts]
+            type = GenericType('Tuple', ctx.program, args)
+            return type
+        elif isinstance(node, ast.Subscript):
+            value_type = self.get_type(node.value, ctx)
+            if value_type.name == 'Tuple':
+                return value_type.type_args[node.slice.value.n]
+            else:
+                raise UnsupportedException(node)
+        elif isinstance(node, ast.Str):
+            return ctx.program.classes['str']
         elif isinstance(node, ast.Compare):
             return ctx.program.classes['bool']
         elif isinstance(node, ast.BoolOp):
@@ -58,7 +72,7 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.Dict):
             return ctx.program.classes['dict']
         elif isinstance(node, ast.BinOp):
-            return ctx.program.classes['int']
+            return self.get_type(node.left, ctx)
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return ctx.program.classes['bool']
@@ -84,12 +98,24 @@ class TypeTranslator(CommonTranslator):
                     return ctx.current_class.superclass
                 else:
                     raise InvalidProgramException(node, 'invalid.super.call')
+            if get_func_name(node) == 'len':
+                return ctx.program.classes['int']
             if isinstance(node.func, ast.Name):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
                         return ctx.actual_function.type
                     elif node.func.id == 'Acc':
                         return ctx.program.classes['bool']
+                    elif node.func.id == 'Old':
+                        return self.get_type(node.args[0], ctx)
+                    elif node.func.id == 'Implies':
+                        return ctx.program.classes['bool']
+                    elif node.func.id == 'Forall':
+                        return ctx.program.classes['bool']
+                    elif node.func.id == 'Exists':
+                        return ctx.program.classes['bool']
+                    elif node.func.id == 'Unfolding':
+                        return self.get_type(node.args[1], ctx)
                     else:
                         raise UnsupportedException(node)
                 elif node.func.id in BUILTINS:

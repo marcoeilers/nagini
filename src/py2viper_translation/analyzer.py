@@ -7,11 +7,13 @@ from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS
 from py2viper_translation.lib.program_nodes import (
+    GenericType,
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
     PythonProgram,
     PythonTryBlock,
+    PythonType,
     PythonVar,
     PythonMethod,
 )
@@ -193,12 +195,7 @@ class Analyzer(ast.NodeVisitor):
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
-        if isinstance(functype, mypy.types.Void):
-            func.type = None
-        elif isinstance(functype, mypy.types.Instance):
-            func.type = self.get_class(functype.type.name())
-        else:
-            raise UnsupportedException(functype)
+        func.type = self.convert_type(functype)
         self.current_function = func
         self.visit_default(node)
         self.current_function = None
@@ -299,7 +296,21 @@ class Analyzer(ast.NodeVisitor):
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
 
-    def typeof(self, node: ast.AST) -> PythonClass:
+    def convert_type(self, mypy_type) -> PythonType:
+        if self.types.is_void_type(mypy_type):
+            return None
+        if self.types.is_instance_type(mypy_type):
+            return self.convert_type(mypy_type.type)
+        if self.types.is_normal_type(mypy_type):
+            return self.get_class(mypy_type.name())
+        elif self.types.is_tuple_type(mypy_type):
+            args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
+            result = GenericType('Tuple', self.program, args)
+            return result
+        else:
+            raise UnsupportedException(mypy_type)
+
+    def typeof(self, node: ast.AST) -> PythonType:
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)
@@ -311,22 +322,22 @@ class Analyzer(ast.NodeVisitor):
             if self.current_function is not None:
                 context.append(self.current_function.name)
             type = self.types.get_type(context, node.id)
-            return self.get_class(type.name())
+            return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             context = [receiver.name]
             type = self.types.get_type(context, node.attr)
-            return self.get_class(type.name())
+            return self.convert_type(type)
         elif isinstance(node, ast.arg):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
             type = self.types.get_type(context, node.arg)
-            return self.get_class(type.name())
-        elif (isinstance(node, ast.Call)
-              and isinstance(node.func, ast.Name)
-              and node.func.id in CONTRACT_FUNCS):
+            return self.convert_type(type)
+        elif (isinstance(node, ast.Call) and
+              isinstance(node.func, ast.Name) and
+              node.func.id in CONTRACT_FUNCS):
             if node.func.id == 'Result':
                 return self.current_function.type
             else:

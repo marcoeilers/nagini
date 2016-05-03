@@ -96,7 +96,11 @@ class PythonNode:
         self.sil_name = None
 
 
-class PythonClass(PythonNode, PythonScope):
+class PythonType:
+    pass
+
+
+class PythonClass(PythonType, PythonNode, PythonScope):
     """
     Represents a class in the Python program.
     """
@@ -248,6 +252,55 @@ class PythonClass(PythonNode, PythonScope):
         return self.superclass.issubtype(cls)
 
 
+class GenericType(PythonType):
+    def __init__(self, name: str, program: PythonProgram,
+                 args: List[PythonType]) -> None:
+        self.name = name
+        self.program = program
+        self.type_args = args
+
+    def get_class(self) -> PythonClass:
+        return self.program.classes[self.name]
+
+    def get_program(self) -> 'PythonProgram':
+        return self.program
+
+    @property
+    def sil_name(self) -> str:
+        return self.get_class().sil_name
+
+    def get_field(self, name: str) -> Optional['PythonField']:
+        """
+        Returns the field with the given name in this class or a superclass.
+        """
+        return self.get_class().get_field(name)
+
+    def get_method(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the method with the given name in this class or a superclass.
+        """
+        return self.get_class().get_method(name)
+
+    def get_function(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the function with the given name in this class or a superclass.
+        """
+        return self.get_class().get_function(name)
+
+    def get_func_or_method(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the function or method with the given name in this class or a
+        superclass.
+        """
+        return self.get_class().get_func_or_method(name)
+
+    def get_predicate(self, name: str) -> Optional['PythonMethod']:
+        """
+        Returns the predicate with the given name in this class or a superclass.
+        """
+        return self.get_class().get_predicate(name)
+
+
 class PythonMethod(PythonNode, PythonScope):
     """
     Represents a Python function which may be pure or impure, belong
@@ -305,12 +358,6 @@ class PythonMethod(PythonNode, PythonScope):
             return
         func_type = self.get_program().types.get_func_type(
             self.get_scope_prefix())
-        if isinstance(func_type, mypy.types.Void):
-            self.type = None
-        elif isinstance(func_type, mypy.types.Instance):
-            self.type = self.get_program().classes[func_type.type.name()]
-        else:
-            raise UnsupportedException(func_type)
         if self.type is not None:
             self.result = self.node_factory.create_python_var(RESULT_NAME, None,
                                                               self.type)

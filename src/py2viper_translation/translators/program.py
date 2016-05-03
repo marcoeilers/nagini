@@ -147,7 +147,8 @@ class ProgramTranslator(CommonTranslator):
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
-        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, ctx)
+        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, True,
+                                          ctx)
         called_name = method.sil_name
         if method.pure:
             pres = pres + [has_subtype]
