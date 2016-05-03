@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.constants import END_LABEL
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
@@ -116,19 +117,17 @@ class ExpressionTranslator(CommonTranslator):
             var = var.ref
         cases = []
         position = self.to_position(call, ctx)
-        err_var = self.viper.LocalVar('_err', self.viper.Ref,
-                                      self.no_position(ctx),
-                                      self.no_info(ctx))
-
+        err_var = ctx.error_var
         relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
         goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
         if goto_finally:
             uncaught_option = goto_finally
         else:
-            if ctx.current_function.declared_exceptions:
+            if ctx.actual_function.declared_exceptions:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
-                gotoend = self.viper.Goto('__end', position,
+                end_label = ctx.get_label_name(END_LABEL)
+                gotoend = self.viper.Goto(end_label, position,
                                           self.no_info(ctx))
                 uncaught_option = self.translate_block([assignerror, gotoend],
                                                        position,
@@ -141,8 +140,9 @@ class ExpressionTranslator(CommonTranslator):
         for block in relevant_try_blocks:
             for handler in block.handlers:
                 condition = self.type_factory.type_check(var, handler.exception,
-                                                       ctx)
-                goto = self.viper.Goto(handler.name,
+                                                         ctx)
+                label_name = ctx.get_label_name(handler.name)
+                goto = self.viper.Goto(label_name,
                                        self.to_position(handler.node, ctx),
                                        self.no_info(ctx))
                 cases.insert(0, (condition, goto))
@@ -185,6 +185,8 @@ class ExpressionTranslator(CommonTranslator):
             if try_.finally_block:
                 # propagate return value
                 var_next = try_.get_finally_var(self.translator)
+                if var_next.sil_name in ctx.var_aliases:
+                    var_next = ctx.var_aliases[var_next.sil_name]
                 number_two = self.viper.IntLit(2, self.no_position(ctx),
                                                self.no_info(ctx))
                 next_assign = self.viper.LocalVarAssign(var_next.ref,
@@ -192,7 +194,8 @@ class ExpressionTranslator(CommonTranslator):
                                                         self.no_position(ctx),
                                                         self.no_info(ctx))
                 # goto finally block
-                goto_next = self.viper.Goto(try_.finally_name,
+                label_name = ctx.get_label_name(try_.finally_name)
+                goto_next = self.viper.Goto(label_name,
                                             self.no_position(ctx),
                                             self.no_info(ctx))
                 return_block = [next_assign, goto_next]
@@ -215,10 +218,10 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(node, '__bool__', args, node, ctx)
         return stmt, call
 
-    def translate_Expr(self, node: ast.Expr, ctx) -> StmtsAndExpr:
+    def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
-    def translate_Name(self, node: ast.Name, ctx) -> StmtsAndExpr:
+    def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
         if node.id in ctx.program.global_vars:
             var = ctx.program.global_vars[node.id]
             type = self.translate_type(var.type, ctx)
@@ -227,7 +230,7 @@ class ExpressionTranslator(CommonTranslator):
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
-            if ctx.var_aliases and node.id in ctx.var_aliases:
+            if node.id in ctx.var_aliases:
                 return [], ctx.var_aliases[node.id].ref
             else:
                 return [], ctx.current_function.get_variable(node.id).ref
@@ -242,7 +245,8 @@ class ExpressionTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'field.nonexistant')
         while field.inherited is not None:
             field = field.inherited
-        if field.is_mangled() and field.cls is not ctx.current_class:
+        if field.is_mangled() and (field.cls is not ctx.current_class and
+                                   field.cls is not ctx.actual_function.cls):
             raise InvalidProgramException(node, 'private.field.access')
 
         return field
@@ -315,7 +319,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_Compare(self, node: ast.Compare, ctx: Context) -> StmtsAndExpr:
+    def translate_Compare(self, node: ast.Compare,
+                          ctx: Context) -> StmtsAndExpr:
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

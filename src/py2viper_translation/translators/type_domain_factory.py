@@ -34,6 +34,7 @@ class TypeDomainFactory:
             self.create_none_type_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
+            self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx)
         ]
 
@@ -160,6 +161,55 @@ class TypeDomainFactory:
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
+    def create_subtype_exclusion_axiom_2(self,
+            ctx: Context) -> 'silver.ast.DomainAxiom':
+        arg_sub = self.viper.LocalVarDecl('sub', self.type_type(),
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
+        var_sub = self.viper.LocalVar('sub', self.type_type(),
+                                      self.no_position(ctx), self.no_info(ctx))
+        arg_super = self.viper.LocalVarDecl('super', self.type_type(),
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
+        var_super = self.viper.LocalVar('super', self.type_type(),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        sub_super = self.viper.DomainFuncApp('issubtype',
+                                             [var_sub, var_super], {},
+                                             self.viper.Bool,
+                                             [var_sub, var_super],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        super_sub = self.viper.DomainFuncApp('issubtype',
+                                             [var_super, var_sub], {},
+                                             self.viper.Bool,
+                                             [var_super, var_sub],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        not_super_sub = self.viper.Not(super_sub, self.no_position(ctx),
+                                       self.no_info(ctx))
+        not_equal = self.viper.NeCmp(var_sub, var_super, self.no_position(ctx),
+                                     self.no_info(ctx))
+        lhs = self.viper.And(sub_super, not_equal, self.no_position(ctx),
+                             self.no_info(ctx))
+        implication = self.viper.Implies(lhs, not_super_sub,
+                                         self.no_position(ctx),
+                                         self.no_info(ctx))
+        trigger = self.viper.Trigger([sub_super],
+                                     self.no_position(ctx),
+                                     self.no_info(ctx))
+        trigger2 = self.viper.Trigger([super_sub],
+                                      self.no_position(ctx),
+                                      self.no_info(ctx))
+        body = self.viper.Forall([arg_sub, arg_super], [trigger, trigger2],
+                                 implication, self.no_position(ctx),
+                                 self.no_info(ctx))
+        return self.viper.DomainAxiom('issubtype_exclusion_2', body,
+                                      self.no_position(ctx), self.no_info(ctx),
+                                      self.type_domain)
+
     def create_subtype_exclusion_axiom(self,
                                        ctx: Context) -> 'silver.ast.DomainAxiom':
         """
@@ -187,14 +237,16 @@ class TypeDomainFactory:
                                             self.no_position(ctx),
                                             self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
-                                        self.no_position(ctx), self.no_info(ctx))
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
 
         sub_super = self.viper.DomainFuncApp('extends_',
                                              [var_sub, var_super], {},
                                              self.viper.Bool,
                                              [var_sub, var_super],
                                              self.no_position(ctx),
-                                             self.no_info(ctx), self.type_domain)
+                                             self.no_info(ctx),
+                                             self.type_domain)
         sub2_super = self.viper.DomainFuncApp('extends_',
                                               [var_sub2, var_super], {},
                                               self.viper.Bool,
@@ -310,7 +362,8 @@ class TypeDomainFactory:
         type_func = self.viper.DomainFuncApp('typeof', [null], {},
                                              self.type_type(), [null],
                                              self.no_position(ctx),
-                                             self.no_info(ctx), self.type_domain)
+                                             self.no_info(ctx),
+                                             self.type_domain)
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
@@ -318,8 +371,9 @@ class TypeDomainFactory:
                                              self.type_domain)
         eq = self.viper.EqCmp(type_func, none_type, self.no_position(ctx),
                               self.no_info(ctx))
-        return self.viper.DomainAxiom('null_nonetype', eq, self.no_position(ctx),
-                                      self.no_info(ctx), self.type_domain)
+        return self.viper.DomainAxiom('null_nonetype', eq,
+                                      self.no_position(ctx), self.no_info(ctx),
+                                      self.type_domain)
 
     def create_none_type_subtype_axiom(self,
                                        ctx: Context) -> 'silver.ast.DomainAxiom':
@@ -397,7 +451,8 @@ class TypeDomainFactory:
                                               self.viper.Bool,
                                               [var_sub, var_middle],
                                               self.no_position(ctx),
-                                              self.no_info(ctx), self.type_domain)
+                                              self.no_info(ctx),
+                                              self.type_domain)
         middle_super = self.viper.DomainFuncApp('issubtype',
                                                 [var_middle, var_super], {},
                                                 self.viper.Bool,
@@ -409,7 +464,8 @@ class TypeDomainFactory:
                                              {}, self.viper.Bool,
                                              [var_sub, var_super],
                                              self.no_position(ctx),
-                                             self.no_info(ctx), self.type_domain)
+                                             self.no_info(ctx),
+                                             self.type_domain)
         implication = self.viper.Implies(
             self.viper.And(sub_middle, middle_super, self.no_position(ctx),
                            self.no_info(ctx)), sub_super, self.no_position(ctx),
@@ -515,7 +571,7 @@ class TypeDomainFactory:
         return subtype_func
 
     def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
-                          ctx: Context) -> Expr:
+                            ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
         is of the given type

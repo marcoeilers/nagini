@@ -4,9 +4,19 @@ from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
-from py2viper_translation.lib.constants import BUILTINS
-from py2viper_translation.lib.program_nodes import PythonClass, PythonMethod
+from py2viper_translation.lib.constants import (
+    BUILTINS,
+    END_LABEL,
+    ERROR_NAME,
+    RESULT_NAME
+)
+from py2viper_translation.lib.program_nodes import (
+    PythonClass,
+    PythonMethod,
+    PythonVar
+)
 from py2viper_translation.lib.util import (
+    get_body_start_index,
     get_func_name,
     InvalidProgramException,
     is_two_arg_super_call,
@@ -46,7 +56,10 @@ class CallTranslator(CommonTranslator):
             else:
                 raise InvalidProgramException(node, 'invalid.super.call')
         elif not node.args:
-            arg_name = next(iter(ctx.current_function.args))
+            arg_name = next(iter(ctx.actual_function.args))
+            if arg_name in ctx.var_aliases:
+                replacement = ctx.var_aliases[arg_name]
+                return replacement.ref
             return [], ctx.current_function.args[arg_name].ref
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
@@ -101,7 +114,7 @@ class CallTranslator(CommonTranslator):
             stmts.append(init)
             if target.declared_exceptions:
                 catchers = self.create_exception_catchers(error_var,
-                    ctx.current_function.try_blocks, node, ctx)
+                    ctx.actual_function.try_blocks, node, ctx)
                 stmts = stmts + catchers
         return arg_stmts + stmts, res_var.ref
 
@@ -163,7 +176,7 @@ class CallTranslator(CommonTranslator):
                                       self.no_info(ctx))]
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
-                ctx.current_function.try_blocks, node, ctx)
+                ctx.actual_function.try_blocks, node, ctx)
         return (arg_stmts + call,
                 result_var.ref if result_var else None)
 
@@ -177,6 +190,119 @@ class CallTranslator(CommonTranslator):
             args.append(arg_expr)
 
         return arg_stmts, args
+
+    def inline_method(self, method: PythonMethod, args: List[PythonVar],
+                      result_var: PythonVar, error_var: PythonVar,
+                      ctx: Context) -> Tuple[List[Stmt], 'silver.ast.Label']:
+        """
+        Inlines a call to the given method, if the given argument vars contain
+        the values of the arguments. Saves the result in result_var and any
+        uncaught exceptions in error_var.
+        """
+        old_label_aliases = ctx.label_aliases
+        old_var_aliases = ctx.var_aliases
+        var_aliases = {}
+
+        for name, arg in zip(method.args.keys(), args):
+            var_aliases[name] = arg
+
+        var_aliases[RESULT_NAME] = result_var
+        if error_var:
+            var_aliases[ERROR_NAME] = error_var
+        ctx.inlined_calls.append(method)
+        ctx.var_aliases = var_aliases
+        ctx.label_aliases = {}
+
+        # create local var aliases
+        locals_to_copy = method.locals.copy()
+        for local_name, local in locals_to_copy.items():
+            local_var = ctx.current_function.create_variable(local_name,
+                                                             local.type,
+                                                             self.translator)
+            ctx.var_aliases[local_name] = local_var
+
+        # create label aliases
+        for label in method.labels:
+            new_label = ctx.current_function.get_fresh_name(label)
+            ctx.label_aliases[label] = new_label
+        end_label_name = ctx.label_aliases[END_LABEL]
+        end_label = self.viper.Label(end_label_name, self.no_position(ctx),
+                                     self.no_info(ctx))
+        ctx.added_handlers.append((method, ctx.var_aliases, ctx.label_aliases))
+
+        # translate body
+        index = get_body_start_index(method.node.body)
+        stmts = []
+
+        for stmt in method.node.body[index:]:
+            stmts += self.translate_stmt(stmt, ctx)
+
+        ctx.inlined_calls.remove(method)
+        ctx.var_aliases = old_var_aliases
+        ctx.label_aliases = old_label_aliases
+        return stmts, end_label
+
+    def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
+                    ctx: Context) -> StmtsAndExpr:
+        """
+        Inlines a statically bound call to the given method. If is_super is set,
+        adds self to the arguments, since this will not be part of the args
+        of the call node.
+        """
+        assert ctx.current_function
+        if method in ctx.inlined_calls:
+            raise InvalidProgramException(node, 'recursive.static.call')
+        position = self.to_position(node, ctx)
+        old_position = ctx.position
+        ctx.position = position
+        args = []
+        stmts = []
+
+        # create local vars for parameters and assign args to them
+        all_arg = node.args
+        if is_super:
+            all_arg = [next(iter(ctx.actual_function.args.values()))] + all_arg
+        for arg_val, (_, arg) in zip(all_arg, method.args.items()):
+            if isinstance(arg_val, PythonVar):
+                arg_stmt = []
+                arg_val = arg_val.ref
+            else:
+                arg_stmt, arg_val = self.translate_expr(arg_val, ctx)
+            stmts += arg_stmt
+            arg_var = ctx.current_function.create_variable('arg', arg.type,
+                                                           self.translator)
+            assign = self.viper.LocalVarAssign(arg_var.ref, arg_val,
+                                               self.to_position(node, ctx),
+                                               self.no_info(ctx))
+            stmts.append(assign)
+            args.append(arg_var)
+
+        # create target vars
+        res_var = None
+        if method.type:
+            res_var = ctx.current_function.create_variable(RESULT_NAME,
+                                                           method.type,
+                                                           self.translator)
+        optional_error_var = None
+        error_var = self.get_error_var(node, ctx)
+        if method.declared_exceptions:
+            var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
+            var.ref = error_var
+            optional_error_var = var
+        old_fold = ctx.ignore_family_folds
+        ctx.ignore_family_folds = True
+        inline_stmts, end_lbl = self.inline_method(method, args, res_var,
+                                                   optional_error_var, ctx)
+        ctx.ignore_family_folds = old_fold
+        stmts += inline_stmts
+        stmts.append(end_lbl)
+        if method.declared_exceptions:
+            stmts += self.create_exception_catchers(error_var,
+                ctx.actual_function.try_blocks, node, ctx)
+        # return result
+        result = res_var.ref if method.type else None
+        ctx.position = old_position
+        return stmts, result
 
     def translate_normal_call(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -195,6 +321,18 @@ class CallTranslator(CommonTranslator):
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
+            if isinstance(node.func.value, ast.Name):
+                if node.func.value.id in ctx.program.classes:
+                    # statically bound call
+                    target_class = ctx.program.classes[node.func.value.id]
+                    target = target_class.get_func_or_method(node.func.attr)
+                    return self.inline_call(target, node, False, ctx)
+            if isinstance(node.func.value, ast.Call):
+                if get_func_name(node.func.value) == 'super':
+                    # super call
+                    target_class = self.get_type(node.func.value, ctx)
+                    target = target_class.get_func_or_method(node.func.attr)
+                    return self.inline_call(target, node, True, ctx)
             # method called on an object
             rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
             receiver_class = self.get_type(node.func.value, ctx)
