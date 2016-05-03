@@ -237,13 +237,12 @@ class MethodTranslator(CommonTranslator):
         old_function = ctx.current_function
         ctx.current_function = method
         results = [res.decl for res in method.get_results()]
-        error_var_decl = self.viper.LocalVarDecl(ERROR_NAME, self.viper.Ref,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx))
-        error_var_ref = self.viper.LocalVar(ERROR_NAME, self.viper.Ref,
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-        method.error_var = error_var_ref
+        error_var = PythonVar(ERROR_NAME, None,
+                              ctx.program.classes['Exception'])
+        error_var.process(ERROR_NAME, self.translator)
+        error_var_decl = error_var.decl
+        error_var_ref = error_var.ref
+        method.error_var = error_var
         pres, posts = self.extract_contract(method, ERROR_NAME, False, ctx)
         if method.cls and method.name == '__init__':
             init_pres = self._create_init_pres(method, ctx)
@@ -371,7 +370,7 @@ class MethodTranslator(CommonTranslator):
             return_block = [goto_end]
         if ctx.actual_function.declared_exceptions:
             # assign error to error output var
-            error_var = ctx.error_var
+            error_var = ctx.error_var.ref
             block_error_var = block.get_error_var(self.translator)
             if block_error_var.sil_name in ctx.var_aliases:
                 block_error_var = ctx.var_aliases[block_error_var.sil_name]
