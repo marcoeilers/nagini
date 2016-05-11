@@ -29,7 +29,7 @@ class MethodTranslator(CommonTranslator):
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
-        return self.var_type_check(param.sil_name, param.type, True, ctx)
+        return self.var_type_check(param.sil_name, param.type, ctx)
 
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
@@ -87,7 +87,7 @@ class MethodTranslator(CommonTranslator):
                 ctx.position = error_type_pos
             has_type = self.var_type_check(ERROR_NAME,
                                            ctx.program.classes[exception],
-                                           False, ctx)
+                                           ctx)
             error_type_conds.append(has_type)
             ctx.position = oldpos
             condition = self.viper.And(error, has_type, self.no_position(ctx),
@@ -125,8 +125,13 @@ class MethodTranslator(CommonTranslator):
         for arg in args.values():
             if not (arg.type.name in PRIMITIVES or
                         (is_constructor and arg == next(iter(args)))):
-                pres.append(self.get_parameter_typeof(arg, ctx))
-
+                type_check = self.get_parameter_typeof(arg, ctx)
+                true_lit = self.viper.TrueLit(self.no_position(ctx),
+                                              self.no_info(ctx))
+                in_ex = self.viper.InhaleExhaleExp(type_check, true_lit,
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+                pres.append(in_ex)
         return pres
 
     def translate_function(self, func: PythonMethod,
@@ -159,9 +164,18 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
         # create typeof preconditions
-        for arg in func.args:
-            if not func.args[arg].type.name in PRIMITIVES:
-                pres.append(self.get_parameter_typeof(func.args[arg], ctx))
+        pres = self._create_typeof_pres(func.args, False, ctx) + pres
+        if func.type.name not in PRIMITIVES:
+            res_type = self.translate_type(func.type, ctx)
+            result = self.viper.Result(res_type, self.no_position(ctx),
+                                       self.no_info(ctx))
+            check = self.type_check(result, func.type, ctx)
+            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+            in_ex = self.viper.InhaleExhaleExp(check, true,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+            posts = [in_ex] + posts
+
         statements = func.node.body
         body_index = get_body_start_index(statements)
         # translate body
@@ -187,8 +201,16 @@ class MethodTranslator(CommonTranslator):
         # create exceptional postconditions
         posts += self._translate_exceptional_posts(method, error_var_ref, ctx)
         # create typeof preconditions
-        pres += self._create_typeof_pres(method.args, is_constructor, ctx)
-
+        type_pres = self._create_typeof_pres(method.args, is_constructor, ctx)
+        pres = type_pres + pres
+        posts = type_pres + posts
+        if method.type and method.type.name not in PRIMITIVES:
+            check = self.type_check(ctx.result_var.ref, method.type, ctx)
+            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+            in_ex = self.viper.InhaleExhaleExp(check, true,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+            posts = [in_ex] + posts
         return pres, posts
 
     def get_all_field_accs(self, fields: List['silver.ast.Field'],
@@ -355,7 +377,7 @@ class MethodTranslator(CommonTranslator):
                 if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
                 condition = self.var_type_check(err_var.sil_name,
-                                                handler.exception, False, ctx)
+                                                handler.exception, ctx)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
                 if_handler = self.viper.If(condition, goto, empty_stmt, pos,

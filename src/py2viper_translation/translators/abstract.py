@@ -208,7 +208,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.to_info([], ctx)
 
     def get_function_call(self, receiver: Union[ast.AST, PythonType],
-                          func_name: str, args: List[Expr], node: ast.AST,
+                          func_name: str, args: List[Expr],
+                          arg_types: List[PythonType], node: ast.AST,
                           ctx: Context) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
@@ -225,12 +226,61 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if not func:
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
-        for arg in func.args.values():
-            formal_args.append(arg.decl)
+        actual_args = []
+        for arg, param, type in zip(args, func.args.values(), arg_types):
+            formal_args.append(param.decl)
+            if (type and type.name in PRIMITIVES and
+                    param.type.name not in PRIMITIVES):
+                # have to box
+                actual_arg = self.box_primitive(arg, type, None, ctx)
+            else:
+                actual_arg = arg
+            actual_args.append(actual_arg)
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name
-        call = self.viper.FuncApp(sil_name, args, self.to_position(node, ctx),
+
+        call = self.viper.FuncApp(sil_name, actual_args,
+                                  self.to_position(node, ctx),
                                   self.no_info(ctx), type, formal_args)
+        if node and not isinstance(node, ast.Assign):
+            node_type = self.get_type(node, ctx)
+        else:
+            node_type = None
+        if (node_type and node_type in PRIMITIVES and
+                func.type.name not in PRIMITIVES):
+            # have to unbox
+            call = self.unbox_primitive(call, node_type, node, ctx)
+        return call
+
+    def get_method_call(self, receiver: Union[ast.AST, PythonType],
+                        func_name: str, args: List[Expr],
+                        arg_types: List[PythonType],
+                        targets: List['silver.ast.LocalVarRef'],
+                        node: ast.AST,
+                        ctx: Context) -> 'silver.ast.MethodCall':
+        if receiver:
+            if isinstance(receiver, ast.AST):
+                target_cls = self.get_type(receiver, ctx)
+            else:
+                target_cls = receiver
+            func = target_cls.get_method(func_name)
+        else:
+            func = ctx.program.methods[func_name]
+        if not func:
+            raise InvalidProgramException(node, 'unknown.function.called')
+        actual_args = []
+        for arg, param, type in zip(args, func.args.values(), arg_types):
+            if (type and type.name in PRIMITIVES and
+                    param.type.name not in PRIMITIVES):
+                # have to box
+                actual_arg = self.box_primitive(arg, type, None, ctx)
+            else:
+                actual_arg = arg
+            actual_args.append(actual_arg)
+        sil_name = func.sil_name
+        call = self.viper.MethodCall(sil_name, actual_args, targets,
+                                     self.to_position(node, ctx),
+                                     self.no_info(ctx))
         return call
 
     def get_error_var(self, stmt: ast.AST,
@@ -254,7 +304,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 ctx.program.classes['Exception'], self.translator)
             return new_var.ref
 
-    def var_type_check(self, name: str, type: PythonType, perms: bool,
+    def var_type_check(self, name: str, type: PythonType,
                        ctx: Context) -> Expr:
         """
         Creates an expression checking if the var with the given name
@@ -266,28 +316,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                           self.no_position(ctx),
                                           self.no_info(ctx))
-        return self.type_check(obj_var, type, perms, ctx)
+        return self.type_check(obj_var, type, ctx)
 
     # TODO: move to type translator, reference in abstract translator
-    def type_check(self, lhs: Expr, type: PythonType, perms: bool,
+    def type_check(self, lhs: Expr, type: PythonType,
                    ctx: Context) -> Expr:
         if type.name in PRIMITIVES:
-            # do we need some boxed integer type?
-            if perms:
-                # access to field
-                field = self.viper.Field(type.name + '_value___', self.config.type_translator.translate_type(type, ctx), self.no_position(ctx), self.no_info(ctx))
-                field_acc = self.viper.FieldAccess(lhs, field, self.no_position(ctx), self.no_info(ctx))
-                one = self.viper.IntLit(1, self.no_position(ctx), self.no_info(ctx))
-                hundred = self.viper.IntLit(100, self.no_position(ctx), self.no_info(ctx))
-                perm = self.viper.FractionalPerm(one, hundred, self.no_position(ctx), self.no_info(ctx))
-                pred = self.viper.FieldAccessPredicate(field_acc, perm, self.no_position(ctx), self.no_info(ctx))
-                return pred
+            # TODO: do we need some boxed integer type?
             return self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         result = self.type_factory.type_check(lhs, type, ctx)
         if type.name == 'Tuple':
             # length
             length = self.viper.IntLit(len(type.type_args), self.no_position(ctx), self.no_info(ctx))
-            len_call = self.get_function_call(type, '__len__', [lhs], None, ctx)
+            len_call = self.get_function_call(type, '__len__', [lhs], [None],
+                                              None, ctx)
             eq = self.viper.EqCmp(len_call, length, self.no_position(ctx), self.no_info(ctx))
             result = self.viper.And(result, eq, self.no_position(ctx), self.no_info(ctx))
             # types of contents
@@ -295,8 +337,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 # typeof getitem lessorequal type
                 item = type.type_args[index]
                 index_lit = self.viper.IntLit(index, self.no_position(ctx), self.no_info(ctx))
-                item_call = self.get_function_call(type, '__getitem__', [lhs, index_lit], None, ctx)
-                type_check = self.type_check(item_call, item, perms, ctx)
+                args = [lhs, index_lit]
+                arg_types = [None, None]
+                item_call = self.get_function_call(type, '__getitem__', args,
+                                                   arg_types, None, ctx)
+                type_check = self.type_check(item_call, item, ctx)
                 result = result = self.viper.And(result, type_check, self.no_position(ctx), self.no_info(ctx))
         return result
 
@@ -333,3 +378,21 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         ctx.var_aliases = old_var_valiases
         ctx.label_aliases = old_lbl_aliases
         return stmts
+
+    def box_primitive(self, primitive: Expr, type: PythonType, node: ast.AST,
+                      ctx: Context) -> StmtsAndExpr:
+        args = [primitive]
+        arg_types = [None]
+        name = '__box__'
+        call = self.get_function_call(type, name, args, arg_types, node, ctx)
+        return call
+
+    def unbox_primitive(self, box: Expr, type: PythonType, node: ast.AST,
+                        ctx: Context) -> Expr:
+        args = [box]
+        arg_types = [None]
+        name = '__unbox__'
+        call = self.get_function_call(ctx.program.classes['__boxed_' + type.name],
+                                      name, args, arg_types, node, ctx)
+        return call
+

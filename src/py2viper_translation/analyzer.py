@@ -255,13 +255,13 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is None:
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
-                    type = self.types.get_type([], node.id)
-                    cls = self.get_class(type.name())
+                    # type = self.types.get_type([], node.id)
+                    cls = self.typeof(node)
                     var = self.node_factory.create_python_var(node.id,
                                                               node, cls)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
-                        or len(assign.targets) != 1):
+                            or len(assign.targets) != 1):
                         raise UnsupportedException(assign)
                     var.value = assign.value
                     self.program.global_vars[node.id] = var
@@ -300,8 +300,14 @@ class Analyzer(ast.NodeVisitor):
         if self.types.is_void_type(mypy_type):
             return None
         if self.types.is_instance_type(mypy_type):
-            return self.convert_type(mypy_type.type)
+            result = self.convert_type(mypy_type.type)
+            if mypy_type.args:
+                args = [self.convert_type(arg) for arg in mypy_type.args]
+                result = GenericType(result.name, self.program, args)
+            return result
         if self.types.is_normal_type(mypy_type):
+            if mypy_type.name() == 'dict':
+                print("+++ " + mypy_type.name())
             return self.get_class(mypy_type.name())
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]

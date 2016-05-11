@@ -124,6 +124,7 @@ class ProgramTranslator(CommonTranslator):
         function which calls the overriding function, to check behavioural
         subtyping.
         """
+        assert not method.pure
         old_function = ctx.current_function
         ctx.current_function = method.overrides
         assert ctx.position is None
@@ -147,35 +148,19 @@ class ProgramTranslator(CommonTranslator):
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref)
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
-        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, True,
+        has_subtype = self.var_type_check(self_arg.sil_name, method.cls,
                                           ctx)
         called_name = method.sil_name
-        if method.pure:
-            pres = pres + [has_subtype]
-            formal_args = []
-            for arg in method.args:
-                formal_args.append(method.args[arg].decl)
-            type = self.translate_type(method.type, ctx)
-            func_app = self.viper.FuncApp(called_name, args,
-                                          self.no_position(ctx),
-                                          self.no_info(ctx), type, formal_args)
-            ctx.current_function = old_function
-            result = self.viper.Function(mname, params, type, pres, posts,
-                                         func_app, self.no_position(ctx),
-                                         self.no_info(ctx))
-            ctx.position = None
-            self.info = None
-            return result
-        else:
-            results, targets, body = self._create_override_check_body_impure(
-                method, has_subtype, called_name, args, ctx)
-            ctx.current_function = old_function
-            result = self.viper.Method(mname, params, results, pres, posts, [],
-                                       body, self.no_position(ctx),
-                                       self.no_info(ctx))
-            ctx.position = None
-            self.info = None
-            return result
+
+        results, targets, body = self._create_override_check_body_impure(
+            method, has_subtype, called_name, args, ctx)
+        ctx.current_function = old_function
+        result = self.viper.Method(mname, params, results, pres, posts, [],
+                                   body, self.no_position(ctx),
+                                   self.no_info(ctx))
+        ctx.position = None
+        self.info = None
+        return result
 
     def _create_override_check_body_impure(self, method: PythonMethod,
             has_subtype: Expr, calledname: str,
@@ -251,7 +236,7 @@ class ProgramTranslator(CommonTranslator):
         methods = []
 
         for sil_prog in sil_progs:
-            domains += self.viper.to_list(sil_prog.domains())
+            domains += [d for d in self.viper.to_list(sil_prog.domains()) if d.name() != 'PyType']
             fields += self.viper.to_list(sil_prog.fields())
             functions += self.viper.to_list(sil_prog.functions())
             predicates += self.viper.to_list(sil_prog.predicates())
