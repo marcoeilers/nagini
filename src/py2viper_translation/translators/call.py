@@ -8,6 +8,7 @@ from py2viper_translation.lib.constants import (
     BUILTINS,
     END_LABEL,
     ERROR_NAME,
+    PRIMITIVES,
     RESULT_NAME
 )
 from py2viper_translation.lib.program_nodes import (
@@ -40,13 +41,14 @@ class CallTranslator(CommonTranslator):
         assert isinstance(node.args[1], ast.Name)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         cls = ctx.program.classes[node.args[1].id]
-        return stmt, self.type_check(obj, cls, False, ctx)
+        return stmt, self.type_check(obj, cls, ctx)
 
     def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         args = [target]
-        call = self.get_function_call(node.args[0], '__len__', args, node, ctx)
+        call = self.get_function_call(node.args[0], '__len__', [target], [None],
+                                      node, ctx)
         return stmt, call
 
     def translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -122,12 +124,12 @@ class CallTranslator(CommonTranslator):
         if node.args:
             raise UnsupportedException(node)
         args = []
+        set_class = ctx.program.classes['set']
         res_var = ctx.current_function.create_variable('set',
-            ctx.program.classes['set'], self.translator)
+            set_class, self.translator)
         targets = [res_var.ref]
-        constr_call = self.viper.MethodCall('set___init__', args, targets,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx))
+        constr_call = self.get_method_call(set_class, '__init__', [],
+                                           [], targets, node, ctx)
         return [constr_call], res_var.ref
 
     def translate_builtin_func(self, node: ast.Call,
@@ -182,6 +184,7 @@ class CallTranslator(CommonTranslator):
 
     def _translate_args(self, node: ast.Call,
                         ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        # TODO: box args if necessary once we have generic methods
         args = []
         arg_stmts = []
         for arg in node.args:
@@ -312,6 +315,7 @@ class CallTranslator(CommonTranslator):
         """
         formal_args = []
         arg_stmts, args = self._translate_args(node, ctx)
+        arg_types = [self.get_type(arg, ctx) for arg in node.args]
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         if name in ctx.program.classes:
@@ -335,6 +339,7 @@ class CallTranslator(CommonTranslator):
                     return self.inline_call(target, node, True, ctx)
             # method called on an object
             rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
+            receiver_type = self.get_type(node.func.value, ctx)
             receiver_class = self.get_type(node.func.value, ctx)
             target = receiver_class.get_predicate(node.func.attr)
             if not target:
@@ -343,6 +348,16 @@ class CallTranslator(CommonTranslator):
             receiver_class = target.cls
             arg_stmts = rec_stmt + arg_stmts
             args = [receiver] + args
+            arg_types = [receiver_type] + arg_types
+            actual_args = []
+            for arg, param, type in zip(args, target.args.values(), arg_types):
+                if (type and type.name in PRIMITIVES and
+                        param.type.name not in PRIMITIVES):
+                    actual_arg = self.box_primitive(arg, type, None, ctx)
+                else:
+                    actual_arg = arg
+                actual_args.append(actual_arg)
+            args = actual_args
         else:
             # global function/method called
             receiver_class = None
@@ -365,11 +380,13 @@ class CallTranslator(CommonTranslator):
                                                            perm, node, ctx)
         elif target.pure:
             type = self.translate_type(target.type, ctx)
-            return (arg_stmts, self.viper.FuncApp(target_name, args,
-                                                  position,
-                                                  self.no_info(ctx),
-                                                  type,
-                                                  formal_args))
+            call = self.viper.FuncApp(target_name, args, position,
+                                      self.no_info(ctx), type, formal_args)
+            call_type = self.get_type(node, ctx)
+            if (call_type and call_type.name in PRIMITIVES and
+                    target.type.name not in PRIMITIVES):
+                call = self.unbox_primitive(call, call_type, node, ctx)
+            return (arg_stmts, call)
         else:
             return self.translate_method_call(target, args, arg_stmts,
                                               position, node, ctx)

@@ -187,8 +187,6 @@ class ViperAST:
         return self.ast.LocalVarAssign(lhs, rhs, position, info)
 
     def FieldAssign(self, lhs, rhs, position, info):
-        print(lhs)
-        print(rhs)
         return self.ast.FieldAssign(lhs, rhs, position, info)
 
     def FieldAccess(self, receiver, field, position, info):
@@ -205,6 +203,9 @@ class ViperAST:
 
     def Exhale(self, expr, position, info):
         return self.ast.Exhale(expr, position, info)
+
+    def InhaleExhaleExp(self, inhale, exhale, position, info):
+        return self.ast.InhaleExhaleExp(inhale, exhale, position, info)
 
     def Assert(self, expr, position, info):
         return self.ast.Assert(expr, position, info)
@@ -253,12 +254,7 @@ class ViperAST:
                                 self.to_seq(formalargs))
 
     def ExplicitSeq(self, elems, position, info):
-        print(elems)
-        print(position)
-        print(info)
-        elems_list = self.to_seq(elems)
-        print(elems_list)
-        return self.ast.ExplicitSeq(elems_list, position, info)
+        return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)

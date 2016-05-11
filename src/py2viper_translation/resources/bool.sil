@@ -9,3 +9,14 @@ function bool___bool__(self: Bool) : Bool
 
 function int___bool__(self: Int) : Bool
     ensures result == (self != 0)
+
+function int___box__(int: Int): Ref
+    ensures __boxed_int___unbox__(result) == int
+
+function __boxed_int___unbox__(box: Ref): Int
+
+function bool___box__(bool: Bool): Ref
+    ensures __boxed_bool___unbox__(result) == bool
+
+function __boxed_bool___unbox__(box: Ref): Bool
+

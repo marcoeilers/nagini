@@ -41,7 +41,7 @@
             "type": null
         },
         "add": {
-            "args": ["set", "int"],
+            "args": ["set", "object"],
             "type": null
         },
         "clear": {
@@ -51,7 +51,7 @@
     },
     "functions": {
         "__contains__": {
-            "args": ["dict", "int"],
+            "args": ["dict", "object"],
             "type": "bool"
         },
         "__bool__": {
@@ -72,21 +72,21 @@
             "type": "set"
         },
         "__setitem__": {
-            "args": ["dict", "int", "object"],
+            "args": ["dict", "object", "object"],
             "type": null
         }
     },
     "functions": {
         "__contains__": {
-            "args": ["dict", "int"],
+            "args": ["dict", "object"],
             "type": "bool"
         },
         "__getitem__": {
-            "args": ["dict", "int"],
+            "args": ["dict", "object"],
             "type": "object"
         },
         "get": {
-            "args": ["dict", "int"],
+            "args": ["dict", "object"],
             "type": "object"
         },
         "keys": {
@@ -113,6 +113,10 @@
         "__bool__": {
             "args": ["int"],
             "type": "bool"
+        },
+        "__box__": {
+            "args": ["int"],
+            "type": "__boxed_int"
         }
     }
 },
@@ -121,6 +125,10 @@
         "__bool__": {
             "args": ["bool"],
             "type": "bool"
+        },
+        "__box__": {
+            "args": ["bool"],
+            "type": "__boxed_bool"
         }
     }
 },
@@ -132,7 +140,9 @@
         }
     }
 },
-"Exception": {},
+"Exception": {
+    "extends": "object"
+},
 "str": {
     "functions": {
         "__len__": {
@@ -150,11 +160,36 @@
         "__add__": {
             "args": ["str", "str"],
             "type": "str"
+        },
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "str"
         }
-    }
+    },
+    "extends": "object"
 },
 "Tuple": {
     "functions": {
+        "__create0__": {
+            "args": [],
+            "type": "Tuple"
+        },
+        "__create1__": {
+            "args": ["object"],
+            "type": "Tuple"
+        },
+        "__create2__": {
+            "args": ["object", "object"],
+            "type": "Tuple"
+        },
+        "__create3__": {
+            "args": ["object", "object", "object"],
+            "type": "Tuple"
+        },
+        "__create4__": {
+            "args": ["object", "object", "object", "object"],
+            "type": "Tuple"
+        },
         "__getitem__": {
             "args": ["Tuple", "int"],
             "type": "object"
@@ -163,8 +198,25 @@
             "args": ["Tuple"],
             "type": "int"
         }
-    }
+    },
+    "extends": "object"
 },
-"__boxed_int": {},
-"__boxed_bool": {}
+"__boxed_int": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_int"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"__boxed_bool": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_bool"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+}
 }

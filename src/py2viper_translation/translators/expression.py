@@ -5,6 +5,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
     PythonTryBlock,
+    PythonType,
     PythonVar
 )
 from py2viper_translation.lib.util import (
@@ -43,54 +44,56 @@ class ExpressionTranslator(CommonTranslator):
         args = []
         res_var = ctx.current_function.create_variable('dict',
             ctx.program.classes['dict'], self.translator)
-        targets = [res_var.ref]
-        constr_call = self.viper.MethodCall('dict___init__', args, targets,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx))
+        dict_class = ctx.program.classes['dict']
+        arg_types = []
+        constr_call = self.get_method_call(dict_class, '__init__', [],
+                                           [], [res_var.ref], node, ctx)
         stmt = [constr_call]
         for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key, ctx)
+            key_type = self.get_type(key, ctx)
             val_stmt, val_val = self.translate_expr(val, ctx)
-            append_call = self.viper.MethodCall('dict___setitem__',
-                                                [res_var.ref, key_val, val_val],
-                                                [], self.to_position(node, ctx),
-                                                self.no_info(ctx))
+            val_type = self.get_type(val, ctx)
+            args = [res_var.ref, key_val, val_val]
+            arg_types = [None, key_type, val_type]
+            append_call = self.get_method_call(dict_class, '__setitem__', args,
+                                               arg_types, [], node, ctx)
             stmt += key_stmt + val_stmt + [append_call]
         return stmt, res_var.ref
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
-        args = []
+        set_class = ctx.program.classes['set']
         res_var = ctx.current_function.create_variable('set',
-            ctx.program.classes['set'], self.translator)
-        targets = [res_var.ref]
-        constr_call = self.viper.MethodCall('set___init__', args, targets,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx))
+            set_class, self.translator)
+        constr_call = self.get_method_call(set_class, '__init__', [], [],
+                                           [res_var.ref], node, ctx)
         stmt = [constr_call]
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
-            append_call = self.viper.MethodCall('set_add',
-                                                [res_var.ref, el_val], [],
-                                                self.to_position(node, ctx),
-                                                self.no_info(ctx))
+            el_type = self.get_type(el, ctx)
+            args = [res_var.ref, el_val]
+            arg_types = [None, el_type]
+            append_call = self.get_method_call(set_class, 'add', args,
+                                               arg_types, [], node, ctx)
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
-        args = []
+        list_class = ctx.program.classes['list']
         res_var = ctx.current_function.create_variable('list',
-            ctx.program.classes['list'], self.translator)
+            list_class, self.translator)
         targets = [res_var.ref]
-        constr_call = self.viper.MethodCall('list___init__', args, targets,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx))
+
+        constr_call = self.get_method_call(list_class, '__init__', [], [],
+                                           [res_var.ref], node, ctx)
         stmt = [constr_call]
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
-            append_call = self.viper.MethodCall('list_append',
-                                                [res_var.ref, el], [],
-                                                self.to_position(node, ctx),
-                                                self.no_info(ctx))
+            el_type = self.get_type(element, ctx)
+            args = [res_var.ref, el]
+            arg_types = [None, el_type]
+            append_call = self.get_method_call(list_class, 'append', args,
+                                               arg_types, [], node, ctx)
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
 
@@ -107,36 +110,26 @@ class ExpressionTranslator(CommonTranslator):
         val_arg = self.viper.IntLit(self._get_string_value(node.s),
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
-        type = self.viper.Ref
-        length_param = self.viper.LocalVarDecl('length', self.viper.Int,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
-        val_param = self.viper.LocalVarDecl('val', self.viper.Int,
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-        formal_args = [length_param, val_param]
-        call = self.viper.FuncApp('str___create__', args,
-                                  self.to_position(node, ctx),
-                                  self.no_info(ctx), type, formal_args)
+        arg_types = [None, None]
+        str_type = ctx.program.classes['str']
+        func_name = '__create__'
+        call = self.get_function_call(str_type, func_name, args, arg_types,
+                                      node, ctx)
         return [], call
 
     def translate_Tuple(self, node: ast.Tuple, ctx: Context) -> StmtsAndExpr:
         stmts = []
         vals = []
+        val_types = []
         for el in node.elts:
-            el_stmt, el_val = self.translate_to_reference(el, ctx)
+            el_stmt, el_val = self.translate_expr(el, ctx)
             stmts += el_stmt
             vals.append(el_val)
-        elements = self.viper.ExplicitSeq(vals, self.to_position(node, ctx),
-                                          self.no_info(ctx))
-        type = self.viper.Ref
-        el_arg = self.viper.LocalVarDecl('seq',
-                                         self.viper.SeqType(self.viper.Ref),
-                                         self.no_position(ctx),
-                                         self.no_info(ctx))
-        call = self.viper.FuncApp('Tuple___init__', [elements],
-                                  self.to_position(node, ctx),
-                                  self.no_info(ctx), type, [el_arg])
+            val_types.append(self.get_type(el, ctx))
+        tuple_class = ctx.program.classes['Tuple']
+        func_name = '__create' + str(len(node.elts)) + '__'
+        call = self.get_function_call(tuple_class, func_name, vals, val_types,
+                                      node, ctx)
         return stmts, call
 
     def translate_Subscript(self, node: ast.Subscript,
@@ -144,11 +137,18 @@ class ExpressionTranslator(CommonTranslator):
         if not isinstance(node.slice, ast.Index):
             raise UnsupportedException(node)
         target_stmt, target = self.translate_expr(node.value, ctx)
+        target_type = self.get_type(node.value, ctx)
         index_stmt, index = self.translate_expr(node.slice.value, ctx)
+        index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
-        call = self.get_function_call(node.value, '__getitem__', args, node,
-                                      ctx)
-        return target_stmt + index_stmt, call
+        arg_types = [target_type, index_type]
+        call = self.get_function_call(node.value, '__getitem__', args,
+                                      arg_types, node, ctx)
+        result = call
+        result_type = self.get_type(node, ctx)
+        if result_type.name in PRIMITIVES:
+            result = self.unbox_primitive(result, result_type, node, ctx)
+        return target_stmt + index_stmt, result
 
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],
@@ -260,32 +260,10 @@ class ExpressionTranslator(CommonTranslator):
         if type is ctx.program.classes['bool']:
             return stmt, res
         args = [res]
-        call = self.get_function_call(node, '__bool__', args, node, ctx)
+        arg_types = [None]
+        call = self.get_function_call(node, '__bool__', args, arg_types, node,
+                                      ctx)
         return stmt, call
-
-    def translate_to_reference(self, node: ast.AST,
-                               ctx: Context) -> StmtsAndExpr:
-        stmt, val = self.translate_expr(node, ctx)
-        type = self.get_type(node, ctx)
-        if type.name in PRIMITIVES:
-            var = ctx.current_function.create_variable('box',
-                ctx.program.classes['__boxed_' + type.name], self.translator)
-            field = self.viper.Field(type.name + '_value___',
-                                     self.translate_type(type, ctx),
-                                     self.no_position(ctx), self.no_info(ctx))
-            new = self.viper.NewStmt(var.ref, [field],
-                                     self.to_position(node, ctx),
-                                     self.no_info(ctx))
-            field_acc = self.viper.FieldAccess(var.ref, field,
-                                               self.to_position(node, ctx),
-                                               self.no_info(ctx))
-            assign = self.viper.FieldAssign(field_acc, val,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx))
-            stmt.append(new)
-            stmt.append(assign)
-            val = var.ref
-        return stmt, val
 
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
@@ -366,9 +344,10 @@ class ExpressionTranslator(CommonTranslator):
         right_stmt, right = self.translate_expr(node.right, ctx)
         stmt = left_stmt + right_stmt
         left_type = self.get_type(node.left, ctx)
+        right_type = self.get_type(node.right, ctx)
         if left_type.name != 'int':
             call = self.get_function_call(node.left, '__add__', [left, right],
-                                          node, ctx)
+                                          [left_type, right_type], node, ctx)
             return stmt, call
         if isinstance(node.op, ast.Add):
             return (stmt, self.viper.Add(left, right,
@@ -398,7 +377,9 @@ class ExpressionTranslator(CommonTranslator):
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)
+        left_type = self.get_type(node.left, ctx)
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
+        right_type = self.get_type(node.comparators[0], ctx)
         stmts = left_stmt + right_stmt
         if isinstance(node.ops[0], ast.Eq):
             # TODO: because get_type doesn't work on all expressions, this
@@ -440,8 +421,9 @@ class ExpressionTranslator(CommonTranslator):
                                             self.no_info(ctx)))
         elif isinstance(node.ops[0], ast.In):
             args = [right, left]
+            arg_types = [right_type, left_type]
             app = self.get_function_call(node.comparators[0], '__contains__',
-                                         args, node, ctx)
+                                         args, arg_types, node, ctx)
             return stmts, app
         else:
             raise UnsupportedException(node.ops[0])

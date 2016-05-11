@@ -1,16 +1,34 @@
 field int_value___: Int
 field bool_value___: Bool
 
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function Tuple(): PyType
+}
 
-function Tuple___init__(seq : Seq[Ref]): Ref
-    ensures Tuple___val__(result) == seq
+function Tuple___create0__(): Ref
+    ensures Tuple___len__(result) == 0
+    ensures typeof(result) == Tuple()
 
-function Tuple___val__(self: Ref): Seq[Ref]
+function Tuple___create1__(arg0 : Ref): Ref
+    ensures Tuple___len__(result) == 1 && Tuple___getitem__(result, 0) == arg0
+    ensures typeof(result) == Tuple()
+
+function Tuple___create2__(arg0 : Ref, arg1: Ref): Ref
+    ensures Tuple___len__(result) == 2 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1
+    ensures typeof(result) == Tuple()
+
+function Tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref): Ref
+    ensures Tuple___len__(result) == 3 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2
+    ensures typeof(result) == Tuple()
+
+function Tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref): Ref
+    ensures Tuple___len__(result) == 4 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2 && Tuple___getitem__(result, 3) == arg3
+    ensures typeof(result) == Tuple()
 
 function Tuple___len__(self: Ref) : Int
-    ensures result == |Tuple___val__(self)|
 
 function Tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
     requires key < Tuple___len__(self)
-    ensures result == Tuple___val__(self)[key]

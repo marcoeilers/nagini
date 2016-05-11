@@ -59,6 +59,12 @@ class TypeTranslator(CommonTranslator):
             value_type = self.get_type(node.value, ctx)
             if value_type.name == 'Tuple':
                 return value_type.type_args[node.slice.value.n]
+            elif value_type.name == 'list':
+                return value_type.type_args[0]
+            elif value_type.name == 'set':
+                return value_type.type_args[0]
+            elif value_type.name == 'dict':
+                return value_type.type_args[1]
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Str):
@@ -68,9 +74,21 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.BoolOp):
             return ctx.program.classes['bool']
         elif isinstance(node, ast.List):
-            return ctx.program.classes['list']
+            if node.elts:
+                # TODO: take common supertype of all elements
+                args = [self.get_type(node.elts[0], ctx)]
+            elif node._parent and isinstance(node._parent, ast.Assign):
+                # of god this is terrible
+                args = [self.get_type(node._parent.targets[0])]
+            else:
+                args = [ctx.program.classes['object']]
+            type = GenericType('list', ctx.program, args)
+            return type
         elif isinstance(node, ast.Dict):
-            return ctx.program.classes['dict']
+            args = [self.get_type(node.keys[0], ctx),
+                    self.get_type(node.values[0], ctx)]
+            type = GenericType('dict', ctx.program, args)
+            return type
         elif isinstance(node, ast.BinOp):
             return self.get_type(node.left, ctx)
         elif isinstance(node, ast.UnaryOp):

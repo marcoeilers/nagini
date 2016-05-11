@@ -56,8 +56,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def set_type(self, fqn, type):
         if isinstance(type, mypy.types.AnyType):
             return  # just ignore??
-        if isinstance(type, mypy.types.Instance):
-            type = type.type
+        # if isinstance(type, mypy.types.Instance):
+        #     type = type.type
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
@@ -143,8 +143,8 @@ class TypeInfo:
             else:
                 return self.get_type(prefix[:len(prefix) - 1], name)
         else:
-            if isinstance(result, mypy.types.Instance):
-                result = result.type
+            # if isinstance(result, mypy.types.Instance):
+            #     result = result.type
             return result
 
     def get_func_type(self, prefix: List[str]):

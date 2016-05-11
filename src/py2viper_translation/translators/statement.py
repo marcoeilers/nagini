@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL
+from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES
 from py2viper_translation.lib.program_nodes import PythonType
 from py2viper_translation.lib.util import (
     flatten,
@@ -143,23 +143,24 @@ class StatementTranslator(CommonTranslator):
             index_lit = self.viper.IntLit(rhs_index, self.no_position(ctx),
                                           self.no_info(ctx))
             args = [rhs, index_lit]
-            rhs = self.get_function_call(rhs_type, '__getitem__', args, node,
-                                         ctx)
+            arg_types = [rhs_type, None]
+            rhs = self.get_function_call(rhs_type, '__getitem__', args,
+                                         arg_types, node, ctx)
+            rhs_index_type = rhs_type.type_args[rhs_index]
+            if rhs_index_type.name in PRIMITIVES:
+                rhs = self.unbox_primitive(rhs, rhs_index_type, node, ctx)
         if isinstance(lhs, ast.Subscript):
             if not isinstance(node.targets[0].slice, ast.Index):
                 raise UnsupportedException(node)
             target_cls = self.get_type(lhs.value, ctx)
             lhs_stmt, target = self.translate_expr(lhs.value, ctx)
-            ind_stmt, index = self.translate_expr(lhs.slice.value,
-                                                  ctx)
-            func = target_cls.get_method('__setitem__')
-            func_name = func.sil_name
-            # rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+            ind_stmt, index = self.translate_expr(lhs.slice.value, ctx)
+            index_type = self.get_type(lhs.slice.value, ctx)
+
             args = [target, index, rhs]
-            targets = []
-            call = self.viper.MethodCall(func_name, args, targets,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx))
+            arg_types = [None, index_type, rhs_type]
+            call = self.get_method_call(target_cls, '__setitem__', args,
+                                        arg_types, [], node, ctx)
             return lhs_stmt + ind_stmt + [call]
         target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
@@ -185,7 +186,7 @@ class StatementTranslator(CommonTranslator):
             # translate rhs
             rhs_stmt, rhs = self.translate_expr(node.value, ctx)
             stmt = rhs_stmt
-            for index in range(len(node.targets)):
+            for index in range(len(node.targets[0].elts)):
                 stmt += self.assign_to(node.targets[0].elts[index], rhs,
                                        index, rhs_type,
                                        node, ctx)
