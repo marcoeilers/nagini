@@ -306,8 +306,6 @@ class Analyzer(ast.NodeVisitor):
                 result = GenericType(result.name, self.program, args)
             return result
         if self.types.is_normal_type(mypy_type):
-            if mypy_type.name() == 'dict':
-                print("+++ " + mypy_type.name())
             return self.get_class(mypy_type.name())
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]

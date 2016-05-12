@@ -8,18 +8,18 @@ from py2viper_translation.lib.program_nodes import (
     PythonType,
     PythonVar
 )
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    Expr,
-    StmtsAndExpr,
-    Stmt
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 from typing import List, Optional
 
 

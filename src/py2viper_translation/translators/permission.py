@@ -1,14 +1,16 @@
 import ast
 
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    Expr,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 
 
 class PermTranslator(CommonTranslator):

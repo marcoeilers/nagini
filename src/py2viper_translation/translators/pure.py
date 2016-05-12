@@ -3,16 +3,16 @@ import ast
 from typing import Dict, List, Union
 
 from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
+from py2viper_translation.lib.typedefs import (
+    Expr,
+)
 from py2viper_translation.lib.util import (
     flatten,
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    Expr,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 
 
 class AssignWrapper:

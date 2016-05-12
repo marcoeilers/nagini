@@ -1,9 +1,18 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_FUNCS
-from py2viper_translation.lib.constants import BUILTINS
-from py2viper_translation.lib.program_nodes import GenericType, PythonClass
+from py2viper_translation.lib.constants import BUILTINS, PRIMITIVES
+from py2viper_translation.lib.program_nodes import (
+    GenericType,
+    PythonClass,
+    PythonType,
+)
 from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
@@ -13,10 +22,10 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (
-    CommonTranslator,
     Context,
     TranslatorConfig,
 )
+from py2viper_translation.translators.common import CommonTranslator
 
 
 class TypeTranslator(CommonTranslator):
@@ -150,3 +159,35 @@ class TypeTranslator(CommonTranslator):
                 return rectype.get_func_or_method(node.func.attr).type
         else:
             raise UnsupportedException(node)
+
+    def type_check(self, lhs: Expr, type: PythonType,
+                   ctx: Context) -> Expr:
+        if type.name in PRIMITIVES:
+            # TODO: do we need some boxed integer type?
+            return self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        result = self.type_factory.type_check(lhs, type, ctx)
+        if type.name == 'Tuple':
+            # length
+            length = self.viper.IntLit(len(type.type_args),
+                                       self.no_position(ctx), self.no_info(ctx))
+            len_call = self.get_function_call(type, '__len__', [lhs], [None],
+                                              None, ctx)
+            eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
+                                  self.no_info(ctx))
+            result = self.viper.And(result, eq, self.no_position(ctx),
+                                    self.no_info(ctx))
+            # types of contents
+            for index in range(len(type.type_args)):
+                # typeof getitem lessorequal type
+                item = type.type_args[index]
+                index_lit = self.viper.IntLit(index, self.no_position(ctx),
+                                              self.no_info(ctx))
+                args = [lhs, index_lit]
+                arg_types = [None, None]
+                item_call = self.get_function_call(type, '__getitem__', args,
+                                                   arg_types, None, ctx)
+                type_check = self.type_check(item_call, item, ctx)
+                result = result = self.viper.And(result, type_check,
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx))
+        return result

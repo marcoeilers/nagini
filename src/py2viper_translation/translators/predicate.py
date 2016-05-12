@@ -2,10 +2,8 @@ import ast
 
 from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.program_nodes import PythonMethod
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 from toposort import toposort_flatten
 from typing import List
 
