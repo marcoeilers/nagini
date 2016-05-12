@@ -2,6 +2,11 @@ import ast
 
 from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES
 from py2viper_translation.lib.program_nodes import PythonType
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.util import (
     flatten,
     get_func_name,
@@ -9,12 +14,8 @@ from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    Expr,
-    Stmt,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 from typing import List, Optional
 
 

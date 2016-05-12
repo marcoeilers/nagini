@@ -1,13 +1,14 @@
 from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.typedefs import (
+    DomainFuncApp,
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
     SIFPythonVar,
-)
-from py2viper_translation.translators.abstract import (
-    DomainFuncApp,
-    Expr,
-    Stmt,
 )
 from py2viper_translation.translators.method import MethodTranslator
 from typing import List

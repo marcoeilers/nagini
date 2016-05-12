@@ -25,7 +25,6 @@ from py2viper_translation.verifier import (
 
 
 def parse_sil_file(sil_path: str, jvm):
-    print('parsing' + sil_path)
     parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
     file = open(sil_path, 'r')
     text = file.read()

@@ -16,6 +16,11 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar
 )
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.util import (
     get_body_start_index,
     get_func_name,
@@ -23,13 +28,8 @@ from py2viper_translation.lib.util import (
     is_two_arg_super_call,
     UnsupportedException,
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    Expr,
-    Stmt,
-    StmtsAndExpr,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 from typing import List, Tuple
 
 

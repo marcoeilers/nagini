@@ -5,7 +5,15 @@ from py2viper_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
+    PythonType,
     PythonVar
+)
+from py2viper_translation.lib.typedefs import (
+    DomainFuncApp,
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+    VarDecl,
 )
 from py2viper_translation.lib.util import (
     flatten,
@@ -14,22 +22,26 @@ from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException
 )
-from py2viper_translation.translators.abstract import (
-    CommonTranslator,
-    Context,
-    DomainFuncApp,
-    Expr,
-    Stmt,
-    VarDecl,
-)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
 from typing import List, Tuple
 
 
 class MethodTranslator(CommonTranslator):
 
+    def _can_assume_type(self, type: PythonType) -> bool:
+        return type.name not in ['Tuple']
+
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
-        return self.var_type_check(param.sil_name, param.type, ctx)
+        result = self.var_type_check(param.sil_name, param.type, ctx)
+        if self._can_assume_type(param.type):
+            true_lit = self.viper.TrueLit(self.no_position(ctx),
+                                          self.no_info(ctx))
+            result = self.viper.InhaleExhaleExp(result, true_lit,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+        return result
 
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
@@ -124,14 +136,9 @@ class MethodTranslator(CommonTranslator):
         pres = []
         for arg in args.values():
             if not (arg.type.name in PRIMITIVES or
-                        (is_constructor and arg == next(iter(args)))):
+                    (is_constructor and arg == next(iter(args)))):
                 type_check = self.get_parameter_typeof(arg, ctx)
-                true_lit = self.viper.TrueLit(self.no_position(ctx),
-                                              self.no_info(ctx))
-                in_ex = self.viper.InhaleExhaleExp(type_check, true_lit,
-                                                   self.no_position(ctx),
-                                                   self.no_info(ctx))
-                pres.append(in_ex)
+                pres.append(type_check)
         return pres
 
     def translate_function(self, func: PythonMethod,
@@ -170,11 +177,12 @@ class MethodTranslator(CommonTranslator):
             result = self.viper.Result(res_type, self.no_position(ctx),
                                        self.no_info(ctx))
             check = self.type_check(result, func.type, ctx)
-            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-            in_ex = self.viper.InhaleExhaleExp(check, true,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
-            posts = [in_ex] + posts
+            if self._can_assume_type(func.type):
+                true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+                check = self.viper.InhaleExhaleExp(check, true,
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+            posts = [check] + posts
 
         statements = func.node.body
         body_index = get_body_start_index(statements)
@@ -206,11 +214,12 @@ class MethodTranslator(CommonTranslator):
         posts = type_pres + posts
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref, method.type, ctx)
-            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-            in_ex = self.viper.InhaleExhaleExp(check, true,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
-            posts = [in_ex] + posts
+            if self._can_assume_type(method.type):
+                true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+                check = self.viper.InhaleExhaleExp(check, true,
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+            posts = [check] + posts
         return pres, posts
 
     def get_all_field_accs(self, fields: List['silver.ast.Field'],
