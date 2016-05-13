@@ -16,34 +16,36 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def __init__(self, type_map, path):
         self.prefix = []
         self.all_types = {}
+        self.alt_types = {}
         self.type_map = type_map
         self.path = path
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
         rectype = self.type_of(o.expr)
         if not isinstance(rectype, mypy.types.AnyType):
-            self.set_type([rectype.type.name(), o.name], self.type_of(o))
+            self.set_type([rectype.type.name(), o.name], self.type_of(o),
+                          o.line)
         super().visit_member_expr(o)
 
     def visit_try_stmt(self, o: mypy.nodes.TryStmt):
         for var in o.vars:
             if var is not None:
-                self.set_type(self.prefix + [var.name], self.type_of(var))
+                self.set_type(self.prefix + [var.name], self.type_of(var), var.line)
         for block in o.handlers:
             block.accept(self)
 
     def visit_name_expr(self, o: mypy.nodes.NameExpr):
         if not o.name in LITERALS:
-            self.set_type(self.prefix + [o.name], self.type_of(o))
+            self.set_type(self.prefix + [o.name], self.type_of(o), o.line)
 
     def visit_func_def(self, o: mypy.nodes.FuncDef):
         oldprefix = self.prefix
         self.prefix = self.prefix + [o.name()]
         functype = self.type_of(o)
-        self.set_type(self.prefix, functype)
+        self.set_type(self.prefix, functype, o.line)
         for arg in o.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
-                          arg.variable.type)
+                          arg.variable.type, arg.line)
         super().visit_func_def(o)
         self.prefix = oldprefix
 
@@ -53,7 +55,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_class_def(o)
         self.prefix = oldprefix
 
-    def set_type(self, fqn, type):
+    def set_type(self, fqn, type, line):
         if isinstance(type, mypy.types.AnyType):
             return  # just ignore??
         # if isinstance(type, mypy.types.Instance):
@@ -61,11 +63,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
-                if not isinstance(self.all_types[key], mypy.types.AnyType):
-                    # Different types for same var? what is happening here?
-                    print(type)
-                    print(self.all_types[key])
-                    raise Exception()
+                # type change after isinstance
+                if key not in self.alt_types:
+                    self.alt_types[key] = {}
+                self.alt_types[key][line] = type
+                return
         self.all_types[key] = type
 
     def type_equals(self, t1, t2):
@@ -99,6 +101,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             msg += 'dead.code'
             raise TypeException([msg])
 
+    def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
+        # weird things seem to happen with is-comparisons, so we ignore those.
+        if 'is' not in o.operators and 'is not' not in o.operators:
+            super().visit_comparison_expr(o)
+
 
 class TypeInfo:
     """
@@ -108,6 +115,7 @@ class TypeInfo:
 
     def __init__(self):
         self.all_types = {}
+        self.alt_types = {}
 
     def check(self, filename: str) -> bool:
         """
@@ -125,6 +133,7 @@ class TypeInfo:
             # print(df)
             res.files['__main__'].accept(visitor)
             self.all_types.update(visitor.all_types)
+            self.alt_types.update(visitor.alt_types)
             return True
         except mypy.errors.CompileError as e:
             for m in e.messages:
@@ -136,16 +145,18 @@ class TypeInfo:
         Looks up the inferred or annotated type for the given name in the given
         prefix
         """
-        result = self.all_types.get(tuple(prefix + [name]))
+        key = tuple(prefix + [name])
+        result = self.all_types.get(key)
+        alts = self.alt_types.get(key)
         if result is None:
             if not prefix:
-                return None
+                return None, None
             else:
                 return self.get_type(prefix[:len(prefix) - 1], name)
         else:
             # if isinstance(result, mypy.types.Instance):
             #     result = result.type
-            return result
+            return result, alts
 
     def get_func_type(self, prefix: List[str]):
         """

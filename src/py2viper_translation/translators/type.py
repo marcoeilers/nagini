@@ -26,6 +26,7 @@ from py2viper_translation.translators.abstract import (
     TranslatorConfig,
 )
 from py2viper_translation.translators.common import CommonTranslator
+from typing import List
 
 
 class TypeTranslator(CommonTranslator):
@@ -57,7 +58,11 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                return ctx.actual_function.get_variable(node.id).type
+                var = ctx.actual_function.get_variable(node.id)
+                if node.lineno in var.alt_types:
+                    return var.alt_types[node.lineno]
+                else:
+                    return var.type
         elif isinstance(node, ast.Num):
             return ctx.program.classes['int']
         elif isinstance(node, ast.Tuple):
@@ -84,20 +89,43 @@ class TypeTranslator(CommonTranslator):
             return ctx.program.classes['bool']
         elif isinstance(node, ast.List):
             if node.elts:
-                # TODO: take common supertype of all elements
-                args = [self.get_type(node.elts[0], ctx)]
+                el_types = [self.get_type(el, ctx) for el in node.elts]
+                args = [self.common_supertype(el_types)]
             elif node._parent and isinstance(node._parent, ast.Assign):
-                # of god this is terrible
-                args = [self.get_type(node._parent.targets[0])]
+                # oh god this is terrible
+                args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.program.classes['object']]
             type = GenericType('list', ctx.program, args)
             return type
+        elif isinstance(node, ast.Set):
+            if node.elts:
+                el_types = [self.get_type(el, ctx) for el in node.elts]
+                args = [self.common_supertype(el_types)]
+            elif node._parent and isinstance(node._parent, ast.Assign):
+                # oh god this is terrible
+                args = self.get_type(node._parent.targets[0], ctx).type_args
+            else:
+                args = [ctx.program.classes['object']]
+            type = GenericType('set', ctx.program, args)
+            return type
         elif isinstance(node, ast.Dict):
-            args = [self.get_type(node.keys[0], ctx),
-                    self.get_type(node.values[0], ctx)]
+            if node.keys:
+                key_types = [self.get_type(key, ctx) for key in node.keys]
+                val_types = [self.get_type(val, ctx) for val in node.values]
+                args = [self.common_supertype(key_types),
+                        self.common_supertype(val_types)]
+            elif node._parent and isinstance(node._parent, ast.Assign):
+                args = self.get_type(node._parent.targets[0], ctx).type_args
+            else:
+                object_class = ctx.program.classes['object']
+                args = [object_class, object_class]
             type = GenericType('dict', ctx.program, args)
             return type
+        elif isinstance(node, ast.IfExp):
+            body_type = self.get_type(node.body, ctx)
+            else_type = self.get_type(node.orelse, ctx)
+            return self.pairwise_supertype(body_type, else_type)
         elif isinstance(node, ast.BinOp):
             return self.get_type(node.left, ctx)
         elif isinstance(node, ast.UnaryOp):
@@ -160,8 +188,38 @@ class TypeTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
+    def common_supertype(self, types: List[PythonType]) -> PythonType:
+        assert types
+        if len(types) == 1:
+            return types[0]
+        current = types[0]
+        for new in types[1:]:
+            current = self.pairwise_supertype(current, new)
+        return current
+
+    def pairwise_supertype(self, t1: PythonType, t2: PythonType) -> PythonType:
+        if self._is_subtype(t1, t2):
+            return t2
+        if self._is_subtype(t2, t1):
+            return t1
+        if not t1.superclass:
+            return None
+        return self.pairwise_supertype(t2, t1.superclass)
+
+    def _is_subtype(self, t1: PythonType, t2: PythonType) -> bool:
+        if t1 == t2:
+            return True
+        if not t1.superclass:
+            return False
+        return self._is_subtype(t1.superclass, t2)
+
     def type_check(self, lhs: Expr, type: PythonType,
                    ctx: Context) -> Expr:
+        """
+        Returns a type check expression. This may return a simple isinstance
+        for simple types, or include information about type arguments for
+        generic types, or things like the lengts for tuples.
+        """
         if type.name in PRIMITIVES:
             # TODO: do we need some boxed integer type?
             return self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))

@@ -193,7 +193,9 @@ class StatementTranslator(CommonTranslator):
                                        node, ctx)
             return stmt
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        lhs_stmt = self.assign_to(node.targets[0], rhs, None, None, node, ctx)
+        rhs_type = self.get_type(node.value, ctx)
+        lhs_stmt = self.assign_to(node.targets[0], rhs, None, rhs_type, node,
+                                  ctx)
         return rhs_stmt + lhs_stmt
 
     def is_invariant(self, stmt: ast.AST) -> bool:

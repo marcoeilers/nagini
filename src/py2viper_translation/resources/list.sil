@@ -7,18 +7,6 @@ method list___init__() returns (res: Ref)
     assume false
 }
 
-//function eq(self: Ref, other: Ref): Bool
-//{
-//    self == other
-//}
-
-//domain list_things {
-//    function list___contains__(self: Ref, item: Ref): Bool
-//    axiom eqContains {
-//        forall lst: Ref, r: Ref, r2: Ref :: list___contains__(lst, r) && eq(r, r2) ==> list___contains__(lst, r2)
-//    }
-//}
-
 function list___contains__(self: Ref, item: Ref): Bool
     requires acc(self.list_acc, 1/100)
     ensures result == (item in self.list_acc)

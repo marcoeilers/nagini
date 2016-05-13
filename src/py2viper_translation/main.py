@@ -174,6 +174,7 @@ def main() -> None:
         else:
             sys.exit(1)
     except (TypeException, InvalidProgramException) as e:
+        raise e
         print("Translation failed")
         if isinstance(e, InvalidProgramException):
             print('Line ' + str(e.node.lineno) + ': ' + e.code)
