@@ -27,6 +27,7 @@ jvm = jvmaccess.JVM(config.classpath)
 type_error_pattern = "^(.*):(\\d+): error: (.*)$"
 mypy_error_matcher = re.compile(type_error_pattern)
 
+
 class AnnotatedTests():
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
         """

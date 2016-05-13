@@ -89,7 +89,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                           ctx: Context) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
-        the given receiver and arguments.
+        the given receiver and arguments. Boxes arguments if necessary, and
+        unboxed the result if needed as well.
         """
         if receiver:
             if isinstance(receiver, ast.AST):
@@ -134,6 +135,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         targets: List['silver.ast.LocalVarRef'],
                         node: ast.AST,
                         ctx: Context) -> 'silver.ast.MethodCall':
+        """
+        Creates a method call to the methoc called func_name, with
+        the given receiver and arguments. Boxes arguments if necessary.
+        """
         if receiver:
             if isinstance(receiver, ast.AST):
                 target_cls = self.get_type(receiver, ctx)
@@ -194,9 +199,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                           self.no_info(ctx))
         return self.type_check(obj_var, type, ctx)
 
-    # TODO: move to type translator, reference in abstract translator
-
-
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
                                 node: ast.AST, ctx: Context) -> Expr:
         """
@@ -233,6 +235,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def box_primitive(self, primitive: Expr, type: PythonType, node: ast.AST,
                       ctx: Context) -> StmtsAndExpr:
+        """
+        Wraps the primitive of type type into a Ref object.
+        """
         args = [primitive]
         arg_types = [None]
         name = '__box__'
@@ -241,6 +246,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def unbox_primitive(self, box: Expr, type: PythonType, node: ast.AST,
                         ctx: Context) -> Expr:
+        """
+        Assuming box is a wrapper-Ref containing a primitive of type type,
+        returns the boxed primitive.
+        """
         args = [box]
         arg_types = [None]
         name = '__unbox__'

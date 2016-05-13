@@ -30,17 +30,30 @@ from typing import List, Tuple
 class MethodTranslator(CommonTranslator):
 
     def _can_assume_type(self, type: PythonType) -> bool:
+        """
+        Checks if type information for the given type has to be checked or
+        can simply be assumed.
+        """
+        # Cannot assume tuple type information, since tuple length may be a
+        # precondition of other functions used in normal pre- and
+        # postconditions.
         return type.name not in ['Tuple']
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
+        """
+        Creates an expression checking if the given parameter has its type,
+        to be assumed in preconditions and/or postconditions. If possible,
+        the expression is wrapped in an InhaleExhaleExpression s.t. it is
+        just assumed, not checked; with some types this is not possible.
+        """
         result = self.var_type_check(param.sil_name, param.type, ctx)
         if self._can_assume_type(param.type):
             true_lit = self.viper.TrueLit(self.no_position(ctx),
                                           self.no_info(ctx))
             result = self.viper.InhaleExhaleExp(result, true_lit,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
+                                                self.no_position(ctx),
+                                                self.no_info(ctx))
         return result
 
     def _translate_pres(self, method: PythonMethod,

@@ -98,6 +98,9 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref
 
     def _get_string_value(self, string: str) -> int:
+        """
+        Computes an integer value that uniquely represents the given string.
+        """
         result = 0
         for index in range(len(string)):
             result += pow(256, index) * ord(string[index])
@@ -382,12 +385,16 @@ class ExpressionTranslator(CommonTranslator):
         right_type = self.get_type(node.comparators[0], ctx)
         stmts = left_stmt + right_stmt
         if isinstance(node.ops[0], ast.Eq):
-            # TODO: because get_type doesn't work on all expressions, this
-            # currently breaks everything
-            # if self.get_type(node.left, ctx).name not in PRIMITIVES:
-            #     call = self.get_function_call(node.left, '__eq__',
-            #                                   [left, right], node, ctx)
-            #     return stmts, call
+            # TODO: this is a workaround for the moment, but doesn't work in
+            # general. If the static left type is e.g. object, but the runtime
+            # type is e.g. str, we will use reference equality instead of
+            # calling __eq__.
+            if left_type.get_function('__eq__'):
+                call = self.get_function_call(node.left, '__eq__',
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                return stmts, call
             return (stmts, self.viper.EqCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))
@@ -412,6 +419,14 @@ class ExpressionTranslator(CommonTranslator):
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))
         elif isinstance(node.ops[0], ast.NotEq):
+            if left_type.get_function('__eq__'):
+                call = self.get_function_call(node.left, '__eq__',
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                not_call = self.viper.Not(call, self.to_position(node, ctx),
+                                          self.no_info(ctx))
+                return stmts, not_call
             return (stmts, self.viper.NeCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))

@@ -205,6 +205,8 @@ class Analyzer(ast.NodeVisitor):
         self.current_function.args[node.arg] = \
             self.node_factory.create_python_var(node.arg, node,
                                                 self.typeof(node))
+        alts = self.get_alt_types(node)
+        self.current_function.args[node.arg].alt_types = alts
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
         if var is None:
@@ -217,8 +219,8 @@ class Analyzer(ast.NodeVisitor):
             raise UnsupportedException(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        if (isinstance(node.func, ast.Name)
-            and node.func.id in CONTRACT_WRAPPER_FUNCS):
+        if (isinstance(node.func, ast.Name) and
+                node.func.id in CONTRACT_WRAPPER_FUNCS):
             assert self.current_function is not None
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])
@@ -286,6 +288,8 @@ class Analyzer(ast.NodeVisitor):
                     var = self.node_factory.create_python_var(node.id,
                                                               node,
                                                               self.typeof(node))
+                    alts = self.get_alt_types(node)
+                    var.alt_types = alts
                     self.current_function.locals[node.id] = var
                 self.track_access(node, var)
 
@@ -297,6 +301,9 @@ class Analyzer(ast.NodeVisitor):
             self.track_access(node, field)
 
     def convert_type(self, mypy_type) -> PythonType:
+        """
+        Converts an internal mypy type to a PythonType.
+        """
         if self.types.is_void_type(mypy_type):
             return None
         if self.types.is_instance_type(mypy_type):
@@ -314,7 +321,27 @@ class Analyzer(ast.NodeVisitor):
         else:
             raise UnsupportedException(mypy_type)
 
+    def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
+        if isinstance(node, (ast.Name, ast.arg)):
+            context = []
+            if self.current_class is not None:
+                context.append(self.current_class.name)
+            if self.current_function is not None:
+                context.append(self.current_function.name)
+            name = node.id if isinstance(node, ast.Name) else node.arg
+            _, alts = self.types.get_type(context, name)
+            result = {}
+            if alts:
+                for line, type in alts.items():
+                    result[line] = self.convert_type(type)
+            return result
+        else:
+            return {}
+
     def typeof(self, node: ast.AST) -> PythonType:
+        """
+        Returns the type of the given AST node.
+        """
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)
@@ -325,19 +352,21 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
-            type = self.types.get_type(context, node.id)
+            type, alts = self.types.get_type(context, node.id)
+            if alts and node.lineno in alts:
+                return self.convert_type(alts[node.lineno])
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             context = [receiver.name]
-            type = self.types.get_type(context, node.attr)
+            type, _ = self.types.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
-            type = self.types.get_type(context, node.arg)
+            type, _ = self.types.get_type(context, node.arg)
             return self.convert_type(type)
         elif (isinstance(node, ast.Call) and
               isinstance(node.func, ast.Name) and

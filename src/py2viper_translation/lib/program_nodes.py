@@ -1,6 +1,7 @@
 import ast
 import mypy
 
+from abc import ABCMeta
 from collections import OrderedDict
 from py2viper_translation.lib.constants import (
     END_LABEL,
@@ -96,7 +97,10 @@ class PythonNode:
         self.sil_name = None
 
 
-class PythonType:
+class PythonType(metaclass=ABCMeta):
+    """
+    Abstract superclass of all kinds python types.
+    """
     pass
 
 
@@ -253,6 +257,12 @@ class PythonClass(PythonType, PythonNode, PythonScope):
 
 
 class GenericType(PythonType):
+    """
+    Represents a specific instantiation of a generic type, e.g. list[int].
+    Provides access to the type arguments (in this case int) and otherwise
+    behaves like the unerlying PythonClass (in this case list).
+    """
+
     def __init__(self, name: str, program: PythonProgram,
                  args: List[PythonType]) -> None:
         self.name = name
@@ -268,6 +278,10 @@ class GenericType(PythonType):
     @property
     def sil_name(self) -> str:
         return self.get_class().sil_name
+
+    @property
+    def superclass(self) -> PythonClass:
+        return self.get_class().superclass
 
     def get_field(self, name: str) -> Optional['PythonField']:
         """
@@ -522,6 +536,7 @@ class PythonVar(PythonNode):
         self.ref = None
         self.writes = []
         self.reads = []
+        self.alt_types = {}
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
