@@ -14,6 +14,7 @@ from typing import List, Tuple
 
 test_translation_dir = 'tests/translation/'
 test_verification_dir = 'tests/verification/'
+test_sif_dir = 'tests/sif/'
 
 os.environ['MYPYPATH'] = config.mypy_path
 
@@ -33,9 +34,9 @@ class AnnotatedTests():
         """
         A test annotation is a comment starting with #::
         """
-        return (tk.type is tokenize.COMMENT
-                and tk.string.strip().startswith('#:: ')
-                and tk.string.strip().endswith(')'))
+        return (tk.type is tokenize.COMMENT and
+                tk.string.strip().startswith('#:: ') and
+                tk.string.strip().endswith(')'))
 
     def get_test_annotations(self, path: str) -> List:
         """
@@ -75,8 +76,8 @@ class AnnotatedTests():
 
 
 class VerificationTests(AnnotatedTests):
-    def test_file(self, path: str, jvm, verifier):
-        prog = translate(path, jvm)
+    def test_file(self, path: str, jvm, verifier, sif):
+        prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
         self.evaluate_result(vresult, path, jvm)
@@ -119,7 +120,7 @@ def verification_test_files():
 
 @pytest.mark.parametrize('path,verifier', verification_test_files())
 def test_verification(path, verifier):
-    verification_tester.test_file(path, jvm, verifier)
+    verification_tester.test_file(path, jvm, verifier, False)
 
 
 class TranslationTests(AnnotatedTests):
@@ -163,3 +164,25 @@ def translation_test_files():
 @pytest.mark.parametrize('path', translation_test_files())
 def test_translation(path):
     translation_tester.test_file(path, jvm)
+
+
+def sif_test_files():
+    result = []
+    for f in os.listdir(test_sif_dir):
+        joined = join(test_sif_dir, f)
+        if isfile(joined) and f.endswith('.py'):
+            result += [(joined, verifier) for verifier in verifiers]
+    return result
+
+
+# TODO: SIF tests are currently commented out because something weird
+# happens with the method calls test case that leads all subsequent tests to
+# fail (probably some state somewhere in Viper that gets messed up by the
+# first test and never gets reinitialized). Additionally, the field assign
+# test fails in Carbon.
+
+# @pytest.mark.parametrize('path,verifier', sif_test_files())
+# def test_sif(path, verifier):
+#     verification_tester.test_file(path, jvm, verifier, True)
+
+
