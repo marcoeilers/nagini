@@ -109,10 +109,18 @@ verification_tester = VerificationTests()
 
 def verification_test_files():
     result = []
-    for f in os.listdir(test_verification_dir):
-        joined = join(test_verification_dir, f)
-        if isfile(joined) and f.endswith('.py'):
-            result += [(joined, verifier) for verifier in verifiers]
+    for root, dir_names, file_names in os.walk(
+            test_verification_dir,
+            topdown=True):
+        if 'resources' in dir_names:
+            # Skip resources directory.
+            dir_names.remove('resources')
+        for file_name in file_names:
+            if file_name.endswith('.py'):
+                result.extend((
+                    (join(root, file_name), verifier)
+                    for verifier in verifiers
+                    ))
     return result
 
 
