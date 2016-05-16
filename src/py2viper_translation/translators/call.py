@@ -47,7 +47,8 @@ class CallTranslator(CommonTranslator):
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         args = [target]
-        call = self.get_function_call(node.args[0], '__len__', [target], [None],
+        arg_type = self.get_type(node.args[0], ctx)
+        call = self.get_function_call(arg_type, '__len__', [target], [None],
                                       node, ctx)
         return stmt, call
 

@@ -92,7 +92,9 @@ class TypeTranslator(CommonTranslator):
                 el_types = [self.get_type(el, ctx) for el in node.elts]
                 args = [self.common_supertype(el_types)]
             elif node._parent and isinstance(node._parent, ast.Assign):
-                # oh god this is terrible
+                # empty constructor is assigned to variable;
+                # we get the type of the empty list from the type of the
+                # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.program.classes['object']]
@@ -103,7 +105,9 @@ class TypeTranslator(CommonTranslator):
                 el_types = [self.get_type(el, ctx) for el in node.elts]
                 args = [self.common_supertype(el_types)]
             elif node._parent and isinstance(node._parent, ast.Assign):
-                # oh god this is terrible
+                # empty constructor is assigned to variable;
+                # we get the type of the empty set from the type of the
+                # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.program.classes['object']]
@@ -116,6 +120,9 @@ class TypeTranslator(CommonTranslator):
                 args = [self.common_supertype(key_types),
                         self.common_supertype(val_types)]
             elif node._parent and isinstance(node._parent, ast.Assign):
+                # empty constructor is assigned to variable;
+                # we get the type of the empty dict from the type of the
+                # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 object_class = ctx.program.classes['object']
@@ -218,12 +225,13 @@ class TypeTranslator(CommonTranslator):
         """
         Returns a type check expression. This may return a simple isinstance
         for simple types, or include information about type arguments for
-        generic types, or things like the lengts for tuples.
+        generic types, or things like the lengths for tuples.
         """
         if type.name in PRIMITIVES:
-            # TODO: do we need some boxed integer type?
-            return self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-        result = self.type_factory.type_check(lhs, type, ctx)
+            boxed = ctx.program.classes['__boxed_' + type.name]
+            result = self.type_factory.type_check(lhs, boxed, ctx)
+        else:
+            result = self.type_factory.type_check(lhs, type, ctx)
         if type.name == 'Tuple':
             # length
             length = self.viper.IntLit(len(type.type_args),

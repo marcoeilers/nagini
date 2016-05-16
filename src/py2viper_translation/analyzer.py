@@ -257,7 +257,6 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is None:
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
-                    # type = self.types.get_type([], node.id)
                     cls = self.typeof(node)
                     var = self.node_factory.create_python_var(node.id,
                                                               node, cls)
@@ -305,23 +304,30 @@ class Analyzer(ast.NodeVisitor):
         Converts an internal mypy type to a PythonType.
         """
         if self.types.is_void_type(mypy_type):
-            return None
-        if self.types.is_instance_type(mypy_type):
+            result = None
+        elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type)
             if mypy_type.args:
                 args = [self.convert_type(arg) for arg in mypy_type.args]
                 result = GenericType(result.name, self.program, args)
-            return result
-        if self.types.is_normal_type(mypy_type):
-            return self.get_class(mypy_type.name())
+        elif self.types.is_normal_type(mypy_type):
+            result = self.get_class(mypy_type.name())
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
             result = GenericType('Tuple', self.program, args)
-            return result
         else:
             raise UnsupportedException(mypy_type)
+        return result
 
     def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
+        """
+        If the given node refers to a local variable, returns a dict with
+        the alt-types of the given variable, i.e. the types it has at other
+        places where it is referenced (e.g. because a reference happens after
+        an isinstance-check).
+        The format is a dict that maps line numbers to types; for anything but
+        references to local vars, the dict is empty.
+        """
         if isinstance(node, (ast.Name, ast.arg)):
             context = []
             if self.current_class is not None:

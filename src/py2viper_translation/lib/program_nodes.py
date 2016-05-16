@@ -260,7 +260,7 @@ class GenericType(PythonType):
     """
     Represents a specific instantiation of a generic type, e.g. list[int].
     Provides access to the type arguments (in this case int) and otherwise
-    behaves like the unerlying PythonClass (in this case list).
+    behaves like the underlying PythonClass (in this case list).
     """
 
     def __init__(self, name: str, program: PythonProgram,

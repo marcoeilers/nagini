@@ -10,6 +10,9 @@ class Function0:
         pass
 
 
+LONG_SIZE = 2147483647
+
+
 class ViperAST:
     """
     Provides convenient access to the classes which constitute the Viper AST.
@@ -91,17 +94,17 @@ class ViperAST:
         negative = num < 0
         if negative:
             num = -num
-        cutoff = 1000000000
+        cutoff = LONG_SIZE
         cutoff_int = self.java.math.BigInteger.valueOf(cutoff)
-        current = num
-        current_int = self.java.math.BigInteger.valueOf(0)
-        while current > 0:
-            cur_part = current % cutoff
-            cur_int = self.java.math.BigInteger.valueOf(cur_part)
-            current_int = current_int.multiply(cutoff_int)
-            current_int = current_int.add(cur_int)
-            current = current // cutoff
-        return self.scala.math.BigInt(current_int)
+        rest = num
+        result_int = self.java.math.BigInteger.valueOf(0)
+        while rest > 0:
+            current_part = rest % cutoff
+            current_int = self.java.math.BigInteger.valueOf(current_part)
+            result_int = result_int.multiply(cutoff_int)
+            result_int = result_int.add(current_int)
+            rest = rest // cutoff
+        return self.scala.math.BigInt(result_int)
 
     def Program(self, domains, fields, functions, predicates, methods, position,
                 info):
