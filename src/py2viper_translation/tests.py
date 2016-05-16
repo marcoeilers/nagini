@@ -38,6 +38,10 @@ class AnnotatedTests():
                 tk.string.strip().startswith('#:: ') and
                 tk.string.strip().endswith(')'))
 
+    def _is_ignore_annotation(self, tk: tokenize.TokenInfo) -> bool:
+        return (tk.type is tokenize.COMMENT and
+                tk.string.strip().startswith('#:: IgnoreFile'))
+
     def get_test_annotations(self, path: str) -> List:
         """
         Retrieves test annotations from the given Python source file
@@ -77,18 +81,21 @@ class AnnotatedTests():
 
 class VerificationTests(AnnotatedTests):
     def test_file(self, path: str, jvm, verifier, sif):
+        test_annotations = self.get_test_annotations(path)
+        if any(self._is_ignore_annotation(tk) for tk in test_annotations):
+            pytest.skip()
         prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
-        self.evaluate_result(vresult, path, jvm)
+        self.evaluate_result(vresult, path, test_annotations, jvm)
 
     def evaluate_result(self, vresult: VerificationResult, file_path: str,
-                        jvm: jvmaccess.JVM):
+                        test_annotations: List, jvm: jvmaccess.JVM):
         """
         Evaluates the verification result w.r.t. the test annotations in
         the file
         """
-        test_annotations = self.get_test_annotations(file_path)
+
         expected = flatten(
             [self.token_to_expected(ann) for ann in test_annotations if
              ann.string.strip().startswith('#:: ExpectedOutput(')])
