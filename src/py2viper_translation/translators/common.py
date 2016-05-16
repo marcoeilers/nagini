@@ -83,7 +83,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
 
-    def get_function_call(self, receiver: Union[ast.AST, PythonType],
+    def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
                           ctx: Context) -> 'silver.ast.FuncApp':
@@ -93,10 +93,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         unboxed the result if needed as well.
         """
         if receiver:
-            if isinstance(receiver, ast.AST):
-                target_cls = self.get_type(receiver, ctx)
-            else:
-                target_cls = receiver
+            target_cls = receiver
             func = target_cls.get_function(func_name)
         else:
             func = ctx.program.functions[func_name]
@@ -129,7 +126,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             call = self.unbox_primitive(call, node_type, node, ctx)
         return call
 
-    def get_method_call(self, receiver: Union[ast.AST, PythonType],
+    def get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],
                         arg_types: List[PythonType],
                         targets: List['silver.ast.LocalVarRef'],
@@ -140,10 +137,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         the given receiver and arguments. Boxes arguments if necessary.
         """
         if receiver:
-            if isinstance(receiver, ast.AST):
-                target_cls = self.get_type(receiver, ctx)
-            else:
-                target_cls = receiver
+            target_cls = receiver
             func = target_cls.get_method(func_name)
         else:
             func = ctx.program.methods[func_name]

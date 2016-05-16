@@ -176,27 +176,30 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
-        if len(node.targets) != 1:
-            # TODO: When does this actually happen?
-            raise UnsupportedException(node)
-        if isinstance(node.targets[0], ast.Tuple):
-            rhs_type = self.get_type(node.value, ctx)
+        rhs_type = self.get_type(node.value, ctx)
+        rhs_stmt, rhs = rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        assign_stmts = []
+        for target in node.targets:
+            assign_stmts += self.translate_single_assign(target, rhs, rhs_type,
+                                                         node, ctx)
+        return rhs_stmt + assign_stmts
+
+    def translate_single_assign(self, target: ast.AST, rhs: Expr,
+                                rhs_type: PythonType, node: ast.AST,
+                                ctx: Context) -> List[Stmt]:
+        stmt = []
+        if isinstance(target, ast.Tuple):
             if (rhs_type.name != 'Tuple' or
                     len(rhs_type.type_args) != len(node.targets[0].elts)):
                 raise InvalidProgramException(node, 'invalid.assign')
             # translate rhs
-            rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-            stmt = rhs_stmt
-            for index in range(len(node.targets[0].elts)):
-                stmt += self.assign_to(node.targets[0].elts[index], rhs,
+            for index in range(len(target.elts)):
+                stmt += self.assign_to(target.elts[index], rhs,
                                        index, rhs_type,
                                        node, ctx)
             return stmt
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        rhs_type = self.get_type(node.value, ctx)
-        lhs_stmt = self.assign_to(node.targets[0], rhs, None, rhs_type, node,
-                                  ctx)
-        return rhs_stmt + lhs_stmt
+        lhs_stmt = self.assign_to(target, rhs, None, rhs_type, node, ctx)
+        return lhs_stmt
 
     def is_invariant(self, stmt: ast.AST) -> bool:
         return get_func_name(stmt) == 'Invariant'

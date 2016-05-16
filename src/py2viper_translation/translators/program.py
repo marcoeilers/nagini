@@ -237,7 +237,8 @@ class ProgramTranslator(CommonTranslator):
         methods = []
 
         for sil_prog in sil_progs:
-            domains += [d for d in self.viper.to_list(sil_prog.domains()) if d.name() != 'PyType']
+            domains += [d for d in self.viper.to_list(sil_prog.domains())
+                        if d.name() != 'PyType']
             fields += self.viper.to_list(sil_prog.fields())
             functions += self.viper.to_list(sil_prog.functions())
             predicates += self.viper.to_list(sil_prog.predicates())

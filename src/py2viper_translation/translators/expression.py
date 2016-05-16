@@ -102,8 +102,8 @@ class ExpressionTranslator(CommonTranslator):
         Computes an integer value that uniquely represents the given string.
         """
         result = 0
-        for index in range(len(string)):
-            result += pow(256, index) * ord(string[index])
+        for (index, char) in enumerate(string):
+            result += pow(256, index) * ord(char)
         return result
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
@@ -145,7 +145,7 @@ class ExpressionTranslator(CommonTranslator):
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
-        call = self.get_function_call(node.value, '__getitem__', args,
+        call = self.get_function_call(target_type, '__getitem__', args,
                                       arg_types, node, ctx)
         result = call
         result_type = self.get_type(node, ctx)
@@ -263,8 +263,9 @@ class ExpressionTranslator(CommonTranslator):
         if type is ctx.program.classes['bool']:
             return stmt, res
         args = [res]
-        arg_types = [None]
-        call = self.get_function_call(node, '__bool__', args, arg_types, node,
+        arg_type = self.get_type(node, ctx)
+        arg_types = [arg_type]
+        call = self.get_function_call(arg_type, '__bool__', args, arg_types, node,
                                       ctx)
         return stmt, call
 
@@ -349,7 +350,7 @@ class ExpressionTranslator(CommonTranslator):
         left_type = self.get_type(node.left, ctx)
         right_type = self.get_type(node.right, ctx)
         if left_type.name != 'int':
-            call = self.get_function_call(node.left, '__add__', [left, right],
+            call = self.get_function_call(left_type, '__add__', [left, right],
                                           [left_type, right_type], node, ctx)
             return stmt, call
         if isinstance(node.op, ast.Add):
@@ -384,20 +385,24 @@ class ExpressionTranslator(CommonTranslator):
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
         right_type = self.get_type(node.comparators[0], ctx)
         stmts = left_stmt + right_stmt
-        if isinstance(node.ops[0], ast.Eq):
+        if isinstance(node.ops[0], (ast.Eq, ast.NotEq)):
             # TODO: this is a workaround for the moment, but doesn't work in
             # general. If the static left type is e.g. object, but the runtime
             # type is e.g. str, we will use reference equality instead of
             # calling __eq__.
+            is_not = isinstance(node.ops[0], ast.NotEq)
             if left_type.get_function('__eq__'):
-                call = self.get_function_call(node.left, '__eq__',
+                call = self.get_function_call(left_type, '__eq__',
                                               [left, right],
                                               [left_type, right_type],
                                               node, ctx)
+                if is_not:
+                    call = self.viper.Not(call, self.to_position(node, ctx),
+                                          self.no_info(ctx))
                 return stmts, call
-            return (stmts, self.viper.EqCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
+            constr = self.viper.NeCmp if is_not else self.viper.EqCmp
+            return (stmts, constr(left, right, self.to_position(node, ctx),
+                                  self.no_info(ctx)))
         elif isinstance(node.ops[0], ast.Is):
             return (stmts, self.viper.EqCmp(left, right,
                                             self.to_position(node, ctx),
@@ -418,18 +423,6 @@ class ExpressionTranslator(CommonTranslator):
             return (stmts, self.viper.LeCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.NotEq):
-            if left_type.get_function('__eq__'):
-                call = self.get_function_call(node.left, '__eq__',
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                not_call = self.viper.Not(call, self.to_position(node, ctx),
-                                          self.no_info(ctx))
-                return stmts, not_call
-            return (stmts, self.viper.NeCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
         elif isinstance(node.ops[0], ast.IsNot):
             return (stmts, self.viper.NeCmp(left, right,
                                             self.to_position(node, ctx),
@@ -437,7 +430,7 @@ class ExpressionTranslator(CommonTranslator):
         elif isinstance(node.ops[0], ast.In):
             args = [right, left]
             arg_types = [right_type, left_type]
-            app = self.get_function_call(node.comparators[0], '__contains__',
+            app = self.get_function_call(right_type, '__contains__',
                                          args, arg_types, node, ctx)
             return stmts, app
         else:
