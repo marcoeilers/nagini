@@ -1,0 +1,222 @@
+{
+"list": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "append": {
+            "args": ["list", "object"],
+            "type": null
+        },
+        "__setitem__": {
+            "args": ["list", "int", "object"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__getitem__": {
+            "args": ["list", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["list", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["list"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["list"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"set":{
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "add": {
+            "args": ["set", "object"],
+            "type": null
+        },
+        "clear": {
+            "args": ["set"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "object"],
+            "type": "bool"
+        },
+        "__bool__": {
+            "args": ["set"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"dict": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null
+        },
+        "keys": {
+            "args": ["dict"],
+            "type": "set"
+        },
+        "__setitem__": {
+            "args": ["dict", "object", "object"],
+            "type": null
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "object"],
+            "type": "bool"
+        },
+        "__getitem__": {
+            "args": ["dict", "object"],
+            "type": "object"
+        },
+        "get": {
+            "args": ["dict", "object"],
+            "type": "object"
+        },
+        "keys": {
+            "args": ["dict"],
+            "type": "set"
+        },
+        "__bool__": {
+            "args": ["dict"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"object": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        }
+    }
+},
+"int": {
+    "functions": {
+        "__bool__": {
+            "args": ["int"],
+            "type": "bool"
+        },
+        "__box__": {
+            "args": ["int"],
+            "type": "__boxed_int"
+        }
+    }
+},
+"bool": {
+    "functions": {
+        "__bool__": {
+            "args": ["bool"],
+            "type": "bool"
+        },
+        "__box__": {
+            "args": ["bool"],
+            "type": "__boxed_bool"
+        }
+    }
+},
+"NoneType": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        }
+    }
+},
+"Exception": {
+    "extends": "object"
+},
+"str": {
+    "functions": {
+        "__len__": {
+            "args": ["str"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["str"],
+            "type": "bool"
+        },
+        "__eq__": {
+            "args": ["str", "object"],
+            "type": "bool"
+        },
+        "__add__": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "str"
+        }
+    },
+    "extends": "object"
+},
+"Tuple": {
+    "functions": {
+        "__create0__": {
+            "args": [],
+            "type": "Tuple"
+        },
+        "__create1__": {
+            "args": ["object"],
+            "type": "Tuple"
+        },
+        "__create2__": {
+            "args": ["object", "object"],
+            "type": "Tuple"
+        },
+        "__create3__": {
+            "args": ["object", "object", "object"],
+            "type": "Tuple"
+        },
+        "__create4__": {
+            "args": ["object", "object", "object", "object"],
+            "type": "Tuple"
+        },
+        "__getitem__": {
+            "args": ["Tuple", "int"],
+            "type": "object"
+        },
+        "__len__": {
+            "args": ["Tuple"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"__boxed_int": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_int"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"__boxed_bool": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_bool"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+}
+}

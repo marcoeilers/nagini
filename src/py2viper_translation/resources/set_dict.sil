@@ -1,0 +1,82 @@
+field set_acc : Set[Ref]
+
+method set___init__() returns (res: Ref)
+    ensures acc(res.set_acc)
+    ensures res.set_acc == Set[Ref]()
+{
+    assume false
+}
+
+function set___contains__(self: Ref, item: Ref) : Bool
+    requires acc(self.set_acc, 1/100)
+    ensures result == (item in self.set_acc)
+
+function set___bool__(self: Ref) : Bool
+    requires acc(self.set_acc, 1/100)
+    ensures result == (|self.set_acc| != 0)
+
+method set_add(self: Ref, item: Ref) returns ()
+    requires acc(self.set_acc)
+    ensures acc(self.set_acc)
+    ensures self.set_acc == old(self.set_acc) union Set(item)
+{
+    assume false
+}
+
+method set_clear(self: Ref) returns ()
+    requires acc(self.set_acc)
+    ensures acc(self.set_acc)
+    ensures self.set_acc == Set[Ref]()
+{
+    assume false
+}
+
+field dict_acc : Set[Ref]
+
+method dict___init__() returns (res: Ref)
+    ensures acc(res.dict_acc)
+    ensures res.dict_acc == Set[Ref]()
+{
+    assume false
+}
+
+function dict___contains__(self: Ref, item: Ref) : Bool
+    requires acc(self.dict_acc, 1/100)
+    ensures result == (item in self.dict_acc)
+
+function dict___bool__(self: Ref) : Bool
+    requires acc(self.dict_acc, 1/100)
+    ensures result == (|self.dict_acc| != 0)
+
+method dict_keys(self: Ref) returns (res: Ref)
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
+    ensures acc(res.set_acc)
+    ensures res.set_acc == self.dict_acc
+{
+    assume false
+}
+
+function dict___getitem__(self: Ref, key: Ref) : Ref
+    requires acc(self.dict_acc, 1/100)
+    requires dict___contains__(self, key)
+
+function dict_get(self: Ref, key: Ref) : Ref
+    requires acc(self.dict_acc, 1/100)
+    ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
+
+method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
+    requires acc(self.dict_acc)
+    ensures acc(self.dict_acc)
+    ensures self.dict_acc == old(self.dict_acc) union Set(key)
+    ensures dict___getitem__(self, key) == item
+    ensures forall k : Ref ::
+        {dict___getitem__(self, k)}
+        {old(dict___getitem__(self, k))}
+        ((old(dict___contains__(self, k)) && k != key)
+        ==>
+        (dict___contains__(self, k) &&
+        (dict___getitem__(self, k) == old(dict___getitem__(self, k)))))
+{
+    assume false
+}
