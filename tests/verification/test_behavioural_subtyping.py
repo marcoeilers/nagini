@@ -7,10 +7,10 @@ class SuperA:
         self.int_field = 14
         self.bool_field = True
 
-    def some_method(self, a: int) -> int:
-        Requires(a > 9)
+    def some_method(self, b: int) -> int:
+        Requires(b > 9)
         Ensures(Result() > 9)
-        return a
+        return b
 
 
 class SubA(SuperA):
@@ -28,10 +28,10 @@ class SubSubA(SubA):
 
 
 class SuperB:
-    def some_method(self, a: int) -> int:
-        Requires(a > 9)
+    def some_method(self, b: int) -> int:
+        Requires(b > 9)
         Ensures(Result() > 9)
-        return a
+        return b
 
 
 class SubB(SuperB):
@@ -51,10 +51,10 @@ class SubSubB(SubB):
 
 
 class SuperC:
-    def some_method(self, a: int) -> int:
-        Requires(a > 9)
+    def some_method(self, b: int) -> int:
+        Requires(b > 9)
         Ensures(Result() > 9)
-        return a
+        return b
 
 
 class SubC(SuperC):
@@ -75,10 +75,10 @@ class SubSubC(SubC):
 
 # Basic tests with access permissions
 class SuperD:
-    def some_method(self, a: SuperA) -> int:
-        Requires(Acc(a.int_field, 1 / 2))
-        Ensures(Acc(a.int_field, 1 / 4))
-        return a.int_field
+    def some_method(self, b: SuperA) -> int:
+        Requires(Acc(b.int_field, 1 / 2))
+        Ensures(Acc(b.int_field, 1 / 4))
+        return b.int_field
 
 
 class SubD(SuperD):
@@ -111,32 +111,32 @@ class SuperE:
 
 class SubE(SuperE):
     #:: ExpectedOutput(call.precondition:insufficient.permission)
-    def some_method(self, b: SuperA) -> int:
-        Requires(Acc(b.int_field, 2 / 3))
-        Ensures(Acc(b.int_field, 2 / 3))
-        return b.int_field + 5
+    def some_method(self, a: SuperA) -> int:
+        Requires(Acc(a.int_field, 2 / 3))
+        Ensures(Acc(a.int_field, 2 / 3))
+        return a.int_field + 5
 
 
 class SubE2(SuperE):
     #:: ExpectedOutput(postcondition.violated:insufficient.permission)
-    def some_method(self, b: SuperA) -> int:
-        Requires(Acc(b.int_field, 1 / 2))
-        Ensures(Acc(b.int_field, 1 / 8))
-        return b.int_field + 5
+    def some_method(self, a: SuperA) -> int:
+        Requires(Acc(a.int_field, 1 / 2))
+        Ensures(Acc(a.int_field, 1 / 8))
+        return a.int_field + 5
 
 
 class SubE3(SuperE):
     #:: ExpectedOutput(call.precondition:insufficient.permission)
-    def some_method(self, b: SuperA) -> int:
-        Requires(Acc(b.bool_field, 1 / 2))
-        Ensures(Acc(b.bool_field, 1 / 2))
+    def some_method(self, a: SuperA) -> int:
+        Requires(Acc(a.bool_field, 1 / 2))
+        Ensures(Acc(a.bool_field, 1 / 2))
         return 5
 
 
 # Covariant return types, contravariant parameters
 class SuperF:
-    def some_method(self, b: SubA, a: SubSubA) -> SubA:
-        return a
+    def some_method(self, a: SubA, b: SubSubA) -> SubA:
+        return b
 
 
 class SubF1(SuperF):
@@ -171,11 +171,24 @@ class Super:
 
 
 class Sub(Super):
-    def some_function(self, c: int) -> int:
+    def some_function(self, a: int) -> int:
         Requires(True)
         Ensures(Result() > 17)
         Exsures(MySpecialException, True)
         Exsures(MyException, True)
         return 19
 
-        # TODO test if exceptional postconditions coincide
+# TODO test if exceptional postconditions coincide
+
+
+class SuperNamed:
+    def some_method(self, named: int= 23) -> int:
+        Ensures(Result() == named)
+        return named
+
+
+class SubNamed(SuperNamed):
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    def some_method(self, named: int=56) -> int:
+        Ensures(Result() == named)
+        return named

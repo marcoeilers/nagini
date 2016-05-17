@@ -189,7 +189,7 @@ class StatementTranslator(CommonTranslator):
                                 ctx: Context) -> List[Stmt]:
         stmt = []
         if isinstance(target, ast.Tuple):
-            if (rhs_type.name != 'Tuple' or
+            if (rhs_type.name != 'tuple' or
                     len(rhs_type.type_args) != len(node.targets[0].elts)):
                 raise InvalidProgramException(node, 'invalid.assign')
             # translate rhs

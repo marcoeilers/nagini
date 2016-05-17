@@ -4,39 +4,39 @@ field bool_value___: Bool
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
-    unique function Tuple(): PyType
+    unique function tuple(): PyType
 }
 
-function Tuple___create0__(): Ref
-    ensures Tuple___len__(result) == 0
-    ensures typeof(result) == Tuple()
+function tuple___create0__(): Ref
+    ensures tuple___len__(result) == 0
+    ensures typeof(result) == tuple()
 
-function Tuple___create1__(arg0 : Ref): Ref
-    ensures Tuple___len__(result) == 1 && Tuple___getitem__(result, 0) == arg0
-    ensures typeof(result) == Tuple()
+function tuple___create1__(arg0 : Ref): Ref
+    ensures tuple___len__(result) == 1 && tuple___getitem__(result, 0) == arg0
+    ensures typeof(result) == tuple()
 
-function Tuple___create2__(arg0 : Ref, arg1: Ref): Ref
-    ensures Tuple___len__(result) == 2 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1
-    ensures typeof(result) == Tuple()
+function tuple___create2__(arg0 : Ref, arg1: Ref): Ref
+    ensures tuple___len__(result) == 2 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1
+    ensures typeof(result) == tuple()
 
-function Tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref): Ref
-    ensures Tuple___len__(result) == 3 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2
-    ensures typeof(result) == Tuple()
+function tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref): Ref
+    ensures tuple___len__(result) == 3 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2
+    ensures typeof(result) == tuple()
 
-function Tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref): Ref
-    ensures Tuple___len__(result) == 4 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2 && Tuple___getitem__(result, 3) == arg3
-    ensures typeof(result) == Tuple()
+function tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref): Ref
+    ensures tuple___len__(result) == 4 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3
+    ensures typeof(result) == tuple()
 
-function Tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref): Ref
-    ensures Tuple___len__(result) == 5 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2 && Tuple___getitem__(result, 3) == arg3 && Tuple___getitem__(result, 4) == arg4
-    ensures typeof(result) == Tuple()
+function tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref): Ref
+    ensures tuple___len__(result) == 5 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4
+    ensures typeof(result) == tuple()
 
-function Tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref): Ref
-    ensures Tuple___len__(result) == 6 && Tuple___getitem__(result, 0) == arg0 && Tuple___getitem__(result, 1) == arg1 && Tuple___getitem__(result, 2) == arg2 && Tuple___getitem__(result, 3) == arg3 && Tuple___getitem__(result, 4) == arg4 && Tuple___getitem__(result, 5) == arg5
-    ensures typeof(result) == Tuple()
+function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref): Ref
+    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
+    ensures typeof(result) == tuple()
 
-function Tuple___len__(self: Ref) : Int
+function tuple___len__(self: Ref) : Int
 
-function Tuple___getitem__(self: Ref, key: Int): Ref
+function tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
-    requires key < Tuple___len__(self)
+    requires key < tuple___len__(self)

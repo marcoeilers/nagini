@@ -57,6 +57,10 @@
         "__bool__": {
             "args": ["set"],
             "type": "bool"
+        },
+        "__len__": {
+            "args": ["set"],
+            "type": "int"
         }
     },
     "extends": "object"
@@ -96,6 +100,10 @@
         "__bool__": {
             "args": ["dict"],
             "type": "bool"
+        },
+        "__len__": {
+            "args": ["dict"],
+            "type": "int"
         }
     },
     "extends": "object"
@@ -168,34 +176,34 @@
     },
     "extends": "object"
 },
-"Tuple": {
+"tuple": {
     "functions": {
         "__create0__": {
             "args": [],
-            "type": "Tuple"
+            "type": "tuple"
         },
         "__create1__": {
             "args": ["object"],
-            "type": "Tuple"
+            "type": "tuple"
         },
         "__create2__": {
             "args": ["object", "object"],
-            "type": "Tuple"
+            "type": "tuple"
         },
         "__create3__": {
             "args": ["object", "object", "object"],
-            "type": "Tuple"
+            "type": "tuple"
         },
         "__create4__": {
             "args": ["object", "object", "object", "object"],
-            "type": "Tuple"
+            "type": "tuple"
         },
         "__getitem__": {
-            "args": ["Tuple", "int"],
+            "args": ["tuple", "int"],
             "type": "object"
         },
         "__len__": {
-            "args": ["Tuple"],
+            "args": ["tuple"],
             "type": "int"
         }
     },

@@ -37,7 +37,7 @@ class MethodTranslator(CommonTranslator):
         # Cannot assume tuple type information, since tuple length may be a
         # precondition of other functions used in normal pre- and
         # postconditions.
-        return type.name not in ['Tuple']
+        return type.name not in ['tuple']
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
@@ -141,18 +141,36 @@ class MethodTranslator(CommonTranslator):
 
         return posts
 
-    def _create_typeof_pres(self, args: List[PythonVar], is_constructor: bool,
+    def _create_typeof_pres(self, func: PythonMethod, is_constructor: bool,
                             ctx: Context) -> List[DomainFuncApp]:
         """
         Creates 'typeof' preconditions for function arguments.
         """
+        args = func.args
         pres = []
         for arg in args.values():
             if not (arg.type.name in PRIMITIVES or
                     (is_constructor and arg == next(iter(args)))):
                 type_check = self.get_parameter_typeof(arg, ctx)
                 pres.append(type_check)
+        if func.var_arg:
+            type_check = self.get_parameter_typeof(func.var_arg, ctx)
+            pres.append(type_check)
+        if func.kw_arg:
+            type_check = self.get_parameter_typeof(func.kw_arg, ctx)
+            pres.append(type_check)
         return pres
+
+    def _translate_params(self, func: PythonMethod,
+                          ctx: Context) -> List[VarDecl]:
+        args = []
+        for name, arg in func.args.items():
+            args.append(arg.decl)
+        if func.var_arg:
+            args.append(func.var_arg.decl)
+        if func.kw_arg:
+            args.append(func.kw_arg.decl)
+        return args
 
     def translate_function(self, func: PythonMethod,
                            ctx: Context) -> 'silver.ast.Function':
@@ -163,9 +181,7 @@ class MethodTranslator(CommonTranslator):
         old_function = ctx.current_function
         ctx.current_function = func
         type = self.translate_type(func.type, ctx)
-        args = []
-        for arg in func.args:
-            args.append(func.args[arg].decl)
+        args = self._translate_params(func)
         if func.declared_exceptions:
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')
@@ -184,7 +200,7 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
         # create typeof preconditions
-        pres = self._create_typeof_pres(func.args, False, ctx) + pres
+        pres = self._create_typeof_pres(func, False, ctx) + pres
         if func.type.name not in PRIMITIVES:
             res_type = self.translate_type(func.type, ctx)
             result = self.viper.Result(res_type, self.no_position(ctx),
@@ -222,7 +238,7 @@ class MethodTranslator(CommonTranslator):
         # create exceptional postconditions
         posts += self._translate_exceptional_posts(method, error_var_ref, ctx)
         # create typeof preconditions
-        type_pres = self._create_typeof_pres(method.args, is_constructor, ctx)
+        type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
         posts = type_pres + posts
         if method.type and method.type.name not in PRIMITIVES:
@@ -299,7 +315,7 @@ class MethodTranslator(CommonTranslator):
                 self.no_position(ctx), self.no_info(ctx))
             pres = [not_null] + pres
 
-        args = [arg.decl for arg in method.get_args()]
+        args = self._translate_params(method, ctx)
 
         statements = method.node.body
         body_index = get_body_start_index(statements)

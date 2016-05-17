@@ -67,11 +67,13 @@ class TypeTranslator(CommonTranslator):
             return ctx.program.classes['int']
         elif isinstance(node, ast.Tuple):
             args = [self.get_type(arg, ctx) for arg in node.elts]
-            type = GenericType('Tuple', ctx.program, args)
+            type = GenericType('tuple', ctx.program, args)
             return type
         elif isinstance(node, ast.Subscript):
             value_type = self.get_type(node.value, ctx)
-            if value_type.name == 'Tuple':
+            if value_type.name == 'tuple':
+                if len(value_type.type_args) == 1:
+                    return value_type.type_args[0]
                 return value_type.type_args[node.slice.value.n]
             elif value_type.name == 'list':
                 return value_type.type_args[0]
@@ -232,28 +234,71 @@ class TypeTranslator(CommonTranslator):
             result = self.type_factory.type_check(lhs, boxed, ctx)
         else:
             result = self.type_factory.type_check(lhs, type, ctx)
-        if type.name == 'Tuple':
+        if type.name == 'tuple':
             # length
-            length = self.viper.IntLit(len(type.type_args),
-                                       self.no_position(ctx), self.no_info(ctx))
-            len_call = self.get_function_call(type, '__len__', [lhs], [None],
-                                              None, ctx)
-            eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
-                                  self.no_info(ctx))
-            result = self.viper.And(result, eq, self.no_position(ctx),
-                                    self.no_info(ctx))
-            # types of contents
-            for index in range(len(type.type_args)):
-                # typeof getitem lessorequal type
-                item = type.type_args[index]
-                index_lit = self.viper.IntLit(index, self.no_position(ctx),
-                                              self.no_info(ctx))
-                args = [lhs, index_lit]
+            if type.exact_length:
+                length = self.viper.IntLit(len(type.type_args),
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+                len_call = self.get_function_call(type, '__len__', [lhs],
+                                                  [None], None, ctx)
+                eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
+                                      self.no_info(ctx))
+                result = self.viper.And(result, eq, self.no_position(ctx),
+                                        self.no_info(ctx))
+                # types of contents
+                for index in range(len(type.type_args)):
+                    # typeof getitem lessorequal type
+                    item = type.type_args[index]
+                    index_lit = self.viper.IntLit(index, self.no_position(ctx),
+                                                  self.no_info(ctx))
+                    args = [lhs, index_lit]
+                    arg_types = [None, None]
+                    item_call = self.get_function_call(type, '__getitem__',
+                                                       args,
+                                                       arg_types, None, ctx)
+                    type_check = self.type_check(item_call, item, ctx)
+                    result = result = self.viper.And(result, type_check,
+                                                     self.no_position(ctx),
+                                                     self.no_info(ctx))
+            else:
+                int_type = ctx.program.classes['int']
+                index_var = ctx.current_function.create_variable('index',
+                    int_type, self.translator)
+                var_decl = index_var.decl
+                zero = self.viper.IntLit(0, self.no_position(ctx),
+                                         self.no_info(ctx))
+                index_positive = self.viper.GeCmp(index_var.ref, zero,
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx))
+                length = self.get_function_call(type, '__len__', [lhs],
+                                                [None], None, ctx)
+                index_less_length = self.viper.LtCmp(index_var.ref, length,
+                                                     self.no_position(ctx),
+                                                     self.no_info(ctx))
+                impl_lhs = self.viper.And(index_positive, index_less_length,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
+                args = [lhs, index_var.ref]
                 arg_types = [None, None]
-                item_call = self.get_function_call(type, '__getitem__', args,
+                item_call = self.get_function_call(type, '__getitem__',
+                                                   args,
                                                    arg_types, None, ctx)
-                type_check = self.type_check(item_call, item, ctx)
-                result = result = self.viper.And(result, type_check,
+                type_check = self.type_check(item_call, type.type_args[0], ctx)
+                implication = self.viper.Implies(impl_lhs, type_check,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
+                forall = self.viper.Forall([var_decl], [], implication,
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+                result = result = self.viper.And(result, forall,
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx))
+        elif type.name == 'dict':
+            # TODO: add acc to dict field. or create a dict predicate and
+            # unfold that in precondition. but also state types of dict
+            # keys and values with forall.
+            pass
+        # TODO: same thing for lists, sets
+        # TODO: refactor into different methods.
         return result

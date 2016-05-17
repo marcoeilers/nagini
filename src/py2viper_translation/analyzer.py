@@ -130,9 +130,12 @@ class Analyzer(ast.NodeVisitor):
                 self.visit(fieldval, node)
             elif isinstance(fieldval, list):
                 for item in fieldval:
-                    self.visit(item, node)
+                    if isinstance(item, ast.AST):
+                        self.visit(item, node)
 
     def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
+        if not child_node:
+            print("111")
         child_node._parent = parent
         method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
@@ -199,6 +202,32 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = func
         self.visit_default(node)
         self.current_function = None
+
+    def visit_arguments(self, node: ast.arguments) -> None:
+        for arg in node.args:
+            self.visit(arg, node)
+        self.current_function.no_args = len(node.args)
+        for kw_only in node.kwonlyargs:
+            self.visit(kw_only, node)
+        defaults = node.defaults
+        args = list(self.current_function.args.values())
+        for index in range(len(defaults)):
+            arg = args[index - len(defaults)]
+            arg.default = defaults[index]
+        if node.vararg:
+            arg = node.vararg
+            annotated_type = self.typeof(arg)
+            assert annotated_type.name == 'tuple'
+            annotated_type.exact_length = False
+            var_arg = self.node_factory.create_python_var(arg.arg, arg,
+                                                          annotated_type)
+            self.current_function.var_arg = var_arg
+        if node.kwarg:
+            arg = node.kwarg
+            annotated_type = self.typeof(arg)
+            kw_arg = self.node_factory.create_python_var(arg.arg, arg,
+                                                         annotated_type)
+            self.current_function.kw_arg = kw_arg
 
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
@@ -283,6 +312,12 @@ class Analyzer(ast.NodeVisitor):
                     var = self.current_function.locals[node.id]
                 elif node.id in self.current_function.args:
                     pass
+                elif (self.current_function.var_arg and
+                        self.current_function.var_arg.name == node.id):
+                    pass
+                elif (self.current_function.kw_arg and
+                        self.current_function.kw_arg.name == node.id):
+                    pass
                 else:
                     var = self.node_factory.create_python_var(node.id,
                                                               node,
@@ -314,8 +349,9 @@ class Analyzer(ast.NodeVisitor):
             result = self.get_class(mypy_type.name())
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
-            result = GenericType('Tuple', self.program, args)
+            result = GenericType('tuple', self.program, args)
         else:
+            print(self.types.is_normal_type(mypy_type))
             raise UnsupportedException(mypy_type)
         return result
 

@@ -250,3 +250,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         call = self.get_function_call(ctx.program.classes['__boxed_' + type.name],
                                       name, args, arg_types, node, ctx)
         return call
+
+    def _get_string_value(self, string: str) -> int:
+        """
+        Computes an integer value that uniquely represents the given string.
+        """
+        result = 0
+        for (index, char) in enumerate(string):
+            result += pow(256, index) * ord(char)
+        return result
