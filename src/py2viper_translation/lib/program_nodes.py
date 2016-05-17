@@ -268,6 +268,7 @@ class GenericType(PythonType):
         self.name = name
         self.program = program
         self.type_args = args
+        self.exact_length = True
 
     def get_class(self) -> PythonClass:
         return self.program.classes[self.name]
@@ -345,6 +346,9 @@ class PythonMethod(PythonNode, PythonScope):
         self.overrides = None  # infer
         self.locals = OrderedDict()  # direct
         self.args = OrderedDict()  # direct
+        self.no_args = -1  # direct
+        self.var_arg = None   # direct
+        self.kw_arg = None  # direct
         self.type = None  # infer
         self.result = None  # infer
         self.error_var = None  # infer
@@ -366,8 +370,14 @@ class PythonMethod(PythonNode, PythonScope):
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
-        for arg in self.args:
-            self.args[arg].process(self.get_fresh_name(arg), translator)
+        for name, arg in self.args.items():
+            arg.process(self.get_fresh_name(name), translator)
+        if self.var_arg:
+            self.var_arg.process(self.get_fresh_name(self.var_arg.name),
+                                 translator)
+        if self.kw_arg:
+            self.kw_arg.process(self.get_fresh_name(self.kw_arg.name),
+                                translator)
         if self.interface:
             return
         func_type = self.get_program().types.get_func_type(
@@ -396,6 +406,10 @@ class PythonMethod(PythonNode, PythonScope):
             return self.locals[name]
         elif name in self.args:
             return self.args[name]
+        elif self.var_arg and self.var_arg.name == name:
+            return self.var_arg
+        elif self.kw_arg and self.kw_arg.name == name:
+            return self.kw_arg
         else:
             return self.get_program().global_vars[name]
 
@@ -537,6 +551,8 @@ class PythonVar(PythonNode):
         self.writes = []
         self.reads = []
         self.alt_types = {}
+        self.default = None
+        self.default_expr = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

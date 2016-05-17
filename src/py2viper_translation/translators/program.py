@@ -188,12 +188,32 @@ class ProgramTranslator(CommonTranslator):
             results.append(error_var_decl)
         if method.declared_exceptions:
             targets.append(error_var_ref)
+
+        # check that arg names match and default args are equal
+        default_checks = []
+        for (name1, arg1), (name2, arg2) in zip(method.args.items(),
+                                                method.overrides.args.items()):
+            if name1 != name2:
+                raise InvalidProgramException(arg1.node, 'invalid.override')
+            if arg1.default or arg2.default:
+                if not (arg1.default and arg2.default):
+                    raise InvalidProgramException(arg1.node, 'invalid.override')
+                val1 = arg1.default_expr
+                val2 = arg2.default_expr
+                eq = self.viper.EqCmp(val1, val2,
+                                      self.to_position(arg1.node, ctx),
+                                      self.no_info(ctx))
+                assertion = self.viper.Assert(eq,
+                                              self.to_position(arg1.node, ctx),
+                                              self.no_info(ctx))
+                default_checks.append(assertion)
+
         call = self.viper.MethodCall(calledname, args, targets,
                                      self.no_position(ctx),
                                      self.no_info(ctx))
         subtype_assume = self.viper.Inhale(has_subtype, self.no_position(ctx),
                                            self.no_info(ctx))
-        body = [subtype_assume, call]
+        body = default_checks + [subtype_assume, call]
         body_block = self.translate_block(body, self.no_position(ctx),
                                           self.no_info(ctx))
         return results, targets, body_block
@@ -223,6 +243,15 @@ class ProgramTranslator(CommonTranslator):
         else:
             if method.overrides.pure:
                 raise InvalidProgramException(method.node, 'invalid.override')
+
+    def translate_default_args(self, method: PythonMethod,
+                               ctx: Context) -> None:
+        for arg in method.args.values():
+            if arg.default:
+                stmt, expr = self.translate_expr(arg.default, ctx)
+                if stmt:
+                    raise InvalidProgramException(arg.default, 'purity.violated')
+                arg.default_expr = expr
 
     def translate_program(self, program: PythonProgram,
                           sil_progs: List,
@@ -263,6 +292,16 @@ class ProgramTranslator(CommonTranslator):
                     sil_field = self.translate_field(field, ctx)
                     field.sil_field = sil_field
                     fields.append(sil_field)
+
+        # translate default args
+        containers = [program] + list(program.classes.values())
+        for container in containers:
+            for function in container.functions.values():
+                self.translate_default_args(function, ctx)
+            for method in container.methods.values():
+                self.translate_default_args(method, ctx)
+            for pred in container.predicates.values():
+                self.translate_default_args(pred, ctx)
 
         for function in program.functions.values():
             functions.append(self.translate_function(function, ctx))

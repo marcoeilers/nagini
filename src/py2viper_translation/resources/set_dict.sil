@@ -7,6 +7,10 @@ method set___init__() returns (res: Ref)
     assume false
 }
 
+function set___len__(self: Ref): Int
+    requires acc(self.set_acc, 1/100)
+    ensures result == |self.set_acc|
+
 function set___contains__(self: Ref, item: Ref) : Bool
     requires acc(self.set_acc, 1/100)
     ensures result == (item in self.set_acc)
@@ -80,3 +84,7 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
 {
     assume false
 }
+
+function dict___len__(self: Ref): Int
+    requires acc(self.dict_acc, 1/100)
+    ensures result == |self.dict_acc|

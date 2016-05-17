@@ -45,6 +45,7 @@ def main() -> None:
     ss.set_sth(25, 35)
     Unfold(ss.meh(35))
 
+
 class A:
 
     def __init__(self) -> None:
@@ -96,6 +97,7 @@ class A:
         Fold(self.pred1(oold + 1))
         return res_val
 
+
 #:: ExpectedOutput(fold.failed:assertion.false)
 class B(A):
 
@@ -106,17 +108,17 @@ class B(A):
         Fold(self.pred1(14))
 
     @Predicate
-    def pred1(self, b: int) -> bool:
+    def pred1(self, a: int) -> bool:
         return Acc(self.bfield) and self.bfield == self.afield
 
-    def set2(self, ooold: int) -> int:
-        Requires(self.pred1(ooold))
-        Ensures(self.pred1(ooold + 1))
-        Unfold(self.pred1(ooold))
-        super().set2(ooold)
-        self.bfield = ooold + 1
+    def set2(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 1))
+        Unfold(self.pred1(oold))
+        super().set2(oold)
+        self.bfield = oold + 1
         res_val = self.afield
-        Fold(self.pred1(ooold + 1))
+        Fold(self.pred1(oold + 1))
         return res_val
 
     def set4(self, oold: int) -> int:
@@ -131,13 +133,13 @@ class B(A):
         return res_val
 
     #:: ExpectedOutput(postcondition.violated:insufficient.permission)
-    def set5(self, ooold: int) -> int:
-        Requires(self.pred1(ooold))
-        Ensures(self.pred1(ooold + 2))
-        Unfold(self.pred1(ooold))
-        super().set5(ooold)
+    def set5(self, oold: int) -> int:
+        Requires(self.pred1(oold))
+        Ensures(self.pred1(oold + 2))
+        Unfold(self.pred1(oold))
+        super().set5(oold)
         self.afield += 1
-        self.bfield = ooold + 2
+        self.bfield = oold + 2
         res_val = self.afield
-        Fold(self.pred1(ooold + 2))
+        Fold(self.pred1(oold + 2))
         return res_val

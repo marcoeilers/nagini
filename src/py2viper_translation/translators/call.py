@@ -1,5 +1,6 @@
 import ast
 
+from collections import OrderedDict
 from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
@@ -14,6 +15,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonMethod,
+    PythonType,
     PythonVar
 )
 from py2viper_translation.lib.typedefs import (
@@ -30,7 +32,7 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 
 
 class CallTranslator(CommonTranslator):
@@ -183,17 +185,182 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + call,
                 result_var.ref if result_var else None)
 
+    def _get_call_target(self, node: ast.Call,
+                         ctx: Context) -> Union[PythonClass, PythonMethod]:
+        """
+        Returns the target of the given call; for constructor calls, the class
+        whose constructor is called, for everything else the method.
+        """
+        name = get_func_name(node)
+        if name in ctx.program.classes:
+            # constructor call
+            return ctx.program.classes[name]
+        if isinstance(node.func, ast.Attribute):
+            if isinstance(node.func.value, ast.Name):
+                if node.func.value.id in ctx.program.classes:
+                    # statically bound call
+                    target_class = ctx.program.classes[node.func.value.id]
+                    return target_class.get_func_or_method(node.func.attr)
+            if isinstance(node.func.value, ast.Call):
+                if get_func_name(node.func.value) == 'super':
+                    # super call
+                    target_class = self.get_type(node.func.value, ctx)
+                    return target_class.get_func_or_method(node.func.attr)
+            # method called on an object
+            receiver_class = self.get_type(node.func.value, ctx)
+            target = receiver_class.get_predicate(node.func.attr)
+            if not target:
+                target = receiver_class.get_func_or_method(node.func.attr)
+            return target
+        else:
+            # global function/method called
+            receiver_class = None
+            target = ctx.program.predicates.get(name)
+            if not target:
+                target = ctx.program.get_func_or_method(name)
+            return target
+
+    def _has_implicit_receiver_arg(self, node: ast.Call, ctx: Context) -> bool:
+        """
+        Checks if the given call node will have to have a receiver added to the
+        arguments in the Silver encoding.
+        """
+        if isinstance(node.func, ast.Attribute):
+            if isinstance(node.func.value, ast.Name):
+                if node.func.value.id in ctx.program.classes:
+                    return False
+                else:
+                    return True
+            return True
+        if isinstance(node.func, ast.Name):
+            if node.func.id in ctx.program.classes:
+                return True
+        return False
+
     def _translate_args(self, node: ast.Call,
-                        ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
-        # TODO: box args if necessary once we have generic methods
+                        ctx: Context) -> Tuple[List[Stmt], List[Expr],
+                                               List[PythonType]]:
+        """
+        Returns the args and types of the given call. Named args are put into
+        the correct position; for *args and **kwargs, tuples and dicts are
+        created and all arguments not bound to any other parameter are put in
+        there.
+        """
+        target = self._get_call_target(node, ctx)
+        if isinstance(target, PythonClass):
+            constr = target.methods.get('__init__')
+            target = constr
+
         args = []
+        arg_types = []
         arg_stmts = []
-        for arg in node.args:
+
+        normal_args = node.args[:target.no_args] if target else node.args
+
+        for arg in normal_args:
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+            arg_type = self.get_type(arg, ctx)
             arg_stmts += arg_stmt
             args.append(arg_expr)
+            arg_types.append(arg_type)
 
-        return arg_stmts, args
+        if not target:
+            return arg_stmts, args, arg_types
+
+        var_args = node.args[target.no_args:]
+
+        keys = list(target.args.keys())
+        if self._has_implicit_receiver_arg(node, ctx):
+            keys = keys[1:]
+
+        no_missing = len(keys) - len(args)
+        args += [False] * no_missing
+        arg_types += [False] * no_missing
+
+        kw_args = OrderedDict()
+
+        # named args
+        for kw in node.keywords:
+            if kw.arg in keys:
+                index = keys.index(kw.arg)
+                arg_stmt, arg_expr = self.translate_expr(kw.value, ctx)
+                arg_type = self.get_type(kw.value, ctx)
+                arg_stmts += arg_stmt
+                args[index] = arg_expr
+                arg_types[index] = arg_type
+            else:
+                if target.kw_arg:
+                    kw_args[kw.arg] = kw.value
+
+        # default args
+        for index, (arg, key) in enumerate(zip(args, keys)):
+            if arg is False:
+                # not set yet, need default
+                args[index] = target.args[key].default_expr
+                arg_types[index] = self.get_type(target.args[key].default, ctx)
+
+        if target.var_arg:
+            var_stmt, var_arg_list = self.wrap_var_args(var_args, node, ctx)
+            args.append(var_arg_list)
+            arg_types.append(target.var_arg.type)
+            arg_stmts += var_stmt
+
+        if target.kw_arg:
+            kw_stmt, kw_arg_dict = self.wrap_kw_args(kw_args, node, ctx)
+            args.append(kw_arg_dict)
+            arg_types.append(target.kw_arg.type)
+            arg_stmts += kw_stmt
+
+        return arg_stmts, args, arg_types
+
+    def wrap_var_args(self, args: List[ast.AST], node: ast.AST,
+                      ctx: Context) -> StmtsAndExpr:
+        tuple_class = ctx.program.classes['tuple']
+        stmts = []
+        vals = []
+        val_types = []
+        for arg in args:
+            arg_stmt, arg_val = self.translate_expr(arg, ctx)
+            stmts += arg_stmt
+            vals.append(arg_val)
+            val_types.append(self.get_type(arg, ctx))
+        func_name = '__create' + str(len(args)) + '__'
+        call = self.get_function_call(tuple_class, func_name, vals, val_types,
+                                      node, ctx)
+        return stmts, call
+
+    def wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Dict,
+                     ctx: Context) -> StmtsAndExpr:
+        res_var = ctx.current_function.create_variable('kw_args',
+            ctx.program.classes['dict'], self.translator)
+        dict_class = ctx.program.classes['dict']
+        arg_types = []
+        constr_call = self.get_method_call(dict_class, '__init__', [],
+                                           [], [res_var.ref], node, ctx)
+        stmt = [constr_call]
+        str_type = ctx.program.classes['str']
+        for key, val in args.items():
+            # key string literal
+            length = len(key)
+            length_arg = self.viper.IntLit(length, self.no_position(ctx),
+                                           self.no_info(ctx))
+            val_arg = self.viper.IntLit(self._get_string_value(key),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+            str_create_args = [length_arg, val_arg]
+            str_create_arg_types = [None, None]
+            func_name = '__create__'
+            key_val = self.get_function_call(str_type, func_name,
+                                             str_create_args,
+                                             str_create_arg_types, node, ctx)
+            val_stmt, val_val = self.translate_expr(val, ctx)
+            val_type = self.get_type(val, ctx)
+            args = [res_var.ref, key_val, val_val]
+            arg_types = [None, str_type, val_type]
+            append_call = self.get_method_call(dict_class, '__setitem__', args,
+                                               arg_types, [], node, ctx)
+            stmt += val_stmt + [append_call]
+        return stmt, res_var.ref
 
     def inline_method(self, method: PythonMethod, args: List[PythonVar],
                       result_var: PythonVar, error_var: PythonVar,
@@ -259,20 +426,15 @@ class CallTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         old_position = ctx.position
         ctx.position = position
+        arg_stmts, arg_vals, arg_types = self._translate_args(node, ctx)
         args = []
-        stmts = []
+        stmts = arg_stmts
 
         # create local vars for parameters and assign args to them
-        all_arg = node.args
         if is_super:
-            all_arg = [next(iter(ctx.actual_function.args.values()))] + all_arg
-        for arg_val, (_, arg) in zip(all_arg, method.args.items()):
-            if isinstance(arg_val, PythonVar):
-                arg_stmt = []
-                arg_val = arg_val.ref
-            else:
-                arg_stmt, arg_val = self.translate_expr(arg_val, ctx)
-            stmts += arg_stmt
+            arg_vals = ([next(iter(ctx.actual_function.args.values())).ref] +
+                        arg_vals)
+        for arg_val, (_, arg) in zip(arg_vals, method.args.items()):
             arg_var = ctx.current_function.create_variable('arg', arg.type,
                                                            self.translator)
             assign = self.viper.LocalVarAssign(arg_var.ref, arg_val,
@@ -315,57 +477,50 @@ class CallTranslator(CommonTranslator):
         or predicate calls.
         """
         formal_args = []
-        arg_stmts, args = self._translate_args(node, ctx)
-        arg_types = [self.get_type(arg, ctx) for arg in node.args]
+        arg_stmts, args, arg_types = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
+        target = self._get_call_target(node, ctx)
         if name in ctx.program.classes:
             # this is a constructor call
-            target_class = ctx.program.classes[name]
-            return self._translate_constructor_call(target_class, node, args,
+            return self._translate_constructor_call(target, node, args,
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 if node.func.value.id in ctx.program.classes:
                     # statically bound call
-                    target_class = ctx.program.classes[node.func.value.id]
-                    target = target_class.get_func_or_method(node.func.attr)
                     return self.inline_call(target, node, False, ctx)
             if isinstance(node.func.value, ast.Call):
                 if get_func_name(node.func.value) == 'super':
                     # super call
-                    target_class = self.get_type(node.func.value, ctx)
-                    target = target_class.get_func_or_method(node.func.attr)
                     return self.inline_call(target, node, True, ctx)
             # method called on an object
             rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
             receiver_type = self.get_type(node.func.value, ctx)
-            receiver_class = self.get_type(node.func.value, ctx)
-            target = receiver_class.get_predicate(node.func.attr)
-            if not target:
-                target = receiver_class.get_func_or_method(node.func.attr)
-                is_predicate = False
+            is_predicate = target.predicate
             receiver_class = target.cls
             arg_stmts = rec_stmt + arg_stmts
             args = [receiver] + args
             arg_types = [receiver_type] + arg_types
-            actual_args = []
-            for arg, param, type in zip(args, target.args.values(), arg_types):
-                if (type and type.name in PRIMITIVES and
-                        param.type.name not in PRIMITIVES):
-                    actual_arg = self.box_primitive(arg, type, None, ctx)
-                else:
-                    actual_arg = arg
-                actual_args.append(actual_arg)
-            args = actual_args
         else:
             # global function/method called
             receiver_class = None
-            target = ctx.program.predicates.get(name)
-            if not target:
-                target = ctx.program.get_func_or_method(name)
-                is_predicate = False
+            is_predicate = target.predicate
+        actual_args = []
+        target_params = list(target.args.values())
+        if target.var_arg:
+            target_params.append(target.var_arg)
+        if target.kw_arg:
+            target_params.append(target.kw_arg)
+        for arg, param, type in zip(args, target_params, arg_types):
+            if (type and type.name in PRIMITIVES and
+                    param.type.name not in PRIMITIVES):
+                actual_arg = self.box_primitive(arg, type, None, ctx)
+            else:
+                actual_arg = arg
+            actual_args.append(actual_arg)
+        args = actual_args
         for arg in target.args:
             formal_args.append(target.args[arg].decl)
         target_name = target.sil_name

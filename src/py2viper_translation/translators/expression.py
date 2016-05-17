@@ -97,15 +97,6 @@ class ExpressionTranslator(CommonTranslator):
             stmt += el_stmt + [append_call]
         return stmt, res_var.ref
 
-    def _get_string_value(self, string: str) -> int:
-        """
-        Computes an integer value that uniquely represents the given string.
-        """
-        result = 0
-        for (index, char) in enumerate(string):
-            result += pow(256, index) * ord(char)
-        return result
-
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
         length = len(node.s)
         length_arg = self.viper.IntLit(length, self.no_position(ctx),
@@ -129,7 +120,7 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
-        tuple_class = ctx.program.classes['Tuple']
+        tuple_class = ctx.program.classes['tuple']
         func_name = '__create' + str(len(node.elts)) + '__'
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
