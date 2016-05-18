@@ -91,7 +91,8 @@
         },
         "get": {
             "args": ["dict", "object"],
-            "type": "object"
+            "type": "object",
+            "generictype": 1
         },
         "keys": {
             "args": ["dict"],

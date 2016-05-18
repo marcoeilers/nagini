@@ -1,8 +1,15 @@
 field list_acc : Seq[Ref]
 
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function list(): PyType
+}
+
 method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()
+    ensures typeof(res) == list()
 {
     assume false
 }

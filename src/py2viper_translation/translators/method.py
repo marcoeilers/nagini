@@ -37,17 +37,19 @@ class MethodTranslator(CommonTranslator):
         # Cannot assume tuple type information, since tuple length may be a
         # precondition of other functions used in normal pre- and
         # postconditions.
-        return type.name not in ['tuple']
+        return type.name not in ['tuple', 'dict', 'set', 'list']
 
     def get_parameter_typeof(self, param: PythonVar,
-                             ctx: Context) -> 'silver.ast.DomainFuncApp':
+                             ctx: Context,
+                             perms: bool=False) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the given parameter has its type,
         to be assumed in preconditions and/or postconditions. If possible,
         the expression is wrapped in an InhaleExhaleExpression s.t. it is
         just assumed, not checked; with some types this is not possible.
         """
-        result = self.var_type_check(param.sil_name, param.type, ctx)
+        result = self.var_type_check(param.sil_name, param.type, ctx,
+                                     perms=perms)
         if self._can_assume_type(param.type):
             true_lit = self.viper.TrueLit(self.no_position(ctx),
                                           self.no_info(ctx))
@@ -157,7 +159,7 @@ class MethodTranslator(CommonTranslator):
             type_check = self.get_parameter_typeof(func.var_arg, ctx)
             pres.append(type_check)
         if func.kw_arg:
-            type_check = self.get_parameter_typeof(func.kw_arg, ctx)
+            type_check = self.get_parameter_typeof(func.kw_arg, ctx, perms=True)
             pres.append(type_check)
         return pres
 
@@ -181,7 +183,7 @@ class MethodTranslator(CommonTranslator):
         old_function = ctx.current_function
         ctx.current_function = func
         type = self.translate_type(func.type, ctx)
-        args = self._translate_params(func)
+        args = self._translate_params(func, ctx)
         if func.declared_exceptions:
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')

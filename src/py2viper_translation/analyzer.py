@@ -115,6 +115,8 @@ class Analyzer(ast.NodeVisitor):
             method.args[name] = arg
         if if_method['type']:
             method.type = self.get_class(if_method['type'])
+        if if_method.get('generictype'):
+            method.generic_type = if_method['generictype']
         if pure:
             cls.functions[method_name] = method
         else:
@@ -134,8 +136,6 @@ class Analyzer(ast.NodeVisitor):
                         self.visit(item, node)
 
     def visit(self, child_node: ast.AST, parent: ast.AST) -> None:
-        if not child_node:
-            print("111")
         child_node._parent = parent
         method = 'visit_' + child_node.__class__.__name__
         visitor = getattr(self, method, self.visit_default)
@@ -200,13 +200,15 @@ class Analyzer(ast.NodeVisitor):
         functype = self.types.get_func_type(func.get_scope_prefix())
         func.type = self.convert_type(functype)
         self.current_function = func
-        self.visit_default(node)
+        self.visit(node.args, node)
+        for child in node.body:
+            self.visit(child, node)
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
         for arg in node.args:
             self.visit(arg, node)
-        self.current_function.no_args = len(node.args)
+        self.current_function._no_args = len(node.args)
         for kw_only in node.kwonlyargs:
             self.visit(kw_only, node)
         defaults = node.defaults
@@ -351,7 +353,6 @@ class Analyzer(ast.NodeVisitor):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
             result = GenericType('tuple', self.program, args)
         else:
-            print(self.types.is_normal_type(mypy_type))
             raise UnsupportedException(mypy_type)
         return result
 
