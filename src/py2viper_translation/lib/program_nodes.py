@@ -6,8 +6,9 @@ from collections import OrderedDict
 from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
+    INT_TYPE,
     PRIMITIVES,
-    RESULT_NAME
+    RESULT_NAME,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import UnsupportedException
@@ -346,7 +347,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.overrides = None  # infer
         self.locals = OrderedDict()  # direct
         self.args = OrderedDict()  # direct
-        self._no_args = -1  # direct
+        self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
         self.type = None  # infer
@@ -399,11 +400,15 @@ class PythonMethod(PythonNode, PythonScope):
             try_block.process(translator)
 
     @property
-    def no_args(self) -> int:
-        if self._no_args == -1:
+    def nargs(self) -> int:
+        if self._nargs == -1:
             return len(self.args)
         else:
-            return self._no_args
+            return self._nargs
+
+    @nargs.setter
+    def nargs(self, nargs: int) -> None:
+        self._nargs = nargs
 
     def get_variable(self, name: str) -> 'PythonVar':
         """
@@ -518,9 +523,9 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        bool_type = self.method.get_program().classes['int']
+        int_type = self.method.get_program().classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
-                                                     bool_type)
+                                                     int_type)
         result.process(sil_name, translator)
         self.method.locals[sil_name] = result
         self.finally_var = result

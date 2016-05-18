@@ -7,10 +7,14 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_translation.lib.constants import (
     BUILTINS,
+    DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
     PRIMITIVES,
-    RESULT_NAME
+    RESULT_NAME,
+    SET_TYPE,
+    STRING_TYPE,
+    TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
@@ -127,7 +131,7 @@ class CallTranslator(CommonTranslator):
         if node.args:
             raise UnsupportedException(node)
         args = []
-        set_class = ctx.program.classes['set']
+        set_class = ctx.program.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
         targets = [res_var.ref]
@@ -255,7 +259,7 @@ class CallTranslator(CommonTranslator):
         arg_types = []
         arg_stmts = []
 
-        normal_args = node.args[:target.no_args] if target else node.args
+        normal_args = node.args[:target.nargs] if target else node.args
 
         for arg in normal_args:
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
@@ -267,7 +271,7 @@ class CallTranslator(CommonTranslator):
         if not target:
             return arg_stmts, args, arg_types
 
-        var_args = node.args[target.no_args:]
+        var_args = node.args[target.nargs:]
 
         keys = list(target.args.keys())
         if self._has_implicit_receiver_arg(node, ctx):
@@ -318,7 +322,7 @@ class CallTranslator(CommonTranslator):
         """
         Wraps the given arguments into a tuple to be passed to an *args param.
         """
-        tuple_class = ctx.program.classes['tuple']
+        tuple_class = ctx.program.classes[TUPLE_TYPE]
         stmts = []
         vals = []
         val_types = []
@@ -338,13 +342,13 @@ class CallTranslator(CommonTranslator):
         Wraps the given arguments into a dict to be passed to an **kwargs param.
         """
         res_var = ctx.current_function.create_variable('kw_args',
-            ctx.program.classes['dict'], self.translator)
-        dict_class = ctx.program.classes['dict']
+            ctx.program.classes[DICT_TYPE], self.translator)
+        dict_class = ctx.program.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref], node, ctx)
         stmt = [constr_call]
-        str_type = ctx.program.classes['str']
+        str_type = ctx.program.classes[STRING_TYPE]
         for key, val in args.items():
             # key string literal
             length = len(key)

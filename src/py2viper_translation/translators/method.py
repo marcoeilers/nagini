@@ -1,6 +1,14 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL, ERROR_NAME, PRIMITIVES
+from py2viper_translation.lib.constants import (
+    DICT_TYPE,
+    END_LABEL,
+    ERROR_NAME,
+    LIST_TYPE,
+    PRIMITIVES,
+    SET_TYPE,
+    TUPLE_TYPE,
+)
 from py2viper_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonMethod,
@@ -37,7 +45,7 @@ class MethodTranslator(CommonTranslator):
         # Cannot assume tuple type information, since tuple length may be a
         # precondition of other functions used in normal pre- and
         # postconditions.
-        return type.name not in ['tuple', 'dict', 'set', 'list']
+        return type.name not in [TUPLE_TYPE, SET_TYPE, DICT_TYPE, LIST_TYPE]
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context,

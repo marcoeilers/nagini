@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.constants import OBJECT_TYPE
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import Context, Expr
 from typing import List, Tuple
@@ -56,7 +57,7 @@ class TypeDomainFactory:
         Creates the type domain function and subtype axiom for this class
         """
 
-        supertype = 'object' if not cls.superclass else cls.superclass.sil_name
+        supertype = OBJECT_TYPE if not cls.superclass else cls.superclass.sil_name
         position = self.to_position(cls.node, ctx)
         info = self.no_info(ctx)
         type_func = self.create_type_function(cls.sil_name, position, info, ctx)
@@ -412,7 +413,7 @@ class TypeDomainFactory:
                                       self.type_domain)
 
     def create_object_type(self, ctx: Context) -> 'silver.ast.DomainFunc':
-        return self.create_type_function('object', self.no_position(ctx),
+        return self.create_type_function(OBJECT_TYPE, self.no_position(ctx),
                                          self.no_info(ctx))
 
     def create_null_type(self, ctx: Context) -> 'silver.ast.DomainFunc':

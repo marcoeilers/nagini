@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.program_nodes import PythonMethod
 from py2viper_translation.translators.abstract import Context
@@ -15,7 +16,7 @@ class PredicateTranslator(CommonTranslator):
         """
         Translates pred to a Silver predicate.
         """
-        if pred.type.name != 'bool':
+        if pred.type.name != BOOL_TYPE:
             raise InvalidProgramException(pred.node, 'invalid.predicate')
         assert ctx.current_function is None
         ctx.current_function = pred
@@ -51,7 +52,7 @@ class PredicateTranslator(CommonTranslator):
         for instance in sorted:
             ctx.var_aliases = {}
             assert not ctx.current_function
-            if instance.type.name != 'bool':
+            if instance.type.name != BOOL_TYPE:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             ctx.current_function = instance

@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES
+from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import PythonType
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -189,7 +189,7 @@ class StatementTranslator(CommonTranslator):
                                 ctx: Context) -> List[Stmt]:
         stmt = []
         if isinstance(target, ast.Tuple):
-            if (rhs_type.name != 'tuple' or
+            if (rhs_type.name != TUPLE_TYPE or
                     len(rhs_type.type_args) != len(node.targets[0].elts)):
                 raise InvalidProgramException(node, 'invalid.assign')
             # translate rhs
