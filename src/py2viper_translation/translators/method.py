@@ -254,7 +254,8 @@ class MethodTranslator(CommonTranslator):
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref, method.type, ctx)
             if self._can_assume_type(method.type):
-                true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+                true = self.viper.TrueLit(self.no_position(ctx),
+                                          self.no_info(ctx))
                 check = self.viper.InhaleExhaleExp(check, true,
                                                    self.no_position(ctx),
                                                    self.no_info(ctx))
@@ -277,8 +278,18 @@ class MethodTranslator(CommonTranslator):
             accs.append(pred)
         return accs
 
+    def _create_method_prolog(self, method: PythonMethod,
+                              ctx: Context) -> List[Stmt]:
+        """
+        Hook to generate the method prolog.
+        """
+        return []
+
     def _create_method_epilog(self, method: PythonMethod,
                               ctx: Context) -> List[Stmt]:
+        """
+        Hook to generate the method epilog.
+        """
         end_name = ctx.get_label_name(END_LABEL)
         return [self.viper.Label(end_name, self.no_position(ctx),
                                  self.no_info(ctx))]
@@ -329,7 +340,7 @@ class MethodTranslator(CommonTranslator):
 
         statements = method.node.body
         body_index = get_body_start_index(statements)
-        body = []
+        body = self._create_method_prolog(method, ctx)
         # translate body
         if method.cls:
             type_check = self.type_factory.concrete_type_check(

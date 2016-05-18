@@ -10,6 +10,7 @@ from py2viper_translation.sif.translators.expression import (
     SIFExpressionTranslator,
 )
 from py2viper_translation.sif.translators.method import SIFMethodTranslator
+from py2viper_translation.sif.translators.program import SIFProgramTranslator
 from py2viper_translation.sif.translators.statement import (
     SIFStatementTranslator,
 )
@@ -17,7 +18,6 @@ from py2viper_translation.translator import Translator
 from py2viper_translation.translators.abstract import Expr, TranslatorConfig
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
-from py2viper_translation.translators.program import ProgramTranslator
 from py2viper_translation.translators.pure import PureTranslator
 
 from py2viper_translation.translators.type import TypeTranslator
@@ -51,8 +51,8 @@ class SIFTranslator(Translator):
                                                 type_info, viper_ast)
         config.type_translator = TypeTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
-        config.prog_translator = ProgramTranslator(config, jvm, source_file,
-                                                   type_info, viper_ast)
+        config.prog_translator = SIFProgramTranslator(config, jvm, source_file,
+                                                      type_info, viper_ast)
         config.method_translator = SIFMethodTranslator(config, jvm, source_file,
                                                         type_info, viper_ast)
         config.type_factory = TypeDomainFactory(viper_ast, self)
