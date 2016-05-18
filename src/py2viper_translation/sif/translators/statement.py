@@ -28,7 +28,8 @@ class SIFStatementTranslator(StatementTranslator):
 
         return stmts
 
-    def _translate_return(self, node: ast.Return, ctx: SIFContext) -> List[Stmt]:
+    def _translate_return(self, node: ast.Return,
+                          ctx: SIFContext) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
             raise UnsupportedException(node)
 

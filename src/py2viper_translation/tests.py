@@ -196,8 +196,8 @@ def sif_test_files():
 # first test and never gets reinitialized). Additionally, the field assign
 # test fails in Carbon.
 
-# @pytest.mark.parametrize('path,verifier', sif_test_files())
-# def test_sif(path, verifier):
-#     verification_tester.test_file(path, jvm, verifier, True)
+@pytest.mark.parametrize('path,verifier', sif_test_files())
+def test_sif(path, verifier):
+    verification_tester.test_file(path, jvm, verifier, True)
 
 
