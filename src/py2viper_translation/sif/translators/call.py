@@ -93,7 +93,7 @@ class SIFCallTranslator(CallTranslator):
             if target.declared_exceptions:
                 raise UnsupportedException(node, "Exceptions not supported.")
             # Add timeLevel to targets.
-            targets.append(ctx.current_function.tl_var.ref)
+            targets.append(ctx.current_function.new_tl_var.ref)
             init = self.viper.MethodCall(target.sil_name, args, targets,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -131,7 +131,7 @@ class SIFCallTranslator(CallTranslator):
         if target.declared_exceptions:
             raise UnsupportedException(node)
         # Add timeLevel to targets.
-        targets.append(ctx.current_function.tl_var.ref)
+        targets.append(ctx.current_function.new_tl_var.ref)
 
         call = self.viper.MethodCall(target.sil_name, args, targets,
                                      position, self.no_info(ctx))
@@ -154,7 +154,7 @@ class SIFCallTranslator(CallTranslator):
             args.append(arg_expr)
         # Add timeLevel.
         assert ctx.current_function
-        args.append(ctx.current_function.tl_var.ref)
+        args.append(ctx.current_function.new_tl_var.ref)
 
         return arg_stms, args
 
@@ -168,11 +168,11 @@ class SIFCallTranslator(CallTranslator):
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
         type_expr = self.type_factory.type_comp(recv, recv_p, ctx)
-        rhs = self.viper.Or(ctx.current_function.tl_var.ref,
+        rhs = self.viper.Or(ctx.current_function.new_tl_var.ref,
                             type_expr,
                             self.no_position(ctx),
                             self.no_info(ctx))
-        assign = self.viper.LocalVarAssign(ctx.current_function.tl_var.ref,
+        assign = self.viper.LocalVarAssign(ctx.current_function.new_tl_var.ref,
                                            rhs,
                                            self.no_position(ctx),
                                            self.no_info(ctx))
