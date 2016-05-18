@@ -35,10 +35,11 @@ class SIFMethodTranslator(MethodTranslator):
         ctx.use_prime = False
         return posts
 
-    def _create_typeof_pres(self, args: List[SIFPythonVar],
+    def _create_typeof_pres(self, func: SIFPythonMethod,
                             is_constructor: bool,
                             ctx: SIFContext) -> List[DomainFuncApp]:
         pres = []
+        args = func.args
         for arg in args.values():
             if not (arg.type.name in PRIMITIVES or
                         (is_constructor and arg == next(iter(args)))):

@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
