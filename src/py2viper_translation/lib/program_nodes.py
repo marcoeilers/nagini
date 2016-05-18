@@ -346,10 +346,11 @@ class PythonMethod(PythonNode, PythonScope):
         self.overrides = None  # infer
         self.locals = OrderedDict()  # direct
         self.args = OrderedDict()  # direct
-        self.no_args = -1  # direct
+        self._no_args = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
         self.type = None  # infer
+        self.generic_type = -1
         self.result = None  # infer
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
@@ -397,6 +398,13 @@ class PythonMethod(PythonNode, PythonScope):
         for try_block in self.try_blocks:
             try_block.process(translator)
 
+    @property
+    def no_args(self) -> int:
+        if self._no_args == -1:
+            return len(self.args)
+        else:
+            return self._no_args
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -414,7 +422,8 @@ class PythonMethod(PythonNode, PythonScope):
             return self.get_program().global_vars[name]
 
     def create_variable(self, name: str, cls: PythonClass,
-                        translator: 'Translator') -> 'PythonVar':
+                        translator: 'Translator',
+                        local: bool=True) -> 'PythonVar':
         """
         Creates a new local variable with the given name and type and performs
         all necessary processing/initialization
@@ -422,7 +431,8 @@ class PythonMethod(PythonNode, PythonScope):
         sil_name = self.get_fresh_name(name)
         result = self.node_factory.create_python_var(sil_name, None, cls)
         result.process(sil_name, translator)
-        self.locals[sil_name] = result
+        if local:
+            self.locals[sil_name] = result
         return result
 
     def get_locals(self) -> List['PythonVar']:

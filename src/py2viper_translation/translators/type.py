@@ -190,10 +190,15 @@ class TypeTranslator(CommonTranslator):
                 if node.func.id in ctx.program.classes:
                     return ctx.program.classes[node.func.id]
                 elif ctx.program.get_func_or_method(node.func.id) is not None:
-                    return ctx.program.get_func_or_method(node.func.id).type
+                    target = ctx.program.get_func_or_method(node.func.id)
+                    return target.type
             elif isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
-                return rectype.get_func_or_method(node.func.attr).type
+                target = rectype.get_func_or_method(node.func.attr)
+                if target.generic_type != -1:
+                    return rectype.type_args[target.generic_type]
+                else:
+                    return target.type
         else:
             raise UnsupportedException(node)
 
@@ -223,7 +228,7 @@ class TypeTranslator(CommonTranslator):
         return self._is_subtype(t1.superclass, t2)
 
     def type_check(self, lhs: Expr, type: PythonType,
-                   ctx: Context) -> Expr:
+                   ctx: Context, perms: bool=False) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
         for simple types, or include information about type arguments for
@@ -264,7 +269,7 @@ class TypeTranslator(CommonTranslator):
             else:
                 int_type = ctx.program.classes['int']
                 index_var = ctx.current_function.create_variable('index',
-                    int_type, self.translator)
+                    int_type, self.translator, local=False)
                 var_decl = index_var.decl
                 zero = self.viper.IntLit(0, self.no_position(ctx),
                                          self.no_info(ctx))
@@ -295,6 +300,22 @@ class TypeTranslator(CommonTranslator):
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
         elif type.name == 'dict':
+            if perms:
+                # field dict_acc : Set[Ref]
+                field_type = self.viper.SetType(self.viper.Ref)
+                field = self.viper.Field('dict_acc', field_type,
+                                         self.no_position(ctx),
+                                         self.no_info(ctx))
+                field_acc = self.viper.FieldAccess(lhs, field,
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+                acc_pred = self.viper.FieldAccessPredicate(field_acc,
+                    self.viper.FullPerm(self.no_position(ctx),
+                                        self.no_info(ctx)),
+                    self.no_position(ctx), self.no_info(ctx))
+                result = result = self.viper.And(result, acc_pred,
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx))
             # TODO: add acc to dict field. or create a dict predicate and
             # unfold that in precondition. but also state types of dict
             # keys and values with forall.

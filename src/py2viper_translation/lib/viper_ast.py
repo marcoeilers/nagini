@@ -151,6 +151,9 @@ class ViperAST:
     def SeqType(self, element_type):
         return self.ast.SeqType(element_type)
 
+    def SetType(self, element_type):
+        return self.ast.SetType(element_type)
+
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
                                self.to_seq(axioms), self.to_seq(typevars),
