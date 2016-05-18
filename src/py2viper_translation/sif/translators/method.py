@@ -47,14 +47,14 @@ class SIFMethodTranslator(MethodTranslator):
 
         return pres
 
-    def _create_method_epilog(self, method: SIFPythonMethod,
-                              ctx: SIFContext) -> List[Stmt]:
+    def _create_method_prolog(self, method: SIFPythonMethod,
+                              ctx: SIFContext):
         # newTimeLevel := timeLevel
         tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref,
                                             method.tl_var.ref,
                                             self.no_position(ctx),
                                             self.no_info(ctx))
-        return super()._create_method_epilog(method, ctx) + [tl_stmt]
+        return [tl_stmt]
 
     def _create_init_pres(self, method: SIFPythonMethod,
                           ctx: SIFContext) -> List[Expr]:

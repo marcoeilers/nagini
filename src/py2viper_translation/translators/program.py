@@ -35,6 +35,17 @@ class ProgramTranslator(CommonTranslator):
                                 self.to_position(field.node, ctx),
                                 self.no_info(ctx))
 
+    def _translate_fields(self, cls: PythonClass,
+                          ctx: Context) -> List['silver.ast.Field']:
+        fields = []
+        for field in cls.fields.values():
+            if field.inherited is None:
+                sil_field = self.translate_field(field, ctx)
+                field.sil_field = sil_field
+                fields.append(sil_field)
+
+        return fields
+
     def create_global_var_function(self, var: PythonVar,
                                    ctx: Context) -> 'silver.ast.Function':
         """
@@ -282,16 +293,10 @@ class ProgramTranslator(CommonTranslator):
             functions.append(
                 self.create_global_var_function(program.global_vars[var], ctx))
 
-        for class_name in program.classes:
+        for class_name, cls in program.classes.items():
             if class_name in PRIMITIVES:
                 continue
-            cls = program.classes[class_name]
-            for field_name in cls.fields:
-                field = cls.fields[field_name]
-                if field.inherited is None:
-                    sil_field = self.translate_field(field, ctx)
-                    field.sil_field = sil_field
-                    fields.append(sil_field)
+            fields += self._translate_fields(cls, ctx)
 
         # translate default args
         containers = [program] + list(program.classes.values())
