@@ -174,7 +174,7 @@ class MethodTranslator(CommonTranslator):
     def _translate_params(self, func: PythonMethod,
                           ctx: Context) -> List[VarDecl]:
         args = []
-        for name, arg in func.args.items():
+        for arg in func.get_args():
             args.append(arg.decl)
         if func.var_arg:
             args.append(func.var_arg.decl)
