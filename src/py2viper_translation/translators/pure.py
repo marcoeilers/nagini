@@ -2,6 +2,7 @@ import ast
 
 from typing import Dict, List, Union
 
+from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -80,7 +81,7 @@ class PureTranslator(CommonTranslator):
         """
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.program.classes['bool'], self.translator)
+            ctx.program.classes[BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.name, conds, cond, node)
         then_cond = conds + [cond_var.name]
         else_cond = conds + [NotWrapper(cond_var.name)]

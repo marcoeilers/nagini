@@ -1,6 +1,16 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES
+from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
+    DICT_TYPE,
+    END_LABEL,
+    INT_TYPE,
+    LIST_TYPE,
+    PRIMITIVES,
+    SET_TYPE,
+    STRING_TYPE,
+    TUPLE_TYPE,
+)
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
@@ -43,8 +53,8 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('dict',
-            ctx.program.classes['dict'], self.translator)
-        dict_class = ctx.program.classes['dict']
+            ctx.program.classes[DICT_TYPE], self.translator)
+        dict_class = ctx.program.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref], node, ctx)
@@ -62,8 +72,8 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
-        set_class = ctx.program.classes['set']
-        res_var = ctx.current_function.create_variable('set',
+        set_class = ctx.program.classes[SET_TYPE]
+        res_var = ctx.current_function.create_variable(SET_TYPE,
             set_class, self.translator)
         constr_call = self.get_method_call(set_class, '__init__', [], [],
                                            [res_var.ref], node, ctx)
@@ -79,8 +89,8 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
-        list_class = ctx.program.classes['list']
-        res_var = ctx.current_function.create_variable('list',
+        list_class = ctx.program.classes[LIST_TYPE]
+        res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
         targets = [res_var.ref]
 
@@ -105,7 +115,7 @@ class ExpressionTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
-        str_type = ctx.program.classes['str']
+        str_type = ctx.program.classes[STRING_TYPE]
         func_name = '__create__'
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
@@ -120,7 +130,7 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
-        tuple_class = ctx.program.classes['tuple']
+        tuple_class = ctx.program.classes[TUPLE_TYPE]
         func_name = '__create' + str(len(node.elts)) + '__'
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
@@ -251,13 +261,13 @@ class ExpressionTranslator(CommonTranslator):
         """
         stmt, res = self.translate_expr(node, ctx)
         type = self.get_type(node, ctx)
-        if type is ctx.program.classes['bool']:
+        if type is ctx.program.classes[BOOL_TYPE]:
             return stmt, res
         args = [res]
         arg_type = self.get_type(node, ctx)
         arg_types = [arg_type]
-        call = self.get_function_call(arg_type, '__bool__', args, arg_types, node,
-                                      ctx)
+        call = self.get_function_call(arg_type, '__bool__', args, arg_types,
+                                      node, ctx)
         return stmt, call
 
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
@@ -340,7 +350,7 @@ class ExpressionTranslator(CommonTranslator):
         stmt = left_stmt + right_stmt
         left_type = self.get_type(node.left, ctx)
         right_type = self.get_type(node.right, ctx)
-        if left_type.name != 'int':
+        if left_type.name != INT_TYPE:
             call = self.get_function_call(left_type, '__add__', [left, right],
                                           [left_type, right_type], node, ctx)
             return stmt, call

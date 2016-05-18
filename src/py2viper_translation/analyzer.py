@@ -5,7 +5,7 @@ import os
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.external.ast_util import mark_text_ranges
-from py2viper_translation.lib.constants import LITERALS
+from py2viper_translation.lib.constants import LITERALS, OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
     GenericType,
     ProgramNodeFactory,
@@ -115,8 +115,8 @@ class Analyzer(ast.NodeVisitor):
             method.args[name] = arg
         if if_method['type']:
             method.type = self.get_class(if_method['type'])
-        if if_method.get('generictype'):
-            method.generic_type = if_method['generictype']
+        if if_method.get('generic_type'):
+            method.generic_type = if_method['generic_type']
         if pure:
             cls.functions[method_name] = method
         else:
@@ -163,7 +163,7 @@ class Analyzer(ast.NodeVisitor):
         if len(node.bases) == 1:
             cls.superclass = self.get_class(node.bases[0].id)
         else:
-            cls.superclass = self.get_class('object')
+            cls.superclass = self.get_class(OBJECT_TYPE)
         self.current_class = cls
         for member in node.body:
             self.visit(member, node)
@@ -208,7 +208,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_arguments(self, node: ast.arguments) -> None:
         for arg in node.args:
             self.visit(arg, node)
-        self.current_function._no_args = len(node.args)
+        self.current_function.nargs = len(node.args)
         for kw_only in node.kwonlyargs:
             self.visit(kw_only, node)
         defaults = node.defaults
@@ -219,7 +219,7 @@ class Analyzer(ast.NodeVisitor):
         if node.vararg:
             arg = node.vararg
             annotated_type = self.typeof(arg)
-            assert annotated_type.name == 'tuple'
+            assert annotated_type.name == TUPLE_TYPE
             annotated_type.exact_length = False
             var_arg = self.node_factory.create_python_var(arg.arg, arg,
                                                           annotated_type)
@@ -351,7 +351,7 @@ class Analyzer(ast.NodeVisitor):
             result = self.get_class(mypy_type.name())
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
-            result = GenericType('tuple', self.program, args)
+            result = GenericType(TUPLE_TYPE, self.program, args)
         else:
             raise UnsupportedException(mypy_type)
         return result
