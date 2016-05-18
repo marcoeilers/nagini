@@ -38,7 +38,7 @@ class ProgramTranslator(CommonTranslator):
     def _translate_fields(self, cls: PythonClass,
                           ctx: Context) -> List['silver.ast.Field']:
         fields = []
-        for _, field in cls.fields.items():
+        for field in cls.fields.values():
             if field.inherited is None:
                 sil_field = self.translate_field(field, ctx)
                 field.sil_field = sil_field
