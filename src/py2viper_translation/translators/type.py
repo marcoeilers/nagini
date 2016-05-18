@@ -240,86 +240,108 @@ class TypeTranslator(CommonTranslator):
         else:
             result = self.type_factory.type_check(lhs, type, ctx)
         if type.name == 'tuple':
-            # length
-            if type.exact_length:
-                length = self.viper.IntLit(len(type.type_args),
-                                           self.no_position(ctx),
-                                           self.no_info(ctx))
-                len_call = self.get_function_call(type, '__len__', [lhs],
-                                                  [None], None, ctx)
-                eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
-                                      self.no_info(ctx))
-                result = self.viper.And(result, eq, self.no_position(ctx),
-                                        self.no_info(ctx))
-                # types of contents
-                for index in range(len(type.type_args)):
-                    # typeof getitem lessorequal type
-                    item = type.type_args[index]
-                    index_lit = self.viper.IntLit(index, self.no_position(ctx),
-                                                  self.no_info(ctx))
-                    args = [lhs, index_lit]
-                    arg_types = [None, None]
-                    item_call = self.get_function_call(type, '__getitem__',
-                                                       args,
-                                                       arg_types, None, ctx)
-                    type_check = self.type_check(item_call, item, ctx)
-                    result = result = self.viper.And(result, type_check,
-                                                     self.no_position(ctx),
-                                                     self.no_info(ctx))
-            else:
-                int_type = ctx.program.classes['int']
-                index_var = ctx.current_function.create_variable('index',
-                    int_type, self.translator, local=False)
-                var_decl = index_var.decl
-                zero = self.viper.IntLit(0, self.no_position(ctx),
-                                         self.no_info(ctx))
-                index_positive = self.viper.GeCmp(index_var.ref, zero,
-                                                  self.no_position(ctx),
-                                                  self.no_info(ctx))
-                length = self.get_function_call(type, '__len__', [lhs],
-                                                [None], None, ctx)
-                index_less_length = self.viper.LtCmp(index_var.ref, length,
-                                                     self.no_position(ctx),
-                                                     self.no_info(ctx))
-                impl_lhs = self.viper.And(index_positive, index_less_length,
-                                          self.no_position(ctx),
-                                          self.no_info(ctx))
-                args = [lhs, index_var.ref]
+            result = self._type_check_tuple(lhs, type, result, ctx, perms=perms)
+        elif type.name == 'dict':
+            result = self._type_check_dict(lhs, type, result, ctx, perms=perms)
+        elif type.name == 'list':
+            result = self._type_check_list(lhs, type, result, ctx, perms=perms)
+        elif type.name == 'set':
+            result = self._type_check_set(lhs, type, result, ctx, perms=perms)
+        # TODO: we need a dict/set/... predicate to wrap access to a dict/...
+        # Problem: type information depends on acc, but acc comes later.
+        return result
+
+    def _type_check_set(self, lhs: Expr, type: PythonType, basic_check: Expr,
+                        ctx: Context, perms: bool=False) -> Expr:
+        return basic_check
+
+    def _type_check_list(self, lhs: Expr, type: PythonType, basic_check: Expr,
+                         ctx: Context, perms: bool=False) -> Expr:
+        return basic_check
+
+    def _type_check_dict(self, lhs: Expr, type: PythonType, basic_check: Expr,
+                         ctx: Context, perms: bool=False) -> Expr:
+        result = basic_check
+        if perms:
+            # access to field dict_acc : Set[Ref]
+            field_type = self.viper.SetType(self.viper.Ref)
+            field = self.viper.Field('dict_acc', field_type,
+                                     self.no_position(ctx),
+                                     self.no_info(ctx))
+            field_acc = self.viper.FieldAccess(lhs, field,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+            acc_pred = self.viper.FieldAccessPredicate(field_acc,
+                self.viper.FullPerm(self.no_position(ctx),
+                                    self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx))
+            result = result = self.viper.And(result, acc_pred,
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
+        return result
+
+    def _type_check_tuple(self, lhs: Expr, type: PythonType, basic_check: Expr,
+                          ctx: Context, perms: bool=False) -> Expr:
+        result = basic_check
+        if type.exact_length:
+            # set length
+            length = self.viper.IntLit(len(type.type_args),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx))
+            len_call = self.get_function_call(type, '__len__', [lhs],
+                                              [None], None, ctx)
+            eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
+                                  self.no_info(ctx))
+            result = self.viper.And(result, eq, self.no_position(ctx),
+                                    self.no_info(ctx))
+            # types of contents
+            for index in range(len(type.type_args)):
+                # typeof getitem lessorequal type
+                item = type.type_args[index]
+                index_lit = self.viper.IntLit(index, self.no_position(ctx),
+                                              self.no_info(ctx))
+                args = [lhs, index_lit]
                 arg_types = [None, None]
                 item_call = self.get_function_call(type, '__getitem__',
                                                    args,
                                                    arg_types, None, ctx)
-                type_check = self.type_check(item_call, type.type_args[0], ctx)
-                implication = self.viper.Implies(impl_lhs, type_check,
+                type_check = self.type_check(item_call, item, ctx)
+                result = result = self.viper.And(result, type_check,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
-                forall = self.viper.Forall([var_decl], [], implication,
-                                           self.no_position(ctx),
-                                           self.no_info(ctx))
-                result = result = self.viper.And(result, forall,
+        else:
+            # exact length is unknown
+            # forall contents, assume type
+            int_type = ctx.program.classes['int']
+            index_var = ctx.current_function.create_variable('index',
+                int_type, self.translator, local=False)
+            var_decl = index_var.decl
+            zero = self.viper.IntLit(0, self.no_position(ctx),
+                                     self.no_info(ctx))
+            index_positive = self.viper.GeCmp(index_var.ref, zero,
+                                              self.no_position(ctx),
+                                              self.no_info(ctx))
+            length = self.get_function_call(type, '__len__', [lhs],
+                                            [None], None, ctx)
+            index_less_length = self.viper.LtCmp(index_var.ref, length,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
-        elif type.name == 'dict':
-            if perms:
-                # field dict_acc : Set[Ref]
-                field_type = self.viper.SetType(self.viper.Ref)
-                field = self.viper.Field('dict_acc', field_type,
-                                         self.no_position(ctx),
-                                         self.no_info(ctx))
-                field_acc = self.viper.FieldAccess(lhs, field,
-                                                   self.no_position(ctx),
-                                                   self.no_info(ctx))
-                acc_pred = self.viper.FieldAccessPredicate(field_acc,
-                    self.viper.FullPerm(self.no_position(ctx),
-                                        self.no_info(ctx)),
-                    self.no_position(ctx), self.no_info(ctx))
-                result = result = self.viper.And(result, acc_pred,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx))
-            # TODO: add acc to dict field. or create a dict predicate and
-            # unfold that in precondition. but also state types of dict
-            # keys and values with forall.
-            pass
-        # TODO: same thing for lists, sets
-        # TODO: refactor into different methods.
+            impl_lhs = self.viper.And(index_positive, index_less_length,
+                                      self.no_position(ctx),
+                                      self.no_info(ctx))
+            args = [lhs, index_var.ref]
+            arg_types = [None, None]
+            item_call = self.get_function_call(type, '__getitem__',
+                                               args,
+                                               arg_types, None, ctx)
+            type_check = self.type_check(item_call, type.type_args[0], ctx)
+            implication = self.viper.Implies(impl_lhs, type_check,
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
+            forall = self.viper.Forall([var_decl], [], implication,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx))
+            result = result = self.viper.And(result, forall,
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
         return result

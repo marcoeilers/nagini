@@ -315,6 +315,9 @@ class CallTranslator(CommonTranslator):
 
     def wrap_var_args(self, args: List[ast.AST], node: ast.AST,
                       ctx: Context) -> StmtsAndExpr:
+        """
+        Wraps the given arguments into a tuple to be passed to an *args param.
+        """
         tuple_class = ctx.program.classes['tuple']
         stmts = []
         vals = []
@@ -331,6 +334,9 @@ class CallTranslator(CommonTranslator):
 
     def wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Dict,
                      ctx: Context) -> StmtsAndExpr:
+        """
+        Wraps the given arguments into a dict to be passed to an **kwargs param.
+        """
         res_var = ctx.current_function.create_variable('kw_args',
             ctx.program.classes['dict'], self.translator)
         dict_class = ctx.program.classes['dict']
