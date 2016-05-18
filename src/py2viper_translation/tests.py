@@ -190,12 +190,6 @@ def sif_test_files():
     return result
 
 
-# TODO: SIF tests are currently commented out because something weird
-# happens with the method calls test case that leads all subsequent tests to
-# fail (probably some state somewhere in Viper that gets messed up by the
-# first test and never gets reinitialized). Additionally, the field assign
-# test fails in Carbon.
-
 @pytest.mark.parametrize('path,verifier', sif_test_files())
 def test_sif(path, verifier):
     verification_tester.test_file(path, jvm, verifier, True)
