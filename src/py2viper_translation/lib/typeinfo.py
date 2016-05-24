@@ -68,8 +68,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if line in self.ignored_lines:
                 return
             else:
-                msg = self.path + ':' + str(line)
-                msg += ': error: Encountered Any type, type annotation missing?'
+                error = ' error: Encountered Any type, type annotation missing?'
+                msg = ':'.join([self.path, str(line), error])
                 raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
