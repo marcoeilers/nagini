@@ -3,7 +3,6 @@ field list_acc : Seq[Ref]
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
-    function get_type_arg(r: Ref, i: Int): PyType
     unique function list(): PyType
 }
 
@@ -50,9 +49,3 @@ method list_append(self: Ref, item: Ref) returns ()
 {
     assume false
 }
-
-//predicate list_list(self: Ref) {
-//    acc(self.list_acc) &&
-//      forall i: Int :: ((i >= 0 && i < |self.list_acc|) ==>
-//        issubtype(typeof(self.list_acc[i]), get_type_arg(self, 0))
-//}
