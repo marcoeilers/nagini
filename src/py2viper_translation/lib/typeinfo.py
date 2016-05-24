@@ -4,6 +4,7 @@ import sys
 from mypy.build import BuildSource
 from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import LITERALS
+from py2viper_translation.lib.util import InvalidProgramException
 from typing import List
 
 
@@ -13,16 +14,23 @@ class TypeException(Exception):
 
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, type_map, path):
+    def __init__(self, type_map, path, ignored_lines):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
         self.type_map = type_map
         self.path = path
+        self.ignored_lines = ignored_lines
+
+    def _is_result_call(self, o: mypy.nodes.Node) -> bool:
+        if isinstance(o, mypy.nodes.CallExpr):
+            if o.callee.name == 'Result':
+                return True
+        return False
 
     def visit_member_expr(self, o: mypy.nodes.MemberExpr):
         rectype = self.type_of(o.expr)
-        if not isinstance(rectype, mypy.types.AnyType):
+        if not self._is_result_call(o.expr):
             self.set_type([rectype.type.name(), o.name], self.type_of(o),
                           o.line)
         super().visit_member_expr(o)
@@ -56,8 +64,13 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = oldprefix
 
     def set_type(self, fqn, type, line):
-        if isinstance(type, mypy.types.AnyType):
-            return  # just ignore??
+        if not type or isinstance(type, mypy.types.AnyType):
+            if line in self.ignored_lines:
+                return
+            else:
+                msg = self.path + ':' + str(line)
+                msg += ': error: Encountered Any type, type annotation missing?'
+                raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
@@ -86,7 +99,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def type_of(self, node):
         if isinstance(node, mypy.nodes.FuncDef):
-            return node.type
+            if node.type:
+                return node.type
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
                 type = self.all_types[tuple(self.prefix)].ret_type
@@ -126,7 +140,8 @@ class TypeInfo:
                 target=mypy.build.TYPE_CHECK,
                 bin_dir=config.mypy_dir
                 )
-            visitor = TypeVisitor(res.types, filename)
+            visitor = TypeVisitor(res.types, filename,
+                                  res.files['__main__'].ignored_lines)
             # for df in res.files['__main__'].defs:
             # print(df)
             res.files['__main__'].accept(visitor)
