@@ -116,20 +116,25 @@ class VerificationTests(AnnotatedTests):
 verification_tester = VerificationTests()
 
 
-def verification_test_files():
+def _test_files(test_dir):
     result = []
     for root, dir_names, file_names in os.walk(
-            test_verification_dir,
+            test_dir,
             topdown=True):
         if 'resources' in dir_names:
             # Skip resources directory.
             dir_names.remove('resources')
         for file_name in file_names:
             if file_name.endswith('.py'):
-                result.extend((
-                    (join(root, file_name), verifier)
-                    for verifier in verifiers
-                    ))
+                result.append(join(root, file_name))
+    return result
+
+
+def verification_test_files():
+    files = _test_files(test_verification_dir)
+    result = []
+    for file in files:
+        result.extend([(file, verifier) for verifier in verifiers])
     return result
 
 
@@ -169,11 +174,7 @@ translation_tester = TranslationTests()
 
 
 def translation_test_files():
-    test_files = [join(test_translation_dir, f) for f in
-                  os.listdir(test_translation_dir) if
-                  isfile(join(test_translation_dir, f)) and f.endswith(
-                      '.py')]
-    return test_files
+    return _test_files(test_translation_dir)
 
 
 @pytest.mark.parametrize('path', translation_test_files())
@@ -182,11 +183,10 @@ def test_translation(path):
 
 
 def sif_test_files():
+    files = _test_files(test_sif_dir)
     result = []
-    for f in os.listdir(test_sif_dir):
-        joined = join(test_sif_dir, f)
-        if isfile(joined) and f.endswith('.py'):
-            result += [(joined, verifier) for verifier in verifiers]
+    for file in files:
+        result.extend([(file, verifier) for verifier in verifiers])
     return result
 
 
