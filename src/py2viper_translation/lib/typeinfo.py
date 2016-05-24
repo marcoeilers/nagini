@@ -1,3 +1,4 @@
+import logging
 import mypy.build
 import sys
 
@@ -6,6 +7,9 @@ from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import LITERALS
 from py2viper_translation.lib.util import InvalidProgramException
 from typing import List
+
+
+logger = logging.getLogger('py2viper_translation.lib.typeinfo')
 
 
 class TypeException(Exception):
@@ -134,12 +138,20 @@ class TypeInfo:
         Typechecks the given file and collects all type information needed for
         the translation to Viper
         """
+
+        def report_errors(errors: List[str]) -> None:
+            for error in errors:
+                logger.info(error)
+            raise TypeException(errors)
+
         try:
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
                 bin_dir=config.mypy_dir
                 )
+            if res.errors:
+                report_errors(res.errors)
             visitor = TypeVisitor(res.types, filename,
                                   res.files['__main__'].ignored_lines)
             # for df in res.files['__main__'].defs:
@@ -149,9 +161,8 @@ class TypeInfo:
             self.alt_types.update(visitor.alt_types)
             return True
         except mypy.errors.CompileError as e:
-            for m in e.messages:
-                sys.stderr.write('Mypy error: ' + m + '\n')
-            raise TypeException(e.messages)
+            report_errors(e.messages)
+
 
     def get_type(self, prefix: List[str], name: str):
         """
