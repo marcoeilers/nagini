@@ -11,12 +11,12 @@ class SuperA:
 
 
 class SubA(SuperA):
-    def some_method(self, b: int) -> int:
-        return b + 5
+    def some_method(self, a: int) -> int:
+        return a + 5
 
 class SubSubA(SubA):
-    def some_method(self, b: int) -> int:
-        return b + 9
+    def some_method(self, a: int) -> int:
+        return a + 9
 
 class SuperF:
     def some_method(self, b: SubA, a: SubSubA) -> SubA:
@@ -24,5 +24,5 @@ class SuperF:
 
 class SubF1(SuperF):
     #:: ExpectedOutput(type.error:Argument 1 of "some_method" incompatible with supertype "SuperF")
-    def some_method(self, a : SubSubA, b : SubSubA) -> SubA:
-        return b
+    def some_method(self, b: SubSubA, a: SubSubA) -> SubA:
+        return a
