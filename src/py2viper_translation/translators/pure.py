@@ -154,7 +154,27 @@ class PureTranslator(CommonTranslator):
         if wrapper.cond:
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
-            old_val = wrapper.names[wrapper.name].ref
+            if wrapper.name in wrapper.names:
+                old_val = wrapper.names[wrapper.name].ref
+            else:
+                # variable newly defined in conditional branch, so
+                # there is no old value; the variable is not defined
+                # if the condition is false.
+                # our encoding requires some value though, even
+                # though that will never be used, so we take some dummy
+                # value.
+                zero = self.viper.IntLit(0, self.no_position(ctx),
+                                         self.no_info(ctx))
+                false = self.viper.FalseLit(self.no_position(ctx),
+                                            self.no_info(ctx))
+                null = self.viper.NullLit(self.no_position(ctx),
+                                          self.no_info(ctx))
+                dummies = {
+                    self.viper.Int: zero,
+                    self.viper.Bool: false,
+                    self.viper.Ref: null
+                }
+                old_val = dummies[wrapper.var.decl.typ()]
             new_val = self.viper.CondExp(cond, val, old_val, position,
                                          info)
             return self.viper.Let(wrapper.var.decl, new_val,
@@ -228,6 +248,7 @@ class PureTranslator(CommonTranslator):
                 added[name] = new_name
                 wrapper.var = new_name
             previous = wrapper
+
         # Second walk through wrappers, starting at the end. Translate all of
         # them into one big expression. Assigns become a let, returns just the
         # returned value, and if something happens in an if block, we put it

@@ -26,7 +26,7 @@ env: .virtualenv
 .virtualenv:
 	mkdir -p .virtualenv
 	wget -c \
-		https://pypi.python.org/packages/source/v/virtualenv/virtualenv-14.0.5.tar.gz \
+		https://pypi.python.org/packages/c8/82/7c1eb879dea5725fae239070b48187de74a8eb06b63d9087cd0a60436353/virtualenv-15.0.1.tar.gz \
 		-O .virtualenv/archive.tar.gz
 	tar -xvf .virtualenv/archive.tar.gz
 	mv virtualenv-* .virtualenv/source

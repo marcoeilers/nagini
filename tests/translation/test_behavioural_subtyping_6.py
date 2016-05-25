@@ -11,7 +11,7 @@ class Super:
 class Sub(Super):
     #:: ExpectedOutput(invalid.program:invalid.override)
     @Pure
-    def some_function(self, c: int) -> int:
+    def some_function(self, a: int) -> int:
         Requires(True)
         Ensures(Result() > 17)
         return 19
