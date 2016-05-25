@@ -47,6 +47,7 @@ class TypeDomainFactory:
             self.issubtype_func(ctx),
             self.isnotsubtype_func(ctx),
             self.typeof_func(ctx),
+            self.type_arg_func(ctx),
             # self.create_object_type(ctx)
         ]
 
@@ -513,6 +514,21 @@ class TypeDomainFactory:
                                           self.no_position(ctx),
                                           self.no_info(ctx))
         return self.viper.DomainFunc('typeof', [obj_var],
+                                     self.type_type(), False,
+                                     self.no_position(ctx), self.no_info(ctx),
+                                     self.type_domain)
+
+    def type_arg_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
+        """
+        Creates the get_type_arg domain function.
+        """
+        obj_var = self.viper.LocalVarDecl('obj', self.viper.Ref,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
+        index_var = self.viper.LocalVarDecl('index', self.viper.Int,
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
+        return self.viper.DomainFunc('get_type_arg', [obj_var, index_var],
                                      self.type_type(), False,
                                      self.no_position(ctx), self.no_info(ctx),
                                      self.type_domain)
