@@ -1,4 +1,5 @@
 import logging
+import mypy.version
 import mypy.build
 import sys
 
@@ -145,6 +146,7 @@ class TypeInfo:
             raise TypeException(errors)
 
         try:
+            print('Mypy version ' + str(mypy.version.__version__))
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
