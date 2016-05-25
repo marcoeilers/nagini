@@ -174,13 +174,14 @@ def main() -> None:
         else:
             sys.exit(1)
     except (TypeException, InvalidProgramException) as e:
-        raise e
         print("Translation failed")
         if isinstance(e, InvalidProgramException):
             print('Line ' + str(e.node.lineno) + ': ' + e.code)
             if e.message:
                 print(e.message)
-            raise e
+        if isinstance(e, TypeException):
+            for msg in e.messages:
+                print(msg)
         sys.exit(1)
     except JavaException as e:
         print(e.stacktrace())

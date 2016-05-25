@@ -1,13 +1,17 @@
 from py2viper_contracts.contracts import *
 
+
 class MyException(Exception):
     pass
+
 
 class MySpecialException(MyException):
     pass
 
+
 class MyOtherException(Exception):
     pass
+
 
 class Super:
     def some_function(self, a: int) -> int:
@@ -16,9 +20,10 @@ class Super:
         Exsures(MyException, True)
         return 18 + a
 
+
 class Sub(Super):
     #:: ExpectedOutput(invalid.program:invalid.override)
-    def some_function(self, c: int) -> int:
+    def some_function(self, a: int) -> int:
         Requires(True)
         Ensures(Result() > 17)
         Exsures(MySpecialException, True)
