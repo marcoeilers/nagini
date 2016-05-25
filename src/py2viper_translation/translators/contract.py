@@ -238,5 +238,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfold(node, ctx)
         elif func_name == 'Unfolding':
             return self.translate_unfolding(node, ctx)
+        elif func_name == 'Forall':
+            return self.translate_forall(node, ctx)
         else:
             raise UnsupportedException(node)
