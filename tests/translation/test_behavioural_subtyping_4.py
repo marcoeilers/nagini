@@ -6,8 +6,8 @@ class SuperA:
         self.int_field = 14
         self.bool_field = True
 
-    def some_method(self, a: int) -> int:
-        return a
+    def some_method(self, b: int) -> int:
+        return b
 
 
 class SubA(SuperA):
@@ -27,5 +27,5 @@ class SuperF:
 
 class SubF1(SuperF):
     #:: ExpectedOutput(type.error:Signature of "some_method" incompatible with supertype "SuperF")
-    def some_method(self, a: SubA, b: SubSubA, c: SuperA) -> SubA:
-        return b
+    def some_method(self, b: SubA, a: SubSubA, c: SuperA) -> SubA:
+        return a
