@@ -21,10 +21,10 @@ class SIFStatementTranslator(StatementTranslator):
         
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         # Translate assignment for prime variables.
         stmts += super().translate_stmt_Assign(node, ctx)
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
 
         return stmts
 
@@ -34,9 +34,9 @@ class SIFStatementTranslator(StatementTranslator):
             raise UnsupportedException(node)
 
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         rhs_stmt_p, rhs_p = self.translate_expr(node.value, ctx)
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
         assign = self.viper.LocalVarAssign(
             ctx.current_function.result.ref,
             rhs, self.to_position(node, ctx), self.no_info(ctx))

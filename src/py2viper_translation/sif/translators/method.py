@@ -1,10 +1,13 @@
-from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.constants import PRIMITIVES, BOOL_TYPE, TUPLE_TYPE
+from py2viper_translation.lib.program_nodes import GenericType
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
     Expr,
     Stmt,
     StmtsAndExpr,
 )
+from py2viper_translation.lib.util import InvalidProgramException, \
+    get_body_start_index
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
@@ -21,18 +24,18 @@ class SIFMethodTranslator(MethodTranslator):
     def _translate_pres(self, method: SIFPythonMethod,
                         ctx: SIFContext):
         pres = super()._translate_pres(method, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         pres += super()._translate_pres(method, ctx)
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
         return pres
 
     def _translate_posts(self, method: SIFPythonMethod,
                          err_var: 'viper.ast.LocalVar',
                          ctx: SIFContext):
         posts = super()._translate_posts(method, err_var, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         posts += super()._translate_posts(method, err_var, ctx)
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
         return posts
 
     def _create_typeof_pres(self, func: SIFPythonMethod,
@@ -88,3 +91,52 @@ class SIFMethodTranslator(MethodTranslator):
                                  self.no_position(ctx), self.no_info(ctx))
 
         return [not_null, not_null_prime, equal] + accs + accs_prime
+
+    def translate_function(self, func: SIFPythonMethod,
+                           ctx: SIFContext) -> 'silver.ast.Function':
+        """
+        Translate a pure Python function to a Viper function. The Viper function
+        returns a tuple (res, res', timeLevel). Bools and ints get boxed.
+        """
+        # TODO: We should really have a save/restore_context method and call it
+        # automatically at the beginning and end of each translate_* method.
+        old_function = ctx.current_function
+        ctx.current_function = func
+        # Create a tuple type.
+        type_args = [func.type, func.type, ctx.program.classes[BOOL_TYPE]]
+        tuple_type = GenericType(TUPLE_TYPE, ctx.program, type_args)
+        type_ = self.translate_type(tuple_type, ctx)
+
+        args = self._translate_params(func, ctx)
+        if func.declared_exceptions:
+            raise InvalidProgramException(func.node,
+                                          'function.throws.exception')
+        # create preconditions
+        pres = self._translate_pres(func, ctx)
+        if func.cls:
+            self_var = next(iter(func.args.values()))
+            not_null = self.viper.NeCmp(self_var.ref,
+                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx))
+            not_null_p = self.viper.NeCmp(self_var.var_prime.ref,
+                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx))
+            pres = [not_null, not_null_p] + pres
+        # create postconditions
+        posts = []
+        for post in func.postcondition:
+            stmt, expr = self.translate_expr(post, ctx)
+            if stmt:
+                raise InvalidProgramException(post, 'purity.violated')
+            posts.append(expr)
+        # create typeof preconditions
+        pres = self._create_typeof_pres(func, False, ctx) + pres
+        # TODO(shitz): Add result type post-condition.
+        statements = func.node.body
+        body_index = get_body_start_index(statements)
+        # translate body
+        body = self.translate_exprs(statements[body_index:], func, ctx)
+        ctx.current_function = old_function
+        return self.viper.Function(func.sil_name, args, type_, pres,
+                                   posts, body, self.no_position(ctx),
+                                   self.no_info(ctx))

@@ -147,9 +147,9 @@ class SIFCallTranslator(CallTranslator):
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
             arg_stms += arg_stmt
             args.append(arg_expr)
-            ctx.use_prime = True
+            ctx.set_prime_ctx()
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
-            ctx.use_prime = False
+            ctx.set_normal_ctx()
             arg_stms += arg_stmt
             args.append(arg_expr)
         # Add timeLevel.
@@ -161,10 +161,10 @@ class SIFCallTranslator(CallTranslator):
     def _translate_receiver(self, node: ast.Call,
                             ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
         recv_stmts, recv = self.translate_expr(node.func.value, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         recv_stmts_p, recv_p = self.translate_expr(node.func.value, ctx)
         assert not recv_stmts_p
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
         type_expr = self.type_factory.type_comp(recv, recv_p, ctx)

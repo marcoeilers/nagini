@@ -32,12 +32,12 @@ class PythonScope:
     def get_fresh_name(self, name: str) -> str:
         if self.contains_name(name):
             counter = 0
-            newname = name + '_' + str(counter)
-            while self.contains_name(newname):
-                counter = counter + 1
-                newname = name + '_' + str(counter)
-            self.sil_names.append(newname)
-            return newname
+            new_name = name + '_' + str(counter)
+            while self.contains_name(new_name):
+                counter += 1
+                new_name = name + '_' + str(counter)
+            self.sil_names.append(new_name)
+            return new_name
         else:
             self.sil_names.append(name)
             return name
@@ -268,11 +268,12 @@ class GenericType(PythonType):
                  args: List[PythonType]) -> None:
         self.name = name
         self.program = program
+        self.cls = self.program.classes[self.name]
         self.type_args = args
         self.exact_length = True
 
     def get_class(self) -> PythonClass:
-        return self.program.classes[self.name]
+        return self.cls
 
     def get_program(self) -> 'PythonProgram':
         return self.program
@@ -345,8 +346,8 @@ class PythonMethod(PythonNode, PythonScope):
                 raise Exception(cls)
         self.cls = cls
         self.overrides = None  # infer
-        self.locals = OrderedDict()  # direct
-        self.args = OrderedDict()  # direct
+        self._locals = OrderedDict()  # direct
+        self._args = OrderedDict()  # direct
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -410,6 +411,22 @@ class PythonMethod(PythonNode, PythonScope):
     def nargs(self, nargs: int) -> None:
         self._nargs = nargs
 
+    @property
+    def args(self) -> OrderedDict:
+        # TODO(shitz): Should make this return an immutable copy.
+        return self._args
+
+    def add_arg(self, name: str, arg: 'PythonVar'):
+        self._args[name] = arg
+
+    @property
+    def locals(self) -> OrderedDict:
+        # TODO(shitz): Should make this return an immutable copy.
+        return self._locals
+
+    def add_local(self, name: str, local: 'PythonVar'):
+        self._locals[name] = local
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -437,7 +454,7 @@ class PythonMethod(PythonNode, PythonScope):
         result = self.node_factory.create_python_var(sil_name, None, cls)
         result.process(sil_name, translator)
         if local:
-            self.locals[sil_name] = result
+            self.add_local(sil_name, result)
         return result
 
     def get_locals(self) -> List['PythonVar']:

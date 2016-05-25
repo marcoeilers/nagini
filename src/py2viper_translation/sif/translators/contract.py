@@ -20,9 +20,9 @@ class SIFContractTranslator(ContractTranslator):
 
     def translate_assert(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
         stmts, _ = super().translate_assert(node, ctx)
-        ctx.use_prime = True
+        ctx.set_prime_ctx()
         stmts_p, _ = super().translate_assert(node, ctx)
-        ctx.use_prime = False
+        ctx.set_normal_ctx()
 
         return stmts + stmts_p, None
 
