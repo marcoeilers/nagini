@@ -227,5 +227,34 @@
         }
     },
     "extends": "object"
+},
+"range": {
+    "functions": {
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "range"
+        },
+        "__getitem__": {
+            "args": ["range", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["range", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["range"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["range"],
+            "type": "bool"
+        },
+        "__sil_set__": {
+            "args": ["range"],
+            "type": "object"
+        }
+    },
+    "extends": "object"
 }
 }

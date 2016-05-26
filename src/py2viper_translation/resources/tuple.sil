@@ -1,6 +1,3 @@
-field int_value___: Int
-field bool_value___: Bool
-
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool

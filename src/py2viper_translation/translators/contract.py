@@ -1,6 +1,7 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
+from py2viper_translation.lib.constants import BUILTIN_PREDICATES, PRIMITIVES
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -13,6 +14,7 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
+from typing import List
 
 
 class ContractTranslator(CommonTranslator):
@@ -71,6 +73,35 @@ class ContractTranslator(CommonTranslator):
 
         return perm
 
+    def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
+                                    args: List[Expr], ctx: Context) -> Expr:
+        if len(args) != 1:
+            raise InvalidProgramException(node, 'invalid.predicate')
+        name = node.func.id
+        seq_ref = self.viper.SeqType(self.viper.Ref)
+        set_ref = self.viper.SetType(self.viper.Ref)
+        if name == 'list_pred':
+            # field list_acc : Seq[Ref]
+            field = self.viper.Field('list_acc', seq_ref, self.no_position(ctx),
+                                     self.no_info(ctx))
+        elif name == 'set_pred':
+            # field set_acc : Set[Ref]
+            field = self.viper.Field('set_acc', set_ref, self.no_position(ctx),
+                                     self.no_info(ctx))
+        elif name == 'dict_pred':
+            # field dict_acc : Set[Ref]
+            field = self.viper.Field('dict_acc', set_ref, self.no_position(ctx),
+                                     self.no_info(ctx))
+        else:
+            raise UnsupportedException(node)
+        field_acc = self.viper.FieldAccess(args[0], field,
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+        pred = self.viper.FieldAccessPredicate(field_acc, perm,
+                                               self.to_position(node, ctx),
+                                               self.no_info(ctx))
+        return pred
+
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -88,7 +119,11 @@ class ContractTranslator(CommonTranslator):
             args.append(arg_expr)
         # get the predicate inside the Acc()
         if isinstance(call.func, ast.Name):
-            pred = ctx.program.get_predicate(call.func.id)
+            if call.func.id in BUILTIN_PREDICATES:
+                return arg_stmts, self.translate_builtin_predicate(call, perm,
+                                                                   args, ctx)
+            else:
+                pred = ctx.program.predicates[call.func.id]
         elif isinstance(call.func, ast.Attribute):
             rec_stmt, receiver = self.translate_expr(call.func.value, ctx)
             assert not rec_stmt
@@ -106,7 +141,7 @@ class ContractTranslator(CommonTranslator):
                    family_root.superclass.get_predicate(name)):
                 family_root = family_root.superclass
             pred_name = family_root.get_predicate(name).sil_name
-        return [], self.create_predicate_access(pred_name, args, perm,
+        return arg_stmts, self.create_predicate_access(pred_name, args, perm,
                                                 node, ctx)
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
@@ -211,6 +246,74 @@ class ContractTranslator(CommonTranslator):
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold
+
+    def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        dom_stmt, domain = self.translate_expr(node.args[0], ctx)
+
+        lambda_ = node.args[1]
+
+        variables = []
+        lambda_prefix = 'lambda' + str(lambda_.lineno) + '$'
+        arg = lambda_.args.args[0]
+        var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+        variables.append(var.decl)
+        assert arg.arg not in ctx.var_aliases
+        if (not isinstance(lambda_.body, ast.Tuple) or
+                len(lambda_.body.elts) != 2):
+            raise InvalidProgramException(node, 'invalid.trigger')
+        ctx.var_aliases[arg.arg] = var
+        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
+
+        triggers = []
+        if not isinstance(lambda_.body.elts[1], ast.List):
+            raise InvalidProgramException(node, 'invalid.trigger')
+        outer = lambda_.body.elts[1]
+
+        if outer.elts:
+            for el in outer.elts:
+                trigger = []
+                if not isinstance(el, ast.List):
+                    raise InvalidProgramException(el, 'invalid.trigger')
+                for inner in el.elts:
+                    part_stmt, part = self.translate_expr(inner, ctx)
+                    if part_stmt:
+                        raise InvalidProgramException(inner,
+                                                      'purity.violated')
+                    trigger.append(part)
+                trigger = self.viper.Trigger(trigger, self.no_position(ctx),
+                                             self.no_info(ctx))
+                triggers.append(trigger)
+
+        del ctx.var_aliases[arg.arg]
+        if body_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+
+        dom_type = self.get_type(node.args[0], ctx)
+
+        set_ref = self.viper.SetType(self.viper.Ref)
+        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))]
+        domain_set = self.viper.FuncApp('range___sil_set__', [domain],
+                                        self.no_position(ctx),
+                                        self.no_info(ctx), set_ref, formal_args)
+        if var.type.name in PRIMITIVES:
+            ref_var = self.box_primitive(var.ref, var.type, None, ctx)
+        else:
+            ref_var = var.ref
+        lhs = self.viper.AnySetContains(ref_var, domain_set,
+                                        self.to_position(node.args[0], ctx),
+                                        self.no_info(ctx))
+
+        implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
+                                         self.no_info(ctx))
+
+
+
+        forall = self.viper.Forall(variables, triggers, implication,
+                                   self.to_position(node, ctx),
+                                   self.no_info(ctx))
+        return dom_stmt, forall
 
     def translate_contractfunc_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
