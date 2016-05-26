@@ -11,6 +11,7 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     PRIMITIVES,
+    RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
     STRING_TYPE,
@@ -139,6 +140,21 @@ class CallTranslator(CommonTranslator):
                                            [], targets, node, ctx)
         return [constr_call], res_var.ref
 
+    def translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        if len(node.args) != 2:
+            raise UnsupportedException(node)
+        range_class = ctx.program.classes[RANGE_TYPE]
+        start_stmt, start = self.translate_expr(node.args[0], ctx)
+        end_stmt, end = self.translate_expr(node.args[1], ctx)
+
+        length = self.viper.Sub(end, start, self.to_position(node.args[1], ctx),
+                                self.no_info(ctx))
+        args = [start, length]
+        arg_types = [None, None]
+        call = self.get_function_call(range_class, '__create__', args,
+                                      arg_types, node, ctx)
+        return start_stmt + end_stmt, call
+
     def translate_builtin_func(self, node: ast.Call,
                                ctx: Context) -> StmtsAndExpr:
         """
@@ -153,6 +169,8 @@ class CallTranslator(CommonTranslator):
             return self.translate_len(node, ctx)
         elif func_name == 'set':
             return self.translate_set(node, ctx)
+        elif func_name == 'range':
+            return self.translate_range(node, ctx)
         else:
             raise UnsupportedException(node)
 

@@ -376,7 +376,8 @@ class MethodTranslator(CommonTranslator):
                 if block.finally_block:
                     body += self.translate_finally(block, ctx)
             body += self.add_handlers_for_inlines(ctx)
-            locals = [local.decl for local in method.get_locals()]
+            locals = [local.decl for local in method.get_locals()
+                      if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         body_block = self.translate_block(body,
                                           self.to_position(method.node, ctx),

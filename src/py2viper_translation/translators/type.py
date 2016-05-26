@@ -9,6 +9,7 @@ from py2viper_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     PRIMITIVES,
+    RANGE_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -92,6 +93,8 @@ class TypeTranslator(CommonTranslator):
                 return value_type.type_args[0]
             elif value_type.name == DICT_TYPE:
                 return value_type.type_args[1]
+            elif value_type.name == RANGE_TYPE:
+                return ctx.program.classes['int']
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Str):

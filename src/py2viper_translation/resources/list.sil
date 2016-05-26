@@ -24,7 +24,9 @@ function list___bool__(self: Ref) : Bool
 
 function list___len__(self: Ref) : Int
     requires acc(self.list_acc, 1/100)
-    ensures result == |self.list_acc|
+{
+ |self.list_acc|
+}
 
 function list___getitem__(self: Ref, key: Int): Ref
     requires acc(self.list_acc, 1/100)
