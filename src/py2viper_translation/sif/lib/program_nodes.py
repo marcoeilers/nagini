@@ -36,6 +36,14 @@ class SIFPythonMethod(PythonMethod):
         self.tl_var.process(self.tl_var.name, translator)
         self.new_tl_var.process(self.new_tl_var.name, translator)
 
+    def get_variable(self, name: str) -> 'SIFPythonVar':
+        if name == self.tl_var.name:
+            return self.tl_var
+        elif name == self.new_tl_var.name:
+            return self.new_tl_var
+        else:
+            return super().get_variable(name)
+
     def get_locals(self) -> List['PythonVar']:
         """
         Returns all method locals as a list of PythonVars.

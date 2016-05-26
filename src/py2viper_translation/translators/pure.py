@@ -154,8 +154,8 @@ class PureTranslator(CommonTranslator):
         if wrapper.cond:
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
-            if wrapper.name in wrapper.names:
-                old_val = wrapper.names[wrapper.name].ref
+            if wrapper.name in ctx.var_aliases:
+                old_val = ctx.var_aliases[wrapper.name].ref
             else:
                 # variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
@@ -190,7 +190,7 @@ class PureTranslator(CommonTranslator):
         if isinstance(wrapper.expr, BinOpWrapper):
             assert isinstance(wrapper, AssignWrapper)
             stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
-            var = wrapper.names[wrapper.name].ref
+            var = ctx.var_aliases[wrapper.name].ref
             if isinstance(wrapper.expr.op, ast.Add):
                 val = self.viper.Add(var, val, position, info)
             elif isinstance(wrapper.expr.op, ast.Sub):
@@ -217,6 +217,10 @@ class PureTranslator(CommonTranslator):
         else:
             raise UnsupportedException(wrapper)
 
+    def _translate_to_wrappers(self, nodes: List[ast.AST],
+                               ctx: Context) -> List[Wrapper]:
+        return flatten([self.translate_pure([], node, ctx)for node in nodes])
+
     def translate_exprs(self, nodes: List[ast.AST],
                         function: PythonMethod, ctx: Context) -> Expr:
         """
@@ -227,8 +231,7 @@ class PureTranslator(CommonTranslator):
         of wrappers.
         """
         # Translate to wrapper objects
-        wrappers = flatten([self.translate_pure([], node, ctx)
-                            for node in nodes])
+        wrappers = self._translate_to_wrappers(nodes, ctx)
         previous = None
         added = {}
         # First walk through wrappers. For every assignment, we create a new

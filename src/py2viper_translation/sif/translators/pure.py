@@ -12,12 +12,19 @@ from py2viper_translation.lib.typedefs import Expr
 from typing import List
 
 
+TL_VAR_NAME = 'tl'
+
+
 class TLAssignWrapper(AssignWrapper):
     """
     Custom wrapper for an assignment to timeLevel which does not need to be
     duplicated.
     """
-    pass
+
+    def __init__(self, name: str, conds: List, expr: ast.AST,
+                 node: ast.AST, sif=True):
+        super().__init__(name, conds, expr, node)
+        self.sif = sif
 
 
 class SIFPureTranslator(PureTranslator):
@@ -31,9 +38,7 @@ class SIFPureTranslator(PureTranslator):
         contain the condition(s) introduced by the if-block.
         Injects a TLAssignWrapper before the if-block.
         """
-        tl_var = ctx.current_function.create_variable('tl',
-            ctx.program.classes[BOOL_TYPE], self.translator)
-        tl_let = TLAssignWrapper(tl_var.name, conds, node.test, node)
+        tl_let = TLAssignWrapper(TL_VAR_NAME, conds, node.test, node)
         return [tl_let] + super().translate_pure_If(conds, node, ctx)
 
     def _translate_wrapper(self, wrapper: Wrapper, previous: Expr,
@@ -103,15 +108,18 @@ class SIFPureTranslator(PureTranslator):
         """
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        cond = self._translate_wrapper_expr(wrapper, ctx)
-        aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
-        aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-        ctx.set_prime_ctx(aliases=aliases, backup=True)
-        cond_p = self._translate_wrapper_expr(wrapper, ctx)
-        ctx.set_normal_ctx(restore=True)
         tl_var = self._get_tl_var(function, ctx)
-        ne = self.viper.NeCmp(cond, cond_p, position, info)
-        rhs = self.viper.Or(tl_var.ref, ne, position, info)
+        if wrapper.sif:
+            cond = self._translate_wrapper_expr(wrapper, ctx)
+            aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
+            aliases.update({k: v.var_prime for (k, v) in function.args.items()})
+            ctx.set_prime_ctx(aliases=aliases, backup=True)
+            cond_p = self._translate_wrapper_expr(wrapper, ctx)
+            ctx.set_normal_ctx(restore=True)
+            ne = self.viper.NeCmp(cond, cond_p, position, info)
+            rhs = self.viper.Or(tl_var.ref, ne, position, info)
+        else:
+            rhs = self._translate_wrapper_expr(wrapper, ctx)
 
         if wrapper.cond:
             conds = self._translate_condition(wrapper.cond,
@@ -124,10 +132,18 @@ class SIFPureTranslator(PureTranslator):
             return self.viper.Let(wrapper.var.decl, rhs,
                                   previous, position, info)
 
+    def _translate_to_wrappers(self, nodes: List[ast.AST],
+                               ctx: SIFContext) -> List[Wrapper]:
+        # Add a wrapper for 'tl = timeLevel'
+        tl_var = ctx.current_function.create_variable(TL_VAR_NAME,
+           ctx.program.classes[BOOL_TYPE], self.translator)
+        node = ast.Name(id=ctx.current_function.tl_var.name, ctx=ast.Load())
+        tl_wrapper = TLAssignWrapper(tl_var.name, [], node, None, False)
+        return [tl_wrapper] + super()._translate_to_wrappers(nodes, ctx)
 
     def _get_tl_var(self, function: SIFPythonMethod,
                     ctx: SIFContext) -> PythonVar:
-        if function.tl_var.sil_name in ctx.var_aliases:
-            return ctx.var_aliases[function.tl_var.name]
+        if TL_VAR_NAME in ctx.var_aliases:
+            return ctx.var_aliases[TL_VAR_NAME]
         else:
             return function.tl_var
