@@ -180,7 +180,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return new_var.ref
 
     def var_type_check(self, name: str, type: PythonType,
-                       ctx: Context, perms: bool=False) -> Expr:
+                       ctx: Context) -> Expr:
         """
         Creates an expression checking if the var with the given name
         is of the given type.
@@ -191,7 +191,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                           self.no_position(ctx),
                                           self.no_info(ctx))
-        return self.type_check(obj_var, type, ctx, perms=perms)
+        return self.type_check(obj_var, type, ctx)
 
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
                                 node: ast.AST, ctx: Context) -> Expr:

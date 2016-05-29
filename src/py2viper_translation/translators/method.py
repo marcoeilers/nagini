@@ -48,22 +48,20 @@ class MethodTranslator(CommonTranslator):
         return type.name not in [TUPLE_TYPE, SET_TYPE, DICT_TYPE, LIST_TYPE]
 
     def get_parameter_typeof(self, param: PythonVar,
-                             ctx: Context,
-                             perms: bool=False) -> 'silver.ast.DomainFuncApp':
+                             ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the given parameter has its type,
         to be assumed in preconditions and/or postconditions. If possible,
         the expression is wrapped in an InhaleExhaleExpression s.t. it is
         just assumed, not checked; with some types this is not possible.
         """
-        result = self.var_type_check(param.sil_name, param.type, ctx,
-                                     perms=perms)
-        if self._can_assume_type(param.type):
-            true_lit = self.viper.TrueLit(self.no_position(ctx),
-                                          self.no_info(ctx))
-            result = self.viper.InhaleExhaleExp(result, true_lit,
-                                                self.no_position(ctx),
-                                                self.no_info(ctx))
+        result = self.var_type_check(param.sil_name, param.type, ctx)
+
+        true_lit = self.viper.TrueLit(self.no_position(ctx),
+                                      self.no_info(ctx))
+        result = self.viper.InhaleExhaleExp(result, true_lit,
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
         return result
 
     def _translate_pres(self, method: PythonMethod,

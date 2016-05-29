@@ -241,8 +241,32 @@ class TypeTranslator(CommonTranslator):
             return False
         return self._is_subtype(t1.superclass, t2)
 
+    def set_type_args(self, lhs: Expr, type: GenericType,
+                      prefix: List[Expr], ctx: Context) -> Expr:
+        args = type.type_args
+        if type.exact_length:
+            nargs = len(type.type_args)
+        else:
+            nargs = -1
+        result = self.type_factory.type_nargs_check(lhs, nargs,
+                                                    prefix, ctx)
+        for i, arg in enumerate(args):
+            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
+            indices = prefix + [lit]
+            if arg.name in PRIMITIVES:
+                arg = ctx.program.classes['__boxed_' + arg.name]
+            check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+            result = self.viper.And(result, check, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+            if isinstance(arg, GenericType):
+                arg_args = self.set_type_args(lhs, arg, indices, ctx)
+                result = self.viper.And(result, arg_args, self.no_position(ctx),
+                                        self.no_info(ctx))
+        return result
+
     def type_check(self, lhs: Expr, type: PythonType,
-                   ctx: Context, perms: bool=False) -> Expr:
+                   ctx: Context) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
         for simple types, or include information about type arguments for
@@ -253,14 +277,22 @@ class TypeTranslator(CommonTranslator):
             result = self.type_factory.type_check(lhs, boxed, ctx)
         else:
             result = self.type_factory.type_check(lhs, type, ctx)
-        if type.name == TUPLE_TYPE:
-            result = self._type_check_tuple(lhs, type, result, ctx, perms=perms)
-        elif type.name == DICT_TYPE:
-            result = self._type_check_dict(lhs, type, result, ctx, perms=perms)
-        elif type.name == LIST_TYPE:
-            result = self._type_check_list(lhs, type, result, ctx, perms=perms)
-        elif type.name == SET_TYPE:
-            result = self._type_check_set(lhs, type, result, ctx, perms=perms)
+
+        if isinstance(type, GenericType):
+            args = self.set_type_args(lhs, type, [], ctx)
+            result = self.viper.And(result, args, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        # TODO: everything after this should be done in the respective predicates
+        # TODO: except tuple things
+        # if type.name == TUPLE_TYPE:
+        #     result = self._type_check_tuple(lhs, type, result, ctx, perms=perms)
+        # elif type.name == DICT_TYPE:
+        #     result = self._type_check_dict(lhs, type, result, ctx, perms=perms)
+        # elif type.name == LIST_TYPE:
+        #     result = self._type_check_list(lhs, type, result, ctx, perms=perms)
+        # elif type.name == SET_TYPE:
+        #     result = self._type_check_set(lhs, type, result, ctx, perms=perms)
         # TODO: we need a dict/set/... predicate to wrap access to a dict/...
         # Problem: type information depends on acc, but acc comes later.
         return result

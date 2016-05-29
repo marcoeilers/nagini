@@ -277,6 +277,9 @@ class ViperAST:
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
+    def EmptySeq(self, type, position, info):
+        return self.ast.EmptySeq(type, position, info)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)
 
