@@ -75,8 +75,6 @@ class ContractTranslator(CommonTranslator):
 
     def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
                                     args: List[Expr], ctx: Context) -> Expr:
-        if len(args) != 1:
-            raise InvalidProgramException(node, 'invalid.predicate')
         name = node.func.id
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)

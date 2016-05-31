@@ -61,6 +61,52 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
 
+    def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
+        iterable_type = self.get_type(node.iter, ctx)
+        iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
+        iter_class = ctx.program.classes['Iterator']
+        iter_var = ctx.actual_function.create_variable('iter', iter_class,
+                                                       self.translator)
+        args = [iterable]
+        arg_types = [iterable_type]
+        iter_assign = self.get_method_call(iterable_type, '__iter__', args,
+                                           arg_types, [iter_var.ref], node, ctx)
+        # iter_assign = self.viper.LocalVarAssign(iter_var.ref, iter_call,
+        #                                         self.to_position(node, ctx),
+        #                                         self.no_info(ctx))
+        exc_class = ctx.program.classes['Exception']
+        err_var = ctx.actual_function.create_variable('iter_err', exc_class,
+                                                      self.translator)
+        target_var = ctx.actual_function.get_variable(node.target.id)
+        args = [iter_var.ref]
+        arg_types = [iter_class]
+        targets = [target_var.ref, err_var.ref]
+        next_call = self.get_method_call(iter_class, '__next__', args,
+                                         arg_types, targets, node, ctx)
+        invariants = []
+        locals = []
+        bodyindex = 0
+        while self.is_invariant(node.body[bodyindex]):
+            invariants.append(self.translate_contract(node.body[bodyindex],
+                                                      ctx))
+            bodyindex += 1
+        body = flatten(
+            [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
+        body.append(next_call)
+        body_block = self.translate_block(body,
+                                          self.to_position(node, ctx),
+                                          self.no_info(ctx))
+        cond = self.viper.EqCmp(err_var.ref,
+                                self.viper.NullLit(self.no_position(ctx),
+                                                   self.no_info(ctx)),
+                                self.to_position(node, ctx),
+                                self.no_info(ctx))
+        loop = self.viper.While(cond, invariants, locals, body_block,
+                                self.to_position(node, ctx), self.no_info(ctx))
+        iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
+                                        [], node, ctx)
+        return [iter_assign, next_call, loop, iter_del]
+
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
         for block in ctx.actual_function.try_blocks:
