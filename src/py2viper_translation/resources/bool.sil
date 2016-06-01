@@ -48,8 +48,6 @@ function range___getitem__(self: Ref, index: Int): Ref
 
 function range___contains__(self: Ref, item: Ref): Bool
 
-function range___sil_set__(self: Ref) : Set[Ref]
+function range___sil_seq__(self: Ref) : Seq[Ref]
     ensures |result| == range___len__(self)
     ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
-
-

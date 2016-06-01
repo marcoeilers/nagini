@@ -85,34 +85,56 @@ function args_equal(self: Ref, res: Ref, index: Int): Bool
 
 field __container : Ref
 field __iter_index : Int
+field __previous: Ref
 
 method list___iter__(self: Ref) returns (_res: Ref)
-    requires acc(self.list_acc, 1/10)
-    ensures acc(_res.list_acc, 1/20)
-    ensures acc(self.list_acc, 1/20)
-    ensures _res.list_acc == self.list_acc
-    ensures acc(_res.__container) && _res.__container == self
-    ensures acc(_res.__iter_index) && _res.__iter_index == 0
+  requires acc(self.list_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.list_acc, 1 / 20)
+  ensures _res.list_acc == self.list_acc
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous) && _res.__previous != _res && _res.__previous != self &&  acc(_res.__previous.list_acc) && _res.__previous.list_acc == Seq[Ref]()
 {
-    assume false
+  inhale false
 }
 
 method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
-    requires acc(self.list_acc, 1/40)
-    requires acc(self.__iter_index)
-    ensures acc(self.list_acc, 1/40)
-    ensures acc(self.__iter_index) && self.__iter_index == old(self.__iter_index) + 1
-    ensures old(|self.list_acc| > self.__iter_index) ==>(_res == old(self.list_acc[self.__iter_index]) && _err == null)
-    ensures old(|self.list_acc| <= self.__iter_index) ==>(_err != null)
+  requires acc(self.list_acc, 1 / 40)
+  requires acc(self.__iter_index, write)
+  requires acc(self.__previous, 1/40) && acc(self.__previous.list_acc)
+  ensures acc(self.list_acc, 1 / 40) && self.list_acc == old(self.list_acc)
+  ensures acc(self.__iter_index, write) && (self.__iter_index == old(self.__iter_index) + 1)
+  ensures old(|self.list_acc| > self.__iter_index) ==> ((_res == old(self.list_acc[self.__iter_index])) && _res in self.list_acc && (_err == null))
+  ensures acc(self.__previous, 1/40) && self.__previous == old(self.__previous) && acc(self.__previous.list_acc) &&
+  		(old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index])))
+  ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null && self.__previous.list_acc == self.list_acc)
 {
-    assume false
+  inhale false
 }
 
 method Iterator___del__(self: Ref)
-    requires acc(self.list_acc, 1/20)
-    requires acc(self.__container)
-    ensures acc(self.__container)
-    ensures acc(self.__container.list_acc, 1/20)
+  requires acc(self.list_acc, 1 / 20)
+  requires acc(self.__container, 1 / 20)
+  ensures acc(self.__container, 1 / 20)
+  ensures acc(self.__container.list_acc, 1 / 20)
 {
-    assume false
+  inhale false
+}
+
+predicate for_invariant(iter: Ref, collection_seq: Seq[Ref], iter_err: Ref, item: Ref){
+	(acc(iter.list_acc, 1/20)) &&
+  	(iter.list_acc == collection_seq) &&
+  	(acc(iter.__iter_index)  && acc(iter.__previous, 1/20)  && acc(iter.__previous.list_acc)) &&
+  	(iter_err == null ==> (iter.__iter_index >= 0 && iter.__iter_index <= |iter.list_acc|)) &&
+  	(iter_err == null ==> (item == iter.list_acc[iter.__iter_index - 1] && item in iter.list_acc)) &&
+  	(iter_err == null ==> (iter.__previous.list_acc == iter.list_acc[..iter.__iter_index - 1])) &&
+  	(iter_err != null ==> (iter.__previous.list_acc == iter.list_acc))
+}
+
+function list___sil_seq__(self: Ref): Seq[Ref]
+    requires acc(self.list_acc, 1/80)
+{
+    self.list_acc
 }

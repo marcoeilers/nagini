@@ -1,6 +1,13 @@
 import ast
 
-from py2viper_translation.lib.constants import END_LABEL, PRIMITIVES, TUPLE_TYPE
+from py2viper_translation.lib.constants import (
+    DICT_TYPE,
+    END_LABEL,
+    LIST_TYPE,
+    PRIMITIVES,
+    SET_TYPE,
+    TUPLE_TYPE,
+)
 from py2viper_translation.lib.program_nodes import PythonType
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -71,9 +78,6 @@ class StatementTranslator(CommonTranslator):
         arg_types = [iterable_type]
         iter_assign = self.get_method_call(iterable_type, '__iter__', args,
                                            arg_types, [iter_var.ref], node, ctx)
-        # iter_assign = self.viper.LocalVarAssign(iter_var.ref, iter_call,
-        #                                         self.to_position(node, ctx),
-        #                                         self.no_info(ctx))
         exc_class = ctx.program.classes['Exception']
         err_var = ctx.actual_function.create_variable('iter_err', exc_class,
                                                       self.translator)
@@ -83,16 +87,47 @@ class StatementTranslator(CommonTranslator):
         targets = [target_var.ref, err_var.ref]
         next_call = self.get_method_call(iter_class, '__next__', args,
                                          arg_types, targets, node, ctx)
-        invariants = []
+
+        np = self.no_position(ctx)
+        ni = self.no_info(ctx)
+        param = self.viper.LocalVarDecl('self', self.viper.Ref, np, ni)
+        seq_ref = self.viper.SeqType(self.viper.Ref)
+        seq_func_name = iterable_type.name + '___sil_seq__'
+        iter_seq = self.viper.FuncApp(seq_func_name, [iterable], np, ni,
+                                      seq_ref, [param])
+        invar_args = [iter_var.ref, iter_seq, err_var.ref, target_var.ref]
+        invar_pred = self.viper.PredicateAccess(invar_args, 'for_invariant', np,
+                                                ni)
+        full_perm = self.viper.FullPerm(np, ni)
+        invar_acc = self.viper.PredicateAccessPredicate(invar_pred, full_perm,
+                                                        np, ni)
+        fold_invar = self.viper.Fold(invar_acc, np, ni)
+        unfold_invar = self.viper.Unfold(invar_acc, np, ni)
+
+        invariant = []
+        if iterable_type.name in {DICT_TYPE, LIST_TYPE, SET_TYPE}:
+            field_name = iterable_type.name + '_acc'
+            acc_field = self.viper.Field(field_name, self.viper.Ref, np, ni)
+            one = self.viper.IntLit(1, np, ni)
+            twenty = self.viper.IntLit(20, np, ni)
+            field_acc = self.viper.FieldAccess(iterable, acc_field, np, ni)
+            frac_perm = self.viper.FractionalPerm(one, twenty, np, ni)
+            field_pred = self.viper.FieldAccessPredicate(field_acc, frac_perm,
+                                                         np, ni)
+            invariant.append(field_pred)
+        invariant.append(invar_acc)
+
         locals = []
         bodyindex = 0
+
         while self.is_invariant(node.body[bodyindex]):
-            invariants.append(self.translate_contract(node.body[bodyindex],
-                                                      ctx))
+            invariant.append(self.translate_contract(node.body[bodyindex], ctx))
             bodyindex += 1
-        body = flatten(
+        body = [unfold_invar]
+        body += flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         body.append(next_call)
+        body.append(fold_invar)
         body_block = self.translate_block(body,
                                           self.to_position(node, ctx),
                                           self.no_info(ctx))
@@ -101,11 +136,12 @@ class StatementTranslator(CommonTranslator):
                                                    self.no_info(ctx)),
                                 self.to_position(node, ctx),
                                 self.no_info(ctx))
-        loop = self.viper.While(cond, invariants, locals, body_block,
+        loop = self.viper.While(cond, invariant, locals, body_block,
                                 self.to_position(node, ctx), self.no_info(ctx))
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
                                         [], node, ctx)
-        return [iter_assign, next_call, loop, iter_del]
+        return [iter_assign, next_call, fold_invar, loop, unfold_invar,
+                iter_del]
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
