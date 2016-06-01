@@ -288,26 +288,23 @@ class ContractTranslator(CommonTranslator):
 
         dom_type = self.get_type(node.args[0], ctx)
 
-        set_ref = self.viper.SetType(self.viper.Ref)
+        seq_ref = self.viper.SeqType(self.viper.Ref)
         formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
                                                self.no_position(ctx),
                                                self.no_info(ctx))]
-        domain_set = self.viper.FuncApp('range___sil_set__', [domain],
+        domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__', [domain],
                                         self.no_position(ctx),
-                                        self.no_info(ctx), set_ref, formal_args)
+                                        self.no_info(ctx), seq_ref, formal_args)
         if var.type.name in PRIMITIVES:
             ref_var = self.box_primitive(var.ref, var.type, None, ctx)
         else:
             ref_var = var.ref
-        lhs = self.viper.AnySetContains(ref_var, domain_set,
-                                        self.to_position(node.args[0], ctx),
-                                        self.no_info(ctx))
+        lhs = self.viper.SeqContains(ref_var, domain_set,
+                                     self.to_position(node.args[0], ctx),
+                                     self.no_info(ctx))
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-
-
-
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
