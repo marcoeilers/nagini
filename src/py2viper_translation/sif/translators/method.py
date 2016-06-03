@@ -1,5 +1,4 @@
-from py2viper_translation.lib.constants import PRIMITIVES, BOOL_TYPE, TUPLE_TYPE
-from py2viper_translation.lib.program_nodes import GenericType
+from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
     Expr,
@@ -143,3 +142,9 @@ class SIFMethodTranslator(MethodTranslator):
         return self.viper.Function(func.sil_name, args, type_, pres,
                                    posts, body, self.no_position(ctx),
                                    self.no_info(ctx))
+
+    def translate_method(self, method: SIFPythonMethod,
+                         ctx: SIFContext) -> 'silver.ast.Method':
+        # Reset ctx to remove any artifacts from previously translated units.
+        ctx.reset()
+        return super().translate_method(method, ctx)

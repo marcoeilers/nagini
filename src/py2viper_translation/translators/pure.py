@@ -133,8 +133,8 @@ class PureTranslator(CommonTranslator):
             if not previous:
                 raise InvalidProgramException(function.node,
                                               'function.return.missing')
-            cond = self.translate_condition(wrapper.cond,
-                                            wrapper.names, ctx)
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
             return self.viper.CondExp(cond, val, previous, position, info)
         else:
             if previous:
@@ -152,8 +152,8 @@ class PureTranslator(CommonTranslator):
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
         if wrapper.cond:
-            cond = self.translate_condition(wrapper.cond,
-                                            wrapper.names, ctx)
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref
             else:
@@ -270,8 +270,8 @@ class PureTranslator(CommonTranslator):
         ctx.var_aliases = {}
         return previous
 
-    def translate_condition(self, conds: List, names: Dict[str, PythonVar],
-                            ctx: Context) -> Expr:
+    def _translate_condition(self, conds: List, names: Dict[str, PythonVar],
+                             ctx: Context) -> Expr:
         """
         Translates the conditions in conds to a big conjunctive expression,
         using the renamings in names.

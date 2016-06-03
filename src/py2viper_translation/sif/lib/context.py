@@ -18,7 +18,7 @@ class SIFContext(Context):
         return self._use_prime
 
     def set_prime_ctx(self, aliases: Dict[str, PythonVar] = None):
-        # assert not self._use_prime
+        assert not self._use_prime
         self._use_prime = True
         if self.var_aliases:
             # var_alias was already set. We back it up and add update with new
@@ -30,7 +30,7 @@ class SIFContext(Context):
         self.var_aliases.update(aliases)
 
     def set_normal_ctx(self):
-        # assert self._use_prime
+        assert self._use_prime
         self._use_prime = False
         # Restore from backed up aliases.
         self.var_aliases = self._old_vars
