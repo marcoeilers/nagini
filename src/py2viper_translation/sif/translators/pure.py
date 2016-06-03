@@ -1,7 +1,6 @@
 import ast
 
-from py2viper_translation.lib.constants import BOOL_TYPE, TUPLE_TYPE
-from py2viper_translation.lib.program_nodes import PythonVar
+from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.util import (
     flatten,
@@ -13,7 +12,6 @@ from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
     TL_VAR_NAME,
 )
-from py2viper_translation.translators.abstract import AbstractTranslator
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
     FuncTripleDomainFactory as FTDF,
 )
@@ -24,7 +22,7 @@ from py2viper_translation.translators.pure import (
     ReturnWrapper,
     Wrapper,
 )
-from typing import List, Dict
+from typing import List
 
 
 class TLAssignWrapper(AssignWrapper):
@@ -48,34 +46,14 @@ class TLJoinWrapper(AssignWrapper):
         assert len(join_wrappers) > 1
         self.join_wrappers = join_wrappers
 
-    def process(self, func: SIFPythonMethod, names: Dict[str, PythonVar],
-                translator: AbstractTranslator):
-        cls = func.get_variable(self.name).type
-        self.var = func.create_variable(self.name, cls, translator)
-        self.names.update(names)
-
-    def translate_expr(self, func: SIFPythonMethod,
-                       translator: 'SIFPureTranslator',
-                       ctx: SIFContext,):
-        if self.cond:
-            self.cond = translator.translate_condition(self.conds, self.names,
-                                                        ctx)
-        pos = translator.no_position(ctx)
-        info = translator.no_info(ctx)
-        or_expr = translator.viper.Or(self.join_wrappers[0].var.ref,
-                                      self.join_wrappers[1].var.ref,
-                                      pos, info)
-        for wrapper in self.join_wrappers[2:]:
-            or_expr = translator.viper.Or(or_expr, wrapper.var.ref,
-                                          pos, info)
-        self.expr = or_expr
-        ctx.current_tl_var_expr = self.var.ref
-
 
 class SIFPureTranslator(PureTranslator):
     """
     SIF version of the PureTranslator.
     """
+    # TODO: The (SIF)PureTranslator needs to be refactored to move the
+    # translation and processing logic into the wrappers. Using 'isinstance'
+    # in so many places is bad design and contradicts the OOP concept.
     def translate_pure_If(self, conds: List, node: ast.If,
                           ctx: SIFContext):
         """
@@ -128,7 +106,6 @@ class SIFPureTranslator(PureTranslator):
 
     def _translate_wrapper(self, wrapper: Wrapper, previous: Expr,
                            function: SIFPythonMethod, ctx: SIFContext) -> Expr:
-        # assert isinstance(wrapper.expr, self.viper.ast.Expr)
         if isinstance(wrapper, ReturnWrapper):
             return self._translate_return_wrapper(wrapper, previous,
                                                   function, ctx)
@@ -136,9 +113,8 @@ class SIFPureTranslator(PureTranslator):
             return self._translate_tl_assign_wrapper(wrapper, previous,
                                                      function, ctx)
         elif isinstance(wrapper, AssignWrapper):
-            previous = self._translate_assign_wrapper(wrapper, previous,
-                                                      function, ctx)
-            return previous
+            return self._translate_assign_wrapper(wrapper, previous,
+                                                  function, ctx)
         else:
             raise UnsupportedException(wrapper)
 
@@ -221,26 +197,22 @@ class SIFPureTranslator(PureTranslator):
         tl_wrapper = TLAssignWrapper(tl_var.name, [], node, None, False)
         return [tl_wrapper] + super()._translate_to_wrappers(nodes, ctx)
 
-    def _get_tl_var(self, function: SIFPythonMethod,
-                    ctx: SIFContext) -> PythonVar:
-        if TL_VAR_NAME in ctx.var_aliases:
-            return ctx.var_aliases[TL_VAR_NAME]
-        else:
-            return function.tl_var
-
     def _translate_assign_wrapper_expr(self, wrapper: Wrapper,
                                        function: SIFPythonMethod,
-                                       ctx: SIFContext):
-        wrapper.expr = self._translate_wrapper_expr(wrapper, ctx)
+                                       ctx: SIFContext) -> Expr:
         if wrapper.cond:
-            wrapper.cond = self.translate_condition(wrapper.cond,
-                                                    wrapper.names, ctx)
+            wrapper.cond = self._translate_condition(wrapper.cond,
+                                                     wrapper.names, ctx)
+        return self._translate_wrapper_expr(wrapper, ctx)
 
     def _translate_return_wrapper_expr(self, wrapper: Wrapper,
                                        function: SIFPythonMethod,
-                                       ctx: SIFContext):
+                                       ctx: SIFContext) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
+        if wrapper.cond:
+            wrapper.cond = self._translate_condition(wrapper.cond,
+                                                     wrapper.names, ctx)
         # Translate expression twice (once in the prime ctx).
         val = self._translate_wrapper_expr(wrapper, ctx)
         aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
@@ -250,21 +222,16 @@ class SIFPureTranslator(PureTranslator):
         ctx.set_normal_ctx()
         # Create FuncTriple as return value.
         args = [val, val_p, ctx.current_tl_var_expr]
-        wrapper.expr = self.config.func_triple_factory.get_call(FTDF.CREATE,
+        return self.config.func_triple_factory.get_call(FTDF.CREATE,
             args, function.type, position, info, ctx)
-        if wrapper.cond:
-            wrapper.cond = self.translate_condition(wrapper.cond,
-                                                    wrapper.names, ctx)
 
-    def _translate_tl_assign_wrapper_expr(self, wrapper: Wrapper,
+    def _translate_tl_assign_wrapper_expr(self, wrapper: TLAssignWrapper,
                                           function: SIFPythonMethod,
-                                          ctx: SIFContext):
-        """
-        Translates a TLAssignWrapper to 'tl = tl || cond != cond'.
-        """
+                                          ctx: SIFContext) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        tl_var = self._get_tl_var(function, ctx)
+        tl_var = ctx.current_tl_var_expr
+        # If sif is set we translate expr to 'tl || expr != expr_p'.
         if wrapper.sif:
             cond = self._translate_wrapper_expr(wrapper, ctx)
             aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
@@ -273,14 +240,30 @@ class SIFPureTranslator(PureTranslator):
             cond_p = self._translate_wrapper_expr(wrapper, ctx)
             ctx.set_normal_ctx()
             ne = self.viper.NeCmp(cond, cond_p, position, info)
-            rhs = self.viper.Or(tl_var.ref, ne, position, info)
+            rhs = self.viper.Or(tl_var, ne, position, info)
         else:
             rhs = self._translate_wrapper_expr(wrapper, ctx)
         if wrapper.cond:
-            wrapper.cond = self.translate_condition(wrapper.cond,
-                                                    wrapper.names, ctx)
-        wrapper.expr = rhs
+            wrapper.cond = self._translate_condition(wrapper.cond,
+                                                     wrapper.names, ctx)
         ctx.current_tl_var_expr = wrapper.var.ref
+        return rhs
+
+    def _translate_tl_join_wrapper_expr(self, wrapper: TLJoinWrapper,
+                                          function: SIFPythonMethod,
+                                          ctx: SIFContext) -> Expr:
+        if wrapper.cond:
+            wrapper.cond = self._translate_condition(wrapper.cond, wrapper.names,
+                                                     ctx)
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        or_expr = self.viper.Or(wrapper.join_wrappers[0].var.ref,
+                                wrapper.join_wrappers[1].var.ref,
+                                pos, info)
+        for wrapper in wrapper.join_wrappers[2:]:
+            or_expr = self.viper.Or(or_expr, wrapper.var.ref, pos, info)
+        ctx.current_tl_var_expr = wrapper.var.ref
+        return or_expr
 
     def _translate_wrapper_exprs(self, wrappers: List[Wrapper],
                                  function: SIFPythonMethod,
@@ -292,26 +275,30 @@ class SIFPureTranslator(PureTranslator):
         for wrapper in wrappers:
             ctx.var_aliases = wrapper.names.copy()
             if isinstance(wrapper, ReturnWrapper):
-                self._translate_return_wrapper_expr(wrapper, function, ctx)
+                wrapper.expr = self._translate_return_wrapper_expr(wrapper,
+                    function, ctx)
                 new_wrappers.append(wrapper)
             elif isinstance(wrapper, TLAssignWrapper):
-                self._translate_tl_assign_wrapper_expr(wrapper, function, ctx)
+                wrapper.expr = self._translate_tl_assign_wrapper_expr(wrapper,
+                    function, ctx)
                 new_wrappers.append(wrapper)
             elif isinstance(wrapper, TLJoinWrapper):
-                wrapper.translate_expr(function, self, ctx)
+                wrapper.expr = self._translate_tl_join_wrapper_expr(wrapper,
+                    function, ctx)
                 new_wrappers.append(wrapper)
             elif isinstance(wrapper, AssignWrapper):
                 aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
                 aliases.update({k: v.var_prime for (k, v) in
                                 function.args.items()})
-                wrapper_p = AssignWrapper(wrapper.name,
-                                          wrapper.cond, wrapper.expr,
-                                          wrapper.node)
+                wrapper_p = AssignWrapper(wrapper.name, wrapper.cond,
+                                          wrapper.expr, wrapper.node)
                 wrapper_p.var = wrapper.var.var_prime
                 wrapper_p.names = aliases
-                self._translate_assign_wrapper_expr(wrapper, function, ctx)
+                wrapper.expr = self._translate_assign_wrapper_expr(wrapper,
+                    function, ctx)
                 ctx.set_prime_ctx(aliases=aliases)
-                self._translate_assign_wrapper_expr(wrapper_p, function, ctx)
+                wrapper_p.expr = self._translate_assign_wrapper_expr(wrapper_p,
+                    function, ctx)
                 ctx.set_normal_ctx()
                 new_wrappers.append(wrapper)
                 new_wrappers.append(wrapper_p)

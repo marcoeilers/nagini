@@ -112,6 +112,7 @@ class SIFCallTranslator(CallTranslator):
                                 arg_stmts: List[Stmt],
                                 position: 'silver.ast.Position', node: ast.AST,
                                 ctx: SIFContext) -> StmtsAndExpr:
+        assert not ctx.use_prime
         info = self.no_info(ctx)
         call_results = self.translated_calls[node]
 
@@ -132,12 +133,8 @@ class SIFCallTranslator(CallTranslator):
             [func_app], target.type, position, info, ctx)
         res_expr2 = self.config.func_triple_factory.get_call(FTDF.GET_PRIME, [
             func_app], target.type, position, info, ctx)
-        if not ctx.use_prime:
-            call_results.add_result(res_expr1)
-            call_results.add_result(res_expr2)
-        else:
-            call_results.add_result(res_expr2)
-            call_results.add_result(res_expr1)
+        call_results.add_result(res_expr1)
+        call_results.add_result(res_expr2)
         call_results.add_result(tl_expr)
 
         return arg_stmts, call_results.next()
