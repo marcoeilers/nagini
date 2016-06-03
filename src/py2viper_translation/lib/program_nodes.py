@@ -11,7 +11,6 @@ from py2viper_translation.lib.constants import (
     RESULT_NAME,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import UnsupportedException
 from typing import List, Optional, Set
 
 

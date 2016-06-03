@@ -12,7 +12,8 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.translator import Translator
 from typing import List
 
-
+TL_VAR_NAME = '__tl'
+NEW_TL_VAR_NAME = '__new_tl'
 SIF_VAR_SUFFIX = "_p"
 
 
@@ -28,8 +29,8 @@ class SIFPythonMethod(PythonMethod):
         super().__init__(name, node, cls, superscope, pure, contract_only,
                          node_factory, interface)
         bool_type = superscope.get_program().classes[BOOL_TYPE]
-        self.tl_var = PythonVar("timeLevel", None, bool_type)
-        self.new_tl_var = PythonVar("newTimeLevel", None, bool_type)
+        self.tl_var = PythonVar(TL_VAR_NAME, None, bool_type)
+        self.new_tl_var = PythonVar(NEW_TL_VAR_NAME, None, bool_type)
 
     def process(self, sil_name: str, translator: 'Translator'):
         super().process(sil_name, translator)
@@ -86,11 +87,15 @@ class SIFPythonVar(PythonVar):
     """
     def __init__(self, name: str, node: ast.AST, type_: PythonClass):
         super().__init__(name, node, type_)
-        self.var_prime = PythonVar(name + SIF_VAR_SUFFIX, node, type_)
+        if name.startswith(TL_VAR_NAME) or name.startswith(NEW_TL_VAR_NAME):
+            self.var_prime = self
+        else:
+            self.var_prime = PythonVar(name + SIF_VAR_SUFFIX, node, type_)
 
     def process(self, sil_name: str, translator: Translator):
         super().process(sil_name, translator)
-        self.var_prime.process(sil_name + SIF_VAR_SUFFIX, translator)
+        if self.var_prime != self:
+            self.var_prime.process(sil_name + SIF_VAR_SUFFIX, translator)
 
 
 class SIFPythonField(PythonField):

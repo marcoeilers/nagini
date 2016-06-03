@@ -1,18 +1,27 @@
 import ast
 
-from py2viper_translation.lib.constants import TUPLE_TYPE, BOOL_TYPE
+from py2viper_translation.lib.constants import BOOL_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import PythonVar
-from py2viper_translation.lib.util import InvalidProgramException, \
-    UnsupportedException
-from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
-from py2viper_translation.translators.pure import PureTranslator, Wrapper, \
-    AssignWrapper, ReturnWrapper
 from py2viper_translation.lib.typedefs import Expr
-from typing import List
-
-
-TL_VAR_NAME = 'tl'
+from py2viper_translation.lib.util import (
+    flatten,
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.sif.lib.context import SIFContext
+from py2viper_translation.sif.lib.program_nodes import (
+    SIFPythonMethod,
+    TL_VAR_NAME,
+)
+from py2viper_translation.translators.abstract import AbstractTranslator
+from py2viper_translation.translators.pure import (
+    AssignWrapper,
+    NotWrapper,
+    PureTranslator,
+    ReturnWrapper,
+    Wrapper,
+)
+from typing import List, Dict
 
 
 class TLAssignWrapper(AssignWrapper):
@@ -27,6 +36,39 @@ class TLAssignWrapper(AssignWrapper):
         self.sif = sif
 
 
+class TLJoinWrapper(AssignWrapper):
+    """
+    Custom wrapper for an assignment to timeLevel after an if-block.
+    """
+    def __init__(self, conds: List, join_wrappers: List[Wrapper]):
+        super().__init__(TL_VAR_NAME, conds, None, None)
+        assert len(join_wrappers) > 1
+        self.join_wrappers = join_wrappers
+
+    def process(self, func: SIFPythonMethod, names: Dict[str, PythonVar],
+                translator: AbstractTranslator):
+        cls = func.get_variable(self.name).type
+        self.var = func.create_variable(self.name, cls, translator)
+        self.names.update(names)
+
+    def translate_expr(self, func: SIFPythonMethod,
+                       translator: 'SIFPureTranslator',
+                       ctx: SIFContext,):
+        if self.cond:
+            self.cond = translator.translate_condition(self.conds, self.names,
+                                                        ctx)
+        pos = translator.no_position(ctx)
+        info = translator.no_info(ctx)
+        or_expr = translator.viper.Or(self.join_wrappers[0].var.ref,
+                                      self.join_wrappers[1].var.ref,
+                                      pos, info)
+        for wrapper in self.join_wrappers[2:]:
+            or_expr = translator.viper.Or(or_expr, wrapper.var.ref,
+                                          pos, info)
+        self.expr = or_expr
+        ctx.current_tl_var_expr = self.var.ref
+
+
 class SIFPureTranslator(PureTranslator):
     """
     SIF version of the PureTranslator.
@@ -39,11 +81,51 @@ class SIFPureTranslator(PureTranslator):
         Injects a TLAssignWrapper before the if-block.
         """
         tl_let = TLAssignWrapper(TL_VAR_NAME, conds, node.test, node)
-        return [tl_let] + super().translate_pure_If(conds, node, ctx)
+        cond = node.test
+        cond_var = ctx.current_function.create_variable('cond',
+            ctx.program.classes[BOOL_TYPE], self.translator)
+        cond_let = AssignWrapper(cond_var.name, conds, cond, node)
+        then_cond = conds + [cond_var.name]
+        else_cond = conds + [NotWrapper(cond_var.name)]
+        then = [self.translate_pure(then_cond, stmt, ctx) for stmt in node.body]
+        then = flatten(then)
+        else_ = []
+        if node.orelse:
+            else_ = [self.translate_pure(else_cond, stmt, ctx) for stmt
+                     in node.orelse]
+            else_ = flatten(else_)
+        res = [tl_let] + [cond_let] + then + else_
+        # Search for the last assignment to TL in the 'then' and 'else' blocks.
+        join_wrappers = [tl_let]
+        for wrapper in reversed(then):
+            if isinstance(wrapper, TLAssignWrapper):
+                join_wrappers.append(wrapper)
+                break
+        for wrapper in reversed(else_):
+            if isinstance(wrapper, TLAssignWrapper):
+                join_wrappers.append(wrapper)
+                break
+        if len(join_wrappers) > 1:
+            res.append(TLJoinWrapper(conds, join_wrappers))
+
+        return res
+
+    def translate_pure_Assign(self, conds: List, node: ast.Assign,
+                              ctx: SIFContext) -> List[Wrapper]:
+        """
+        Translates an assign statement to an AssignWrapper. If the RHS is a
+        call, generate assignment to timelevel.
+        """
+        wrappers = super().translate_pure_Assign(conds, node, ctx)
+        if isinstance(node.value, ast.Call):
+            tl_let = TLAssignWrapper(TL_VAR_NAME, conds, node.value, node,
+                                     False)
+            wrappers.append(tl_let)
+        return wrappers
 
     def _translate_wrapper(self, wrapper: Wrapper, previous: Expr,
                            function: SIFPythonMethod, ctx: SIFContext) -> Expr:
-
+        # assert isinstance(wrapper.expr, self.viper.ast.Expr)
         if isinstance(wrapper, ReturnWrapper):
             return self._translate_return_wrapper(wrapper, previous,
                                                   function, ctx)
@@ -51,90 +133,85 @@ class SIFPureTranslator(PureTranslator):
             return self._translate_tl_assign_wrapper(wrapper, previous,
                                                      function, ctx)
         elif isinstance(wrapper, AssignWrapper):
-            # Since wrappers are translated in reverse order, we first translate
-            # in the prime context.
-            aliases = {k: v.var_prime for (k, v) in wrapper.names.items ()}
-            aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-            ctx.set_prime_ctx(aliases=aliases, backup=True)
-            saved_var = wrapper.var
-            wrapper.var = wrapper.var.var_prime
-            previous = self._translate_assign_wrapper(wrapper, previous,
-                                                      function, ctx)
-            ctx.set_normal_ctx(restore=True)
-            wrapper.var = saved_var
             previous = self._translate_assign_wrapper(wrapper, previous,
                                                       function, ctx)
             return previous
         else:
             raise UnsupportedException(wrapper)
 
+    def _translate_assign_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: SIFPythonMethod,
+                                  ctx: SIFContext):
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+        if wrapper.cond:
+            if wrapper.name in ctx.var_aliases:
+                old_val = ctx.var_aliases[wrapper.name].ref
+            else:
+                # variable newly defined in conditional branch, so
+                # there is no old value; the variable is not defined
+                # if the condition is false.
+                # our encoding requires some value though, even
+                # though that will never be used, so we take some dummy
+                # value.
+                zero = self.viper.IntLit(0, self.no_position(ctx),
+                                         self.no_info(ctx))
+                false = self.viper.FalseLit(self.no_position(ctx),
+                                            self.no_info(ctx))
+                null = self.viper.NullLit(self.no_position(ctx),
+                                          self.no_info(ctx))
+                dummies = {
+                    self.viper.Int: zero,
+                    self.viper.Bool: false,
+                    self.viper.Ref: null
+                }
+                old_val = dummies[wrapper.var.decl.typ()]
+            new_val = self.viper.CondExp(wrapper.cond, wrapper.expr,
+                                         old_val, position, info)
+            return self.viper.Let(wrapper.var.decl, new_val,
+                                  previous, position, info)
+        else:
+            return self.viper.Let(wrapper.var.decl, wrapper.expr,
+                                  previous, position, info)
+
     def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,
                                   function: SIFPythonMethod,
                                   ctx: SIFContext) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        # Translate expression twice (once in the prime ctx).
-        val = self._translate_wrapper_expr(wrapper, ctx)
-        aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
-        aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-        ctx.set_prime_ctx(aliases=aliases, backup=True)
-        val_p = self._translate_wrapper_expr(wrapper, ctx)
-        ctx.set_normal_ctx(restore=True)
-        # Create tuple as return value.
-        tuple_cls = ctx.program.classes[TUPLE_TYPE]
-        args = [val, val_p, self._get_tl_var(function, ctx).ref]
-        arg_types = [function.type, function.type,
-                     ctx.program.classes[BOOL_TYPE]]
-        tuple_ = self.get_function_call(tuple_cls, '__create3__', args,
-                                        arg_types, None, ctx)
         if wrapper.cond:
             if not previous:
                 raise InvalidProgramException(function.node,
                                               'function.return.missing')
-            cond = self._translate_condition(wrapper.cond,
-                                             wrapper.names, ctx)
-            return self.viper.CondExp(cond, tuple_, previous, position, info)
+            return self.viper.CondExp(wrapper.cond, wrapper.expr, previous,
+                                      position, info)
         else:
             if previous:
                 raise InvalidProgramException(function.node,
                                               'function.dead.code')
-            return tuple_
+            return wrapper.expr
 
     def _translate_tl_assign_wrapper(self, wrapper: Wrapper, previous: Expr,
                                      function: SIFPythonMethod,
                                      ctx: SIFContext) -> Expr:
-        """
-        Translates a TLAssignWrapper to 'tl = tl || cond != cond'.
-        """
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        tl_var = self._get_tl_var(function, ctx)
-        if wrapper.sif:
-            cond = self._translate_wrapper_expr(wrapper, ctx)
-            aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
-            aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-            ctx.set_prime_ctx(aliases=aliases, backup=True)
-            cond_p = self._translate_wrapper_expr(wrapper, ctx)
-            ctx.set_normal_ctx(restore=True)
-            ne = self.viper.NeCmp(cond, cond_p, position, info)
-            rhs = self.viper.Or(tl_var.ref, ne, position, info)
-        else:
-            rhs = self._translate_wrapper_expr(wrapper, ctx)
-
         if wrapper.cond:
-            conds = self._translate_condition(wrapper.cond,
-                                              wrapper.names, ctx)
-            new_val = self.viper.CondExp(conds, rhs, tl_var.ref, position,
-                                         info)
+            old_val = ctx.var_aliases[wrapper.name].ref
+            new_val = self.viper.CondExp(wrapper.cond, wrapper.expr,
+                                         old_val, position, info)
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)
         else:
-            return self.viper.Let(wrapper.var.decl, rhs,
+            return self.viper.Let(wrapper.var.decl, wrapper.expr,
                                   previous, position, info)
 
     def _translate_to_wrappers(self, nodes: List[ast.AST],
                                ctx: SIFContext) -> List[Wrapper]:
-        # Add a wrapper for 'tl = timeLevel'
+        # Add a wrapper for '__tl_0 = __tl'
         tl_var = ctx.current_function.create_variable(TL_VAR_NAME,
            ctx.program.classes[BOOL_TYPE], self.translator)
         node = ast.Name(id=ctx.current_function.tl_var.name, ctx=ast.Load())
@@ -147,3 +224,117 @@ class SIFPureTranslator(PureTranslator):
             return ctx.var_aliases[TL_VAR_NAME]
         else:
             return function.tl_var
+
+    def _translate_assign_wrapper_expr(self, wrapper: Wrapper,
+                                       function: SIFPythonMethod,
+                                       ctx: SIFContext):
+        wrapper.expr = self._translate_wrapper_expr(wrapper, ctx)
+        if wrapper.cond:
+            wrapper.cond = self.translate_condition(wrapper.cond,
+                                                    wrapper.names, ctx)
+
+    def _translate_return_wrapper_expr(self, wrapper: Wrapper,
+                                       function: SIFPythonMethod,
+                                       ctx: SIFContext):
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        # Translate expression twice (once in the prime ctx).
+        val = self._translate_wrapper_expr(wrapper, ctx)
+        aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
+        aliases.update({k: v.var_prime for (k, v) in function.args.items()})
+        ctx.set_prime_ctx(aliases=aliases)
+        val_p = self._translate_wrapper_expr(wrapper, ctx)
+        ctx.set_normal_ctx()
+        # Create FuncTriple as return value.
+        args = [val, val_p, ctx.current_tl_var_expr]
+        wrapper.expr = self.config.func_triple_factory.get_call('ft_create',
+            args, function.type, position, info, ctx)
+        if wrapper.cond:
+            wrapper.cond = self.translate_condition(wrapper.cond,
+                                                    wrapper.names, ctx)
+
+    def _translate_tl_assign_wrapper_expr(self, wrapper: Wrapper,
+                                          function: SIFPythonMethod,
+                                          ctx: SIFContext):
+        """
+        Translates a TLAssignWrapper to 'tl = tl || cond != cond'.
+        """
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        tl_var = self._get_tl_var(function, ctx)
+        if wrapper.sif:
+            cond = self._translate_wrapper_expr(wrapper, ctx)
+            aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
+            aliases.update({k: v.var_prime for (k, v) in function.args.items()})
+            ctx.set_prime_ctx(aliases=aliases)
+            cond_p = self._translate_wrapper_expr(wrapper, ctx)
+            ctx.set_normal_ctx()
+            ne = self.viper.NeCmp(cond, cond_p, position, info)
+            rhs = self.viper.Or(tl_var.ref, ne, position, info)
+        else:
+            rhs = self._translate_wrapper_expr(wrapper, ctx)
+        if wrapper.cond:
+            wrapper.cond = self.translate_condition(wrapper.cond,
+                                                    wrapper.names, ctx)
+        wrapper.expr = rhs
+        ctx.current_tl_var_expr = wrapper.var.ref
+
+    def _translate_wrapper_exprs(self, wrappers: List[Wrapper],
+                                 function: SIFPythonMethod,
+                                 ctx: SIFContext) -> List[Wrapper]:
+        """
+        Translate all expressions and conditions for each wrapper.
+        """
+        new_wrappers =[]
+        for wrapper in wrappers:
+            ctx.var_aliases = wrapper.names.copy()
+            if isinstance(wrapper, ReturnWrapper):
+                self._translate_return_wrapper_expr(wrapper, function, ctx)
+                new_wrappers.append(wrapper)
+            elif isinstance(wrapper, TLAssignWrapper):
+                self._translate_tl_assign_wrapper_expr(wrapper, function, ctx)
+                new_wrappers.append(wrapper)
+            elif isinstance(wrapper, TLJoinWrapper):
+                wrapper.translate_expr(function, self, ctx)
+                new_wrappers.append(wrapper)
+            elif isinstance(wrapper, AssignWrapper):
+                # ctx.current_tl_var_expr = None
+                aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
+                aliases.update({k: v.var_prime for (k, v) in
+                                function.args.items()})
+                wrapper_p = AssignWrapper(wrapper.name,
+                                          wrapper.cond, wrapper.expr,
+                                          wrapper.node)
+                wrapper_p.var = wrapper.var.var_prime
+                wrapper_p.names = aliases
+                self._translate_assign_wrapper_expr(wrapper, function, ctx)
+                ctx.set_prime_ctx(aliases=aliases)
+                self._translate_assign_wrapper_expr(wrapper_p, function, ctx)
+                ctx.set_normal_ctx()
+                new_wrappers.append(wrapper)
+                new_wrappers.append(wrapper_p)
+            else:
+                raise UnsupportedException(wrapper.node)
+        return new_wrappers
+
+    def translate_exprs(self, nodes: List[ast.AST],
+                        function: SIFPythonMethod, ctx: SIFContext) -> Expr:
+        # Reset the context to make sure it doesn't contain any artifacts from
+        # from previous functions.
+        ctx.reset()
+        # Translate to wrapper objects
+        wrappers = self._translate_to_wrappers(nodes, ctx)
+        self._collect_names(wrappers, function)
+
+        # Walk through wrappers and translate all expressions and conditions.
+        wrappers = self._translate_wrapper_exprs(wrappers, function, ctx)
+
+        # Walk through wrappers in reverse an connect them all to one big
+        # expression.
+        previous = None
+        for wrapper in reversed(wrappers):
+            ctx.var_aliases = wrapper.names.copy()
+            previous = self._translate_wrapper(wrapper, previous, function, ctx)
+
+        ctx.var_aliases = {}
+        return previous

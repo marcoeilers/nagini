@@ -133,8 +133,8 @@ class PureTranslator(CommonTranslator):
             if not previous:
                 raise InvalidProgramException(function.node,
                                               'function.return.missing')
-            cond = self._translate_condition(wrapper.cond,
-                                             wrapper.names, ctx)
+            cond = self.translate_condition(wrapper.cond,
+                                            wrapper.names, ctx)
             return self.viper.CondExp(cond, val, previous, position, info)
         else:
             if previous:
@@ -152,8 +152,8 @@ class PureTranslator(CommonTranslator):
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
         if wrapper.cond:
-            cond = self._translate_condition(wrapper.cond,
-                                             wrapper.names, ctx)
+            cond = self.translate_condition(wrapper.cond,
+                                            wrapper.names, ctx)
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref
             else:
@@ -221,23 +221,16 @@ class PureTranslator(CommonTranslator):
                                ctx: Context) -> List[Wrapper]:
         return flatten([self.translate_pure([], node, ctx)for node in nodes])
 
-    def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx: Context) -> Expr:
+    def _collect_names(self, wrappers: List[Wrapper], function: PythonMethod):
         """
-        Translates a list of nodes to a single (let-)expression if the nodes
-        are only returns, assignments and if-blocks. First translates them to
-        Assign- and ReturnWrappers with conditions derived from surrounding
-        if-blocks (if any), then creates one big expression out of a list
-        of wrappers.
+        First walk through wrappers. For every assignment, we create a new
+        variable with a different name. Future references to the original
+        name need to refer to the new name, so we create dicts that map old
+        to new names.
         """
-        # Translate to wrapper objects
-        wrappers = self._translate_to_wrappers(nodes, ctx)
         previous = None
         added = {}
-        # First walk through wrappers. For every assignment, we create a new
-        # variable with a different name. Future references to the original
-        # name need to refer to the new name, so we create dicts that map old
-        # to new names.
+
         for wrapper in wrappers:
             if previous:
                 wrapper.names.update(previous.names)
@@ -252,20 +245,33 @@ class PureTranslator(CommonTranslator):
                 wrapper.var = new_name
             previous = wrapper
 
+    def translate_exprs(self, nodes: List[ast.AST],
+                        function: PythonMethod, ctx: Context) -> Expr:
+        """
+        Translates a list of nodes to a single (let-)expression if the nodes
+        are only returns, assignments and if-blocks. First translates them to
+        Assign- and ReturnWrappers with conditions derived from surrounding
+        if-blocks (if any), then creates one big expression out of a list
+        of wrappers.
+        """
+        # Translate to wrapper objects
+        wrappers = self._translate_to_wrappers(nodes, ctx)
+        self._collect_names(wrappers, function)
+
         # Second walk through wrappers, starting at the end. Translate all of
         # them into one big expression. Assigns become a let, returns just the
         # returned value, and if something happens in an if block, we put it
         assert not ctx.var_aliases
         previous = None
         for wrapper in reversed(wrappers):
-            ctx.var_aliases = wrapper.names
+            ctx.var_aliases = wrapper.names.copy()
             previous = self._translate_wrapper(wrapper, previous, function, ctx)
 
         ctx.var_aliases = {}
         return previous
 
-    def _translate_condition(self, conds: List, names: Dict[str, PythonVar],
-                             ctx: Context) -> Expr:
+    def translate_condition(self, conds: List, names: Dict[str, PythonVar],
+                            ctx: Context) -> Expr:
         """
         Translates the conditions in conds to a big conjunctive expression,
         using the renamings in names.

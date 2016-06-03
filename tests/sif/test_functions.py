@@ -47,3 +47,8 @@ def func7(a: int) -> int:
         c -= 1
     return c + 42
 
+
+@Pure
+def func8(a: int) -> int:
+    b = func7(func7(a))
+    return b

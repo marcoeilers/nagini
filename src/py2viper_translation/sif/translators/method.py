@@ -3,15 +3,14 @@ from py2viper_translation.lib.program_nodes import GenericType
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
     Expr,
-    Stmt,
-    StmtsAndExpr,
 )
-from py2viper_translation.lib.util import InvalidProgramException, \
-    get_body_start_index
+from py2viper_translation.lib.util import (
+    get_body_start_index,
+    InvalidProgramException,
+)
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
-    SIFPythonVar,
 )
 from py2viper_translation.translators.method import MethodTranslator
 from typing import List
@@ -102,10 +101,8 @@ class SIFMethodTranslator(MethodTranslator):
         # automatically at the beginning and end of each translate_* method.
         old_function = ctx.current_function
         ctx.current_function = func
-        # Create a tuple type.
-        type_args = [func.type, func.type, ctx.program.classes[BOOL_TYPE]]
-        tuple_type = GenericType(TUPLE_TYPE, ctx.program, type_args)
-        type_ = self.translate_type(tuple_type, ctx)
+        # Create a FuncTriple type.
+        type_ = self.config.func_triple_factory.get_type(func.type, ctx)
 
         args = self._translate_params(func, ctx)
         if func.declared_exceptions:
