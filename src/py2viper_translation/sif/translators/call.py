@@ -251,8 +251,6 @@ class SIFCallTranslator(CallTranslator):
         """
         func_name = get_func_name(node)
         if node in self.translated_calls:
-            # Sanity check. This can only happen if ctx.use_prime == True.
-            # assert ctx.use_prime
             assert len(self.translated_calls[node])
             return [], self.translated_calls[node].next()
         elif func_name in CONTRACT_FUNCS:
