@@ -19,33 +19,44 @@ domain PyType {
 function tuple___create0__(): Ref
     ensures tuple___len__(result) == 0
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 0
 
 function tuple___create1__(arg0 : Ref): Ref
     ensures tuple___len__(result) == 1 && tuple___getitem__(result, 0) == arg0
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 1
 
 function tuple___create2__(arg0 : Ref, arg1: Ref): Ref
     ensures tuple___len__(result) == 2 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 2
 
 function tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref): Ref
     ensures tuple___len__(result) == 3 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 3
 
 function tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref): Ref
     ensures tuple___len__(result) == 4 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 4
 
 function tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref): Ref
     ensures tuple___len__(result) == 5 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 5
 
 function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref): Ref
     ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
     ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 6
 
-function tuple___len__(self: Ref) : Int
-    ensures get_type_nargs0(self) != -1 ==> (result == get_type_nargs0(self))
+function tuple___len__(self: Ref): Int
+{
+	(get_type_nargs0(self) != -1) ? get_type_nargs0(self) : tuple___len__unknown(self)
+}
+
+function tuple___len__unknown(self: Ref): Int
 
 function tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
