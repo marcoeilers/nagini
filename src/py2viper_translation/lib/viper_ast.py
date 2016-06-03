@@ -104,6 +104,8 @@ class ViperAST:
             result_int = result_int.multiply(cutoff_int)
             result_int = result_int.add(current_int)
             rest = rest // cutoff
+        if negative:
+            result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)
 
     def Program(self, domains, fields, functions, predicates, methods, position,
@@ -290,10 +292,6 @@ class ViperAST:
         return self.ast.Result(type, position, info)
 
     def AnySetContains(self, elem, s, position, info):
-        print(elem)
-        print(elem.typ())
-        print(s)
-        print(s.typ())
         return self.ast.AnySetContains(elem, s, position, info)
 
     def SeqContains(self, elem, s, position, info):

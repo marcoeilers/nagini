@@ -151,6 +151,8 @@ class AbstractTranslator(metaclass=ABCMeta):
                           ctx: Context) -> List[Stmt]:
         return self.config.method_translator.translate_finally(block, ctx)
 
-    def type_check(self, lhs: Expr, type: PythonType, ctx: Context) -> Expr:
-        return self.config.type_translator.type_check(lhs, type, ctx)
+    def type_check(self, lhs: Expr, type: PythonType, ctx: Context,
+                   inhale_exhale: bool=True) -> Expr:
+        return self.config.type_translator.type_check(lhs, type, ctx,
+            inhale_exhale=inhale_exhale)
 

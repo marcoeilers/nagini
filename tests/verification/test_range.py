@@ -8,4 +8,5 @@ def rangetest() -> None:
     Assert(7 not in a)
     Assert(5 not in a)
     Assert(Forall(a, lambda x: (x < 5, [])))
+    #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(Forall(a, lambda x: (x < 4, [])))

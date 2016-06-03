@@ -48,7 +48,7 @@ class CallTranslator(CommonTranslator):
         assert isinstance(node.args[1], ast.Name)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         cls = ctx.program.classes[node.args[1].id]
-        return stmt, self.type_check(obj, cls, ctx)
+        return stmt, self.type_check(obj, cls, ctx, inhale_exhale=False)
 
     def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1

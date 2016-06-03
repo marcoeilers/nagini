@@ -188,8 +188,8 @@ class ExpressionTranslator(CommonTranslator):
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
-                condition = self.type_factory.type_check(var, handler.exception,
-                                                         ctx)
+                condition = self.type_check(var, handler.exception, ctx,
+                                            inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name,
                                        self.to_position(handler.node, ctx),
