@@ -17,6 +17,11 @@ class FuncTripleDomainFactory:
     """
     Factory for the FuncTriple Domain.
     """
+    GET = 'ft_get1'
+    GET_PRIME = 'ft_get2'
+    GET_TL = 'ft_get3'
+    CREATE = 'ft_create'
+
     def __init__(self, viper: ViperAST, config: SIFTranslatorConfig):
         self.viper = viper
         self.config = config
@@ -47,9 +52,9 @@ class FuncTripleDomainFactory:
         Domain.
         """
         var_map = self._create_var_map(ret_type, ctx)
-        if name == 'ft_create':
+        if name == self.CREATE:
             type_passed = self.get_type(ret_type, ctx)
-        elif name == 'ft_get3':
+        elif name == self.GET_TL:
             type_passed = self.viper.Bool
         else:
             type_passed = self.config.type_translator.translate_type(

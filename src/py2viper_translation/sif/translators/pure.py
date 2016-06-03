@@ -14,6 +14,9 @@ from py2viper_translation.sif.lib.program_nodes import (
     TL_VAR_NAME,
 )
 from py2viper_translation.translators.abstract import AbstractTranslator
+from py2viper_translation.sif.translators.func_triple_domain_factory import (
+    FuncTripleDomainFactory as FTDF,
+)
 from py2viper_translation.translators.pure import (
     AssignWrapper,
     NotWrapper,
@@ -247,7 +250,7 @@ class SIFPureTranslator(PureTranslator):
         ctx.set_normal_ctx()
         # Create FuncTriple as return value.
         args = [val, val_p, ctx.current_tl_var_expr]
-        wrapper.expr = self.config.func_triple_factory.get_call('ft_create',
+        wrapper.expr = self.config.func_triple_factory.get_call(FTDF.CREATE,
             args, function.type, position, info, ctx)
         if wrapper.cond:
             wrapper.cond = self.translate_condition(wrapper.cond,
@@ -298,7 +301,6 @@ class SIFPureTranslator(PureTranslator):
                 wrapper.translate_expr(function, self, ctx)
                 new_wrappers.append(wrapper)
             elif isinstance(wrapper, AssignWrapper):
-                # ctx.current_tl_var_expr = None
                 aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
                 aliases.update({k: v.var_prime for (k, v) in
                                 function.args.items()})
