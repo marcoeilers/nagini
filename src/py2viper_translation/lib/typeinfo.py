@@ -61,6 +61,17 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_func_def(o)
         self.prefix = oldprefix
 
+    def visit_func_expr(self, o: mypy.nodes.FuncExpr):
+        oldprefix = self.prefix
+        self.prefix = self.prefix + ['lambda' + str(o.line)]
+        # functype = self.type_of(o)
+        # self.set_type(self.prefix, functype, o.line)
+        for arg in o.arguments:
+            self.set_type(self.prefix + [arg.variable.name()],
+                          arg.variable.type, arg.line)
+        o.body.accept(self)
+        self.prefix = oldprefix
+
     def visit_class_def(self, o: mypy.nodes.ClassDef):
         oldprefix = self.prefix
         self.prefix = self.prefix + [o.name]
