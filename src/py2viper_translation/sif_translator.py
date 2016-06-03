@@ -4,10 +4,14 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonVar
+from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
 from py2viper_translation.sif.translators.call import SIFCallTranslator
 from py2viper_translation.sif.translators.contract import SIFContractTranslator
 from py2viper_translation.sif.translators.expression import (
     SIFExpressionTranslator,
+)
+from py2viper_translation.sif.translators.func_triple_domain_factory import (
+    FuncTripleDomainFactory,
 )
 from py2viper_translation.sif.translators.method import SIFMethodTranslator
 from py2viper_translation.sif.translators.program import SIFProgramTranslator
@@ -16,7 +20,7 @@ from py2viper_translation.sif.translators.statement import (
     SIFStatementTranslator,
 )
 from py2viper_translation.translator import Translator
-from py2viper_translation.translators.abstract import Expr, TranslatorConfig
+from py2viper_translation.translators.abstract import Expr
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
 
@@ -30,7 +34,7 @@ from typing import List
 class SIFTranslator(Translator):
     def __init__(self, jvm: JVM, source_file: str, type_info: TypeInfo,
                  viper_ast: ViperAST):
-        config = TranslatorConfig(self)
+        config = SIFTranslatorConfig(self)
         config.pure_translator = SIFPureTranslator(config, jvm, source_file,
                                                    type_info, viper_ast)
         config.call_translator = SIFCallTranslator(config, jvm, source_file,
@@ -56,6 +60,8 @@ class SIFTranslator(Translator):
         config.method_translator = SIFMethodTranslator(config, jvm, source_file,
                                                         type_info, viper_ast)
         config.type_factory = TypeDomainFactory(viper_ast, self)
+        config.func_triple_factory = FuncTripleDomainFactory(viper_ast, config)
+
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 

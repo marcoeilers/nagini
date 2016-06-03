@@ -26,6 +26,15 @@ class SIFStatementTranslator(StatementTranslator):
         stmts += super().translate_stmt_Assign(node, ctx)
         ctx.set_normal_ctx()
 
+        if ctx.current_tl_var_expr != ctx.current_function.new_tl_var.ref:
+            # RHS was a function call. Need assignment for timeLevel
+            assert isinstance(node.value, ast.Call)
+            assign = self.viper.LocalVarAssign(
+                ctx.current_function.new_tl_var.ref, ctx.current_tl_var_expr,
+                self.to_position(node, ctx), self.no_info(ctx))
+            ctx.current_tl_var_expr = None
+            stmts.append(assign)
+
         return stmts
 
     def _translate_return(self, node: ast.Return,
