@@ -347,6 +347,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.overrides = None  # infer
         self.locals = OrderedDict()  # direct
         self.args = OrderedDict()  # direct
+        self.special_vars = OrderedDict()  # direct
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -396,6 +397,8 @@ class PythonMethod(PythonNode, PythonScope):
                     self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
+        for name in self.special_vars:
+            self.special_vars[name].process(self.get_fresh_name(name), translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -419,6 +422,8 @@ class PythonMethod(PythonNode, PythonScope):
             return self.locals[name]
         elif name in self.args:
             return self.args[name]
+        elif name in self.special_vars:
+            return self.special_vars[name]
         elif self.var_arg and self.var_arg.name == name:
             return self.var_arg
         elif self.kw_arg and self.kw_arg.name == name:

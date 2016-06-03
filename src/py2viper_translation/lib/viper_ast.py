@@ -104,6 +104,8 @@ class ViperAST:
             result_int = result_int.multiply(cutoff_int)
             result_int = result_int.add(current_int)
             rest = rest // cutoff
+        if negative:
+            result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)
 
     def Program(self, domains, fields, functions, predicates, methods, position,
@@ -277,6 +279,9 @@ class ViperAST:
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
+    def EmptySeq(self, type, position, info):
+        return self.ast.EmptySeq(type, position, info)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)
 
@@ -285,6 +290,12 @@ class ViperAST:
 
     def Result(self, type, position, info):
         return self.ast.Result(type, position, info)
+
+    def AnySetContains(self, elem, s, position, info):
+        return self.ast.AnySetContains(elem, s, position, info)
+
+    def SeqContains(self, elem, s, position, info):
+        return self.ast.SeqContains(elem, s, position, info)
 
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info)
@@ -320,6 +331,9 @@ class ViperAST:
         return self.ast.NullLit(position, info)
 
     def Forall(self, variables, triggers, exp, position, info):
+        print(variables)
+        print(triggers)
+        print(exp)
         return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
                                exp, position, info)
 

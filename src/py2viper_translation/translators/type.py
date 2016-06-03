@@ -9,6 +9,7 @@ from py2viper_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     PRIMITIVES,
+    RANGE_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -92,6 +93,8 @@ class TypeTranslator(CommonTranslator):
                 return value_type.type_args[0]
             elif value_type.name == DICT_TYPE:
                 return value_type.type_args[1]
+            elif value_type.name == RANGE_TYPE:
+                return ctx.program.classes['int']
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Str):
@@ -238,8 +241,60 @@ class TypeTranslator(CommonTranslator):
             return False
         return self._is_subtype(t1.superclass, t2)
 
+    def set_type_args(self, lhs: Expr, type: GenericType,
+                      prefix: List[Expr], ctx: Context) -> Expr:
+        args = type.type_args
+        result = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        # if type.exact_length:
+        #     nargs = len(type.type_args)
+        # else:
+        #     nargs = -1
+        # result = self.type_factory.type_nargs_check(lhs, nargs,
+        #                                             prefix, ctx)
+        for i, arg in enumerate(args):
+            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
+            indices = prefix + [lit]
+            if arg.name in PRIMITIVES:
+                arg = ctx.program.classes['__boxed_' + arg.name]
+            check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+            result = self.viper.And(result, check, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+            if isinstance(arg, GenericType):
+                arg_args = self.set_type_args(lhs, arg, indices, ctx)
+                result = self.viper.And(result, arg_args, self.no_position(ctx),
+                                        self.no_info(ctx))
+        return result
+
+    def set_type_nargs(self, lhs: Expr, type: GenericType,
+                       prefix: List[Expr], ctx: Context) -> Expr:
+        args = type.type_args
+        if type.exact_length:
+            nargs = len(type.type_args)
+            result = self.type_factory.type_nargs_check(lhs, nargs,
+                                                        prefix, ctx)
+        else:
+            # nargs = -1
+            result = self.viper.TrueLit(self.no_position(ctx),
+                                        self.no_info(ctx))
+
+        for i, arg in enumerate(args):
+            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
+            indices = prefix + [lit]
+            # if arg.name in PRIMITIVES:
+            #     arg = ctx.program.classes['__boxed_' + arg.name]
+            # check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+            # result = self.viper.And(result, check, self.no_position(ctx),
+            #                         self.no_info(ctx))
+
+            if isinstance(arg, GenericType):
+                arg_nargs = self.set_type_nargs(lhs, arg, indices, ctx)
+                result = self.viper.And(result, arg_nargs, self.no_position(ctx),
+                                        self.no_info(ctx))
+        return result
+
     def type_check(self, lhs: Expr, type: PythonType,
-                   ctx: Context, perms: bool=False) -> Expr:
+                   ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
         for simple types, or include information about type arguments for
@@ -250,14 +305,31 @@ class TypeTranslator(CommonTranslator):
             result = self.type_factory.type_check(lhs, boxed, ctx)
         else:
             result = self.type_factory.type_check(lhs, type, ctx)
-        if type.name == TUPLE_TYPE:
-            result = self._type_check_tuple(lhs, type, result, ctx, perms=perms)
-        elif type.name == DICT_TYPE:
-            result = self._type_check_dict(lhs, type, result, ctx, perms=perms)
-        elif type.name == LIST_TYPE:
-            result = self._type_check_list(lhs, type, result, ctx, perms=perms)
-        elif type.name == SET_TYPE:
-            result = self._type_check_set(lhs, type, result, ctx, perms=perms)
+
+        if isinstance(type, GenericType):
+            args = self.set_type_args(lhs, type, [], ctx)
+            result = self.viper.And(result, args, self.no_position(ctx),
+                                    self.no_info(ctx))
+        if inhale_exhale:
+            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+            result = self.viper.InhaleExhaleExp(result, true,
+                                                self.no_position(ctx),
+                                                self.no_info(ctx))
+        if isinstance(type, GenericType):
+            nargs = self.set_type_nargs(lhs, type, [], ctx)
+            result = self.viper.And(result, nargs, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        # TODO: everything after this should be done in the respective predicates
+        # TODO: except tuple things
+        # if type.name == TUPLE_TYPE:
+        #     result = self._type_check_tuple(lhs, type, result, ctx, perms=perms)
+        # elif type.name == DICT_TYPE:
+        #     result = self._type_check_dict(lhs, type, result, ctx, perms=perms)
+        # elif type.name == LIST_TYPE:
+        #     result = self._type_check_list(lhs, type, result, ctx, perms=perms)
+        # elif type.name == SET_TYPE:
+        #     result = self._type_check_set(lhs, type, result, ctx, perms=perms)
         # TODO: we need a dict/set/... predicate to wrap access to a dict/...
         # Problem: type information depends on acc, but acc comes later.
         return result
