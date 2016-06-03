@@ -48,6 +48,8 @@ class SIFContext(Context):
             return self._curr_tl_var_expr
         elif TL_VAR_NAME in self.var_aliases:
             return self.var_aliases[TL_VAR_NAME].ref
+        elif self.current_function.pure:
+            return self.current_function.tl_var.ref
         else:
             return self.current_function.new_tl_var.ref
 

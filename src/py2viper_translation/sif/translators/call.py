@@ -12,6 +12,9 @@ from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
+from py2viper_translation.sif.translators.func_triple_domain_factory import (
+    FuncTripleDomainFactory as FTDF,
+)
 from py2viper_translation.translators.abstract import (
     Expr,
     Stmt,
@@ -120,14 +123,14 @@ class SIFCallTranslator(CallTranslator):
         func_app = self.viper.FuncApp(target.sil_name, args, position,
                                       info, type_, formal_args)
         # We have to update the current timeLevel var expression.
-        tl_expr = self.config.func_triple_factory.get_call('ft_get3',
+        tl_expr = self.config.func_triple_factory.get_call(FTDF.GET_TL,
             [func_app], target.type, position, info, ctx)
         ctx.current_tl_var_expr = tl_expr
 
         # Add the resulting expressions to call_results.
-        res_expr1 = self.config.func_triple_factory.get_call('ft_get1',
+        res_expr1 = self.config.func_triple_factory.get_call(FTDF.GET,
             [func_app], target.type, position, info, ctx)
-        res_expr2 = self.config.func_triple_factory.get_call('ft_get2', [
+        res_expr2 = self.config.func_triple_factory.get_call(FTDF.GET_PRIME, [
             func_app], target.type, position, info, ctx)
         if not ctx.use_prime:
             call_results.add_result(res_expr1)

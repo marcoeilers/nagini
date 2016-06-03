@@ -101,6 +101,8 @@ class SIFMethodTranslator(MethodTranslator):
         # automatically at the beginning and end of each translate_* method.
         old_function = ctx.current_function
         ctx.current_function = func
+        # Reset ctx to remove any artifacts from previously translated units.
+        ctx.reset()
         # Create a FuncTriple type.
         type_ = self.config.func_triple_factory.get_type(func.type, ctx)
 
@@ -123,9 +125,13 @@ class SIFMethodTranslator(MethodTranslator):
         posts = []
         for post in func.postcondition:
             stmt, expr = self.translate_expr(post, ctx)
-            if stmt:
+            ctx.set_prime_ctx()
+            stmt_p, expr_p = self.translate_expr(post, ctx)
+            ctx.set_normal_ctx()
+            if stmt or stmt_p:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
+            posts.append(expr_p)
         # create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
         # TODO(shitz): Add result type post-condition.
