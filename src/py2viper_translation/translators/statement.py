@@ -74,6 +74,7 @@ class StatementTranslator(CommonTranslator):
         iter_class = ctx.program.classes['Iterator']
         iter_var = ctx.actual_function.create_variable('iter', iter_class,
                                                        self.translator)
+        node._iterator = iter_var
         args = [iterable]
         arg_types = [iterable_type]
         iter_assign = self.get_method_call(iterable_type, '__iter__', args,
@@ -121,7 +122,12 @@ class StatementTranslator(CommonTranslator):
         bodyindex = 0
 
         while self.is_invariant(node.body[bodyindex]):
-            invariant.append(self.translate_contract(node.body[bodyindex], ctx))
+            inv_node = node.body[bodyindex]
+            user_inv = self.translate_contract(inv_node, ctx)
+            user_inv = self.viper.Unfolding(invar_acc, user_inv,
+                                            self.to_position(inv_node, ctx),
+                                            self.no_info(ctx))
+            invariant.append(user_inv)
             bodyindex += 1
         body = [unfold_invar]
         body += flatten(

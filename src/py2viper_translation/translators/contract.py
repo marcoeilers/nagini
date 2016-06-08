@@ -8,6 +8,7 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
     UnsupportedException,
@@ -214,6 +215,21 @@ class ContractTranslator(CommonTranslator):
             return True
         return False
 
+    def translate_previous(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        arg = node.args[0]
+        if not isinstance(arg, ast.Name):
+            raise InvalidProgramException(node, 'invalid.previous')
+        loop = find_loop_for_previous(node, arg.id)
+        if not loop:
+            raise InvalidProgramException(node, 'invalid.previous')
+        iterator = loop._iterator.ref
+        list_field = self.viper.Field('__previous', self.viper.Ref,
+                                      self.no_position(ctx), self.no_info(ctx))
+        field_acc = self.viper.FieldAccess(iterator, list_field,
+                                           self.to_position(node, ctx),
+                                           self.no_info(ctx))
+        return [], field_acc
+
     def translate_unfold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Unfold() contract function.
@@ -338,5 +354,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfolding(node, ctx)
         elif func_name == 'Forall':
             return self.translate_forall(node, ctx)
+        elif func_name == 'Previous':
+            return self.translate_previous(node, ctx)
         else:
             raise UnsupportedException(node)
