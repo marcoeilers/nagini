@@ -129,12 +129,12 @@ class SIFCallTranslator(CallTranslator):
         ctx.current_tl_var_expr = tl_expr
 
         # Add the resulting expressions to call_results.
-        res_expr1 = self.config.func_triple_factory.get_call(FTDF.GET,
+        res_expr = self.config.func_triple_factory.get_call(FTDF.GET,
             [func_app], target.type, position, info, ctx)
-        res_expr2 = self.config.func_triple_factory.get_call(FTDF.GET_PRIME, [
-            func_app], target.type, position, info, ctx)
-        call_results.add_result(res_expr1)
-        call_results.add_result(res_expr2)
+        res_expr_p = self.config.func_triple_factory.get_call(FTDF.GET_PRIME,
+            [func_app], target.type, position, info, ctx)
+        call_results.add_result(res_expr)
+        call_results.add_result(res_expr_p)
         call_results.add_result(tl_expr)
 
         return arg_stmts, call_results.next()

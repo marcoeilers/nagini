@@ -9,12 +9,13 @@ from py2viper_translation.lib.program_nodes import (
     PythonVar,
     ProgramNodeFactory,
 )
+from py2viper_translation.sif.lib.constants import (
+    NEW_TL_VAR_NAME,
+    SIF_VAR_SUFFIX,
+    TL_VAR_NAME,
+)
 from py2viper_translation.translator import Translator
 from typing import List
-
-TL_VAR_NAME = '__tl'
-NEW_TL_VAR_NAME = '__new_tl'
-SIF_VAR_SUFFIX = "_p"
 
 
 class SIFPythonMethod(PythonMethod):
