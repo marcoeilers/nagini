@@ -28,6 +28,7 @@ class AssignWrapper:
         self.expr = expr
         self.node = node
         self.names = {}
+        self.var = None
 
 
 class ReturnWrapper:
@@ -122,24 +123,114 @@ class PureTranslator(CommonTranslator):
         wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
         return [wrapper]
 
-    def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx: Context) -> Expr:
+    def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        val = self._translate_wrapper_expr(wrapper, ctx)
+        if wrapper.cond:
+            if not previous:
+                raise InvalidProgramException(function.node,
+                                              'function.return.missing')
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+            return self.viper.CondExp(cond, val, previous, position, info)
+        else:
+            if previous:
+                raise InvalidProgramException(function.node,
+                                              'function.dead.code')
+            return val
+
+    def _translate_assign_wrapper(self, wrapper: Wrapper, previous: Expr,
+                                  function: PythonMethod,
+                                  ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        val = self._translate_wrapper_expr(wrapper, ctx)
+        if not previous:
+            raise InvalidProgramException(function.node,
+                                          'function.return.missing')
+        if wrapper.cond:
+            cond = self._translate_condition(wrapper.cond,
+                                             wrapper.names, ctx)
+            if wrapper.name in ctx.var_aliases:
+                old_val = ctx.var_aliases[wrapper.name].ref
+            else:
+                # variable newly defined in conditional branch, so
+                # there is no old value; the variable is not defined
+                # if the condition is false.
+                # our encoding requires some value though, even
+                # though that will never be used, so we take some dummy
+                # value.
+                zero = self.viper.IntLit(0, self.no_position(ctx),
+                                         self.no_info(ctx))
+                false = self.viper.FalseLit(self.no_position(ctx),
+                                            self.no_info(ctx))
+                null = self.viper.NullLit(self.no_position(ctx),
+                                          self.no_info(ctx))
+                dummies = {
+                    self.viper.Int: zero,
+                    self.viper.Bool: false,
+                    self.viper.Ref: null
+                }
+                old_val = dummies[wrapper.var.decl.typ()]
+            new_val = self.viper.CondExp(cond, val, old_val, position,
+                                         info)
+            return self.viper.Let(wrapper.var.decl, new_val,
+                                  previous, position, info)
+        else:
+            return self.viper.Let(wrapper.var.decl, val,
+                                  previous, position, info)
+
+    def _translate_wrapper_expr(self, wrapper: Wrapper,
+                                ctx: Context) -> Expr:
+        info = self.no_info(ctx)
+        position = self.to_position(wrapper.node, ctx)
+        if isinstance(wrapper.expr, BinOpWrapper):
+            assert isinstance(wrapper, AssignWrapper)
+            stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
+            var = ctx.var_aliases[wrapper.name].ref
+            if isinstance(wrapper.expr.op, ast.Add):
+                val = self.viper.Add(var, val, position, info)
+            elif isinstance(wrapper.expr.op, ast.Sub):
+                val = self.viper.Sub(var, val, position, info)
+            elif isinstance(wrapper.expr.op, ast.Mult):
+                val = self.viper.Mul(var, val, position, info)
+            else:
+                raise UnsupportedException(wrapper.node)
+        else:
+            stmt, val = self.translate_expr(wrapper.expr, ctx)
+        if stmt:
+            raise InvalidProgramException(wrapper.expr,
+                                          'purity.violated')
+        return val
+
+    def _translate_wrapper(self, wrapper: Wrapper, previous: Expr,
+                           function: PythonMethod, ctx: Context) -> Expr:
+        if isinstance(wrapper, ReturnWrapper):
+            return self._translate_return_wrapper(wrapper, previous,
+                                                  function, ctx)
+        elif isinstance(wrapper, AssignWrapper):
+            return self._translate_assign_wrapper(wrapper, previous,
+                                                  function, ctx)
+        else:
+            raise UnsupportedException(wrapper)
+
+    def _translate_to_wrappers(self, nodes: List[ast.AST],
+                               ctx: Context) -> List[Wrapper]:
+        return flatten([self.translate_pure([], node, ctx)for node in nodes])
+
+    def _collect_names(self, wrappers: List[Wrapper], function: PythonMethod):
         """
-        Translates a list of nodes to a single (let-)expression if the nodes
-        are only returns, assignments and if-blocks. First translates them to
-        Assign- and ReturnWrappers with conditions derived from surrounding
-        if-blocks (if any), then creates one big expression out of a list
-        of wrappers.
+        First walk through wrappers. For every assignment, we create a new
+        variable with a different name. Future references to the original
+        name need to refer to the new name, so we create dicts that map old
+        to new names.
         """
-        # Translate to wrapper objects
-        wrappers = flatten([self.translate_pure([], node, ctx)
-                            for node in nodes])
         previous = None
         added = {}
-        # First walk through wrappers. For every assignment, we create a new
-        # variable with a different name. Future references to the original
-        # name need to refer to the new name, so we create dicts that map old
-        # to new names.
+
         for wrapper in wrappers:
             if previous:
                 wrapper.names.update(previous.names)
@@ -151,87 +242,31 @@ class PureTranslator(CommonTranslator):
                 cls = function.get_variable(name).type
                 new_name = function.create_variable(name, cls, self.translator)
                 added[name] = new_name
-                wrapper.variable = new_name
+                wrapper.var = new_name
             previous = wrapper
-        previous = None
-        info = self.no_info(ctx)
-        assert not ctx.var_aliases
 
-        zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
-        false = self.viper.FalseLit(self.no_position(ctx), self.no_info(ctx))
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        dummies = {
-            self.viper.Int: zero,
-            self.viper.Bool: false,
-            self.viper.Ref : null
-        }
+    def translate_exprs(self, nodes: List[ast.AST],
+                        function: PythonMethod, ctx: Context) -> Expr:
+        """
+        Translates a list of nodes to a single (let-)expression if the nodes
+        are only returns, assignments and if-blocks. First translates them to
+        Assign- and ReturnWrappers with conditions derived from surrounding
+        if-blocks (if any), then creates one big expression out of a list
+        of wrappers.
+        """
+        # Translate to wrapper objects
+        wrappers = self._translate_to_wrappers(nodes, ctx)
+        self._collect_names(wrappers, function)
 
         # Second walk through wrappers, starting at the end. Translate all of
         # them into one big expression. Assigns become a let, returns just the
         # returned value, and if something happens in an if block, we put it
-        # into an if-expression.
+        assert not ctx.var_aliases
+        previous = None
         for wrapper in reversed(wrappers):
-            position = self.to_position(wrapper.node, ctx)
-            ctx.var_aliases = wrapper.names
-            if isinstance(wrapper.expr, BinOpWrapper):
-                assert isinstance(wrapper, AssignWrapper)
-                stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
-                var = wrapper.names[wrapper.name].ref
-                if isinstance(wrapper.expr.op, ast.Add):
-                    val = self.viper.Add(var, val, position, info)
-                elif isinstance(wrapper.expr.op, ast.Sub):
-                    val = self.viper.Sub(var, val, position, info)
-                elif isinstance(wrapper.expr.op, ast.Mult):
-                    val = self.viper.Mul(var, val, position, info)
-                else:
-                    raise UnsupportedException(wrapper.node)
-            else:
-                stmt, val = self.translate_expr(wrapper.expr, ctx)
-            if stmt:
-                raise InvalidProgramException(wrapper.expr,
-                                              'purity.violated')
-            if isinstance(wrapper, ReturnWrapper):
-                if wrapper.cond:
-                    if not previous:
-                        raise InvalidProgramException(function.node,
-                                                      'function.return.missing')
-                    cond = self._translate_condition(wrapper.cond,
-                                                     wrapper.names, ctx)
-                    previous = self.viper.CondExp(cond, val, previous, position,
-                                                  info)
-                else:
-                    if previous:
-                        raise InvalidProgramException(function.node,
-                                                      'function.dead.code')
-                    previous = val
-            elif isinstance(wrapper, AssignWrapper):
-                if not previous:
-                    raise InvalidProgramException(function.node,
-                                                  'function.return.missing')
-                if wrapper.cond:
-                    cond = self._translate_condition(wrapper.cond,
-                                                     wrapper.names, ctx)
-                    if wrapper.name in wrapper.names:
-                        old_val = wrapper.names[wrapper.name].ref
-                    else:
-                        # variable newly defined in conditional branch, so
-                        # there is no old value; the variable is not defined
-                        # if the condition is false.
-                        # our encoding requires some value though, even
-                        # though that will never be used, so we take some dummy
-                        # value.
-                        old_val = dummies[wrapper.variable.decl.typ()]
-                    new_val = self.viper.CondExp(cond, val, old_val, position,
-                                                 info)
-                    let = self.viper.Let(wrapper.variable.decl, new_val,
-                                         previous, position, info)
-                    previous = let
-                else:
-                    let = self.viper.Let(wrapper.variable.decl, val,
-                                         previous, position, info)
-                    previous = let
-            else:
-                raise UnsupportedException(wrapper)
+            ctx.var_aliases = wrapper.names.copy()
+            previous = self._translate_wrapper(wrapper, previous, function, ctx)
+
         ctx.var_aliases = {}
         return previous
 
@@ -244,11 +279,11 @@ class PureTranslator(CommonTranslator):
         previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         for cond in conds:
             if isinstance(cond, NotWrapper):
-                current = names.get(cond.cond).ref
+                current = ctx.var_aliases.get(cond.cond).ref
                 current = self.viper.Not(current, self.no_position(ctx),
                                          self.no_info(ctx))
             else:
-                current = names.get(cond).ref
+                current = ctx.var_aliases.get(cond).ref
             previous = self.viper.And(previous, current, self.no_position(ctx),
                                       self.no_info(ctx))
         return previous
