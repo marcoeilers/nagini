@@ -63,6 +63,7 @@ class PythonProgram(PythonScope):
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.predicates = OrderedDict()
+        self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
         self.types = types
         for primitive in PRIMITIVES:
@@ -462,6 +463,75 @@ class PythonMethod(PythonNode, PythonScope):
             return []
 
 
+class PythonIOOperation(PythonNode, PythonScope):
+    """
+    Represents an IO operation which may be basic or not.
+
+    +   ``preset`` – a set of input places.
+    +   ``postset`` – a set of output places.
+    +   ``inputs`` – inputs of IO operation (excluding preset).
+    +   ``outputs`` – outputs of IO operation (excluding postset).
+    """
+    def __init__(
+            self,
+            name: str,
+            node: ast.AST,
+            superscope: PythonScope,
+            node_factory: 'ProgramNodeFactory',
+            ):
+        PythonNode.__init__(self, name, node)
+        PythonScope.__init__(self, [], superscope)
+        self._preset = []
+        self._postset = []
+        self._inputs = []
+        self._outputs = []
+        self._terminates = None
+        self._termination_measure = None
+
+    def set_preset(self, preset: List['PythonVar']) -> None:
+        assert len(preset) == 1
+        self._preset = preset
+
+    def set_postset(self, postset: List['PythonVar']) -> None:
+        assert len(postset) == 1
+        self._postset = postset
+
+    def set_inputs(self, inputs: List['PythonVar']) -> None:
+        assert isinstance(inputs, list)
+        self._inputs = inputs
+
+    def is_input(self, name) -> bool:
+        for input in self._inputs:
+            if input.name == name:
+                return True
+        else:
+            return False
+
+    def set_outputs(self, outputs: List['PythonVar']) -> None:
+        assert isinstance(outputs, list)
+        self._outputs = outputs
+
+    def set_terminates(self, expression: ast.AST) -> bool:
+        """
+        Sets the property if it is not already set and returns ``True``.
+        """
+        if self._terminates is None:
+            self._terminates = expression
+            return True
+        else:
+            return False
+
+    def set_termination_measure(self, expression: ast.AST) -> bool:
+        """
+        Sets the property if it is not already set and returns ``True``.
+        """
+        if self._termination_measure is None:
+            self._termination_measure = expression
+            return True
+        else:
+            return False
+
+
 class PythonExceptionHandler(PythonNode):
     """
     Represents an except-block belonging to a try-block.
@@ -639,6 +709,12 @@ class ProgramNodeFactory:
                              interface: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface)
+
+    def create_python_io_operation(self, name: str, node: ast.AST,
+                                   superscope: PythonScope,
+                                   container_factory: 'ProgramNodeFactory',
+                                   ) -> PythonIOOperation:
+        return PythonIOOperation(name, node, superscope, container_factory)
 
     def create_python_field(self, name: str, node: ast.AST, type_: PythonClass,
                             cls: PythonClass) -> PythonField:

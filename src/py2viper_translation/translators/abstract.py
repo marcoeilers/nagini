@@ -42,6 +42,7 @@ class TranslatorConfig:
         self.pure_translator = None
         self.type_translator = None
         self.pred_translator = None
+        self.io_operation_translator = None
         self.prog_translator = None
         self.method_translator = None
         self.type_factory = None
@@ -101,6 +102,19 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_predicate(self, pred: PythonMethod,
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
+
+    def translate_io_operation(
+            self,
+            operation: PythonMethod,
+            ctx: Context,
+            ) -> Tuple[
+                'ast.silver.Predicate',
+                List['ast.silver.Function'],
+                List['ast.silver.Method'],
+                ]:
+        return self.config.io_operation_translator.translate_io_operation(
+            operation,
+            ctx)
 
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
