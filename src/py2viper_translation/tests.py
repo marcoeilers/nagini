@@ -152,6 +152,8 @@ class TranslationTests(AnnotatedTests):
 
     def test_file(self, path: str, jvm):
         test_annotations = self.get_test_annotations(path)
+        if any(self._is_ignore_annotation(tk) for tk in test_annotations):
+            pytest.skip()
         expected = flatten(
             [self.token_to_expected(ann) for ann in test_annotations if
              ann.string.strip().startswith('#:: ExpectedOutput(')])
