@@ -70,7 +70,10 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                var = ctx.actual_function.get_variable(node.id)
+                if node.id in ctx.var_aliases:
+                    var = ctx.var_aliases[node.id]
+                else:
+                    var = ctx.actual_function.get_variable(node.id)
                 if node.lineno in var.alt_types:
                     return var.alt_types[node.lineno]
                 else:
@@ -194,6 +197,9 @@ class TypeTranslator(CommonTranslator):
                         return ctx.program.classes[BOOL_TYPE]
                     elif node.func.id == 'Unfolding':
                         return self.get_type(node.args[1], ctx)
+                    elif node.func.id == 'Previous':
+                        arg_type = self.get_type(node.args[0], ctx)
+                        return GenericType(LIST_TYPE, ctx.program, [arg_type])
                     else:
                         raise UnsupportedException(node)
                 elif node.func.id in BUILTINS:

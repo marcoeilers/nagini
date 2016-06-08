@@ -1,5 +1,4 @@
 from py2viper_contracts.contracts import *
-from typing import List, Dict
 
 
 def w(normal: int, *args: int, other: bool, **kwargs: bool) -> int:
