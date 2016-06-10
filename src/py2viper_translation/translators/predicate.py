@@ -16,7 +16,7 @@ class PredicateTranslator(CommonTranslator):
         """
         Translates pred to a Silver predicate.
         """
-        if pred.type.name != BOOL_TYPE:
+        if not pred.type or pred.type.name != BOOL_TYPE:
             raise InvalidProgramException(pred.node, 'invalid.predicate')
         assert ctx.current_function is None
         ctx.current_function = pred

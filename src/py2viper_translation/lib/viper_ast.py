@@ -129,6 +129,9 @@ class ViperAST:
         return self.ast.Field(name, type, position, info)
 
     def Predicate(self, name, args, body, position, info):
+        print(name)
+        print(args)
+        print(body)
         return self.ast.Predicate(name, self.to_seq(args),
                                   self.scala.Some(body), position, info)
 

@@ -190,6 +190,8 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = func
+        if not func.type:
+            raise InvalidProgramException(func.node, 'function.type.none')
         type = self.translate_type(func.type, ctx)
         args = self._translate_params(func, ctx)
         if func.declared_exceptions:
