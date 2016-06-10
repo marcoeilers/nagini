@@ -225,7 +225,7 @@ class StatementTranslator(CommonTranslator):
                                  self.no_info(ctx))]
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
-        if not ctx.actual_function:
+        if not node.value:
             return []
         type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)

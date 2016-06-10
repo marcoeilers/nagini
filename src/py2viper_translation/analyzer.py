@@ -18,7 +18,11 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import get_func_name, UnsupportedException
+from py2viper_translation.lib.util import (
+    get_func_name,
+    InvalidProgramException,
+    UnsupportedException
+)
 from typing import Dict
 
 
@@ -198,6 +202,8 @@ class Analyzer(ast.NodeVisitor):
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
+        if func.pure and not functype:
+            raise InvalidProgramException(node, 'function.type.none')
         func.type = self.convert_type(functype)
         self.current_function = func
         self.visit(node.args, node)
@@ -252,7 +258,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
-            assert self.current_function is not None
+            if not self.current_function or self.current_function.predicate:
+                raise InvalidProgramException(node, 'contract.outside.function')
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])
             elif node.func.id == 'Ensures':
