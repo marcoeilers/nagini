@@ -109,14 +109,13 @@ class Analyzer(ast.NodeVisitor):
     def _add_interface_method(self, method_name, if_method, cls, pure):
         method = PythonMethod(method_name, None, cls, self.program,
                               pure, False, self.node_factory, True)
-        method.args = OrderedDict()
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
             arg = self.node_factory.create_python_var(name, None,
                                                       self.get_class(arg_type))
             ctr += 1
-            method.args[name] = arg
+            method.add_arg(name, arg)
         if if_method['type']:
             method.type = self.get_class(if_method['type'])
         if if_method.get('generic_type'):
