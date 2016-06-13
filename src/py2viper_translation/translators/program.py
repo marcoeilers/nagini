@@ -161,7 +161,7 @@ class ProgramTranslator(CommonTranslator):
             args.append(method.overrides.args[arg].ref)
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
         has_subtype = self.var_type_check(self_arg.sil_name, method.cls,
-                                          ctx)
+                                          ctx, inhale_exhale=False)
         called_name = method.sil_name
 
         results, targets, body = self._create_override_check_body_impure(

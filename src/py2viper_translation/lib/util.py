@@ -155,3 +155,13 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
     while is_exception_decl(statements[body_index]):
         body_index += 1
     return body_index
+
+
+def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
+    if isinstance(node, ast.For):
+        if isinstance(node.target, ast.Name):
+            if node.target.id == name:
+                return node
+    if not node._parent:
+        return None
+    return find_loop_for_previous(node._parent, name)
