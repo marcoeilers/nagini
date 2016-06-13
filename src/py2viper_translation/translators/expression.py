@@ -188,8 +188,8 @@ class ExpressionTranslator(CommonTranslator):
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
-                condition = self.type_factory.type_check(var, handler.exception,
-                                                         ctx)
+                condition = self.type_check(var, handler.exception, ctx,
+                                            inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name,
                                        self.to_position(handler.node, ctx),
@@ -428,11 +428,14 @@ class ExpressionTranslator(CommonTranslator):
             return (stmts, self.viper.NeCmp(left, right,
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.In):
+        elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
             args = [right, left]
             arg_types = [right_type, left_type]
             app = self.get_function_call(right_type, '__contains__',
                                          args, arg_types, node, ctx)
+            if isinstance(node.ops[0], ast.NotIn):
+                app = self.viper.Not(app, self.to_position(node, ctx),
+                                     self.no_info(ctx))
             return stmts, app
         else:
             raise UnsupportedException(node.ops[0])

@@ -3,6 +3,7 @@ field set_acc : Set[Ref]
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
+    function get_type_nargs0(r: Ref): Int
     unique function set(): PyType
     unique function dict(): PyType
 }
@@ -11,6 +12,7 @@ method set___init__() returns (res: Ref)
     ensures acc(res.set_acc)
     ensures res.set_acc == Set[Ref]()
     ensures typeof(res) == set()
+    ensures get_type_nargs0(res) == 1
 {
     assume false
 }
@@ -49,6 +51,7 @@ method dict___init__() returns (res: Ref)
     ensures acc(res.dict_acc)
     ensures res.dict_acc == Set[Ref]()
     ensures typeof(res) == dict()
+    ensures get_type_nargs0(res) == 2
 {
     assume false
 }
