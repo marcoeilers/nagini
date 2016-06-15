@@ -509,6 +509,10 @@ class CallTranslator(CommonTranslator):
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         target = self._get_call_target(node, ctx)
+        if not target:
+            # Must be a function that exists (otherwise mypy would complain)
+            # we don't know, so probably some builtin we don't support yet.
+            raise UnsupportedException(node)
         if name in ctx.program.classes:
             # this is a constructor call
             return self._translate_constructor_call(target, node, args,

@@ -4,6 +4,7 @@ domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
     function get_type_nargs0(r: Ref): Int
+    function get_type_arg1(r: Ref, a1: Int): PyType
     function get_type_nargs1(r: Ref, a1: Int): Int
     unique function set(): PyType
     unique function dict(): PyType
@@ -40,8 +41,6 @@ method set___iter__(self: Ref) returns (_res: Ref)
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
   ensures acc(self.set_acc, 1 / 20)
-  //ensures |_res.list_acc| == |self.set_acc|
-  //ensures forall c : Ref :: {c in self.set_acc} {c in _res.list_acc} c in self.set_acc <==> c in _res.list_acc
   ensures _res.list_acc == set___sil_seq__(self)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
@@ -92,8 +91,6 @@ method dict___iter__(self: Ref) returns (_res: Ref)
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
   ensures acc(self.dict_acc, 1 / 20)
-  //ensures |_res.list_acc| == |self.dict_acc|
-  //ensures forall c : Ref :: {c in self.dict_acc} {c in _res.list_acc} c in self.dict_acc <==> c in _res.list_acc
   ensures _res.list_acc == dict___sil_seq__(self)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
@@ -134,6 +131,8 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     ensures forall k : Ref ::
         {dict___getitem__(self, k)}
         {old(dict___getitem__(self, k))}
+        {old(dict___contains__(self, k))}
+        {dict___contains__(self, k)}
         ((old(dict___contains__(self, k)) && k != key)
         ==>
         (dict___contains__(self, k) &&
@@ -141,6 +140,16 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
 {
     assume false
 }
+
+method dict_values(self: Ref) returns (_res: Ref)
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
+    ensures self.dict_acc == old(self.dict_acc)
+    ensures typeof(_res) == set()
+    ensures acc(_res.set_acc)
+    ensures |_res.set_acc| == |self.dict_acc|
+    ensures (forall k: Ref :: { dict___contains__(self, k) } {k in self.dict_acc} (dict___contains__(self, k)) ==> (dict___getitem__(self, k) in _res.set_acc))
+    ensures get_type_nargs0(_res) == 1 && get_type_arg1(_res, 0) == get_type_arg1(self, 1)
 
 function dict___len__(self: Ref): Int
     requires acc(self.dict_acc, 1/100)

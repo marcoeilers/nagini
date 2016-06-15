@@ -90,6 +90,10 @@
         "__iter__": {
             "args": ["dict"],
             "type": "Iterator"
+        },
+        "values": {
+            "args": ["dict"],
+            "type": "set"
         }
     },
     "functions": {

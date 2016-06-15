@@ -53,9 +53,6 @@ function list___getitem__(self: Ref, key: Int): Ref
     ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
     (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
     (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2))
-    ensures args_equal(self, result, 0)
-//    ensures forall index : Seq[Int] :: {get_type_nargs(result, index)} get_type_nargs(result, index) == get_type_nargs(self, Seq(0) ++ index)
-//    ensures forall index : Seq[Int] :: {get_type_arg(result, index)} get_type_arg(result, index) == get_type_arg(self, Seq(0) ++ index)
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires acc(self.list_acc)
@@ -73,19 +70,6 @@ method list_append(self: Ref, item: Ref) returns ()
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {
     assume false
-}
-
-function nargs_equal(self: Ref, res: Ref, index: Int): Bool
-{
-    (get_type_nargs0(res) == get_type_nargs1(self, index)) &&
-    (forall i1: Int :: {get_type_nargs1(res, i1)} get_type_nargs1(res, i1) == get_type_nargs2(self, index, i1)) &&
-    (forall i1: Int, i2: Int :: {get_type_nargs2(res, i1, i2)} get_type_nargs2(res, i1, i2) == get_type_nargs3(self, index, i1, i2))
-}
-
-function args_equal(self: Ref, res: Ref, index: Int): Bool
-{
-    (forall i1: Int :: get_type_arg1(res, i1) == get_type_arg2(self, index, i1)) &&
-    (forall i1: Int, i2: Int :: get_type_arg2(res, i1, i2) == get_type_arg3(self, index, i1, i2))
 }
 
 field __container : Ref
@@ -128,16 +112,6 @@ method Iterator___del__(self: Ref)
 {
   inhale false
 }
-
-//predicate for_invariant(iter: Ref, collection_seq: Seq[Ref], iter_err: Ref, item: Ref){
-//	(acc(iter.list_acc, 1/20)) &&
-//  	(iter.list_acc == collection_seq) &&
-//  	(acc(iter.__iter_index)  && acc(iter.__previous, 1/20)  && acc(iter.__previous.list_acc)) &&
-//  	(iter_err == null ==> (iter.__iter_index >= 0 && iter.__iter_index <= |iter.list_acc|)) &&
-//  	(iter_err == null ==> (item == iter.list_acc[iter.__iter_index - 1] && item in iter.list_acc)) &&
-//  	(iter_err == null ==> (iter.__previous.list_acc == iter.list_acc[..iter.__iter_index - 1])) &&
-//  	(iter_err != null ==> (iter.__previous.list_acc == iter.list_acc))
-//}
 
 function list___sil_seq__(self: Ref): Seq[Ref]
     requires acc(self.list_acc, 1/80)
