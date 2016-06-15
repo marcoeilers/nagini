@@ -24,13 +24,14 @@ function int___box__(int: Int): Ref
     ensures typeof(result) == __boxed_int()
 
 function __boxed_int___unbox__(box: Ref): Int
+    ensures int___box__(result) == box
 
 function bool___box__(bool: Bool): Ref
     ensures __boxed_bool___unbox__(result) == bool
     ensures typeof(result) == __boxed_bool()
 
 function __boxed_bool___unbox__(box: Ref): Bool
-
+    ensures bool___box__(result) == box
 
 function range___create__(start: Int, len: Int): Ref
     requires len >= 0

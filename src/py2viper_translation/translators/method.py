@@ -37,31 +37,17 @@ from typing import List, Tuple
 
 class MethodTranslator(CommonTranslator):
 
-    def _can_assume_type(self, type: PythonType) -> bool:
-        """
-        Checks if type information for the given type has to be checked or
-        can simply be assumed.
-        """
-        # Cannot assume tuple type information, since tuple length may be a
-        # precondition of other functions used in normal pre- and
-        # postconditions.
-        return type.name not in [TUPLE_TYPE, SET_TYPE, DICT_TYPE, LIST_TYPE]
-
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the given parameter has its type,
         to be assumed in preconditions and/or postconditions. If possible,
         the expression is wrapped in an InhaleExhaleExpression s.t. it is
-        just assumed, not checked; with some types this is not possible.
+        just assumed, not checked. Generally this seems to be possible with
+        types, but not with type arg numbers, because the latter encodes length
+        for tuples.
         """
         result = self.var_type_check(param.sil_name, param.type, ctx)
-
-        # true_lit = self.viper.TrueLit(self.no_position(ctx),
-        #                               self.no_info(ctx))
-        # result = self.viper.InhaleExhaleExp(result, true_lit,
-        #                                     self.no_position(ctx),
-        #                                     self.no_info(ctx))
         return result
 
     def _translate_pres(self, method: PythonMethod,
@@ -229,11 +215,6 @@ class MethodTranslator(CommonTranslator):
             result = self.viper.Result(res_type, self.no_position(ctx),
                                        self.no_info(ctx))
             check = self.type_check(result, func.type, ctx)
-            # if self._can_assume_type(func.type):
-            #     true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-            #     check = self.viper.InhaleExhaleExp(check, true,
-            #                                        self.no_position(ctx),
-            #                                        self.no_info(ctx))
             posts = [check] + posts
 
         statements = func.node.body
@@ -266,12 +247,6 @@ class MethodTranslator(CommonTranslator):
         posts = type_pres + posts
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref, method.type, ctx)
-
-            # true = self.viper.TrueLit(self.no_position(ctx),
-            #                           self.no_info(ctx))
-            # check = self.viper.InhaleExhaleExp(check, true,
-            #                                    self.no_position(ctx),
-            #                                    self.no_info(ctx))
             posts = [check] + posts
         return pres, posts
 
