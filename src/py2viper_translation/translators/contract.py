@@ -262,7 +262,14 @@ class ContractTranslator(CommonTranslator):
         return expr_stmt, unfold
 
     def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        dom_stmt, domain = self.translate_expr(node.args[0], ctx)
+        domain_node = node.args[0]
+        domain_old = False
+        if (isinstance(domain_node, ast.Call) and
+                get_func_name(domain_node) == 'Old'):
+            domain_old = True
+            domain_node = domain_node.args[0]
+
+        dom_stmt, domain = self.translate_expr(domain_node, ctx)
 
         lambda_ = node.args[1]
 
@@ -308,16 +315,19 @@ class ContractTranslator(CommonTranslator):
         formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
                                                self.no_position(ctx),
                                                self.no_info(ctx))]
-        domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__', [domain],
-                                        self.no_position(ctx),
+        domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
+                                        [domain], self.no_position(ctx),
                                         self.no_info(ctx), seq_ref, formal_args)
         if var.type.name in PRIMITIVES:
             ref_var = self.box_primitive(var.ref, var.type, None, ctx)
         else:
             ref_var = var.ref
         lhs = self.viper.SeqContains(ref_var, domain_set,
-                                     self.to_position(node.args[0], ctx),
+                                     self.to_position(domain_node, ctx),
                                      self.no_info(ctx))
+        if domain_old:
+            lhs = self.viper.Old(lhs, self.to_position(node.args[0], ctx),
+                                 self.no_info(ctx))
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))

@@ -294,6 +294,7 @@ class ExpressionTranslator(CommonTranslator):
         recv = self.get_type(node.value, ctx)
         field = recv.get_field(node.attr)
         if not field:
+            recv = self.get_type(node.value, ctx)
             raise InvalidProgramException(node, 'field.nonexistant')
         while field.inherited is not None:
             field = field.inherited
