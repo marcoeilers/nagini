@@ -4,6 +4,7 @@ domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
     function get_type_nargs0(r: Ref): Int
+    function get_type_nargs1(r: Ref, a1: Int): Int
     unique function set(): PyType
     unique function dict(): PyType
 }
@@ -29,10 +30,31 @@ function set___bool__(self: Ref) : Bool
     requires acc(self.set_acc, 1/100)
     ensures result == (|self.set_acc| != 0)
 
+field __container : Ref
+field __iter_index : Int
+field __previous: Ref
+field list_acc : Seq[Ref]
+
+method set___iter__(self: Ref) returns (_res: Ref)
+  requires acc(self.set_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.set_acc, 1 / 20)
+  //ensures |_res.list_acc| == |self.set_acc|
+  //ensures forall c : Ref :: {c in self.set_acc} {c in _res.list_acc} c in self.set_acc <==> c in _res.list_acc
+  ensures _res.list_acc == set___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+{
+  inhale false
+}
+
 method set_add(self: Ref, item: Ref) returns ()
     requires acc(self.set_acc)
     ensures acc(self.set_acc)
     ensures self.set_acc == old(self.set_acc) union Set(item)
+    ensures get_type_nargs1(self, 0) == get_type_nargs0(item)
 {
     assume false
 }
@@ -44,6 +66,11 @@ method set_clear(self: Ref) returns ()
 {
     assume false
 }
+
+function set___sil_seq__(self: Ref): Seq[Ref]
+    requires acc(self.set_acc, 1/80)
+    ensures |result| == |self.set_acc|
+    ensures forall c: Ref :: {c in self.set_acc} {c in result} c in self.set_acc <==> c in result
 
 field dict_acc : Set[Ref]
 
@@ -59,6 +86,21 @@ method dict___init__() returns (res: Ref)
 function dict___contains__(self: Ref, item: Ref) : Bool
     requires acc(self.dict_acc, 1/100)
     ensures result == (item in self.dict_acc)
+
+method dict___iter__(self: Ref) returns (_res: Ref)
+  requires acc(self.dict_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.dict_acc, 1 / 20)
+  //ensures |_res.list_acc| == |self.dict_acc|
+  //ensures forall c : Ref :: {c in self.dict_acc} {c in _res.list_acc} c in self.dict_acc <==> c in _res.list_acc
+  ensures _res.list_acc == dict___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+{
+  inhale false
+}
 
 function dict___bool__(self: Ref) : Bool
     requires acc(self.dict_acc, 1/100)
@@ -76,6 +118,7 @@ method dict_keys(self: Ref) returns (res: Ref)
 function dict___getitem__(self: Ref, key: Ref) : Ref
     requires acc(self.dict_acc, 1/100)
     requires dict___contains__(self, key)
+    ensures get_type_nargs0(result) == get_type_nargs1(self, 1)
 
 function dict_get(self: Ref, key: Ref) : Ref
     requires acc(self.dict_acc, 1/100)
@@ -86,6 +129,8 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     ensures acc(self.dict_acc)
     ensures self.dict_acc == old(self.dict_acc) union Set(key)
     ensures dict___getitem__(self, key) == item
+    ensures get_type_nargs1(self, 0) == get_type_nargs0(key)
+    ensures get_type_nargs1(self, 1) == get_type_nargs0(item)
     ensures forall k : Ref ::
         {dict___getitem__(self, k)}
         {old(dict___getitem__(self, k))}
@@ -100,3 +145,8 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
 function dict___len__(self: Ref): Int
     requires acc(self.dict_acc, 1/100)
     ensures result == |self.dict_acc|
+
+function dict___sil_seq__(self: Ref): Seq[Ref]
+    requires acc(self.dict_acc, 1/80)
+    ensures |result| == |self.dict_acc|
+    ensures forall c: Ref :: {c in self.dict_acc} {c in result} c in self.dict_acc <==> c in result

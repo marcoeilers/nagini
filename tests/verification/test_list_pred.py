@@ -1,5 +1,5 @@
 from py2viper_contracts.contracts import *
-from typing import List, Tuple
+# from typing import List, Tuple
 
 
 def main() -> None:

@@ -51,6 +51,10 @@
         "clear": {
             "args": ["set"],
             "type": null
+        },
+        "__iter__": {
+            "args": ["set"],
+            "type": "Iterator"
         }
     },
     "functions": {
@@ -82,6 +86,10 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null
+        },
+        "__iter__": {
+            "args": ["dict"],
+            "type": "Iterator"
         }
     },
     "functions": {

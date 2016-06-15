@@ -279,10 +279,34 @@ class ProgramTranslator(CommonTranslator):
         for sil_prog in sil_progs:
             domains += [d for d in self.viper.to_list(sil_prog.domains())
                         if d.name() != 'PyType']
-            fields += self.viper.to_list(sil_prog.fields())
+            # fields += [f for f in self.viper.to_list(sil_prog.fields())
+            #            if not f.name().startswith('__')]
             functions += self.viper.to_list(sil_prog.functions())
             predicates += self.viper.to_list(sil_prog.predicates())
             methods += self.viper.to_list(sil_prog.methods())
+
+        # predefined fields
+        fields.append(self.viper.Field('__container', self.viper.Ref,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('__iter_index', self.viper.Int,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('__previous', self.viper.Ref,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('list_acc',
+                                       self.viper.SeqType(self.viper.Ref),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('set_acc',
+                                       self.viper.SetType(self.viper.Ref),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
+        fields.append(self.viper.Field('dict_acc',
+                                       self.viper.SetType(self.viper.Ref),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
 
         type_funcs = self.type_factory.get_default_functions(ctx)
         type_axioms = self.type_factory.get_default_axioms(ctx)

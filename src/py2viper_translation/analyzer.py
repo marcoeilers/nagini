@@ -63,7 +63,7 @@ class Analyzer(ast.NodeVisitor):
             # ignore
             pass
         self.asts[abs_path] = parse_result
-        print(py2viper_translation.external.astpp.dump(parse_result))
+        # print(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if get_func_name(stmt) != 'Import':

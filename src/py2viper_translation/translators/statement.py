@@ -93,6 +93,7 @@ class StatementTranslator(CommonTranslator):
         ni = self.no_info(ctx)
         param = self.viper.LocalVarDecl('self', self.viper.Ref, np, ni)
         seq_ref = self.viper.SeqType(self.viper.Ref)
+        set_ref = self.viper.SetType(self.viper.Ref)
         seq_func_name = iterable_type.name + '___sil_seq__'
         iter_seq = self.viper.FuncApp(seq_func_name, [iterable], np, ni,
                                       seq_ref, [param])
@@ -100,23 +101,78 @@ class StatementTranslator(CommonTranslator):
         invar_pred = self.viper.PredicateAccess(invar_args, 'for_invariant', np,
                                                 ni)
         full_perm = self.viper.FullPerm(np, ni)
-        invar_acc = self.viper.PredicateAccessPredicate(invar_pred, full_perm,
-                                                        np, ni)
-        fold_invar = self.viper.Fold(invar_acc, np, ni)
-        unfold_invar = self.viper.Unfold(invar_acc, np, ni)
+        # invar_acc = self.viper.PredicateAccessPredicate(invar_pred, full_perm,
+        #                                                 np, ni)
+        # fold_invar = self.viper.Fold(invar_acc, np, ni)
+        # unfold_invar = self.viper.Unfold(invar_acc, np, ni)
 
         invariant = []
+        one = self.viper.IntLit(1, np, ni)
+        zero = self.viper.IntLit(0, np, ni)
+        twenty = self.viper.IntLit(20, np, ni)
+        frac_perm_120 = self.viper.FractionalPerm(one, twenty, np, ni)
         if iterable_type.name in {DICT_TYPE, LIST_TYPE, SET_TYPE}:
             field_name = iterable_type.name + '_acc'
-            acc_field = self.viper.Field(field_name, self.viper.Ref, np, ni)
-            one = self.viper.IntLit(1, np, ni)
-            twenty = self.viper.IntLit(20, np, ni)
+            field_type = seq_ref if iterable_type.name == LIST_TYPE else set_ref
+            acc_field = self.viper.Field(field_name, field_type, np, ni)
             field_acc = self.viper.FieldAccess(iterable, acc_field, np, ni)
-            frac_perm = self.viper.FractionalPerm(one, twenty, np, ni)
-            field_pred = self.viper.FieldAccessPredicate(field_acc, frac_perm,
-                                                         np, ni)
+            field_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                         frac_perm_120, np, ni)
             invariant.append(field_pred)
-        invariant.append(invar_acc)
+        else:
+            raise UnsupportedException(node)
+
+
+        list_acc_field = self.viper.Field('list_acc', seq_ref, np, ni)
+        iter_acc = self.viper.FieldAccess(iter_var.ref, list_acc_field, np, ni)
+        iter_acc_pred = self.viper.FieldAccessPredicate(iter_acc, frac_perm_120, np, ni)
+        invariant.append(iter_acc_pred)
+
+        iter_list_equal = self.viper.EqCmp(iter_acc, iter_seq, np, ni)
+        invariant.append(iter_list_equal)
+
+        index_field = self.viper.Field('__iter_index', self.viper.Int, np, ni)
+        iter_index_acc = self.viper.FieldAccess(iter_var.ref, index_field, np, ni)
+        iter_index_acc_pred = self.viper.FieldAccessPredicate(iter_index_acc, full_perm, np, ni)
+        invariant.append(iter_index_acc_pred)
+
+        previous_field = self.viper.Field('__previous', self.viper.Ref, np, ni)
+        iter_previous_acc = self.viper.FieldAccess(iter_var.ref, previous_field, np, ni)
+        iter_previous_acc_pred = self.viper.FieldAccessPredicate(iter_previous_acc, frac_perm_120, np, ni)
+        invariant.append(iter_previous_acc_pred)
+
+        previous_list_acc = self.viper.FieldAccess(iter_previous_acc, list_acc_field, np, ni)
+        previous_list_acc_pred = self.viper.FieldAccessPredicate(previous_list_acc, full_perm, np, ni)
+        invariant.append(previous_list_acc_pred)
+
+        index_minus_one = self.viper.Sub(iter_index_acc, one, np, ni)
+        object_class = ctx.program.classes['object']
+        list_class = ctx.program.classes['list']
+        previous_len = self.get_function_call(list_class, '__len__', [iter_previous_acc], [object_class], None, ctx)
+        previous_len_eq = self.viper.EqCmp(index_minus_one, previous_len, np, ni)
+        invariant.append(previous_len_eq)
+
+        no_error = self.viper.EqCmp(err_var.ref, self.viper.NullLit(np, ni), np, ni)
+        some_error = self.viper.NeCmp(err_var.ref, self.viper.NullLit(np, ni), np, ni)
+
+        index_nonneg = self.viper.GeCmp(iter_index_acc, zero, np, ni)
+        iter_list_len = self.viper.SeqLength(iter_acc, np, ni)
+        index_le_len = self.viper.LeCmp(iter_index_acc, iter_list_len, np, ni)
+        index_bounds = self.viper.And(index_nonneg, index_le_len, np, ni)
+        invariant.append(self.viper.Implies(no_error, index_bounds, np, ni))
+
+        iter_current_index = self.viper.SeqIndex(iter_acc, index_minus_one, np, ni)
+        current_element_index = self.viper.EqCmp(target_var.ref, iter_current_index, np, ni)
+        current_element_contained = self.viper.SeqContains(target_var.ref, iter_acc, np, ni)
+        current_element_info = self.viper.And(current_element_index, current_element_contained, np, ni)
+        invariant.append(self.viper.Implies(no_error, current_element_info, np, ni))
+
+        previous_elements = self.viper.SeqTake(iter_acc, index_minus_one, np, ni)
+        iter_previous_contents = self.viper.EqCmp(previous_list_acc, previous_elements, np, ni)
+        invariant.append(self.viper.Implies(no_error, iter_previous_contents, np, ni))
+
+        previous_is_all = self.viper.EqCmp(previous_list_acc, iter_acc, np, ni)
+        invariant.append(self.viper.Implies(some_error, previous_is_all, np, ni))
 
         locals = []
         bodyindex = 0
@@ -124,16 +180,15 @@ class StatementTranslator(CommonTranslator):
         while self.is_invariant(node.body[bodyindex]):
             inv_node = node.body[bodyindex]
             user_inv = self.translate_contract(inv_node, ctx)
-            user_inv = self.viper.Unfolding(invar_acc, user_inv,
-                                            self.to_position(inv_node, ctx),
-                                            self.no_info(ctx))
+            # user_inv = self.viper.Unfolding(invar_acc, user_inv,
+            #                                 self.to_position(inv_node, ctx),
+            #                                 self.no_info(ctx))
             invariant.append(user_inv)
             bodyindex += 1
-        body = [unfold_invar]
+        body = []
         body += flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         body.append(next_call)
-        body.append(fold_invar)
         body_block = self.translate_block(body,
                                           self.to_position(node, ctx),
                                           self.no_info(ctx))
@@ -146,8 +201,7 @@ class StatementTranslator(CommonTranslator):
                                 self.to_position(node, ctx), self.no_info(ctx))
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
                                         [], node, ctx)
-        return [iter_assign, next_call, fold_invar, loop, unfold_invar,
-                iter_del]
+        return [iter_assign, next_call, loop, iter_del]
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None

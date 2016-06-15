@@ -300,6 +300,15 @@ class ViperAST:
     def SeqContains(self, elem, s, position, info):
         return self.ast.SeqContains(elem, s, position, info)
 
+    def SeqLength(self, s, position, info):
+        return self.ast.SeqLength(s, position, info)
+
+    def SeqIndex(self, s, ind, position, info):
+        return self.ast.SeqIndex(s, ind, position, info)
+
+    def SeqTake(self, s, end, postion, info):
+        return self.ast.SeqTake(s, end, postion, info)
+
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info)
 
@@ -334,9 +343,6 @@ class ViperAST:
         return self.ast.NullLit(position, info)
 
     def Forall(self, variables, triggers, exp, position, info):
-        print(variables)
-        print(triggers)
-        print(exp)
         return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
                                exp, position, info)
 

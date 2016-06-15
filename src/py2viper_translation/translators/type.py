@@ -70,10 +70,11 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                if node.id in ctx.var_aliases:
-                    var = ctx.var_aliases[node.id]
-                else:
-                    var = ctx.actual_function.get_variable(node.id)
+                # var aliases should never change the type of a variable,
+                # so we'll ignore those here.
+                # TODO: var_aliases and alt_types don't really go together,
+                # do they?
+                var = ctx.actual_function.get_variable(node.id)
                 if node.lineno in var.alt_types:
                     return var.alt_types[node.lineno]
                 else:
