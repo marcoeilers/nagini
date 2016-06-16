@@ -1,7 +1,9 @@
 import logging
 import mypy.build
+import mypy.fastparse
 import sys
 
+from functools import wraps
 from mypy.build import BuildSource
 from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import LITERALS
@@ -10,6 +12,29 @@ from typing import List
 
 
 logger = logging.getLogger('py2viper_translation.lib.typeinfo')
+
+
+def with_column(f):
+    @wraps(f)
+    def wrapper(self, ast):
+        node = f(self, ast)
+        if hasattr(ast, 'col_offset'):
+            node.column = ast.col_offset
+        return node
+    return wrapper
+
+
+ASTConverter = mypy.fastparse.ASTConverter
+for name in dir(ASTConverter):
+    m = getattr(ASTConverter, name)
+    if callable(m) and name.startswith('visit_'):
+        setattr(ASTConverter, name, with_column(m))
+
+
+def col(node):
+    if hasattr(node, 'column'):
+        return node.column
+    return None
 
 
 class TypeException(Exception):
@@ -36,28 +61,31 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         rectype = self.type_of(o.expr)
         if not self._is_result_call(o.expr):
             self.set_type([rectype.type.name(), o.name], self.type_of(o),
-                          o.line)
+                          o.line, col(o))
         super().visit_member_expr(o)
 
     def visit_try_stmt(self, o: mypy.nodes.TryStmt):
         for var in o.vars:
             if var is not None:
-                self.set_type(self.prefix + [var.name], self.type_of(var), var.line)
+                self.set_type(self.prefix + [var.name], self.type_of(var),
+                              var.line, col(var))
         for block in o.handlers:
             block.accept(self)
 
     def visit_name_expr(self, o: mypy.nodes.NameExpr):
+        print("name " + o.name)
         if not o.name in LITERALS:
-            self.set_type(self.prefix + [o.name], self.type_of(o), o.line)
+            self.set_type(self.prefix + [o.name], self.type_of(o), o.line,
+                          col(o))
 
     def visit_func_def(self, o: mypy.nodes.FuncDef):
         oldprefix = self.prefix
         self.prefix = self.prefix + [o.name()]
         functype = self.type_of(o)
-        self.set_type(self.prefix, functype, o.line)
+        self.set_type(self.prefix, functype, o.line, col(o))
         for arg in o.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
-                          arg.variable.type, arg.line)
+                          arg.variable.type, arg.line, col(arg))
         super().visit_func_def(o)
         self.prefix = oldprefix
 
@@ -66,7 +94,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = self.prefix + ['lambda' + str(o.line)]
         for arg in o.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
-                          arg.variable.type, arg.line)
+                          arg.variable.type, arg.line, col(arg))
         o.body.accept(self)
         self.prefix = oldprefix
 
@@ -76,7 +104,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_class_def(o)
         self.prefix = oldprefix
 
-    def set_type(self, fqn, type, line):
+    def set_type(self, fqn, type, line, col):
+        print('have set_type, line ' + str(line) + ', col ' + str(col))
         if isinstance(type, mypy.types.CallableType):
             type = type.ret_type
         if not type or isinstance(type, mypy.types.AnyType):
@@ -89,10 +118,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
+                print('have alt type, line ' + str(line) + ', col ' + str(col))
                 # type change after isinstance
                 if key not in self.alt_types:
                     self.alt_types[key] = {}
-                self.alt_types[key][line] = type
+                self.alt_types[key][(line, col)] = type
                 return
         self.all_types[key] = type
 
@@ -111,6 +141,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def visit_call_expr(self, o: mypy.nodes.CallExpr):
         for a in o.args:
             a.accept(self)
+        o.callee.accept(self)
 
     def type_of(self, node):
         if isinstance(node, mypy.nodes.FuncDef):
@@ -162,7 +193,8 @@ class TypeInfo:
             res = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 target=mypy.build.TYPE_CHECK,
-                bin_dir=config.mypy_dir
+                bin_dir=config.mypy_dir,
+                flags=[mypy.build.FAST_PARSER]
                 )
             if res.errors:
                 report_errors(res.errors)
@@ -176,7 +208,6 @@ class TypeInfo:
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
-
 
     def get_type(self, prefix: List[str], name: str):
         """

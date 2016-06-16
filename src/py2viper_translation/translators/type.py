@@ -75,8 +75,10 @@ class TypeTranslator(CommonTranslator):
                 # TODO: var_aliases and alt_types don't really go together,
                 # do they?
                 var = ctx.actual_function.get_variable(node.id)
-                if node.lineno in var.alt_types:
-                    return var.alt_types[node.lineno]
+                col = node.col_offset if hasattr(node, 'col_offset') else None
+                key = (node.lineno, col)
+                if key in var.alt_types:
+                    return var.alt_types[key]
                 else:
                     return var.type
         elif isinstance(node, ast.Num):
