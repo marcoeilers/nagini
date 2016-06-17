@@ -314,6 +314,14 @@ class ProgramTranslator(CommonTranslator):
             methods.append(self.translate_method(method, ctx))
         for pred in program.predicates.values():
             predicates.append(self.translate_predicate(pred, ctx))
+        for operation in program.io_operations.values():
+            predicate, getters, checkers = self.translate_io_operation(
+                    operation,
+                    ctx)
+            predicates.append(predicate)
+            functions.extend(getters)
+            methods.extend(checkers)
+
         for class_name, cls in program.classes.items():
             if class_name in PRIMITIVES:
                 continue

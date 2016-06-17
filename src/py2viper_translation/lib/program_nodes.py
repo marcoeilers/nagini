@@ -81,6 +81,8 @@ class PythonProgram(PythonScope):
             predicate.process(self.get_fresh_name(name), translator)
         for name, var in self.global_vars.items():
             var.process(self.get_fresh_name(name), translator)
+        for name, operation in self.io_operations.items():
+            operation.process(self.get_fresh_name(name), translator)
 
     def get_scope_prefix(self) -> List[str]:
         return []
@@ -488,6 +490,25 @@ class PythonIOOperation(PythonNode, PythonScope):
         self._terminates = None
         self._termination_measure = None
 
+    def _process_var_list(self, var_list: List['PythonVar'],
+                          translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for all variables in ``var_list``.
+        """
+        for var in var_list:
+            var.process(self.get_fresh_name(var.name), translator)
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for preset, postset, inputs and
+        outputs. Also, sets the ``sil_name``.
+        """
+        self.sil_name = sil_name
+        self._process_var_list(self._preset, translator)
+        self._process_var_list(self._postset, translator)
+        self._process_var_list(self._inputs, translator)
+        self._process_var_list(self._outputs, translator)
+
     def set_preset(self, preset: List['PythonVar']) -> None:
         assert len(preset) == 1
         self._preset = preset
@@ -530,6 +551,19 @@ class PythonIOOperation(PythonNode, PythonScope):
             return True
         else:
             return False
+
+    def get_arguments(self) -> List['PythonVar']:
+        """
+        Returns a list of arguments that uniquely identify IO operation
+        instance.
+        """
+        return self._preset + self._inputs
+
+    def get_results(self) -> List['PythonVar']:
+        """
+        Returns a list of results for this IO operation.
+        """
+        return self._postset + self._outputs
 
 
 class PythonExceptionHandler(PythonNode):
