@@ -6,6 +6,7 @@ from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
+    PythonIOOperation,
     PythonMethod,
     PythonTryBlock,
     PythonType,
@@ -105,7 +106,7 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_io_operation(
             self,
-            operation: PythonMethod,
+            operation: PythonIOOperation,
             ctx: Context,
             ) -> Tuple[
                 'ast.silver.Predicate',
