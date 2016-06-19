@@ -10,6 +10,9 @@ test: bin/py.test
 mypy: bin/mypy
 	bin/mypy --fast-parser -s $(CHECKED_FILES)
 
+flake8: bin/flake8
+	bin/flake8 --max-complexity 12 $(CHECKED_FILES)
+
 docs: bin/sphinxbuilder
 	bin/sphinxbuilder
 
@@ -23,6 +26,9 @@ bin/py.test: $(BUILDOUT_DEPS)
 	$(BUILDOUT_CMD)
 
 bin/mypy: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/flake8: $(BUILDOUT_DEPS)
 	$(BUILDOUT_CMD)
 
 bin/sphinxbuilder: $(BUILDOUT_DEPS)
