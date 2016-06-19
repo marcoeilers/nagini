@@ -32,21 +32,21 @@ method list___init__() returns (res: Ref)
 }
 
 function list___contains__(self: Ref, item: Ref): Bool
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     ensures result == (item in self.list_acc)
 
 function list___bool__(self: Ref) : Bool
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     ensures result == (|self.list_acc| != 0)
 
 function list___len__(self: Ref) : Int
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
 {
  |self.list_acc|
 }
 
 function list___getitem__(self: Ref, key: Int): Ref
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     requires key >= 0
     requires key < list___len__(self)
     ensures result == self.list_acc[key]
@@ -114,7 +114,7 @@ method Iterator___del__(self: Ref)
 }
 
 function list___sil_seq__(self: Ref): Seq[Ref]
-    requires acc(self.list_acc, 1/80)
+    requires acc(self.list_acc, wildcard)
 {
     self.list_acc
 }

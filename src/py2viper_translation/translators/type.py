@@ -250,6 +250,9 @@ class TypeTranslator(CommonTranslator):
 
     def set_type_args(self, lhs: Expr, type: GenericType,
                       prefix: List[Expr], ctx: Context) -> Expr:
+        """
+        Creates an expression specifying the type of lhs and its type arguments.
+        """
         args = type.type_args
         result = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
 
@@ -270,6 +273,10 @@ class TypeTranslator(CommonTranslator):
 
     def set_type_nargs(self, lhs: Expr, type: GenericType,
                        prefix: List[Expr], ctx: Context) -> Expr:
+        """
+        Creates an expression specifying the number of type args the type
+        of lhs has at each level of nesting.
+        """
         args = type.type_args
         if type.exact_length:
             nargs = len(type.type_args)
