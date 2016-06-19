@@ -4,6 +4,8 @@ import os
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from py2viper_translation.analyzer_io import IOOperationAnalyzer
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS, OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
@@ -21,8 +23,8 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
-    UnsupportedException
-)
+    UnsupportedException,
+    )
 from typing import Dict
 
 
@@ -45,6 +47,7 @@ class Analyzer(ast.NodeVisitor):
         self.modules = [os.path.abspath(path)]
         self.asts = {}
         self.node_factory = node_factory
+        self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -177,6 +180,9 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if not isinstance(name, str):
             raise Exception(name)
+        if self.is_io_operation(node):
+            self.io_operation_analyzer.analyze_io_operation(node)
+            return
         if self.current_class is None:
             scope_container = self.program
         else:
@@ -211,6 +217,7 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
+        assert self.current_function is not None
         for arg in node.args:
             self.visit(arg, node)
         self.current_function.nargs = len(node.args)
@@ -269,6 +276,12 @@ class Analyzer(ast.NodeVisitor):
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
                     node.args[1])
+        if (isinstance(node.func, ast.Name) and
+            node.func.id in IO_OPERATION_PROPERTY_FUNCS):
+            raise InvalidProgramException(
+                node,
+                'invalid.io_operation.misplaced_property',
+                )
         self.visit_default(node)
 
     def visit_Name(self, node: ast.Name) -> None:
@@ -471,3 +484,7 @@ class Analyzer(ast.NodeVisitor):
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return (len(func.decorator_list) == 1
                 and func.decorator_list[0].id == 'Predicate')
+
+    def is_io_operation(self, func: ast.FunctionDef) -> bool:
+        return (len(func.decorator_list) == 1
+                and func.decorator_list[0].id == 'IOOperation')

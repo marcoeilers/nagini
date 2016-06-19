@@ -129,8 +129,9 @@ class ViperAST:
         return self.ast.Field(name, type, position, info)
 
     def Predicate(self, name, args, body, position, info):
+        body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Predicate(name, self.to_seq(args),
-                                  self.scala.Some(body), position, info)
+                                  body, position, info)
 
     def PredicateAccess(self, args, pred_name, position, info):
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
