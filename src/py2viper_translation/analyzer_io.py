@@ -4,13 +4,13 @@ Analyzer that collects information about IO operations.
 
 
 import ast
-import py2viper_translation
+import py2viper_translation   # noqa
 
 
 from mypy.types import AnyType
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from py2viper_translation.lib.constants import BOOL_TYPE
-from py2viper_translation.lib.program_nodes import (
+from py2viper_translation.lib.program_nodes import (  # noqa
     ProgramNodeFactory,
     PythonClass,
     PythonIOOperation,
@@ -36,10 +36,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._program = parent.program
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.get_class('Place') # type: PythonClass
+        self._place_class = parent.get_class('Place')   # type: PythonClass
 
-        self._current_io_operation = None # type: PythonIOOperation
-        self._current_node = None # type: ast.FunctionDef
+        self._current_io_operation = None   # type: PythonIOOperation
+        self._current_node = None           # type: ast.FunctionDef
         self._in_property = False
 
     def _raise_invalid_operation(
@@ -96,8 +96,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._raise_invalid_operation('kwarg')
         for default in node.args.defaults:
             if (not isinstance(default, ast.Call) or
-                not isinstance(default.func, ast.Name) or   # type: ignore
-                not default.func.id == 'Result'):           # type: ignore
+                    not isinstance(default.func, ast.Name) or   # type: ignore
+                    not default.func.id == 'Result'):           # type: ignore
                 self._raise_invalid_operation('default_argument')
 
     def _typeof(self, node: ast.AST) -> PythonType:
@@ -114,8 +114,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         Checks that exactly one place is in preset, sets operation
         preset and returns input list with all places removed.
         """
-        if (not inputs or
-            self._typeof(inputs[0]) != self._place_class):
+        if (not inputs or self._typeof(inputs[0]) != self._place_class):
             self._raise_invalid_operation('invalid_preset')
         for input in inputs[1:]:
             if self._typeof(input) == self._place_class:
@@ -191,11 +190,11 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         assert self._current_node is not None
 
         if (isinstance(node.func, ast.Name) and
-            node.func.id in IO_OPERATION_PROPERTY_FUNCS):
+                node.func.id in IO_OPERATION_PROPERTY_FUNCS):
 
             for child in self._current_node.body:
                 if (isinstance(child, ast.Expr) and
-                    child.value == node):
+                        child.value == node):
                     break
             else:
                 self._raise_invalid_operation(
