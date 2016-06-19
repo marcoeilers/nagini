@@ -1,4 +1,5 @@
 import ast
+import logging
 import mypy
 import os
 import py2viper_translation.external.astpp
@@ -25,6 +26,9 @@ from py2viper_translation.lib.util import (
     UnsupportedException
 )
 from typing import Dict
+
+
+logger = logging.getLogger('py2viper_translation.analyzer')
 
 
 class Analyzer(ast.NodeVisitor):
@@ -63,7 +67,7 @@ class Analyzer(ast.NodeVisitor):
             # ignore
             pass
         self.asts[abs_path] = parse_result
-        # print(py2viper_translation.external.astpp.dump(parse_result))
+        logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if get_func_name(stmt) != 'Import':

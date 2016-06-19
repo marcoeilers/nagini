@@ -150,20 +150,19 @@ class MethodTranslator(CommonTranslator):
         if func.var_arg:
             type_check = self.get_parameter_typeof(func.var_arg, ctx)
             pres.append(type_check)
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
         if func.kw_arg:
             type_check = self.get_parameter_typeof(func.kw_arg, ctx)
             set_ref = self.viper.SetType(self.viper.Ref)
             dict_acc_field = self.viper.Field('dict_acc', set_ref,
-                                              self.no_position(ctx),
-                                              self.no_info(ctx))
+                                              pos, info)
             field_acc = self.viper.FieldAccess(func.kw_arg.ref, dict_acc_field,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
+                                               pos, info)
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
             acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
-                                                       self.no_position(ctx),
-                                                       self.no_info(ctx))
+                                                       pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
         return pres

@@ -26,54 +26,55 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.path = path
         self.ignored_lines = ignored_lines
 
-    def _is_result_call(self, o: mypy.nodes.Node) -> bool:
-        if isinstance(o, mypy.nodes.CallExpr):
-            if o.callee.name == 'Result':
+    def _is_result_call(self, node: mypy.nodes.Node) -> bool:
+        if isinstance(node, mypy.nodes.CallExpr):
+            if node.callee.name == 'Result':
                 return True
         return False
 
-    def visit_member_expr(self, o: mypy.nodes.MemberExpr):
-        rectype = self.type_of(o.expr)
-        if not self._is_result_call(o.expr):
-            self.set_type([rectype.type.name(), o.name], self.type_of(o),
-                          o.line)
-        super().visit_member_expr(o)
+    def visit_member_expr(self, node: mypy.nodes.MemberExpr):
+        rectype = self.type_of(node.expr)
+        if not self._is_result_call(node.expr):
+            self.set_type([rectype.type.name(), node.name], self.type_of(node),
+                          node.line)
+        super().visit_member_expr(node)
 
-    def visit_try_stmt(self, o: mypy.nodes.TryStmt):
-        for var in o.vars:
+    def visit_try_stmt(self, node: mypy.nodes.TryStmt):
+        for var in node.vars:
             if var is not None:
                 self.set_type(self.prefix + [var.name], self.type_of(var), var.line)
-        for block in o.handlers:
+        for block in node.handlers:
             block.accept(self)
 
-    def visit_name_expr(self, o: mypy.nodes.NameExpr):
-        if not o.name in LITERALS:
-            self.set_type(self.prefix + [o.name], self.type_of(o), o.line)
+    def visit_name_expr(self, node: mypy.nodes.NameExpr):
+        if not node.name in LITERALS:
+            self.set_type(self.prefix + [node.name], self.type_of(node),
+                          node.line)
 
-    def visit_func_def(self, o: mypy.nodes.FuncDef):
+    def visit_func_def(self, node: mypy.nodes.FuncDef):
         oldprefix = self.prefix
-        self.prefix = self.prefix + [o.name()]
-        functype = self.type_of(o)
-        self.set_type(self.prefix, functype, o.line)
-        for arg in o.arguments:
+        self.prefix = self.prefix + [node.name()]
+        functype = self.type_of(node)
+        self.set_type(self.prefix, functype, node.line)
+        for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
                           arg.variable.type, arg.line)
-        super().visit_func_def(o)
+        super().visit_func_def(node)
         self.prefix = oldprefix
 
-    def visit_func_expr(self, o: mypy.nodes.FuncExpr):
+    def visit_func_expr(self, node: mypy.nodes.FuncExpr):
         oldprefix = self.prefix
-        self.prefix = self.prefix + ['lambda' + str(o.line)]
-        for arg in o.arguments:
+        self.prefix = self.prefix + ['lambda' + str(node.line)]
+        for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
                           arg.variable.type, arg.line)
-        o.body.accept(self)
+        node.body.accept(self)
         self.prefix = oldprefix
 
-    def visit_class_def(self, o: mypy.nodes.ClassDef):
+    def visit_class_def(self, node: mypy.nodes.ClassDef):
         oldprefix = self.prefix
-        self.prefix = self.prefix + [o.name]
-        super().visit_class_def(o)
+        self.prefix = self.prefix + [node.name]
+        super().visit_class_def(node)
         self.prefix = oldprefix
 
     def set_type(self, fqn, type, line):
@@ -108,8 +109,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return all_eq
         return t1 == t2
 
-    def visit_call_expr(self, o: mypy.nodes.CallExpr):
-        for a in o.args:
+    def visit_call_expr(self, node: mypy.nodes.CallExpr):
+        for a in node.args:
             a.accept(self)
 
     def type_of(self, node):

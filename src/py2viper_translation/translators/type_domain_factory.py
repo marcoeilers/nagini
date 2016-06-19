@@ -42,14 +42,10 @@ class TypeDomainFactory:
     def get_default_functions(self,
                               ctx: Context) -> List['silver.ast.DomainFunc']:
         result = [
-            # self.create_null_type(ctx),
             self.extends_func(ctx),
             self.issubtype_func(ctx),
             self.isnotsubtype_func(ctx),
             self.typeof_func(ctx),
-            # self.type_arg_func(ctx),
-            # self.type_nargs_func(ctx),
-            # self.create_object_type(ctx)
         ]
         result += self.type_arg_funcs(ctx)
         result += self.type_nargs_funcs(ctx)
@@ -635,13 +631,9 @@ class TypeDomainFactory:
 
         name = 'get_type_arg' + str(len(indices))
         args = [lhs] + indices
-        type_arg_func = self.viper.DomainFuncApp(name,
-                                                 args,
-                                                 {}, self.type_type(),
-                                                 args,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx),
-                                                 self.type_domain)
+        type_arg_func = self.viper.DomainFuncApp(name, args, {},
+            self.type_type(), args, self.no_position(ctx),
+            self.no_info(ctx), self.type_domain)
         type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
@@ -655,12 +647,14 @@ class TypeDomainFactory:
                          indices: List['Expr'], ctx: Context) -> 'Expr':
         name = 'get_type_nargs' + str(len(indices))
         args = [lhs] + indices
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
         type_arg_func = self.viper.DomainFuncApp(name,
                                                  args,
                                                  {}, self.viper.Int,
                                                  args,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx),
+                                                 pos,
+                                                 info,
                                                  self.type_domain)
         nargs_lit = self.viper.IntLit(nargs, self.no_position(ctx),
                                       self.no_info(ctx))

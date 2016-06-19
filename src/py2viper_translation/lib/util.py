@@ -158,10 +158,17 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
 
 
 def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
+    """
+    In a for loop like
+    for x in xs:
+    Previous(x) refers to the objects processed in previous iterations.
+    Given the Previous-call-node, this function returns the for loop to whose
+    previous iterations the node refers.
+    """
     if isinstance(node, ast.For):
         if isinstance(node.target, ast.Name):
             if node.target.id == name:
                 return node
-    if not node._parent:
+    if not hasattr(node, '_parent') or not node._parent:
         return None
     return find_loop_for_previous(node._parent, name)
