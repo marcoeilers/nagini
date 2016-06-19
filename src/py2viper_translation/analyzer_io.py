@@ -4,6 +4,7 @@ Analyzer that collects information about IO operations.
 
 
 import ast
+import py2viper_translation
 
 
 from mypy.types import AnyType
@@ -11,11 +12,15 @@ from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
     ProgramNodeFactory,
+    PythonClass,
     PythonIOOperation,
     PythonType,
     PythonVar,
     )
-from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+    )
 from typing import List
 
 
@@ -24,15 +29,17 @@ class IOOperationAnalyzer(ast.NodeVisitor):
     Walks through IO operation AST and collects the needed information.
     """
 
-    def __init__(self, parent: 'Analyzer', node_factory: ProgramNodeFactory):
+    def __init__(
+            self, parent: 'py2viper_translation.analyzer.Analyzer',
+            node_factory: ProgramNodeFactory) -> None:
         self._parent = parent
         self._program = parent.program
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.get_class('Place')
+        self._place_class = parent.get_class('Place') # type: PythonClass
 
-        self._current_io_operation = None
-        self._current_node = None
+        self._current_io_operation = None # type: PythonIOOperation
+        self._current_node = None # type: ast.FunctionDef
         self._in_property = False
 
     def _raise_invalid_operation(
@@ -89,8 +96,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._raise_invalid_operation('kwarg')
         for default in node.args.defaults:
             if (not isinstance(default, ast.Call) or
-                not isinstance(default.func, ast.Name) or
-                not default.func.id == 'Result'):
+                not isinstance(default.func, ast.Name) or   # type: ignore
+                not default.func.id == 'Result'):           # type: ignore
                 self._raise_invalid_operation('default_argument')
 
     def _typeof(self, node: ast.AST) -> PythonType:
@@ -102,7 +109,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             node.arg)
         return self._parent.convert_type(typ)
 
-    def _set_preset(self, inputs: List[ast.AST]) -> List[ast.AST]:
+    def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
         """
         Checks that exactly one place is in preset, sets operation
         preset and returns input list with all places removed.
@@ -118,7 +125,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_io_operation.set_preset([in_place])
         return inputs[1:]
 
-    def _set_postset(self, outputs: List[ast.AST]) -> List[ast.AST]:
+    def _set_postset(self, outputs: List[ast.arg]) -> List[ast.arg]:
         """
         Checks that exactly one place is in postset, sets operation
         postset and returns input list with all places removed.
