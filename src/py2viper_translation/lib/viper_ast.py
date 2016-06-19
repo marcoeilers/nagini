@@ -189,6 +189,9 @@ class ViperAST:
                                         domain_name)
         return result
 
+    def TypeVar(self, name):
+        return self.ast.TypeVar(name)
+
     def MethodCall(self, methodname, args, targets, position, info):
         return self.ast.MethodCall(methodname, self.to_seq(args),
                                    self.to_seq(targets), position, info)

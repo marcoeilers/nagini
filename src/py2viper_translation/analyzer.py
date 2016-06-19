@@ -112,14 +112,13 @@ class Analyzer(ast.NodeVisitor):
     def _add_interface_method(self, method_name, if_method, cls, pure):
         method = PythonMethod(method_name, None, cls, self.program,
                               pure, False, self.node_factory, True)
-        method.args = OrderedDict()
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
             arg = self.node_factory.create_python_var(name, None,
                                                       self.get_class(arg_type))
             ctr += 1
-            method.args[name] = arg
+            method.add_arg(name, arg)
         if if_method['type']:
             method.type = self.get_class(if_method['type'])
         if if_method.get('generic_type'):
@@ -208,6 +207,8 @@ class Analyzer(ast.NodeVisitor):
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
+        if func.pure and not functype:
+            raise InvalidProgramException(node, 'function.type.none')
         func.type = self.convert_type(functype)
         self.current_function = func
         self.visit(node.args, node)
@@ -263,7 +264,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
-            assert self.current_function is not None
+            if not self.current_function or self.current_function.predicate:
+                raise InvalidProgramException(node, 'contract.outside.function')
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])
             elif node.func.id == 'Ensures':

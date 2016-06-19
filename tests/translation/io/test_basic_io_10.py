@@ -2,8 +2,8 @@ from py2viper_contracts.contracts import Requires, Predicate
 from py2viper_contracts.io import *
 
 
-#:: ExpectedOutput(invalid.program:invalid.io_operation.return_type_not_bool)
 @IOOperation
+#:: ExpectedOutput(type.error:Encountered Any type, type annotation missing?)
 def read_int_io(
         t_pre: Place,
         result: int = Result(),

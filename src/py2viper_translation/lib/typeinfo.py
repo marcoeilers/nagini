@@ -68,6 +68,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = oldprefix
 
     def set_type(self, fqn, type, line):
+        if isinstance(type, mypy.types.CallableType):
+            type = type.ret_type
         if not type or isinstance(type, mypy.types.AnyType):
             if line in self.ignored_lines:
                 return
@@ -107,14 +109,17 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return node.type
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
-                type = self.all_types[tuple(self.prefix)].ret_type
+                type = self.all_types[tuple(self.prefix)]
                 return type
         if node in self.type_map:
             result = self.type_map[node]
             return result
         else:
             msg = self.path + ':' + str(node.get_line()) + ': error: '
-            msg += 'dead.code'
+            if isinstance(node, mypy.nodes.FuncDef):
+                msg += 'Encountered Any type, type annotation missing?'
+            else:
+                msg += 'dead.code'
             raise TypeException([msg])
 
     def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
