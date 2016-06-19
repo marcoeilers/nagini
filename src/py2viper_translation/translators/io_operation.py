@@ -1,12 +1,13 @@
-from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonVar,
     )
-from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
 from typing import Tuple, List
+
+if False:         # Just to make mypy happy.
+    import viper  # noqa
 
 
 class IOOperationTranslator(CommonTranslator):
@@ -16,9 +17,9 @@ class IOOperationTranslator(CommonTranslator):
             operation: PythonIOOperation,
             ctx: Context,
             ) -> Tuple[
-                'ast.silver.Predicate',
-                List['ast.silver.Function'],
-                List['ast.silver.Method'],
+                'viper.silver.ast.Predicate',
+                List['viper.silver.ast.Function'],
+                List['viper.silver.ast.Method'],
                 ]:
         """ Translates IO operation to Silver.
         """
