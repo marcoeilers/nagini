@@ -1,17 +1,41 @@
-test: buildout
+CHECKED_FILES=\
+							src/py2viper_translation/analyzer_io.py \
+							src/py2viper_translation/translators/io_operation.py
+BUILDOUT_DEPS=bin/buildout buildout.cfg
+BUILDOUT_CMD=bin/buildout -v
+
+test: bin/py.test
 	bin/py.test -x src/py2viper_translation/tests.py
 
-docs: buildout
+mypy: bin/mypy
+	bin/mypy --fast-parser -s $(CHECKED_FILES)
+
+docs: bin/sphinxbuilder
 	bin/sphinxbuilder
 
-docs_coverage: buildout
+docs_coverage: bin/python bin/sphinx-build
 	bin/python bin/sphinx-build -b coverage docs/source docs/build/coverage
 
-doctest: buildout
+doctest: bin/python bin/sphinx-build
 	bin/python bin/sphinx-build -b doctest docs/source docs/build/doctest
 
-buildout: bin/buildout
-	bin/buildout -v
+bin/py.test: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/mypy: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/sphinxbuilder: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/sphinx-build: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/python: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+buildout: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
 
 bin/buildout: bootstrap.py env deps/py2viper-contracts
 	env/bin/python bootstrap.py
