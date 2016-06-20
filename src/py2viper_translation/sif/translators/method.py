@@ -48,13 +48,6 @@ class SIFMethodTranslator(MethodTranslator):
         ctx.set_prime_ctx()
         pres += super()._translate_pres(method, ctx)
         ctx.set_normal_ctx()
-        # # Repeat the non-null check for receiver.
-        # if method.cls:
-        #     not_null = self.viper.NeCmp(
-        #         next(iter(method.args.values())).var_prime.ref,
-        #         self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-        #         self.no_position(ctx), self.no_info(ctx))
-        #     pres.insert(1, not_null)
         ctx.in_pres = False
         return pres
 
