@@ -4,24 +4,18 @@ Analyzer that collects information about IO operations.
 
 
 import ast
-import py2viper_translation   # noqa
-
 
 from mypy.types import AnyType
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from typing import List
+
+import py2viper_translation     # pylint: disable=unused-import
+from py2viper_translation.lib import program_nodes as nodes
 from py2viper_translation.lib.constants import BOOL_TYPE
-from py2viper_translation.lib.program_nodes import (  # noqa
-    ProgramNodeFactory,
-    PythonClass,
-    PythonIOOperation,
-    PythonType,
-    PythonVar,
-    )
 from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
-    )
-from typing import List
+)
 
 
 class IOOperationAnalyzer(ast.NodeVisitor):
@@ -31,14 +25,14 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
     def __init__(
             self, parent: 'py2viper_translation.analyzer.Analyzer',
-            node_factory: ProgramNodeFactory) -> None:
+            node_factory: nodes.ProgramNodeFactory) -> None:
         self._parent = parent
         self._program = parent.program
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.get_class('Place')   # type: PythonClass
+        self._place_class = parent.get_class('Place')  # type: nodes.PythonClass
 
-        self._current_io_operation = None   # type: PythonIOOperation
+        self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
         self._in_property = False
 
@@ -52,12 +46,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         raise InvalidProgramException(
             node,
             'invalid.io_operation.' + error_type,
-            )
+        )
 
     def _create_io_operation(
-            self,
-            node: ast.FunctionDef
-            ) -> PythonIOOperation:
+            self, node: ast.FunctionDef) -> nodes.PythonIOOperation:
         """
         Creates non-initialized IO operation from an AST node and adds
         it to program.
@@ -69,7 +61,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             node,
             self._program,
             self._node_factory,
-            )
+        )
         self._program.io_operations[name] = operation
         return operation
 
@@ -100,7 +92,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                     not default.func.id == 'Result'):           # type: ignore
                 self._raise_invalid_operation('default_argument')
 
-    def _typeof(self, node: ast.AST) -> PythonType:
+    def _typeof(self, node: ast.AST) -> nodes.PythonType:
         """ Returns the type of the given AST node.
         """
         assert isinstance(node, ast.arg)
@@ -114,10 +106,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         Checks that exactly one place is in preset, sets operation
         preset and returns input list with all places removed.
         """
-        if (not inputs or self._typeof(inputs[0]) != self._place_class):
+        if not inputs or self._typeof(inputs[0]) != self._place_class:
             self._raise_invalid_operation('invalid_preset')
-        for input in inputs[1:]:
-            if self._typeof(input) == self._place_class:
+        for inp in inputs[1:]:
+            if self._typeof(inp) == self._place_class:
                 self._raise_invalid_operation('invalid_preset')
         in_place = self._node_factory.create_python_var(
             inputs[0].arg, inputs[0], self._place_class)
@@ -151,19 +143,20 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._check_arg_types()
 
         inputs = node.args.args[:-len(node.args.defaults)]
-        outputs = node.args.args[len(node.args.defaults)-1:]
+        outputs = node.args.args[len(node.args.defaults) - 1:]
 
         inputs = self._set_preset(inputs)
         outputs = self._set_postset(outputs)
 
-        def node_to_var(node: ast.arg) -> PythonVar:
+        def node_to_var(node: ast.arg) -> nodes.PythonVar:
+            """ Creates variable from argument. """
             return self._node_factory.create_python_var(
                 node.arg, node, self._typeof(node))
 
         self._current_io_operation.set_inputs(
-                list(map(node_to_var, inputs)))
+            list(map(node_to_var, inputs)))
         self._current_io_operation.set_outputs(
-                list(map(node_to_var, outputs)))
+            list(map(node_to_var, outputs)))
 
     def analyze_io_operation(self, node: ast.FunctionDef) -> None:
         """
@@ -185,7 +178,11 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_node = None
         self._current_io_operation = None
 
-    def visit_Call(self, node: ast.Call) -> None:
+    def visit_Call(self, node: ast.Call) -> None:   # pylint: disable=invalid-name
+        """
+        Currently, only parses properties such as ``Terminates`` and
+        ``TerminationMeasure``.
+        """
         assert self._current_io_operation is not None
         assert self._current_node is not None
 
@@ -198,21 +195,21 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                     break
             else:
                 self._raise_invalid_operation(
-                        'misplaced_property',
-                        node)
+                    'misplaced_property',
+                    node)
 
             operation = self._current_io_operation
             arg = node.args[0]
             if node.func.id == 'Terminates':
                 if not operation.set_terminates(arg):
                     self._raise_invalid_operation(
-                            'duplicate_property',
-                            node)
+                        'duplicate_property',
+                        node)
             elif node.func.id == 'TerminationMeasure':
                 if not operation.set_termination_measure(arg):
                     self._raise_invalid_operation(
-                            'duplicate_property',
-                            node)
+                        'duplicate_property',
+                        node)
             else:
                 raise UnsupportedException(node)
             self._in_property = True
@@ -223,7 +220,11 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             for arg in node.args:
                 self.visit(arg)
 
-    def visit_Name(self, node: ast.Name) -> None:
+    def visit_Name(self, node: ast.Name) -> None:   # pylint: disable=invalid-name
+        """
+        Checks if provided node is an operation input and raises an
+        error, if it is not.
+        """
         if self._in_property:
             if not self._current_io_operation.is_input(node.id):
                 self._raise_invalid_operation('depends_on_not_imput', node)
