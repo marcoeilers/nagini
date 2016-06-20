@@ -78,6 +78,15 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
 
+        if method.cls:
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+                                        self.viper.NullLit(
+                                            self.no_position(ctx),
+                                            self.no_info(ctx)),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+            pres = [not_null] + pres
+
         return pres
 
     def _translate_posts(self, method: PythonMethod,
@@ -88,9 +97,9 @@ class MethodTranslator(CommonTranslator):
         """
         posts = []
         no_error = self.viper.EqCmp(err_var,
-                                   self.viper.NullLit(self.no_position(ctx),
-                                                      self.no_info(ctx)),
-                                   self.no_position(ctx), self.no_info(ctx))
+                                    self.viper.NullLit(self.no_position(ctx),
+                                                       self.no_info(ctx)),
+                                    self.no_position(ctx), self.no_info(ctx))
         for post in method.postcondition:
             stmt, expr = self.translate_expr(post, ctx)
             if stmt:
@@ -199,11 +208,11 @@ class MethodTranslator(CommonTranslator):
                                           'function.throws.exception')
         # create preconditions
         pres = self._translate_pres(func, ctx)
-        if func.cls:
-            not_null = self.viper.NeCmp(next(iter(func.args.values())).ref,
-                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-                self.no_position(ctx), self.no_info(ctx))
-            pres = [not_null] + pres
+        # if func.cls:
+        #     not_null = self.viper.NeCmp(next(iter(func.args.values())).ref,
+        #         self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+        #         self.no_position(ctx), self.no_info(ctx))
+        #     pres = [not_null] + pres
         # create postconditions
         posts = []
         for post in func.postcondition:
@@ -332,11 +341,7 @@ class MethodTranslator(CommonTranslator):
             pres = init_pres + pres
         if method.declared_exceptions:
             results.append(error_var_decl)
-        if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
-                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-                self.no_position(ctx), self.no_info(ctx))
-            pres = [not_null] + pres
+
 
         args = self._translate_params(method, ctx)
 

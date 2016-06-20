@@ -1,7 +1,6 @@
-from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.typedefs import (
-    DomainFuncApp,
     Expr,
+    Stmt,
 )
 from py2viper_translation.lib.util import (
     get_body_start_index,
@@ -11,6 +10,9 @@ from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
 )
+from py2viper_translation.sif.translators.func_triple_domain_factory import (
+    FuncTripleDomainFactory as FTDF,
+)
 from py2viper_translation.translators.method import MethodTranslator
 from typing import List
 
@@ -19,39 +21,57 @@ class SIFMethodTranslator(MethodTranslator):
     """
     SIF version of the MethodTranslator.
     """
+    def _create_tl_post(self, method: SIFPythonMethod, ctx: SIFContext) -> Expr:
+        """
+        Creates a check whether a method/function is timelevel preserving.
+        """
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        tl_expr = method.tl_var.ref
+        if method.pure:
+            type_ = self.config.func_triple_factory.get_type(method.type, ctx)
+            res = self.viper.Result(type_, pos, info)
+            new_tl_expr = self.config.func_triple_factory.get_call(FTDF.GET_TL,
+                [res], method.type, pos, info, ctx)
+        else:
+            new_tl_expr = method.new_tl_var.ref
+
+        not_tl = self.viper.Not(tl_expr, pos, info)
+        not_new_tl = self.viper.Not(new_tl_expr, pos, info)
+
+        return self.viper.Implies(not_tl, not_new_tl, pos, info)
+
     def _translate_pres(self, method: SIFPythonMethod,
                         ctx: SIFContext):
+        ctx.in_pres = True
         pres = super()._translate_pres(method, ctx)
         ctx.set_prime_ctx()
         pres += super()._translate_pres(method, ctx)
         ctx.set_normal_ctx()
+        # # Repeat the non-null check for receiver.
+        # if method.cls:
+        #     not_null = self.viper.NeCmp(
+        #         next(iter(method.args.values())).var_prime.ref,
+        #         self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+        #         self.no_position(ctx), self.no_info(ctx))
+        #     pres.insert(1, not_null)
+        ctx.in_pres = False
         return pres
 
     def _translate_posts(self, method: SIFPythonMethod,
                          err_var: 'viper.ast.LocalVar',
                          ctx: SIFContext):
+        ctx.in_posts = True
         posts = super()._translate_posts(method, err_var, ctx)
-        ctx.set_prime_ctx()
-        posts += super()._translate_posts(method, err_var, ctx)
-        ctx.set_normal_ctx()
+        # !tl ==> !new_tl
+        if method.preserves_tl:
+            posts.append(self._create_tl_post(method, ctx))
+        ctx.in_posts = False
         return posts
 
-    def _create_typeof_pres(self, func: SIFPythonMethod,
-                            is_constructor: bool,
-                            ctx: SIFContext) -> List[DomainFuncApp]:
-        pres = []
-        args = func.args
-        for arg in args.values():
-            if not (arg.type.name in PRIMITIVES or
-                        (is_constructor and arg == next(iter(args)))):
-                pres.append(self.get_parameter_typeof(arg, ctx))
-                pres.append(self.get_parameter_typeof(arg.var_prime, ctx))
-
-        return pres
-
     def _create_method_prolog(self, method: SIFPythonMethod,
-                              ctx: SIFContext):
-        # newTimeLevel := timeLevel
+                              ctx: SIFContext) -> List[Stmt]:
+        # new_tl := tl
         tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref,
                                             method.tl_var.ref,
                                             self.no_position(ctx),
@@ -111,26 +131,18 @@ class SIFMethodTranslator(MethodTranslator):
                                           'function.throws.exception')
         # create preconditions
         pres = self._translate_pres(func, ctx)
-        if func.cls:
-            self_var = next(iter(func.args.values()))
-            not_null = self.viper.NeCmp(self_var.ref,
-                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-                self.no_position(ctx), self.no_info(ctx))
-            not_null_p = self.viper.NeCmp(self_var.var_prime.ref,
-                self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-                self.no_position(ctx), self.no_info(ctx))
-            pres = [not_null, not_null_p] + pres
         # create postconditions
+        ctx.in_posts = True
         posts = []
         for post in func.postcondition:
             stmt, expr = self.translate_expr(post, ctx)
-            ctx.set_prime_ctx()
-            stmt_p, expr_p = self.translate_expr(post, ctx)
-            ctx.set_normal_ctx()
-            if stmt or stmt_p:
+            if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
-            posts.append(expr_p)
+        # Add check that timelevel is preserved.
+        if func.preserves_tl:
+            posts.append(self._create_tl_post(func, ctx))
+        ctx.in_posts = False
         # create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
         # TODO(shitz): Add result type post-condition.

@@ -32,6 +32,15 @@ class SIFPythonMethod(PythonMethod):
         bool_type = superscope.get_program().classes[BOOL_TYPE]
         self.tl_var = PythonVar(TL_VAR_NAME, None, bool_type)
         self.new_tl_var = PythonVar(NEW_TL_VAR_NAME, None, bool_type)
+        self._set_preserves_tl()
+
+    @property
+    def preserves_tl(self) -> bool:
+        return self._preserves_tl
+
+    def _set_preserves_tl(self):
+        decorators = {d.id for d in self.node.decorator_list}
+        self._preserves_tl = 'NotPreservingTL' not in decorators
 
     def process(self, sil_name: str, translator: 'Translator'):
         super().process(sil_name, translator)
