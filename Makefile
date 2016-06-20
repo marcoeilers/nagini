@@ -1,6 +1,7 @@
-CHECKED_FILES=\
+CHECKED_FILES:=\
 							src/py2viper_translation/analyzer_io.py \
 							src/py2viper_translation/translators/io_operation.py
+CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
 BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
@@ -11,7 +12,13 @@ mypy: bin/mypy
 	bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
-	bin/flake8 --max-complexity 12 $(CHECKED_FILES)
+	bin/flake8 --ignore=F401,E501 --max-complexity 12 $(CHECKED_FILES)
+
+pylint: bin/pylint
+	bin/pylint $(CHECKED_MODULES)
+
+pylint_report: bin/pylint
+	bin/pylint --reports=y $(CHECKED_MODULES)
 
 docs: bin/sphinxbuilder
 	bin/sphinxbuilder
@@ -29,6 +36,9 @@ bin/mypy: $(BUILDOUT_DEPS)
 	$(BUILDOUT_CMD)
 
 bin/flake8: $(BUILDOUT_DEPS)
+	$(BUILDOUT_CMD)
+
+bin/pylint: $(BUILDOUT_DEPS)
 	$(BUILDOUT_CMD)
 
 bin/sphinxbuilder: $(BUILDOUT_DEPS)
