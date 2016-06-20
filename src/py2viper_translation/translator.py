@@ -24,6 +24,7 @@ from py2viper_translation.translators.type_domain_factory import (
 )
 from typing import List
 
+
 class Translator:
     """
     Translates a Python AST to a Silver AST.
