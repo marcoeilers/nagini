@@ -159,9 +159,11 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
 
 def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     """
-    In a for loop like
-    for x in xs:
-    Previous(x) refers to the objects processed in previous iterations.
+    In a for loop like::
+
+        for x in xs:
+
+    ``Previous(x)`` refers to the objects processed in previous iterations.
     Given the Previous-call-node, this function returns the for loop to whose
     previous iterations the node refers.
     """
