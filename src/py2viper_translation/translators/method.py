@@ -208,11 +208,6 @@ class MethodTranslator(CommonTranslator):
                                           'function.throws.exception')
         # create preconditions
         pres = self._translate_pres(func, ctx)
-        # if func.cls:
-        #     not_null = self.viper.NeCmp(next(iter(func.args.values())).ref,
-        #         self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
-        #         self.no_position(ctx), self.no_info(ctx))
-        #     pres = [not_null] + pres
         # create postconditions
         posts = []
         for post in func.postcondition:

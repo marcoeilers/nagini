@@ -39,6 +39,10 @@ class SIFPythonMethod(PythonMethod):
         return self._preserves_tl
 
     def _set_preserves_tl(self):
+        # FIXME(shitz): This should actually be done in the Analyzer, however,
+        # then I'd need to subclass it, which I think is not reasonable just
+        # for this single case. If the need for a custom analyzer increases
+        # we can move this there eventually.
         decorators = {d.id for d in self.node.decorator_list}
         self._preserves_tl = 'NotPreservingTL' not in decorators
 
