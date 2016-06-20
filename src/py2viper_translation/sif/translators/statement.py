@@ -31,11 +31,9 @@ class SIFStatementTranslator(StatementTranslator):
         Silver:
         tl = tl || cond != cond_p
         if(cond) {
-            inhale cond_p
             sif(then_body)
         } else {
-            inhale !cond_p
-            sif(else_body
+            sif(else_body)
         }
         """
         pos = self.to_position(node, ctx)
@@ -54,17 +52,9 @@ class SIFStatementTranslator(StatementTranslator):
         # Translate the bodies.
         then_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.body])
-        # Add 'inhale cond_p' to the then body.
-        assume = self.viper.Inhale(cond_p, pos, info)
-        then_body.insert(0, assume)
         then_block = self.translate_block(then_body, pos, info)
         else_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.orelse])
-        # Add 'inhale not cond_p' to the else body.
-        if else_body:
-            not_cond = self.viper.Not(cond_p, pos, info)
-            assume_not = self.viper.Inhale(not_cond, pos, info)
-            else_body.insert(0, assume_not)
         else_block = self.translate_block(else_body, pos, info)
         if_stmt = self.viper.If(cond, then_block, else_block, pos, info)
 
