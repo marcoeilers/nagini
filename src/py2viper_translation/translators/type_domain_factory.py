@@ -41,14 +41,15 @@ class TypeDomainFactory:
 
     def get_default_functions(self,
                               ctx: Context) -> List['silver.ast.DomainFunc']:
-        return [
-            # self.create_null_type(ctx),
+        result = [
             self.extends_func(ctx),
             self.issubtype_func(ctx),
             self.isnotsubtype_func(ctx),
             self.typeof_func(ctx),
-            # self.create_object_type(ctx)
         ]
+        result += self.type_arg_funcs(ctx)
+        result += self.type_nargs_funcs(ctx)
+        return result
 
     def create_type(self, cls: 'PythonClass',
                     ctx: Context) -> Tuple['silver.ast.DomainFunc',
@@ -517,6 +518,60 @@ class TypeDomainFactory:
                                      self.no_position(ctx), self.no_info(ctx),
                                      self.type_domain)
 
+    def type_arg_funcs(self, ctx: Context) -> List['silver.ast.DomainFunc']:
+        result = []
+        for n in range(1, 6):
+            result.append(self.type_arg_func(n, ctx))
+        return result
+
+    def type_arg_func(self, n: int, ctx: Context) -> 'silver.ast.DomainFunc':
+        """
+        Creates the get_type_arg domain function.
+        """
+        obj_var = self.viper.LocalVarDecl('obj', self.viper.Ref,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
+        args = [obj_var]
+        for i in range(n):
+            name = 'index' + str(i)
+            index_var = self.viper.LocalVarDecl(name, self.viper.Int,
+                                                self.no_position(ctx),
+                                                self.no_info(ctx))
+            args.append(index_var)
+        name = 'get_type_arg' + str(n)
+        result = self.viper.DomainFunc(name, args,
+                                       self.type_type(), False,
+                                       self.no_position(ctx), self.no_info(ctx),
+                                       self.type_domain)
+        return result
+
+    def type_nargs_funcs(self, ctx: Context) -> List['silver.ast.DomainFunc']:
+        result = []
+        for n in range(6):
+            result.append(self.type_nargs_func(n, ctx))
+        return result
+
+    def type_nargs_func(self, n: int, ctx: Context) -> 'silver.ast.DomainFunc':
+        """
+        Creates the get_type_arg domain function.
+        """
+        obj_var = self.viper.LocalVarDecl('obj', self.viper.Ref,
+                                          self.no_position(ctx),
+                                          self.no_info(ctx))
+        args = [obj_var]
+        for i in range(n):
+            name = 'index' + str(i)
+            index_var = self.viper.LocalVarDecl(name, self.viper.Int,
+                                                self.no_position(ctx),
+                                                self.no_info(ctx))
+            args.append(index_var)
+        name = 'get_type_nargs' + str(n)
+        result = self.viper.DomainFunc(name, args,
+                                       self.viper.Int, False,
+                                       self.no_position(ctx), self.no_info(ctx),
+                                       self.type_domain)
+        return result
+
     def subtype_func(self, name: str, ctx: Context) -> 'silver.ast.DomainFunc':
         """
         Creates the issubtype, extends and isnotsubtype domain functions.
@@ -570,6 +625,42 @@ class TypeDomainFactory:
                                           self.no_info(ctx),
                                           self.type_domain)
         return result
+
+    def type_arg_check(self, lhs: Expr, arg: 'PythonType',
+                       indices: List['Expr'], ctx: Context) -> 'Expr':
+
+        name = 'get_type_arg' + str(len(indices))
+        args = [lhs] + indices
+        type_arg_func = self.viper.DomainFuncApp(name, args, {},
+            self.type_type(), args, self.no_position(ctx),
+            self.no_info(ctx), self.type_domain)
+        type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
+                                             self.type_type(), [],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        eq = self.viper.EqCmp(type_arg_func, type_func, self.no_position(ctx),
+                              self.no_info(ctx))
+        return eq
+
+    def type_nargs_check(self, lhs: Expr, nargs: int,
+                         indices: List['Expr'], ctx: Context) -> 'Expr':
+        name = 'get_type_nargs' + str(len(indices))
+        args = [lhs] + indices
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        type_arg_func = self.viper.DomainFuncApp(name,
+                                                 args,
+                                                 {}, self.viper.Int,
+                                                 args,
+                                                 pos,
+                                                 info,
+                                                 self.type_domain)
+        nargs_lit = self.viper.IntLit(nargs, self.no_position(ctx),
+                                      self.no_info(ctx))
+        eq = self.viper.EqCmp(type_arg_func, nargs_lit, self.no_position(ctx),
+                              self.no_info(ctx))
+        return eq
 
     def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
                             ctx: Context) -> Expr:

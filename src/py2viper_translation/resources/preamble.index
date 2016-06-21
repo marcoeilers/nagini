@@ -12,6 +12,10 @@
         "__setitem__": {
             "args": ["list", "int", "object"],
             "type": null
+        },
+        "__iter__": {
+            "args": ["list"],
+            "type": "Iterator"
         }
     },
     "functions": {
@@ -47,6 +51,10 @@
         "clear": {
             "args": ["set"],
             "type": null
+        },
+        "__iter__": {
+            "args": ["set"],
+            "type": "Iterator"
         }
     },
     "functions": {
@@ -78,6 +86,14 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null
+        },
+        "__iter__": {
+            "args": ["dict"],
+            "type": "Iterator"
+        },
+        "values": {
+            "args": ["dict"],
+            "type": "set"
         }
     },
     "functions": {
@@ -224,6 +240,48 @@
         "__unbox__": {
             "args": ["__boxed_bool"],
             "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"range": {
+    "functions": {
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "range"
+        },
+        "__getitem__": {
+            "args": ["range", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["range", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["range"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["range"],
+            "type": "bool"
+        },
+        "__sil_set__": {
+            "args": ["range"],
+            "type": "object"
+        }
+    },
+    "extends": "object"
+},
+"Iterator": {
+    "methods":{
+        "__next__": {
+            "args": ["Iterator"],
+            "type": "object"
+        },
+        "__del__": {
+            "args": ["Iterator"],
+            "type": null
         }
     },
     "extends": "object"

@@ -104,6 +104,8 @@ class ViperAST:
             result_int = result_int.multiply(cutoff_int)
             result_int = result_int.add(current_int)
             rest = rest // cutoff
+        if negative:
+            result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)
 
     def Program(self, domains, fields, functions, predicates, methods, position,
@@ -238,6 +240,9 @@ class ViperAST:
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info)
 
+    def WildcardPerm(self, position, info):
+        return self.ast.WildcardPerm(position, info)
+
     def FractionalPerm(self, left, right, position, info):
         return self.ast.FractionalPerm(left, right, position, info)
 
@@ -281,6 +286,9 @@ class ViperAST:
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
+    def EmptySeq(self, type, position, info):
+        return self.ast.EmptySeq(type, position, info)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)
 
@@ -289,6 +297,21 @@ class ViperAST:
 
     def Result(self, type, position, info):
         return self.ast.Result(type, position, info)
+
+    def AnySetContains(self, elem, s, position, info):
+        return self.ast.AnySetContains(elem, s, position, info)
+
+    def SeqContains(self, elem, s, position, info):
+        return self.ast.SeqContains(elem, s, position, info)
+
+    def SeqLength(self, s, position, info):
+        return self.ast.SeqLength(s, position, info)
+
+    def SeqIndex(self, s, ind, position, info):
+        return self.ast.SeqIndex(s, ind, position, info)
+
+    def SeqTake(self, s, end, postion, info):
+        return self.ast.SeqTake(s, end, postion, info)
 
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info)
