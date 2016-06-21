@@ -37,33 +37,17 @@ from typing import List, Tuple
 
 class MethodTranslator(CommonTranslator):
 
-    def _can_assume_type(self, type: PythonType) -> bool:
-        """
-        Checks if type information for the given type has to be checked or
-        can simply be assumed.
-        """
-        # Cannot assume tuple type information, since tuple length may be a
-        # precondition of other functions used in normal pre- and
-        # postconditions.
-        return type.name not in [TUPLE_TYPE, SET_TYPE, DICT_TYPE, LIST_TYPE]
-
     def get_parameter_typeof(self, param: PythonVar,
-                             ctx: Context,
-                             perms: bool=False) -> 'silver.ast.DomainFuncApp':
+                             ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the given parameter has its type,
         to be assumed in preconditions and/or postconditions. If possible,
         the expression is wrapped in an InhaleExhaleExpression s.t. it is
-        just assumed, not checked; with some types this is not possible.
+        just assumed, not checked. Generally this seems to be possible with
+        types, but not with type arg numbers, because the latter encodes length
+        for tuples.
         """
-        result = self.var_type_check(param.sil_name, param.type, ctx,
-                                     perms=perms)
-        if self._can_assume_type(param.type):
-            true_lit = self.viper.TrueLit(self.no_position(ctx),
-                                          self.no_info(ctx))
-            result = self.viper.InhaleExhaleExp(result, true_lit,
-                                                self.no_position(ctx),
-                                                self.no_info(ctx))
+        result = self.var_type_check(param.sil_name, param.type, ctx)
         return result
 
     def _translate_pres(self, method: PythonMethod,
@@ -122,7 +106,7 @@ class MethodTranslator(CommonTranslator):
                 ctx.position = error_type_pos
             has_type = self.var_type_check(ERROR_NAME,
                                            ctx.program.classes[exception],
-                                           ctx)
+                                           ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
             ctx.position = oldpos
             condition = self.viper.And(error, has_type, self.no_position(ctx),
@@ -166,9 +150,21 @@ class MethodTranslator(CommonTranslator):
         if func.var_arg:
             type_check = self.get_parameter_typeof(func.var_arg, ctx)
             pres.append(type_check)
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
         if func.kw_arg:
-            type_check = self.get_parameter_typeof(func.kw_arg, ctx, perms=True)
+            type_check = self.get_parameter_typeof(func.kw_arg, ctx)
+            set_ref = self.viper.SetType(self.viper.Ref)
+            dict_acc_field = self.viper.Field('dict_acc', set_ref,
+                                              pos, info)
+            field_acc = self.viper.FieldAccess(func.kw_arg.ref, dict_acc_field,
+                                               pos, info)
+            full_perm = self.viper.FullPerm(self.no_position(ctx),
+                                            self.no_info(ctx))
+            acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                                                       pos, info)
             pres.append(type_check)
+            pres.append(acc_pred)
         return pres
 
     def _translate_params(self, func: PythonMethod,
@@ -218,11 +214,6 @@ class MethodTranslator(CommonTranslator):
             result = self.viper.Result(res_type, self.no_position(ctx),
                                        self.no_info(ctx))
             check = self.type_check(result, func.type, ctx)
-            if self._can_assume_type(func.type):
-                true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-                check = self.viper.InhaleExhaleExp(check, true,
-                                                   self.no_position(ctx),
-                                                   self.no_info(ctx))
             posts = [check] + posts
 
         statements = func.node.body
@@ -255,12 +246,6 @@ class MethodTranslator(CommonTranslator):
         posts = type_pres + posts
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref, method.type, ctx)
-            if self._can_assume_type(method.type):
-                true = self.viper.TrueLit(self.no_position(ctx),
-                                          self.no_info(ctx))
-                check = self.viper.InhaleExhaleExp(check, true,
-                                                   self.no_position(ctx),
-                                                   self.no_info(ctx))
             posts = [check] + posts
         return pres, posts
 
@@ -378,7 +363,8 @@ class MethodTranslator(CommonTranslator):
                 if block.finally_block:
                     body += self.translate_finally(block, ctx)
             body += self.add_handlers_for_inlines(ctx)
-            locals = [local.decl for local in method.get_locals()]
+            locals = [local.decl for local in method.get_locals()
+                      if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         body_block = self.translate_block(body,
                                           self.to_position(method.node, ctx),
@@ -438,7 +424,8 @@ class MethodTranslator(CommonTranslator):
                 if err_var.sil_name in ctx.var_aliases:
                     err_var = ctx.var_aliases[err_var.sil_name]
                 condition = self.var_type_check(err_var.sil_name,
-                                                handler.exception, ctx)
+                                                handler.exception, ctx,
+                                                inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name, pos, info)
                 if_handler = self.viper.If(condition, goto, empty_stmt, pos,
