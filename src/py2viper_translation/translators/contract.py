@@ -332,7 +332,10 @@ class ContractTranslator(CommonTranslator):
 
         lambda_ = node.args[1]
         variables = []
-        lambda_prefix = 'lambda' + str(lambda_.lineno) + '$'
+        lambda_prefix = 'lambda' + str(lambda_.lineno)
+        if hasattr(lambda_, 'col_offset'):
+            lambda_prefix += '_' + str(lambda_.col_offset)
+        lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
         variables.append(var.decl)

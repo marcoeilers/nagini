@@ -245,6 +245,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = 'lambda' + str(node.lineno)
+        if hasattr(node, 'col_offset'):
+            name += '_' + str(node.col_offset)
         self.current_scopes.append(name)
         for arg in node.args.args:
             var = self.node_factory.create_python_var(arg.arg, arg,
@@ -423,8 +425,9 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, alts = self.types.get_type(context, node.id)
-            if alts and node.lineno in alts:
-                return self.convert_type(alts[node.lineno])
+            key = (node.lineno, node.col_offset)
+            if alts and key in alts:
+                return self.convert_type(alts[key])
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
