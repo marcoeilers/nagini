@@ -2,6 +2,7 @@ import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.constants import BUILTIN_PREDICATES, PRIMITIVES
+from py2viper_translation.lib.program_nodes import PythonVar
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -141,7 +142,7 @@ class ContractTranslator(CommonTranslator):
                 family_root = family_root.superclass
             pred_name = family_root.get_predicate(name).sil_name
         return arg_stmts, self.create_predicate_access(pred_name, args, perm,
-                                                node, ctx)
+                                                       node, ctx)
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
@@ -222,7 +223,7 @@ class ContractTranslator(CommonTranslator):
         loop = find_loop_for_previous(node, arg.id)
         if not loop:
             raise InvalidProgramException(node, 'invalid.previous')
-        iterator = loop._iterator.ref
+        iterator = ctx.loop_iterators[loop].ref
         list_field = self.viper.Field('__previous', self.viper.Ref,
                                       self.no_position(ctx), self.no_info(ctx))
         field_acc = self.viper.FieldAccess(iterator, list_field,
@@ -261,34 +262,21 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return expr_stmt, unfold
 
-    def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        domain_node = node.args[0]
-        domain_old = False
-        if (isinstance(domain_node, ast.Call) and
-                get_func_name(domain_node) == 'Old'):
-            domain_old = True
-            domain_node = domain_node.args[0]
-
-        dom_stmt, domain = self.translate_expr(domain_node, ctx)
-
-        lambda_ = node.args[1]
-
-        variables = []
-        lambda_prefix = 'lambda' + str(lambda_.lineno) + '$'
-        arg = lambda_.args.args[0]
-        var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
-        variables.append(var.decl)
-        assert arg.arg not in ctx.var_aliases
-        if (not isinstance(lambda_.body, ast.Tuple) or
-                len(lambda_.body.elts) != 2):
+    def _translate_triggers(self, body: ast.AST, node: ast.Call,
+                            ctx: Context) -> List['silver.ast.Trigger']:
+        """
+        Assuming the given body is a tuple whose second element is a list
+        literal containing any number of list literals containing expressions,
+        translates those to a list of triggers.
+        """
+        if (not isinstance(body, ast.Tuple) or
+                    len(body.elts) != 2):
             raise InvalidProgramException(node, 'invalid.trigger')
-        ctx.var_aliases[arg.arg] = var
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
-
+        trigger_node = body.elts[1]
         triggers = []
-        if not isinstance(lambda_.body.elts[1], ast.List):
+        if not isinstance(trigger_node, ast.List):
             raise InvalidProgramException(node, 'invalid.trigger')
-        outer = lambda_.body.elts[1]
+        outer = trigger_node
 
         if outer.elts:
             for el in outer.elts:
@@ -304,13 +292,22 @@ class ContractTranslator(CommonTranslator):
                 trigger = self.viper.Trigger(trigger, self.no_position(ctx),
                                              self.no_info(ctx))
                 triggers.append(trigger)
+        return triggers
 
-        del ctx.var_aliases[arg.arg]
-        if body_stmt:
-            raise InvalidProgramException(node, 'purity.violated')
-
-        dom_type = self.get_type(node.args[0], ctx)
-
+    def _create_quantifier_contains_expr(self, var: PythonVar,
+                                         domain_node: ast.AST,
+                                         ctx: Context) -> StmtsAndExpr:
+        """
+        Creates the left hand side of the implication in a quantifier
+        expression, which says that var is an element of the given domain.
+        """
+        domain_old = False
+        if (isinstance(domain_node, ast.Call) and
+                    get_func_name(domain_node) == 'Old'):
+            domain_old = True
+            domain_node = domain_node.args[0]
+        dom_stmt, domain = self.translate_expr(domain_node, ctx)
+        dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
                                                self.no_position(ctx),
@@ -322,12 +319,39 @@ class ContractTranslator(CommonTranslator):
             ref_var = self.box_primitive(var.ref, var.type, None, ctx)
         else:
             ref_var = var.ref
-        lhs = self.viper.SeqContains(ref_var, domain_set,
-                                     self.to_position(domain_node, ctx),
-                                     self.no_info(ctx))
+        result = self.viper.SeqContains(ref_var, domain_set,
+                                        self.to_position(domain_node, ctx),
+                                        self.no_info(ctx))
         if domain_old:
-            lhs = self.viper.Old(lhs, self.to_position(node.args[0], ctx),
-                                 self.no_info(ctx))
+            result = self.viper.Old(result, self.to_position(domain_node, ctx),
+                                    self.no_info(ctx))
+        return dom_stmt, result
+
+    def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        domain_node = node.args[0]
+
+        lambda_ = node.args[1]
+        variables = []
+        lambda_prefix = 'lambda' + str(lambda_.lineno)
+        if hasattr(lambda_, 'col_offset'):
+            lambda_prefix += '_' + str(lambda_.col_offset)
+        lambda_prefix += '$'
+        arg = lambda_.args.args[0]
+        var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+        variables.append(var.decl)
+        assert arg.arg not in ctx.var_aliases
+
+        ctx.var_aliases[arg.arg] = var
+        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
+
+        triggers = self._translate_triggers(lambda_.body, node, ctx)
+
+        del ctx.var_aliases[arg.arg]
+        if body_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+
+        dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
+                                                              ctx)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))

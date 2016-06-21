@@ -239,6 +239,9 @@ class ViperAST:
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info)
 
+    def WildcardPerm(self, position, info):
+        return self.ast.WildcardPerm(position, info)
+
     def FractionalPerm(self, left, right, position, info):
         return self.ast.FractionalPerm(left, right, position, info)
 

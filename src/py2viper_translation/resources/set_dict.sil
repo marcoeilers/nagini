@@ -20,15 +20,15 @@ method set___init__() returns (res: Ref)
 }
 
 function set___len__(self: Ref): Int
-    requires acc(self.set_acc, 1/100)
+    requires acc(self.set_acc, wildcard)
     ensures result == |self.set_acc|
 
 function set___contains__(self: Ref, item: Ref) : Bool
-    requires acc(self.set_acc, 1/100)
+    requires acc(self.set_acc, wildcard)
     ensures result == (item in self.set_acc)
 
 function set___bool__(self: Ref) : Bool
-    requires acc(self.set_acc, 1/100)
+    requires acc(self.set_acc, wildcard)
     ensures result == (|self.set_acc| != 0)
 
 field __container : Ref
@@ -67,7 +67,7 @@ method set_clear(self: Ref) returns ()
 }
 
 function set___sil_seq__(self: Ref): Seq[Ref]
-    requires acc(self.set_acc, 1/80)
+    requires acc(self.set_acc, wildcard)
     ensures |result| == |self.set_acc|
     ensures forall c: Ref :: {c in self.set_acc} {c in result} c in self.set_acc <==> c in result
 
@@ -83,7 +83,7 @@ method dict___init__() returns (res: Ref)
 }
 
 function dict___contains__(self: Ref, item: Ref) : Bool
-    requires acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, wildcard)
     ensures result == (item in self.dict_acc)
 
 method dict___iter__(self: Ref) returns (_res: Ref)
@@ -100,7 +100,7 @@ method dict___iter__(self: Ref) returns (_res: Ref)
 }
 
 function dict___bool__(self: Ref) : Bool
-    requires acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, wildcard)
     ensures result == (|self.dict_acc| != 0)
 
 method dict_keys(self: Ref) returns (res: Ref)
@@ -113,12 +113,12 @@ method dict_keys(self: Ref) returns (res: Ref)
 }
 
 function dict___getitem__(self: Ref, key: Ref) : Ref
-    requires acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, wildcard)
     requires dict___contains__(self, key)
     ensures get_type_nargs0(result) == get_type_nargs1(self, 1)
 
 function dict_get(self: Ref, key: Ref) : Ref
-    requires acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, wildcard)
     ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
 
 method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
@@ -152,10 +152,10 @@ method dict_values(self: Ref) returns (_res: Ref)
     ensures get_type_nargs0(_res) == 1 && get_type_arg1(_res, 0) == get_type_arg1(self, 1)
 
 function dict___len__(self: Ref): Int
-    requires acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, wildcard)
     ensures result == |self.dict_acc|
 
 function dict___sil_seq__(self: Ref): Seq[Ref]
-    requires acc(self.dict_acc, 1/80)
+    requires acc(self.dict_acc, wildcard)
     ensures |result| == |self.dict_acc|
     ensures forall c: Ref :: {c in self.dict_acc} {c in result} c in self.dict_acc <==> c in result

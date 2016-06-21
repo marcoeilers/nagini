@@ -142,7 +142,8 @@ class CallTranslator(CommonTranslator):
 
     def translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
-            raise UnsupportedException(node)
+            msg = 'range() is currently only supported with two args.'
+            raise UnsupportedException(node, msg)
         range_class = ctx.program.classes[RANGE_TYPE]
         start_stmt, start = self.translate_expr(node.args[0], ctx)
         end_stmt, end = self.translate_expr(node.args[1], ctx)
@@ -512,7 +513,8 @@ class CallTranslator(CommonTranslator):
         if not target:
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
-            raise UnsupportedException(node)
+            msg = 'Unsupported builtin function.'
+            raise UnsupportedException(node, msg)
         if name in ctx.program.classes:
             # this is a constructor call
             return self._translate_constructor_call(target, node, args,
