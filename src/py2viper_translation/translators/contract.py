@@ -269,7 +269,7 @@ class ContractTranslator(CommonTranslator):
         """
         return [], self.viper.TrueLit(self.to_position(node, ctx),
                                       self.no_info(ctx))
-    
+
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
         """
@@ -391,14 +391,11 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfold(node, ctx)
         elif func_name == 'Unfolding':
             return self.translate_unfolding(node, ctx)
-<<<<<<< local
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
-=======
         elif func_name == 'Forall':
             return self.translate_forall(node, ctx)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
->>>>>>> other
         else:
             raise UnsupportedException(node)
