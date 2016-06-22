@@ -45,9 +45,9 @@ class SIFMethodTranslator(MethodTranslator):
                         ctx: SIFContext):
         ctx.in_pres = True
         pres = super()._translate_pres(method, ctx)
-        ctx.set_prime_ctx()
-        pres += super()._translate_pres(method, ctx)
-        ctx.set_normal_ctx()
+        # ctx.set_prime_ctx()
+        # pres += super()._translate_pres(method, ctx)
+        # ctx.set_normal_ctx()
         ctx.in_pres = False
         return pres
 

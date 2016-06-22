@@ -1,16 +1,17 @@
 import ast
 
+from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
 )
 from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
     FuncTripleDomainFactory as FTDF,
 )
 from py2viper_translation.translators.abstract import StmtsAndExpr
 from py2viper_translation.translators.contract import ContractTranslator
+
 
 class SIFContractTranslator(ContractTranslator):
     """
@@ -48,10 +49,6 @@ class SIFContractTranslator(ContractTranslator):
         Translates a Acc(field). Needs to generate Acc(field_p) as well.
         """
         stmt, acc = super().translate_acc_field(node, perm, ctx)
-        if ctx.in_pres:
-            return stmt, acc
-        # Post conditions are only translated for non-prime variables, however,
-        # Acc predicates need to be translated for prime vars as well.
         ctx.set_prime_ctx()
         stmt_p, acc_p = super().translate_acc_field(node, perm, ctx)
         ctx.set_normal_ctx()
@@ -70,7 +67,7 @@ class SIFContractTranslator(ContractTranslator):
             return [], self.viper.TrueLit(pos, info)
 
         not_tl = self.viper.Not(ctx.current_tl_var_expr, pos, info)
-        if len(node.args):
+        if node.args:
             stmts, expr = self.translate_expr(node.args[0], ctx)
             ctx.set_prime_ctx()
             stmts_p, expr_p = self.translate_expr(node.args[0], ctx)

@@ -463,17 +463,17 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
-    def _compatible_decorators(self, decorators: Set[str]) -> bool:
-        return ('Predicate' not in decorators) or ('Pure' not in decorators)
+    def _incompatible_decorators(self, decorators: Set[str]) -> bool:
+        return ('Predicate' in decorators) and ('Pure' in decorators)
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
-        if not self._compatible_decorators(decorators):
+        if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Pure' in decorators
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
-        if not self._compatible_decorators(decorators):
+        if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Predicate' in decorators

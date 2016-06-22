@@ -1,8 +1,7 @@
 import ast
 
-from py2viper_translation.lib.util import UnsupportedException, flatten
+from py2viper_translation.lib.util import flatten, UnsupportedException
 from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.sif.lib.program_nodes import SIF_VAR_SUFFIX
 from py2viper_translation.translators.abstract import Stmt
 from py2viper_translation.translators.statement import StatementTranslator
 from typing import List
@@ -22,19 +21,25 @@ class SIFStatementTranslator(StatementTranslator):
         """
         SIF translation of if-statements.
 
+        ```
+        #!rst
+
         Python:
-        if cond:
-            then_body
-        else:
-            else_body
+            if cond:
+                then_body
+            else:
+                else_body
 
         Silver:
-        tl = tl || cond != cond_p
-        if(cond) {
-            sif(then_body)
-        } else {
-            sif(else_body)
-        }
+
+        .. code-block:: silver
+            tl = tl || cond != cond_p
+            if(cond) {
+                sif(then_body)
+            } else {
+                sif(else_body)
+            }
+        ```
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -43,6 +48,7 @@ class SIFStatementTranslator(StatementTranslator):
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
         ctx.set_prime_ctx()
         cond_stmt_p, cond_p = self.translate_to_bool(node.test, ctx)
+        ctx.set_normal_ctx()
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
