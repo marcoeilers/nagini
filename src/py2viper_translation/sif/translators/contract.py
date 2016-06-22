@@ -59,7 +59,9 @@ class SIFContractTranslator(ContractTranslator):
         return [], and_accs
 
     def translate_low(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
-        assert len(node.args) <= 1
+        if len(node.args) > 1:
+            raise UnsupportedException(node, "Only 0 or 1 arguments are "
+                                             "supported for Low().")
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
