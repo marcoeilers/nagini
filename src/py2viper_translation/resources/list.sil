@@ -1,36 +1,58 @@
 field list_acc : Seq[Ref]
+field set_acc : Set[Ref]
+field dict_acc : Set[Ref]
 
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
+    function get_type_arg1(obj: Ref, index: Int): PyType
+    function get_type_arg2(obj: Ref, index: Int, index2: Int): PyType
+    function get_type_arg3(obj: Ref, index: Int, index2: Int, index3: Int): PyType
+    function get_type_arg4(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int): PyType
+    function get_type_arg5(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): PyType
+    function get_type_arg6(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int, index6: Int): PyType
+    function get_type_nargs0(r: Ref): Int
+    function get_type_nargs1(r: Ref, index: Int): Int
+    function get_type_nargs2(r: Ref, index: Int, index2: Int): Int
+    function get_type_nargs3(r: Ref, index: Int, index2: Int, index3: Int): Int
+    function get_type_nargs4(r: Ref, index: Int, index2: Int, index3: Int, index4: Int): Int
+    function get_type_nargs5(r: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): Int
     unique function list(): PyType
+    unique function set(): PyType
+    unique function dict(): PyType
 }
 
 method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()
     ensures typeof(res) == list()
+    ensures get_type_nargs0(res) == 1
 {
     assume false
 }
 
 function list___contains__(self: Ref, item: Ref): Bool
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     ensures result == (item in self.list_acc)
 
 function list___bool__(self: Ref) : Bool
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     ensures result == (|self.list_acc| != 0)
 
 function list___len__(self: Ref) : Int
-    requires acc(self.list_acc, 1/100)
-    ensures result == |self.list_acc|
+    requires acc(self.list_acc, wildcard)
+{
+ |self.list_acc|
+}
 
 function list___getitem__(self: Ref, key: Int): Ref
-    requires acc(self.list_acc, 1/100)
+    requires acc(self.list_acc, wildcard)
     requires key >= 0
     requires key < list___len__(self)
     ensures result == self.list_acc[key]
+    ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
+    (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
+    (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2))
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires acc(self.list_acc)
@@ -48,4 +70,51 @@ method list_append(self: Ref, item: Ref) returns ()
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {
     assume false
+}
+
+field __container : Ref
+field __iter_index : Int
+field __previous: Ref
+
+method list___iter__(self: Ref) returns (_res: Ref)
+  requires acc(self.list_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.list_acc, 1 / 20)
+  ensures _res.list_acc == self.list_acc
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+{
+  inhale false
+}
+
+method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
+  requires acc(self.list_acc, 1 / 40)
+  requires acc(self.__iter_index, write)
+  requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
+  ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
+  ensures acc(self.__iter_index, write) && (self.__iter_index == old(self.__iter_index) + 1)
+  ensures old(|self.list_acc| > self.__iter_index) ==> (_res == old(self.list_acc[self.__iter_index])) && ((_res in self.list_acc) && (_err == null))
+  ensures acc(self.__previous, 1 / 40) && ((self.__previous == old(self.__previous)) && (acc(self.__previous.list_acc, write) && (old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index])))))
+  ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null) && (self.__previous.list_acc == self.list_acc)
+{
+  inhale false
+}
+
+method Iterator___del__(self: Ref)
+  requires acc(self.list_acc, 1 / 20)
+  requires acc(self.__container, 1 / 20)
+  ensures acc(self.__container, 1 / 20)
+  ensures (typeof(self.__container) == list()) ==> acc(self.__container.list_acc, 1 / 20)
+  ensures (typeof(self.__container) == dict()) ==> acc(self.__container.dict_acc, 1 / 20)
+  ensures (typeof(self.__container) == set()) ==> acc(self.__container.set_acc, 1 / 20)
+{
+  inhale false
+}
+
+function list___sil_seq__(self: Ref): Seq[Ref]
+    requires acc(self.list_acc, wildcard)
+{
+    self.list_acc
 }

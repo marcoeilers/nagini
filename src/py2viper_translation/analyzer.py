@@ -1,6 +1,8 @@
 import ast
+import logging
 import mypy
 import os
+import py2viper_translation.external.astpp
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -26,6 +28,9 @@ from py2viper_translation.lib.util import (
 from typing import Dict, Set
 
 
+logger = logging.getLogger('py2viper_translation.analyzer')
+
+
 class Analyzer(ast.NodeVisitor):
     """
     Walks through the Python AST and collects the structures to be translated.
@@ -41,6 +46,7 @@ class Analyzer(ast.NodeVisitor):
         self.program = PythonProgram(types, node_factory)
         self.current_class = None
         self.current_function = None
+        self.current_scopes = []
         self.contract_only = False
         self.modules = [os.path.abspath(path)]
         self.asts = {}
@@ -61,7 +67,7 @@ class Analyzer(ast.NodeVisitor):
             # ignore
             pass
         self.asts[abs_path] = parse_result
-        # print(astpp.dump(parse_result))
+        logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if get_func_name(stmt) != 'Import':
@@ -235,6 +241,20 @@ class Analyzer(ast.NodeVisitor):
                                                          annotated_type)
             self.current_function.kw_arg = kw_arg
 
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        assert self.current_function
+        name = 'lambda' + str(node.lineno)
+        self.current_scopes.append(name)
+        for arg in node.args.args:
+            var = self.node_factory.create_python_var(arg.arg, arg,
+                                                      self.typeof(arg))
+            alts = self.get_alt_types(node)
+            var.alt_types = alts
+            local_name = name + '$' + arg.arg
+            self.current_function.special_vars[local_name] = var
+        self.visit(node.body, node)
+        self.current_scopes.pop()
+
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         self.current_function.args[node.arg] = \
@@ -400,6 +420,7 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
+            context.extend(self.current_scopes)
             type, alts = self.types.get_type(context, node.id)
             if alts and node.lineno in alts:
                 return self.convert_type(alts[node.lineno])
@@ -414,6 +435,7 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
+            context.extend(self.current_scopes)
             type, _ = self.types.get_type(context, node.arg)
             return self.convert_type(type)
         elif (isinstance(node, ast.Call) and
