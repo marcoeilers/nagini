@@ -19,6 +19,7 @@ class Context:
         self.inlined_calls = []
         self.ignore_family_folds = False
         self.added_handlers = []
+        self.loop_iterators = {}
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []

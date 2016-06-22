@@ -347,6 +347,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.overrides = None  # infer
         self._locals = OrderedDict()  # direct
         self._args = OrderedDict()  # direct
+        self._special_vars = OrderedDict()  # direct
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -396,6 +397,8 @@ class PythonMethod(PythonNode, PythonScope):
                     self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
+        for name in self.special_vars:
+            self.special_vars[name].process(self.get_fresh_name(name), translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -426,6 +429,10 @@ class PythonMethod(PythonNode, PythonScope):
     def add_local(self, name: str, local: 'PythonVar'):
         self._locals[name] = local
 
+    @property
+    def special_vars(self) -> OrderedDict:
+        return self._special_vars
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -435,6 +442,8 @@ class PythonMethod(PythonNode, PythonScope):
             return self.locals[name]
         elif name in self.args:
             return self.args[name]
+        elif name in self.special_vars:
+            return self.special_vars[name]
         elif self.var_arg and self.var_arg.name == name:
             return self.var_arg
         elif self.kw_arg and self.kw_arg.name == name:
