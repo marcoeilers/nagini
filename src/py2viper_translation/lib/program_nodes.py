@@ -351,6 +351,7 @@ class PythonMethod(PythonNode, PythonScope):
         self._locals = OrderedDict()  # direct
         self._args = OrderedDict()  # direct
         self._special_vars = OrderedDict()  # direct
+        self._io_existential_vars = OrderedDict()
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -436,6 +437,14 @@ class PythonMethod(PythonNode, PythonScope):
     def special_vars(self) -> OrderedDict:
         return self._special_vars
 
+    @property
+    def io_existential_vars(self) -> OrderedDict:
+        """
+        IO existential variables are variables defined by using
+        ``IOExists`` construct.
+        """
+        return self._io_existential_vars
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -447,6 +456,8 @@ class PythonMethod(PythonNode, PythonScope):
             return self.args[name]
         elif name in self.special_vars:
             return self.special_vars[name]
+        elif name in self.io_existential_vars:
+            return self.io_existential_vars[name]
         elif self.var_arg and self.var_arg.name == name:
             return self.var_arg
         elif self.kw_arg and self.kw_arg.name == name:
@@ -577,9 +588,9 @@ class PythonIOOperation(PythonNode, PythonScope):
         else:
             return False
 
-    def get_arguments(self) -> List['PythonVar']:
+    def get_parameters(self) -> List['PythonVar']:
         """
-        Returns a list of arguments that uniquely identify IO operation
+        Returns a list of parameters that uniquely identify IO operation
         instance.
         """
         return self._preset + self._inputs
@@ -588,7 +599,7 @@ class PythonIOOperation(PythonNode, PythonScope):
         """
         Returns a list of results for this IO operation.
         """
-        return self._postset + self._outputs
+        return self._outputs + self._postset
 
 
 class PythonExceptionHandler(PythonNode):
@@ -681,17 +692,14 @@ class PythonTryBlock(PythonNode):
         self.get_finally_var(translator)
 
 
-class PythonVar(PythonNode):
+class PythonVarBase(PythonNode):
     """
-    Represents a variable in Python. Can be a global variable, a local variable
-    or a function parameter.
+    Abstract class representing any variable in Python.
     """
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
         self.type = type
-        self.decl = None
-        self.ref = None
         self.writes = []
         self.reads = []
         self.alt_types = {}
@@ -700,13 +708,74 @@ class PythonVar(PythonNode):
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
-        Creates a Silver variable declaration and reference representing this
-        Python variable.
+        Sets ``sil_name``.
         """
         self.sil_name = sil_name
+
+
+class PythonVar(PythonVarBase):
+    """
+    Represents a variable in Python. Can be a local variable or a
+    function parameter.
+    """
+
+    def __init__(self, name: str, node: ast.AST, type: PythonClass):
+        super().__init__(name, node, type)
+        self.decl = None
+        self.ref = None
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates a Silver variable declaration and reference representing
+        this Python variable.
+        """
+        super().process(sil_name, translator)
         prog = self.type.get_program()
         self.decl = translator.translate_pythonvar_decl(self, prog)
         self.ref = translator.translate_pythonvar_ref(self, prog)
+
+
+class PythonGlobalVar(PythonVarBase):
+    """
+    Represents a global variable in Python.
+    """
+
+
+class PythonIOExistentialVar(PythonVarBase):
+    """
+    Represents an existential variable in Python. Existential variable
+    is a variable created by using ``IOExists`` construct and it can be
+    used only in contracts. Unlike normal variables, it is translated to
+    getter functions.
+    """
+
+    def __init__(self, name: str, node: ast.AST, type: PythonClass):
+        super().__init__(name, node, type)
+        self._ref = None
+
+    def is_defined(self) -> bool:
+        """
+        Returns true if main getter was already defined.
+        """
+        return not self._ref is None
+
+    @property
+    def ref(self) -> 'viper.silver.ast.Expression':
+        """
+        Returns a Silver expression node that can be used to refer to
+        this variable.
+        """
+        assert not self._ref is None
+        return self._ref
+
+    @ref.setter
+    def ref(self, ref: 'viper.silver.ast.Expression') -> None:
+        """
+        Sets a Silver expression node that can be used to refer to this
+        variable.
+        """
+        assert self._ref is None
+        self._ref = ref
 
 
 class PythonField(PythonNode):
@@ -757,9 +826,17 @@ class ProgramNodeFactory:
     
     TODO: Add more interfaces for other types of containers if needed.
     """
+
     def create_python_var(self, name: str, node: ast.AST,
-                          type_: PythonClass) -> PythonVar:
-        return PythonVar(name, node, type_)
+                          type_: PythonClass, is_global: bool = False,
+                          is_io_existential: bool = False) -> PythonVarBase:
+        assert not (is_global and is_io_existential)
+        if is_global:
+            return PythonGlobalVar(name, node, type_)
+        elif is_io_existential:
+            return PythonIOExistentialVar(name, node, type_)
+        else:
+            return PythonVar(name, node, type_)
 
     def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
                              superscope: PythonScope,
