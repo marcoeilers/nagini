@@ -185,7 +185,8 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         stmt, exp = self.translate_expr(node.args[0], ctx)
-        res = self.viper.Old(exp, self.to_position(node, ctx), self.no_info(ctx))
+        res = self.viper.Old(exp, self.to_position(node, ctx),
+                             self.no_info(ctx))
         return stmt, res
 
     def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -261,6 +262,13 @@ class ContractTranslator(CommonTranslator):
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold
+
+    def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Low() contract function.
+        """
+        return [], self.viper.TrueLit(self.to_position(node, ctx),
+                                      self.no_info(ctx))
 
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
@@ -383,6 +391,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfold(node, ctx)
         elif func_name == 'Unfolding':
             return self.translate_unfolding(node, ctx)
+        elif func_name == 'Low':
+            return self.translate_low(node, ctx)
         elif func_name == 'Forall':
             return self.translate_forall(node, ctx)
         elif func_name == 'Previous':
