@@ -25,6 +25,7 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    is_io_existential,
     UnsupportedException,
     )
 from typing import Dict
@@ -54,6 +55,11 @@ class Analyzer(ast.NodeVisitor):
         self.asts = {}
         self.node_factory = node_factory
         self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
+        self._is_io_existential = False     # Are we defining an
+                                            # IOExists block?
+        self._lambda_stack = []             # Keeps track how deep we
+                                            # are in a lambda
+                                            # expression.
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -219,7 +225,14 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = func
         self.visit(node.args, node)
         for child in node.body:
-            self.visit(child, node)
+            if is_io_existential(child):
+                self._is_io_existential = True
+                self.visit(child.value, node)   # child.value is used in
+                                                # order to avoid
+                                                # creating IOExists
+                                                # variable.
+            else:
+                self.visit(child, node)
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
@@ -253,14 +266,23 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function
         name = 'lambda' + str(node.lineno)
         self.current_scopes.append(name)
+        lambda_var_names = {}
         for arg in node.args.args:
-            var = self.node_factory.create_python_var(arg.arg, arg,
-                                                      self.typeof(arg))
+            var = self.node_factory.create_python_var(
+                arg.arg, arg, self.typeof(arg),
+                is_io_existential=self._is_io_existential)
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
-            self.current_function.special_vars[local_name] = var
+            if self._is_io_existential:
+                self.current_function.io_existential_vars[local_name] = var
+            else:
+                self.current_function.special_vars[local_name] = var
+            lambda_var_names[arg.arg] = local_name
+        self._is_io_existential = False
+        self._lambda_stack.append(lambda_var_names)
         self.visit(node.body, node)
+        self._lambda_stack.pop()
         self.current_scopes.pop()
 
     def visit_arg(self, node: ast.arg) -> None:
@@ -304,10 +326,21 @@ class Analyzer(ast.NodeVisitor):
                 )
         self.visit_default(node)
 
+
+    def _make_variable_name_unique(self, node: ast.Name) -> None:
+        """
+        If node.id is defined by Lambda, make it uniquely defined.
+        """
+        for lambda_var_names in reversed(self._lambda_stack):
+            if node.id in lambda_var_names:
+                node.id = lambda_var_names[node.id]
+                return
+
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in LITERALS:
             return
         if isinstance(node._parent, ast.Call):
+            self._make_variable_name_unique(node)
             return
         if isinstance(node._parent, ast.arg):
             if node._parent.annotation is node:
@@ -342,16 +375,22 @@ class Analyzer(ast.NodeVisitor):
                 # node is a static field.
                 raise UnsupportedException(node)
         if node.id not in self.program.global_vars:
-            # node is a local variable or a static field.
+            # node is a local variable, lambda argument, or a static
+            # field.
             if self.current_function is None:
                 # node is a static field.
                 raise UnsupportedException(node)
             else:
-                # node refers to a local variable.
+                # node refers to a local variable or lambda argument.
+                self._make_variable_name_unique(node)
                 var = None
                 if node.id in self.current_function.locals:
                     var = self.current_function.locals[node.id]
                 elif node.id in self.current_function.args:
+                    pass
+                elif node.id in self.current_function.special_vars:
+                    pass
+                elif node.id in self.current_function.io_existential_vars:
                     pass
                 elif (self.current_function.var_arg and
                         self.current_function.var_arg.name == node.id):

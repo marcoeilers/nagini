@@ -5,6 +5,7 @@ from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
+from py2viper_contracts.io import IO_CONTRACT_FUNCS
 from py2viper_translation.lib.constants import (
     BUILTINS,
     DICT_TYPE,
@@ -592,7 +593,11 @@ class CallTranslator(CommonTranslator):
             raise ValueError('Contract call translated as normal call.')
         elif get_func_name(node) in CONTRACT_FUNCS:
             return self.translate_contractfunc_call(node, ctx)
+        elif get_func_name(node) in IO_CONTRACT_FUNCS:
+            return self.translate_io_contractfunc_call(node, ctx)
         elif get_func_name(node) in BUILTINS:
             return self.translate_builtin_func(node, ctx)
+        elif get_func_name(node) in ctx.program.io_operations:
+            return self.translate_io_operation_call(node, ctx)
         else:
             return self.translate_normal_call(node, ctx)

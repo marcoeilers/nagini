@@ -143,17 +143,42 @@ def is_exception_decl(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Exsures'
 
 
+def is_io_existential(stmt: ast.AST) -> bool:
+    """
+    Returns True if statement is a definition of IOExists.
+    """
+    if (isinstance(stmt, ast.Assign) and
+            len(stmt.targets) == 1 and
+            isinstance(stmt.targets[0], ast.Name) and
+            stmt.targets[0].id == 'IOExists'):
+        return True
+    else:
+        return False
+
+
 def get_body_start_index(statements: List[ast.AST]) -> int:
     """
-    Returns the index of the first statement that is not a method contract
+    Returns the index of the first statement that is not a method
+    contract.
+
+    .. note::
+
+        In the case when a method has only a contract, the returned
+        index is equal to ``len(statements)``.
     """
     body_index = 0
-    while is_pre(statements[body_index]):
-        body_index += 1
-    while is_post(statements[body_index]):
-        body_index += 1
-    while is_exception_decl(statements[body_index]):
-        body_index += 1
+    try:
+        while is_io_existential(statements[body_index]):
+            body_index += 1
+        while is_pre(statements[body_index]):
+            body_index += 1
+        while is_post(statements[body_index]):
+            body_index += 1
+        while is_exception_decl(statements[body_index]):
+            body_index += 1
+    except IndexError:
+        # This exception means that the method has only a contract.
+        pass
     return body_index
 
 

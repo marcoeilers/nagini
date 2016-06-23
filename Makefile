@@ -1,6 +1,7 @@
 CHECKED_FILES:=\
 							src/py2viper_translation/analyzer_io.py \
-							src/py2viper_translation/translators/io_operation.py
+							src/py2viper_translation/translators/io_operation.py \
+							src/py2viper_translation/lib/preamble_constructor.py
 CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
 BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v

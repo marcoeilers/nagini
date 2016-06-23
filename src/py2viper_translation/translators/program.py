@@ -6,6 +6,9 @@ from py2viper_translation.lib.constants import (
     PRIMITIVES,
     RESULT_NAME
 )
+from py2viper_translation.lib.preamble_constructor import (
+    IOPreambleConstructor
+)
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
@@ -305,6 +308,15 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SetType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+
+        # predefined IO stuff
+        io_constructor = IOPreambleConstructor(
+            self.config.translator, self.viper)
+        io_predicates, io_getters, io_methods = (
+            io_constructor.construct_io_preamble(ctx))
+        functions.extend(io_getters)
+        predicates.extend(io_predicates)
+        methods.extend(io_methods)
 
         type_funcs = self.type_factory.get_default_functions(ctx)
         type_axioms = self.type_factory.get_default_axioms(ctx)
