@@ -1,8 +1,8 @@
 import ast
 
-from py2viper_contracts.contracts import CONTRACT_FUNCS
+from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.jvmaccess import JVM
-from py2viper_translation.lib.program_nodes import PythonClass
+from py2viper_translation.lib.program_nodes import PythonClass, PythonType
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
@@ -174,7 +174,8 @@ class SIFCallTranslator(CallTranslator):
         return arg_stmts + [call], res_expr
 
     def _translate_args(self, node: ast.Call,
-                        ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
+                        ctx: SIFContext) -> Tuple[List[Stmt], List[Expr],
+                                                  List[PythonType]]:
         args = []
         arg_stmts = []
         for arg in node.args:
@@ -190,7 +191,7 @@ class SIFCallTranslator(CallTranslator):
         assert ctx.current_function
         args.append(ctx.current_tl_var_expr)
 
-        return arg_stmts, args
+        return arg_stmts, args, []
 
     def _translate_receiver(self, node: ast.Call,
                             ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
@@ -215,7 +216,7 @@ class SIFCallTranslator(CallTranslator):
 
     def translate_normal_call(self, node: ast.Call,
                               ctx: SIFContext) -> StmtsAndExpr:
-        arg_stmts, args = self._translate_args(node, ctx)
+        arg_stmts, args, _ = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         if name in ctx.program.classes:
