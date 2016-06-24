@@ -143,7 +143,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._check_arg_types()
 
         inputs = node.args.args[:-len(node.args.defaults)]
-        outputs = node.args.args[len(node.args.defaults) - 1:]
+        outputs = node.args.args[-len(node.args.defaults):]
 
         inputs = self._set_preset(inputs)
         outputs = self._set_postset(outputs)
