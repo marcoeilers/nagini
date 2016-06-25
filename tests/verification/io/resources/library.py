@@ -47,7 +47,7 @@ def read_int(t1: Place) -> Tuple[Place, int]:
         ),
         Ensures(
             token(t2) and
-            (t2 == Result()[0] and
-            value == Result()[1])
+            t2 == Result()[0] and
+            value == Result()[1]
         )
     )   # type: Callable[[Place, int], Tuple[bool, bool]]
