@@ -14,6 +14,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
+    PythonIOExistentialVar,
     PythonTryBlock,
     PythonType,
     PythonVar
@@ -310,7 +311,12 @@ class ExpressionTranslator(CommonTranslator):
             if node.id in ctx.var_aliases:
                 return [], ctx.var_aliases[node.id].ref
             else:
-                return [], ctx.current_function.get_variable(node.id).ref
+                var = ctx.current_function.get_variable(node.id)
+                if (isinstance(var, PythonIOExistentialVar) and
+                        not var.is_defined()):
+                    raise InvalidProgramException(
+                        node, 'io_existential_var.use_of_undefined')
+                return [], var.ref
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
@@ -406,6 +412,10 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
+        if self.is_io_existential_defining_equality(node, ctx):
+            self.define_io_existential(node, ctx)
+            return ([], self.viper.TrueLit(self.to_position(node, ctx),
+                                           self.no_info(ctx)))
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

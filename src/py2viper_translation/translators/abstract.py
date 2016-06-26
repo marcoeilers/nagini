@@ -170,6 +170,15 @@ class AbstractTranslator(metaclass=ABCMeta):
         translator = self.config.io_operation_translator
         return translator.translate_io_operation_call(node, ctx)
 
+    def is_io_existential_defining_equality(self, node: ast.Expr,
+                                            ctx: Context) -> bool:
+        translator = self.config.io_operation_translator
+        return translator.is_io_existential_defining_equality(node, ctx)
+
+    def define_io_existential(self, node: ast.Expr, ctx: Context) -> None:
+        translator = self.config.io_operation_translator
+        translator.define_io_existential(node, ctx)
+
     def translate_handler(self, handler: PythonExceptionHandler,
                           ctx: Context) -> List[Stmt]:
         return self.config.method_translator.translate_handler(handler, ctx)

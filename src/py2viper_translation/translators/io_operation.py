@@ -1,10 +1,60 @@
 """
 This file contains code responsible for translating IO operations.
+
+Translation of IO Existential Variables
+=======================================
+
+VeriFast has ``?a`` syntax which is essentially an assignment expression
+that allows to link IO operations in contracts. However, neither Python,
+nor Silver has assignment expressions.
+
+``IOExists`` is a special construct that allows to define IO existential
+variables (class ``PythonIOExistentialVar``) that can be used for
+linking IO operations in contracts. For example::
+
+    def read_int(t1: Place) -> Tuple[Place, int]:
+        IOExists = lambda t2, value: (
+            Requires(
+                token(t1) and
+                read_int_io(t1, value, t2)
+            ),
+            Ensures(
+                token(t2) and
+                (t2 == Result()[0] and
+                value == Result()[1])
+            )
+        )   # type: Callable[[Place, int], Tuple[bool, bool]]
+
+Here ``t2`` and ``value`` are IO existential variables. Unlike normal
+variables, existential variables are not created as variables on the
+Silver level, but instead they are replaced with their definitions. A
+definition of the existential variable is its first mention in a
+contract, which must be one of:
+
+1.  **IO operation's result.** In this case the definition of the
+    existential variable is IO operation's getter. For example,
+    ``read_int_io(t1, value, t2)`` in the example above defines
+    ``value`` and ``t2``. As a result, in all subsequent uses
+    ``value`` is translated to ``get__read_int_io__value(t1)`` and
+    ``t2`` to ``get__read_int_io__t_post(t1)``.
+2.  **Equality with already defined value.** The only accepted syntax in
+    this case is ``existential_variable == something``. For example,
+    ``2 == value`` would give an error because existential variable is
+    on the right hand side. In this case, the definition of the
+    existential variable is the right hand side of the equality.
+
+.. note::
+
+    In both cases, the defining mention must be a top level assertion.
+    This restriction could be lifted by implementing Petri Net control
+    flow analysis that ensures that an existential variable is always
+    defined before it is used.
 """
 
 
 import ast
 
+from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonIOExistentialVar,
@@ -18,7 +68,7 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-from typing import cast, List, Tuple
+from typing import Callable, cast, List, Tuple  # pylint: disable=unused-import
 
 # Just to make mypy happy.
 if False:         # pylint: disable=using-constant-test
@@ -42,6 +92,27 @@ def _raise_invalid_operation_use(error_type: str, node: ast.AST) -> None:
         node,
         'invalid.io_operation_use.' + error_type,
     )
+
+
+def _is_top_level_assertion(node: ast.expr) -> bool:
+    """
+    Checks if assertion represented by node is top level. That is,
+    the node is immediate child of a contract wrapper function.
+    """
+    def get_parent(node: ast.expr) -> ast.expr:
+        """ Just a helper function to make mypy happy.
+        """
+        return node._parent     # type: ignore
+    parent = get_parent(node)
+    while (isinstance(parent, ast.BoolOp) and
+           isinstance(parent.op, ast.And)):
+        node = parent
+        parent = get_parent(node)
+    if (isinstance(parent, ast.Call) and
+            isinstance(parent.func, ast.Name)):
+        func_name = parent.func.id
+        return func_name in CONTRACT_WRAPPER_FUNCS
+    return False
 
 
 class IOOperationTranslator(CommonTranslator):
@@ -207,3 +278,37 @@ class IOOperationTranslator(CommonTranslator):
         self._translate_results(args, operation, node, ctx)
         # TODO: And expressions returned by _translate_results.
         return [], predicate
+
+    def is_io_existential_defining_equality(self, node: ast.expr,
+                                            ctx: Context) -> bool:
+        """
+        Checks if ``node`` is an equality that defines IO existential
+        variable.
+        """
+        if (_is_top_level_assertion(node) and
+                isinstance(node, ast.Compare)):
+            if (len(node.ops) == 1 and
+                    len(node.comparators) == 1 and
+                    isinstance(node.left, ast.Name) and
+                    isinstance(node.ops[0], ast.Eq)):
+                var = ctx.actual_function.get_variable(node.left.id)
+                return (
+                    isinstance(var, PythonIOExistentialVar) and
+                    not var.is_defined())
+        return False
+
+    def define_io_existential(self, node: ast.Compare, ctx: Context) -> None:
+        """
+        From defining equality defines IO existential variable.
+        """
+        assert self.is_io_existential_defining_equality(node, ctx)
+
+        # TODO: The result of this call must not only be an expression,
+        # but a pure expression.
+        _, right = self.translate_expr(
+            node.comparators[0], ctx,
+            expression=True)
+
+        name_node = cast(ast.Name, node.left)
+        var = ctx.actual_function.get_variable(name_node.id)
+        var.ref = right
