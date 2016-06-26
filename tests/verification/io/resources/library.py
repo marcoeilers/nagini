@@ -9,28 +9,6 @@ from typing import Tuple, Callable
 
 
 @IOOperation
-def write_string_io(
-        t_pre: Place,
-        value: str,
-        t_post: Place = Result(),
-        ) -> bool:
-    Terminates(True)
-
-
-def write_string(t1: Place, value: str) -> Place:
-    IOExists = lambda t2: (
-        Requires(
-            token(t1) and
-            write_string_io(t1, value, t2)
-        ),
-        Ensures(
-            token(t2) and
-            t2 == Result()
-        )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
-
-
-@IOOperation
 def read_int_io(
         t_pre: Place,
         number: int = Result(),
@@ -51,3 +29,47 @@ def read_int(t1: Place) -> Tuple[Place, int]:
             value == Result()[1]
         )
     )   # type: Callable[[Place, int], Tuple[bool, bool]]
+
+
+@IOOperation
+def write_int_io(
+        t_pre: Place,
+        value: int,
+        t_post: Place = Result(),
+        ) -> bool:
+    Terminates(True)
+
+
+def write_int(t1: Place, value: int) -> Place:
+    IOExists = lambda t2: (
+        Requires(
+            token(t1) and
+            write_int_io(t1, value, t2)
+        ),
+        Ensures(
+            token(t2) and
+            t2 == Result()
+        )
+    )   # type: Callable[[Place], Tuple[bool, bool]]
+
+
+@IOOperation
+def write_string_io(
+        t_pre: Place,
+        value: str,
+        t_post: Place = Result(),
+        ) -> bool:
+    Terminates(True)
+
+
+def write_string(t1: Place, value: str) -> Place:
+    IOExists = lambda t2: (
+        Requires(
+            token(t1) and
+            write_string_io(t1, value, t2)
+        ),
+        Ensures(
+            token(t2) and
+            t2 == Result()
+        )
+    )   # type: Callable[[Place], Tuple[bool, bool]]
