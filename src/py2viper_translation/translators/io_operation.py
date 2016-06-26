@@ -20,8 +20,8 @@ linking IO operations in contracts. For example::
             ),
             Ensures(
                 token(t2) and
-                (t2 == Result()[0] and
-                value == Result()[1])
+                t2 == Result()[0] and
+                value == Result()[1]
             )
         )   # type: Callable[[Place, int], Tuple[bool, bool]]
 
@@ -43,12 +43,25 @@ contract, which must be one of:
     on the right hand side. In this case, the definition of the
     existential variable is the right hand side of the equality.
 
-.. note::
+    .. note::
 
-    In both cases, the defining mention must be a top level assertion.
-    This restriction could be lifted by implementing Petri Net control
-    flow analysis that ensures that an existential variable is always
-    defined before it is used.
+        The defining equality must be a top level assertion because the
+        following contract::
+
+            (
+                value == x.f
+                if b
+                else value == x.g
+            ) and
+            value == 2
+
+        would be translated to:
+
+        .. code-block:: silver
+
+            (b ? True : x.f == x.g) && x.f == 2
+
+        which is probably not what a programmer intended.
 """
 
 
@@ -210,11 +223,6 @@ class IOOperationTranslator(CommonTranslator):
         A helper method that defines getters corresponding to operation
         results, or emits equalities between each result and getter
         definition.
-
-        .. todo::
-
-            Implement defining equalities between each result and getter
-            definition.
         """
 
         position = self.to_position(node, ctx)
@@ -226,6 +234,7 @@ class IOOperationTranslator(CommonTranslator):
         if len(result_instances) != len(results):
             _raise_invalid_operation_use('result_mismatch', node)
 
+        equations = []
         for result, instance_expr in zip(results, result_instances):
             if not isinstance(instance_expr, ast.Name):
                 _raise_invalid_operation_use(
@@ -237,20 +246,23 @@ class IOOperationTranslator(CommonTranslator):
                     'variable_not_existential', node)
             var = ctx.actual_function.io_existential_vars[var_name]
             assert isinstance(var, PythonIOExistentialVar)
+
+            name = _construct_getter_name(operation, result)
+            typ = self.translate_type(result.type, ctx)
+            formal_args = [
+                arg.decl
+                for arg in operation.get_parameters()
+            ]
+            getter = self.viper.FuncApp(
+                name, args, position, info, typ, formal_args)
+
             if var.is_defined():
-                # TODO: Implement: getter_result == getter_instance
-                raise UnsupportedException(node)
+                comparison = self.viper.EqCmp(getter, var.ref,
+                                              position, info)
+                equations.append(comparison)
             else:
-                name = _construct_getter_name(operation, result)
-                typ = self.translate_type(result.type, ctx)
-                formal_args = [
-                    arg.decl
-                    for arg in operation.get_parameters()
-                ]
-                getter = self.viper.FuncApp(
-                    name, args, position, info, typ, formal_args)
                 var.ref = getter
-        return []
+        return equations
 
     def translate_io_operation_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
@@ -275,9 +287,15 @@ class IOOperationTranslator(CommonTranslator):
             operation.sil_name, args, perm, node, ctx)
 
         # Translate results.
-        self._translate_results(args, operation, node, ctx)
-        # TODO: And expressions returned by _translate_results.
-        return [], predicate
+        equations = self._translate_results(args, operation, node, ctx)
+
+        # And everything.
+        expr = predicate
+        for equation in equations:
+            expr = self.viper.And(expr, equation,
+                                  self.to_position(node, ctx),
+                                  self.no_info(ctx))
+        return [], expr
 
     def is_io_existential_defining_equality(self, node: ast.expr,
                                             ctx: Context) -> bool:
