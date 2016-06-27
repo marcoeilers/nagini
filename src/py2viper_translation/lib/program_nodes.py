@@ -449,7 +449,7 @@ class PythonMethod(PythonNode, PythonScope):
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_program().global_vars[name]
+            return self.get_program().global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',

@@ -103,6 +103,8 @@ class VerificationTests(AnnotatedTests):
         if vresult:
             assert not expected
         else:
+            # make sure we produce an error string
+            str(vresult)
             missing_info = [error for error in vresult.errors if
                             not isinstance(error.pos(),
                                            jvm.viper.silver.ast.HasLineColumn)]

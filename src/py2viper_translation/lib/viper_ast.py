@@ -1,5 +1,8 @@
 import types
 
+from py2viper_translation.lib.cache import cache
+from uuid import uuid1
+
 
 def getobject(package, name):
     return getattr(getattr(package, name + '$'), 'MODULE$')
@@ -26,6 +29,7 @@ class ViperAST:
         self.java = java
         self.scala = scala
         self.jvm = jvm
+        self.nodes = {}
 
         def getconst(name):
             return getobject(ast, name)
@@ -374,10 +378,12 @@ class ViperAST:
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
+        id = str(uuid1())
+        cache[id] = expr
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
             end = self.scala.Some(end)
         else:
             end = self.none
-        return self.ast.SourcePosition(path, start, end)
+        return self.ast.IdentifierPosition(path, start, end, id)
