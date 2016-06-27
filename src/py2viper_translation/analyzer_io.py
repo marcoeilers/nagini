@@ -1,6 +1,4 @@
-"""
-Analyzer that collects information about IO operations.
-"""
+"""Analyzer that collects information about IO operations."""
 
 
 import ast
@@ -19,9 +17,7 @@ from py2viper_translation.lib.util import (
 
 
 class IOOperationAnalyzer(ast.NodeVisitor):
-    """
-    Walks through IO operation AST and collects the needed information.
-    """
+    """Walks through IO operation AST and collects the needed information."""
 
     def __init__(
             self, parent: 'py2viper_translation.analyzer.Analyzer',
@@ -40,8 +36,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self,
             error_type: str,
             node: ast.AST = None):
-        """ Raises InvalidProgramException.
-        """
+        """Raise InvalidProgramException."""
         node = node or self._current_node
         raise InvalidProgramException(
             node,
@@ -50,7 +45,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
     def _create_io_operation(
             self, node: ast.FunctionDef) -> nodes.PythonIOOperation:
-        """
+        """Create IO operation.
+
         Creates non-initialized IO operation from an AST node and adds
         it to program.
         """
@@ -66,8 +62,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         return operation
 
     def _check_type(self) -> None:
-        """ Checks if operation type is ``bool``.
-        """
+        """Check if operation type is ``bool``."""
         scope_prefix = self._current_io_operation.get_scope_prefix()
         func_type = self._types.get_func_type(scope_prefix)
         if isinstance(func_type, AnyType):
@@ -77,7 +72,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._raise_invalid_operation('return_type_not_bool')
 
     def _check_arg_types(self) -> None:
-        """
+        """Allow only certain types of args.
+
         Do not allow ``*args`` and ``**kwargs``. Only ``Result()`` is
         allowed as default value.
         """
@@ -93,8 +89,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 self._raise_invalid_operation('default_argument')
 
     def _typeof(self, node: ast.AST) -> nodes.PythonType:
-        """ Returns the type of the given AST node.
-        """
+        """Get the type of the given AST node."""
         assert isinstance(node, ast.arg)
         typ, _ = self._parent.types.get_type(
             [self._current_io_operation.name],
@@ -102,7 +97,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         return self._parent.convert_type(typ)
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
-        """
+        """Check and set preset.
+
         Checks that exactly one place is in preset, sets operation
         preset and returns input list with all places removed.
         """
@@ -117,7 +113,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         return inputs[1:]
 
     def _set_postset(self, outputs: List[ast.arg]) -> List[ast.arg]:
-        """
+        """Check and set postset.
+
         Checks that exactly one place is in postset, sets operation
         postset and returns input list with all places removed.
         """
@@ -136,8 +133,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             return outputs[:-1]
 
     def _parse_arguments(self) -> None:
-        """ Parses and checks operation arguments.
-        """
+        """Parse and check operation arguments."""
         node = self._current_node
 
         self._check_arg_types()
@@ -149,7 +145,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         outputs = self._set_postset(outputs)
 
         def node_to_var(node: ast.arg) -> nodes.PythonVar:
-            """ Creates variable from argument. """
+            """Create variable from argument."""
             return self._node_factory.create_python_var(
                 node.arg, node, self._typeof(node))
 
@@ -159,9 +155,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             list(map(node_to_var, outputs)))
 
     def analyze_io_operation(self, node: ast.FunctionDef) -> None:
-        """
-        Analyzes AST node representing IO operation and extracts
-        information from it.
+        """Analyze AST node representing IO operation.
+
+        That is: extract information and perform some basic
+        well-formedness checks.
         """
         assert self._current_io_operation is None
         assert self._current_node is None
@@ -179,7 +176,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_io_operation = None
 
     def visit_Call(self, node: ast.Call) -> None:   # pylint: disable=invalid-name
-        """
+        """Parse IO operation properties.
+
         Currently, only parses properties such as ``Terminates`` and
         ``TerminationMeasure``.
         """
@@ -221,9 +219,11 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 self.visit(arg)
 
     def visit_Name(self, node: ast.Name) -> None:   # pylint: disable=invalid-name
-        """
-        Checks if provided node is an operation input and raises an
-        error, if it is not.
+        """Check if node is an operation input.
+
+        This method is expected to be called by ``visit_Call`` on IO
+        operation property arguments. Checks if provided node is an
+        operation input and raises an error, if it is not.
         """
         if self._in_property:
             if not self._current_io_operation.is_input(node.id):
