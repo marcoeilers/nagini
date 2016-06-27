@@ -23,7 +23,7 @@ from py2viper_translation.translator import Translator
 from py2viper_translation.translators.abstract import Expr
 from py2viper_translation.translators.io_operation import (
     IOOperationTranslator,
-    )
+)
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
 

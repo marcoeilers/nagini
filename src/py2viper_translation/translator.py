@@ -14,7 +14,7 @@ from py2viper_translation.translators.contract import ContractTranslator
 from py2viper_translation.translators.expression import ExpressionTranslator
 from py2viper_translation.translators.io_operation import (
     IOOperationTranslator,
-    )
+)
 from py2viper_translation.translators.method import MethodTranslator
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
