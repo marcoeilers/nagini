@@ -94,8 +94,7 @@ if False:         # pylint: disable=using-constant-test
 
 def _construct_getter_name(operation: PythonIOOperation,
                            result: PythonVar) -> str:
-    """ Utility function for constructing getter name.
-    """
+    """Utility function for constructing getter name."""
     return 'get__{0}__{1}'.format(
         operation.sil_name,
         result.sil_name,
@@ -103,8 +102,7 @@ def _construct_getter_name(operation: PythonIOOperation,
 
 
 def _raise_invalid_operation_use(error_type: str, node: ast.AST) -> None:
-    """ Raises InvalidProgramException.
-    """
+    """Raise InvalidProgramException."""
     raise InvalidProgramException(
         node,
         'invalid.io_operation_use.' + error_type,
@@ -112,13 +110,9 @@ def _raise_invalid_operation_use(error_type: str, node: ast.AST) -> None:
 
 
 def _is_top_level_assertion(node: ast.expr) -> bool:
-    """
-    Checks if assertion represented by node is top level. That is,
-    the node is immediate child of a contract wrapper function.
-    """
+    """Check if assertion represented by node is top level."""
     def get_parent(node: ast.expr) -> ast.expr:
-        """ Just a helper function to make mypy happy.
-        """
+        """Just a helper function to make mypy happy."""
         return node._parent     # type: ignore
     parent = get_parent(node)
     while (isinstance(parent, ast.BoolOp) and
@@ -133,14 +127,11 @@ def _is_top_level_assertion(node: ast.expr) -> bool:
 
 
 class IOOperationTranslator(CommonTranslator):
-    """ Class responsible for translating IO operations.
-    """
+    """Class responsible for translating IO operations."""
 
     def _construct_full_perm(self, node: ast.Call,
                              ctx: Context) -> 'viper.silver.ast.FullPerm':
-        """
-        Constructs silver full perm AST node.
-        """
+        """Construct silver full perm AST node."""
         return self.viper.FullPerm(self.to_position(node, ctx),
                                    self.no_info(ctx))
 
@@ -150,8 +141,7 @@ class IOOperationTranslator(CommonTranslator):
                 'viper.silver.ast.Predicate',
                 List['viper.silver.ast.Function'],
                 List['viper.silver.ast.Method']]:
-        """ Translates IO operation to Silver.
-        """
+        """Translate IO operation to Silver."""
         args = [
             arg.decl
             for arg in operation.get_parameters()
@@ -178,8 +168,11 @@ class IOOperationTranslator(CommonTranslator):
 
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:
-        """
-        Translates a call to a IO contract function such as ``token``.
+        """Translate a call to a IO contract function.
+
+        Currently supported functions:
+
+        +   ``token``
         """
         func_name = get_func_name(node)
         if func_name == 'token':
@@ -210,10 +203,7 @@ class IOOperationTranslator(CommonTranslator):
     def _translate_args(
             self, args: List[ast.expr],
             ctx: Context) -> List[Expr]:
-        """
-        A helper method that translates IO operation arguments to
-        silver.
-        """
+        """Translate IO operation arguments to silver."""
         arg_exprs = []
         for arg in args:
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
@@ -225,12 +215,11 @@ class IOOperationTranslator(CommonTranslator):
             self, args: List[ast.Expr],
             operation: PythonIOOperation, node: ast.Call,
             ctx: Context) -> List[Expr]:
-        """
-        A helper method that defines getters corresponding to operation
-        results, or emits equalities between each result and getter
-        definition.
-        """
+        """Translate IO operation results.
 
+        That is: define getters corresponding to operation results or
+        emit equalities between each result and getter definition.
+        """
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         parameters_count = len(operation.get_parameters())
@@ -272,12 +261,13 @@ class IOOperationTranslator(CommonTranslator):
 
     def translate_io_operation_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
-        """
-        Translates a call to an IO operation:
+        """Translate a call to an IO operation.
 
-        1.  Emits a predicate corresponding to the operation.
-        2.  Either defines getters corresponding to operation results,
-            or emits equalities between each result and getter
+        That is:
+
+        1.  Emit a predicate corresponding to the operation.
+        2.  Either define getters corresponding to operation results,
+            or emit equalities between each result and getter
             definition.
         """
         assert ctx.actual_function
@@ -305,9 +295,10 @@ class IOOperationTranslator(CommonTranslator):
 
     def is_io_existential_defining_equality(self, node: ast.expr,
                                             ctx: Context) -> bool:
-        """
-        Checks if ``node`` is an equality that defines IO existential
-        variable.
+        """Check if ``node`` defines IO existential variable.
+
+        That is, node is equality of form:
+        ``existential_variable == something``.
         """
         if (_is_top_level_assertion(node) and
                 isinstance(node, ast.Compare)):
@@ -322,9 +313,7 @@ class IOOperationTranslator(CommonTranslator):
         return False
 
     def define_io_existential(self, node: ast.Compare, ctx: Context) -> None:
-        """
-        From defining equality defines IO existential variable.
-        """
+        """From defining equality defines IO existential variable."""
         assert self.is_io_existential_defining_equality(node, ctx)
 
         # TODO: The result of this call must not only be an expression,

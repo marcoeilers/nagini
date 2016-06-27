@@ -1,7 +1,4 @@
-"""
-Classes for constructing preambles for cases when it is more convenient
-than having static Silver files.
-"""
+"""Classes for constructing preambles."""
 
 
 from py2viper_translation.translators.abstract import Context
@@ -34,10 +31,7 @@ class IOPreambleConstructor:
                 List['viper.silver.ast.Predicate'],
                 List['viper.silver.ast.Function'],
                 List['viper.silver.ast.Method']]:
-        """
-        Main method that constructs IO preamble.
-        """
-
+        """Main method that constructs IO preamble."""
         position = self._translator.no_position(ctx)
         info = self._translator.no_info(ctx)
 

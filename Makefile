@@ -13,7 +13,7 @@ mypy: bin/mypy
 	bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
-	bin/flake8 --ignore=F401,E501 --max-complexity 12 $(CHECKED_FILES)
+	bin/flake8 --ignore=F401,E501,D102 --max-complexity 12 $(CHECKED_FILES)
 
 pylint: bin/pylint
 	bin/pylint $(CHECKED_MODULES)
