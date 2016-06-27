@@ -1,14 +1,21 @@
 from py2viper_contracts.contracts import *
 
+
 def foo(x: int) -> int:
     Requires(x >= 0)
+    Requires(Low(x >= 0))
     Ensures(Result() == 2 * x)
+    Ensures(Low(Result() == 2 * x))
     return 2 * x
+
 
 def bar(x: int) -> int:
     Requires(x > 2)
+    Requires(Low(x > 2))
     Ensures(Result() == x - 2)
+    Ensures(Low(Result() == x - 2))
     return x - 2
+
 
 class A:
     def __init__(self, a: int) -> None:
@@ -28,6 +35,7 @@ class A:
 
 
 def main() -> None:
+    Requires(Low())
     x = 25 * foo(bar(5))
     a = A(x)
     b = a.m2(a.m1(x))

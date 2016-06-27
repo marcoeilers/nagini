@@ -25,7 +25,7 @@ from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException
 )
-from typing import Dict
+from typing import Dict, Set
 
 
 logger = logging.getLogger('py2viper_translation.analyzer')
@@ -192,7 +192,6 @@ class Analyzer(ast.NodeVisitor):
         elif self.is_pure(node):
             container = scope_container.functions
         else:
-            assert not node.decorator_list
             container = scope_container.methods
         if name in container:
             func = container[name]
@@ -489,10 +488,17 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
+    def _incompatible_decorators(self, decorators: Set[str]) -> bool:
+        return ('Predicate' in decorators) and ('Pure' in decorators)
+
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return (len(func.decorator_list) == 1
-                and func.decorator_list[0].id == 'Pure')
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'Pure' in decorators
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        return (len(func.decorator_list) == 1
-                and func.decorator_list[0].id == 'Predicate')
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'Predicate' in decorators

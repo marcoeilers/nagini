@@ -12,6 +12,8 @@ class SIFContext(Context):
         self._use_prime = False
         self._old_vars = {}
         self._curr_tl_var_expr = None  # Current timeLevel expression
+        self.in_pres = False
+        self.in_posts = False
 
     @property
     def use_prime(self) -> bool:
@@ -46,6 +48,8 @@ class SIFContext(Context):
     def current_tl_var_expr(self) -> Expr:
         if self._curr_tl_var_expr:
             return self._curr_tl_var_expr
+        elif self.in_pres:
+            return self.actual_function.tl_var.ref
         elif TL_VAR_NAME in self.var_aliases:
             return self.var_aliases[TL_VAR_NAME].ref
         elif self.actual_function.pure:
