@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     PRIMITIVES,
     RESULT_NAME,
 )
+from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from typing import List, Optional, Set
 
@@ -760,7 +761,7 @@ class PythonIOExistentialVar(PythonVarBase):
         return not self._ref is None
 
     @property
-    def ref(self) -> 'viper.silver.ast.Expression':
+    def ref(self) -> Expr:
         """
         Returns a Silver expression node that can be used to refer to
         this variable.
@@ -769,7 +770,7 @@ class PythonIOExistentialVar(PythonVarBase):
         return self._ref
 
     @ref.setter
-    def ref(self, ref: 'viper.silver.ast.Expression') -> None:
+    def ref(self, ref: Expr) -> None:
         """
         Sets a Silver expression node that can be used to refer to this
         variable.

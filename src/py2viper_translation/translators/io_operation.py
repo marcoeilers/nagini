@@ -67,13 +67,18 @@ contract, which must be one of:
 
 import ast
 
+from typing import Callable, cast, List, Tuple  # pylint: disable=unused-import
+
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonIOExistentialVar,
     PythonVar,
 )
-from py2viper_translation.lib.typedefs import StmtsAndExpr
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    StmtsAndExpr,
+)
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
@@ -81,7 +86,6 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-from typing import Callable, cast, List, Tuple  # pylint: disable=unused-import
 
 # Just to make mypy happy.
 if False:         # pylint: disable=using-constant-test
@@ -193,7 +197,9 @@ class IOOperationTranslator(CommonTranslator):
             measure for a token gives an assertion error.
 
         """
-        assert len(node.args) == 1, "Obligations not implemented."
+        if len(node.args) != 1:
+            raise UnsupportedException(
+                node, "Obligations not implemented.")
         place = node.args[0]
         place_stmt, place_expr = self.translate_expr(place, ctx)
         assert not place_stmt
@@ -203,7 +209,7 @@ class IOOperationTranslator(CommonTranslator):
 
     def _translate_args(
             self, args: List[ast.expr],
-            ctx: Context) -> List['viper.silver.ast.Expression']:
+            ctx: Context) -> List[Expr]:
         """
         A helper method that translates IO operation arguments to
         silver.
@@ -218,7 +224,7 @@ class IOOperationTranslator(CommonTranslator):
     def _translate_results(
             self, args: List[ast.Expr],
             operation: PythonIOOperation, node: ast.Call,
-            ctx: Context) -> List['viper.silver.ast.Expression']:
+            ctx: Context) -> List[Expr]:
         """
         A helper method that defines getters corresponding to operation
         results, or emits equalities between each result and getter
@@ -323,9 +329,10 @@ class IOOperationTranslator(CommonTranslator):
 
         # TODO: The result of this call must not only be an expression,
         # but a pure expression.
-        _, right = self.translate_expr(
+        right_stmt, right = self.translate_expr(
             node.comparators[0], ctx,
             expression=True)
+        assert not right_stmt   # Should be handled by expression=True.
 
         name_node = cast(ast.Name, node.left)
         var = ctx.actual_function.get_variable(name_node.id)
