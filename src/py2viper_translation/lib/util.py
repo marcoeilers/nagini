@@ -147,10 +147,11 @@ def is_io_existential(stmt: ast.AST) -> bool:
     """
     Returns True if statement is a definition of IOExists.
     """
-    if (isinstance(stmt, ast.Assign) and
-            len(stmt.targets) == 1 and
-            isinstance(stmt.targets[0], ast.Name) and
-            stmt.targets[0].id == 'IOExists'):
+    if (isinstance(stmt, ast.Expr) and
+            isinstance(stmt.value, ast.Call) and
+            isinstance(stmt.value.func, ast.Call) and
+            isinstance(stmt.value.func.func, ast.Name) and
+            stmt.value.func.func.id.startswith('IOExists')):
         return True
     else:
         return False

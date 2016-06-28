@@ -18,7 +18,8 @@ def read_int_io(
 
 
 def read_int(t1: Place) -> Tuple[Place, int]:
-    IOExists = lambda t2, value: (
+    IOExists2(Place, int)(
+        lambda t2, value: (
         Requires(
             token(t1) and
             read_int_io(t1, value, t2)
@@ -27,8 +28,9 @@ def read_int(t1: Place) -> Tuple[Place, int]:
             token(t2) and
             t2 == Result()[0] and
             value == Result()[1]
+        ),
         )
-    )   # type: Callable[[Place, int], Tuple[bool, bool]]
+    )
 
 
 @IOOperation
@@ -41,7 +43,8 @@ def write_int_io(
 
 
 def write_int(t1: Place, value: int) -> Place:
-    IOExists = lambda t2: (
+    IOExists1(Place)(
+        lambda t2: (
         Requires(
             token(t1) and
             write_int_io(t1, value, t2)
@@ -49,8 +52,9 @@ def write_int(t1: Place, value: int) -> Place:
         Ensures(
             token(t2) and
             t2 == Result()
+        ),
         )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
+    )
 
 
 @IOOperation
@@ -63,7 +67,8 @@ def write_string_io(
 
 
 def write_string(t1: Place, value: str) -> Place:
-    IOExists = lambda t2: (
+    IOExists1(Place)(
+        lambda t2: (
         Requires(
             token(t1) and
             write_string_io(t1, value, t2)
@@ -71,5 +76,6 @@ def write_string(t1: Place, value: str) -> Place:
         Ensures(
             token(t2) and
             t2 == Result()
+        ),
         )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
+    )

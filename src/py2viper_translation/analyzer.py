@@ -226,12 +226,7 @@ class Analyzer(ast.NodeVisitor):
         for child in node.body:
             if is_io_existential(child):
                 self._is_io_existential = True
-                self.visit(child.value, node)   # child.value is used in
-                                                # order to avoid
-                                                # creating IOExists
-                                                # variable.
-            else:
-                self.visit(child, node)
+            self.visit(child, node)
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
