@@ -535,8 +535,7 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators: Set[str]) -> bool:
         return (
                (('Predicate' in decorators) and ('Pure' in decorators)) or
-               (('Predicate' in decorators) and ('IOOperation' in decorators)) or
-               (('Pure' in decorators) and ('IOOperation' in decorators))
+               (('IOOperation' in decorators) and (len(decorators) != 1))
                )
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
