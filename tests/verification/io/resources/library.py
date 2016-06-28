@@ -1,11 +1,9 @@
 from py2viper_contracts.contracts import (
     Requires,
-    Predicate,
-    Result,
-    Assert,
+    Ensures,
 )
 from py2viper_contracts.io import *
-from typing import Tuple, Callable
+from typing import Tuple
 
 
 @IOOperation
