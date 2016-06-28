@@ -15,7 +15,8 @@ Import('resources/library.py')
 
 
 def read_int1(t1: Place) -> Tuple[int, Place]:
-    IOExists = lambda t2, value: (
+    IOExists2(Place, int)(
+        lambda t2, value: (
         Requires(
             token(t1) and
             read_int_io(t1, value, t2)
@@ -24,8 +25,9 @@ def read_int1(t1: Place) -> Tuple[int, Place]:
             token(t2) and
             t2 == Result()[1] and
             value == Result()[0]
+        ),
         )
-    )   # type: Callable[[Place, int], Tuple[bool, bool]]
+    )
 
     t2, number = read_int(t1)
 
@@ -33,7 +35,8 @@ def read_int1(t1: Place) -> Tuple[int, Place]:
 
 
 def read_int2(t1: Place) -> Tuple[int, int, Place]:
-    IOExists = lambda t3, t2, value1, value2: (
+    IOExists4(Place, Place, int, int)(
+        lambda t3, t2, value1, value2: (
         Requires(
             token(t1) and
             read_int_io(t1, value1, t2) and
@@ -44,8 +47,9 @@ def read_int2(t1: Place) -> Tuple[int, int, Place]:
             t3 == Result()[2] and
             value1 == Result()[0] and
             value2 == Result()[1]
+        ),
         )
-    )   # type: Callable[[Place, Place, int, int], Tuple[bool, bool]]
+    )
 
     t2, number1 = read_int(t1)
     t3, number2 = read_int(t2)
@@ -54,7 +58,8 @@ def read_int2(t1: Place) -> Tuple[int, int, Place]:
 
 
 def read_int3(t1: Place) -> Tuple[int, int, Place]:
-    IOExists = lambda t3, t2, value1, value2: (
+    IOExists4(Place, Place, int, int)(
+        lambda t3, t2, value1, value2: (
         Requires(
             token(t1) and
             read_int_io(t1, value1, t2) and
@@ -66,8 +71,9 @@ def read_int3(t1: Place) -> Tuple[int, int, Place]:
             t3 == Result()[2] and
             value1 == Result()[0] and
             value2 == Result()[1]
+        ),
         )
-    )   # type: Callable[[Place, Place, int, int], Tuple[bool, bool]]
+    )
 
     t2, number1 = read_int(t1)
     t3, number2 = read_int(t2)
@@ -79,7 +85,8 @@ def read_int3(t1: Place) -> Tuple[int, int, Place]:
 
 
 def read_write_int1(t1: Place) -> Place:
-    IOExists = lambda t2, t3, value: (
+    IOExists3(Place, Place, int)(
+        lambda t2, t3, value: (
         Requires(
             token(t1) and
             read_int_io(t1, value, t2) and
@@ -88,8 +95,9 @@ def read_write_int1(t1: Place) -> Place:
         Ensures(
             token(t3) and
             t3 == Result()
+        ),
         )
-    )   # type: Callable[[Place, Place, int], Tuple[bool, bool]]
+    )
 
     t2, number = read_int(t1)
     t3 = write_int(t2, number)
@@ -98,7 +106,8 @@ def read_write_int1(t1: Place) -> Place:
 
 
 def read_write_int2(t1: Place) -> Place:
-    IOExists = lambda t2, t3, t4, t5, value1, value2: (
+    IOExists6(Place, Place, Place, Place, int, int)(
+        lambda t2, t3, t4, t5, value1, value2: (
         Requires(
             token(t1) and
             read_int_io(t1, value1, t2) and
@@ -109,8 +118,9 @@ def read_write_int2(t1: Place) -> Place:
         Ensures(
             token(t5) and
             t5 == Result()
+        ),
         )
-    )   # type: Callable[[Place, Place, Place, Place, int, int], Tuple[bool, bool]]
+    )
 
     t2, number1 = read_int(t1)
     t3, number2 = read_int(t2)
@@ -122,7 +132,8 @@ def read_write_int2(t1: Place) -> Place:
 
 # TODO: Should be uncommented as soon as MissingOutput directive is supported.
 #   def read_write_int3(t1: Place) -> Place:
-#       IOExists = lambda t2, t3, t4, t5, value1, value2: (
+#       IOExists6(Place, Place, Place, Place, int, int)(
+#           lambda t2, t3, t4, t5, value1, value2: (
 #           Requires(
 #               token(t1) and
 #               read_int_io(t1, value1, t2) and
@@ -133,8 +144,9 @@ def read_write_int2(t1: Place) -> Place:
 #           Ensures(
 #               token(t5) and
 #               t5 == Result()
+#           ),
 #           )
-#       )   # type: Callable[[Place, Place, Place, Place, int, int], Tuple[bool, bool]]
+#       )
 
 #       t2, number1 = read_int(t1)
 #       t3, number2 = read_int(t2)

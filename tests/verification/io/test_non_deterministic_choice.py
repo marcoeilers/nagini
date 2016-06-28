@@ -14,7 +14,8 @@ Import('resources/library.py')
 
 
 def write_implementation_defined1(t1: Place) -> Place:
-    IOExists = lambda t2: (
+    IOExists1(Place)(
+        lambda t2: (
         Requires(
             token(t1) and
             write_string_io(t1, "Hello!", t2) and
@@ -24,15 +25,17 @@ def write_implementation_defined1(t1: Place) -> Place:
         Ensures(
             token(t2) and
             t2 == Result()
+        ),
         )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
+    )
 
     t2 = write_string(t1, "Hello!")
     return t2
 
 
 def write_implementation_defined2(t1: Place) -> Place:
-    IOExists = lambda t2: (
+    IOExists1(Place)(
+        lambda t2: (
         Requires(
             token(t1) and
             write_string_io(t1, "Hello!", t2) and
@@ -42,15 +45,17 @@ def write_implementation_defined2(t1: Place) -> Place:
         Ensures(
             token(t2) and
             t2 == Result()
+        ),
         )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
+    )
 
     t2 = write_string(t1, "Hallo!")
     return t2
 
 
 def write_implementation_defined3(t1: Place) -> Place:
-    IOExists = lambda t2: (
+    IOExists1(Place)(
+        lambda t2: (
         Requires(
             token(t1) and
             write_string_io(t1, "Hello!", t2) and
@@ -60,15 +65,17 @@ def write_implementation_defined3(t1: Place) -> Place:
         Ensures(
             token(t2) and
             t2 == Result()
+        ),
         )
-    )   # type: Callable[[Place], Tuple[bool, bool]]
+    )
 
     t2 = write_string(t1, "Sveikas!")
     return t2
 
 
 def write_non_negative(t1: Place) -> Place:
-    IOExists = lambda t2, t3, value: (
+    IOExists3(Place, Place, int)(
+        lambda t2, t3, value: (
         Requires(
             token(t1) and
             read_int_io(t1, value, t2) and
@@ -82,8 +89,9 @@ def write_non_negative(t1: Place) -> Place:
         Ensures(
             token(t3) and
             t3 == Result()
+        ),
         )
-    )   # type: Callable[[Place, Place, int], Tuple[bool, bool]]
+    )
 
     t2, number = read_int(t1)
 
@@ -96,7 +104,8 @@ def write_non_negative(t1: Place) -> Place:
 
 
 def write_only_positive(t1: Place) -> Place:
-    IOExists = lambda t2, t3, value: (
+    IOExists3(Place, Place, int)(
+        lambda t2, t3, value: (
         Requires(
             token(t1) and
             read_int_io(t1, value, t2) and
@@ -110,8 +119,9 @@ def write_only_positive(t1: Place) -> Place:
                 write_int_io(t2, value, t3) and
                 t2 == Result()
             )
+        ),
         )
-    )   # type: Callable[[Place, Place, int], Tuple[bool, bool]]
+    )
 
     t2, number = read_int(t1)
 
