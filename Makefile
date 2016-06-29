@@ -1,8 +1,15 @@
-CHECKED_FILES:=\
+CHECKED_TRANSLATOR_FILES:=\
 							src/py2viper_translation/analyzer_io.py \
 							src/py2viper_translation/translators/io_operation.py \
 							src/py2viper_translation/lib/preamble_constructor.py
-CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
+CHECKED_CONTRACT_FILES:=\
+							deps/py2viper-contracts/src/py2viper_contracts/io.py
+CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
+
+CHECKED_TRANSLATOR_MODULES:=$(subst /,.,$(CHECKED_TRANSLATOR_FILES:src/%.py=%))
+CHECKED_CONTRACT_MODULES:=$(subst /,.,$(CHECKED_CONTRACT_FILES:deps/py2viper-contracts/src/%.py=%))
+CHECKED_MODULES:=$(CHECKED_TRANSLATOR_MODULES) $(CHECKED_CONTRACT_MODULES)
+
 BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
