@@ -265,10 +265,10 @@ class IOOperationTranslator(CommonTranslator):
 
         That is:
 
-        1.  Emit a predicate corresponding to the operation.
-        2.  Either define getters corresponding to operation results,
-            or emit equalities between each result and getter
-            definition.
+        1.  Emit a predicate access corresponding to the operation.
+        2.  Either define getter invocations corresponding to the
+            operation results, or emit equalities between each result
+            and already defined getter invocation.
         """
         assert ctx.actual_function
 

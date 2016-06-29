@@ -324,6 +324,10 @@ class Analyzer(ast.NodeVisitor):
     def _make_variable_name_unique(self, node: ast.Name) -> None:
         """
         If node.id is defined by Lambda, make it uniquely defined.
+
+        .. todo::
+            This function is a workaround for py2viper issue `19
+            <https://bitbucket.org/viperproject/py2viper-translation/issues/19/>`_.
         """
         for lambda_var_names in reversed(self._lambda_stack):
             if node.id in lambda_var_names:
@@ -334,6 +338,7 @@ class Analyzer(ast.NodeVisitor):
         if node.id in LITERALS:
             return
         if isinstance(node._parent, ast.Call):
+            # FIXME: Remove this call once #19 is properly fixed.
             self._make_variable_name_unique(node)
             return
         if isinstance(node._parent, ast.arg):
@@ -376,6 +381,7 @@ class Analyzer(ast.NodeVisitor):
                 raise UnsupportedException(node)
             else:
                 # node refers to a local variable or lambda argument.
+                # FIXME: Remove this call once #19 is properly fixed.
                 self._make_variable_name_unique(node)
                 var = None
                 if node.id in self.current_function.locals:
