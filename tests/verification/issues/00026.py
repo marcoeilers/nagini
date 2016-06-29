@@ -1,3 +1,4 @@
+#:: IgnoreFile(/py2viper/issue/26/)
 from py2viper_contracts.contracts import *
 from typing import Tuple
 
