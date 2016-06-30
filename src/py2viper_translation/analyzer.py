@@ -338,7 +338,7 @@ class Analyzer(ast.NodeVisitor):
         if node.id in LITERALS:
             return
         if isinstance(node._parent, ast.Call):
-            # FIXME: Remove this call once #19 is properly fixed.
+            # FIXME(Marco): Remove this call once #19 is properly fixed.
             self._make_variable_name_unique(node)
             return
         if isinstance(node._parent, ast.arg):
@@ -381,7 +381,7 @@ class Analyzer(ast.NodeVisitor):
                 raise UnsupportedException(node)
             else:
                 # node refers to a local variable or lambda argument.
-                # FIXME: Remove this call once #19 is properly fixed.
+                # FIXME(Marco): Remove this call once #19 is properly fixed.
                 self._make_variable_name_unique(node)
                 var = None
                 if node.id in self.current_function.locals:
