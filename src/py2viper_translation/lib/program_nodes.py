@@ -828,16 +828,20 @@ class ProgramNodeFactory:
     TODO: Add more interfaces for other types of containers if needed.
     """
 
-    def create_python_var(self, name: str, node: ast.AST,
-                          type_: PythonClass, is_global: bool = False,
-                          is_io_existential: bool = False) -> PythonVarBase:
-        assert not (is_global and is_io_existential)
-        if is_global:
-            return PythonGlobalVar(name, node, type_)
-        elif is_io_existential:
-            return PythonIOExistentialVar(name, node, type_)
-        else:
-            return PythonVar(name, node, type_)
+    def create_python_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonVar:
+        return PythonVar(name, node, type_)
+
+    def create_python_global_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_)
+
+    def create_python_io_existential_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonIOExistentialVar:
+        return PythonIOExistentialVar(name, node, type_)
 
     def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
                              superscope: PythonScope,

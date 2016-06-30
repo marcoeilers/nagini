@@ -262,9 +262,12 @@ class Analyzer(ast.NodeVisitor):
         self.current_scopes.append(name)
         lambda_var_names = {}
         for arg in node.args.args:
-            var = self.node_factory.create_python_var(
-                arg.arg, arg, self.typeof(arg),
-                is_io_existential=self._is_io_existential)
+            if self._is_io_existential:
+                var = self.node_factory.create_python_io_existential_var(
+                    arg.arg, arg, self.typeof(arg))
+            else:
+                var = self.node_factory.create_python_var(
+                    arg.arg, arg, self.typeof(arg))
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
@@ -360,8 +363,8 @@ class Analyzer(ast.NodeVisitor):
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
-                    var = self.node_factory.create_python_var(node.id,
-                                                              node, cls)
+                    var = self.node_factory.create_python_global_var(
+                        node.id, node, cls)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
