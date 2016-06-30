@@ -1,6 +1,14 @@
 import ast
 
-from typing import TypeVar, List, Tuple, Optional, Dict, Any
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 
 T = TypeVar('T')
@@ -200,3 +208,18 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     if not hasattr(node, '_parent') or not node._parent:
         return None
     return find_loop_for_previous(node._parent, name)
+
+
+def join_expressions(operator: Callable[[T, T], T],
+                     expressions: List[T]) -> T:
+    """
+    Joins expressions with ``operator``.
+
+    This function joins expressions backwards (the last two expressions
+    are most nested) in order to avoid Silicon issue
+    `241 <https://bitbucket.org/viperproject/silicon/issues/241>`_.
+    """
+    result = expressions[-1]
+    for part in reversed(expressions[:-1]):
+        result = operator(part, result)
+    return result

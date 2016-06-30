@@ -27,6 +27,7 @@ from py2viper_translation.lib.typedefs import (
 from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
+    join_expressions,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -509,15 +510,18 @@ class ExpressionTranslator(CommonTranslator):
             expression_parts.append(expression_part)
 
         if isinstance(node.op, ast.And):
-            operator = self.viper.And
+            operator = (
+                lambda left, right:
+                self.viper.And(left, right, position, info))
         else:
-            operator = self.viper.Or
+            operator = (
+                lambda left, right:
+                self.viper.Or(left, right, position, info))
 
-        joined_expression_parts = expression_parts[:]
-        for i, part in enumerate(joined_expression_parts[1:]):
-            joined_parts = operator(joined_expression_parts[i], part,
-                                    position, info)
-            joined_expression_parts[i+1] = joined_parts
+        joined_expression_parts = [
+            join_expressions(operator, expression_parts[:i+1])
+            for i in range(len(expression_parts))
+            ]
 
         statements = statements_parts[0]
         for i, part in enumerate(statements_parts[1:]):
