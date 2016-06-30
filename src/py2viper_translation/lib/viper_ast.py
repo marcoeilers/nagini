@@ -198,6 +198,9 @@ class ViperAST:
         return self.ast.TypeVar(name)
 
     def MethodCall(self, methodname, args, targets, position, info):
+        print(position)
+        if 'no position' in str(position):
+            print("+++")
         return self.ast.MethodCall(methodname, self.to_seq(args),
                                    self.to_seq(targets), position, info)
 
@@ -373,13 +376,14 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
-    def to_position(self, expr):
+    def to_position(self, expr, vias, error_string: str=None):
         if expr is None:
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
         id = str(uuid1())
-        cache[id] = expr
+        assert not id in cache
+        cache[id] = (expr, list(vias), error_string)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)

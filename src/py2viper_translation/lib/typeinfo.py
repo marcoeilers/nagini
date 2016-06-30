@@ -119,7 +119,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if line in self.ignored_lines:
                 return
             else:
-                error = ' error: Encountered Any type, type annotation missing?'
+                error = ' error: Encountered Any type. Type annotation missing?'
                 msg = ':'.join([self.path, str(line), error])
                 raise TypeException([msg])
         key = tuple(fqn)
@@ -163,7 +163,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         else:
             msg = self.path + ':' + str(node.get_line()) + ': error: '
             if isinstance(node, mypy.nodes.FuncDef):
-                msg += 'Encountered Any type, type annotation missing?'
+                msg += 'Encountered Any type. Type annotation missing?'
             else:
                 msg += 'dead.code'
             raise TypeException([msg])

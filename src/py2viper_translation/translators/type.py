@@ -301,7 +301,7 @@ class TypeTranslator(CommonTranslator):
                                         self.no_info(ctx))
         return result
 
-    def type_check(self, lhs: Expr, type: PythonType,
+    def type_check(self, lhs: Expr, type: PythonType, position,
                    ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
@@ -310,9 +310,9 @@ class TypeTranslator(CommonTranslator):
         """
         if type.name in PRIMITIVES:
             boxed = ctx.program.classes['__boxed_' + type.name]
-            result = self.type_factory.type_check(lhs, boxed, ctx)
+            result = self.type_factory.type_check(lhs, boxed, position, ctx)
         else:
-            result = self.type_factory.type_check(lhs, type, ctx)
+            result = self.type_factory.type_check(lhs, type, position, ctx)
 
         if isinstance(type, GenericType):
             args = self.set_type_args(lhs, type, [], ctx)

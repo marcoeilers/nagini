@@ -47,6 +47,8 @@ class ExpressionTranslator(CommonTranslator):
         return self.translate_expr(node.value, ctx)
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
+        if node.n == 122:
+            print("++")
         return ([], self.viper.IntLit(node.n, self.to_position(node, ctx),
                                       self.no_info(ctx)))
 
@@ -182,14 +184,17 @@ class ExpressionTranslator(CommonTranslator):
                                                        position,
                                                        self.no_info(ctx))
             else:
+                error_string = '"method raises no exceptions"'
+                error_pos = self.to_position(call, ctx, error_string)
                 uncaught_option = self.viper.Exhale(
-                    self.viper.FalseLit(position, self.no_info(ctx)), position,
+                    self.viper.FalseLit(error_pos, self.no_info(ctx)), error_pos,
                     self.no_info(ctx))
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
-                condition = self.type_check(var, handler.exception, ctx,
-                                            inhale_exhale=False)
+                condition = self.type_check(var, handler.exception,
+                                            self.to_position(handler.node, ctx),
+                                            ctx, inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name,
                                        self.to_position(handler.node, ctx),
