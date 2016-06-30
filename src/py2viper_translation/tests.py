@@ -211,8 +211,11 @@ class TranslationTests(AnnotatedTests):
     def extract_mypy_error(self, message):
         parts = mypy_error_matcher.match(message).groups()
         offset = 3 if parts[0] is None else 0
+        reason = parts[2 + offset].strip()
+        if '(' in reason:
+            reason = reason.split('(')[0].strip()
         return (int(parts[1 + offset]),
-                'type.error:' + parts[2 + offset].strip(), [])
+                'type.error:' + reason, [])
 
     def test_file(self, path: str, jvm):
         test_annotations = self.get_test_annotations(path)

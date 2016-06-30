@@ -595,7 +595,7 @@ class CallTranslator(CommonTranslator):
         method call, on a receiver object or not.
         """
         if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
-            raise ValueError('Contract call translated as normal call.')
+            raise InvalidProgramException(node, 'invalid.contract.position')
         elif get_func_name(node) in CONTRACT_FUNCS:
             return self.translate_contractfunc_call(node, ctx)
         elif get_func_name(node) in BUILTINS:
