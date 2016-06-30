@@ -48,7 +48,8 @@ class CallTranslator(CommonTranslator):
         assert isinstance(node.args[1], ast.Name)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         cls = ctx.program.classes[node.args[1].id]
-        return stmt, self.type_check(obj, cls, ctx, inhale_exhale=False)
+        pos = self.to_position(node, ctx)
+        return stmt, self.type_check(obj, cls, pos, ctx, inhale_exhale=False)
 
     def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
@@ -69,12 +70,12 @@ class CallTranslator(CommonTranslator):
             arg_name = next(iter(ctx.actual_function.args))
             if arg_name in ctx.var_aliases:
                 replacement = ctx.var_aliases[arg_name]
-                return replacement.ref
-            return [], ctx.current_function.args[arg_name].ref
+                return replacement.ref(node, ctx)
+            return [], ctx.current_function.args[arg_name].ref(node, ctx)
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
-    def var_concrete_type_check(self, name: str, type: PythonClass,
+    def var_concrete_type_check(self, name: str, type: PythonClass, position,
                                 ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
@@ -83,7 +84,8 @@ class CallTranslator(CommonTranslator):
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-        return self.type_factory.concrete_type_check(obj_var, type, ctx)
+        return self.type_factory.concrete_type_check(obj_var, type, position,
+                                                     ctx)
 
     def _translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
@@ -98,16 +100,18 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
         fields = target_class.get_all_sil_fields()
-        new = self.viper.NewStmt(res_var.ref, fields, self.no_position(ctx),
+        new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
+        pos = self.to_position(node, ctx)
         result_has_type = self.var_concrete_type_check(res_var.name,
                                                        target_class,
+                                                       pos,
                                                        ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
-        type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),
+        type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
-        args = [res_var.ref] + args
+        args = [res_var.ref()] + args
         stmts = [new, type_inhale]
         target = target_class.get_method('__init__')
         if target:
@@ -126,7 +130,7 @@ class CallTranslator(CommonTranslator):
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
                 stmts = stmts + catchers
-        return arg_stmts + stmts, res_var.ref
+        return arg_stmts + stmts, res_var.ref()
 
     def translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if node.args:
@@ -135,10 +139,10 @@ class CallTranslator(CommonTranslator):
         set_class = ctx.program.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
-        targets = [res_var.ref]
+        targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        return [constr_call], res_var.ref
+        return [constr_call], res_var.ref()
 
     def translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
@@ -195,7 +199,7 @@ class CallTranslator(CommonTranslator):
         if target.type is not None:
             result_var = result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
-            targets.append(result_var.ref)
+            targets.append(result_var.ref())
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
@@ -206,7 +210,7 @@ class CallTranslator(CommonTranslator):
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         return (arg_stmts + call,
-                result_var.ref if result_var else None)
+                result_var.ref() if result_var else None)
 
     def _get_call_target(self, node: ast.Call,
                          ctx: Context) -> Union[PythonClass, PythonMethod]:
@@ -365,7 +369,7 @@ class CallTranslator(CommonTranslator):
         dict_class = ctx.program.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
-                                           [], [res_var.ref], node, ctx)
+                                           [], [res_var.ref()], node, ctx)
         stmt = [constr_call]
         str_type = ctx.program.classes[STRING_TYPE]
         for key, val in args.items():
@@ -384,12 +388,12 @@ class CallTranslator(CommonTranslator):
                                              str_create_arg_types, node, ctx)
             val_stmt, val_val = self.translate_expr(val, ctx)
             val_type = self.get_type(val, ctx)
-            args = [res_var.ref, key_val, val_val]
+            args = [res_var.ref(), key_val, val_val]
             arg_types = [None, str_type, val_type]
             append_call = self.get_method_call(dict_class, '__setitem__', args,
                                                arg_types, [], node, ctx)
             stmt += val_stmt + [append_call]
-        return stmt, res_var.ref
+        return stmt, res_var.ref()
 
     def inline_method(self, method: PythonMethod, args: List[PythonVar],
                       result_var: PythonVar, error_var: PythonVar,
@@ -443,7 +447,7 @@ class CallTranslator(CommonTranslator):
         return stmts, end_label
 
     def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
-                    ctx: Context) -> StmtsAndExpr:
+                    inline_reason: str, ctx: Context) -> StmtsAndExpr:
         """
         Inlines a statically bound call to the given method. If is_super is set,
         adds self to the arguments, since this will not be part of the args
@@ -454,19 +458,19 @@ class CallTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'recursive.static.call')
         position = self.to_position(node, ctx)
         old_position = ctx.position
-        ctx.position = position
+        ctx.position.append((inline_reason, position))
         arg_stmts, arg_vals, arg_types = self._translate_args(node, ctx)
         args = []
         stmts = arg_stmts
 
         # create local vars for parameters and assign args to them
         if is_super:
-            arg_vals = ([next(iter(ctx.actual_function.args.values())).ref] +
+            arg_vals = ([next(iter(ctx.actual_function.args.values())).ref()] +
                         arg_vals)
         for arg_val, (_, arg) in zip(arg_vals, method.args.items()):
             arg_var = ctx.current_function.create_variable('arg', arg.type,
                                                            self.translator)
-            assign = self.viper.LocalVarAssign(arg_var.ref, arg_val,
+            assign = self.viper.LocalVarAssign(arg_var.ref(), arg_val,
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
             stmts.append(assign)
@@ -482,7 +486,7 @@ class CallTranslator(CommonTranslator):
         error_var = self.get_error_var(node, ctx)
         if method.declared_exceptions:
             var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
-            var.ref = error_var
+            var._ref = error_var
             optional_error_var = var
         old_fold = ctx.ignore_family_folds
         ctx.ignore_family_folds = True
@@ -495,8 +499,8 @@ class CallTranslator(CommonTranslator):
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         # return result
-        result = res_var.ref if method.type else None
-        ctx.position = old_position
+        result = res_var.ref() if method.type else None
+        ctx.position.pop()
         return stmts, result
 
     def translate_normal_call(self, node: ast.Call,
@@ -524,11 +528,13 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func.value, ast.Name):
                 if node.func.value.id in ctx.program.classes:
                     # statically bound call
-                    return self.inline_call(target, node, False, ctx)
+                    return self.inline_call(target, node, False, 'static call',
+                                            ctx)
             if isinstance(node.func.value, ast.Call):
                 if get_func_name(node.func.value) == 'super':
                     # super call
-                    return self.inline_call(target, node, True, ctx)
+                    return self.inline_call(target, node, True, 'static call',
+                                            ctx)
             # method called on an object
             rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
             receiver_type = self.get_type(node.func.value, ctx)

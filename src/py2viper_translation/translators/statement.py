@@ -128,7 +128,7 @@ class StatementTranslator(CommonTranslator):
             raise UnsupportedException(node)
 
         list_acc_field = self.viper.Field('list_acc', seq_ref, pos, info)
-        iter_acc = self.viper.FieldAccess(iter_var.ref, list_acc_field, pos,
+        iter_acc = self.viper.FieldAccess(iter_var.ref(), list_acc_field, pos,
                                           info)
         iter_acc_pred = self.viper.FieldAccessPredicate(iter_acc, frac_perm_120,
                                                         pos, info)
@@ -139,8 +139,8 @@ class StatementTranslator(CommonTranslator):
 
         index_field = self.viper.Field('__iter_index', self.viper.Int, pos,
                                        info)
-        iter_index_acc = self.viper.FieldAccess(iter_var.ref, index_field, pos,
-                                                info)
+        iter_index_acc = self.viper.FieldAccess(iter_var.ref(), index_field,
+                                                pos, info)
         iter_index_acc_pred = self.viper.FieldAccessPredicate(iter_index_acc,
                                                               full_perm, pos,
                                                               info)
@@ -148,7 +148,8 @@ class StatementTranslator(CommonTranslator):
 
         previous_field = self.viper.Field('__previous', self.viper.Ref, pos,
                                           info)
-        iter_previous_acc = self.viper.FieldAccess(iter_var.ref, previous_field,
+        iter_previous_acc = self.viper.FieldAccess(iter_var.ref(),
+                                                   previous_field,
                                                    pos, info)
         iter_previous_acc_pred = self.viper.FieldAccessPredicate(
             iter_previous_acc, frac_perm_120, pos, info)
@@ -170,10 +171,11 @@ class StatementTranslator(CommonTranslator):
                                            info)
         invariant.append(previous_len_eq)
 
-        no_error = self.viper.EqCmp(err_var.ref, self.viper.NullLit(pos, info),
+        no_error = self.viper.EqCmp(err_var.ref(),
+                                    self.viper.NullLit(pos, info),
                                     pos, info)
-        some_error = self.viper.NeCmp(err_var.ref, self.viper.NullLit(pos,
-                                                                      info),
+        some_error = self.viper.NeCmp(err_var.ref(),
+                                      self.viper.NullLit(pos, info),
                                       pos, info)
 
         index_nonneg = self.viper.GeCmp(iter_index_acc, zero, pos, info)
@@ -185,7 +187,7 @@ class StatementTranslator(CommonTranslator):
 
         iter_current_index = self.viper.SeqIndex(iter_acc, index_minus_one, pos,
                                                  info)
-        boxed_target = target_var.ref
+        boxed_target = target_var.ref()
         if target_var.type.name in PRIMITIVES:
             boxed_target = self.box_primitive(boxed_target, target_var.type,
                                               None, ctx)
@@ -193,7 +195,7 @@ class StatementTranslator(CommonTranslator):
                                                       target_var.type, None,
                                                       ctx)
 
-        current_element_index = self.viper.EqCmp(target_var.ref,
+        current_element_index = self.viper.EqCmp(target_var.ref(),
                                                  iter_current_index, pos, info)
         current_element_contained = self.viper.SeqContains(boxed_target,
                                                            iter_acc, pos, info)
@@ -225,7 +227,8 @@ class StatementTranslator(CommonTranslator):
         args = [iterable]
         arg_types = [iterable_type]
         iter_assign = self.get_method_call(iterable_type, '__iter__', args,
-                                           arg_types, [iter_var.ref], node, ctx)
+                                           arg_types, [iter_var.ref()], node,
+                                           ctx)
         return iter_var, iter_assign
 
     def _get_next_call(self, iter_var: PythonVar, target_var: PythonVar,
@@ -243,27 +246,29 @@ class StatementTranslator(CommonTranslator):
         err_var = ctx.actual_function.create_variable('iter_err', exc_class,
                                                       self.translator)
         iter_class = ctx.program.classes['Iterator']
-        args = [iter_var.ref]
+        args = [iter_var.ref()]
         arg_types = [iter_class]
-        targets = [boxed_target_var.ref, err_var.ref]
+        targets = [boxed_target_var.ref(node.target, ctx), err_var.ref()]
         next_call = self.get_method_call(iter_class, '__next__', args,
                                          arg_types, targets, node, ctx)
 
         if target_var.type.name in PRIMITIVES:
-            unboxed_target = self.unbox_primitive(boxed_target_var.ref,
-                                                  target_var.type, None, ctx)
+            unboxed_target = self.unbox_primitive(
+                boxed_target_var.ref(node.target, ctx), target_var.type, None,
+                ctx)
         else:
-            unboxed_target = boxed_target_var.ref
-        target_assign = self.viper.LocalVarAssign(target_var.ref,
+            unboxed_target = boxed_target_var.ref(node.target, ctx)
+        target_assign = self.viper.LocalVarAssign(target_var.ref(node.target,
+                                                                 ctx),
                                                   unboxed_target,
-                                                  self.no_position(ctx),
+                                                  self.to_position(node, ctx),
                                                   self.no_info(ctx))
         return err_var, next_call, target_assign
 
     def _get_iterator_delete(self, iter_var: PythonVar, node: ast.For,
                              ctx: Context) -> Stmt:
         iter_class = ctx.program.classes['Iterator']
-        args = [iter_var.ref]
+        args = [iter_var.ref()]
         arg_types = [iter_class]
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
                                         [], node, ctx)
@@ -297,7 +302,7 @@ class StatementTranslator(CommonTranslator):
                                           self.to_position(node, ctx),
                                           self.no_info(ctx))
         del ctx.loop_iterators[node]
-        cond = self.viper.EqCmp(err_var.ref,
+        cond = self.viper.EqCmp(err_var.ref(),
                                 self.viper.NullLit(self.no_position(ctx),
                                                    self.no_info(ctx)),
                                 self.to_position(node, ctx),
@@ -317,7 +322,7 @@ class StatementTranslator(CommonTranslator):
         code_var = try_block.get_finally_var(self.translator)
         if code_var.sil_name in ctx.var_aliases:
             code_var = ctx.var_aliases[code_var.sil_name]
-        code_var = code_var.ref
+        code_var = code_var.ref()
         zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
         assign = self.viper.LocalVarAssign(code_var, zero,
                                            self.no_position(ctx),
@@ -358,7 +363,7 @@ class StatementTranslator(CommonTranslator):
             type = self.get_type(node, ctx)
             var = ctx.current_function.create_variable('expr', type,
                                                        self.translator)
-            assign = self.viper.LocalVarAssign(var.ref, expr,
+            assign = self.viper.LocalVarAssign(var.ref(node, ctx), expr,
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
             stmt.append(assign)
@@ -479,7 +484,7 @@ class StatementTranslator(CommonTranslator):
         type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
-            ctx.result_var.ref,
+            ctx.result_var.ref(node, ctx),
             rhs, self.to_position(node, ctx),
             self.no_info(ctx))
 
@@ -492,7 +497,7 @@ class StatementTranslator(CommonTranslator):
                                            node)
         for try_block in tries:
             if try_block.finally_block:
-                lhs = try_block.get_finally_var(self.translator).ref
+                lhs = try_block.get_finally_var(self.translator).ref()
                 rhs = self.viper.IntLit(1, self.no_position(ctx),
                                         self.no_info(ctx))
                 finally_assign = self.viper.LocalVarAssign(lhs, rhs,

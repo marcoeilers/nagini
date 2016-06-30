@@ -53,7 +53,7 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.actual_function.type
         if not ctx.actual_function.pure:
-            return [], ctx.result_var.ref
+            return [], ctx.result_var.ref(node, ctx)
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
                                           self.to_position(node, ctx),
@@ -95,7 +95,7 @@ class ContractTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
         field_acc = self.viper.FieldAccess(args[0], field,
-                                           self.no_position(ctx),
+                                           self.to_position(node, ctx),
                                            self.no_info(ctx))
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
                                                self.to_position(node, ctx),
@@ -224,7 +224,7 @@ class ContractTranslator(CommonTranslator):
         loop = find_loop_for_previous(node, arg.id)
         if not loop:
             raise InvalidProgramException(node, 'invalid.previous')
-        iterator = ctx.loop_iterators[loop].ref
+        iterator = ctx.loop_iterators[loop].ref()
         list_field = self.viper.Field('__previous', self.viper.Ref,
                                       self.no_position(ctx), self.no_info(ctx))
         field_acc = self.viper.FieldAccess(iterator, list_field,
@@ -324,9 +324,9 @@ class ContractTranslator(CommonTranslator):
                                         [domain], self.no_position(ctx),
                                         self.no_info(ctx), seq_ref, formal_args)
         if var.type.name in PRIMITIVES:
-            ref_var = self.box_primitive(var.ref, var.type, None, ctx)
+            ref_var = self.box_primitive(var.ref(), var.type, None, ctx)
         else:
-            ref_var = var.ref
+            ref_var = var.ref()
         result = self.viper.SeqContains(ref_var, domain_set,
                                         self.to_position(domain_node, ctx),
                                         self.no_info(ctx))
@@ -340,7 +340,10 @@ class ContractTranslator(CommonTranslator):
 
         lambda_ = node.args[1]
         variables = []
-        lambda_prefix = 'lambda' + str(lambda_.lineno) + '$'
+        lambda_prefix = 'lambda' + str(lambda_.lineno)
+        if hasattr(lambda_, 'col_offset'):
+            lambda_prefix += '_' + str(lambda_.col_offset)
+        lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
         variables.append(var.decl)

@@ -13,7 +13,7 @@ class Context:
         self.current_class = None
         self.var_aliases = {}
         self.label_aliases = {}
-        self.position = None
+        self.position = []
         self.info = None
         self.program = None
         self.inlined_calls = []
