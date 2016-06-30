@@ -178,7 +178,8 @@ class IOOperationTranslator(CommonTranslator):
         if func_name == 'token':
             return self.translate_token(node, ctx)
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node,
+                                       'Unsupported contract function.')
 
     def translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
