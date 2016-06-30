@@ -169,13 +169,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             err_var = tries[0].get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
-            return err_var.ref
+            return err_var.ref()
         if ctx.actual_function.declared_exceptions:
-            return ctx.error_var.ref
+            return ctx.error_var.ref(stmt, ctx)
         else:
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
-            return new_var.ref
+            return new_var.ref()
 
     def var_type_check(self, name: str, type: PythonType, position,
                        ctx: Context, inhale_exhale: bool=True) -> Expr:
@@ -184,7 +184,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         is of the given type.
         """
         if name in ctx.var_aliases:
-            obj_var = ctx.var_aliases[name].ref
+            obj_var = ctx.var_aliases[name].ref()
         else:
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                           self.no_position(ctx),

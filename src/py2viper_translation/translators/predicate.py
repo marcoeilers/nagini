@@ -44,7 +44,7 @@ class PredicateTranslator(CommonTranslator):
 
         name = root.sil_name
         args = []
-        self_var_ref = root.args[next(iter(root.args))].ref
+        self_var_ref = root.args[next(iter(root.args))].ref()
         for arg in root.args:
             args.append(root.args[arg].decl)
         body = None

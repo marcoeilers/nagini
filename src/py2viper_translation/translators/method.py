@@ -66,7 +66,7 @@ class MethodTranslator(CommonTranslator):
         if method.cls:
             error_string = '"call receiver is not None"'
             pos = self.to_position(method.node, ctx, error_string)
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                         self.viper.NullLit(
                                             self.no_position(ctx),
                                             self.no_info(ctx)),
@@ -173,7 +173,8 @@ class MethodTranslator(CommonTranslator):
             set_ref = self.viper.SetType(self.viper.Ref)
             dict_acc_field = self.viper.Field('dict_acc', set_ref,
                                               pos, info)
-            field_acc = self.viper.FieldAccess(func.kw_arg.ref, dict_acc_field,
+            field_acc = self.viper.FieldAccess(func.kw_arg.ref(),
+                                               dict_acc_field,
                                                pos, info)
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
@@ -257,7 +258,8 @@ class MethodTranslator(CommonTranslator):
         posts = type_pres + posts
         no_pos = self.no_position(ctx)
         if method.type and method.type.name not in PRIMITIVES:
-            check = self.type_check(ctx.result_var.ref, method.type, no_pos,
+            check = self.type_check(ctx.result_var.ref(method.node, ctx),
+                                    method.type, no_pos,
                                     ctx)
             posts = [check] + posts
         return pres, posts
@@ -298,7 +300,7 @@ class MethodTranslator(CommonTranslator):
         """
         Generates preconditions specific to the '__init__' method.
         """
-        self_var = method.args[next(iter(method.args))].ref
+        self_var = method.args[next(iter(method.args))].ref()
         fields = method.cls.get_all_sil_fields()
         accs = self.get_all_field_accs(fields, self_var,
                                        self.to_position(method.node, ctx),
@@ -322,7 +324,7 @@ class MethodTranslator(CommonTranslator):
                               ctx.program.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         error_var_decl = error_var.decl
-        error_var_ref = error_var.ref
+        error_var_ref = error_var.ref()
         method.error_var = error_var
         pres, posts = self.extract_contract(method, ERROR_NAME, False, ctx)
         if method.cls and method.name == '__init__':
@@ -340,7 +342,7 @@ class MethodTranslator(CommonTranslator):
         if method.cls:
             no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
-                next(iter(method.args.values())).ref, method.cls, no_pos, ctx)
+                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
             inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
                                             self.no_info(ctx))
             body.append(inhale_type)
@@ -419,8 +421,8 @@ class MethodTranslator(CommonTranslator):
                 var_next = current.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
-                next_assign = self.viper.LocalVarAssign(var_next.ref,
-                                                        finally_var.ref,
+                next_assign = self.viper.LocalVarAssign(var_next.ref(),
+                                                        finally_var.ref(),
                                                         pos, info)
                 # goto finally block
                 next_label = ctx.get_label_name(current.finally_name)
@@ -451,12 +453,12 @@ class MethodTranslator(CommonTranslator):
             return_block = [goto_end]
         if ctx.actual_function.declared_exceptions:
             # assign error to error output var
-            error_var = ctx.error_var.ref
+            error_var = ctx.error_var.ref()
             block_error_var = block.get_error_var(self.translator)
             if block_error_var.sil_name in ctx.var_aliases:
                 block_error_var = ctx.var_aliases[block_error_var.sil_name]
             assign = self.viper.LocalVarAssign(
-                error_var, block_error_var.ref, pos, info)
+                error_var, block_error_var.ref(), pos, info)
             except_block.append(assign)
             except_block.append(goto_end)
         else:
@@ -469,9 +471,9 @@ class MethodTranslator(CommonTranslator):
         return_block = self.translate_block(return_block, pos, info)
 
         number_zero = self.viper.IntLit(0, pos, info)
-        greater_zero = self.viper.GtCmp(finally_var.ref, number_zero, pos, info)
+        greater_zero = self.viper.GtCmp(finally_var.ref(), number_zero, pos, info)
         number_one = self.viper.IntLit(1, pos, info)
-        greater_one = self.viper.GtCmp(finally_var.ref, number_one, pos, info)
+        greater_one = self.viper.GtCmp(finally_var.ref(), number_one, pos, info)
         if_return = self.viper.If(greater_zero, return_block, goto_post, pos,
                                   info)
         if_except = self.viper.If(greater_one, except_block, if_return, pos,
@@ -508,7 +510,7 @@ class MethodTranslator(CommonTranslator):
             finally_var = handler.try_block.get_finally_var(self.translator)
             if finally_var.sil_name in ctx.var_aliases:
                 finally_var = ctx.var_aliases[finally_var.sil_name]
-            lhs = finally_var.ref
+            lhs = finally_var.ref()
             rhs = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
             var_set = self.viper.LocalVarAssign(lhs, rhs, self.no_position(ctx),
                                                 self.no_info(ctx))

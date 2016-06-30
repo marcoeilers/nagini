@@ -341,6 +341,10 @@ class ViperAST:
         return self.ast.Or(left, right, position, info)
 
     def If(self, cond, thn, els, position, info):
+        print(cond)
+        print(thn)
+        print(els)
+        print(position)
         return self.ast.If(cond, thn, els, position, info)
 
     def TrueLit(self, position, info):

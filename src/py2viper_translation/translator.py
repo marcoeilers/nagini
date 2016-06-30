@@ -78,11 +78,13 @@ class Translator:
         return self.expr_translator.translate_pythonvar_decl(var, ctx)
 
     def translate_pythonvar_ref(self, var: PythonVar,
-                                program: PythonProgram) -> Expr:
+                                program: PythonProgram,
+                                node: ast.AST, ctx: Context) -> Expr:
         # we need a context object here
-        ctx = Context()
-        ctx.program = program
-        return self.expr_translator.translate_pythonvar_ref(var, ctx)
+        if not ctx:
+            ctx = Context()
+            ctx.program = program
+        return self.expr_translator.translate_pythonvar_ref(var, node, ctx)
 
     def to_position(self, node: ast.AST, ctx: Context) -> 'silver.ast.Position':
         return self.expr_translator.to_position(node, ctx)
