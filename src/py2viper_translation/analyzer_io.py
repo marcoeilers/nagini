@@ -209,7 +209,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                         'duplicate_property',
                         node)
             else:
-                raise UnsupportedException(node)
+                raise UnsupportedException(node,
+                                           'Unsupported property type.')
             self._in_property = True
             for arg in node.args:
                 self.visit(arg)
