@@ -131,6 +131,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 outputs[-1].arg, outputs[-1], self._place_class)
             self._current_io_operation.set_postset([out_place])
             return outputs[:-1]
+        else:
+            return []
 
     def _parse_arguments(self) -> None:
         """Parse and check operation arguments."""
@@ -138,8 +140,12 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
         self._check_arg_types()
 
-        inputs = node.args.args[:-len(node.args.defaults)]
-        outputs = node.args.args[-len(node.args.defaults):]
+        if node.args.defaults:
+            inputs = node.args.args[:-len(node.args.defaults)]
+            outputs = node.args.args[-len(node.args.defaults):]
+        else:
+            inputs = node.args.args[:]
+            outputs = []
 
         inputs = self._set_preset(inputs)
         outputs = self._set_postset(outputs)
