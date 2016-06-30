@@ -4,15 +4,18 @@ import ast
 class Cache:
 
     def __init__(self):
-        self.nodes = {}
+        self._nodes = {}
 
     def reset(self) -> None:
-        self.nodes = {}
+        self._nodes = {}
 
     def __getitem__(self, item: str) -> ast.AST:
-        return self.nodes[item]
+        return self._nodes[item]
 
     def __setitem__(self, key: str, value: ast.AST) -> None:
-        self.nodes[key] = value
+        self._nodes[key] = value
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._nodes
 
 cache = Cache()

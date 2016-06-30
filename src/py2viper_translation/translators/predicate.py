@@ -68,7 +68,9 @@ class PredicateTranslator(CommonTranslator):
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             has_type = self.type_factory.type_check(self_var_ref, instance.cls,
-                                                  ctx)
+                                                    self.to_position(
+                                                        instance.node, ctx),
+                                                    ctx)
             implication = self.viper.Implies(has_type, current,
                 self.to_position(instance.node, ctx), self.no_info(ctx))
             ctx.current_function = None

@@ -48,7 +48,8 @@ class CallTranslator(CommonTranslator):
         assert isinstance(node.args[1], ast.Name)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         cls = ctx.program.classes[node.args[1].id]
-        return stmt, self.type_check(obj, cls, ctx, inhale_exhale=False)
+        pos = self.to_position(node, ctx)
+        return stmt, self.type_check(obj, cls, pos, ctx, inhale_exhale=False)
 
     def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
@@ -74,7 +75,7 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
-    def var_concrete_type_check(self, name: str, type: PythonClass,
+    def var_concrete_type_check(self, name: str, type: PythonClass, position,
                                 ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
@@ -83,7 +84,8 @@ class CallTranslator(CommonTranslator):
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-        return self.type_factory.concrete_type_check(obj_var, type, ctx)
+        return self.type_factory.concrete_type_check(obj_var, type, position,
+                                                     ctx)
 
     def _translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
@@ -100,12 +102,14 @@ class CallTranslator(CommonTranslator):
         fields = target_class.get_all_sil_fields()
         new = self.viper.NewStmt(res_var.ref, fields, self.no_position(ctx),
                                  self.no_info(ctx))
+        pos = self.to_position(node, ctx)
         result_has_type = self.var_concrete_type_check(res_var.name,
                                                        target_class,
+                                                       pos,
                                                        ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
-        type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),
+        type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref] + args
         stmts = [new, type_inhale]
@@ -443,7 +447,7 @@ class CallTranslator(CommonTranslator):
         return stmts, end_label
 
     def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
-                    ctx: Context) -> StmtsAndExpr:
+                    inline_reason: str, ctx: Context) -> StmtsAndExpr:
         """
         Inlines a statically bound call to the given method. If is_super is set,
         adds self to the arguments, since this will not be part of the args
@@ -454,7 +458,7 @@ class CallTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'recursive.static.call')
         position = self.to_position(node, ctx)
         old_position = ctx.position
-        ctx.position = position
+        ctx.position.append((inline_reason, position))
         arg_stmts, arg_vals, arg_types = self._translate_args(node, ctx)
         args = []
         stmts = arg_stmts
@@ -496,7 +500,7 @@ class CallTranslator(CommonTranslator):
                 ctx.actual_function.try_blocks, node, ctx)
         # return result
         result = res_var.ref if method.type else None
-        ctx.position = old_position
+        ctx.position.pop()
         return stmts, result
 
     def translate_normal_call(self, node: ast.Call,
@@ -524,11 +528,13 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func.value, ast.Name):
                 if node.func.value.id in ctx.program.classes:
                     # statically bound call
-                    return self.inline_call(target, node, False, ctx)
+                    return self.inline_call(target, node, False, 'static call',
+                                            ctx)
             if isinstance(node.func.value, ast.Call):
                 if get_func_name(node.func.value) == 'super':
                     # super call
-                    return self.inline_call(target, node, True, ctx)
+                    return self.inline_call(target, node, True, 'static call',
+                                            ctx)
             # method called on an object
             rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
             receiver_type = self.get_type(node.func.value, ctx)
