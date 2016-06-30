@@ -24,6 +24,20 @@ def flatten(lists: List[List[T]]) -> List[T]:
     return [item for sublist in lists for item in sublist]
 
 
+def flatten_dict(dicts: List[Dict[T, List[V]]],
+                 defaults: List[T]=[]) -> Dict[T, List[V]]:
+    result = {}
+    for key in defaults:
+        result[key] = []
+    for d in dicts:
+        for key, value in d.items():
+            if key in result:
+                result[key].extend(value)
+            else:
+                result[key] = value
+    return result
+
+
 class UnsupportedException(Exception):
     """
     Exception that is thrown when attempting to translate a Python element not

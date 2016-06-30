@@ -128,7 +128,7 @@ class SIFPureTranslator(PureTranslator):
                                           'function.return.missing')
         if wrapper.cond:
             if wrapper.name in ctx.var_aliases:
-                old_val = ctx.var_aliases[wrapper.name].ref
+                old_val = ctx.var_aliases[wrapper.name].ref()
             else:
                 # variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
@@ -179,7 +179,7 @@ class SIFPureTranslator(PureTranslator):
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
         if wrapper.cond:
-            old_val = ctx.var_aliases[wrapper.name].ref
+            old_val = ctx.var_aliases[wrapper.name].ref()
             new_val = self.viper.CondExp(wrapper.cond, wrapper.expr,
                                          old_val, position, info)
             return self.viper.Let(wrapper.var.decl, new_val,
@@ -246,7 +246,7 @@ class SIFPureTranslator(PureTranslator):
         if wrapper.cond:
             wrapper.cond = self._translate_condition(wrapper.cond,
                                                      wrapper.names, ctx)
-        ctx.current_tl_var_expr = wrapper.var.ref
+        ctx.current_tl_var_expr = wrapper.var.ref()
         return rhs
 
     def _translate_tl_join_wrapper_expr(self, wrapper: TLJoinWrapper,
@@ -257,12 +257,12 @@ class SIFPureTranslator(PureTranslator):
                                                      ctx)
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
-        or_expr = self.viper.Or(wrapper.join_wrappers[0].var.ref,
-                                wrapper.join_wrappers[1].var.ref,
+        or_expr = self.viper.Or(wrapper.join_wrappers[0].var.ref(),
+                                wrapper.join_wrappers[1].var.ref(),
                                 pos, info)
         for wrapper in wrapper.join_wrappers[2:]:
-            or_expr = self.viper.Or(or_expr, wrapper.var.ref, pos, info)
-        ctx.current_tl_var_expr = wrapper.var.ref
+            or_expr = self.viper.Or(or_expr, wrapper.var.ref(), pos, info)
+        ctx.current_tl_var_expr = wrapper.var.ref()
         return or_expr
 
     def _translate_wrapper_exprs(self, wrappers: List[Wrapper],

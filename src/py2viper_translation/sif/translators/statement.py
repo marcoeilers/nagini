@@ -53,7 +53,7 @@ class SIFStatementTranslator(StatementTranslator):
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
         tl_assign = self.viper.LocalVarAssign(
-            ctx.actual_function.new_tl_var.ref, or_expr, pos, info)
+            ctx.actual_function.new_tl_var.ref(), or_expr, pos, info)
 
         # Translate the bodies.
         then_body = flatten([self.translate_stmt(stmt, ctx)
@@ -80,11 +80,11 @@ class SIFStatementTranslator(StatementTranslator):
         stmts += super().translate_stmt_Assign(node, ctx)
         ctx.set_normal_ctx()
 
-        if ctx.current_tl_var_expr != ctx.current_function.new_tl_var.ref:
+        if ctx.current_tl_var_expr != ctx.current_function.new_tl_var.ref():
             # RHS was a function call. Need assignment for timeLevel
             assert isinstance(node.value, ast.Call)
             assign = self.viper.LocalVarAssign(
-                ctx.actual_function.new_tl_var.ref, ctx.current_tl_var_expr,
+                ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
                 self.to_position(node, ctx), self.no_info(ctx))
             ctx.current_tl_var_expr = None
             stmts.append(assign)
@@ -100,14 +100,14 @@ class SIFStatementTranslator(StatementTranslator):
         rhs_stmt_p, rhs_p = self.translate_expr(node.value, ctx)
         ctx.set_normal_ctx()
         assign = self.viper.LocalVarAssign(
-            ctx.current_function.result.ref, rhs, pos, info)
+            ctx.current_function.result.ref(node, ctx), rhs, pos, info)
         assign_p = self.viper.LocalVarAssign(
-            ctx.current_function.result.var_prime.ref, rhs_p, pos, info)
+            ctx.current_function.result.var_prime.ref(), rhs_p, pos, info)
         res = rhs_stmt + [assign] + rhs_stmt_p + [assign_p]
         if isinstance(node.value, ast.Call):
             _, tl_expr = self.translate_expr(node.value, ctx)
             assign_tl = self.viper.LocalVarAssign(
-                ctx.current_function.new_tl_var.ref, tl_expr, pos, info)
+                ctx.current_function.new_tl_var.ref(), tl_expr, pos, info)
             res.append(assign_tl)
 
         return res
