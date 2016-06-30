@@ -318,9 +318,7 @@ class Analyzer(ast.NodeVisitor):
         if (isinstance(node.func, ast.Name) and
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
-                node,
-                'invalid.io_operation.misplaced_property',
-                )
+                node, 'invalid.io_operation.misplaced_property')
         self.visit_default(node)
 
 
@@ -541,11 +539,9 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
-    def _incompatible_decorators(self, decorators: Set[str]) -> bool:
-        return (
-               (('Predicate' in decorators) and ('Pure' in decorators)) or
-               (('IOOperation' in decorators) and (len(decorators) != 1))
-               )
+    def _incompatible_decorators(self, decorators) -> bool:
+        return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('IOOperation' in decorators) and (len(decorators) != 1)))
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
