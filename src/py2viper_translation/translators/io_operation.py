@@ -112,7 +112,9 @@ def _raise_invalid_operation_use(error_type: str, node: ast.AST) -> None:
 def _is_top_level_assertion(node: ast.expr) -> bool:
     """Check if assertion represented by node is top level."""
     def get_parent(node: ast.expr) -> ast.expr:
-        """Just a helper function to make mypy happy."""
+        """A helper function to get a parent node."""
+        # _parent is not a node field, it is added dynamically by our
+        # code. That is why mypy reports an error here.
         return node._parent     # type: ignore
     parent = get_parent(node)
     while (isinstance(parent, ast.BoolOp) and
