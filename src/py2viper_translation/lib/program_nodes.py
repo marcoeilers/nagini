@@ -9,8 +9,10 @@ from py2viper_translation.lib.constants import (
     INT_TYPE,
     PRIMITIVES,
     RESULT_NAME,
+    VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import InvalidProgramException
 from typing import List, Optional, Set
 
 
@@ -57,7 +59,7 @@ class PythonScope:
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__([], None)
+        super().__init__(list(VIPER_KEYWORDS), None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -118,7 +120,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [], superscope)
+        PythonScope.__init__(self, list(VIPER_KEYWORDS), superscope)
         self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -127,6 +129,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+        self.defined = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -338,7 +341,9 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [RESULT_NAME, ERROR_NAME, END_LABEL],
+        PythonScope.__init__(self, list(VIPER_KEYWORDS) + [RESULT_NAME,
+                                                           ERROR_NAME,
+                                                           END_LABEL],
                              superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
@@ -594,6 +599,7 @@ class PythonVar(PythonNode):
         self.alt_types = {}
         self.default = None
         self.default_expr = None
+        self.value = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

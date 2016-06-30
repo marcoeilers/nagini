@@ -1,5 +1,5 @@
 from py2viper_contracts.contracts import *
 
 
-#:: ExpectedOutput(invalid.program:contract.outside.function)
+#:: ExpectedOutput(invalid.program:invalid.contract.position)
 Requires(True)

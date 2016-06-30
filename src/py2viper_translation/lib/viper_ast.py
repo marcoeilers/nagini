@@ -1,3 +1,4 @@
+import ast
 import types
 
 from py2viper_translation.lib.cache import cache
@@ -382,6 +383,9 @@ class ViperAST:
 
     def to_position(self, expr, vias, error_string: str=None):
         if expr is None:
+            return self.NoPosition
+        if not hasattr(expr, 'lineno'):
+            # TODO: this should never happen, but it does.
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
