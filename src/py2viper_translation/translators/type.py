@@ -396,18 +396,18 @@ class TypeTranslator(CommonTranslator):
             var_decl = index_var.decl
             zero = self.viper.IntLit(0, self.no_position(ctx),
                                      self.no_info(ctx))
-            index_positive = self.viper.GeCmp(index_var.ref, zero,
+            index_positive = self.viper.GeCmp(index_var.ref(), zero,
                                               self.no_position(ctx),
                                               self.no_info(ctx))
             length = self.get_function_call(type, '__len__', [lhs],
                                             [None], None, ctx)
-            index_less_length = self.viper.LtCmp(index_var.ref, length,
+            index_less_length = self.viper.LtCmp(index_var.ref(), length,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
             impl_lhs = self.viper.And(index_positive, index_less_length,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-            args = [lhs, index_var.ref]
+            args = [lhs, index_var.ref()]
             arg_types = [None, None]
             item_call = self.get_function_call(type, '__getitem__',
                                                args,

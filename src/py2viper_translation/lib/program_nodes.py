@@ -587,7 +587,8 @@ class PythonVar(PythonNode):
         super().__init__(name, node)
         self.type = type
         self.decl = None
-        self.ref = None
+        self._ref = None
+        self._translator = None
         self.writes = []
         self.reads = []
         self.alt_types = {}
@@ -600,9 +601,17 @@ class PythonVar(PythonNode):
         Python variable.
         """
         self.sil_name = sil_name
+        self._translator = translator
         prog = self.type.get_program()
         self.decl = translator.translate_pythonvar_decl(self, prog)
-        self.ref = translator.translate_pythonvar_ref(self, prog)
+        self._ref = translator.translate_pythonvar_ref(self, prog, None, None)
+
+    def ref(self, node: ast.AST=None,
+            ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
+        if not node:
+            return self._ref
+        prog = self.type.get_program()
+        return self._translator.translate_pythonvar_ref(self, prog, node, ctx)
 
 
 class PythonField(PythonNode):

@@ -139,8 +139,11 @@ class Failure(VerificationResult):
             for via in reason_entry[1]:
                 pos_string += ', via ' + via[0] + ' at ' + str(via[1])
         else:
+            reason_file = reason_pos.file()
             reason_node = None
         reason = reason_string if reason_string else reason_node
+        if not reason:
+            reason = str(reason_offending)
         reason_msg = reasons[error_id[1]](reason)
         error_pos = error.pos()
         if hasattr(error_pos, 'id'):

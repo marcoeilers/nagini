@@ -97,12 +97,12 @@ class ProgramTranslator(CommonTranslator):
                                            '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
-        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                     self.viper.NullLit(self.no_position(ctx),
                                                        self.no_info(ctx)),
                                     self.no_position(ctx), self.no_info(ctx))
         new_type = self.type_factory.concrete_type_check(
-            next(iter(method.args.values())).ref, cls, pos, ctx)
+            next(iter(method.args.values())).ref(), cls, pos, ctx)
         pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
@@ -151,7 +151,7 @@ class ProgramTranslator(CommonTranslator):
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                         self.viper.NullLit(self.no_position(ctx),
                                                            self.no_info(ctx)),
                                         self.no_position(ctx),
@@ -159,7 +159,7 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null] + pres
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
-            args.append(method.overrides.args[arg].ref)
+            args.append(method.overrides.args[arg].ref())
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
         has_subtype = self.var_type_check(self_arg.sil_name, method.cls, pos,
                                           ctx, inhale_exhale=False)
