@@ -115,6 +115,8 @@ class ViperAST:
 
     def Program(self, domains, fields, functions, predicates, methods, position,
                 info):
+        print(sorted([method.name() for method in methods]))
+        print([str(method) for method in domains])
         return self.ast.Program(self.to_seq(domains), self.to_seq(fields),
                                 self.to_seq(functions), self.to_seq(predicates),
                                 self.to_seq(methods), position, info)

@@ -7,6 +7,7 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     INT_TYPE,
+    INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
     VIPER_KEYWORDS,
@@ -59,7 +60,7 @@ class PythonScope:
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__(list(VIPER_KEYWORDS), None)
+        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -120,7 +121,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, list(VIPER_KEYWORDS), superscope)
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -341,9 +342,8 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, list(VIPER_KEYWORDS) + [RESULT_NAME,
-                                                           ERROR_NAME,
-                                                           END_LABEL],
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES +
+                             [RESULT_NAME, ERROR_NAME, END_LABEL],
                              superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):

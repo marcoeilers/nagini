@@ -14,7 +14,7 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt(self, node: ast.AST, ctx: SIFContext) -> List[Stmt]:
         # Reset context to clear artifacts of translations from previous
         # statements.
-        ctx.reset()
+        # ctx.reset()
         return super().translate_stmt(node, ctx)
 
     def translate_stmt_If(self, node: ast.If, ctx: SIFContext) -> List[Stmt]:

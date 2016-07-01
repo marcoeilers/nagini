@@ -423,7 +423,7 @@ class CallTranslator(CommonTranslator):
             local_var = ctx.current_function.create_variable(local_name,
                                                              local.type,
                                                              self.translator)
-            ctx.var_aliases[local_name] = local_var
+            ctx.set_alias(local_name, local_var, local)
 
         # create label aliases
         for label in method.labels:
