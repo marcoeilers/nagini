@@ -109,6 +109,14 @@ def _raise_invalid_operation_use(error_type: str, node: ast.AST) -> None:
     )
 
 
+def _raise_invalid_existential_var(error_type: str, node: ast.AST) -> None:
+    """Raise InvalidProgramException."""
+    raise InvalidProgramException(
+        node,
+        'invalid.io_existential_var.' + error_type,
+    )
+
+
 def _is_top_level_assertion(node: ast.expr) -> bool:
     """Check if assertion represented by node is top level."""
     def get_parent(node: ast.expr) -> ast.expr:
@@ -245,6 +253,10 @@ class IOOperationTranslator(CommonTranslator):
             var = ctx.actual_function.io_existential_vars[var_name]
             assert isinstance(var, PythonIOExistentialVar)
 
+            if var.type != result.type:
+                _raise_invalid_existential_var(
+                    'defining_expression_type_mismatch', node)
+
             name = _construct_getter_name(operation, result)
             typ = self.translate_type(result.type, ctx)
             formal_args = [
@@ -328,4 +340,10 @@ class IOOperationTranslator(CommonTranslator):
 
         name_node = cast(ast.Name, node.left)
         var = ctx.actual_function.get_variable(name_node.id)
+
+        expression_type = self.get_type(node.comparators[0], ctx)
+        if var.type != expression_type:
+            _raise_invalid_existential_var(
+                'defining_expression_type_mismatch', node)
+
         var.ref = right
