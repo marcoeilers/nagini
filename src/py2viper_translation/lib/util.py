@@ -26,6 +26,9 @@ def flatten(lists: List[List[T]]) -> List[T]:
 
 def flatten_dict(dicts: List[Dict[T, List[V]]],
                  defaults: List[T]=[]) -> Dict[T, List[V]]:
+    """
+    Flattens a dict of lists, i.e., concatenates all lists for the same keys.
+    """
     result = {}
     for key in defaults:
         result[key] = []

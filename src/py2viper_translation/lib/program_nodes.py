@@ -614,6 +614,11 @@ class PythonVar(PythonNode):
 
     def ref(self, node: ast.AST=None,
             ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
+        """
+        Creates a reference to this variable. If no arguments are supplied,
+        the reference will have no position. Otherwise, it will have the
+        position of the given node in the given context.
+        """
         if not node:
             return self._ref
         prog = self.type.get_program()

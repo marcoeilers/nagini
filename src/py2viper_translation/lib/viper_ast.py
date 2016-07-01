@@ -1,7 +1,7 @@
 import ast
 import types
 
-from py2viper_translation.lib.cache import cache
+from py2viper_translation.lib.errors import cache
 from uuid import uuid1
 
 
@@ -115,8 +115,6 @@ class ViperAST:
 
     def Program(self, domains, fields, functions, predicates, methods, position,
                 info):
-        print(sorted([method.name() for method in methods]))
-        print([str(method) for method in domains])
         return self.ast.Program(self.to_seq(domains), self.to_seq(fields),
                                 self.to_seq(functions), self.to_seq(predicates),
                                 self.to_seq(methods), position, info)
@@ -201,9 +199,6 @@ class ViperAST:
         return self.ast.TypeVar(name)
 
     def MethodCall(self, methodname, args, targets, position, info):
-        print(position)
-        if 'no position' in str(position):
-            print("+++")
         return self.ast.MethodCall(methodname, self.to_seq(args),
                                    self.to_seq(targets), position, info)
 
@@ -344,10 +339,6 @@ class ViperAST:
         return self.ast.Or(left, right, position, info)
 
     def If(self, cond, thn, els, position, info):
-        print(cond)
-        print(thn)
-        print(els)
-        print(position)
         return self.ast.If(cond, thn, els, position, info)
 
     def TrueLit(self, position, info):

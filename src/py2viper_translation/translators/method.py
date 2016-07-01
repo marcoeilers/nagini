@@ -116,15 +116,11 @@ class MethodTranslator(CommonTranslator):
         error_string += ', '.join(method.declared_exceptions) + '"'
         error_type_pos = self.to_position(method.node, ctx, error_string)
         for exception in method.declared_exceptions:
-            # oldpos = ctx.position
-            # if ctx.position is None:
-            #     ctx.position = error_type_pos
             has_type = self.var_type_check(ERROR_NAME,
                                            ctx.program.classes[exception],
                                            error_type_pos,
                                            ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
-            # ctx.position = oldpos
             condition = self.viper.And(error, has_type, self.no_position(ctx),
                                        self.no_info(ctx))
             for post in method.declared_exceptions[exception]:
