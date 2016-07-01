@@ -347,14 +347,13 @@ class ContractTranslator(CommonTranslator):
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
         variables.append(var.decl)
-        assert arg.arg not in ctx.var_aliases
 
-        ctx.var_aliases[arg.arg] = var
+        ctx.set_alias(arg.arg, var, None)
         body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
 
         triggers = self._translate_triggers(lambda_.body, node, ctx)
 
-        del ctx.var_aliases[arg.arg]
+        ctx.remove_alias(arg.arg)
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 

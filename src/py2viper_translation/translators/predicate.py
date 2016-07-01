@@ -59,7 +59,7 @@ class PredicateTranslator(CommonTranslator):
             for root_name, current_name in zip(root.args.keys(),
                                                instance.args.keys()):
                 root_var = root.args[root_name]
-                ctx.var_aliases[current_name] = root_var
+                ctx.set_alias(current_name, root_var)
             if len(instance.node.body) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')

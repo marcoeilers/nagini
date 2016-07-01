@@ -359,9 +359,21 @@ class MethodTranslator(CommonTranslator):
                     self.viper.NullLit(self.no_position(ctx),
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
+            # create local variables for parameters
+            for name, arg in method.args.items():
+                arg_var = ctx.current_function.create_variable(name,
+                                                               arg.type,
+                                                               self.translator)
+                arg_assign = self.viper.LocalVarAssign(arg_var.ref(), arg.ref(),
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
+                body.append(arg_assign)
+                ctx.set_alias(name, arg_var, arg)
             body += flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in
                  method.node.body[body_index:]])
+            for name in method.args:
+                ctx.remove_alias(name)
             end_label = ctx.get_label_name(END_LABEL)
             body.append(self.viper.Goto(end_label, self.no_position(ctx),
                                         self.no_info(ctx)))
