@@ -70,10 +70,10 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                # var aliases should never change the type of a variable,
-                # so we'll ignore those here.
-                # TODO: var_aliases and alt_types don't really go together,
-                # do they?
+                # var aliases should never change the type of a variable, but
+                # we might still get alt_type information from them that we
+                # don't get from the normal variable in case where there *is*
+                # no normal variable, lambda arguments.
                 var = ctx.actual_function.get_variable(node.id)
                 if not var and node.id in ctx.var_aliases:
                     var = ctx.var_aliases[node.id]
@@ -301,7 +301,8 @@ class TypeTranslator(CommonTranslator):
                                         self.no_info(ctx))
         return result
 
-    def type_check(self, lhs: Expr, type: PythonType, position,
+    def type_check(self, lhs: Expr, type: PythonType,
+                   position: 'silver.ast.Position',
                    ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance

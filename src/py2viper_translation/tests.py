@@ -6,7 +6,7 @@ import tokenize
 
 from os.path import isfile, join
 from py2viper_translation.lib import config, jvmaccess
-from py2viper_translation.lib.cache import cache
+from py2viper_translation.lib.errors import cache
 from py2viper_translation.lib.typeinfo import TypeException
 from py2viper_translation.lib.util import InvalidProgramException, flatten, flatten_dict
 from py2viper_translation.main import translate, verify
@@ -109,9 +109,6 @@ class AnnotatedTests():
                 error.readableMessage(), self.get_vias(error))
 
     def compare_actual_expected(self, actual, expected, optional, labels):
-        print(actual)
-        print(expected)
-        print(labels)
         actual_unexpected = []
         missing_expected = []
         expected = [(l, i, [labels[i] for i in v]) for (l, i, v) in expected]

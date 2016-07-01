@@ -54,6 +54,11 @@ class Analyzer(ast.NodeVisitor):
 
     def define_new(self, container: Union[PythonProgram, PythonClass],
                    name: str, node: ast.AST) -> None:
+        """
+        Called when a new top level element named name is created in container.
+        Checks there is any existing element with the same name, and raises
+        an exception in that case.
+        """
         if isinstance(container, PythonProgram):
             if name in container.classes:
                 cls = container.classes[name]
@@ -150,6 +155,8 @@ class Analyzer(ast.NodeVisitor):
         self.visit(self.asts[module], None)
 
     def visit_Module(self, node: ast.Module) -> None:
+        # Top level elements may only be imports, classes, functions, global
+        # var assignments or Import() calls.
         for stmt in node.body:
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
                                  ast.ImportFrom, ast.Assign)):

@@ -171,13 +171,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 err_var = ctx.var_aliases[err_var.sil_name]
             return err_var.ref()
         if ctx.actual_function.declared_exceptions:
-            return ctx.error_var.ref(stmt, ctx)
+            return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
             return new_var.ref()
 
-    def var_type_check(self, name: str, type: PythonType, position,
+    def var_type_check(self, name: str, type: PythonType,
+                       position: 'silver.ast.Position',
                        ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Creates an expression checking if the var with the given name

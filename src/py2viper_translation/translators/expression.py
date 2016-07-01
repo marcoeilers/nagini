@@ -47,8 +47,6 @@ class ExpressionTranslator(CommonTranslator):
         return self.translate_expr(node.value, ctx)
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
-        if node.n == 122:
-            print("++")
         return ([], self.viper.IntLit(node.n, self.to_position(node, ctx),
                                       self.no_info(ctx)))
 

@@ -24,6 +24,11 @@ def col(node) -> Optional[int]:
 
 
 def with_column(f):
+    """
+    Decorator for functions belonging to the translation from Python AST to
+    mypy AST. Adds the column information from the Python node to the column
+    field of the mypy node.
+    """
     @wraps(f)
     def wrapper(self, ast):
         node = f(self, ast)
@@ -33,6 +38,7 @@ def with_column(f):
     return wrapper
 
 
+# Monkey-patch mypy's AST converter to add column information
 ASTConverter = mypy.fastparse.ASTConverter
 for name in dir(ASTConverter):
     m = getattr(ASTConverter, name)

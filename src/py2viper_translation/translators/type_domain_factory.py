@@ -596,7 +596,8 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
-    def type_check(self, lhs: 'Expr', type: 'PythonType', position,
+    def type_check(self, lhs: 'Expr', type: 'PythonType',
+                   position: 'silver.ast.Position',
                    ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
@@ -662,7 +663,8 @@ class TypeDomainFactory:
                               self.no_info(ctx))
         return eq
 
-    def concrete_type_check(self, lhs: Expr, type: 'PythonClass', position,
+    def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
+                            position: 'silver.ast.Position',
                             ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression

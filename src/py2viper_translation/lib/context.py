@@ -77,7 +77,9 @@ class Context:
     def set_alias(self, name: str, var: PythonVar,
                   replaces: PythonVar=None) -> None:
         """
-        Sets an alias for a variable.
+        Sets an alias for a variable. Makes sure the alt_types of the alias
+        variable match those of the variable it replaces. If there already is
+        an alias for the given name, memorizes the old one and replaces it.
         """
         if name in self.var_aliases:
             if name not in self.old_aliases:
@@ -90,6 +92,11 @@ class Context:
         self.var_aliases[name] = var
 
     def remove_alias(self, name: str) -> None:
+        """
+        Removes the alias for the given variable. If there was a different alias
+        before, that one will be used again afterwards. Otherwise, there will
+        no longer be an alias for this name.
+        """
         if name in self.old_aliases and self.old_aliases[name]:
             old = self.old_aliases[name].pop()
             self.var_aliases[name] = old
