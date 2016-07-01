@@ -132,7 +132,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._current_io_operation.set_postset([out_place])
             return outputs[:-1]
         else:
-            return []
+            return outputs
 
     def _parse_arguments(self) -> None:
         """Parse and check operation arguments."""
