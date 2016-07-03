@@ -378,7 +378,10 @@ class ViperAST:
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
-            # TODO: this should never happen, but it does.
+            # TODO: this should never happen (because all nodes that the parser
+            # creates have this field), but it does, because in the SIF code we
+            # create artificial ast.Name objects which don't have it. That
+            # should probably be changed.
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)

@@ -88,7 +88,7 @@ errors = {
                   ' might not be well-formed.',
 }
 
-reasons = {
+REASONS = {
     'assertion.false': lambda n: 'Assertion ' + pprint(n) + ' might not hold.',
     'receiver.null': lambda n: 'Receiver of ' + pprint(n) + ' might be null.',
     'division.by.zero': lambda n: 'Divisor ' + pprint(n) + ' might be zero.',
@@ -120,14 +120,14 @@ def error_msg(error: 'silver.verifier.AbstractError') -> str:
         if reason_entry[1]:
             got_proper_position = True
         for via in reason_entry[1]:
-            pos_string += ', via ' + via[0] + ' at ' + str(via[1])
+            pos_string += ', via {0} at {1}'.format(via[0], via[1])
     else:
         reason_file = reason_pos.file()
         reason_node = None
     reason = reason_string if reason_string else reason_node
     if not reason:
         reason = str(reason_offending)
-    reason_msg = reasons[error_id[1]](reason)
+    reason_msg = REASONS[error_id[1]](reason)
     error_pos = error.pos()
     if hasattr(error_pos, 'id'):
         error_pos = error_pos.id()
@@ -135,10 +135,10 @@ def error_msg(error: 'silver.verifier.AbstractError') -> str:
         error_node = error_entry[0]
         if not got_proper_position:
             for via in error_entry[1]:
-                pos_string += ', via ' + via[0] + ' at ' + str(via[1])
+                pos_string += ', via {0} at {1}'.format(via[0], via[1])
     else:
         off = error.offendingNode()
         off_pos = off.pos()
         error_node = None
     error_msg = errors[error_id[0]](error_node)
-    return error_msg + ' ' + reason_msg + ' (' + pos_string + ')'
+    return '{0} {1} ({2})'.format(error_msg, reason_msg, pos_string)
