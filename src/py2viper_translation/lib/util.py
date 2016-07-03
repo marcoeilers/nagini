@@ -151,10 +151,17 @@ def is_exception_decl(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Exsures'
 
 
+def is_docstring(stmt: ast.AST) -> bool:
+    """Return True if statement is a docstring."""
+    if (isinstance(stmt, ast.Expr) and
+            isinstance(stmt.value, ast.Str)):
+        return True
+    else:
+        return False
+
+
 def is_io_existential(stmt: ast.AST) -> bool:
-    """
-    Returns True if statement is a definition of IOExists.
-    """
+    """Return True if statement is a definition of IOExists."""
     if (isinstance(stmt, ast.Expr) and
             isinstance(stmt.value, ast.Call) and
             isinstance(stmt.value.func, ast.Call) and
@@ -177,6 +184,8 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
     """
     body_index = 0
     try:
+        while is_docstring(statements[body_index]):
+            body_index += 1
         while is_io_existential(statements[body_index]):
             body_index += 1
         while is_pre(statements[body_index]):
