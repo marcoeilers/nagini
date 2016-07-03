@@ -1,13 +1,14 @@
 import logging
 import mypy.build
-import mypy.fastparse
+import py2viper_translation.lib.mypy_parser_patch
 import sys
 
-from functools import wraps
 from mypy.build import BuildSource
 from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import LITERALS
-from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+)
 from typing import List, Optional
 
 
@@ -21,29 +22,6 @@ def col(node) -> Optional[int]:
     if hasattr(node, 'column'):
         return node.column
     return None
-
-
-def with_column(f):
-    """
-    Decorator for functions belonging to the translation from Python AST to
-    mypy AST. Adds the column information from the Python node to the column
-    field of the mypy node.
-    """
-    @wraps(f)
-    def wrapper(self, ast):
-        node = f(self, ast)
-        if hasattr(ast, 'col_offset'):
-            node.column = ast.col_offset
-        return node
-    return wrapper
-
-
-# Monkey-patch mypy's AST converter to add column information
-ASTConverter = mypy.fastparse.ASTConverter
-for name in dir(ASTConverter):
-    m = getattr(ASTConverter, name)
-    if callable(m) and name.startswith('visit_'):
-        setattr(ASTConverter, name, with_column(m))
 
 
 class TypeException(Exception):
@@ -102,9 +80,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def visit_func_expr(self, node: mypy.nodes.FuncExpr):
         oldprefix = self.prefix
-        prefix_string = 'lambda' + str(node.line)
-        if col(node):
-            prefix_string += '_' + str(col(node))
+        prefix_string = 'lambda{0}_{1}'.format(node.line, col(node) or
+                                                'unknown')
         self.prefix = self.prefix + [prefix_string]
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],

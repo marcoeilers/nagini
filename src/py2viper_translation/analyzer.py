@@ -55,8 +55,8 @@ class Analyzer(ast.NodeVisitor):
     def define_new(self, container: Union[PythonProgram, PythonClass],
                    name: str, node: ast.AST) -> None:
         """
-        Called when a new top level element named name is created in container.
-        Checks there is any existing element with the same name, and raises
+        Called when a new top level element named ``name`` is created in
+        ``container``. Checks there is any existing element with the same name, and raises
         an exception in that case.
         """
         if isinstance(container, PythonProgram):
@@ -281,8 +281,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = 'lambda' + str(node.lineno)
-        if hasattr(node, 'col_offset'):
-            name += '_' + str(node.col_offset)
+        # if hasattr(node, 'col_offset'):
+        name += '_' + str(node.col_offset)
         self.current_scopes.append(name)
         for arg in node.args.args:
             var = self.node_factory.create_python_var(arg.arg, arg,

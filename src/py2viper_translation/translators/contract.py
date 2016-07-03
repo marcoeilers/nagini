@@ -343,6 +343,8 @@ class ContractTranslator(CommonTranslator):
         lambda_prefix = 'lambda' + str(lambda_.lineno)
         if hasattr(lambda_, 'col_offset'):
             lambda_prefix += '_' + str(lambda_.col_offset)
+        else:
+            lambda_prefix += '_unknown'
         lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)

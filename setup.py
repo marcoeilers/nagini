@@ -17,6 +17,7 @@ setup(
             'mypy-lang',
             'toposort',
             'jpype1',
+            'astunparse',
             ],
         entry_points = {
              'console_scripts': [

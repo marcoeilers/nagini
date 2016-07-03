@@ -111,9 +111,9 @@ class MethodTranslator(CommonTranslator):
                                                     self.no_info(ctx)),
                                  self.no_position(ctx), self.no_info(ctx))
         error_type_conds = []
-        error_string = '"method only raises exceptions of type'
-        error_string += 's ' if len(method.declared_exceptions) > 1 else ' '
-        error_string += ', '.join(method.declared_exceptions) + '"'
+        error_string = '"method only raises exceptions of type{0} {1}"'.format(
+            's' if len(method.declared_exceptions) > 1 else '',
+            ', '.join(method.declared_exceptions))
         error_type_pos = self.to_position(method.node, ctx, error_string)
         for exception in method.declared_exceptions:
             has_type = self.var_type_check(ERROR_NAME,
