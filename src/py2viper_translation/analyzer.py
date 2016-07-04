@@ -6,6 +6,8 @@ import py2viper_translation.external.astpp
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from py2viper_translation.analyzer_io import IOOperationAnalyzer
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS, OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
@@ -23,7 +25,8 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
-    UnsupportedException
+    is_io_existential,
+    UnsupportedException,
 )
 from typing import Dict, Set
 
@@ -51,6 +54,12 @@ class Analyzer(ast.NodeVisitor):
         self.modules = [os.path.abspath(path)]
         self.asts = {}
         self.node_factory = node_factory
+        self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
+        self._is_io_existential = False     # Are we defining an
+                                            # IOExists block?
+        self._lambda_stack = []             # Keeps track how deep we
+                                            # are in a lambda
+                                            # expression.
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -183,6 +192,9 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if not isinstance(name, str):
             raise Exception(name)
+        if self.is_io_operation(node):
+            self.io_operation_analyzer.analyze_io_operation(node)
+            return
         if self.current_class is None:
             scope_container = self.program
         else:
@@ -200,9 +212,10 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
+            contract_only = self.contract_only or self.is_contract_only(node)
             func = self.node_factory.create_python_method(name, node,
                 self.current_class, scope_container, self.is_pure(node),
-                self.contract_only, self.node_factory)
+                contract_only, self.node_factory)
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
@@ -212,10 +225,13 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = func
         self.visit(node.args, node)
         for child in node.body:
+            if is_io_existential(child):
+                self._is_io_existential = True
             self.visit(child, node)
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
+        assert self.current_function is not None
         for arg in node.args:
             self.visit(arg, node)
         self.current_function.nargs = len(node.args)
@@ -245,14 +261,26 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function
         name = 'lambda' + str(node.lineno)
         self.current_scopes.append(name)
+        lambda_var_names = {}
         for arg in node.args.args:
-            var = self.node_factory.create_python_var(arg.arg, arg,
-                                                      self.typeof(arg))
+            if self._is_io_existential:
+                var = self.node_factory.create_python_io_existential_var(
+                    arg.arg, arg, self.typeof(arg))
+            else:
+                var = self.node_factory.create_python_var(
+                    arg.arg, arg, self.typeof(arg))
             alts = self.get_alt_types(node)
             var.alt_types = alts
             local_name = name + '$' + arg.arg
-            self.current_function.special_vars[local_name] = var
+            if self._is_io_existential:
+                self.current_function.io_existential_vars[local_name] = var
+            else:
+                self.current_function.special_vars[local_name] = var
+            lambda_var_names[arg.arg] = local_name
+        self._is_io_existential = False
+        self._lambda_stack.append(lambda_var_names)
         self.visit(node.body, node)
+        self._lambda_stack.pop()
         self.current_scopes.pop()
 
     def visit_arg(self, node: ast.arg) -> None:
@@ -288,12 +316,32 @@ class Analyzer(ast.NodeVisitor):
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
                     node.args[1])
+        if (isinstance(node.func, ast.Name) and
+            node.func.id in IO_OPERATION_PROPERTY_FUNCS):
+            raise InvalidProgramException(
+                node, 'invalid.io_operation.misplaced_property')
         self.visit_default(node)
+
+
+    def _make_variable_name_unique(self, node: ast.Name) -> None:
+        """
+        If node.id is defined by Lambda, make it uniquely defined.
+
+        .. todo::
+            This function is a workaround for py2viper issue `19
+            <https://bitbucket.org/viperproject/py2viper-translation/issues/19/>`_.
+        """
+        for lambda_var_names in reversed(self._lambda_stack):
+            if node.id in lambda_var_names:
+                node.id = lambda_var_names[node.id]
+                return
 
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in LITERALS:
             return
         if isinstance(node._parent, ast.Call):
+            # FIXME(Marco): Remove this call once #19 is properly fixed.
+            self._make_variable_name_unique(node)
             return
         if isinstance(node._parent, ast.arg):
             if node._parent.annotation is node:
@@ -314,8 +362,8 @@ class Analyzer(ast.NodeVisitor):
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
-                    var = self.node_factory.create_python_var(node.id,
-                                                              node, cls)
+                    var = self.node_factory.create_python_global_var(
+                        node.id, node, cls)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
@@ -328,16 +376,23 @@ class Analyzer(ast.NodeVisitor):
                 # node is a static field.
                 raise UnsupportedException(node)
         if node.id not in self.program.global_vars:
-            # node is a local variable or a static field.
+            # node is a local variable, lambda argument, or a static
+            # field.
             if self.current_function is None:
                 # node is a static field.
                 raise UnsupportedException(node)
             else:
-                # node refers to a local variable.
+                # node refers to a local variable or lambda argument.
+                # FIXME(Marco): Remove this call once #19 is properly fixed.
+                self._make_variable_name_unique(node)
                 var = None
                 if node.id in self.current_function.locals:
                     var = self.current_function.locals[node.id]
                 elif node.id in self.current_function.args:
+                    pass
+                elif node.id in self.current_function.special_vars:
+                    pass
+                elif node.id in self.current_function.io_existential_vars:
                     pass
                 elif (self.current_function.var_arg and
                         self.current_function.var_arg.name == node.id):
@@ -485,8 +540,15 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
-    def _incompatible_decorators(self, decorators: Set[str]) -> bool:
-        return ('Predicate' in decorators) and ('Pure' in decorators)
+    def _incompatible_decorators(self, decorators) -> bool:
+        return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('IOOperation' in decorators) and (len(decorators) != 1)))
+
+    def is_contract_only(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'ContractOnly' in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
@@ -499,3 +561,9 @@ class Analyzer(ast.NodeVisitor):
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Predicate' in decorators
+
+    def is_io_operation(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'IOOperation' in decorators

@@ -6,6 +6,7 @@ from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
+    PythonIOOperation,
     PythonMethod,
     PythonTryBlock,
     PythonType,
@@ -42,6 +43,7 @@ class TranslatorConfig:
         self.pure_translator = None
         self.type_translator = None
         self.pred_translator = None
+        self.io_operation_translator = None
         self.prog_translator = None
         self.method_translator = None
         self.type_factory = None
@@ -69,8 +71,10 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translator(self):
         return self.config.translator
 
-    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
-        return self.config.expr_translator.translate_expr(node, ctx)
+    def translate_expr(self, node: ast.AST, ctx: Context,
+                       expression: bool = False) -> StmtsAndExpr:
+        return self.config.expr_translator.translate_expr(
+            node, ctx, expression)
 
     def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
         return self.config.expr_translator.translate_to_bool(node, ctx)
@@ -101,6 +105,19 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_predicate(self, pred: PythonMethod,
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
+
+    def translate_io_operation(
+            self,
+            operation: PythonIOOperation,
+            ctx: Context,
+            ) -> Tuple[
+                'ast.silver.Predicate',
+                List['ast.silver.Function'],
+                List['ast.silver.Method'],
+                ]:
+        return self.config.io_operation_translator.translate_io_operation(
+            operation,
+            ctx)
 
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
@@ -142,6 +159,25 @@ class AbstractTranslator(metaclass=ABCMeta):
                                     ctx: Context) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node,
                                                                            ctx)
+
+    def translate_io_contractfunc_call(self, node: ast.Call,
+                                       ctx: Context) -> StmtsAndExpr:
+        translator = self.config.io_operation_translator
+        return translator.translate_io_contractfunc_call(node, ctx)
+
+    def translate_io_operation_call(self, node: ast.Call,
+                                    ctx: Context) -> StmtsAndExpr:
+        translator = self.config.io_operation_translator
+        return translator.translate_io_operation_call(node, ctx)
+
+    def is_io_existential_defining_equality(self, node: ast.Expr,
+                                            ctx: Context) -> bool:
+        translator = self.config.io_operation_translator
+        return translator.is_io_existential_defining_equality(node, ctx)
+
+    def define_io_existential(self, node: ast.Expr, ctx: Context) -> None:
+        translator = self.config.io_operation_translator
+        translator.define_io_existential(node, ctx)
 
     def translate_handler(self, handler: PythonExceptionHandler,
                           ctx: Context) -> List[Stmt]:

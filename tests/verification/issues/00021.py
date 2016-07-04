@@ -1,6 +1,14 @@
-#:: IgnoreFile(/py2viper/issue/21/)
 from py2viper_contracts.contracts import *
 
 
-def bla() -> None:
+def test1() -> None:
     Requires(True)
+
+
+def test2() -> None:
+    Ensures(True)
+
+
+def test3() -> None:
+    Requires(True)
+    Ensures(True)

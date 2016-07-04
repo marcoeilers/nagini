@@ -11,7 +11,7 @@ class TestClass:
         Requires(Acc(self.fld, 1/100))
         return self.fld
 
-    #:: ExpectedOutput(invalid.program:invalid.predicate)
     @Predicate
     def some_pred(self, val: int) -> bool:
+        #:: ExpectedOutput(invalid.program:not_expression)
         return Acc(self.fld) and self.some_func() == val

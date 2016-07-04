@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     PRIMITIVES,
     RESULT_NAME,
 )
+from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from typing import List, Optional, Set
 
@@ -62,6 +63,7 @@ class PythonProgram(PythonScope):
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.predicates = OrderedDict()
+        self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
         self.types = types
         for primitive in PRIMITIVES:
@@ -79,6 +81,8 @@ class PythonProgram(PythonScope):
             predicate.process(self.get_fresh_name(name), translator)
         for name, var in self.global_vars.items():
             var.process(self.get_fresh_name(name), translator)
+        for name, operation in self.io_operations.items():
+            operation.process(self.get_fresh_name(name), translator)
 
     def get_scope_prefix(self) -> List[str]:
         return []
@@ -348,6 +352,7 @@ class PythonMethod(PythonNode, PythonScope):
         self._locals = OrderedDict()  # direct
         self._args = OrderedDict()  # direct
         self._special_vars = OrderedDict()  # direct
+        self._io_existential_vars = OrderedDict()
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -433,6 +438,14 @@ class PythonMethod(PythonNode, PythonScope):
     def special_vars(self) -> OrderedDict:
         return self._special_vars
 
+    @property
+    def io_existential_vars(self) -> OrderedDict:
+        """
+        IO existential variables are variables defined by using
+        ``IOExists`` construct.
+        """
+        return self._io_existential_vars
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -444,6 +457,8 @@ class PythonMethod(PythonNode, PythonScope):
             return self.args[name]
         elif name in self.special_vars:
             return self.special_vars[name]
+        elif name in self.io_existential_vars:
+            return self.io_existential_vars[name]
         elif self.var_arg and self.var_arg.name == name:
             return self.var_arg
         elif self.kw_arg and self.kw_arg.name == name:
@@ -485,6 +500,107 @@ class PythonMethod(PythonNode, PythonScope):
             return [self.result]
         else:
             return []
+
+
+class PythonIOOperation(PythonNode, PythonScope):
+    """
+    Represents an IO operation which may be basic or not.
+
+    +   ``preset`` – a set of input places.
+    +   ``postset`` – a set of output places.
+    +   ``inputs`` – inputs of IO operation (excluding preset).
+    +   ``outputs`` – outputs of IO operation (excluding postset).
+    """
+    def __init__(
+            self,
+            name: str,
+            node: ast.AST,
+            superscope: PythonScope,
+            node_factory: 'ProgramNodeFactory',
+            ):
+        PythonNode.__init__(self, name, node)
+        PythonScope.__init__(self, [], superscope)
+        self._preset = []
+        self._postset = []
+        self._inputs = []
+        self._outputs = []
+        self._terminates = None
+        self._termination_measure = None
+
+    def _process_var_list(self, var_list: List['PythonVar'],
+                          translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for all variables in ``var_list``.
+        """
+        for var in var_list:
+            var.process(self.get_fresh_name(var.name), translator)
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for preset, postset, inputs and
+        outputs. Also, sets the ``sil_name``.
+        """
+        self.sil_name = sil_name
+        self._process_var_list(self._preset, translator)
+        self._process_var_list(self._postset, translator)
+        self._process_var_list(self._inputs, translator)
+        self._process_var_list(self._outputs, translator)
+
+    def set_preset(self, preset: List['PythonVar']) -> None:
+        assert len(preset) == 1
+        self._preset = preset
+
+    def set_postset(self, postset: List['PythonVar']) -> None:
+        assert len(postset) == 1
+        self._postset = postset
+
+    def set_inputs(self, inputs: List['PythonVar']) -> None:
+        assert isinstance(inputs, list)
+        self._inputs = inputs
+
+    def is_input(self, name) -> bool:
+        for input in self._inputs:
+            if input.name == name:
+                return True
+        else:
+            return False
+
+    def set_outputs(self, outputs: List['PythonVar']) -> None:
+        assert isinstance(outputs, list)
+        self._outputs = outputs
+
+    def set_terminates(self, expression: ast.AST) -> bool:
+        """
+        Sets the property if it is not already set and returns ``True``.
+        """
+        if self._terminates is None:
+            self._terminates = expression
+            return True
+        else:
+            return False
+
+    def set_termination_measure(self, expression: ast.AST) -> bool:
+        """
+        Sets the property if it is not already set and returns ``True``.
+        """
+        if self._termination_measure is None:
+            self._termination_measure = expression
+            return True
+        else:
+            return False
+
+    def get_parameters(self) -> List['PythonVar']:
+        """
+        Returns a list of parameters that uniquely identify IO operation
+        instance.
+        """
+        return self._preset + self._inputs
+
+    def get_results(self) -> List['PythonVar']:
+        """
+        Returns a list of results for this IO operation.
+        """
+        return self._outputs + self._postset
 
 
 class PythonExceptionHandler(PythonNode):
@@ -577,17 +693,14 @@ class PythonTryBlock(PythonNode):
         self.get_finally_var(translator)
 
 
-class PythonVar(PythonNode):
+class PythonVarBase(PythonNode):
     """
-    Represents a variable in Python. Can be a global variable, a local variable
-    or a function parameter.
+    Abstract class representing any variable in Python.
     """
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
         self.type = type
-        self.decl = None
-        self.ref = None
         self.writes = []
         self.reads = []
         self.alt_types = {}
@@ -596,13 +709,74 @@ class PythonVar(PythonNode):
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
-        Creates a Silver variable declaration and reference representing this
-        Python variable.
+        Sets ``sil_name``.
         """
         self.sil_name = sil_name
+
+
+class PythonVar(PythonVarBase):
+    """
+    Represents a variable in Python. Can be a local variable or a
+    function parameter.
+    """
+
+    def __init__(self, name: str, node: ast.AST, type: PythonClass):
+        super().__init__(name, node, type)
+        self.decl = None
+        self.ref = None
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates a Silver variable declaration and reference representing
+        this Python variable.
+        """
+        super().process(sil_name, translator)
         prog = self.type.get_program()
         self.decl = translator.translate_pythonvar_decl(self, prog)
         self.ref = translator.translate_pythonvar_ref(self, prog)
+
+
+class PythonGlobalVar(PythonVarBase):
+    """
+    Represents a global variable in Python.
+    """
+
+
+class PythonIOExistentialVar(PythonVarBase):
+    """
+    Represents an existential variable in Python. Existential variable
+    is a variable created by using ``IOExists`` construct and it can be
+    used only in contracts. Unlike normal variables, it is translated to
+    getter functions.
+    """
+
+    def __init__(self, name: str, node: ast.AST, type: PythonClass):
+        super().__init__(name, node, type)
+        self._ref = None
+
+    def is_defined(self) -> bool:
+        """
+        Returns true if main getter was already defined.
+        """
+        return not self._ref is None
+
+    @property
+    def ref(self) -> Expr:
+        """
+        Returns a Silver expression node that can be used to refer to
+        this variable.
+        """
+        assert not self._ref is None
+        return self._ref
+
+    @ref.setter
+    def ref(self, ref: Expr) -> None:
+        """
+        Sets a Silver expression node that can be used to refer to this
+        variable.
+        """
+        assert self._ref is None
+        self._ref = ref
 
 
 class PythonField(PythonNode):
@@ -653,9 +827,21 @@ class ProgramNodeFactory:
     
     TODO: Add more interfaces for other types of containers if needed.
     """
-    def create_python_var(self, name: str, node: ast.AST,
-                          type_: PythonClass) -> PythonVar:
+
+    def create_python_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonVar:
         return PythonVar(name, node, type_)
+
+    def create_python_global_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_)
+
+    def create_python_io_existential_var(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonIOExistentialVar:
+        return PythonIOExistentialVar(name, node, type_)
 
     def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
                              superscope: PythonScope,
@@ -664,6 +850,12 @@ class ProgramNodeFactory:
                              interface: bool = False) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface)
+
+    def create_python_io_operation(self, name: str, node: ast.AST,
+                                   superscope: PythonScope,
+                                   container_factory: 'ProgramNodeFactory',
+                                   ) -> PythonIOOperation:
+        return PythonIOOperation(name, node, superscope, container_factory)
 
     def create_python_field(self, name: str, node: ast.AST, type_: PythonClass,
                             cls: PythonClass) -> PythonField:

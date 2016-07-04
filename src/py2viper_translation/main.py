@@ -144,6 +144,10 @@ def main() -> None:
         action='store_true',
         help='print generated Silver program')
     parser.add_argument(
+        '--write-silver-to-file',
+        default=None,
+        help='write generated Silver program to specified file')
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -180,6 +184,9 @@ def main() -> None:
             if args.verbose:
                 print('Result:')
             print(prog)
+        if args.write_silver_to_file:
+            with open(args.write_silver_to_file, 'w') as fp:
+                fp.write(str(prog))
         if args.verifier == 'silicon':
             backend = ViperVerifier.silicon
         elif args.verifier == 'carbon':

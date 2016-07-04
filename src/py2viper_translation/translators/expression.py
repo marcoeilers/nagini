@@ -14,6 +14,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
+    PythonIOExistentialVar,
     PythonTryBlock,
     PythonType,
     PythonVar
@@ -26,6 +27,7 @@ from py2viper_translation.lib.typedefs import (
 from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
+    join_expressions,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -35,13 +37,38 @@ from typing import List, Optional
 
 class ExpressionTranslator(CommonTranslator):
 
-    def translate_expr(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        # TODO: Update all code to use this flag.
+        self._is_expression = False
+
+    def translate_expr(self, node: ast.AST, ctx: Context,
+                       expression: bool = False) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression
+
+        :param expression:
+            Indicates if ``node`` must be translated into Silver
+            expression.
+
+            +   If ``True``, then sets a flag that ``node`` must be
+                translated into Silver expression.
+            +   If ``False``, leaves the flag unaltered.
         """
+
+        old_is_expression = self._is_expression
+
+        if expression:
+            self._is_expression = True
+
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        return visitor(node, ctx)
+        result =  visitor(node, ctx)
+
+        self._is_expression = old_is_expression
+
+        return result
 
     def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
@@ -285,7 +312,12 @@ class ExpressionTranslator(CommonTranslator):
             if node.id in ctx.var_aliases:
                 return [], ctx.var_aliases[node.id].ref
             else:
-                return [], ctx.current_function.get_variable(node.id).ref
+                var = ctx.current_function.get_variable(node.id)
+                if (isinstance(var, PythonIOExistentialVar) and
+                        not var.is_defined()):
+                    raise InvalidProgramException(
+                        node, 'io_existential_var.use_of_undefined')
+                return [], var.ref
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
@@ -378,8 +410,13 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
+
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
+        if self.is_io_existential_defining_equality(node, ctx):
+            self.define_io_existential(node, ctx)
+            return ([], self.viper.TrueLit(self.to_position(node, ctx),
+                                           self.no_info(ctx)))
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)
@@ -457,41 +494,50 @@ class ExpressionTranslator(CommonTranslator):
             raise UnsupportedException(node)
 
     def translate_BoolOp(self, node: ast.BoolOp, ctx: Context) -> StmtsAndExpr:
-        if len(node.values) != 2:
-            raise UnsupportedException(node)
+        assert isinstance(node.op, ast.Or) or isinstance(node.op, ast.And)
+
         position = self.to_position(node, ctx)
-        left_stmt, left = self.translate_expr(node.values[0], ctx)
-        right_stmt, right = self.translate_expr(node.values[1], ctx)
-        if left_stmt or right_stmt:
-            # TODO: Something important breaks if we run this normally
-            # with an acc() as left and a method call on the rhs. If this
-            # happens in a test, all tests afterwards fail. Either catch all
-            # such cases here, or fix it in Silver.
-            if isinstance(left, self.jvm.viper.silver.ast.FieldAccessPredicate):
-                return left_stmt + right_stmt, right
-            cond = left
-            if isinstance(node.op, ast.Or):
-                cond = self.viper.Not(cond, position, self.no_info(ctx))
-            then_block = self.translate_block(right_stmt, position,
-                                              self.no_info(ctx))
-            else_block = self.translate_block([], position, self.no_info(ctx))
-            if_stmt = self.viper.If(cond, then_block, else_block, position,
-                                   self.no_info(ctx))
-            stmt = left_stmt + [if_stmt]
-        else:
-            stmt = []
+        info = self.no_info(ctx)
+
+        statements_parts = []
+        expression_parts = []
+        for value in node.values:
+            statements_part, expression_part = self.translate_expr(
+                value, ctx)
+            if self._is_expression and statements_part:
+                raise InvalidProgramException(node, 'not_expression')
+            statements_parts.append(statements_part)
+            expression_parts.append(expression_part)
+
         if isinstance(node.op, ast.And):
-            return (stmt, self.viper.And(left,
-                                         right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        elif isinstance(node.op, ast.Or):
-            return (stmt, self.viper.Or(left,
-                                        right,
-                                        self.to_position(node, ctx),
-                                        self.no_info(ctx)))
+            operator = (
+                lambda left, right:
+                self.viper.And(left, right, position, info))
         else:
-            raise UnsupportedException(node)
+            operator = (
+                lambda left, right:
+                self.viper.Or(left, right, position, info))
+
+        joined_expression_parts = [
+            join_expressions(operator, expression_parts[:i+1])
+            for i in range(len(expression_parts))
+            ]
+
+        statements = statements_parts[0]
+        for i, part in enumerate(statements_parts[1:]):
+
+            cond = joined_expression_parts[i]
+            if isinstance(node.op, ast.Or):
+                cond = self.viper.Not(cond, position, info)
+
+            if part:
+                then_block = self.translate_block(part, position, info)
+                else_block = self.translate_block([], position, info)
+                if_stmt = self.viper.If(cond, then_block, else_block,
+                                        position, info)
+                statements.append(if_stmt)
+
+        return statements, joined_expression_parts[-1]
 
     def translate_pythonvar_decl(self, var: PythonVar,
                                  ctx: Context) -> 'silver.ast.LocalVarDecl':
