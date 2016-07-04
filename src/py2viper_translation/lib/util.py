@@ -1,6 +1,8 @@
 import ast
+import astunparse
 
-from typing import TypeVar, List, Tuple, Optional, Dict, Any
+
+from typing import Any, Dict, List, Optional, Tuple, TypeVar
 
 
 T = TypeVar('T')
@@ -22,6 +24,23 @@ def flatten(lists: List[List[T]]) -> List[T]:
     Flattens a list of lists into a flat list
     """
     return [item for sublist in lists for item in sublist]
+
+
+def flatten_dict(dicts: List[Dict[T, List[V]]],
+                 defaults: List[T]=[]) -> Dict[T, List[V]]:
+    """
+    Flattens a dict of lists, i.e., concatenates all lists for the same keys.
+    """
+    result = {}
+    for key in defaults:
+        result[key] = []
+    for d in dicts:
+        for key, value in d.items():
+            if key in result:
+                result[key].extend(value)
+            else:
+                result[key] = value
+    return result
 
 
 class UnsupportedException(Exception):
@@ -174,3 +193,60 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     if not hasattr(node, '_parent') or not node._parent:
         return None
     return find_loop_for_previous(node._parent, name)
+
+
+def construct_lambda_prefix(line: int, column: Optional[int]) -> str:
+    """
+    Creates an identifier for a lambda expression based on its line and column.
+    """
+    return 'lambda{0}_{1}'.format(line,
+                                  'unknown' if column is None else column)
+
+
+def pprint(node) -> str:
+    """
+    Pretty prints a Python AST node. When given a string, just returns it.
+    """
+    if not node:
+        raise ValueError(node)
+    if isinstance(node, str):
+        return node
+    if isinstance(node, ast.FunctionDef):
+        # mainly for debugging, whenever this happens it's almost certainly
+        # wrong.
+        raise ValueError(node)
+    res = astunparse.unparse(node)
+    res = res.replace('\n', '')
+    return res
+
+
+def get_target_name(node: ast.AST) -> str:
+    """
+    Returns the name of the function this node belongs to. If it's a call,
+    that's the name of the call target, if it's a function, that function's
+    name. For any other node, the name of the containing function,
+    """
+    if (not isinstance(node, ast.Call) and
+            not isinstance(node, ast.FunctionDef)):
+        node = get_containing_member(node)
+    if isinstance(node, ast.FunctionDef):
+        return node.name
+    func = node.func
+    if isinstance(func, ast.Name):
+        func = func.id
+    if isinstance(func, ast.Attribute):
+        func = func.attr
+    return func
+
+
+def get_containing_member(node: ast.AST) -> Optional[ast.FunctionDef]:
+    """
+    Returns the function this node belongs to, if any.
+    """
+    member = node
+    while not isinstance(member, ast.FunctionDef) and member is not None:
+        if hasattr(member, '_parent'):
+            member = member._parent
+        else:
+            member = None
+    return member

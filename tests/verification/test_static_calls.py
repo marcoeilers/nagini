@@ -43,7 +43,7 @@ class Super:
         finally:
             c.value += 3
 
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)|ExpectedOutput(postcondition.violated:assertion.false,L1)
     def some_func_2(self, c: Container) -> int:
         Requires(Acc(c.value))
         Ensures(False)
@@ -75,7 +75,7 @@ class Super:
             c1.value += 7
 
 
-#:: ExpectedOutput(postcondition.violated:assertion.false)
+#:: Label(L1)
 class Sub(Super):
     def so_many_methods(self, ca: Container, cb: Container) -> Container:
         Requires(Acc(ca.value))

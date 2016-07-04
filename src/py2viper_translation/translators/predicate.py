@@ -44,7 +44,7 @@ class PredicateTranslator(CommonTranslator):
 
         name = root.sil_name
         args = []
-        self_var_ref = root.args[next(iter(root.args))].ref
+        self_var_ref = root.args[next(iter(root.args))].ref()
         for arg in root.args:
             args.append(root.args[arg].decl)
         body = None
@@ -59,7 +59,7 @@ class PredicateTranslator(CommonTranslator):
             for root_name, current_name in zip(root.args.keys(),
                                                instance.args.keys()):
                 root_var = root.args[root_name]
-                ctx.var_aliases[current_name] = root_var
+                ctx.set_alias(current_name, root_var)
             if len(instance.node.body) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
@@ -68,7 +68,9 @@ class PredicateTranslator(CommonTranslator):
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             has_type = self.type_factory.type_check(self_var_ref, instance.cls,
-                                                  ctx)
+                                                    self.to_position(
+                                                        instance.node, ctx),
+                                                    ctx)
             implication = self.viper.Implies(has_type, current,
                 self.to_position(instance.node, ctx), self.no_info(ctx))
             ctx.current_function = None
