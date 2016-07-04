@@ -9,6 +9,7 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
@@ -340,11 +341,9 @@ class ContractTranslator(CommonTranslator):
 
         lambda_ = node.args[1]
         variables = []
-        lambda_prefix = 'lambda' + str(lambda_.lineno)
-        if hasattr(lambda_, 'col_offset'):
-            lambda_prefix += '_' + str(lambda_.col_offset)
-        else:
-            lambda_prefix += '_unknown'
+        lambda_prefix = construct_lambda_prefix(lambda_.lineno,
+                                                getattr(lambda_, 'col_offset',
+                                                        None))
         lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)

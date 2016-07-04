@@ -7,6 +7,7 @@ from mypy.build import BuildSource
 from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import LITERALS
 from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
     InvalidProgramException,
 )
 from typing import List, Optional
@@ -80,8 +81,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def visit_func_expr(self, node: mypy.nodes.FuncExpr):
         oldprefix = self.prefix
-        prefix_string = 'lambda{0}_{1}'.format(node.line, col(node) or
-                                                'unknown')
+        prefix_string = construct_lambda_prefix(node.line, col(node))
         self.prefix = self.prefix + [prefix_string]
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
