@@ -36,7 +36,7 @@ class SuperB:
 
 
 class SubB(SuperB):
-    #:: ExpectedOutput(call.precondition:assertion.false,L1);Label(L2)
+    #:: ExpectedOutput(call.precondition:assertion.false,L1)|Label(L2)
     def some_method(self, b: int) -> int:
         Requires(b > 10)
         Ensures(Result() > 10)

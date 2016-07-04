@@ -60,7 +60,7 @@ class AnnotatedTests():
                   'OptionalOutput': [],
                   'Label': []}
         content = token.string.strip()[3:].strip()
-        stripped_list = [part.strip() for part in content.split(';')]
+        stripped_list = [part.strip() for part in content.split('|')]
         for part in stripped_list:
             match = matcher.match(part)
             if match:
