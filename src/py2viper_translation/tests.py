@@ -55,7 +55,7 @@ class AnnotatedTests():
         return test_annotations
 
     def extract_annotations(self, token) -> Dict[str, List[Any]]:
-        matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,_:\d ?\'"]+)\)')
+        matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,_:;\d ?\'"]+)\)')
         result = {'ExpectedOutput': [],
                   'OptionalOutput': [],
                   'Label': []}
