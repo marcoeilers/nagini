@@ -1,4 +1,8 @@
+import ast
 import types
+
+from py2viper_translation.lib.errors import cache
+from uuid import uuid1
 
 
 def getobject(package, name):
@@ -26,6 +30,7 @@ class ViperAST:
         self.java = java
         self.scala = scala
         self.jvm = jvm
+        self.nodes = {}
 
         def getconst(name):
             return getobject(ast, name)
@@ -369,15 +374,24 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
-    def to_position(self, expr):
+    def to_position(self, expr, vias, error_string: str=None):
         if expr is None:
+            return self.NoPosition
+        if not hasattr(expr, 'lineno'):
+            # TODO: this should never happen (because all nodes that the parser
+            # creates have this field), but it does, because in the SIF code we
+            # create artificial ast.Name objects which don't have it. That
+            # should probably be changed.
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
+        id = str(uuid1())
+        assert not id in cache
+        cache[id] = (expr, list(vias), error_string)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
             end = self.scala.Some(end)
         else:
             end = self.none
-        return self.ast.SourcePosition(path, start, end)
+        return self.ast.IdentifierPosition(path, start, end, id)

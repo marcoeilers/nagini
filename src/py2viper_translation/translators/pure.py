@@ -155,7 +155,7 @@ class PureTranslator(CommonTranslator):
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
             if wrapper.name in ctx.var_aliases:
-                old_val = ctx.var_aliases[wrapper.name].ref
+                old_val = ctx.var_aliases[wrapper.name].ref()
             else:
                 # variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
@@ -190,7 +190,7 @@ class PureTranslator(CommonTranslator):
         if isinstance(wrapper.expr, BinOpWrapper):
             assert isinstance(wrapper, AssignWrapper)
             stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
-            var = ctx.var_aliases[wrapper.name].ref
+            var = ctx.var_aliases[wrapper.name].ref()
             if isinstance(wrapper.expr.op, ast.Add):
                 val = self.viper.Add(var, val, position, info)
             elif isinstance(wrapper.expr.op, ast.Sub):
@@ -279,11 +279,11 @@ class PureTranslator(CommonTranslator):
         previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         for cond in conds:
             if isinstance(cond, NotWrapper):
-                current = ctx.var_aliases.get(cond.cond).ref
+                current = ctx.var_aliases.get(cond.cond).ref()
                 current = self.viper.Not(current, self.no_position(ctx),
                                          self.no_info(ctx))
             else:
-                current = ctx.var_aliases.get(cond).ref
+                current = ctx.var_aliases.get(cond).ref()
             previous = self.viper.And(previous, current, self.no_position(ctx),
                                       self.no_info(ctx))
         return previous

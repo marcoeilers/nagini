@@ -1,4 +1,5 @@
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -9,6 +10,7 @@ import traceback
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
+from py2viper_translation.lib.errors import cache
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
@@ -47,6 +49,7 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
+    cache.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
@@ -200,6 +203,7 @@ def main() -> None:
             print('Line ' + str(e.node.lineno) + ': ' + e.code)
             if e.message:
                 print(e.message)
+            print(astunparse.unparse(e.node))
         if isinstance(e, TypeException):
             for msg in e.messages:
                 print(msg)

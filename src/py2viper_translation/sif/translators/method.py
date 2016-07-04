@@ -27,14 +27,14 @@ class SIFMethodTranslator(MethodTranslator):
         """
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
-        tl_expr = method.tl_var.ref
+        tl_expr = method.tl_var.ref()
         if method.pure:
             type_ = self.config.func_triple_factory.get_type(method.type, ctx)
             res = self.viper.Result(type_, pos, info)
             new_tl_expr = self.config.func_triple_factory.get_call(FTDF.GET_TL,
                 [res], method.type, pos, info, ctx)
         else:
-            new_tl_expr = method.new_tl_var.ref
+            new_tl_expr = method.new_tl_var.ref()
 
         not_tl = self.viper.Not(tl_expr, pos, info)
         not_new_tl = self.viper.Not(new_tl_expr, pos, info)
@@ -65,8 +65,8 @@ class SIFMethodTranslator(MethodTranslator):
     def _create_method_prolog(self, method: SIFPythonMethod,
                               ctx: SIFContext) -> List[Stmt]:
         # new_tl := tl
-        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref,
-                                            method.tl_var.ref,
+        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
+                                            method.tl_var.ref(),
                                             self.no_position(ctx),
                                             self.no_info(ctx))
         return [tl_stmt]
@@ -77,8 +77,8 @@ class SIFMethodTranslator(MethodTranslator):
         Generates preconditions specific to the '__init__' method.
         """
         self_var = method.args[next(iter(method.args))]
-        self_ref = self_var.ref
-        self_ref_prime = self_var.var_prime.ref
+        self_ref = self_var.ref()
+        self_ref_prime = self_var.var_prime.ref()
         fields = method.cls.get_all_fields()
         sil_fields = method.cls.get_all_sil_fields()
         sil_fields_prime = [f.field_prime.sil_field for f in fields]

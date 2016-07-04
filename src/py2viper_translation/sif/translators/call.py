@@ -69,26 +69,29 @@ class SIFCallTranslator(CallTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        call_results.add_result(res_var.ref)
-        call_results.add_result(res_var.var_prime.ref)
+        call_results.add_result(res_var.ref())
+        call_results.add_result(res_var.var_prime.ref())
         fields = []
         for field in target_class.get_all_fields():
             fields.append(field.sil_field)
             fields.append(field.field_prime.sil_field)
-        new_stmt = self.viper.NewStmt(res_var.ref, fields,
+        new_stmt = self.viper.NewStmt(res_var.ref(), fields,
                                       self.no_position(ctx),
                                       info)
         result_has_type = self.var_concrete_type_check(res_var.name,
-                                                       target_class, ctx)
+                                                       target_class,
+                                                       self.no_position(ctx),
+                                                       ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),
                                         info)
         # Set the prime version to be equal to the newly created var.
-        assign = self.viper.LocalVarAssign(res_var.var_prime.ref, res_var.ref,
+        assign = self.viper.LocalVarAssign(res_var.var_prime.ref(),
+                                           res_var.ref(),
                                            self.no_position(ctx),
                                            info)
-        args = [res_var.ref, res_var.var_prime.ref] + args
+        args = [res_var.ref(), res_var.var_prime.ref()] + args
         stmts = [new_stmt, type_inhale, assign]
         target = target_class.get_method('__init__')
         if target:
@@ -96,7 +99,7 @@ class SIFCallTranslator(CallTranslator):
             if target.declared_exceptions:
                 raise UnsupportedException(node, "Exceptions not supported.")
             # Add timeLevel to targets.
-            targets.append(ctx.current_function.new_tl_var.ref)
+            targets.append(ctx.current_function.new_tl_var.ref())
             init = self.viper.MethodCall(target.sil_name, args, targets,
                                          self.to_position(node, ctx),
                                          info)
@@ -158,14 +161,14 @@ class SIFCallTranslator(CallTranslator):
         if target.type is not None:
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
-            targets.append(result_var.ref)
-            call_results.add_result(result_var.ref)
-            targets.append(result_var.var_prime.ref)
-            call_results.add_result(result_var.var_prime.ref)
+            targets.append(result_var.ref())
+            call_results.add_result(result_var.ref())
+            targets.append(result_var.var_prime.ref())
+            call_results.add_result(result_var.var_prime.ref())
         if target.declared_exceptions:
             raise UnsupportedException(node)
         # Add timeLevel to targets.
-        targets.append(ctx.current_function.new_tl_var.ref)
+        targets.append(ctx.current_function.new_tl_var.ref())
 
         call = self.viper.MethodCall(target.sil_name, args, targets,
                                      position, self.no_info(ctx))
@@ -204,11 +207,11 @@ class SIFCallTranslator(CallTranslator):
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
         type_expr = self.type_factory.type_comp(recv, recv_p, ctx)
-        rhs = self.viper.Or(ctx.current_function.new_tl_var.ref,
+        rhs = self.viper.Or(ctx.current_function.new_tl_var.ref(),
                             type_expr,
                             self.no_position(ctx),
                             info)
-        assign = self.viper.LocalVarAssign(ctx.current_function.new_tl_var.ref,
+        assign = self.viper.LocalVarAssign(ctx.current_function.new_tl_var.ref(),
                                            rhs,
                                            self.no_position(ctx),
                                            info)

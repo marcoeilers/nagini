@@ -597,6 +597,7 @@ class TypeDomainFactory:
         return self.subtype_func('extends_', ctx)
 
     def type_check(self, lhs: 'Expr', type: 'PythonType',
+                   position: 'silver.ast.Position',
                    ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
@@ -621,7 +622,7 @@ class TypeDomainFactory:
                                           [type_func, supertype_func], {},
                                           self.viper.Bool,
                                           [var_sub, var_super],
-                                          self.no_position(ctx),
+                                          position,
                                           self.no_info(ctx),
                                           self.type_domain)
         return result
@@ -663,6 +664,7 @@ class TypeDomainFactory:
         return eq
 
     def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
+                            position: 'silver.ast.Position',
                             ctx: Context) -> Expr:
         """
         Creates an expression checking if the given lhs expression
@@ -678,7 +680,7 @@ class TypeDomainFactory:
                                                   self.no_position(ctx),
                                                   self.no_info(ctx),
                                                   self.type_domain)
-        cmp = self.viper.EqCmp(type_func, supertype_func, self.no_position(ctx),
+        cmp = self.viper.EqCmp(type_func, supertype_func, position,
                                self.no_info(ctx))
         return cmp
 
