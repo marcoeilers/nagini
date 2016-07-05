@@ -1,3 +1,4 @@
+#:: IgnoreFile(/py2viper/issue/35/)
 from py2viper_contracts.contracts import Requires, Predicate
 from py2viper_contracts.io import *
 

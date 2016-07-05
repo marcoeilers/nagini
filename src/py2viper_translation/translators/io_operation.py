@@ -340,11 +340,11 @@ class IOOperationTranslator(CommonTranslator):
                 name, args, position, info, typ, formal_args)
 
             if var.is_defined():
-                comparison = self.viper.EqCmp(getter, var.ref,
+                comparison = self.viper.EqCmp(getter, var.ref(),
                                               position, info)
                 equations.append(comparison)
             else:
-                var.ref = getter
+                var.set_ref(getter)
         return equations
 
     def translate_io_operation_call(self, node: ast.Call,
@@ -419,4 +419,4 @@ class IOOperationTranslator(CommonTranslator):
             _raise_invalid_existential_var(
                 'defining_expression_type_mismatch', node)
 
-        var.ref = right
+        var.set_ref(right)

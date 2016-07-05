@@ -33,9 +33,9 @@ class SIFContractTranslator(ContractTranslator):
                     info, ctx)
         else:
             if not ctx.use_prime:
-                result = ctx.current_function.result.ref
+                result = ctx.current_function.result.ref()
             else:
-                result = ctx.current_function.result.var_prime.ref
+                result = ctx.current_function.result.var_prime.ref()
 
         return [], result
 

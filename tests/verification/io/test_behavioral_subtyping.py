@@ -1,4 +1,10 @@
-from py2viper_contracts.contracts import Requires, Ensures, Result, Import
+from py2viper_contracts.contracts import (
+    Acc,
+    Ensures,
+    Import,
+    Requires,
+    Result,
+)
 from py2viper_contracts.io import *
 from typing import Tuple
 
@@ -47,6 +53,7 @@ class SuperA:
                 write_int_io(t1, self.int_field, t2)
             ),
             Ensures(
+                #:: ExpectedOutput(postcondition.violated:insufficient.permission,SuperA__write_int1)
                 token(t2) and
                 t2 == Result()
             ),
@@ -193,7 +200,7 @@ class SubA2(SuperA):
     # dependent. If overriding method takes all permission, then
     # information provided in the precondition about getter equality is
     # havoced and verifier fails to prove equality.
-    #:: ExpectedOutput(postcondition.violated:insufficient.permission)
+    #:: Label(SuperA__write_int1)
     def write_int1(self, t1: Place, value: int) -> Place:
         IOExists1(Place)(
             lambda t2: (

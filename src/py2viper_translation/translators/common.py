@@ -55,15 +55,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
-    def to_position(self, node: ast.AST, ctx: Context) -> 'silver.ast.Position':
+    def to_position(self, node: ast.AST, ctx: Context,
+                    error_string: str=None) -> 'silver.ast.Position':
         """
-        Extracts the position from a node.
-        If ctx.position is set to override the actual position, returns that.
+        Extracts the position from a node, assigns an ID to the node and stores
+        the node and the position in the context for it.
         """
-        if ctx.position is not None:
-            return ctx.position
-        else:
-            return self.viper.to_position(node)
+        return self.viper.to_position(node, ctx.position, error_string)
 
     def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.to_position(None, ctx)
@@ -171,27 +169,29 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             err_var = tries[0].get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
-            return err_var.ref
+            return err_var.ref()
         if ctx.actual_function.declared_exceptions:
-            return ctx.error_var.ref
+            return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',
                 ctx.program.classes['Exception'], self.translator)
-            return new_var.ref
+            return new_var.ref()
 
     def var_type_check(self, name: str, type: PythonType,
+                       position: 'silver.ast.Position',
                        ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Creates an expression checking if the var with the given name
         is of the given type.
         """
         if name in ctx.var_aliases:
-            obj_var = ctx.var_aliases[name].ref
+            obj_var = ctx.var_aliases[name].ref()
         else:
             obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                           self.no_position(ctx),
                                           self.no_info(ctx))
-        return self.type_check(obj_var, type, ctx, inhale_exhale=inhale_exhale)
+        return self.type_check(obj_var, type, position, ctx,
+                               inhale_exhale=inhale_exhale)
 
     def create_predicate_access(self, pred_name: str, args: List, perm: Expr,
                                 node: ast.AST, ctx: Context) -> Expr:

@@ -84,55 +84,55 @@ class ExpressionTranslator(CommonTranslator):
         dict_class = ctx.program.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
-                                           [], [res_var.ref], node, ctx)
+                                           [], [res_var.ref()], node, ctx)
         stmt = [constr_call]
         for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key, ctx)
             key_type = self.get_type(key, ctx)
             val_stmt, val_val = self.translate_expr(val, ctx)
             val_type = self.get_type(val, ctx)
-            args = [res_var.ref, key_val, val_val]
+            args = [res_var.ref(), key_val, val_val]
             arg_types = [None, key_type, val_type]
             append_call = self.get_method_call(dict_class, '__setitem__', args,
                                                arg_types, [], node, ctx)
             stmt += key_stmt + val_stmt + [append_call]
-        return stmt, res_var.ref
+        return stmt, res_var.ref(node, ctx)
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
         set_class = ctx.program.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable(SET_TYPE,
             set_class, self.translator)
         constr_call = self.get_method_call(set_class, '__init__', [], [],
-                                           [res_var.ref], node, ctx)
+                                           [res_var.ref()], node, ctx)
         stmt = [constr_call]
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
             el_type = self.get_type(el, ctx)
-            args = [res_var.ref, el_val]
+            args = [res_var.ref(), el_val]
             arg_types = [None, el_type]
             append_call = self.get_method_call(set_class, 'add', args,
                                                arg_types, [], node, ctx)
             stmt += el_stmt + [append_call]
-        return stmt, res_var.ref
+        return stmt, res_var.ref(node, ctx)
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
         list_class = ctx.program.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
-        targets = [res_var.ref]
+        targets = [res_var.ref()]
 
         constr_call = self.get_method_call(list_class, '__init__', [], [],
-                                           [res_var.ref], node, ctx)
+                                           [res_var.ref()], node, ctx)
         stmt = [constr_call]
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
             el_type = self.get_type(element, ctx)
-            args = [res_var.ref, el]
+            args = [res_var.ref(), el]
             arg_types = [None, el_type]
             append_call = self.get_method_call(list_class, 'append', args,
                                                arg_types, [], node, ctx)
             stmt += el_stmt + [append_call]
-        return stmt, res_var.ref
+        return stmt, res_var.ref(node, ctx)
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
         length = len(node.s)
@@ -190,10 +190,10 @@ class ExpressionTranslator(CommonTranslator):
         the caller function.
         """
         if isinstance(var, PythonVar):
-            var = var.ref
+            var = var.ref()
         cases = []
         position = self.to_position(call, ctx)
-        err_var = ctx.error_var.ref
+        err_var = ctx.error_var.ref()
         relevant_try_blocks = get_surrounding_try_blocks(try_blocks, call)
         goto_finally = self._create_goto_finally(relevant_try_blocks, ctx)
         if goto_finally:
@@ -209,14 +209,17 @@ class ExpressionTranslator(CommonTranslator):
                                                        position,
                                                        self.no_info(ctx))
             else:
+                error_string = '"method raises no exceptions"'
+                error_pos = self.to_position(call, ctx, error_string)
                 uncaught_option = self.viper.Exhale(
-                    self.viper.FalseLit(position, self.no_info(ctx)), position,
+                    self.viper.FalseLit(error_pos, self.no_info(ctx)), error_pos,
                     self.no_info(ctx))
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
-                condition = self.type_check(var, handler.exception, ctx,
-                                            inhale_exhale=False)
+                condition = self.type_check(var, handler.exception,
+                                            self.to_position(handler.node, ctx),
+                                            ctx, inhale_exhale=False)
                 label_name = ctx.get_label_name(handler.name)
                 goto = self.viper.Goto(label_name,
                                        self.to_position(handler.node, ctx),
@@ -265,7 +268,7 @@ class ExpressionTranslator(CommonTranslator):
                     var_next = ctx.var_aliases[var_next.sil_name]
                 number_two = self.viper.IntLit(2, self.no_position(ctx),
                                                self.no_info(ctx))
-                next_assign = self.viper.LocalVarAssign(var_next.ref,
+                next_assign = self.viper.LocalVarAssign(var_next.ref(),
                                                         number_two,
                                                         self.no_position(ctx),
                                                         self.no_info(ctx))
@@ -310,14 +313,14 @@ class ExpressionTranslator(CommonTranslator):
             return [], func_app
         else:
             if node.id in ctx.var_aliases:
-                return [], ctx.var_aliases[node.id].ref
+                return [], ctx.var_aliases[node.id].ref(node, ctx)
             else:
                 var = ctx.current_function.get_variable(node.id)
                 if (isinstance(var, PythonIOExistentialVar) and
                         not var.is_defined()):
                     raise InvalidProgramException(
                         node, 'io_existential_var.use_of_undefined')
-                return [], var.ref
+                return [], var.ref(node, ctx)
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
@@ -549,11 +552,13 @@ class ExpressionTranslator(CommonTranslator):
                                        self.translate_type(var.type, ctx),
                                        self.no_position(ctx), self.no_info(ctx))
 
-    def translate_pythonvar_ref(self, var: PythonVar, ctx: Context) -> Expr:
+    def translate_pythonvar_ref(self, var: PythonVar, node: ast.AST,
+                                ctx: Context) -> Expr:
         """
         Creates a variable reference for the given PythonVar.
         To be called during the processing phase by the Analyzer.
         """
         return self.viper.LocalVar(var.sil_name,
                                    self.translate_type(var.type, ctx),
-                                   self.no_position(ctx), self.no_info(ctx))
+                                   self.to_position(node, ctx),
+                                   self.no_info(ctx))

@@ -7,11 +7,14 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     INT_TYPE,
+    INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
+    VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
+from py2viper_translation.lib.util import InvalidProgramException
 from typing import List, Optional, Set
 
 
@@ -58,7 +61,7 @@ class PythonScope:
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__([], None)
+        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -122,7 +125,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [], superscope)
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -131,6 +134,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+        self.defined = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -342,7 +346,8 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [RESULT_NAME, ERROR_NAME, END_LABEL],
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES +
+                             [RESULT_NAME, ERROR_NAME, END_LABEL],
                              superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
@@ -723,7 +728,9 @@ class PythonVar(PythonVarBase):
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
         self.decl = None
-        self.ref = None
+        self._ref = None
+        self._translator = None
+        self.value = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -731,9 +738,22 @@ class PythonVar(PythonVarBase):
         this Python variable.
         """
         super().process(sil_name, translator)
+        self._translator = translator
         prog = self.type.get_program()
         self.decl = translator.translate_pythonvar_decl(self, prog)
-        self.ref = translator.translate_pythonvar_ref(self, prog)
+        self._ref = translator.translate_pythonvar_ref(self, prog, None, None)
+
+    def ref(self, node: ast.AST=None,
+            ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
+        """
+        Creates a reference to this variable. If no arguments are supplied,
+        the reference will have no position. Otherwise, it will have the
+        position of the given node in the given context.
+        """
+        if not node:
+            return self._ref
+        prog = self.type.get_program()
+        return self._translator.translate_pythonvar_ref(self, prog, node, ctx)
 
 
 class PythonGlobalVar(PythonVarBase):
@@ -760,21 +780,21 @@ class PythonIOExistentialVar(PythonVarBase):
         """
         return not self._ref is None
 
-    @property
-    def ref(self) -> Expr:
+    def ref(self, node: ast.AST = None, ctx: 'Context' = None) -> Expr:
         """
         Returns a Silver expression node that can be used to refer to
         this variable.
         """
+        # TODO (Vytautas): Update to new API.
         assert not self._ref is None
         return self._ref
 
-    @ref.setter
-    def ref(self, ref: Expr) -> None:
+    def set_ref(self, ref: Expr) -> None:
         """
         Sets a Silver expression node that can be used to refer to this
         variable.
         """
+        # TODO (Vytautas): Update to new API.
         assert self._ref is None
         self._ref = ref
 
