@@ -297,7 +297,6 @@ class Analyzer(ast.NodeVisitor):
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = 'lambda' + str(node.lineno)
-        # if hasattr(node, 'col_offset'):
         name += '_' + str(node.col_offset)
         self.current_scopes.append(name)
         lambda_var_names = {}
