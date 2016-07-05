@@ -28,7 +28,7 @@ from py2viper_translation.lib.util import (
     is_io_existential,
     UnsupportedException,
 )
-from typing import Dict, Set
+from typing import Dict, Set, Union
 
 
 logger = logging.getLogger('py2viper_translation.analyzer')
@@ -60,6 +60,25 @@ class Analyzer(ast.NodeVisitor):
         self._lambda_stack = []             # Keeps track how deep we
                                             # are in a lambda
                                             # expression.
+
+    def define_new(self, container: Union[PythonProgram, PythonClass],
+                   name: str, node: ast.AST) -> None:
+        """
+        Called when a new top level element named ``name`` is created in
+        ``container``. Checks there is any existing element with the
+        same name, and raises an exception in that case.
+        """
+        if isinstance(container, PythonProgram):
+            if name in container.classes:
+                cls = container.classes[name]
+                if cls.defined:
+                    raise InvalidProgramException(node, 'multiple.definitions')
+            if name in container.global_vars:
+                raise InvalidProgramException(node, 'multiple.definitions')
+        if (name in container.functions or
+                    name in container.methods or
+                    name in container.predicates):
+            raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -112,6 +131,7 @@ class Analyzer(ast.NodeVisitor):
         for class_name in interface:
             if_cls = interface[class_name]
             cls = self.get_class(class_name, interface=True)
+            cls.defined = True
             if 'extends' in if_cls:
                 cls.superclass = self.get_class(if_cls['extends'])
             for method_name in if_cls.get('methods', []):
@@ -141,7 +161,21 @@ class Analyzer(ast.NodeVisitor):
             cls.methods[method_name] = method
 
     def visit_module(self, module: str) -> None:
-        self.visit_default(self.asts[module])
+        self.visit(self.asts[module], None)
+
+    def visit_Module(self, node: ast.Module) -> None:
+        # Top level elements may only be imports, classes, functions, global
+        # var assignments or Import() calls.
+        for stmt in node.body:
+            if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
+                                 ast.ImportFrom, ast.Assign)):
+                continue
+            if get_func_name(stmt) == 'Import':
+                continue
+            if get_func_name(stmt) in CONTRACT_WRAPPER_FUNCS:
+                raise InvalidProgramException(stmt, 'invalid.contract.position')
+            raise InvalidProgramException(stmt, 'global.statement')
+        self.visit_default(node)
 
     def visit_default(self, node: ast.AST) -> None:
         for field in node._fields:
@@ -174,7 +208,9 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_class is None
         assert self.current_function is None
         name = node.name
+        self.define_new(self.program, name, node)
         cls = self.get_class(name)
+        cls.defined = True
         cls.node = node
         if len(node.bases) > 1:
             raise UnsupportedException(node)
@@ -199,6 +235,7 @@ class Analyzer(ast.NodeVisitor):
             scope_container = self.program
         else:
             scope_container = self.current_class
+        self.define_new(scope_container, name, node)
         if self.is_predicate(node):
             container = scope_container.predicates
         elif self.is_pure(node):
@@ -260,6 +297,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = 'lambda' + str(node.lineno)
+        # if hasattr(node, 'col_offset'):
+        name += '_' + str(node.col_offset)
         self.current_scopes.append(name)
         lambda_var_names = {}
         for arg in node.args.args:
@@ -305,7 +344,7 @@ class Analyzer(ast.NodeVisitor):
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
             if not self.current_function or self.current_function.predicate:
-                raise InvalidProgramException(node, 'contract.outside.function')
+                raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])
             elif node.func.id == 'Ensures':
@@ -362,6 +401,7 @@ class Analyzer(ast.NodeVisitor):
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
+                    self.define_new(self.program, node.id, node)
                     var = self.node_factory.create_python_global_var(
                         node.id, node, cls)
                     assign = node._parent
@@ -477,8 +517,9 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, alts = self.types.get_type(context, node.id)
-            if alts and node.lineno in alts:
-                return self.convert_type(alts[node.lineno])
+            key = (node.lineno, node.col_offset)
+            if alts and key in alts:
+                return self.convert_type(alts[key])
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)

@@ -1,3 +1,4 @@
+#:: IgnoreFile(/py2viper/issue/36/)
 """
 This test illustrates the problem of using heap dependent IO operations
 in non-deterministic choice.

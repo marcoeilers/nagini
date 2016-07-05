@@ -70,13 +70,17 @@ class TypeTranslator(CommonTranslator):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
             else:
-                # var aliases should never change the type of a variable,
-                # so we'll ignore those here.
-                # TODO: var_aliases and alt_types don't really go together,
-                # do they?
+                # var aliases should never change the type of a variable, but
+                # we might still get alt_type information from them that we
+                # don't get from the normal variable in case where there *is*
+                # no normal variable, lambda arguments.
                 var = ctx.actual_function.get_variable(node.id)
-                if node.lineno in var.alt_types:
-                    return var.alt_types[node.lineno]
+                if not var and node.id in ctx.var_aliases:
+                    var = ctx.var_aliases[node.id]
+                col = node.col_offset if hasattr(node, 'col_offset') else None
+                key = (node.lineno, col)
+                if key in var.alt_types:
+                    return var.alt_types[key]
                 else:
                     return var.type
         elif isinstance(node, ast.Num):
@@ -298,6 +302,7 @@ class TypeTranslator(CommonTranslator):
         return result
 
     def type_check(self, lhs: Expr, type: PythonType,
+                   position: 'silver.ast.Position',
                    ctx: Context, inhale_exhale: bool=True) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
@@ -306,9 +311,9 @@ class TypeTranslator(CommonTranslator):
         """
         if type.name in PRIMITIVES:
             boxed = ctx.program.classes['__boxed_' + type.name]
-            result = self.type_factory.type_check(lhs, boxed, ctx)
+            result = self.type_factory.type_check(lhs, boxed, position, ctx)
         else:
-            result = self.type_factory.type_check(lhs, type, ctx)
+            result = self.type_factory.type_check(lhs, type, position, ctx)
 
         if isinstance(type, GenericType):
             args = self.set_type_args(lhs, type, [], ctx)
@@ -392,18 +397,18 @@ class TypeTranslator(CommonTranslator):
             var_decl = index_var.decl
             zero = self.viper.IntLit(0, self.no_position(ctx),
                                      self.no_info(ctx))
-            index_positive = self.viper.GeCmp(index_var.ref, zero,
+            index_positive = self.viper.GeCmp(index_var.ref(), zero,
                                               self.no_position(ctx),
                                               self.no_info(ctx))
             length = self.get_function_call(type, '__len__', [lhs],
                                             [None], None, ctx)
-            index_less_length = self.viper.LtCmp(index_var.ref, length,
+            index_less_length = self.viper.LtCmp(index_var.ref(), length,
                                                  self.no_position(ctx),
                                                  self.no_info(ctx))
             impl_lhs = self.viper.And(index_positive, index_less_length,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-            args = [lhs, index_var.ref]
+            args = [lhs, index_var.ref()]
             arg_types = [None, None]
             item_call = self.get_function_call(type, '__getitem__',
                                                args,

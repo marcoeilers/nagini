@@ -1,3 +1,5 @@
+import ast
+
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import PythonProgram
 from py2viper_translation.lib.typeinfo import TypeInfo
@@ -86,8 +88,10 @@ class SIFTranslator(Translator):
         return self.expr_translator.translate_pythonvar_decl(var, ctx)
 
     def translate_pythonvar_ref(self, var: SIFPythonVar,
-                                program: PythonProgram) -> Expr:
-        # we need a context object here
-        ctx = SIFContext()
-        ctx.program = program
-        return self.expr_translator.translate_pythonvar_ref(var, ctx)
+                                program: PythonProgram, node: ast.AST,
+                                ctx: 'Context') -> Expr:
+        if not ctx:
+            # we need a context object here
+            ctx = SIFContext()
+            ctx.program = program
+        return self.expr_translator.translate_pythonvar_ref(var, node, ctx)

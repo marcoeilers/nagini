@@ -1,3 +1,4 @@
+#:: IgnoreFile(/py2viper/issue/36/)
 """
 Tests if IO operation can be used before its definition.
 """
