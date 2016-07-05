@@ -81,6 +81,10 @@ class AnnotatedTests():
         return result
 
     def token_to_expected(self, content, token):
+        if content.startswith('type.error:'):
+            # Type errors need special treatment because they contain
+            # error text, not ids.
+            return (token.start, (content, ()))
         split = content.split(',')
         id = split[0]
         vias = split[1:]
