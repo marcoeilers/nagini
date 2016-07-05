@@ -170,6 +170,10 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
                                  ast.ImportFrom, ast.Assign)):
                 continue
+            if (isinstance(stmt, ast.Expr) and
+                    isinstance(stmt.value, ast.Str)):
+                # A docstring.
+                continue
             if get_func_name(stmt) == 'Import':
                 continue
             if get_func_name(stmt) in CONTRACT_WRAPPER_FUNCS:
