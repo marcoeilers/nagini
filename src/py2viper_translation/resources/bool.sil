@@ -1,0 +1,56 @@
+function object___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function NoneType___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function bool___bool__(self: Bool) : Bool
+    ensures result == self
+
+function int___bool__(self: Int) : Bool
+    ensures result == (self != 0)
+
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function __boxed_int(): PyType
+    unique function __boxed_bool(): PyType
+    unique function range(): PyType
+}
+
+function int___box__(int: Int): Ref
+    ensures __boxed_int___unbox__(result) == int
+    ensures forall other: Int :: {int___box__(other)} ((int___box__(other) == result) <==> (other == int))
+    ensures typeof(result) == __boxed_int()
+
+function __boxed_int___unbox__(box: Ref): Int
+    ensures int___box__(result) == box
+
+function bool___box__(bool: Bool): Ref
+    ensures __boxed_bool___unbox__(result) == bool
+    ensures typeof(result) == __boxed_bool()
+
+function __boxed_bool___unbox__(box: Ref): Bool
+    ensures bool___box__(result) == box
+
+function range___create__(start: Int, len: Int): Ref
+    requires len >= 0
+    ensures range___len__(result) == len
+    ensures typeof(result) == range()
+    ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == int___box__(start + i)))
+    ensures forall i: Int :: {range___contains__(result, int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, int___box__(i))))
+
+function range___len__(self: Ref): Int
+    ensures result >= 0
+
+function range___getitem__(self: Ref, index: Int): Ref
+    requires index >= 0
+    requires index < range___len__(self)
+
+function range___contains__(self: Ref, item: Ref): Bool
+
+function range___sil_seq__(self: Ref) : Seq[Ref]
+    ensures |result| == range___len__(self)
+    ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
+
+
