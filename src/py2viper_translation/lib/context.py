@@ -1,4 +1,5 @@
 from py2viper_translation.lib.constants import ERROR_NAME, RESULT_NAME
+from py2viper_translation.lib.io_context import IOOpenContext
 from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
 from typing import List
 
@@ -21,6 +22,7 @@ class Context:
         self.ignore_family_folds = False
         self.added_handlers = []
         self.loop_iterators = {}
+        self.io_open_context = IOOpenContext()
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []
