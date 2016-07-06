@@ -531,6 +531,8 @@ class PythonIOOperation(PythonNode, PythonScope):
         self._outputs = []
         self._terminates = None
         self._termination_measure = None
+        self._body = None
+        self._io_existentials = None
 
     def _process_var_list(self, var_list: List['PythonVar'],
                           translator: 'Translator') -> None:
@@ -576,7 +578,7 @@ class PythonIOOperation(PythonNode, PythonScope):
 
     def set_terminates(self, expression: ast.AST) -> bool:
         """
-        Sets the property if it is not already set and returns ``True``.
+        Set the property if it is not already set and return ``True``.
         """
         if self._terminates is None:
             self._terminates = expression
@@ -586,7 +588,7 @@ class PythonIOOperation(PythonNode, PythonScope):
 
     def set_termination_measure(self, expression: ast.AST) -> bool:
         """
-        Sets the property if it is not already set and returns ``True``.
+        Set the property if it is not already set and return ``True``.
         """
         if self._termination_measure is None:
             self._termination_measure = expression
@@ -594,16 +596,59 @@ class PythonIOOperation(PythonNode, PythonScope):
         else:
             return False
 
+    def is_basic(self) -> bool:
+        """
+        Is this IO operation basic?
+        """
+        return self._body is None
+
+    def set_body(self, expression: ast.AST) -> bool:
+        """
+        Set the body if it is not already set and return ``True``.
+        """
+        if self._body is None:
+            self._body = expression
+            return True
+        else:
+            return False
+
+    def get_body(self) -> ast.AST:
+        """
+        Return IO operation body.
+        """
+        assert self._body is not None
+        return self._body
+
+    def set_io_existentials(
+            self,
+            io_existentials: List['PythonVarCreator']) -> bool:
+        """
+        Set io existentials list if not already set and return
+        ``True``.
+        """
+        if self._io_existentials is None:
+            self._io_existentials = io_existentials
+            return True
+        else:
+            return False
+
+    def get_io_existentials(self) -> List['PythonVarCreator']:
+        """
+        Get IO existentials.
+        """
+        assert self._io_existentials is not None
+        return self._io_existentials
+
     def get_parameters(self) -> List['PythonVar']:
         """
-        Returns a list of parameters that uniquely identify IO operation
+        Return a list of parameters that uniquely identify IO operation
         instance.
         """
         return self._preset + self._inputs
 
     def get_results(self) -> List['PythonVar']:
         """
-        Returns a list of results for this IO operation.
+        Return a list of results for this IO operation.
         """
         return self._outputs + self._postset
 
@@ -786,7 +831,7 @@ class PythonIOExistentialVar(PythonVarBase):
         this variable.
         """
         # TODO (Vytautas): Update to new API.
-        assert not self._ref is None
+        assert not self._ref is None, self.name
         return self._ref
 
     def set_ref(self, ref: Expr) -> None:
@@ -797,6 +842,28 @@ class PythonIOExistentialVar(PythonVarBase):
         # TODO (Vytautas): Update to new API.
         assert self._ref is None
         self._ref = ref
+
+
+class PythonVarCreator:
+    """
+    A factory for Python variable. It is used instead of a concrete
+    variable when the same Python variable can be translated into
+    multiple silver variables. For example, when opening a non-basic IO
+    operation.
+    """
+
+    def __init__(self, name: str, node: ast.AST,
+                 type: PythonClass) -> None:
+        self._name = name
+        self._node = node
+        self._type = type
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def create_variable_instance(self) -> PythonVar:
+        return PythonVar(self._name, self._node, self._type)
 
 
 class PythonField(PythonNode):
@@ -862,6 +929,11 @@ class ProgramNodeFactory:
             self, name: str, node: ast.AST,
             type_: PythonClass) -> PythonIOExistentialVar:
         return PythonIOExistentialVar(name, node, type_)
+
+    def create_python_var_creator(
+            self, name: str, node: ast.AST,
+            type_: PythonClass) -> PythonIOExistentialVar:
+        return PythonVarCreator(name, node, type_)
 
     def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
                              superscope: PythonScope,
