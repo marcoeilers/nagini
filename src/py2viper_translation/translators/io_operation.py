@@ -134,7 +134,6 @@ in fields should not be too common in practise:
     1.  Does wrapping getters in ``old`` in postcondition solve the
         issue of having to provide permissions to fields in
         postcondition?
-
 """
 
 
@@ -209,6 +208,18 @@ def _is_top_level_assertion(node: ast.expr) -> bool:
     return False
 
 
+def _get_openned_operation(
+        node: ast.Call, ctx: Context) -> PythonIOOperation:
+    """Get the operation that is being opened."""
+    if (len(node.args) == 1 and
+            isinstance(node.args[0], ast.Call) and
+            isinstance(node.args[0].func, ast.Name)):
+        name = node.args[0].func.id
+        if name in ctx.program.io_operations:
+            return ctx.program.io_operations[name]
+    _raise_invalid_operation_use('open_non_io_operation', node)
+
+
 class IOOperationTranslator(CommonTranslator):
     """Class responsible for translating IO operations."""
 
@@ -259,12 +270,14 @@ class IOOperationTranslator(CommonTranslator):
         """
         func_name = get_func_name(node)
         if func_name == 'token':
-            return self.translate_token(node, ctx)
+            return self._translate_token(node, ctx)
+        if func_name == 'Open':
+            return self._translate_open(node, ctx)
         else:
             raise UnsupportedException(node,
                                        'Unsupported contract function.')
 
-    def translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translate a call to IO contract function ``token``.
 
@@ -284,6 +297,114 @@ class IOOperationTranslator(CommonTranslator):
         return [], self.create_predicate_access('token', [place_expr], perm,
                                                 node, ctx)
 
+    def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate ``Open(io_operation)``.
+
+        .. todo::
+
+            Refactor this monster into method template.
+        """
+        assert ctx.actual_function
+        io_ctx = ctx.io_open_context
+        io_ctx.start_io_operation_open()
+
+        operation = _get_openned_operation(node, ctx)
+        if operation.is_basic():
+            _raise_invalid_operation_use('open_basic_io_operation', node)
+
+        statements = []
+
+        py_args = cast(ast.Call, node.args[0]).args
+        if len(py_args) != len(operation.get_parameters()):
+            _raise_invalid_operation_use('result_used_argument', node)
+        sil_args = self._translate_args(py_args, ctx)
+
+        perm = self._construct_full_perm(node, ctx)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        # Exhale.
+        predicate = self.create_predicate_access(
+            operation.sil_name, sil_args, perm, node, ctx)
+        statements.append(self.viper.Exhale(predicate, position, info))
+
+        # Inhale.
+
+        body = operation.get_body()
+
+        open_aliases = []
+
+        # Define fresh local variables for stuff mentioned in IOExists.
+        # Make sure that they have fresh silver names. Add them to the
+        # context and variable aliases.
+        io_existential_vars = dict(
+            (creator.name, creator.create_variable_instance())
+            for creator in operation.get_io_existentials()
+        )
+
+        for name, var in io_existential_vars.items():
+            sil_name = ctx.actual_function.get_fresh_name(name)
+            var.process(sil_name, self.translator)
+            ctx.actual_function.locals[sil_name] = var
+            io_ctx.add_variable(name, var)
+            ctx.set_alias(name, var)
+            open_aliases.append(name)
+
+        # Set up aliases for input. Here we use existential variables
+        # during translation that are later replaced by silver
+        # expressions that were provided as arguments.
+        for parameter, py_arg, sil_arg in zip(
+                operation.get_parameters(), py_args, sil_args):
+            var_type = self.get_type(py_arg, ctx)
+            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
+            var.set_ref(sil_arg)
+            ctx.set_alias(parameter.name, var)
+            open_aliases.append(parameter.name)
+
+        # Set up aliases for output. The same idea as with IOExists
+        # stuff, just we immediately provide their definitions because
+        # we know them.
+        for result in operation.get_results():
+            name = result.name
+            var = PythonVar(name, result.node, result.type)
+            sil_name = ctx.actual_function.get_fresh_name(name)
+            var.process(sil_name, self.translator)
+            ctx.actual_function.locals[sil_name] = var
+            io_ctx.add_variable(name, var)
+            getter = self._create_result_getter(
+                sil_args, operation, result, ctx, position, info)
+            io_ctx.define_variable(name, getter)
+            ctx.set_alias(name, var)
+            open_aliases.append(name)
+
+        # Translate body. During translation defining getters are stored
+        # in the context and variables are replaced by variables created
+        # earlier. Note that existentials defined by
+        # ``existential == expression`` are not allowed because both use
+        # cases (fields and Result()) are forbidden inside IO
+        # operations.
+        body_statements, body_expression = self.translate_expr(
+            body, ctx, expression=True)
+        assert not body_statements
+
+        # Remove all created aliases.
+        for alias in open_aliases:
+            ctx.remove_alias(alias)
+
+        # Emit equalities among created variables and their
+        # corresponding defining getters.
+        for var, definition in io_ctx.get_ordered_variable_defs():
+            assignment = self.viper.LocalVarAssign(var.ref(), definition,
+                                                   position, info)
+            statements.append(assignment)
+
+        # Emit inhale of the translated body.
+        statements.append(self.viper.Inhale(body_expression, position, info))
+
+        io_ctx.stop_io_operation_open()
+
+        return (statements, None)
+
     def _translate_args(
             self, args: List[ast.expr],
             ctx: Context) -> List[Expr]:
@@ -294,6 +415,20 @@ class IOOperationTranslator(CommonTranslator):
             assert not arg_stmt
             arg_exprs.append(arg_expr)
         return arg_exprs
+
+    def _create_result_getter(
+            self, args: List[ast.Expr], operation, result, ctx,
+            position, info):
+        """Construct a getter for an IO operation result."""
+        name = _construct_getter_name(operation, result)
+        typ = self.translate_type(result.type, ctx)
+        formal_args = [
+            arg.decl
+            for arg in operation.get_parameters()
+        ]
+        getter = self.viper.FuncApp(
+            name, args, position, info, typ, formal_args)
+        return getter
 
     def _translate_results(
             self, args: List[ast.Expr],
@@ -313,6 +448,7 @@ class IOOperationTranslator(CommonTranslator):
         if len(result_instances) != len(results):
             _raise_invalid_operation_use('result_mismatch', node)
 
+        io_ctx = ctx.io_open_context
         equations = []
         for result, instance_expr in zip(results, result_instances):
             if not isinstance(instance_expr, ast.Name):
@@ -320,31 +456,38 @@ class IOOperationTranslator(CommonTranslator):
                     'not_variable_in_result_position', node)
             instance = cast(ast.Name, instance_expr)
             var_name = instance.id
-            if var_name not in ctx.actual_function.io_existential_vars:
+            if io_ctx.contains_variable(var_name):
+                var = io_ctx.get_variable(var_name)
+                assert isinstance(var, PythonVar)
+            elif var_name in ctx.actual_function.io_existential_vars:
+                var = ctx.actual_function.io_existential_vars[var_name]
+                assert isinstance(var, PythonIOExistentialVar)
+            else:
                 _raise_invalid_operation_use(
                     'variable_not_existential', node)
-            var = ctx.actual_function.io_existential_vars[var_name]
-            assert isinstance(var, PythonIOExistentialVar)
 
             if var.type != result.type:
                 _raise_invalid_existential_var(
                     'defining_expression_type_mismatch', node)
 
-            name = _construct_getter_name(operation, result)
-            typ = self.translate_type(result.type, ctx)
-            formal_args = [
-                arg.decl
-                for arg in operation.get_parameters()
-            ]
-            getter = self.viper.FuncApp(
-                name, args, position, info, typ, formal_args)
+            getter = self._create_result_getter(
+                args, operation, result, ctx, position, info)
 
-            if var.is_defined():
+            is_existential_def = (
+                isinstance(var, PythonIOExistentialVar) and
+                var.is_defined())
+            is_open_def = (
+                isinstance(var, PythonVar) and
+                io_ctx.is_variable_defined(var_name))
+            if is_existential_def or is_open_def:
                 comparison = self.viper.EqCmp(getter, var.ref(),
                                               position, info)
                 equations.append(comparison)
             else:
-                var.set_ref(getter)
+                if isinstance(var, PythonVar):
+                    io_ctx.define_variable(var_name, getter)
+                else:
+                    var.set_ref(getter)
         return equations
 
     def translate_io_operation_call(self, node: ast.Call,
