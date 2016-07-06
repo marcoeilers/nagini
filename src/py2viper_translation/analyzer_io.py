@@ -5,12 +5,13 @@ import ast
 
 from mypy.types import AnyType
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
-from typing import List
+from typing import cast, List
 
 import py2viper_translation     # pylint: disable=unused-import
 from py2viper_translation.lib import program_nodes as nodes
 from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
     InvalidProgramException,
     UnsupportedException,
 )
@@ -88,12 +89,16 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                     not default.func.id == 'Result'):           # type: ignore
                 self._raise_invalid_operation('default_argument')
 
-    def _typeof(self, node: ast.AST) -> nodes.PythonType:
+    def _typeof(self, node: ast.AST,
+                lambda_: ast.Lambda = None) -> nodes.PythonType:
         """Get the type of the given AST node."""
         assert isinstance(node, ast.arg)
-        typ, _ = self._parent.types.get_type(
-            [self._current_io_operation.name],
-            node.arg)
+        scopes = [self._current_io_operation.name]
+        if lambda_:
+            prefix = construct_lambda_prefix(
+                lambda_.lineno, lambda_.col_offset)
+            scopes.append(prefix)
+        typ, _ = self._parent.types.get_type(scopes, node.arg)
         return self._parent.convert_type(typ)
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
@@ -180,6 +185,34 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
         self._current_node = None
         self._current_io_operation = None
+
+    def visit_Return(self, node: ast.Return) -> None:   # pylint: disable=invalid-name
+        """Parse IO operation body.
+
+        IO operation body must be a single expression that is returned.
+        """
+        body = node.value
+
+        if (isinstance(body, ast.Call) and
+                isinstance(body.func, ast.Call) and
+                isinstance(body.func.func, ast.Name) and
+                body.func.func.id.startswith('IOExists')):
+            lambda_ = cast(ast.Lambda, body.args[0])
+            args = lambda_.args.args
+            io_existential_creators = [
+                self._node_factory.create_python_var_creator(
+                    arg.arg, arg, self._typeof(arg, lambda_))
+                for arg in args
+            ]
+            body = lambda_.body
+        else:
+            io_existential_creators = []
+        if not self._current_io_operation.set_body(body):
+            self._raise_invalid_operation(
+                'duplicate_body',
+                node)
+        assert self._current_io_operation.set_io_existentials(
+            io_existential_creators)
 
     def visit_Call(self, node: ast.Call) -> None:   # pylint: disable=invalid-name
         """Parse IO operation properties.
