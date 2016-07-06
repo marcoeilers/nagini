@@ -1,7 +1,8 @@
 CHECKED_TRANSLATOR_FILES:=\
 							src/py2viper_translation/analyzer_io.py \
 							src/py2viper_translation/translators/io_operation.py \
-							src/py2viper_translation/lib/preamble_constructor.py
+							src/py2viper_translation/lib/preamble_constructor.py \
+							src/py2viper_translation/lib/io_context.py
 CHECKED_CONTRACT_FILES:=\
 							deps/py2viper-contracts/src/py2viper_contracts/io.py
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)

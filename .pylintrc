@@ -174,7 +174,7 @@ expected-line-ending-format=LF
 spelling-dict=en_GB
 
 # List of comma separated words that should not be checked.
-spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–
+spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–,str
 
 # A path to a file that contains private dictionary; one word per line.
 spelling-private-dict-file=
@@ -225,7 +225,7 @@ bad-names=foo,bar,baz,toto,tutu,tata
 name-group=
 
 # Include a hint for the correct naming format with invalid-name
-include-naming-hint=no
+include-naming-hint=yes
 
 # Regular expression matching correct function names
 function-rgx=[a-z_][a-z0-9_]{2,30}$
