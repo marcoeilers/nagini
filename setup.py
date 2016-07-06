@@ -18,6 +18,7 @@ setup(
             'toposort',
             'jpype1',
             'astunparse',
+            'typed-ast',
             ],
         entry_points = {
              'console_scripts': [
