@@ -96,7 +96,6 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        print(prog)
         vresult = verifier.verify(prog)
         return vresult
     except JavaException as je:
