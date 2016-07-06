@@ -26,6 +26,6 @@ class SuperF:
 
 
 class SubF1(SuperF):
-    #:: ExpectedOutput(type.error:Argument 1 of "some_method" incompatible with supertype "SuperF");ExpectedOutput(type.error:Return type of "some_method" incompatible with supertype "SuperF")
+    #:: ExpectedOutput(type.error:Argument 1 of "some_method" incompatible with supertype "SuperF")|ExpectedOutput(type.error:Return type of "some_method" incompatible with supertype "SuperF")
     def some_method(self, b: int, a: SubSubA) -> int:
         return 16

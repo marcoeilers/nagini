@@ -75,8 +75,8 @@ class ProgramTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
-        assert ctx.position is None
-        ctx.position = self.viper.to_position(cls.node)
+        pos = self.viper.to_position(cls.node, ctx.position)
+        ctx.position.append(('inheritance', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         params = []
         results = []
@@ -85,7 +85,8 @@ class ProgramTranslator(CommonTranslator):
         if method.type:
             results.append(method.result.decl)
 
-        error_var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
+        error_var = PythonVar(ERROR_NAME, None,
+                              ctx.program.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
@@ -96,12 +97,12 @@ class ProgramTranslator(CommonTranslator):
                                            '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
-        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                     self.viper.NullLit(self.no_position(ctx),
                                                        self.no_info(ctx)),
                                     self.no_position(ctx), self.no_info(ctx))
         new_type = self.type_factory.concrete_type_check(
-            next(iter(method.args.values())).ref, cls, ctx)
+            next(iter(method.args.values())).ref(), cls, pos, ctx)
         pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
@@ -125,7 +126,7 @@ class ProgramTranslator(CommonTranslator):
         result = self.viper.Method(mname, params, results, pres, posts, locals,
                                    body, self.no_position(ctx),
                                    self.no_info(ctx))
-        ctx.position = None
+        ctx.position.pop()
         self.info = None
         return result
 
@@ -139,8 +140,8 @@ class ProgramTranslator(CommonTranslator):
         assert not method.pure
         old_function = ctx.current_function
         ctx.current_function = method.overrides
-        assert ctx.position is None
-        ctx.position = self.viper.to_position(method.node)
+        pos = self.viper.to_position(method.node, ctx.position)
+        ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         self._check_override_validity(method, ctx)
         params = []
@@ -150,7 +151,7 @@ class ProgramTranslator(CommonTranslator):
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref,
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                         self.viper.NullLit(self.no_position(ctx),
                                                            self.no_info(ctx)),
                                         self.no_position(ctx),
@@ -158,19 +159,19 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null] + pres
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
-            args.append(method.overrides.args[arg].ref)
+            args.append(method.overrides.args[arg].ref())
         self_arg = method.overrides.args[next(iter(method.overrides.args))]
-        has_subtype = self.var_type_check(self_arg.sil_name, method.cls,
+        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, pos,
                                           ctx, inhale_exhale=False)
         called_name = method.sil_name
-
+        ctx.position.pop()
         results, targets, body = self._create_override_check_body_impure(
             method, has_subtype, called_name, args, ctx)
         ctx.current_function = old_function
         result = self.viper.Method(mname, params, results, pres, posts, [],
                                    body, self.no_position(ctx),
                                    self.no_info(ctx))
-        ctx.position = None
+
         self.info = None
         return result
 
@@ -204,6 +205,9 @@ class ProgramTranslator(CommonTranslator):
         default_checks = []
         for (name1, arg1), (name2, arg2) in zip(method.args.items(),
                                                 method.overrides.args.items()):
+            error_string = ('"default value matches overridden method '
+                            'for argument {0}"').format(name1)
+            assert_pos = self.to_position(arg1.node, ctx, error_string)
             if name1 != name2:
                 raise InvalidProgramException(arg1.node, 'invalid.override')
             if arg1.default or arg2.default:
@@ -211,17 +215,18 @@ class ProgramTranslator(CommonTranslator):
                     raise InvalidProgramException(arg1.node, 'invalid.override')
                 val1 = arg1.default_expr
                 val2 = arg2.default_expr
-                eq = self.viper.EqCmp(val1, val2,
-                                      self.to_position(arg1.node, ctx),
+                eq = self.viper.EqCmp(val1, val2, assert_pos,
                                       self.no_info(ctx))
-                assertion = self.viper.Assert(eq,
-                                              self.to_position(arg1.node, ctx),
+                assertion = self.viper.Assert(eq, assert_pos,
                                               self.no_info(ctx))
                 default_checks.append(assertion)
-
+        ctx.position.append(('overridden method',
+                             self.viper.to_position(method.overrides.node,
+                                                    ctx.position)))
         call = self.viper.MethodCall(calledname, args, targets,
-                                     self.no_position(ctx),
+                                     self.to_position(method.node, ctx),
                                      self.no_info(ctx))
+        ctx.position.pop()
         subtype_assume = self.viper.Inhale(has_subtype, self.no_position(ctx),
                                            self.no_info(ctx))
         body = default_checks + [subtype_assume, call]

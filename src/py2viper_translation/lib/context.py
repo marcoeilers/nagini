@@ -12,8 +12,9 @@ class Context:
         self.current_function = None
         self.current_class = None
         self.var_aliases = {}
+        self.old_aliases = {}
         self.label_aliases = {}
-        self.position = None
+        self.position = []
         self.info = None
         self.program = None
         self.inlined_calls = []
@@ -48,7 +49,7 @@ class Context:
         Returns the result var of the current function or the current alias for
         it.
         """
-        if self.var_aliases and RESULT_NAME in self.var_aliases:
+        if RESULT_NAME in self.var_aliases:
             return self.var_aliases[RESULT_NAME]
         if self.current_function.result:
             return self.current_function.result
@@ -60,7 +61,7 @@ class Context:
         Returns the error var of the current function or the current alias for
         it.
         """
-        if self.var_aliases and ERROR_NAME in self.var_aliases:
+        if ERROR_NAME in self.var_aliases:
             return self.var_aliases[ERROR_NAME]
         return self.current_function.error_var
 
@@ -72,3 +73,33 @@ class Context:
         if name in self.label_aliases:
             return self.label_aliases[name]
         return name
+
+    def set_alias(self, name: str, var: PythonVar,
+                  replaces: PythonVar=None) -> None:
+        """
+        Sets an alias for a variable. Makes sure the alt_types of the alias
+        variable match those of the variable it replaces. If there already is
+        an alias for the given name, memorizes the old one and replaces it.
+        """
+        if name in self.var_aliases:
+            if name not in self.old_aliases:
+                self.old_aliases[name] = []
+            self.old_aliases[name].append(self.var_aliases[name])
+        if replaces:
+            if replaces.alt_types:
+                assert not var.alt_types
+                var.alt_types = replaces.alt_types
+        self.var_aliases[name] = var
+
+    def remove_alias(self, name: str) -> None:
+        """
+        Removes the alias for the given variable. If there was a different alias
+        before, that one will be used again afterwards. Otherwise, there will
+        no longer be an alias for this name.
+        """
+        if name in self.old_aliases and self.old_aliases[name]:
+            old = self.old_aliases[name].pop()
+            self.var_aliases[name] = old
+        else:
+            del self.var_aliases[name]
+
