@@ -130,30 +130,28 @@ def read_write_int2(t1: Place) -> Place:
     return t5
 
 
-# TODO: Should be uncommented as soon as MissingOutput directive is supported.
-#   def read_write_int3(t1: Place) -> Place:
-#       IOExists6(Place, Place, Place, Place, int, int)(
-#           lambda t2, t3, t4, t5, value1, value2: (
-#           Requires(
-#               token(t1) and
-#               read_int_io(t1, value1, t2) and
-#               read_int_io(t2, value2, t3) and
-#               write_int_io(t3, value1, t4) and
-#               write_int_io(t4, value2, t5)
-#           ),
-#           Ensures(
-#               token(t5) and
-#               t5 == Result()
-#           ),
-#           )
-#       )
+def read_write_int3(t1: Place) -> Place:
+    IOExists6(Place, Place, Place, Place, int, int)(
+        lambda t2, t3, t4, t5, value1, value2: (
+        Requires(
+            token(t1) and
+            read_int_io(t1, value1, t2) and
+            read_int_io(t2, value2, t3) and
+            write_int_io(t3, value1, t4) and
+            write_int_io(t4, value2, t5)
+        ),
+        Ensures(
+            token(t5) and
+            t5 == Result()
+        ),
+        )
+    )
 
-#       t2, number1 = read_int(t1)
-#       t3, number2 = read_int(t2)
-#       #:: ExpectedOutput(call.precondition:insufficient.permission)
-#       t4 = write_int(t3, number2)
-#       #:: ExpectedOutput(call.precondition:insufficient.permission)
-#       #:: MissingOutput(call.precondition:insufficient.permission, /silicon/issue/34/)
-#       t5 = write_int(t4, number1)
+    t2, number1 = read_int(t1)
+    t3, number2 = read_int(t2)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    t4 = write_int(t3, number2)
+    #:: OptionalOutput(call.precondition:insufficient.permission)
+    t5 = write_int(t4, number1)
 
-#       return t5
+    return t5
