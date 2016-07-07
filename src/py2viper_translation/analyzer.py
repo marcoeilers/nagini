@@ -269,7 +269,9 @@ class Analyzer(ast.NodeVisitor):
         for child in node.body:
             if is_io_existential(child):
                 self._is_io_existential = True
-            self.visit(child, node)
+                self.visit(child.value.args[0], node)
+            else:
+                self.visit(child, node)
         self.current_function = None
 
     def visit_arguments(self, node: ast.arguments) -> None:
@@ -381,6 +383,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in LITERALS:
             return
+        if node.id.startswith('IOExists'):
+            raise InvalidProgramException(node, 'invalid.ioexists.misplaced')
         if isinstance(node._parent, ast.Call):
             # FIXME(Marco): Remove this call once #19 is properly fixed.
             self._make_variable_name_unique(node)
