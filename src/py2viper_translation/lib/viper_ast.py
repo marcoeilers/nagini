@@ -1,4 +1,8 @@
+import ast
 import types
+
+from py2viper_translation.lib.errors import cache
+from uuid import uuid1
 
 
 def getobject(package, name):
@@ -26,6 +30,7 @@ class ViperAST:
         self.java = java
         self.scala = scala
         self.jvm = jvm
+        self.nodes = {}
 
         def getconst(name):
             return getobject(ast, name)
@@ -104,6 +109,8 @@ class ViperAST:
             result_int = result_int.multiply(cutoff_int)
             result_int = result_int.add(current_int)
             rest = rest // cutoff
+        if negative:
+            result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)
 
     def Program(self, domains, fields, functions, predicates, methods, position,
@@ -188,6 +195,9 @@ class ViperAST:
                                         domain_name)
         return result
 
+    def TypeVar(self, name):
+        return self.ast.TypeVar(name)
+
     def MethodCall(self, methodname, args, targets, position, info):
         return self.ast.MethodCall(methodname, self.to_seq(args),
                                    self.to_seq(targets), position, info)
@@ -234,6 +244,9 @@ class ViperAST:
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info)
 
+    def WildcardPerm(self, position, info):
+        return self.ast.WildcardPerm(position, info)
+
     def FractionalPerm(self, left, right, position, info):
         return self.ast.FractionalPerm(left, right, position, info)
 
@@ -277,6 +290,9 @@ class ViperAST:
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
+    def EmptySeq(self, type, position, info):
+        return self.ast.EmptySeq(type, position, info)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info)
 
@@ -285,6 +301,21 @@ class ViperAST:
 
     def Result(self, type, position, info):
         return self.ast.Result(type, position, info)
+
+    def AnySetContains(self, elem, s, position, info):
+        return self.ast.AnySetContains(elem, s, position, info)
+
+    def SeqContains(self, elem, s, position, info):
+        return self.ast.SeqContains(elem, s, position, info)
+
+    def SeqLength(self, s, position, info):
+        return self.ast.SeqLength(s, position, info)
+
+    def SeqIndex(self, s, ind, position, info):
+        return self.ast.SeqIndex(s, ind, position, info)
+
+    def SeqTake(self, s, end, postion, info):
+        return self.ast.SeqTake(s, end, postion, info)
 
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info)
@@ -343,15 +374,24 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
-    def to_position(self, expr):
+    def to_position(self, expr, vias, error_string: str=None):
         if expr is None:
+            return self.NoPosition
+        if not hasattr(expr, 'lineno'):
+            # TODO: this should never happen (because all nodes that the parser
+            # creates have this field), but it does, because in the SIF code we
+            # create artificial ast.Name objects which don't have it. That
+            # should probably be changed.
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
+        id = str(uuid1())
+        assert not id in cache
+        cache[id] = (expr, list(vias), error_string)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
             end = self.scala.Some(end)
         else:
             end = self.none
-        return self.ast.SourcePosition(path, start, end)
+        return self.ast.IdentifierPosition(path, start, end, id)

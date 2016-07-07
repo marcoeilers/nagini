@@ -7,11 +7,13 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     INT_TYPE,
+    INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
+    VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import UnsupportedException
+from py2viper_translation.lib.util import InvalidProgramException
 from typing import List, Optional, Set
 
 
@@ -32,12 +34,12 @@ class PythonScope:
     def get_fresh_name(self, name: str) -> str:
         if self.contains_name(name):
             counter = 0
-            newname = name + '_' + str(counter)
-            while self.contains_name(newname):
-                counter = counter + 1
-                newname = name + '_' + str(counter)
-            self.sil_names.append(newname)
-            return newname
+            new_name = name + '_' + str(counter)
+            while self.contains_name(new_name):
+                counter += 1
+                new_name = name + '_' + str(counter)
+            self.sil_names.append(new_name)
+            return new_name
         else:
             self.sil_names.append(name)
             return name
@@ -58,7 +60,7 @@ class PythonScope:
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__([], None)
+        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -119,7 +121,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [], superscope)
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -128,6 +130,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
+        self.defined = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -268,11 +271,12 @@ class GenericType(PythonType):
                  args: List[PythonType]) -> None:
         self.name = name
         self.program = program
+        self.cls = self.program.classes[self.name]
         self.type_args = args
         self.exact_length = True
 
     def get_class(self) -> PythonClass:
-        return self.program.classes[self.name]
+        return self.cls
 
     def get_program(self) -> 'PythonProgram':
         return self.program
@@ -338,15 +342,17 @@ class PythonMethod(PythonNode, PythonScope):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [RESULT_NAME, ERROR_NAME, END_LABEL],
+        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES +
+                             [RESULT_NAME, ERROR_NAME, END_LABEL],
                              superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
         self.cls = cls
         self.overrides = None  # infer
-        self.locals = OrderedDict()  # direct
-        self.args = OrderedDict()  # direct
+        self._locals = OrderedDict()  # direct
+        self._args = OrderedDict()  # direct
+        self._special_vars = OrderedDict()  # direct
         self._nargs = -1  # direct
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
@@ -396,6 +402,8 @@ class PythonMethod(PythonNode, PythonScope):
                     self.name)
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
+        for name in self.special_vars:
+            self.special_vars[name].process(self.get_fresh_name(name), translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -410,6 +418,26 @@ class PythonMethod(PythonNode, PythonScope):
     def nargs(self, nargs: int) -> None:
         self._nargs = nargs
 
+    @property
+    def args(self) -> OrderedDict:
+        # TODO(shitz): Should make this return an immutable copy.
+        return self._args
+
+    def add_arg(self, name: str, arg: 'PythonVar'):
+        self._args[name] = arg
+
+    @property
+    def locals(self) -> OrderedDict:
+        # TODO(shitz): Should make this return an immutable copy.
+        return self._locals
+
+    def add_local(self, name: str, local: 'PythonVar'):
+        self._locals[name] = local
+
+    @property
+    def special_vars(self) -> OrderedDict:
+        return self._special_vars
+
     def get_variable(self, name: str) -> 'PythonVar':
         """
         Returns the variable (local variable or method parameter) with the
@@ -419,12 +447,14 @@ class PythonMethod(PythonNode, PythonScope):
             return self.locals[name]
         elif name in self.args:
             return self.args[name]
+        elif name in self.special_vars:
+            return self.special_vars[name]
         elif self.var_arg and self.var_arg.name == name:
             return self.var_arg
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_program().global_vars[name]
+            return self.get_program().global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
@@ -437,7 +467,7 @@ class PythonMethod(PythonNode, PythonScope):
         result = self.node_factory.create_python_var(sil_name, None, cls)
         result.process(sil_name, translator)
         if local:
-            self.locals[sil_name] = result
+            self.add_local(sil_name, result)
         return result
 
     def get_locals(self) -> List['PythonVar']:
@@ -562,12 +592,14 @@ class PythonVar(PythonNode):
         super().__init__(name, node)
         self.type = type
         self.decl = None
-        self.ref = None
+        self._ref = None
+        self._translator = None
         self.writes = []
         self.reads = []
         self.alt_types = {}
         self.default = None
         self.default_expr = None
+        self.value = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -575,9 +607,22 @@ class PythonVar(PythonNode):
         Python variable.
         """
         self.sil_name = sil_name
+        self._translator = translator
         prog = self.type.get_program()
         self.decl = translator.translate_pythonvar_decl(self, prog)
-        self.ref = translator.translate_pythonvar_ref(self, prog)
+        self._ref = translator.translate_pythonvar_ref(self, prog, None, None)
+
+    def ref(self, node: ast.AST=None,
+            ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
+        """
+        Creates a reference to this variable. If no arguments are supplied,
+        the reference will have no position. Otherwise, it will have the
+        position of the given node in the given context.
+        """
+        if not node:
+            return self._ref
+        prog = self.type.get_program()
+        return self._translator.translate_pythonvar_ref(self, prog, node, ctx)
 
 
 class PythonField(PythonNode):

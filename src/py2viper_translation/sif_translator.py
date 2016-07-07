@@ -1,24 +1,30 @@
+import ast
+
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import PythonProgram
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonVar
+from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
 from py2viper_translation.sif.translators.call import SIFCallTranslator
 from py2viper_translation.sif.translators.contract import SIFContractTranslator
 from py2viper_translation.sif.translators.expression import (
     SIFExpressionTranslator,
 )
+from py2viper_translation.sif.translators.func_triple_domain_factory import (
+    FuncTripleDomainFactory,
+)
 from py2viper_translation.sif.translators.method import SIFMethodTranslator
 from py2viper_translation.sif.translators.program import SIFProgramTranslator
+from py2viper_translation.sif.translators.pure import SIFPureTranslator
 from py2viper_translation.sif.translators.statement import (
     SIFStatementTranslator,
 )
 from py2viper_translation.translator import Translator
-from py2viper_translation.translators.abstract import Expr, TranslatorConfig
+from py2viper_translation.translators.abstract import Expr
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
-from py2viper_translation.translators.pure import PureTranslator
 
 from py2viper_translation.translators.type import TypeTranslator
 from py2viper_translation.translators.type_domain_factory import (
@@ -30,9 +36,9 @@ from typing import List
 class SIFTranslator(Translator):
     def __init__(self, jvm: JVM, source_file: str, type_info: TypeInfo,
                  viper_ast: ViperAST):
-        config = TranslatorConfig(self)
-        config.pure_translator = PureTranslator(config, jvm, source_file,
-                                                type_info, viper_ast)
+        config = SIFTranslatorConfig(self)
+        config.pure_translator = SIFPureTranslator(config, jvm, source_file,
+                                                   type_info, viper_ast)
         config.call_translator = SIFCallTranslator(config, jvm, source_file,
                                                    type_info, viper_ast)
         config.contract_translator = SIFContractTranslator(config, jvm,
@@ -56,6 +62,8 @@ class SIFTranslator(Translator):
         config.method_translator = SIFMethodTranslator(config, jvm, source_file,
                                                         type_info, viper_ast)
         config.type_factory = TypeDomainFactory(viper_ast, self)
+        config.func_triple_factory = FuncTripleDomainFactory(viper_ast, config)
+
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
@@ -75,8 +83,10 @@ class SIFTranslator(Translator):
         return self.expr_translator.translate_pythonvar_decl(var, ctx)
 
     def translate_pythonvar_ref(self, var: SIFPythonVar,
-                                program: PythonProgram) -> Expr:
-        # we need a context object here
-        ctx = SIFContext()
-        ctx.program = program
-        return self.expr_translator.translate_pythonvar_ref(var, ctx)
+                                program: PythonProgram, node: ast.AST,
+                                ctx: 'Context') -> Expr:
+        if not ctx:
+            # we need a context object here
+            ctx = SIFContext()
+            ctx.program = program
+        return self.expr_translator.translate_pythonvar_ref(var, node, ctx)

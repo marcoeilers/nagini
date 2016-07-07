@@ -1,6 +1,8 @@
 import ast
+import logging
 import mypy
 import os
+import py2viper_translation.external.astpp
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -18,8 +20,16 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import get_func_name, UnsupportedException
-from typing import Dict
+from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
+    get_func_name,
+    InvalidProgramException,
+    UnsupportedException
+)
+from typing import Dict, Set, Union
+
+
+logger = logging.getLogger('py2viper_translation.analyzer')
 
 
 class Analyzer(ast.NodeVisitor):
@@ -37,10 +47,30 @@ class Analyzer(ast.NodeVisitor):
         self.program = PythonProgram(types, node_factory)
         self.current_class = None
         self.current_function = None
+        self.current_scopes = []
         self.contract_only = False
         self.modules = [os.path.abspath(path)]
         self.asts = {}
         self.node_factory = node_factory
+
+    def define_new(self, container: Union[PythonProgram, PythonClass],
+                   name: str, node: ast.AST) -> None:
+        """
+        Called when a new top level element named ``name`` is created in
+        ``container``. Checks there is any existing element with the same name, and raises
+        an exception in that case.
+        """
+        if isinstance(container, PythonProgram):
+            if name in container.classes:
+                cls = container.classes[name]
+                if cls.defined:
+                    raise InvalidProgramException(node, 'multiple.definitions')
+            if name in container.global_vars:
+                raise InvalidProgramException(node, 'multiple.definitions')
+        if (name in container.functions or
+                    name in container.methods or
+                    name in container.predicates):
+            raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
         """
@@ -57,7 +87,7 @@ class Analyzer(ast.NodeVisitor):
             # ignore
             pass
         self.asts[abs_path] = parse_result
-        # print(astpp.dump(parse_result))
+        logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if get_func_name(stmt) != 'Import':
@@ -93,6 +123,7 @@ class Analyzer(ast.NodeVisitor):
         for class_name in interface:
             if_cls = interface[class_name]
             cls = self.get_class(class_name, interface=True)
+            cls.defined = True
             if 'extends' in if_cls:
                 cls.superclass = self.get_class(if_cls['extends'])
             for method_name in if_cls.get('methods', []):
@@ -105,14 +136,13 @@ class Analyzer(ast.NodeVisitor):
     def _add_interface_method(self, method_name, if_method, cls, pure):
         method = PythonMethod(method_name, None, cls, self.program,
                               pure, False, self.node_factory, True)
-        method.args = OrderedDict()
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
             arg = self.node_factory.create_python_var(name, None,
                                                       self.get_class(arg_type))
             ctr += 1
-            method.args[name] = arg
+            method.add_arg(name, arg)
         if if_method['type']:
             method.type = self.get_class(if_method['type'])
         if if_method.get('generic_type'):
@@ -123,7 +153,21 @@ class Analyzer(ast.NodeVisitor):
             cls.methods[method_name] = method
 
     def visit_module(self, module: str) -> None:
-        self.visit_default(self.asts[module])
+        self.visit(self.asts[module], None)
+
+    def visit_Module(self, node: ast.Module) -> None:
+        # Top level elements may only be imports, classes, functions, global
+        # var assignments or Import() calls.
+        for stmt in node.body:
+            if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
+                                 ast.ImportFrom, ast.Assign)):
+                continue
+            if get_func_name(stmt) == 'Import':
+                continue
+            if get_func_name(stmt) in CONTRACT_WRAPPER_FUNCS:
+                raise InvalidProgramException(stmt, 'invalid.contract.position')
+            raise InvalidProgramException(stmt, 'global.statement')
+        self.visit_default(node)
 
     def visit_default(self, node: ast.AST) -> None:
         for field in node._fields:
@@ -156,7 +200,9 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_class is None
         assert self.current_function is None
         name = node.name
+        self.define_new(self.program, name, node)
         cls = self.get_class(name)
+        cls.defined = True
         cls.node = node
         if len(node.bases) > 1:
             raise UnsupportedException(node)
@@ -178,12 +224,12 @@ class Analyzer(ast.NodeVisitor):
             scope_container = self.program
         else:
             scope_container = self.current_class
+        self.define_new(scope_container, name, node)
         if self.is_predicate(node):
             container = scope_container.predicates
         elif self.is_pure(node):
             container = scope_container.functions
         else:
-            assert not node.decorator_list
             container = scope_container.methods
         if name in container:
             func = container[name]
@@ -198,6 +244,8 @@ class Analyzer(ast.NodeVisitor):
             container[name] = func
         func.predicate = self.is_predicate(node)
         functype = self.types.get_func_type(func.get_scope_prefix())
+        if func.pure and not functype:
+            raise InvalidProgramException(node, 'function.type.none')
         func.type = self.convert_type(functype)
         self.current_function = func
         self.visit(node.args, node)
@@ -231,6 +279,20 @@ class Analyzer(ast.NodeVisitor):
                                                          annotated_type)
             self.current_function.kw_arg = kw_arg
 
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        assert self.current_function
+        name = construct_lambda_prefix(node.lineno, node.col_offset)
+        self.current_scopes.append(name)
+        for arg in node.args.args:
+            var = self.node_factory.create_python_var(arg.arg, arg,
+                                                      self.typeof(arg))
+            alts = self.get_alt_types(node)
+            var.alt_types = alts
+            local_name = name + '$' + arg.arg
+            self.current_function.special_vars[local_name] = var
+        self.visit(node.body, node)
+        self.current_scopes.pop()
+
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
         self.current_function.args[node.arg] = \
@@ -252,7 +314,8 @@ class Analyzer(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
-            assert self.current_function is not None
+            if not self.current_function or self.current_function.predicate:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
                 self.current_function.precondition.append(node.args[0])
             elif node.func.id == 'Ensures':
@@ -289,6 +352,7 @@ class Analyzer(ast.NodeVisitor):
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
+                    self.define_new(self.program, node.id, node)
                     var = self.node_factory.create_python_var(node.id,
                                                               node, cls)
                     assign = node._parent
@@ -395,9 +459,11 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
+            context.extend(self.current_scopes)
             type, alts = self.types.get_type(context, node.id)
-            if alts and node.lineno in alts:
-                return self.convert_type(alts[node.lineno])
+            key = (node.lineno, node.col_offset)
+            if alts and key in alts:
+                return self.convert_type(alts[key])
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
@@ -409,6 +475,7 @@ class Analyzer(ast.NodeVisitor):
             if self.current_class is not None:
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
+            context.extend(self.current_scopes)
             type, _ = self.types.get_type(context, node.arg)
             return self.convert_type(type)
         elif (isinstance(node, ast.Call) and
@@ -458,10 +525,17 @@ class Analyzer(ast.NodeVisitor):
             self.current_function.labels.append(finally_name)
         self.current_function.try_blocks.append(try_block)
 
+    def _incompatible_decorators(self, decorators: Set[str]) -> bool:
+        return ('Predicate' in decorators) and ('Pure' in decorators)
+
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return (len(func.decorator_list) == 1
-                and func.decorator_list[0].id == 'Pure')
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'Pure' in decorators
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        return (len(func.decorator_list) == 1
-                and func.decorator_list[0].id == 'Predicate')
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'Predicate' in decorators

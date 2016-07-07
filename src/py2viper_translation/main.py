@@ -1,6 +1,8 @@
 import argparse
+import astunparse
 import inspect
 import json
+import logging
 import os
 import sys
 import traceback
@@ -8,6 +10,7 @@ import traceback
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
+from py2viper_translation.lib.errors import cache
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
@@ -46,10 +49,12 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
+    cache.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
-    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil']
+    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
+                 'func_triple.sil']
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
@@ -99,6 +104,21 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
         traceback.print_exc()
 
 
+def _parse_log_level(log_level_string: str) -> int:
+    """ Parses the log level provided by the user.
+    """
+    LOG_LEVELS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
+
+    log_level_string_upper = log_level_string.upper()
+    if log_level_string_upper in LOG_LEVELS:
+        return getattr(logging, log_level_string_upper, logging.WARNING)
+    else:
+        msg = 'Invalid logging level {0} (expected one of: {1})'.format(
+            log_level_string,
+            LOG_LEVELS)
+        raise argparse.ArgumentTypeError(msg)
+
+
 def main() -> None:
     """ Entry point for the translator.
     """
@@ -134,13 +154,16 @@ def main() -> None:
     parser.add_argument(
         '--verifier',
         help='verifier to be used (carbon or silicon)',
-        default='silicon'
-    )
+        default='silicon')
     parser.add_argument(
         '--sif',
         action='store_true',
-        help='Verify secure information flow'
-    )
+        help='Verify secure information flow')
+    parser.add_argument(
+        '--log',
+        type=_parse_log_level,
+        help='log level',
+        default='WARNING')
     args = parser.parse_args()
 
     python_file = args.python_file
@@ -148,6 +171,7 @@ def main() -> None:
     config.boogie_path = args.boogie
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
+    logging.basicConfig(level=args.log)
 
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
@@ -179,6 +203,7 @@ def main() -> None:
             print('Line ' + str(e.node.lineno) + ': ' + e.code)
             if e.message:
                 print(e.message)
+            print(astunparse.unparse(e.node))
         if isinstance(e, TypeException):
             for msg in e.messages:
                 print(msg)

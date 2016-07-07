@@ -1,7 +1,9 @@
+import ast
+
 from abc import ABCMeta
 from enum import Enum
-
 from py2viper_translation.lib import config
+from py2viper_translation.lib.errors import error_msg
 from py2viper_translation.lib.jvmaccess import JVM
 
 
@@ -38,8 +40,9 @@ class Failure(VerificationResult):
         return False
 
     def __str__(self):
+        all_errors = [error_msg(error) for error in self.errors]
         return "Verification failed.\nErrors:\n" + '\n'.join(
-            [str(error) for error in self.errors])
+            all_errors)
 
 
 class Silicon:
