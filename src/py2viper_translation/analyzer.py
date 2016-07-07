@@ -23,6 +23,7 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
     get_func_name,
     InvalidProgramException,
     is_io_existential,
@@ -300,8 +301,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
-        name = 'lambda' + str(node.lineno)
-        name += '_' + str(node.col_offset)
+        name = construct_lambda_prefix(node.lineno, node.col_offset)
         self.current_scopes.append(name)
         lambda_var_names = {}
         for arg in node.args.args:

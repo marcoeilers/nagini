@@ -29,7 +29,6 @@ def error_msg(error: 'silver.verifier.AbstractError') -> str:
         pos_string += ''.join(', via {0} at {1}'.format(reason, pos)
                               for reason, pos in reason_entry[1])
     else:
-        reason_file = reason_pos.file()
         reason_node = None
     reason = reason_string if reason_string else reason_node
     if not reason:
