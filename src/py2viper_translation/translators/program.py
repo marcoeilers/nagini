@@ -208,8 +208,8 @@ class ProgramTranslator(CommonTranslator):
         default_checks = []
         for (name1, arg1), (name2, arg2) in zip(method.args.items(),
                                                 method.overrides.args.items()):
-            error_string = '"default value matches overridden method for '
-            error_string += 'argument ' + name1 + '"'
+            error_string = ('"default value matches overridden method '
+                            'for argument {0}"').format(name1)
             assert_pos = self.to_position(arg1.node, ctx, error_string)
             if name1 != name2:
                 raise InvalidProgramException(arg1.node, 'invalid.override')
