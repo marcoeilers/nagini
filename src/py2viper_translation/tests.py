@@ -120,7 +120,7 @@ class AnnotatedTests():
             (line, id, vias) = ae
             vias_decrement = [via - 1 for via in vias]
             key = (line - 1, id, vias_decrement)
-            if not key in expected or key in optional:
+            if not key in expected and not key in optional:
                 actual_unexpected += [ae]
         for ee in expected:
             (line, id, vias) = ee
