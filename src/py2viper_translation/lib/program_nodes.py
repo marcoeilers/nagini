@@ -452,7 +452,7 @@ class PythonMethod(PythonNode, PythonScope):
         """
         return self._io_existential_vars
 
-    def get_variable(self, name: str) -> 'PythonVar':
+    def get_variable(self, name: str) -> Optional['PythonVar']:
         """
         Returns the variable (local variable or method parameter) with the
         given name.
@@ -470,7 +470,7 @@ class PythonMethod(PythonNode, PythonScope):
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_program().global_vars[name]
+            return self.get_program().global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
