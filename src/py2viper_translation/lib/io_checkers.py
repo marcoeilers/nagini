@@ -58,7 +58,10 @@ class IOOperationBodyChecker(ast.NodeVisitor):
                 node.func.id in self._program.io_operations):
             operation = self._program.io_operations[node.func.id]
             result_count = len(operation.get_results())
-            results = node.args[-result_count:]
+            if result_count > 0:
+                results = node.args[-result_count:]
+            else:
+                results = []
             for arg in results:
                 if not isinstance(arg, ast.Name):
                     _raise_error(node, 'not_variable_in_result_position')
