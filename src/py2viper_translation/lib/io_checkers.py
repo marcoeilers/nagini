@@ -47,6 +47,8 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         name = node.id
         if name.startswith('IOExists'):
             _raise_error(node, 'ioexists')
+        if name == 'Acc':
+            _raise_error(node, 'non_pure')
         if name in self._undefined_existentials:
             _raise_error(node, 'use_of_undefined_existential')
 
