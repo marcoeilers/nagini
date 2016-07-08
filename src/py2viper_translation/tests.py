@@ -186,6 +186,14 @@ def _test_files(test_dir):
     for root, dir_names, file_names in os.walk(
             test_dir,
             topdown=True):
+        if 'tests' in file_names:
+            # tests file lists all tests in this directory, so we read
+            # its contents and do not proceed deeper.
+            with open(join(root, 'tests')) as fp:
+                for file_name in fp:
+                    result.append(join(root, file_name.strip()))
+            dir_names.clear()
+            continue
         if 'resources' in dir_names:
             # Skip resources directory.
             dir_names.remove('resources')
