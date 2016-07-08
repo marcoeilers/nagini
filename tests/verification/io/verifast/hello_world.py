@@ -28,12 +28,12 @@ def putchar(c: str, t1: Place) -> Tuple[bool, Place]:
         Requires(
             token(t1) and
             write_char_io(t1, stdout, c, success, t2)
-            ),
+        ),
         Ensures(
             token(t2) and
             success == Result()[0] and
             t2 == Result()[1]
-            )
+        )
     ))
 
 
@@ -45,11 +45,11 @@ def main(t1: Place) -> Place:
             token(t1) and
             write_char_io(t1, stdout, 'h', success1, t2) and
             write_char_io(t2, stdout, 'i', success2, t3)
-            ),
+        ),
         Ensures(
             token(t3) and
             t3 == Result()
-            )
+        )
     ))
     success, t2 = putchar('h', t1)
     success, t3 = putchar('i', t2)
