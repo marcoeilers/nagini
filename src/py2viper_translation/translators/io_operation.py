@@ -123,11 +123,11 @@ in fields should not be too common in practise:
 2.  It is not allowed to have permissions in non-basic IO operation
     definitions.
 
-    .. todo::
+    .. todo:: Vytautas
 
         Implement this check.
 
-.. todo::
+.. todo:: Vytautas
 
     Things to investigate:
 
@@ -149,6 +149,7 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
+    Stmt,
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
@@ -186,6 +187,14 @@ def _raise_invalid_existential_var(error_type: str, node: ast.AST) -> None:
     raise InvalidProgramException(
         node,
         'invalid.io_existential_var.' + error_type,
+    )
+
+
+def _raise_invalid_get_ghost_output(error_type: str, node: ast.AST) -> None:
+    """Raise InvalidProgramException."""
+    raise InvalidProgramException(
+        node,
+        'invalid.get_ghost_output.' + error_type,
     )
 
 
@@ -281,7 +290,7 @@ class IOOperationTranslator(CommonTranslator):
         """
         Translate a call to IO contract function ``token``.
 
-        .. todo::
+        .. todo:: Vytautas
 
             Implement support for obligations. Currently, providing a
             measure for a token gives an assertion error.
@@ -300,7 +309,7 @@ class IOOperationTranslator(CommonTranslator):
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``.
 
-        .. todo::
+        .. todo:: Vytautas
 
             Refactor this monster into method template.
         """
@@ -563,3 +572,57 @@ class IOOperationTranslator(CommonTranslator):
                 'defining_expression_type_mismatch', node)
 
         var.set_ref(right)
+
+    def translate_get_ghost_output(
+            self, node: ast.Assign, ctx: Context) -> List[Stmt]:
+        """Translate ``GetGhostOutput``."""
+        if len(node.targets) != 1:
+            _raise_invalid_get_ghost_output('multiple_targets', node)
+        if not isinstance(node.targets[0], ast.Name):
+            _raise_invalid_get_ghost_output('target_not_variable', node)
+        target_name = cast(ast.Name, node.targets[0]).id
+        target = ctx.actual_function.get_variable(target_name)
+        assert target
+
+        operation_call, result_name_node = cast(ast.Call, node.value).args
+
+        if not isinstance(result_name_node, ast.Str):
+            _raise_invalid_get_ghost_output('result_identifier_not_str', node)
+        result_name = cast(ast.Str, result_name_node).s
+
+        if not (isinstance(operation_call, ast.Call) and
+                isinstance(operation_call.func, ast.Name)):
+            _raise_invalid_get_ghost_output('argument_not_io_operation', node)
+        operation_call = cast(ast.Call, operation_call)
+        operation_name = cast(ast.Name, operation_call.func).id
+
+        if operation_name not in ctx.program.io_operations:
+            _raise_invalid_get_ghost_output('argument_not_io_operation', node)
+        operation = ctx.program.io_operations[operation_name]
+
+        result = None
+        for result in operation.get_results():
+            if result.name == result_name:
+                break
+        else:
+            _raise_invalid_get_ghost_output('invalid_result_identifier', node)
+        assert result
+
+        if result.type != target.type:
+            _raise_invalid_get_ghost_output('type_mismatch', node)
+
+        # TODO: (Vytautas) Refactor this code duplication.
+        py_args = operation_call.args
+        if len(py_args) != len(operation.get_parameters()):
+            _raise_invalid_operation_use('result_used_argument', node)
+        sil_args = self._translate_args(py_args, ctx)
+
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        getter = self._create_result_getter(
+            sil_args, operation, result, ctx, position, info)
+
+        assignment = self.viper.LocalVarAssign(target.ref(), getter,
+                                               position, info)
+
+        return [assignment]

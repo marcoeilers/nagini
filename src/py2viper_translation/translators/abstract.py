@@ -179,6 +179,11 @@ class AbstractTranslator(metaclass=ABCMeta):
         translator = self.config.io_operation_translator
         translator.define_io_existential(node, ctx)
 
+    def translate_get_ghost_output(self, node: ast.Expr,
+                                   ctx: Context) -> List[Stmt]:
+        translator = self.config.io_operation_translator
+        return translator.translate_get_ghost_output(node, ctx)
+
     def translate_handler(self, handler: PythonExceptionHandler,
                           ctx: Context) -> List[Stmt]:
         return self.config.method_translator.translate_handler(handler, ctx)
