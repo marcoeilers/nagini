@@ -143,9 +143,11 @@ from typing import Callable, cast, List, Tuple  # pylint: disable=unused-import
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.program_nodes import (
+    PythonGlobalVar,
     PythonIOOperation,
     PythonIOExistentialVar,
     PythonVar,
+    PythonVarBase,
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -447,6 +449,15 @@ class IOOperationTranslator(CommonTranslator):
 
         That is: define getters corresponding to operation results or
         emit equalities between each result and getter definition.
+
+        .. todo:: Vytautas
+
+            Refactor this monster.
+
+        .. todo:: Vytautas
+
+            Allow arbitrary expressions in result positions, not only
+            variables.
         """
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -460,43 +471,53 @@ class IOOperationTranslator(CommonTranslator):
         io_ctx = ctx.io_open_context
         equations = []
         for result, instance_expr in zip(results, result_instances):
+
             if not isinstance(instance_expr, ast.Name):
                 _raise_invalid_operation_use(
                     'not_variable_in_result_position', node)
-            instance = cast(ast.Name, instance_expr)
-            var_name = instance.id
-            if io_ctx.contains_variable(var_name):
-                var = io_ctx.get_variable(var_name)
-                assert isinstance(var, PythonVar)
-            elif var_name in ctx.actual_function.io_existential_vars:
-                var = ctx.actual_function.io_existential_vars[var_name]
-                assert isinstance(var, PythonIOExistentialVar)
-            else:
-                _raise_invalid_operation_use(
-                    'variable_not_existential', node)
-
-            if var.type != result.type:
-                _raise_invalid_existential_var(
-                    'defining_expression_type_mismatch', node)
 
             getter = self._create_result_getter(
                 args, operation, result, ctx, position, info)
 
-            is_existential_def = (
-                isinstance(var, PythonIOExistentialVar) and
-                var.is_defined())
-            is_open_def = (
-                isinstance(var, PythonVar) and
-                io_ctx.is_variable_defined(var_name))
-            if is_existential_def or is_open_def:
-                comparison = self.viper.EqCmp(getter, var.ref(),
-                                              position, info)
+            def add_comparison(var: PythonVarBase) -> Expr:
+                """Create ``EqCmp`` between ``var`` and ``getter``."""
+                comparison = self.viper.EqCmp(
+                    getter, var.ref(), position, info)  # pylint: disable=cell-var-from-loop
                 equations.append(comparison)
-            else:
-                if isinstance(var, PythonVar):
+
+            def check(var: PythonVarBase) -> None:
+                """Perform well-formedness checks."""
+                if var.type != result.type:  # pylint: disable=cell-var-from-loop
+                    _raise_invalid_existential_var(
+                        'defining_expression_type_mismatch', node)
+
+            instance = cast(ast.Name, instance_expr)
+            var_name = instance.id
+
+            if io_ctx.contains_variable(var_name):
+                # Variable denotes a result of the operation being opened.
+                var = io_ctx.get_variable(var_name)
+                assert isinstance(var, PythonVar)
+                check(var)
+                if io_ctx.is_variable_defined(var_name):
+                    add_comparison(var)
+                else:
                     io_ctx.define_variable(var_name, getter)
+            elif var_name in ctx.actual_function.io_existential_vars:
+                var = ctx.actual_function.io_existential_vars[var_name]
+                assert isinstance(var, PythonIOExistentialVar)
+                check(var)
+                if var.is_defined():
+                    add_comparison(var)
                 else:
                     var.set_ref(getter)
+            else:
+                # Normal variable, which is already defined.
+                var = ctx.actual_function.get_variable(var_name)
+                assert var and isinstance(var, (PythonVar, PythonGlobalVar))
+                check(var)
+                add_comparison(var)
+
         return equations
 
     def translate_io_operation_call(self, node: ast.Call,
