@@ -19,6 +19,7 @@ from py2viper_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    is_get_ghost_output,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -430,6 +431,8 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
+        if is_get_ghost_output(node):
+            return self.translate_get_ghost_output(node, ctx)
         rhs_type = self.get_type(node.value, ctx)
         rhs_stmt, rhs = rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign_stmts = []

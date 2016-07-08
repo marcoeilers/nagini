@@ -307,3 +307,9 @@ def get_containing_member(node: ast.AST) -> Optional[ast.FunctionDef]:
         else:
             member = None
     return member
+
+
+def is_get_ghost_output(node: ast.Assign) -> bool:
+    return (isinstance(node.value, ast.Call) and
+            isinstance(node.value.func, ast.Name) and
+            node.value.func.id == 'GetGhostOutput')
