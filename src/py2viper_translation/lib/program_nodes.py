@@ -12,6 +12,7 @@ from py2viper_translation.lib.constants import (
     RESULT_NAME,
     VIPER_KEYWORDS,
 )
+from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
@@ -85,7 +86,7 @@ class PythonProgram(PythonScope):
         for name, var in self.global_vars.items():
             var.process(self.get_fresh_name(name), translator)
         for name, operation in self.io_operations.items():
-            operation.process(self.get_fresh_name(name), translator)
+            operation.process(self.get_fresh_name(name), translator, self)
 
     def get_scope_prefix(self) -> List[str]:
         return []
@@ -542,11 +543,19 @@ class PythonIOOperation(PythonNode, PythonScope):
         for var in var_list:
             var.process(self.get_fresh_name(var.name), translator)
 
-    def process(self, sil_name: str, translator: 'Translator') -> None:
+    def process(self, sil_name: str, translator: 'Translator',
+                program: PythonProgram) -> None:
         """
         Creates fresh Silver names for preset, postset, inputs and
         outputs. Also, sets the ``sil_name``.
         """
+        if self._body is not None:
+            body_checker = IOOperationBodyChecker(
+                self._body,
+                self.get_results(),
+                self._io_existentials,
+                program)
+            body_checker.check()
         self.sil_name = sil_name
         self._process_var_list(self._preset, translator)
         self._process_var_list(self._postset, translator)

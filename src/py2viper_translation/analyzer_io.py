@@ -17,26 +17,6 @@ from py2viper_translation.lib.util import (
 )
 
 
-class IOOperationBodyChecker(ast.NodeVisitor):
-    """Perform some simple well formedness checks for IOOperation body."""
-
-    def check(self, body: ast.Expr) -> None:
-        """Check that body is well formed."""
-        self.visit(body)
-
-    def visit_Name(self, node: ast.Name) -> None:   # pylint: disable=invalid-name
-        """Check that only allowed names are used in the body."""
-        name = node.id
-        def raise_error(error_type):
-            """Raise error exception."""
-            raise InvalidProgramException(
-                node,
-                'invalid.io_operation.body.' + error_type,
-            )
-        if name.startswith('IOExists'):
-            raise_error('ioexists')
-
-
 class IOOperationAnalyzer(ast.NodeVisitor):
     """Walks through IO operation AST and collects the needed information."""
 
@@ -227,8 +207,6 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             body = lambda_.body
         else:
             io_existential_creators = []
-        checker = IOOperationBodyChecker()
-        checker.check(body)
         if not self._current_io_operation.set_body(body):
             self._raise_invalid_operation(
                 'duplicate_body',
