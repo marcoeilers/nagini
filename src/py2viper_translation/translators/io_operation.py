@@ -206,7 +206,10 @@ def _is_top_level_assertion(node: ast.expr) -> bool:
         """A helper function to get a parent node."""
         # _parent is not a node field, it is added dynamically by our
         # code. That is why mypy reports an error here.
-        return node._parent     # type: ignore
+        if hasattr(node, '_parent'):
+            return node._parent     # type: ignore
+        else:
+            return None
     parent = get_parent(node)
     while (isinstance(parent, ast.BoolOp) and
            isinstance(parent.op, ast.And)):
@@ -282,7 +285,7 @@ class IOOperationTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'token':
             return self._translate_token(node, ctx)
-        if func_name == 'Open':
+        elif func_name == 'Open':
             return self._translate_open(node, ctx)
         else:
             raise UnsupportedException(node,
