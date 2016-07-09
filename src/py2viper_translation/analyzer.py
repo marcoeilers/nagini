@@ -3,6 +3,7 @@ import logging
 import mypy
 import os
 import py2viper_translation.external.astpp
+import py2viper_contracts.io_builtins
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -108,7 +109,10 @@ class Analyzer(ast.NodeVisitor):
             if len(call.args) != 1 or not isinstance(call.args[0], ast.Str):
                 raise UnsupportedException(call)
             imported = call.args[0].s
-            imp_path = os.path.dirname(abs_path) + os.sep + imported
+            if imported == 'io_builtins':
+                imp_path = py2viper_contracts.io_builtins.__file__
+            else:
+                imp_path = os.path.dirname(abs_path) + os.sep + imported
             self.add_module(imp_path)
 
     def add_module(self, abs_path: str) -> None:

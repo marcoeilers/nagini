@@ -331,8 +331,6 @@ class MethodTranslator(CommonTranslator):
 
         args = self._translate_params(method, ctx)
 
-        statements = method.node.body
-        body_index = get_body_start_index(statements)
         body = self._create_method_prolog(method, ctx)
         # translate body
         if method.cls:
@@ -350,6 +348,8 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
+            statements = method.node.body
+            body_index = get_body_start_index(statements)
             if method.declared_exceptions:
                 body.append(self.viper.LocalVarAssign(error_var_ref,
                     self.viper.NullLit(self.no_position(ctx),
