@@ -107,6 +107,17 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         Checks that exactly one place is in preset, sets operation
         preset and returns input list with all places removed.
         """
+        if self._current_io_operation.name == 'join_io':
+            # Special handling of built-in “join_io”.
+            assert len(inputs) == 2
+            in_places = []
+            for i in range(2):
+                assert self._typeof(inputs[i]) == self._place_class
+                in_place = self._node_factory.create_python_var(
+                    inputs[i].arg, inputs[i], self._place_class)
+                in_places.append(in_place)
+            self._current_io_operation.set_preset(in_places)
+            return []
         if not inputs or self._typeof(inputs[0]) != self._place_class:
             self._raise_invalid_operation('invalid_preset')
         for inp in inputs[1:]:
@@ -128,7 +139,19 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             if self._typeof(output) == self._place_class:
                 counter += 1
         if counter > 1:
-            self._raise_invalid_operation('invalid_postset')
+            if self._current_io_operation.name == 'split_io':
+                # Special handling of built-in “split_io”.
+                assert len(outputs) == 2
+                out_places = []
+                for i in range(2):
+                    assert self._typeof(outputs[i]) == self._place_class
+                    out_place = self._node_factory.create_python_var(
+                        outputs[i].arg, outputs[i], self._place_class)
+                    out_places.append(out_place)
+                self._current_io_operation.set_postset(out_places)
+                return []
+            else:
+                self._raise_invalid_operation('invalid_postset')
         elif counter == 1:
             if self._typeof(outputs[-1]) != self._place_class:
                 self._raise_invalid_operation('invalid_postset')

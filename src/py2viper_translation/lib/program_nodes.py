@@ -3,6 +3,7 @@ import mypy
 
 from abc import ABCMeta
 from collections import OrderedDict
+from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
@@ -535,6 +536,10 @@ class PythonIOOperation(PythonNode, PythonScope):
         self._body = None
         self._io_existentials = None
 
+    @property
+    def is_builtin(self) -> bool:
+        return self.name in BUILTIN_IO_OPERATIONS
+
     def _process_var_list(self, var_list: List['PythonVar'],
                           translator: 'Translator') -> None:
         """
@@ -563,11 +568,11 @@ class PythonIOOperation(PythonNode, PythonScope):
         self._process_var_list(self._outputs, translator)
 
     def set_preset(self, preset: List['PythonVar']) -> None:
-        assert len(preset) == 1
+        assert len(preset) == 1 or self.is_builtin
         self._preset = preset
 
     def set_postset(self, postset: List['PythonVar']) -> None:
-        assert len(postset) == 1
+        assert len(postset) == 1 or self.is_builtin
         self._postset = postset
 
     def set_inputs(self, inputs: List['PythonVar']) -> None:

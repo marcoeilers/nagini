@@ -200,21 +200,23 @@ def _raise_invalid_get_ghost_output(error_type: str, node: ast.AST) -> None:
     )
 
 
+def _get_parent(node: ast.expr) -> ast.expr:
+    """A helper function to get a parent node."""
+    # _parent is not a node field, it is added dynamically by our
+    # code. That is why mypy reports an error here.
+    if hasattr(node, '_parent'):
+        return node._parent     # type: ignore
+    else:
+        return None
+
+
 def _is_top_level_assertion(node: ast.expr) -> bool:
     """Check if assertion represented by node is top level."""
-    def get_parent(node: ast.expr) -> ast.expr:
-        """A helper function to get a parent node."""
-        # _parent is not a node field, it is added dynamically by our
-        # code. That is why mypy reports an error here.
-        if hasattr(node, '_parent'):
-            return node._parent     # type: ignore
-        else:
-            return None
-    parent = get_parent(node)
+    parent = _get_parent(node)
     while (isinstance(parent, ast.BoolOp) and
            isinstance(parent.op, ast.And)):
         node = parent
-        parent = get_parent(node)
+        parent = _get_parent(node)
     if (isinstance(parent, ast.Call) and
             isinstance(parent.func, ast.Name)):
         func_name = parent.func.id
@@ -285,6 +287,8 @@ class IOOperationTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'token':
             return self._translate_token(node, ctx)
+        elif func_name == 'ctoken':
+            return self._translate_ctoken(node, ctx)
         elif func_name == 'Open':
             return self._translate_open(node, ctx)
         else:
@@ -292,14 +296,12 @@ class IOOperationTranslator(CommonTranslator):
                                        'Unsupported contract function.')
 
     def _translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """
-        Translate a call to IO contract function ``token``.
+        """Translate a call to IO contract function ``token``.
 
         .. todo:: Vytautas
 
             Implement support for obligations. Currently, providing a
             measure for a token gives an assertion error.
-
         """
         if len(node.args) != 1:
             raise UnsupportedException(
@@ -309,6 +311,29 @@ class IOOperationTranslator(CommonTranslator):
         assert not place_stmt
         perm = self._construct_full_perm(node, ctx)
         return [], self.create_predicate_access('token', [place_expr], perm,
+                                                node, ctx)
+
+    def _translate_ctoken(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to IO contract function ``ctoken``."""
+        assert len(node.args) == 1
+        if ctx.actual_function.name != 'Gap':
+            parent = _get_parent(node)
+            while parent is not None:
+                if (isinstance(parent, ast.Call) and
+                        isinstance(parent.func, ast.Name) and
+                        parent.func.id == 'Ensures'):
+                    # ctoken in postcondition is unsound.
+                    raise InvalidProgramException(
+                        node,
+                        'invalid.postcondition.ctoken_not_allowed',
+                    )
+                parent = _get_parent(parent)
+        place = node.args[0]
+        place_stmt, place_expr = self.translate_expr(
+            place, ctx, expression=True)
+        assert not place_stmt
+        perm = self._construct_full_perm(node, ctx)
+        return [], self.create_predicate_access('ctoken', [place_expr], perm,
                                                 node, ctx)
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
