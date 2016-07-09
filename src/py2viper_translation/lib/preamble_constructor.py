@@ -38,5 +38,6 @@ class IOPreambleConstructor:
         place = self._viper.LocalVarDecl(
             'place', self._viper.Ref, position, info)
         token = self._viper.Predicate('token', [place], None, position, info)
+        ctoken = self._viper.Predicate('ctoken', [place], None, position, info)
 
-        return [token], [], []
+        return [token, ctoken], [], []

@@ -5,7 +5,8 @@ CHECKED_TRANSLATOR_FILES:=\
 							src/py2viper_translation/lib/io_context.py \
 							src/py2viper_translation/lib/io_checkers.py
 CHECKED_CONTRACT_FILES:=\
-							deps/py2viper-contracts/src/py2viper_contracts/io.py
+							deps/py2viper-contracts/src/py2viper_contracts/io.py \
+							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
 CHECKED_TRANSLATOR_MODULES:=$(subst /,.,$(CHECKED_TRANSLATOR_FILES:src/%.py=%))
