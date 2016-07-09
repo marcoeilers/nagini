@@ -1,7 +1,8 @@
 from py2viper_contracts.contracts import (
+    Ensures,
     Import,
     Requires,
-    Ensures,
+    Result,
 )
 from py2viper_contracts.io import *
 

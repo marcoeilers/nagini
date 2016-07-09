@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Assert
+from py2viper_contracts.contracts import Assert, Result
 from py2viper_contracts.io import *
 
 

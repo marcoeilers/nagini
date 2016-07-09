@@ -1,6 +1,5 @@
-from py2viper_contracts.contracts import Ensures
+from py2viper_contracts.contracts import Ensures, Result
 from py2viper_contracts.io import *
-from typing import Tuple, Callable
 
 
 def test() -> Place:

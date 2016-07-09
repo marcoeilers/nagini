@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Predicate
+from py2viper_contracts.contracts import Predicate, Result
 from py2viper_contracts.io import *
 
 

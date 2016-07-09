@@ -1,8 +1,9 @@
 from py2viper_contracts.contracts import (
     Assert,
+    Ensures,
     Import,
     Requires,
-    Ensures,
+    Result,
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (

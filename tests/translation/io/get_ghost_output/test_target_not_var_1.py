@@ -1,3 +1,4 @@
+from py2viper_contracts.contracts import Result
 from py2viper_contracts.io import *
 from typing import Tuple
 
