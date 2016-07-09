@@ -1,4 +1,9 @@
-from py2viper_contracts.contracts import Requires, Ensures, ContractOnly
+from py2viper_contracts.contracts import (
+    ContractOnly,
+    Ensures,
+    Requires,
+    Result,
+)
 from py2viper_contracts.io import *
 from typing import Tuple, Callable
 

@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Pure
+from py2viper_contracts.contracts import Pure, Result
 from py2viper_contracts.io import *
 
 

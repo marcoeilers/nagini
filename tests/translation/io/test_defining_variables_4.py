@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Ensures, Implies
+from py2viper_contracts.contracts import Ensures, Implies, Result
 from py2viper_contracts.io import *
 from typing import Tuple, Callable
 

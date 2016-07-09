@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import NotPreservingTL
+from py2viper_contracts.contracts import NotPreservingTL, Result
 from py2viper_contracts.io import *
 
 

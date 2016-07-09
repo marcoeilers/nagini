@@ -1,7 +1,8 @@
 from py2viper_contracts.contracts import (
-    Requires,
     Ensures,
     Import,
+    Requires,
+    Result,
 )
 from py2viper_contracts.io import *
 from typing import Tuple

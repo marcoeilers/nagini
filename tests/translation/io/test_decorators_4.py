@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Ghost
+from py2viper_contracts.contracts import Ghost, Result
 from py2viper_contracts.io import *
 
 
