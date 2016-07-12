@@ -43,6 +43,7 @@ def write_int_twice_io(
         t_post: Place = Result(),
         ) -> bool:
     Terminates(True)
+    TerminationMeasure(2)
     return IOExists1(Place)(
         lambda t2: (
         write_int_io(t_pre, number1, t2) and

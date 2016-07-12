@@ -24,6 +24,7 @@ def test_io(
         t_pre: Place,
         t_post: Place = Result()) -> bool:
     Terminates(True)
+    TerminationMeasure(2)
     return IOExists6(Place, Place, Place, Place, Place, int)(
         lambda t2, t3, t4, t5, t6, res: (
         no_op_io(t_pre, t2) and
