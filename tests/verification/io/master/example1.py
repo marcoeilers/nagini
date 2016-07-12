@@ -31,7 +31,6 @@ def create_server_socket_io(
         t_post: Place = Result()) -> bool:
     """ An operation that creates a server socket. """
     Terminates(True)
-    #TerminationMeasure(0) – default value for basic IO.
 
 
 @ContractOnly
@@ -61,7 +60,6 @@ def accept_io(
     """ An operation that listens on the server socket for incoming
     connections.
     """
-    #Terminates(False) – default value for basic IO.
 
 
 @ContractOnly
@@ -206,7 +204,7 @@ def output_io(
         data: str,
         t_post: Place = Result()) -> bool:
     Terminates(True)
-    TerminationMeasure(1)
+    TerminationMeasure(2)
     return IOExists4(Place, Place, Place, Place)(
         lambda t1, t2, t3, t4: (
             (

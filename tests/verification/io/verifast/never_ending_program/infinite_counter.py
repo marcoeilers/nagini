@@ -29,6 +29,7 @@ def print_unary_io(
         number: int,
         t_end: Place = Result()) -> bool:
     Terminates(True)
+    TerminationMeasure(number+2 if number >= 1 else 2)
     return IOExists2(Place, bool)(
         lambda t2, success: (
         (
