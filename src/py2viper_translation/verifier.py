@@ -4,6 +4,7 @@ from abc import ABCMeta
 from enum import Enum
 from py2viper_translation.lib import config
 from py2viper_translation.lib.errors import error_msg
+from py2viper_translation.lib.error_translation import manager as error_mng
 from py2viper_translation.lib.jvmaccess import JVM
 
 
@@ -34,7 +35,7 @@ class Failure(VerificationResult):
     """
 
     def __init__(self, errors: 'silver.verifier.AbstractError'):
-        self.errors = errors
+        self.errors = error_mng.translate(errors)
 
     def __bool__(self):
         return False

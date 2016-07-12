@@ -2,6 +2,7 @@ import ast
 import types
 
 from py2viper_translation.lib.errors import cache
+from py2viper_translation.lib.error_translation import manager as error_mng
 from uuid import uuid1
 
 
@@ -375,7 +376,8 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
-    def to_position(self, expr, vias, error_string: str=None):
+    def to_position(self, expr, vias, error_string: str=None,
+                    error_translator=None):
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
@@ -389,6 +391,8 @@ class ViperAST:
         id = str(uuid1())
         assert not id in cache
         cache[id] = (expr, list(vias), error_string)
+        if error_translator is not None:
+            error_mng.register_translator(id, error_translator)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
