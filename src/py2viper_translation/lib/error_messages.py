@@ -35,6 +35,8 @@ ERRORS = {
     'predicate.not.wellformed':
         lambda n: 'Predicate ' + get_containing_member(n).name +
                   ' might not be well-formed.',
+    'termination_check.failed':
+        lambda n: 'Operation might not terminate.',
 }
 
 REASONS = {
@@ -46,4 +48,7 @@ REASONS = {
     'insufficient.permission':
         lambda n: 'There might be insufficient permission to access ' +
                   pprint(n) + '.',
+    'measure.non_positive':
+        lambda n: 'Termination measure {} might be non-positive.'.format(
+            pprint(n))
 }
