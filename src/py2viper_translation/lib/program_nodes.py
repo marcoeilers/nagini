@@ -17,7 +17,7 @@ from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 
 
 class PythonScope:
@@ -559,7 +559,8 @@ class PythonIOOperation(PythonNode, PythonScope):
                 self._body,
                 self.get_results(),
                 self._io_existentials,
-                program)
+                program,
+                translator)
             body_checker.check()
         self.sil_name = sil_name
         self._process_var_list(self._preset, translator)
@@ -600,6 +601,16 @@ class PythonIOOperation(PythonNode, PythonScope):
         else:
             return False
 
+    def get_terminates(self) -> ast.AST:
+        """
+        Get the ``Terminates`` property.
+
+        If it was not set, it sets a default ``False``.
+        """
+        if self._terminates is None:
+            self._terminates = ast.NameConstant(False)
+        return self._terminates
+
     def set_termination_measure(self, expression: ast.AST) -> bool:
         """
         Set the property if it is not already set and return ``True``.
@@ -609,6 +620,16 @@ class PythonIOOperation(PythonNode, PythonScope):
             return True
         else:
             return False
+
+    def get_termination_measure(self) -> ast.AST:
+        """
+        Get the ``TerminationMeasure`` property.
+
+        If it was not set, it sets a default ``1``.
+        """
+        if self._termination_measure is None:
+            self._termination_measure = ast.Num(1)
+        return self._termination_measure
 
     def is_basic(self) -> bool:
         """
@@ -666,6 +687,21 @@ class PythonIOOperation(PythonNode, PythonScope):
         """
         return self._outputs + self._postset
 
+    def get_variable(self, name: str) -> Optional['PythonVar']:
+        """
+        Returns the variable (existential variable or parameter) with
+        the given name.
+        """
+        for var in self._preset:
+            if var.name == name:
+                return var
+        for var in self._inputs:
+            if var.name == name:
+                return var
+        for var in self._io_existentials:
+            if var.name == name:
+                return var.create_io_existential_variable_instance()
+        return None
 
 class PythonExceptionHandler(PythonNode):
     """
@@ -872,12 +908,71 @@ class PythonVarCreator:
         self._node = node
         self._type = type
 
+        # Information needed to construct defining getter.
+        self._defining_order = None     # type: Optional[int]
+        self._defining_node = None
+        self._defining_result = None
+
+        # Defining getter.
+        self._existential_ref = None
+
+    @property
+    def defining_order(self) -> int:
+        """In what order existentials are defined?
+
+        If the variable's defining order is ``x``, then its defining
+        getter might have any existential variable with defining order
+        ``y (y < x)`` as its argument.
+        """
+        assert self._defining_order is not None
+        return self._defining_order
+
     @property
     def name(self) -> str:
         return self._name
 
+    def set_defining_info(self, order: int, node: ast.Call,
+                          result: PythonVar) -> None:
+        """Store information needed to contstruct the defining getter."""
+        assert self._defining_order is None
+        assert self._defining_node is None
+        assert self._defining_result is None
+
+        self._defining_order = order
+        self._defining_node = node
+        self._defining_result = result
+
+    def get_defining_info(self) -> Tuple[ast.Call, PythonVar]:
+        """Retrieve information needed to contstruct the defining getter."""
+        assert self._defining_order is not None
+        assert self._defining_node is not None
+        assert self._defining_result is not None
+
+        return self._defining_node, self._defining_result
+
+    def set_existential_ref(self, ref: Expr) -> None:
+        """Set defining getter."""
+        assert not self._existential_ref
+        self._existential_ref = ref
+
     def create_variable_instance(self) -> PythonVar:
+        """Create a normal variable.
+
+        Normal variables are used when translating ``Open`` statement.
+        """
         return PythonVar(self._name, self._node, self._type)
+
+    def create_io_existential_variable_instance(
+            self) -> PythonIOExistentialVar:
+        """Create an existential variable.
+
+        Existential variables are used when translating termination
+        checks.
+        """
+        var = PythonIOExistentialVar(self._name, self._node, self._type)
+        assert self._existential_ref
+        var.set_ref(self._existential_ref)
+        return var
 
 
 class PythonField(PythonNode):

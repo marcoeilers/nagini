@@ -8,6 +8,10 @@ from typing import List
 from py2viper_translation import lib    # pylint: disable=unused-import
 from py2viper_translation.lib.util import InvalidProgramException
 
+# Just to make mypy happy.
+if False:         # pylint: disable=using-constant-test
+    from py2viper_translation.translator import Translator  # pylint: disable=unused-import
+
 
 def _raise_error(node, error_type) -> None:
     """Raise error exception."""
@@ -30,13 +34,17 @@ class IOOperationBodyChecker(ast.NodeVisitor):
             self, body: ast.Expr,
             results: List['lib.program_nodes.PythonVar'],
             io_existentials: List['lib.program_nodes.PythonVarCreator'],
-            program: 'lib.program_nodes.PythonProgram') -> None:
+            program: 'lib.program_nodes.PythonProgram',
+            translator: 'Translator') -> None:
         super().__init__()
         self._body = body
         self._results = {var.name for var in results}
-        self._existentials = {var.name for var in io_existentials}
-        self._undefined_existentials = self._existentials.copy()
+        self._existentials = dict(
+            (var.name, var) for var in io_existentials)
+        self._undefined_existentials = set(self._existentials.keys())
         self._program = program
+        self._translator = translator
+        self._counter = 0
 
     def check(self) -> None:
         """Check that body is well formed."""
@@ -62,7 +70,7 @@ class IOOperationBodyChecker(ast.NodeVisitor):
                 results = node.args[-result_count:]
             else:
                 results = []
-            for arg in results:
+            for i, arg in enumerate(results):
                 if not isinstance(arg, ast.Name):
                     _raise_error(node, 'not_variable_in_result_position')
                 elif (arg.id not in self._existentials and
@@ -70,6 +78,10 @@ class IOOperationBodyChecker(ast.NodeVisitor):
                     _raise_error(node, 'variable_not_existential')
                 elif arg.id in self._undefined_existentials:
                     self._undefined_existentials.remove(arg.id)
+                    var = self._existentials[arg.id]
+                    var.set_defining_info(self._counter, node,
+                                          operation.get_results()[i])
+                    self._counter += 1
         self.visit(node.func)
         for arg in node.args:
             self.visit(arg)
