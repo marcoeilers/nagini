@@ -77,6 +77,7 @@ class TypeDomainFactory:
     def create_type_function(self, name: str, position: 'silver.ast.Position',
                              info: 'silver.ast.Info',
                              ctx: Context) -> 'silver.ast.DomainFunc':
+        print('domfunc ' + str(name))
         return self.viper.DomainFunc(name, [], self.type_type(), True, position,
                                      info, self.type_domain)
 

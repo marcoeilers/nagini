@@ -20,6 +20,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonMethod,
+    PythonProgram,
     PythonType,
     PythonVar
 )
@@ -45,9 +46,9 @@ class CallTranslator(CommonTranslator):
     def translate_isinstance(self, node: ast.Call,
                              ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
-        assert isinstance(node.args[1], ast.Name)
+        assert isinstance(self.get_target(node.args[1], ctx.program), PythonClass)
         stmt, obj = self.translate_expr(node.args[0], ctx)
-        cls = ctx.program.classes[node.args[1].id]
+        cls = self.get_target(node.args[1], ctx.program)
         pos = self.to_position(node, ctx)
         return stmt, self.type_check(obj, cls, pos, ctx, inhale_exhale=False)
 
@@ -136,7 +137,7 @@ class CallTranslator(CommonTranslator):
         if node.args:
             raise UnsupportedException(node)
         args = []
-        set_class = ctx.program.classes[SET_TYPE]
+        set_class = ctx.program.global_prog.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
         targets = [res_var.ref()]
@@ -148,7 +149,7 @@ class CallTranslator(CommonTranslator):
         if len(node.args) != 2:
             msg = 'range() is currently only supported with two args.'
             raise UnsupportedException(node, msg)
-        range_class = ctx.program.classes[RANGE_TYPE]
+        range_class = ctx.program.global_prog.classes[RANGE_TYPE]
         start_stmt, start = self.translate_expr(node.args[0], ctx)
         end_stmt, end = self.translate_expr(node.args[1], ctx)
 
@@ -218,6 +219,9 @@ class CallTranslator(CommonTranslator):
         Returns the target of the given call; for constructor calls, the class
         whose constructor is called, for everything else the method.
         """
+        target = self.get_target(node.func, ctx.actual_function if ctx.actual_function else ctx.program)
+        if target:
+            return target
         name = get_func_name(node)
         if name in ctx.program.classes:
             # constructor call
@@ -345,7 +349,7 @@ class CallTranslator(CommonTranslator):
         """
         Wraps the given arguments into a tuple to be passed to an *args param.
         """
-        tuple_class = ctx.program.classes[TUPLE_TYPE]
+        tuple_class = ctx.program.global_prog.classes[TUPLE_TYPE]
         stmts = []
         vals = []
         val_types = []
@@ -365,13 +369,13 @@ class CallTranslator(CommonTranslator):
         Wraps the given arguments into a dict to be passed to an **kwargs param.
         """
         res_var = ctx.current_function.create_variable('kw_args',
-            ctx.program.classes[DICT_TYPE], self.translator)
-        dict_class = ctx.program.classes[DICT_TYPE]
+            ctx.program.global_prog.classes[DICT_TYPE], self.translator)
+        dict_class = ctx.program.global_prog.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
         stmt = [constr_call]
-        str_type = ctx.program.classes[STRING_TYPE]
+        str_type = ctx.program.global_prog.classes[STRING_TYPE]
         for key, val in args.items():
             # key string literal
             length = len(key)
@@ -485,7 +489,7 @@ class CallTranslator(CommonTranslator):
         optional_error_var = None
         error_var = self.get_error_var(node, ctx)
         if method.declared_exceptions:
-            var = PythonVar(ERROR_NAME, None, ctx.program.classes['Exception'])
+            var = PythonVar(ERROR_NAME, None, ctx.program.global_prog.classes['Exception'])
             var._ref = error_var
             optional_error_var = var
         old_fold = ctx.ignore_family_folds
@@ -519,30 +523,34 @@ class CallTranslator(CommonTranslator):
             # we don't know, so probably some builtin we don't support yet.
             msg = 'Unsupported builtin function.'
             raise UnsupportedException(node, msg)
-        if name in ctx.program.classes:
+        if isinstance(target, PythonClass):
             # this is a constructor call
             return self._translate_constructor_call(target, node, args,
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
-            if isinstance(node.func.value, ast.Name):
-                if node.func.value.id in ctx.program.classes:
-                    # statically bound call
-                    return self.inline_call(target, node, False, 'static call',
-                                            ctx)
-            if isinstance(node.func.value, ast.Call):
-                if get_func_name(node.func.value) == 'super':
+            rec_target = self.get_target(node.func.value, ctx.actual_function if ctx.actual_function else ctx.program)
+            if isinstance(rec_target, PythonClass):
+                # statically bound call
+                return self.inline_call(target, node, False, 'static call',
+                                        ctx)
+            elif isinstance(rec_target, PythonProgram):
+                # normal, receiverless call to imported function
+                receiver_class = None
+                is_predicate = target.predicate
+            elif isinstance(node.func.value, ast.Call) and get_func_name(node.func.value) == 'super':
                     # super call
                     return self.inline_call(target, node, True, 'static call',
                                             ctx)
-            # method called on an object
-            rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
-            receiver_type = self.get_type(node.func.value, ctx)
-            is_predicate = target.predicate
-            receiver_class = target.cls
-            arg_stmts = rec_stmt + arg_stmts
-            args = [receiver] + args
-            arg_types = [receiver_type] + arg_types
+            else:
+                # method called on an object
+                rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
+                receiver_type = self.get_type(node.func.value, ctx)
+                is_predicate = target.predicate
+                receiver_class = target.cls
+                arg_stmts = rec_stmt + arg_stmts
+                args = [receiver] + args
+                arg_types = [receiver_type] + arg_types
         else:
             # global function/method called
             receiver_class = None
