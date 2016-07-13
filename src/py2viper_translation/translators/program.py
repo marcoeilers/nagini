@@ -86,7 +86,7 @@ class ProgramTranslator(CommonTranslator):
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.classes['Exception'])
+                              ctx.program.global_prog.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
@@ -242,12 +242,10 @@ class ProgramTranslator(CommonTranslator):
         """
         if len(method.args) != len(method.overrides.args):
             raise InvalidProgramException(method.node, 'invalid.override')
-        for exc in method.declared_exceptions:
-            exc_class = ctx.program.classes[exc]
+        for exc_class in method.declared_exceptions:
             allowed = False
             for superexc in method.overrides.declared_exceptions:
-                superexcclass = ctx.program.classes[superexc]
-                if exc_class.issubtype(superexcclass):
+                if exc_class.issubtype(superexc):
                     allowed = True
                     break
             if not allowed:
@@ -269,7 +267,7 @@ class ProgramTranslator(CommonTranslator):
                     raise InvalidProgramException(arg.default, 'purity.violated')
                 arg.default_expr = expr
 
-    def translate_program(self, program: PythonProgram,
+    def translate_program(self, programs: List[PythonProgram],
                           sil_progs: List,
                           ctx: Context) -> 'silver.ast.Program':
         """
@@ -316,72 +314,74 @@ class ProgramTranslator(CommonTranslator):
 
         predicate_families = OrderedDict()
 
-        for var in program.global_vars:
-            functions.append(
-                self.create_global_var_function(program.global_vars[var], ctx))
+        for program in programs:
+            ctx.program = program
+            for var in program.global_vars:
+                functions.append(
+                    self.create_global_var_function(program.global_vars[var], ctx))
 
-        for class_name, cls in program.classes.items():
-            if class_name in PRIMITIVES:
-                continue
-            fields += self._translate_fields(cls, ctx)
-
-        # translate default args
-        containers = [program] + list(program.classes.values())
-        for container in containers:
-            for function in container.functions.values():
-                self.translate_default_args(function, ctx)
-            for method in container.methods.values():
-                self.translate_default_args(method, ctx)
-            for pred in container.predicates.values():
-                self.translate_default_args(pred, ctx)
-
-        for function in program.functions.values():
-            functions.append(self.translate_function(function, ctx))
-        for method in program.methods.values():
-            methods.append(self.translate_method(method, ctx))
-        for pred in program.predicates.values():
-            predicates.append(self.translate_predicate(pred, ctx))
-        for class_name, cls in program.classes.items():
-            if class_name in PRIMITIVES:
-                continue
-            old_class = ctx.current_class
-            ctx.current_class = cls
-            funcs, axioms = self.type_factory.create_type(cls, ctx)
-            type_funcs.append(funcs)
-            if axioms:
-                type_axioms.append(axioms)
-            for func_name in cls.functions:
-                func = cls.functions[func_name]
-                if func.interface:
+            for class_name, cls in program.classes.items():
+                if class_name in PRIMITIVES:
                     continue
-                functions.append(self.translate_function(func, ctx))
-                if func.overrides:
-                    raise InvalidProgramException(func.node,
-                                                  'invalid.override')
-            for method_name in cls.methods:
-                method = cls.methods[method_name]
-                if method.interface:
-                    continue
+                fields += self._translate_fields(cls, ctx)
+
+            # translate default args
+            containers = [program] + list(program.classes.values())
+            for container in containers:
+                for function in container.functions.values():
+                    self.translate_default_args(function, ctx)
+                for method in container.methods.values():
+                    self.translate_default_args(method, ctx)
+                for pred in container.predicates.values():
+                    self.translate_default_args(pred, ctx)
+
+            for function in program.functions.values():
+                functions.append(self.translate_function(function, ctx))
+            for method in program.methods.values():
                 methods.append(self.translate_method(method, ctx))
-                if method_name != '__init__' and method.overrides:
-                    methods.append(self.create_override_check(method, ctx))
-            for method_name in cls.get_all_methods():
-                method = cls.get_method(method_name)
-                if (method.cls != cls and method_name != '__init__' and
-                        not cls.name.startswith('Dummy_Sub')):
-                    # inherited
-                    methods.append(self.create_inherit_check(method, cls, ctx))
-            for pred_name in cls.predicates:
-                pred = cls.predicates[pred_name]
-                cpred = pred
-                while cpred.overrides:
-                    cpred = cpred.overrides
-                if cpred in predicate_families:
-                    predicate_families[cpred].append(pred)
-                else:
-                    predicate_families[cpred] = [pred]
-            # methods.append(self.create_constructor(cls))
-            ctx.current_class = old_class
+            for pred in program.predicates.values():
+                predicates.append(self.translate_predicate(pred, ctx))
+            for class_name, cls in program.classes.items():
+                if class_name in PRIMITIVES:
+                    continue
+                old_class = ctx.current_class
+                ctx.current_class = cls
+                funcs, axioms = self.type_factory.create_type(cls, ctx)
+                type_funcs.append(funcs)
+                if axioms:
+                    type_axioms.append(axioms)
+                for func_name in cls.functions:
+                    func = cls.functions[func_name]
+                    if func.interface:
+                        continue
+                    functions.append(self.translate_function(func, ctx))
+                    if func.overrides:
+                        raise InvalidProgramException(func.node,
+                                                      'invalid.override')
+                for method_name in cls.methods:
+                    method = cls.methods[method_name]
+                    if method.interface:
+                        continue
+                    methods.append(self.translate_method(method, ctx))
+                    if method_name != '__init__' and method.overrides:
+                        methods.append(self.create_override_check(method, ctx))
+                for method_name in cls.get_all_methods():
+                    method = cls.get_method(method_name)
+                    if (method.cls != cls and method_name != '__init__' and
+                            not cls.name.startswith('Dummy_Sub')):
+                        # inherited
+                        methods.append(self.create_inherit_check(method, cls, ctx))
+                for pred_name in cls.predicates:
+                    pred = cls.predicates[pred_name]
+                    cpred = pred
+                    while cpred.overrides:
+                        cpred = cpred.overrides
+                    if cpred in predicate_families:
+                        predicate_families[cpred].append(pred)
+                    else:
+                        predicate_families[cpred] = [pred]
+                # methods.append(self.create_constructor(cls))
+                ctx.current_class = old_class
 
         for root in predicate_families:
             pf = self.translate_predicate_family(root, predicate_families[root],

@@ -59,13 +59,22 @@ class PythonScope:
 
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
-                 node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
+                 node_factory: 'ProgramNodeFactory',
+                 type_prefix: str,
+                 global_prog: 'PythonProgram',
+                 sil_names: List[str] = None) -> None:
+        if sil_names is None:
+            sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
+        super().__init__(sil_names, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.predicates = OrderedDict()
         self.global_vars = OrderedDict()
+        self.namespaces = OrderedDict()
+        self.global_prog = global_prog
+        self.type_prefix = type_prefix
+        self.from_imports = []
         self.types = types
         for primitive in PRIMITIVES:
             self.classes[primitive] = node_factory.create_python_class(
@@ -87,10 +96,21 @@ class PythonProgram(PythonScope):
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
-        if name in self.functions:
-            return self.functions[name]
-        else:
-            return self.methods[name]
+        for cont in [self] + self.from_imports + [self.global_prog]:
+            if name in cont.functions:
+                return cont.functions[name]
+            elif name in cont.methods:
+                return cont.methods[name]
+
+    def get_type(self, prefix: List[str], name: str):
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefix)
+        return self.types.get_type(actual_prefix, name)
+
+    def get_func_type(self, prefix: List[str]):
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefix)
+        return self.types.get_func_type(actual_prefix)
 
 
 class PythonNode:
@@ -120,6 +140,8 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
+        if name == 'Super':
+            print("asdasd")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
@@ -267,11 +289,11 @@ class GenericType(PythonType):
     behaves like the underlying PythonClass (in this case list).
     """
 
-    def __init__(self, name: str, program: PythonProgram,
+    def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
-        self.name = name
-        self.program = program
-        self.cls = self.program.classes[self.name]
+        self.name = cls.name
+        self.program = cls.get_program()
+        self.cls = cls
         self.type_args = args
         self.exact_length = True
 
@@ -569,7 +591,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_program().classes['Exception']
+        exc_type = self.method.get_program().global_prog.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
@@ -590,6 +612,8 @@ class PythonVar(PythonNode):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
+        if name == 'Whatever':
+            print("343345")
         self.type = type
         self.decl = None
         self._ref = None

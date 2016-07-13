@@ -4,6 +4,7 @@ from py2viper_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     LIST_TYPE,
+    OBJECT_TYPE,
     PRIMITIVES,
     SET_TYPE,
     TUPLE_TYPE,
@@ -162,8 +163,8 @@ class StatementTranslator(CommonTranslator):
         invariant.append(previous_list_acc_pred)
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
-        object_class = ctx.program.classes['object']
-        list_class = ctx.program.classes['list']
+        object_class = ctx.program.global_prog.classes[OBJECT_TYPE]
+        list_class = ctx.program.global_prog.classes[LIST_TYPE]
         previous_len = self.get_function_call(list_class, '__len__',
                                               [iter_previous_acc],
                                               [object_class], None, ctx)
@@ -219,7 +220,7 @@ class StatementTranslator(CommonTranslator):
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
                       node: ast.AST, ctx: Context) -> Tuple[PythonVar, Stmt]:
-        iter_class = ctx.program.classes['Iterator']
+        iter_class = ctx.program.global_prog.classes['Iterator']
         iter_var = ctx.actual_function.create_variable('iter', iter_class,
                                                        self.translator)
         assert not node in ctx.loop_iterators
@@ -235,17 +236,17 @@ class StatementTranslator(CommonTranslator):
                        node: ast.For, ctx: Context) -> Tuple[PythonVar, Stmt]:
 
         if target_var.type.name in PRIMITIVES:
-            boxed_target_type = ctx.program.classes['__boxed_' +
-                                                    target_var.type.name]
+            boxed_target_type = ctx.program.global_prog.classes['__boxed_' +
+                                                                target_var.type.name]
         else:
             boxed_target_type = target_var.type
         boxed_target_var = ctx.actual_function.create_variable('target',
                                                                boxed_target_type,
                                                                self.translator)
-        exc_class = ctx.program.classes['Exception']
+        exc_class = ctx.program.global_prog.classes['Exception']
         err_var = ctx.actual_function.create_variable('iter_err', exc_class,
                                                       self.translator)
-        iter_class = ctx.program.classes['Iterator']
+        iter_class = ctx.program.global_prog.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         targets = [boxed_target_var.ref(node.target, ctx), err_var.ref()]
@@ -267,7 +268,7 @@ class StatementTranslator(CommonTranslator):
 
     def _get_iterator_delete(self, iter_var: PythonVar, node: ast.For,
                              ctx: Context) -> Stmt:
-        iter_class = ctx.program.classes['Iterator']
+        iter_class = ctx.program.global_prog.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
