@@ -50,5 +50,15 @@ REASONS = {
                   pprint(n) + '.',
     'measure.non_positive':
         lambda n: 'Termination measure {} might be non-positive.'.format(
-            pprint(n))
+            pprint(n)),
+    'measure.non_decreasing':
+        lambda n: 'Termination measure of {} might be not smaller.'.format(
+            pprint(n)),
+    'gap.enabled':
+        lambda n: 'Gap {} might be enabled in terminating IO operation.'.format(
+            pprint(n)),
+    'child_termination.not_implied':
+        lambda n: ('Parent IO operation termination condition does not '
+                   'imply {} termination condition.').format(
+            pprint(n)),
 }

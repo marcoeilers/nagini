@@ -123,10 +123,6 @@ in fields should not be too common in practise:
 2.  It is not allowed to have permissions in non-basic IO operation
     definitions.
 
-    .. todo:: Vytautas
-
-        Implement this check.
-
 .. todo:: Vytautas
 
     Things to investigate:
@@ -139,9 +135,26 @@ in fields should not be too common in practise:
 
 import ast
 
-from typing import Callable, cast, List, Tuple  # pylint: disable=unused-import
+from typing import (    # pylint: disable=unused-import
+    Callable,
+    cast,
+    List,
+    Optional,
+    Tuple,
+    Type,
+)
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
+from py2viper_translation.lib.error_translation import (
+    BaseError,
+    GapEnabledError,
+    TerminationMeasureNonPositiveError,
+    TerminationMeasureNonDecreasingError,
+    TerminationNotImpliedError,
+)
+from py2viper_translation.lib.guard_collectors import (
+    GuardCollectingVisitor,
+)
 from py2viper_translation.lib.program_nodes import (
     PythonGlobalVar,
     PythonIOOperation,
@@ -157,6 +170,7 @@ from py2viper_translation.lib.typedefs import (
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    join_expressions,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -165,6 +179,7 @@ from py2viper_translation.translators.common import CommonTranslator
 # Just to make mypy happy.
 if False:         # pylint: disable=using-constant-test
     import viper  # pylint: disable=import-error,unused-import
+    from viper.silver import ast as viper_ast   # pylint: disable=import-error,unused-import,wrong-import-order
 
 
 def _construct_getter_name(operation: PythonIOOperation,
@@ -236,6 +251,165 @@ def _get_openned_operation(
     _raise_invalid_operation_use('open_non_io_operation', node)
 
 
+class TerminationCheckGenerator(GuardCollectingVisitor):
+    """Class responsible for generating IO operation termination checks."""
+
+    def __init__(self, io_translator: 'IOOperationTranslator',
+                 ctx: Context,
+                 termination_condition: Expr,
+                 termination_measure: Expr) -> None:
+        super().__init__()
+        self._io_translator = io_translator
+        self._ctx = ctx
+        self._termination_condition = termination_condition
+        self._termination_measure = termination_measure
+        self._current_operation = None          # type: PythonIOOperation
+        self._current_operation_node = None     # type: ast.Call
+        self._current_identifier = None         # type: str
+        self._current_guard_condition = None    # type: Expr
+        self.checks = []                        # type: List[Stmt]
+
+    def _is_io_operation(self, node: ast.Call) -> bool:
+        return (isinstance(node.func, ast.Name) and
+                node.func.id in self._ctx.program.io_operations)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if self._is_io_operation(node):
+            self._create_termination_checks(node)
+        else:
+            super().visit_Call(node)
+
+    def _create_termination_checks(self, node: ast.Call) -> None:
+        assert self._current_operation is None
+        assert self._current_identifier is None
+        assert self._current_guard_condition is None
+        assert self._current_operation_node is None
+
+        self._current_operation_node = node
+
+        operation_name = cast(ast.Name, node.func).id
+        operation = self._ctx.program.io_operations[operation_name]
+        self._current_operation = operation
+
+        identifier = "{} ({}:{})".format(
+            operation.name, node.lineno, node.col_offset)
+        self._current_identifier = identifier
+
+        self._current_guard_condition = self._create_guard_condition()
+
+        self._check_gap()
+        aliases = self._set_up_aliases(node)
+        self._check_termination_condition()
+        self._check_termination_measure()
+        self._clean_up_aliases(aliases)
+
+        self._current_operation = None
+        self._current_identifier = None
+        self._current_guard_condition = None
+        self._current_operation_node = None
+
+    def _set_up_aliases(self, node: ast.Call) -> List[str]:
+        """Set up aliases for the operation termination check translation.
+
+        .. todo:: Vytautas
+
+            Refactor: Very similar code is used in several places.
+        """
+        aliases = []
+
+        py_args = node.args[:len(self._current_operation.get_parameters())]
+        sil_args = self._io_translator.translate_args(py_args, self._ctx)
+        for parameter, py_arg, sil_arg in zip(
+                self._current_operation.get_parameters(),
+                py_args,
+                sil_args):
+            var_type = self._io_translator.get_type(py_arg, self._ctx)
+            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
+            var.set_ref(sil_arg)
+            self._ctx.set_alias(parameter.name, var)
+            aliases.append(parameter.name)
+        return aliases
+
+    def _clean_up_aliases(self, aliases: List[str]) -> None:
+        """Remove created aliases."""
+        for alias in aliases:
+            self._ctx.remove_alias(alias)
+
+    def _create_guard_condition(self) -> Expr:
+        """Generate a Silver expression that guards current AST node."""
+        guard_sil_parts = []
+        for part in self.current_guard:
+            sil_part = self._translate_expr(part)
+            guard_sil_parts.append(sil_part)
+        and_operator = (
+            lambda left, right:
+            self._viper.And(left, right,
+                            self._position(), self._no_info()))
+        condition = join_expressions(
+            and_operator, [self._termination_condition] + guard_sil_parts)
+        return condition
+
+    def _add_check(self, condition: Expr, comment_template: str,
+                   position: 'viper_ast.IdentifierPosition') -> None:
+        check = self._viper.Implies(
+            self._current_guard_condition, condition,
+            position, self._no_info())
+        comment = comment_template.format(self._current_identifier)
+        assertion = self._viper.Assert(
+            check, position, self._to_info(comment))
+        self.checks.append(assertion)
+
+    def _check_gap(self) -> None:
+        """Check that ``gap_io`` is disabled under termination condition."""
+        if self._current_operation.name == 'gap_io':
+            position = self._position(GapEnabledError)
+            false = self._viper.FalseLit(position, self._no_info())
+            self._add_check(false, "Gap at {}.", position)
+
+    def _check_termination_condition(self) -> None:
+        """Check that child termination condition is implied."""
+        termination_condition = self._translate_expr(
+            self._current_operation.get_terminates())
+        position = self._position(TerminationNotImpliedError)
+        self._add_check(termination_condition,
+                        "Termination condition of {}.",
+                        position)
+
+    def _check_termination_measure(self) -> None:
+        """Check that child measure is strictly smaller."""
+        termination_measure = self._translate_expr(
+            self._current_operation.get_termination_measure())
+        position = self._position(TerminationMeasureNonDecreasingError)
+        larger = self._viper.GtCmp(
+            self._termination_measure,
+            termination_measure,
+            position, self._no_info())
+        self._add_check(larger, "Termination measure of {}.", position)
+
+    def _translate_expr(self, node: ast.AST) -> Expr:
+        statement, expression = self._io_translator.translate_expr(
+            node, self._ctx, expression=True)
+        assert not statement
+        return expression
+
+    def _no_info(self) -> 'viper_ast.NoInfo':
+        return self._io_translator.no_info(self._ctx)
+
+    def _to_info(self, comment) -> 'viper_ast.SimpleInfo':
+        return self._io_translator.to_info([comment], self._ctx)
+
+    def _position(
+            self,
+            etr: Type[BaseError]=None) -> 'viper_ast.IdentifierPosition':
+        return self._io_translator.to_position(
+            self._current_operation_node, self._ctx,
+            error_translator=etr)
+
+    @property
+    def _viper(self) -> 'viper':
+        return self._io_translator.viper
+
+
 class IOOperationTranslator(CommonTranslator):
     """Class responsible for translating IO operations."""
 
@@ -270,11 +444,97 @@ class IOOperationTranslator(CommonTranslator):
                                          position, info)
             getters.append(getter)
 
+        if not operation.is_basic():
+            self._translate_defining_getters(operation, ctx)
+
+        method = self._create_termination_check(operation, ctx)
+        checks = [method]
+
         return (
             predicate,
             getters,
-            []
+            checks,
         )
+
+    def _translate_defining_getters(
+            self, main_operation: PythonIOOperation,
+            ctx: Context) -> None:
+        """Translate defining getters of existential variables."""
+        assert not main_operation.is_basic()
+        assert ctx.current_function is None
+        ctx.current_function = main_operation
+
+        existentials = main_operation.get_io_existentials()
+        existentials.sort(key=lambda var: var.defining_order)
+
+        for existential in existentials:
+            node, result = existential.get_defining_info()
+            getter = self.create_result_getter(node, result, ctx)
+            existential.set_existential_ref(getter)
+
+        ctx.current_function = None
+
+    def _create_termination_check(
+            self, operation: PythonIOOperation,
+            ctx: Context) -> 'viper.silver.ast.Method':
+        """Create a termination check."""
+        assert not ctx.current_function
+        ctx.current_function = operation
+
+        name = ctx.program.get_fresh_name(
+            operation.sil_name + '__termination_check')
+        parameters = [
+            parameter.decl
+            for parameter in operation.get_parameters()
+        ]
+        info = self.no_info(ctx)
+        checks = []     # type: Expr[Stmt]
+
+        statement, termination_condition = self.translate_expr(
+            operation.get_terminates(), ctx, expression=True)
+        assert not statement
+        statement, termination_measure = self.translate_expr(
+            operation.get_termination_measure(), ctx, expression=True)
+        assert not statement
+
+        # Check that measure is positive.
+        # TODO (Vytautas): Refactor code duplication.
+        position = self.to_position(
+            operation.get_termination_measure(),
+            ctx,
+            error_translator=TerminationMeasureNonPositiveError)
+        positive = self.viper.GtCmp(
+            termination_measure,
+            self.viper.IntLit(0, position, info),
+            position,
+            info)
+        check = self.viper.Implies(
+            termination_condition,
+            positive,
+            position,
+            info)
+        assertion = self.viper.Assert(
+            check, position,
+            self.to_info(["Termination measure must be positive."], ctx))
+        checks.append(assertion)
+
+        # Check IO operations.
+        if not operation.is_basic():
+            generator = TerminationCheckGenerator(
+                self, ctx, termination_condition, termination_measure)
+            generator(operation.get_body())
+            checks.extend(generator.checks)
+
+        position = self.to_position(operation.get_termination_measure(), ctx)
+
+        body = self.translate_block(checks, position, info)
+
+        ctx.current_function = None
+        result = self.viper.Method(
+            name=name, args=parameters, returns=[], pres=[], posts=[],
+            locals=[], body=body, position=self.no_position(ctx), info=info)
+
+        return result
 
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:
@@ -353,10 +613,11 @@ class IOOperationTranslator(CommonTranslator):
 
         statements = []
 
-        py_args = cast(ast.Call, node.args[0]).args
+        operation_call = cast(ast.Call, node.args[0])
+        py_args = operation_call.args
         if len(py_args) != len(operation.get_parameters()):
             _raise_invalid_operation_use('result_used_argument', node)
-        sil_args = self._translate_args(py_args, ctx)
+        sil_args = self.translate_args(py_args, ctx)
 
         perm = self._construct_full_perm(node, ctx)
         position = self.to_position(node, ctx)
@@ -410,8 +671,10 @@ class IOOperationTranslator(CommonTranslator):
             var.process(sil_name, self.translator)
             ctx.actual_function.locals[sil_name] = var
             io_ctx.add_variable(name, var)
-            getter = self._create_result_getter(
-                sil_args, operation, result, ctx, position, info)
+            getter = self.create_result_getter(
+                operation_call, result, ctx, sil_args=sil_args)
+            # NOTE: sil_args must be translated in the context without
+            # aliases.
             io_ctx.define_variable(name, getter)
             ctx.set_alias(name, var)
             open_aliases.append(name)
@@ -444,7 +707,7 @@ class IOOperationTranslator(CommonTranslator):
 
         return (statements, None)
 
-    def _translate_args(
+    def translate_args(
             self, args: List[ast.expr],
             ctx: Context) -> List[Expr]:
         """Translate IO operation arguments to silver."""
@@ -455,23 +718,32 @@ class IOOperationTranslator(CommonTranslator):
             arg_exprs.append(arg_expr)
         return arg_exprs
 
-    def _create_result_getter(
-            self, args: List[ast.Expr], operation, result, ctx,
-            position, info):
+    def create_result_getter(
+            self, node: ast.Call, result: PythonVar, ctx: Context,
+            sil_args: Optional[List[ast.Expr]] = None) -> Expr:
         """Construct a getter for an IO operation result."""
-        name = _construct_getter_name(operation, result)
+        position = self.no_position(ctx)
+        info = self.no_info(ctx)
+
+        operation_name = cast(ast.Name, node.func).id
+        operation = ctx.program.io_operations[operation_name]
+
+        if sil_args is None:
+            py_args = node.args[:len(operation.get_parameters())]
+            sil_args = self.translate_args(py_args, ctx)
+
+        getter_name = _construct_getter_name(operation, result)
         typ = self.translate_type(result.type, ctx)
         formal_args = [
             arg.decl
             for arg in operation.get_parameters()
         ]
         getter = self.viper.FuncApp(
-            name, args, position, info, typ, formal_args)
+            getter_name, sil_args, position, info, typ, formal_args)
         return getter
 
     def _translate_results(
-            self, args: List[ast.Expr],
-            operation: PythonIOOperation, node: ast.Call,
+            self, operation: PythonIOOperation, node: ast.Call,
             ctx: Context) -> List[Expr]:
         """Translate IO operation results.
 
@@ -504,8 +776,7 @@ class IOOperationTranslator(CommonTranslator):
                 _raise_invalid_operation_use(
                     'not_variable_in_result_position', node)
 
-            getter = self._create_result_getter(
-                args, operation, result, ctx, position, info)
+            getter = self.create_result_getter(node, result, ctx)
 
             def add_comparison(var: PythonVarBase) -> Expr:
                 """Create ``EqCmp`` between ``var`` and ``getter``."""
@@ -564,7 +835,7 @@ class IOOperationTranslator(CommonTranslator):
         name = get_func_name(node)
         operation = ctx.program.io_operations[name]
         parameters_count = len(operation.get_parameters())
-        args = self._translate_args(node.args[:parameters_count], ctx)
+        args = self.translate_args(node.args[:parameters_count], ctx)
         perm = self._construct_full_perm(node, ctx)
 
         # Translate predicate.
@@ -572,7 +843,7 @@ class IOOperationTranslator(CommonTranslator):
             operation.sil_name, args, perm, node, ctx)
 
         # Translate results.
-        equations = self._translate_results(args, operation, node, ctx)
+        equations = self._translate_results(operation, node, ctx)
 
         # And everything.
         expr = predicate
@@ -660,17 +931,12 @@ class IOOperationTranslator(CommonTranslator):
         if result.type != target.type:
             _raise_invalid_get_ghost_output('type_mismatch', node)
 
-        # TODO: (Vytautas) Refactor this code duplication.
-        py_args = operation_call.args
-        if len(py_args) != len(operation.get_parameters()):
+        if len(operation_call.args) != len(operation.get_parameters()):
             _raise_invalid_operation_use('result_used_argument', node)
-        sil_args = self._translate_args(py_args, ctx)
+        getter = self.create_result_getter(operation_call, result, ctx)
 
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        getter = self._create_result_getter(
-            sil_args, operation, result, ctx, position, info)
-
         assignment = self.viper.LocalVarAssign(target.ref(), getter,
                                                position, info)
 

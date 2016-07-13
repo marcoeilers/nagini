@@ -39,7 +39,7 @@ class BaseError:
         return self._error.readableMessage()
 
 
-class TerminationMeasureError(BaseError):
+class TerminationMeasureNonPositiveError(BaseError):
     """Termination measure is not well-formed."""
 
     def fullId(self):
@@ -51,6 +51,53 @@ class TerminationMeasureError(BaseError):
         original_id = super().fullId()
         if original_id == 'assert.failed:assertion.false':
             return 'termination_check.failed:measure.non_positive'
+        else:
+            return original_id
+
+
+class TerminationMeasureNonDecreasingError(BaseError):
+    """Termination measure is not decreasing."""
+
+    def fullId(self):
+        """Full error identifier.
+
+        Return measure non-decreasing identifier instead of assertion
+        failure.
+        """
+        original_id = super().fullId()
+        if original_id == 'assert.failed:assertion.false':
+            return 'termination_check.failed:measure.non_decreasing'
+        else:
+            return original_id
+
+
+class GapEnabledError(BaseError):
+    """``gap_io`` is enabled in IO that should terminate."""
+
+    def fullId(self):
+        """Full error identifier.
+
+        Return gap enabled identifier instead of assertion failure.
+        """
+        original_id = super().fullId()
+        if original_id == 'assert.failed:assertion.false':
+            return 'termination_check.failed:gap.enabled'
+        else:
+            return original_id
+
+
+class TerminationNotImpliedError(BaseError):
+    """IO operation's termination does not imply children's termination."""
+
+    def fullId(self):
+        """Full error identifier.
+
+        Return children termination not implied identifier instead of
+        assertion failure.
+        """
+        original_id = super().fullId()
+        if original_id == 'assert.failed:assertion.false':
+            return 'termination_check.failed:child_termination.not_implied'
         else:
             return original_id
 
