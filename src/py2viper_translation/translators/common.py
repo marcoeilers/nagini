@@ -7,6 +7,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
     PythonMethod,
+    PythonNode,
+    PythonProgram,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -94,7 +96,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             target_cls = receiver
             func = target_cls.get_function(func_name)
         else:
-            func = ctx.program.functions[func_name]
+            for container in [ctx.program] + ctx.program.from_imports + [ctx.program.global_prog]:
+                if func_name in container.functions:
+                    func = container.functions[func_name]
+                    break
         if not func:
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
@@ -174,7 +179,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',
-                ctx.program.classes['Exception'], self.translator)
+                ctx.program.global_prog.classes['Exception'], self.translator)
             return new_var.ref()
 
     def var_type_check(self, name: str, type: PythonType,
@@ -248,7 +253,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         arg_types = [None]
         name = '__unbox__'
         call = self.get_function_call(
-            ctx.program.classes['__boxed_' + type.name], name, args,
+            ctx.program.global_prog.classes['__boxed_' + type.name], name, args,
             arg_types, node, ctx)
         return call
 
@@ -260,3 +265,49 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         for (index, char) in enumerate(string):
             result += pow(256, index) * ord(char)
         return result
+
+    def get_included_programs(self, prog: PythonProgram,
+                              include_global: bool=True) -> List[PythonProgram]:
+        result = [prog]
+        for p in prog.from_imports:
+            result.extend(self.get_included_programs(p, include_global=False))
+        result.append(prog.global_prog)
+        return result
+
+    def get_target(self, node: ast.AST, container: PythonNode) -> PythonProgram:
+        if isinstance(node, ast.Name):
+            if isinstance(container, PythonMethod):
+                containers = [container]
+                containers.extend(self.get_included_programs(container.get_program()))
+            else:
+                # assume program
+                containers = self.get_included_programs(container)
+            for ctx in containers:
+                for field in ['var_aliases', 'locals', 'classes', 'functions',
+                              'global_vars', 'methods', 'predicates',
+                              'namespaces']:
+                    if hasattr(ctx, field):
+                        field_val = getattr(ctx, field)
+                        if node.id in field_val:
+                            return field_val[node.id]
+            return None
+        elif isinstance(node, ast.Call):
+            return self.get_target(node.func, container)
+        elif isinstance(node, ast.Attribute):
+            ctx = self.get_target(node.value, container)
+            if isinstance(ctx, (PythonVar, PythonMethod)):
+                ctx = ctx.type
+            containers = [ctx]
+            while isinstance(containers[-1], PythonClass) and containers[
+                -1].superclass:
+                containers.append(containers[-1].superclass)
+            for ctx in containers:
+                for field in ['classes', 'functions', 'global_vars',
+                              'methods', 'predicates', 'namespaces']:
+                    if hasattr(ctx, field):
+                        field_val = getattr(ctx, field)
+                        if node.attr in field_val:
+                            return field_val[node.attr]
+            return None
+        else:
+            return None

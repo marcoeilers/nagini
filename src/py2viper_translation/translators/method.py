@@ -113,11 +113,11 @@ class MethodTranslator(CommonTranslator):
         error_type_conds = []
         error_string = '"method only raises exceptions of type{0} {1}"'.format(
             's' if len(method.declared_exceptions) > 1 else '',
-            ', '.join(method.declared_exceptions))
+            ', '.join([e.name for e in method.declared_exceptions]))
         error_type_pos = self.to_position(method.node, ctx, error_string)
         for exception in method.declared_exceptions:
             has_type = self.var_type_check(ERROR_NAME,
-                                           ctx.program.classes[exception],
+                                           exception,
                                            error_type_pos,
                                            ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
@@ -317,7 +317,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = method
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.classes['Exception'])
+                              ctx.program.global_prog.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()

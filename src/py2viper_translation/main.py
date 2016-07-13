@@ -58,31 +58,47 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
-    sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
+
     modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
+    type_correct = types.check(os.path.abspath(path))
+    if not type_correct:
+        return None
     if sif:
         node_factory = SIFProgramNodeFactory()
     else:
         node_factory = ProgramNodeFactory()
     analyzer = Analyzer(jvm, viperast, types, path, node_factory)
+    main_program = analyzer.program
     for si in sil_interface:
         analyzer.add_interface(json.loads(si))
-    for module in analyzer.modules:
+
+    mod_index = 0
+    while mod_index < len(analyzer.modules):
+        module = analyzer.modules[mod_index]
         analyzer.collect_imports(module)
-        type_correct = types.check(module)
-        if type_correct:
-            analyzer.contract_only = module != os.path.abspath(path)
+        mod_index += 1
+
+    for module in analyzer.modules:
+        if module.startswith('mod$'):
+            continue
+        if module != os.path.abspath(path):
+            analyzer.contract_only = True
+            analyzer.program = analyzer.module_programs[module]
             analyzer.visit_module(module)
         else:
-            return None
+            analyzer.program = main_program
+            analyzer.contract_only = False
+            analyzer.visit_module(module)
     if sif:
         translator = SIFTranslator(jvm, path, types, viperast)
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    prog = translator.translate_program(analyzer.program, sil_programs)
+    sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
+    programs = [main_program.global_prog] + list(analyzer.module_programs.values())
+    prog = translator.translate_program(programs, sil_programs)
     return prog
 
 
