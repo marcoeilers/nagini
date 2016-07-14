@@ -2,7 +2,7 @@ import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.constants import BUILTIN_PREDICATES, PRIMITIVES
-from py2viper_translation.lib.program_nodes import PythonVar
+from py2viper_translation.lib.program_nodes import PythonProgram, PythonVar
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -124,14 +124,19 @@ class ContractTranslator(CommonTranslator):
                 return arg_stmts, self.translate_builtin_predicate(call, perm,
                                                                    args, ctx)
             else:
-                pred = ctx.program.predicates[call.func.id]
+                pred = self.get_target(call.func, ctx.actual_function if ctx.actual_function else ctx.program)
         elif isinstance(call.func, ast.Attribute):
-            rec_stmt, receiver = self.translate_expr(call.func.value, ctx)
-            assert not rec_stmt
-            receiver_class = self.get_type(call.func.value, ctx)
-            name = call.func.attr
-            pred = receiver_class.get_predicate(name)
-            args = [receiver] + args
+            receiver = self.get_target(call.func.value,
+                                       ctx.actual_function if ctx.actual_function else ctx.program)
+            if isinstance(receiver, PythonProgram):
+                pred = receiver.predicates[call.func.attr]
+            else:
+                rec_stmt, receiver = self.translate_expr(call.func.value, ctx)
+                assert not rec_stmt
+                receiver_class = self.get_type(call.func.value, ctx)
+                name = call.func.attr
+                pred = receiver_class.get_predicate(name)
+                args = [receiver] + args
         else:
             raise UnsupportedException(node)
         pred_name = pred.sil_name

@@ -290,6 +290,8 @@ class ExpressionTranslator(CommonTranslator):
             if node.id in ctx.var_aliases:
                 return [], ctx.var_aliases[node.id].ref(node, ctx)
             else:
+                if ctx.current_function.get_variable(node.id) is None:
+                    print("!!!")
                 return [], ctx.current_function.get_variable(node.id).ref(node,
                                                                           ctx)
 

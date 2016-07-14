@@ -297,7 +297,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             ctx = self.get_target(node.value, container)
             if isinstance(ctx, (PythonVar, PythonMethod)):
                 ctx = ctx.type
-            containers = [ctx]
+            if isinstance(ctx, PythonProgram):
+                containers = self.get_included_programs(ctx, include_global=False)
+            else:
+                containers = [ctx]
             while isinstance(containers[-1], PythonClass) and containers[
                 -1].superclass:
                 containers.append(containers[-1].superclass)

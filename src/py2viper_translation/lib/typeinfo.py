@@ -189,6 +189,7 @@ class TypeInfo:
     def __init__(self):
         self.all_types = {}
         self.alt_types = {}
+        self.files = {}
 
     def check(self, filename: str) -> bool:
         """
@@ -214,6 +215,7 @@ class TypeInfo:
                 if name in {'builtins', 'py2viper_contracts',
                             'py2viper_contracts.contracts', 'typing', 'abc'}:
                     continue
+                self.files[name] = file.path
                 visitor = TypeVisitor(res.types, name,
                                       file.ignored_lines)
                 visitor.prefix = [name]

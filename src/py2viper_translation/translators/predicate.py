@@ -56,6 +56,7 @@ class PredicateTranslator(CommonTranslator):
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             ctx.current_function = instance
+            ctx.program = instance.get_program()
             for root_name, current_name in zip(root.args.keys(),
                                                instance.args.keys()):
                 root_var = root.args[root_name]

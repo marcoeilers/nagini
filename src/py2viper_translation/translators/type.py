@@ -97,6 +97,10 @@ class TypeTranslator(CommonTranslator):
                     var = ctx.var_aliases[node.id]
                 col = node.col_offset if hasattr(node, 'col_offset') else None
                 key = (node.lineno, col)
+                if var is None:
+                    print("!!!")
+                    self.get_target(node._parent._parent._parent.func,
+                                    ctx.actual_function if ctx.actual_function else ctx.program)
                 if key in var.alt_types:
                     return var.alt_types[key]
                 else:
