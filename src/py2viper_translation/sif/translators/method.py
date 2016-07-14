@@ -127,8 +127,9 @@ class SIFMethodTranslator(MethodTranslator):
         # create postconditions
         ctx.in_posts = True
         posts = []
-        for post in func.postcondition:
-            stmt, expr = self.translate_expr(post, ctx)
+        for post, aliases in func.postcondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(post, ctx)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)

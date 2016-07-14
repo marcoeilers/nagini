@@ -2,8 +2,8 @@ import ast
 import logging
 import mypy
 import os
-import py2viper_translation.external.astpp
 import py2viper_contracts.io_builtins
+import py2viper_translation.external.astpp
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -59,9 +59,8 @@ class Analyzer(ast.NodeVisitor):
         self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
         self._is_io_existential = False     # Are we defining an
                                             # IOExists block?
-        self._lambda_stack = []             # Keeps track how deep we
-                                            # are in a lambda
-                                            # expression.
+        self._aliases = {}                  # Dict[str, PythonBaseVar]
+        # TODO: Remove this one.
 
     def define_new(self, container: Union[PythonProgram, PythonClass],
                    name: str, node: ast.AST) -> None:
@@ -310,10 +309,12 @@ class Analyzer(ast.NodeVisitor):
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         self.current_scopes.append(name)
         lambda_var_names = {}
+        assert not self._aliases
         for arg in node.args.args:
             if self._is_io_existential:
                 var = self.node_factory.create_python_io_existential_var(
                     arg.arg, arg, self.typeof(arg))
+                self._aliases[arg.arg] = var
             else:
                 var = self.node_factory.create_python_var(
                     arg.arg, arg, self.typeof(arg))
@@ -326,10 +327,9 @@ class Analyzer(ast.NodeVisitor):
                 self.current_function.special_vars[local_name] = var
             lambda_var_names[arg.arg] = local_name
         self._is_io_existential = False
-        self._lambda_stack.append(lambda_var_names)
         self.visit(node.body, node)
-        self._lambda_stack.pop()
         self.current_scopes.pop()
+        self._aliases.clear()
 
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
@@ -355,9 +355,11 @@ class Analyzer(ast.NodeVisitor):
             if not self.current_function or self.current_function.predicate:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
-                self.current_function.precondition.append(node.args[0])
+                self.current_function.precondition.append(
+                    (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Ensures':
-                self.current_function.postcondition.append(node.args[0])
+                self.current_function.postcondition.append(
+                    (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = node.args[0].id
                 if exception not in self.current_function.declared_exceptions:
@@ -370,28 +372,12 @@ class Analyzer(ast.NodeVisitor):
                 node, 'invalid.io_operation.misplaced_property')
         self.visit_default(node)
 
-
-    def _make_variable_name_unique(self, node: ast.Name) -> None:
-        """
-        If node.id is defined by Lambda, make it uniquely defined.
-
-        .. todo::
-            This function is a workaround for py2viper issue `19
-            <https://bitbucket.org/viperproject/py2viper-translation/issues/19/>`_.
-        """
-        for lambda_var_names in reversed(self._lambda_stack):
-            if node.id in lambda_var_names:
-                node.id = lambda_var_names[node.id]
-                return
-
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in LITERALS:
             return
         if node.id.startswith('IOExists'):
             raise InvalidProgramException(node, 'invalid.ioexists.misplaced')
         if isinstance(node._parent, ast.Call):
-            # FIXME(Marco): Remove this call once #19 is properly fixed.
-            self._make_variable_name_unique(node)
             return
         if isinstance(node._parent, ast.arg):
             if node._parent.annotation is node:
@@ -434,8 +420,6 @@ class Analyzer(ast.NodeVisitor):
                 raise UnsupportedException(node)
             else:
                 # node refers to a local variable or lambda argument.
-                # FIXME(Marco): Remove this call once #19 is properly fixed.
-                self._make_variable_name_unique(node)
                 var = None
                 if node.id in self.current_function.locals:
                     var = self.current_function.locals[node.id]
