@@ -251,6 +251,16 @@ def _get_openned_operation(
     _raise_invalid_operation_use('open_non_io_operation', node)
 
 
+def _get_variable(var_name: str, ctx: Context) -> PythonVarBase:
+    """Return variable by taking into account aliasing."""
+    if var_name in ctx.var_aliases:
+        var = ctx.var_aliases[var_name]
+    else:
+        var = ctx.actual_function.get_variable(var_name)
+        assert var
+    return var
+
+
 class TerminationCheckGenerator(GuardCollectingVisitor):
     """Class responsible for generating IO operation termination checks."""
 
@@ -543,6 +553,8 @@ class IOOperationTranslator(CommonTranslator):
         Currently supported functions:
 
         +   ``token``
+        +   ``ctoken``
+        +   ``Open``
         """
         func_name = get_func_name(node)
         if func_name == 'token':
@@ -567,7 +579,8 @@ class IOOperationTranslator(CommonTranslator):
             raise UnsupportedException(
                 node, "Obligations not implemented.")
         place = node.args[0]
-        place_stmt, place_expr = self.translate_expr(place, ctx)
+        place_stmt, place_expr = self.translate_expr(place, ctx,
+                                                     expression=True)
         assert not place_stmt
         perm = self._construct_full_perm(node, ctx)
         return [], self.create_predicate_access('token', [place_expr], perm,
@@ -792,6 +805,11 @@ class IOOperationTranslator(CommonTranslator):
 
             instance = cast(ast.Name, instance_expr)
             var_name = instance.id
+            if var_name in ctx.var_aliases:
+                var = ctx.var_aliases[var_name]
+            else:
+                var = ctx.actual_function.get_variable(var_name)
+                assert var
 
             if io_ctx.contains_variable(var_name):
                 # Variable denotes a result of the operation being opened.
@@ -802,9 +820,7 @@ class IOOperationTranslator(CommonTranslator):
                     add_comparison(var)
                 else:
                     io_ctx.define_variable(var_name, getter)
-            elif var_name in ctx.actual_function.io_existential_vars:
-                var = ctx.actual_function.io_existential_vars[var_name]
-                assert isinstance(var, PythonIOExistentialVar)
+            elif isinstance(var, PythonIOExistentialVar):
                 check(var)
                 if var.is_defined():
                     add_comparison(var)
@@ -866,7 +882,7 @@ class IOOperationTranslator(CommonTranslator):
                     len(node.comparators) == 1 and
                     isinstance(node.left, ast.Name) and
                     isinstance(node.ops[0], ast.Eq)):
-                var = ctx.actual_function.get_variable(node.left.id)
+                var = _get_variable(node.left.id, ctx)
                 return (
                     isinstance(var, PythonIOExistentialVar) and
                     not var.is_defined())
@@ -884,7 +900,7 @@ class IOOperationTranslator(CommonTranslator):
         assert not right_stmt   # Should be handled by expression=True.
 
         name_node = cast(ast.Name, node.left)
-        var = ctx.actual_function.get_variable(name_node.id)
+        var = _get_variable(name_node.id, ctx)
 
         expression_type = self.get_type(node.comparators[0], ctx)
         if var.type != expression_type:

@@ -313,14 +313,14 @@ class ExpressionTranslator(CommonTranslator):
             return [], func_app
         else:
             if node.id in ctx.var_aliases:
-                return [], ctx.var_aliases[node.id].ref(node, ctx)
+                var = ctx.var_aliases[node.id]
             else:
                 var = ctx.current_function.get_variable(node.id)
-                if (isinstance(var, PythonIOExistentialVar) and
-                        not var.is_defined()):
-                    raise InvalidProgramException(
-                        node, 'io_existential_var.use_of_undefined')
-                return [], var.ref(node, ctx)
+            if (isinstance(var, PythonIOExistentialVar) and
+                    not var.is_defined()):
+                raise InvalidProgramException(
+                    node, 'io_existential_var.use_of_undefined')
+            return [], var.ref(node, ctx)
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
