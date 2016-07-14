@@ -1,15 +1,18 @@
 from py2viper_contracts.contracts import *
 import resources.namespace_test as nt
-from resources.namespace_test_3 import a_function
-Import('resources/namespace_test.py', 'nt')
-Import('resources/namespace_test_3.py')
+from resources.namespace_test_3 import a_function, P
+# Import('resources/namespace_test.py', 'nt')
+# Import('resources/namespace_test_3.py')
 
 
 class Sub(nt.resources.namespace_test_2.Super):
-    pass
+    @Predicate
+    def some_pred(self, i: int) -> bool:
+        return i < OTHER_GLOBAL
 
 
 GLOBAL = 43
+OTHER_GLOBAL = 36
 
 
 def a_method() -> bool:
@@ -82,3 +85,19 @@ def catches() -> None:
 def throws() -> None:
     Exsures(nt.SpecificException, True)
     raise nt.SpecificException()
+
+
+def pred_use(i: int) -> None:
+    Requires(nt.resources.namespace_test_2.B(i))
+    Ensures(Acc(nt.PP(i)))
+    Unfold(nt.resources.namespace_test_2.B(i))
+    Fold(P(i))
+    Fold(nt.PP(i))
+
+
+def pred_fam_use(u: int, s: Sub) -> None:
+    Requires(s.some_pred(u))
+    Ensures(Acc(s.some_pred(u)))
+    Unfold(s.some_pred(u))
+    Assert(u == 35)
+    Fold(s.some_pred(u))

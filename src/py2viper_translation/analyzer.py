@@ -96,21 +96,39 @@ class Analyzer(ast.NodeVisitor):
         self.asts[abs_path] = parse_result
         logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
+        imports = [s for s in parse_result.body if isinstance(s, (ast.Import, ast.ImportFrom))]
         for stmt in parse_result.body:
-            if get_func_name(stmt) != 'Import':
-                continue
-            if isinstance(stmt, ast.Expr):
-                call = stmt.value
-            else:
-                call = stmt
-
-            if (not isinstance(call.args[0], ast.Str) or
-                    (len(call.args) > 1 and
-                         not isinstance(call.args[1], ast.Str))):
-                raise UnsupportedException(call)
-            imported = call.args[0].s
-            imp_path = os.path.dirname(abs_path) + os.sep + imported
-            self.add_module(imp_path, abs_path, call.args[1].s if len(call.args) > 1 else None)
+            if isinstance(stmt, ast.Import):
+                for name in stmt.names:
+                    module = name.name
+                    if module == 'typing':
+                        continue
+                    as_ = name.asname
+                    assert module in self.types.files
+                    path = self.types.files[module]
+                    self.add_module(path, abs_path, as_ if as_ else module)
+            elif isinstance(stmt, ast.ImportFrom):
+                module = stmt.module
+                if (module == 'py2viper_contracts.contracts' or
+                            module == 'typing'):
+                    continue
+                assert module in self.types.files
+                path = self.types.files[module]
+                self.add_module(path, abs_path, None)
+            # if get_func_name(stmt) != 'Import':
+            #     continue
+            # if isinstance(stmt, ast.Expr):
+            #     call = stmt.value
+            # else:
+            #     call = stmt
+            #
+            # if (not isinstance(call.args[0], ast.Str) or
+            #         (len(call.args) > 1 and
+            #              not isinstance(call.args[1], ast.Str))):
+            #     raise UnsupportedException(call)
+            # imported = call.args[0].s
+            # imp_path = os.path.dirname(abs_path) + os.sep + imported
+            # self.add_module(imp_path, abs_path, call.args[1].s if len(call.args) > 1 else None)
 
     def add_module(self, abs_path: str, into: str, as_: str) -> None:
         if as_ and '.' in as_:
