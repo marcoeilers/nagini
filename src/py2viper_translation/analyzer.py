@@ -15,6 +15,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonNode,
     PythonProgram,
+    PythonProgramView,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -114,7 +115,11 @@ class Analyzer(ast.NodeVisitor):
                     continue
                 assert module in self.types.files
                 path = self.types.files[module]
-                self.add_module(path, abs_path, None)
+                if len(stmt.names) == 1 and stmt.names[0].name== '*':
+                    names = None
+                else:
+                    names = [(a.name, a.asname if a.asname else None) for a in stmt.names]
+                self.add_module(path, abs_path, None, names)
             # if get_func_name(stmt) != 'Import':
             #     continue
             # if isinstance(stmt, ast.Expr):
@@ -130,7 +135,7 @@ class Analyzer(ast.NodeVisitor):
             # imp_path = os.path.dirname(abs_path) + os.sep + imported
             # self.add_module(imp_path, abs_path, call.args[1].s if len(call.args) > 1 else None)
 
-    def add_module(self, abs_path: str, into: str, as_: str) -> None:
+    def add_module(self, abs_path: str, into: str, as_: str, names=None) -> None:
         if as_ and '.' in as_:
             split = as_.split('.', 1)
             first = split[0]
@@ -149,8 +154,11 @@ class Analyzer(ast.NodeVisitor):
             new_prog = self.module_programs[abs_path]
         into_prog = self.module_programs[into]
         if as_:
+            assert not names
             into_prog.namespaces[as_] = new_prog
         else:
+            if names:
+                new_prog = PythonProgramView(new_prog, names)
             into_prog.from_imports.append(new_prog)
 
     def process(self, translator: 'Translator') -> None:

@@ -14,7 +14,7 @@ from py2viper_translation.lib.constants import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 
 class PythonScope:
@@ -75,6 +75,7 @@ class PythonProgram(PythonScope):
         self.global_prog = global_prog
         self.type_prefix = type_prefix
         self.from_imports = []
+        self.node_factory = node_factory
         self.types = types
         for primitive in PRIMITIVES:
             self.classes[primitive] = node_factory.create_python_class(
@@ -111,6 +112,55 @@ class PythonProgram(PythonScope):
         actual_prefix = [self.type_prefix]
         actual_prefix.extend(prefix)
         return self.types.get_func_type(actual_prefix)
+
+
+class LazyDict:
+    def __init__(self, names: List[Tuple[str, str]], prog: PythonProgram, field: str):
+        self.prog = prog
+        self.field = field
+        self.names = {}
+        for name, as_name in names:
+            new_name = as_name if as_name else name
+            self.names[new_name] = name
+
+    def __getitem__(self, item):
+        if item in self.names:
+            key = self.names[item]
+            progs = get_included_programs(self.prog, include_global=False)
+            actuals = [getattr(p, self.field) for p in progs]
+            for actual in actuals:
+                if key in actual:
+                    return actual[key]
+        raise KeyError(item)
+
+    def __contains__(self, item):
+        if item in self.names:
+            key = self.names[item]
+            progs = get_included_programs(self.prog, include_global=False)
+            actuals = [getattr(p, self.field) for p in progs]
+            for actual in actuals:
+                if key in actual:
+                    return True
+        return False
+
+
+def get_included_programs(prog: PythonProgram,
+                          include_global: bool = True) -> List[PythonProgram]:
+    result = [prog]
+    for p in prog.from_imports:
+        result.extend(get_included_programs(p, include_global=False))
+    result.append(prog.global_prog)
+    return result
+
+
+class PythonProgramView(PythonProgram):
+    def __init__(self, prog: PythonProgram, names: List[Tuple[str, str]]):
+        super().__init__(prog.types, prog.node_factory, prog.type_prefix,
+                         prog.global_prog, prog.sil_names)
+        for field in ['functions', 'methods', 'namespaces', 'predicates',
+                      'classes', 'global_vars']:
+            lazy_dict = LazyDict(names, prog, field)
+            setattr(self, field, lazy_dict)
 
 
 class PythonNode:
