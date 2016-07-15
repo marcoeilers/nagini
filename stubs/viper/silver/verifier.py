@@ -1,13 +1,13 @@
 from typing import Any
 
 from viper.silver.ast import (
-    IdentifierPosition,
+    AbstractSourcePosition,
     Node,
 )
 
 
 class AbstractError:
-    def pos(self) -> IdentifierPosition:
+    def pos(self) -> AbstractSourcePosition:
         pass
     def fullId(self) -> str:
         pass
@@ -19,7 +19,7 @@ class AbstractErrorReason:
         pass
     def offendingNode(self) -> Node:
         pass
-    def pos(self) -> IdentifierPosition:
+    def pos(self) -> AbstractSourcePosition:
         pass
     def readableMessage(self) -> str:
         pass
@@ -29,7 +29,7 @@ class ErrorMessage:
         pass
     def offendingNode(self) -> Node:
         pass
-    def pos(self) -> IdentifierPosition:
+    def pos(self) -> AbstractSourcePosition:
         pass
     def readableMessage(self) -> str:
         pass
@@ -42,5 +42,5 @@ class VerificationError(AbstractError, ErrorMessage):
         pass
 
 class AbstractVerificationError(VerificationError):
-    def pos(self) -> IdentifierPosition:
+    def pos(self) -> AbstractSourcePosition:
         pass

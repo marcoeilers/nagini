@@ -424,7 +424,7 @@ class IOOperationTranslator(CommonTranslator):
     """Class responsible for translating IO operations."""
 
     def _construct_full_perm(self, node: ast.Call,
-                             ctx: Context) -> 'viper.silver.ast.FullPerm':
+                             ctx: Context) -> 'viper_ast.FullPerm':
         """Construct silver full perm AST node."""
         return self.viper.FullPerm(self.to_position(node, ctx),
                                    self.no_info(ctx))
@@ -432,9 +432,9 @@ class IOOperationTranslator(CommonTranslator):
     def translate_io_operation(
             self, operation: PythonIOOperation,
             ctx: Context) -> Tuple[
-                'viper.silver.ast.Predicate',
-                List['viper.silver.ast.Function'],
-                List['viper.silver.ast.Method']]:
+                'viper_ast.Predicate',
+                List['viper_ast.Function'],
+                List['viper_ast.Method']]:
         """Translate IO operation to Silver."""
         args = [
             arg.decl
@@ -486,7 +486,7 @@ class IOOperationTranslator(CommonTranslator):
 
     def _create_termination_check(
             self, operation: PythonIOOperation,
-            ctx: Context) -> 'viper.silver.ast.Method':
+            ctx: Context) -> 'viper_ast.Method':
         """Create a termination check."""
         assert not ctx.current_function
         ctx.current_function = operation

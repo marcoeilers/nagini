@@ -3,13 +3,15 @@ from typing import Any, List
 class Node:
     pass
 
-class IdentifierPosition:
+class AbstractSourcePosition:
     def file(self) -> Any:
         pass
     def start(self) -> Any:
         pass
     def end(self) -> Any:
         pass
+
+class IdentifierPosition(AbstractSourcePosition):
     def id(self) -> str:
         pass
 
