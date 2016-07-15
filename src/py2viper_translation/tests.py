@@ -6,7 +6,7 @@ import tokenize
 
 from os.path import isfile, join
 from py2viper_translation.lib import config, jvmaccess
-from py2viper_translation.lib.errors import cache
+from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.typeinfo import TypeException
 from py2viper_translation.lib.util import InvalidProgramException, flatten, flatten_dict
 from py2viper_translation.main import translate, verify
@@ -94,23 +94,21 @@ class AnnotatedTests():
         return (content, token.start[0])
 
     def get_vias(self, error) -> str:
-        reason_pos = error.reason().offendingNode().pos()
-        if hasattr(reason_pos, 'id'):
-            reason_pos = reason_pos.id()
-            reason_entry = cache[reason_pos]
-            if reason_entry[1]:
-                return [via[1].line() for via in reason_entry[1]]
-        error_pos = error.pos()
-        if hasattr(error_pos, 'id'):
-            error_pos = error_pos.id()
-            error_entry = cache[error_pos]
-            return [via[1].line() for via in error_entry[1]]
+        reason_pos = error.reason.position
+        if reason_pos.node_id:
+            vias = error_manager.get_vias(reason_pos.node_id)
+            if vias:
+                return [via[1].line() for via in vias]
+        error_pos = error.position
+        if error_pos.node_id:
+            vias = error_manager.get_vias(error_pos.node_id)
+            return [via[1].line() for via in vias]
         return []
 
     def failure_to_actual(self, error: 'silver.verifier.AbstractError') \
-            -> Tuple[int, int, str, str, List[int]]:
-        return ((error.pos().line(), error.pos().column()), error.fullId(),
-                error.readableMessage(), self.get_vias(error))
+            -> Tuple[int, int, str, List[int]]:
+        return ((error.pos().line(), error.pos().column()), error.full_id,
+                self.get_vias(error))
 
     def compare_actual_expected(self, actual, expected, optional, labels):
         actual_unexpected = []
@@ -171,7 +169,7 @@ class VerificationTests(AnnotatedTests):
                                            jvm.viper.silver.ast.HasLineColumn)]
             actual = [self.failure_to_actual(error) for error in vresult.errors
                       if not error in missing_info]
-            actual_lo = [(line, id, via) for ((line, col), id, msg, via) in
+            actual_lo = [(line, id, via) for ((line, col), id, via) in
                          actual]
             assert not missing_info
             self.compare_actual_expected(actual_lo, expected_lo, optional_lo,

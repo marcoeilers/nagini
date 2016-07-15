@@ -1,9 +1,7 @@
 import ast
 import types
 
-from py2viper_translation.lib.errors import cache
-from py2viper_translation.lib.error_translation import manager as error_mng
-from uuid import uuid1
+from py2viper_translation.lib.errors import error_manager, Rules
 
 
 def getobject(package, name):
@@ -377,7 +375,7 @@ class ViperAST:
         return self.ast.SimpleInfo(self.to_seq(comments))
 
     def to_position(self, expr, vias, error_string: str=None,
-                    error_translator=None):
+                    rules: Rules=None):
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
@@ -388,11 +386,8 @@ class ViperAST:
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
-        id = str(uuid1())
-        assert not id in cache
-        cache[id] = (expr, list(vias), error_string)
-        if error_translator is not None:
-            error_mng.register_translator(id, error_translator)
+        id = error_manager.add_error_information(
+            expr, list(vias), error_string, rules)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
