@@ -3,7 +3,7 @@ import ast
 from abc import ABCMeta
 from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
-from py2viper_translation.lib.error_translation import BaseError
+from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
@@ -58,13 +58,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
-            error_translator: BaseError=None) -> 'silver.ast.Position':
+            rules: Rules=None) -> 'silver.ast.Position':
         """
         Extracts the position from a node, assigns an ID to the node and stores
         the node and the position in the context for it.
         """
-        return self.viper.to_position(node, ctx.position, error_string,
-                                      error_translator)
+        return self.viper.to_position(node, ctx.position, error_string, rules)
 
     def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.to_position(None, ctx)

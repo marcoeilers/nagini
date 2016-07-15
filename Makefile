@@ -4,8 +4,12 @@ CHECKED_TRANSLATOR_FILES:=\
 							src/py2viper_translation/lib/preamble_constructor.py \
 							src/py2viper_translation/lib/io_context.py \
 							src/py2viper_translation/lib/io_checkers.py \
-							src/py2viper_translation/lib/error_translation.py \
-							src/py2viper_translation/lib/guard_collectors.py
+							src/py2viper_translation/lib/guard_collectors.py \
+							src/py2viper_translation/lib/errors/__init__.py \
+							src/py2viper_translation/lib/errors/manager.py \
+							src/py2viper_translation/lib/errors/messages.py \
+							src/py2viper_translation/lib/errors/rules.py \
+							src/py2viper_translation/lib/errors/wrappers.py
 CHECKED_CONTRACT_FILES:=\
 							deps/py2viper-contracts/src/py2viper_contracts/io.py \
 							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py
@@ -25,7 +29,7 @@ mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
-	bin/flake8 --ignore=F401,E501,D102 --max-complexity 12 $(CHECKED_FILES)
+	bin/flake8 --ignore=F401,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
 
 pylint: bin/pylint
 	bin/pylint $(CHECKED_MODULES)

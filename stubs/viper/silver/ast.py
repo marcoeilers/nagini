@@ -10,6 +10,10 @@ class AbstractSourcePosition:
         pass
     def end(self) -> Any:
         pass
+    def line(self) -> int:
+        pass
+    def column(self) -> int:
+        pass
 
 class IdentifierPosition(AbstractSourcePosition):
     def id(self) -> str:

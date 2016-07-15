@@ -145,13 +145,7 @@ from typing import (    # pylint: disable=unused-import
 )
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.lib.error_translation import (
-    BaseError,
-    GapEnabledError,
-    TerminationMeasureNonPositiveError,
-    TerminationMeasureNonDecreasingError,
-    TerminationNotImpliedError,
-)
+from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
@@ -372,7 +366,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
     def _check_gap(self) -> None:
         """Check that ``gap_io`` is disabled under termination condition."""
         if self._current_operation.name == 'gap_io':
-            position = self._position(GapEnabledError)
+            position = self._position(
+                rules.TERMINATION_CHECK_GAP_ENABLED)
             false = self._viper.FalseLit(position, self._no_info())
             self._add_check(false, "Gap at {}.", position)
 
@@ -380,7 +375,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         """Check that child termination condition is implied."""
         termination_condition = self._translate_expr(
             self._current_operation.get_terminates())
-        position = self._position(TerminationNotImpliedError)
+        position = self._position(
+            rules.TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED)
         self._add_check(termination_condition,
                         "Termination condition of {}.",
                         position)
@@ -389,7 +385,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         """Check that child measure is strictly smaller."""
         termination_measure = self._translate_expr(
             self._current_operation.get_termination_measure())
-        position = self._position(TerminationMeasureNonDecreasingError)
+        position = self._position(
+            rules.TERMINATION_CHECK_MEASURE_NON_DECREASING)
         larger = self._viper.GtCmp(
             self._termination_measure,
             termination_measure,
@@ -410,10 +407,9 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
 
     def _position(
             self,
-            etr: Type[BaseError]=None) -> 'viper_ast.IdentifierPosition':
+            rules: Rules=None) -> 'viper_ast.IdentifierPosition':
         return self._io_translator.to_position(
-            self._current_operation_node, self._ctx,
-            error_translator=etr)
+            self._current_operation_node, self._ctx, rules=rules)
 
     @property
     def _viper(self) -> 'viper':
@@ -512,7 +508,7 @@ class IOOperationTranslator(CommonTranslator):
         position = self.to_position(
             operation.get_termination_measure(),
             ctx,
-            error_translator=TerminationMeasureNonPositiveError)
+            rules=rules.TERMINATION_CHECK_MEASURE_NON_POSITIVE)
         positive = self.viper.GtCmp(
             termination_measure,
             self.viper.IntLit(0, position, info),
