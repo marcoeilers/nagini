@@ -1,6 +1,6 @@
 from py2viper_contracts.contracts import *
 import resources.namespace_test as nt
-from resources.namespace_test_3 import a_function, P
+from resources.namespace_test_3 import a_function, P as PPP
 # Import('resources/namespace_test.py', 'nt')
 # Import('resources/namespace_test_3.py')
 
@@ -91,7 +91,7 @@ def pred_use(i: int) -> None:
     Requires(nt.resources.namespace_test_2.B(i))
     Ensures(Acc(nt.PP(i)))
     Unfold(nt.resources.namespace_test_2.B(i))
-    Fold(P(i))
+    Fold(PPP(i))
     Fold(nt.PP(i))
 
 

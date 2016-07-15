@@ -4,6 +4,7 @@ from abc import ABCMeta
 from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
+    get_included_programs,
     PythonClass,
     PythonExceptionHandler,
     PythonMethod,
@@ -266,22 +267,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result += pow(256, index) * ord(char)
         return result
 
-    def get_included_programs(self, prog: PythonProgram,
-                              include_global: bool=True) -> List[PythonProgram]:
-        result = [prog]
-        for p in prog.from_imports:
-            result.extend(self.get_included_programs(p, include_global=False))
-        result.append(prog.global_prog)
-        return result
-
     def get_target(self, node: ast.AST, container: PythonNode) -> PythonProgram:
         if isinstance(node, ast.Name):
             if isinstance(container, PythonMethod):
                 containers = [container]
-                containers.extend(self.get_included_programs(container.get_program()))
+                containers.extend(get_included_programs(container.get_program()))
             else:
                 # assume program
-                containers = self.get_included_programs(container)
+                containers = get_included_programs(container)
             for ctx in containers:
                 for field in ['var_aliases', 'locals', 'classes', 'functions',
                               'global_vars', 'methods', 'predicates',
@@ -298,7 +291,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if isinstance(ctx, (PythonVar, PythonMethod)):
                 ctx = ctx.type
             if isinstance(ctx, PythonProgram):
-                containers = self.get_included_programs(ctx, include_global=False)
+                containers = get_included_programs(ctx, include_global=False)
             else:
                 containers = [ctx]
             while isinstance(containers[-1], PythonClass) and containers[
