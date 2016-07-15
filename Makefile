@@ -22,7 +22,7 @@ test: bin/py.test
 	bin/py.test -x src/py2viper_translation/tests.py
 
 mypy: bin/mypy
-	MYPYPATH=stubs bin/mypy --fast-parser -s $(CHECKED_FILES)
+	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
 	bin/flake8 --ignore=F401,E501,D102 --max-complexity 12 $(CHECKED_FILES)
