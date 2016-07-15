@@ -120,11 +120,12 @@ class ErrorTranslationManager:
 
     def _translate_error(
             self, error: 'AbstractVerificationError') -> BaseError:
-        node_id = error.pos().id()
-        if node_id in self._translators:
-            return self._translators[node_id](error)
-        else:
-            return BaseError(error)
+        pos = error.pos()
+        if hasattr(pos, 'id'):
+            node_id = pos.id()
+            if node_id in self._translators:
+                return self._translators[node_id](error)
+        return BaseError(error)
 
     def register_translator(self, node_id: str,
                             error_translator: Type[BaseError]) -> None:
