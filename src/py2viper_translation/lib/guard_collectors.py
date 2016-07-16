@@ -18,7 +18,7 @@ class GuardCollectingVisitor(ast.NodeVisitor):
         super().__init__()
         self.current_guard = None   # type: Optional[List[ast.AST]]
 
-    def __call__(self, node: ast.AST) -> None:
+    def traverse(self, node: ast.AST) -> None:
         """Traverse ``node``."""
         assert self.current_guard is None
         self.current_guard = []
