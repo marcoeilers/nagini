@@ -233,7 +233,7 @@ def _is_top_level_assertion(node: ast.expr) -> bool:
     return False
 
 
-def _get_openned_operation(
+def _get_opened_operation(
         node: ast.Call, ctx: Context) -> PythonIOOperation:
     """Get the operation that is being opened."""
     if (len(node.args) == 1 and
@@ -407,9 +407,9 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
 
     def _position(
             self,
-            rules: Rules=None) -> 'viper_ast.IdentifierPosition':
+            conversion_rules: Rules=None) -> 'viper_ast.IdentifierPosition':
         return self._io_translator.to_position(
-            self._current_operation_node, self._ctx, rules=rules)
+            self._current_operation_node, self._ctx, rules=conversion_rules)
 
     @property
     def _viper(self) -> 'viper':
@@ -528,7 +528,7 @@ class IOOperationTranslator(CommonTranslator):
         if not operation.is_basic():
             generator = TerminationCheckGenerator(
                 self, ctx, termination_condition, termination_measure)
-            generator(operation.get_body())
+            generator.traverse(operation.get_body())
             checks.extend(generator.checks)
 
         position = self.to_position(operation.get_termination_measure(), ctx)
@@ -616,7 +616,7 @@ class IOOperationTranslator(CommonTranslator):
         io_ctx = ctx.io_open_context
         io_ctx.start_io_operation_open()
 
-        operation = _get_openned_operation(node, ctx)
+        operation = _get_opened_operation(node, ctx)
         if operation.is_basic():
             _raise_invalid_operation_use('open_basic_io_operation', node)
 

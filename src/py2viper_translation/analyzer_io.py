@@ -178,15 +178,14 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         inputs = self._set_preset(inputs)
         outputs = self._set_postset(outputs)
 
-        def node_to_var(node: ast.arg) -> nodes.PythonVar:
-            """Create variable from argument."""
-            return self._node_factory.create_python_var(
+        self._current_io_operation.set_inputs([
+            self._node_factory.create_python_var(
                 node.arg, node, self._typeof(node))
-
-        self._current_io_operation.set_inputs(
-            list(map(node_to_var, inputs)))
-        self._current_io_operation.set_outputs(
-            list(map(node_to_var, outputs)))
+            for node in inputs])
+        self._current_io_operation.set_outputs([
+            self._node_factory.create_python_var(
+                node.arg, node, self._typeof(node))
+            for node in outputs])
 
     def analyze_io_operation(self, node: ast.FunctionDef) -> None:
         """Analyze AST node representing IO operation.

@@ -308,7 +308,6 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         self.current_scopes.append(name)
-        lambda_var_names = {}
         assert not self._aliases
         for arg in node.args.args:
             if self._is_io_existential:
@@ -325,7 +324,6 @@ class Analyzer(ast.NodeVisitor):
                 self.current_function.io_existential_vars[local_name] = var
             else:
                 self.current_function.special_vars[local_name] = var
-            lambda_var_names[arg.arg] = local_name
         self._is_io_existential = False
         self.visit(node.body, node)
         self.current_scopes.pop()
