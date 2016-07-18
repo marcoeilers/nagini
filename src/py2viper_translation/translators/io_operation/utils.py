@@ -52,7 +52,7 @@ def get_parent(node: ast.expr) -> ast.expr:
     # _parent is not a node field, it is added dynamically by our
     # code. That is why mypy reports an error here.
     if hasattr(node, '_parent'):
-        return node._parent     # type: ignore
+        return node._parent     # pylint: disable=protected-access
     else:
         return None
 

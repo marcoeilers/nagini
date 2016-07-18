@@ -4,7 +4,8 @@
 from typing import Dict, Tuple
 
 
-Rules = Dict[Tuple[str, str], Tuple[str, str]]  # pylint: disable=invalid-name
+class Rules(Dict[Tuple[str, str], Tuple[str, str]]):
+    """Error conversion rules."""
 
 
 TERMINATION_CHECK_MEASURE_NON_POSITIVE = {

@@ -10,9 +10,8 @@ from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
-from py2viper_translation.lib.program_nodes import (    # pylint: disable=unused-import
+from py2viper_translation.lib.program_nodes import (
     PythonIOExistentialVar,
-    PythonIOOperation,
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -25,10 +24,6 @@ from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.io_operation.common import (
     IOOperationCommonTranslator,
 )
-
-# Just to make mypy happy.
-if False:                                       # pylint: disable=using-constant-test
-    from viper.silver import ast as viper_ast   # pylint: disable=import-error,unused-import,wrong-import-order
 
 
 class TerminationCheckGenerator(GuardCollectingVisitor):

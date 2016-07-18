@@ -5,12 +5,7 @@ import ast
 
 from typing import List
 
-from py2viper_translation import lib    # pylint: disable=unused-import
 from py2viper_translation.lib.util import InvalidProgramException
-
-# Just to make mypy happy.
-if False:         # pylint: disable=using-constant-test
-    from py2viper_translation.translator import Translator  # pylint: disable=unused-import
 
 
 def _raise_error(node, error_type) -> None:
@@ -50,7 +45,7 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         """Check that body is well formed."""
         self.visit(self._body)
 
-    def visit_Name(self, node: ast.Name) -> None:   # pylint: disable=invalid-name
+    def visit_Name(self, node: ast.Name) -> None:
         """Check that only allowed names are used in the body."""
         name = node.id
         if name.startswith('IOExists'):
@@ -60,7 +55,7 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         if name in self._undefined_existentials:
             _raise_error(node, 'use_of_undefined_existential')
 
-    def visit_Call(self, node: ast.Call) -> None:   # pylint: disable=invalid-name
+    def visit_Call(self, node: ast.Call) -> None:
         """Check IO operation use and define existential variables."""
         if (isinstance(node.func, ast.Name) and
                 node.func.id in self._program.io_operations):

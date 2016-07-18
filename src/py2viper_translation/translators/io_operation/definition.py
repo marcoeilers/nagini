@@ -17,10 +17,6 @@ from py2viper_translation.translators.io_operation.utils import (
     construct_getter_name,
 )
 
-# Just to make mypy happy.
-if False:                                       # pylint: disable=using-constant-test
-    from viper.silver import ast as viper_ast   # pylint: disable=import-error,unused-import,wrong-import-order
-
 
 class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
     """Class responsible for translating IO operation definitions."""
