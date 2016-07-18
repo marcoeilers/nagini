@@ -7,7 +7,6 @@ from mypy.types import AnyType
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from typing import cast, List
 
-import py2viper_translation     # pylint: disable=unused-import
 from py2viper_translation.lib import program_nodes as nodes
 from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.util import (
@@ -208,7 +207,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_node = None
         self._current_io_operation = None
 
-    def visit_Return(self, node: ast.Return) -> None:   # pylint: disable=invalid-name
+    def visit_Return(self, node: ast.Return) -> None:
         """Parse IO operation body.
 
         IO operation body must be a single expression that is returned.
@@ -236,7 +235,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         assert self._current_io_operation.set_io_existentials(
             io_existential_creators)
 
-    def visit_Call(self, node: ast.Call) -> None:   # pylint: disable=invalid-name
+    def visit_Call(self, node: ast.Call) -> None:
         """Parse IO operation properties.
 
         Currently, only parses properties such as ``Terminates`` and
@@ -280,7 +279,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             for arg in node.args:
                 self.visit(arg)
 
-    def visit_Name(self, node: ast.Name) -> None:   # pylint: disable=invalid-name
+    def visit_Name(self, node: ast.Name) -> None:
         """Check if node is an operation input.
 
         This method is expected to be called by ``visit_Call`` on IO

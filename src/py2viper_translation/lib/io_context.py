@@ -2,7 +2,7 @@
 
 
 from collections import OrderedDict
-from typing import Dict, List, Tuple    # pylint: disable=unused-import
+from typing import List, Tuple
 
 from py2viper_translation.lib.program_nodes import PythonVar
 from py2viper_translation.lib.typedefs import Expr
@@ -19,7 +19,7 @@ class IOOpenContext:
         self._open_var_aliases = {}  # type: Dict[str, PythonVar]
         """Variables used while opening IO operation."""
 
-        self._open_var_alias_definitions = OrderedDict()  # type: Dict[str, Expr]
+        self._open_var_alias_definitions = OrderedDict()
         """Initial assignments to variables used in opening IO operation."""
 
     def start_io_operation_open(self) -> None:

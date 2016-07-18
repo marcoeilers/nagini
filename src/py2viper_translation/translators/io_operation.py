@@ -135,7 +135,7 @@ in fields should not be too common in practise:
 
 import ast
 
-from typing import (    # pylint: disable=unused-import
+from typing import (
     Callable,
     cast,
     List,
@@ -169,11 +169,6 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-
-# Just to make mypy happy.
-if False:         # pylint: disable=using-constant-test
-    import viper  # pylint: disable=import-error,unused-import
-    from viper.silver import ast as viper_ast   # pylint: disable=import-error,unused-import,wrong-import-order
 
 
 def _construct_getter_name(operation: PythonIOOperation,

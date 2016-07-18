@@ -3,8 +3,6 @@
 
 import ast
 
-from typing import List, Optional   # pylint: disable=unused-import
-
 
 class GuardCollectingVisitor(ast.NodeVisitor):
     """Visitor that maintains guard information.
@@ -27,7 +25,7 @@ class GuardCollectingVisitor(ast.NodeVisitor):
         assert len(self.current_guard) == 0
         self.current_guard = None
 
-    def visit_Call(self, node: ast.Call) -> None:       # pylint: disable=invalid-name
+    def visit_Call(self, node: ast.Call) -> None:
         """Add ``Implies`` condition to guard."""
         if (isinstance(node.func, ast.Name) and
                 node.func.id == 'Implies'):
@@ -38,7 +36,7 @@ class GuardCollectingVisitor(ast.NodeVisitor):
         else:
             self.generic_visit(node)
 
-    def visit_IfExp(self, node: ast.IfExp) -> None:     # pylint: disable=invalid-name
+    def visit_IfExp(self, node: ast.IfExp) -> None:
         """Add ``If`` condition to guard."""
         # Visit then branch.
         self.current_guard.append(node.test)
