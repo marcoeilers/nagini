@@ -6,14 +6,6 @@ from typing import Any, List
 from py2viper_translation.lib.errors.messages import ERRORS, REASONS
 from py2viper_translation.lib.errors.rules import Rules
 
-# Just to make mypy happy.
-if False:                                   # pylint: disable=using-constant-test
-    from viper.silver import ast            # pylint: disable=import-error,unused-import,wrong-import-order
-    from viper.silver.verifier import (     # pylint: disable=import-error,unused-import
-        AbstractVerificationError,
-        AbstractErrorReason,
-    )
-
 
 class Position:
     """Wrapper around ``AbstractSourcePosition``."""
@@ -48,14 +40,14 @@ class Reason:
         self._reason = reason
         self._node = node
         self._reason_string = reason_string
-        self.id = reason_id     # pylint: disable=invalid-name
+        self.identifier = reason_id
         self.vias = vias
         self.offending_node = reason.offendingNode()
         self.position = Position(self.offending_node.pos())
 
     def __str__(self) -> str:
         reason = self._reason_string or self._node or str(self.offending_node)
-        return REASONS[self.id](reason)
+        return REASONS[self.identifier](reason)
 
 
 class Error:
@@ -77,7 +69,7 @@ class Error:
         self._error = error
         self._node = node
         self._vias = vias
-        self.id = error_id      # pylint: disable=invalid-name
+        self.identifier = error_id
         if reason_item:
             self.reason = Reason(
                 reason_id, viper_reason, reason_item.node,
@@ -99,7 +91,7 @@ class Error:
     @property
     def full_id(self) -> str:
         """Full error identifier."""
-        return '{}:{}'.format(self.id, self.reason.id)
+        return '{}:{}'.format(self.identifier, self.reason.identifier)
 
     @property
     def offending_node(self) -> 'ast.Node':
@@ -123,7 +115,7 @@ class Error:
     @property
     def message(self) -> str:
         """Human readable error message."""
-        return ERRORS[self.id](self._node)
+        return ERRORS[self.identifier](self._node)
 
     def __str__(self) -> str:
         """Format error.

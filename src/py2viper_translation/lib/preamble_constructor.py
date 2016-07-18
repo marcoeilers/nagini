@@ -5,11 +5,6 @@ from py2viper_translation.translators.abstract import Context
 from py2viper_translation.lib.viper_ast import ViperAST
 from typing import List, Tuple
 
-# Just to make mypy happy.
-if False:         # pylint: disable=using-constant-test
-    import py2viper_translation     # pylint: disable=unused-import,ungrouped-imports
-    import viper  # pylint: disable=import-error,unused-import
-
 
 class IOPreambleConstructor:
     """

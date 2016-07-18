@@ -9,13 +9,6 @@ from typing import Any, List, Optional
 from py2viper_translation.lib.errors.wrappers import Error
 from py2viper_translation.lib.errors.rules import Rules
 
-# Just to make mypy happy.
-if False:                                   # pylint: disable=using-constant-test
-    from viper.silver import ast            # pylint: disable=import-error,unused-import,wrong-import-order
-    from viper.silver.verifier import (     # pylint: disable=import-error,unused-import
-        AbstractVerificationError,
-    )
-
 
 Item = namedtuple('Item', 'node vias reason_string')
 
