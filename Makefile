@@ -15,7 +15,9 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/interface.py \
 	src/py2viper_translation/translators/io_operation/termination_check.py \
 	src/py2viper_translation/translators/io_operation/use.py \
-	src/py2viper_translation/translators/io_operation/utils.py
+	src/py2viper_translation/translators/io_operation/utils.py \
+	src/py2viper_translation/translators/io_operation/opener.py \
+	src/py2viper_translation/translators/io_operation/result_translator.py
 CHECKED_CONTRACT_FILES:=\
 							deps/py2viper-contracts/src/py2viper_contracts/io.py \
 							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py
