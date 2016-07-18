@@ -6,7 +6,11 @@ import ast
 from typing import cast, List, Optional
 
 from py2viper_translation.lib.context import Context
-from py2viper_translation.lib.program_nodes import PythonVar
+from py2viper_translation.lib.program_nodes import (
+    PythonIOOperation,
+    PythonIOExistentialVar,
+    PythonVar,
+)
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.translators.common import CommonTranslator
 from py2viper_translation.translators.io_operation.utils import (
@@ -51,3 +55,21 @@ class IOOperationCommonTranslator(CommonTranslator):
         getter = self.viper.FuncApp(
             getter_name, sil_args, position, info, typ, formal_args)
         return getter
+
+    def set_up_io_operation_input_aliases(
+            self, operation: PythonIOOperation, node: ast.Call,
+            ctx: Context) -> List[str]:
+        """Set up aliases from operation's parameters to its arguments."""
+        aliases = []
+
+        parameters = operation.get_parameters()
+        py_args = node.args[:len(parameters)]
+        sil_args = self.translate_args(py_args, ctx)
+        for parameter, py_arg, sil_arg in zip(parameters, py_args, sil_args):
+            var_type = self.get_type(py_arg, ctx)
+            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
+            var.set_ref(sil_arg)
+            ctx.set_alias(parameter.name, var)
+            aliases.append(parameter.name)
+
+        return aliases

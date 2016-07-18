@@ -71,18 +71,6 @@ def is_top_level_assertion(node: ast.expr) -> bool:
     return False
 
 
-def get_opened_operation(
-        node: ast.Call, ctx: Context) -> PythonIOOperation:
-    """Get the operation that is being opened."""
-    if (len(node.args) == 1 and
-            isinstance(node.args[0], ast.Call) and
-            isinstance(node.args[0].func, ast.Name)):
-        name = node.args[0].func.id
-        if name in ctx.program.io_operations:
-            return ctx.program.io_operations[name]
-    raise_invalid_operation_use('open_non_io_operation', node)
-
-
 def get_variable(var_name: str, ctx: Context) -> PythonVarBase:
     """Return variable by taking into account aliasing."""
     if var_name in ctx.var_aliases:

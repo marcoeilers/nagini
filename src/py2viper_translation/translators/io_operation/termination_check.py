@@ -10,9 +10,6 @@ from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
-from py2viper_translation.lib.program_nodes import (
-    PythonIOExistentialVar,
-)
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -82,42 +79,16 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         self._current_guard_condition = self._create_guard_condition()
 
         self._check_gap()
-        aliases = self._set_up_aliases(node)
-        self._check_termination_condition()
-        self._check_termination_measure()
-        self._clean_up_aliases(aliases)
+        with self._ctx.aliases_context():
+            self._io_translator.set_up_io_operation_input_aliases(
+                self._current_operation, node, self._ctx)
+            self._check_termination_condition()
+            self._check_termination_measure()
 
         self._current_operation = None
         self._current_identifier = None
         self._current_guard_condition = None
         self._current_operation_node = None
-
-    def _set_up_aliases(self, node: ast.Call) -> List[str]:
-        """Set up aliases for the operation termination check translation.
-
-        .. todo:: Vytautas
-
-            Refactor: Very similar code is used in several places.
-        """
-        aliases = []
-
-        py_args = node.args[:len(self._current_operation.get_parameters())]
-        sil_args = self._io_translator.translate_args(py_args, self._ctx)
-        for parameter, py_arg, sil_arg in zip(
-                self._current_operation.get_parameters(),
-                py_args,
-                sil_args):
-            var_type = self._io_translator.get_type(py_arg, self._ctx)
-            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
-            var.set_ref(sil_arg)
-            self._ctx.set_alias(parameter.name, var)
-            aliases.append(parameter.name)
-        return aliases
-
-    def _clean_up_aliases(self, aliases: List[str]) -> None:
-        """Remove created aliases."""
-        for alias in aliases:
-            self._ctx.remove_alias(alias)
 
     def _create_guard_condition(self) -> Expr:
         """Generate a Silver expression that guards current AST node."""
