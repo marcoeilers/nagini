@@ -14,7 +14,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonTryBlock,
     PythonType,
-    PythonVar
+    PythonVar,
+    PythonVarBase,
 )
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
@@ -51,14 +52,16 @@ class MethodTranslator(CommonTranslator):
         result = self.var_type_check(param.sil_name, param.type, no_pos, ctx)
         return result
 
+
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
         """
         Translates the preconditions specified for 'method'.
         """
         pres = []
-        for pre in method.precondition:
-            stmt, expr = self.translate_expr(pre, ctx)
+        for pre, aliases in method.precondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(pre, ctx)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -87,8 +90,9 @@ class MethodTranslator(CommonTranslator):
                                     self.viper.NullLit(self.no_position(ctx),
                                                        self.no_info(ctx)),
                                     self.no_position(ctx), self.no_info(ctx))
-        for post in method.postcondition:
-            stmt, expr = self.translate_expr(post, ctx)
+        for post, aliases in method.postcondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(post, ctx)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -211,8 +215,9 @@ class MethodTranslator(CommonTranslator):
         pres = self._translate_pres(func, ctx)
         # create postconditions
         posts = []
-        for post in func.postcondition:
-            stmt, expr = self.translate_expr(post, ctx)
+        for post, aliases in func.postcondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(post, ctx)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -331,8 +336,6 @@ class MethodTranslator(CommonTranslator):
 
         args = self._translate_params(method, ctx)
 
-        statements = method.node.body
-        body_index = get_body_start_index(statements)
         body = self._create_method_prolog(method, ctx)
         # translate body
         if method.cls:
@@ -350,6 +353,8 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
+            statements = method.node.body
+            body_index = get_body_start_index(statements)
             if method.declared_exceptions:
                 body.append(self.viper.LocalVarAssign(error_var_ref,
                     self.viper.NullLit(self.no_position(ctx),

@@ -1,6 +1,12 @@
+from contextlib import contextmanager
 from py2viper_translation.lib.constants import ERROR_NAME, RESULT_NAME
-from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
-from typing import List
+from py2viper_translation.lib.io_context import IOOpenContext
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+    PythonVar,
+    PythonVarBase,
+)
+from typing import Dict, List
 
 
 class Context:
@@ -21,6 +27,21 @@ class Context:
         self.ignore_family_folds = False
         self.added_handlers = []
         self.loop_iterators = {}
+        self.io_open_context = IOOpenContext()
+
+    @contextmanager
+    def additional_aliases(
+            self, aliases: Dict[str, PythonVarBase] = None) -> None:
+        """
+        Execute in context with additional aliases.
+        """
+        for name, var in aliases.items():
+            self.set_alias(name, var, None)
+        try:
+            yield
+        finally:
+            for name in aliases:
+                self.remove_alias(name)
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []

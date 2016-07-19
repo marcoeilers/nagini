@@ -1,8 +1,15 @@
 import ast
 import astunparse
 
-
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 
 T = TypeVar('T')
@@ -162,17 +169,52 @@ def is_exception_decl(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Exsures'
 
 
+def is_docstring(stmt: ast.AST) -> bool:
+    """Return True if statement is a docstring."""
+    if (isinstance(stmt, ast.Expr) and
+            isinstance(stmt.value, ast.Str)):
+        return True
+    else:
+        return False
+
+
+def is_io_existential(stmt: ast.AST) -> bool:
+    """Return True if statement is a definition of IOExists."""
+    if (isinstance(stmt, ast.Expr) and
+            isinstance(stmt.value, ast.Call) and
+            isinstance(stmt.value.func, ast.Call) and
+            isinstance(stmt.value.func.func, ast.Name) and
+            stmt.value.func.func.id.startswith('IOExists')):
+        return True
+    else:
+        return False
+
+
 def get_body_start_index(statements: List[ast.AST]) -> int:
     """
-    Returns the index of the first statement that is not a method contract
+    Returns the index of the first statement that is not a method
+    contract.
+
+    .. note::
+
+        In the case when a method has only a contract, the returned
+        index is equal to ``len(statements)``.
     """
     body_index = 0
-    while is_pre(statements[body_index]):
-        body_index += 1
-    while is_post(statements[body_index]):
-        body_index += 1
-    while is_exception_decl(statements[body_index]):
-        body_index += 1
+    try:
+        while is_docstring(statements[body_index]):
+            body_index += 1
+        while is_io_existential(statements[body_index]):
+            body_index += 1
+        while is_pre(statements[body_index]):
+            body_index += 1
+        while is_post(statements[body_index]):
+            body_index += 1
+        while is_exception_decl(statements[body_index]):
+            body_index += 1
+    except IndexError:
+        # This exception means that the method has only a contract.
+        pass
     return body_index
 
 
@@ -193,6 +235,21 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     if not hasattr(node, '_parent') or not node._parent:
         return None
     return find_loop_for_previous(node._parent, name)
+
+
+def join_expressions(operator: Callable[[T, T], T],
+                     expressions: List[T]) -> T:
+    """
+    Joins expressions with ``operator``.
+
+    This function joins expressions backwards (the last two expressions
+    are most nested) in order to avoid Silicon issue
+    `241 <https://bitbucket.org/viperproject/silicon/issues/241>`_.
+    """
+    result = expressions[-1]
+    for part in reversed(expressions[:-1]):
+        result = operator(part, result)
+    return result
 
 
 def construct_lambda_prefix(line: int, column: Optional[int]) -> str:
@@ -250,3 +307,9 @@ def get_containing_member(node: ast.AST) -> Optional[ast.FunctionDef]:
         else:
             member = None
     return member
+
+
+def is_get_ghost_output(node: ast.Assign) -> bool:
+    return (isinstance(node.value, ast.Call) and
+            isinstance(node.value.func, ast.Name) and
+            node.value.func.id == 'GetGhostOutput')

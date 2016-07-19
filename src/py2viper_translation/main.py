@@ -10,7 +10,7 @@ import traceback
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
-from py2viper_translation.lib.errors import cache
+from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
@@ -49,7 +49,7 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
-    cache.clear()
+    error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
@@ -96,7 +96,6 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        print(prog)
         vresult = verifier.verify(prog)
         return vresult
     except JavaException as je:
@@ -147,6 +146,10 @@ def main() -> None:
         action='store_true',
         help='print generated Silver program')
     parser.add_argument(
+        '--write-silver-to-file',
+        default=None,
+        help='write generated Silver program to specified file')
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -183,6 +186,9 @@ def main() -> None:
             if args.verbose:
                 print('Result:')
             print(prog)
+        if args.write_silver_to_file:
+            with open(args.write_silver_to_file, 'w') as fp:
+                fp.write(str(prog))
         if args.verifier == 'silicon':
             backend = ViperVerifier.silicon
         elif args.verifier == 'carbon':
