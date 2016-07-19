@@ -1,8 +1,7 @@
 import ast
 import types
 
-from py2viper_translation.lib.errors import cache
-from uuid import uuid1
+from py2viper_translation.lib.errors import error_manager, Rules
 
 
 def getobject(package, name):
@@ -136,8 +135,9 @@ class ViperAST:
         return self.ast.Field(name, type, position, info)
 
     def Predicate(self, name, args, body, position, info):
+        body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Predicate(name, self.to_seq(args),
-                                  self.scala.Some(body), position, info)
+                                  body, position, info)
 
     def PredicateAccess(self, args, pred_name, position, info):
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
@@ -374,7 +374,8 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
-    def to_position(self, expr, vias, error_string: str=None):
+    def to_position(self, expr, vias, error_string: str=None,
+                    rules: Rules=None):
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
@@ -385,9 +386,8 @@ class ViperAST:
             return self.NoPosition
         path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
-        id = str(uuid1())
-        assert not id in cache
-        cache[id] = (expr, list(vias), error_string)
+        id = error_manager.add_error_information(
+            expr, list(vias), error_string, rules)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
