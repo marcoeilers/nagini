@@ -347,13 +347,15 @@ class Analyzer(ast.NodeVisitor):
             container = scope_container.methods
         if name in container:
             func = container[name]
-            func.cls = self.current_class
+            if not self.is_static_method(node):
+                func.cls = self.current_class
             func.pure = self.is_pure(node)
             func.node = node
             func.superscope = scope_container
         else:
+            cls = self.current_class if not self.is_static_method(node) else None
             func = self.node_factory.create_python_method(name, node,
-                self.current_class, scope_container, self.is_pure(node),
+                cls, scope_container, self.is_pure(node),
                 self.contract_only, self.node_factory)
             container[name] = func
         func.predicate = self.is_predicate(node)
@@ -474,6 +476,8 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function is None:
             # node is global in some way.
             if self.current_class is None:
+                if node.id in self.program.classes:
+                    return
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
@@ -490,7 +494,19 @@ class Analyzer(ast.NodeVisitor):
                 self.track_access(node, var)
             else:
                 # node is a static field.
-                raise UnsupportedException(node)
+                cls = self.typeof(node)
+                self.define_new(self.current_class, node.id, node)
+                var = self.node_factory.create_python_var(node.id,
+                                                          node, cls)
+                assign = node._parent
+                if (not isinstance(assign, ast.Assign)
+                    or len(assign.targets) != 1):
+                    raise UnsupportedException(assign)
+                var.value = assign.value
+                self.current_class.static_fields[node.id] = var
+                if node.id in self.current_class.fields:
+                    del self.current_class.fields[node.id]
+                return
         if node.id not in self.program.global_vars:
             # node is a local variable or a static field.
             if self.current_function is None:
@@ -681,3 +697,10 @@ class Analyzer(ast.NodeVisitor):
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Predicate' in decorators
+
+    def is_static_method(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'staticmethod' in decorators
+

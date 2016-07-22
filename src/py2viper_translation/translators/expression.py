@@ -302,6 +302,9 @@ class ExpressionTranslator(CommonTranslator):
         recv = self.get_type(node.value, ctx)
         field = recv.get_field(node.attr)
         if not field:
+            if isinstance(recv, PythonClass) and node.attr in recv.static_fields:
+                var = recv.static_fields[node.attr]
+                return var
             recv = self.get_type(node.value, ctx)
             raise InvalidProgramException(node, 'field.nonexistant')
         while field.inherited is not None:
@@ -326,9 +329,22 @@ class ExpressionTranslator(CommonTranslator):
                 return [], self.viper.FuncApp(target.sil_name, [], pos, info, var_type, [])
             else:
                 raise UnsupportedException(node)
+        elif isinstance(target, PythonClass):
+            field = target.static_fields[node.attr]
+            type = self.translate_type(field.type, ctx)
+            func_app = self.viper.FuncApp(field.sil_name, [],
+                                          self.to_position(node, ctx),
+                                          self.no_info(ctx), type, [])
+            return [], func_app
         else:
             stmt, receiver = self.translate_expr(node.value, ctx)
             field = self._lookup_field(node, ctx)
+            if isinstance(field, PythonVar):
+                type = self.translate_type(field.type, ctx)
+                func_app = self.viper.FuncApp(field.sil_name, [],
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx), type, [])
+                return [], func_app
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  self.to_position(node, ctx),
                                                  self.no_info(ctx)))

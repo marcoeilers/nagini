@@ -531,9 +531,14 @@ class CallTranslator(CommonTranslator):
         if isinstance(node.func, ast.Attribute):
             rec_target = self.get_target(node.func.value, ctx.actual_function if ctx.actual_function else ctx.program)
             if isinstance(rec_target, PythonClass):
-                # statically bound call
-                return self.inline_call(target, node, False, 'static call',
-                                        ctx)
+                if not target.cls:
+                    # static method
+                    receiver_class = None
+                    is_predicate = target.predicate
+                else:
+                    # statically bound call
+                    return self.inline_call(target, node, False, 'static call',
+                                            ctx)
             elif isinstance(rec_target, PythonProgram):
                 # normal, receiverless call to imported function
                 receiver_class = None
