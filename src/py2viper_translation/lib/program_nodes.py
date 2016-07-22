@@ -198,8 +198,10 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.superclass = superclass
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.static_methods = OrderedDict()
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
+        self.static_fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
@@ -219,6 +221,9 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         """
         if name in self.fields:
             field = self.fields[name]
+            assert field.type == type
+        elif name in self.static_fields:
+            field = self.static_fields[name]
             assert field.type == type
         else:
             field = self.node_factory.create_python_field(name, node,
@@ -317,12 +322,18 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         for name, method in self.methods.items():
             method_name = self.name + '_' + name
             method.process(self.get_fresh_name(method_name), translator)
+        for name, method in self.static_methods.items():
+            method_name = self.name + '_' + name
+            method.process(self.get_fresh_name(method_name), translator)
         for name, predicate in self.predicates.items():
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)
         for name, field in self.fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name))
+        for name, field in self.static_fields.items():
+            field_name = self.name + '_' + name
+            field.process(self.get_fresh_name(field_name), translator)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:

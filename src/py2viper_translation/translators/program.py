@@ -324,6 +324,8 @@ class ProgramTranslator(CommonTranslator):
                 if class_name in PRIMITIVES:
                     continue
                 fields += self._translate_fields(cls, ctx)
+                for name, field in cls.static_fields.items():
+                    functions.append(self.create_global_var_function(field, ctx))
 
             # translate default args
             containers = [program] + list(program.classes.values())
@@ -367,7 +369,7 @@ class ProgramTranslator(CommonTranslator):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.get_all_methods():
                     method = cls.get_method(method_name)
-                    if (method.cls != cls and method_name != '__init__' and
+                    if (method.cls and method.cls != cls and method_name != '__init__' and
                             not cls.name.startswith('Dummy_Sub')):
                         # inherited
                         methods.append(self.create_inherit_check(method, cls, ctx))
