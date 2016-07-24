@@ -11,6 +11,14 @@ VarDecl = 'silver.ast.LocalVarDecl'
 
 DomainFuncApp = 'silver.ast.DomainFuncApp'
 
+Predicate = 'silver.ast.Predicate'
+
+Field = 'silver.ast.Field'
+
+Function = 'silver.ast.Function'
+
+Method = 'silver.ast.Method'
+
 TypeVar = 'silver.ast.TypeVar'
 
 Type = 'silver.ast.Type'
