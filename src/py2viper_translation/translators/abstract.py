@@ -44,6 +44,7 @@ class TranslatorConfig:
         self.type_translator = None
         self.pred_translator = None
         self.io_operation_translator = None
+        self.obligation_translator = None
         self.prog_translator = None
         self.method_translator = None
         self.type_factory = None
@@ -183,6 +184,47 @@ class AbstractTranslator(metaclass=ABCMeta):
                                    ctx: Context) -> List[Stmt]:
         translator = self.config.io_operation_translator
         return translator.translate_get_ghost_output(node, ctx)
+
+    def translate_obligation_contractfunc_call(self, node: ast.Call,
+                                               ctx: Context) -> StmtsAndExpr:
+        translator = self.config.obligation_translator
+        return translator.translate_obligation_contractfunc_call(node, ctx)
+
+    def get_obligation_preamble(
+            self,
+            ctx: Context) -> Tuple['viper_ast.Predicate', 'viper_ast.Field']:
+        translator = self.config.obligation_translator
+        return translator.get_obligation_preamble(ctx)
+
+    def create_method_node(
+            self, ctx, name, args, returns, pres, posts, locals, body,
+            position, info, method=None) -> List[Stmt]:
+        translator = self.config.obligation_translator
+        return translator.create_method_node(
+            ctx, name, args, returns, pres, posts, locals, body,
+            position, info, method)
+
+    def create_method_call_node(
+            self, ctx, methodname, args, targets, position, info,
+            target_method=None, target_node=None) -> List[Stmt]:
+        translator = self.config.obligation_translator
+        return translator.create_method_call_node(
+            ctx, methodname, args, targets, position, info, target_method,
+            target_node)
+
+    def enter_loop_translation(self, node, ctx) -> None:
+        translator = self.config.obligation_translator
+        return translator.enter_loop_translation(node, ctx)
+
+    def leave_loop_translation(self, ctx) -> None:
+        translator = self.config.obligation_translator
+        return translator.leave_loop_translation(ctx)
+
+    def create_while_node(
+            self, ctx, cond, invariants, locals, body, node) -> List[Stmt]:
+        translator = self.config.obligation_translator
+        return translator.create_while_node(
+            ctx, cond, invariants, locals, body, node)
 
     def translate_handler(self, handler: PythonExceptionHandler,
                           ctx: Context) -> List[Stmt]:

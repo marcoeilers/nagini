@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from py2viper_translation.lib.constants import ERROR_NAME, RESULT_NAME
 from py2viper_translation.lib.io_context import IOOpenContext
+from py2viper_translation.lib.obligation_context import ObligationContext
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
@@ -28,6 +29,7 @@ class Context:
         self.added_handlers = []
         self.loop_iterators = {}
         self.io_open_context = IOOpenContext()
+        self.obligation_context = ObligationContext()
         self._alias_context_stack = []
         self._current_alias_context = []
 

@@ -147,7 +147,8 @@ class Analyzer(ast.NodeVisitor):
 
     def _add_interface_method(self, method_name, if_method, cls, pure):
         method = PythonMethod(method_name, None, cls, self.program,
-                              pure, False, self.node_factory, True)
+                              pure, False, self.node_factory, True,
+                              if_method)
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)

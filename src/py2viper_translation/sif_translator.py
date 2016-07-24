@@ -26,6 +26,9 @@ from py2viper_translation.translators.abstract import Expr
 from py2viper_translation.translators.io_operation import (
     IOOperationTranslator,
 )
+from py2viper_translation.translators.obligation import (
+    ObligationTranslator,
+)
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
 
@@ -54,6 +57,8 @@ class SIFTranslator(Translator):
         config.pred_translator = PredicateTranslator(config, jvm, source_file,
                                                      type_info, viper_ast)
         config.io_operation_translator = IOOperationTranslator(
+            config, jvm, source_file, type_info, viper_ast)
+        config.obligation_translator = ObligationTranslator(
             config, jvm, source_file, type_info, viper_ast)
         config.stmt_translator = SIFStatementTranslator(config, jvm,
                                                         source_file,

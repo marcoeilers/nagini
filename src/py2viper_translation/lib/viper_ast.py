@@ -57,6 +57,7 @@ class ViperAST:
         self.Int = getconst("Int")
         self.Bool = getconst("Bool")
         self.Ref = getconst("Ref")
+        self.Perm = getconst("Perm")
         self.sourcefile = sourcefile
         self.none = getobject(scala, "None")
 
@@ -244,11 +245,48 @@ class ViperAST:
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info)
 
+    def NoPerm(self, position, info):
+        return self.ast.NoPerm(position, info)
+
     def WildcardPerm(self, position, info):
         return self.ast.WildcardPerm(position, info)
 
     def FractionalPerm(self, left, right, position, info):
         return self.ast.FractionalPerm(left, right, position, info)
+
+    def CurrentPerm(self, location, position, info):
+        return self.ast.CurrentPerm(location, position, info)
+
+    def ForPerm(self, variable, accessList, body, position, info):
+        return self.ast.ForPerm(variable, self.to_seq(accessList), body,
+                                position, info)
+
+    def PermMinus(self, exp, position, info):
+        return self.ast.PermMinus(exp, position, info)
+
+    def PermAdd(self, left, right, position, info):
+        return self.ast.PermAdd(left, right, position, info)
+
+    def PermSub(self, left, right, position, info):
+        return self.ast.PermSub(left, right, position, info)
+
+    def PermMul(self, left, right, position, info):
+        return self.ast.PermMul(left, right, position, info)
+
+    def IntPermMul(self, left, right, position, info):
+        return self.ast.IntPermMul(left, right, position, info)
+
+    def PermLtCmp(self, left, right, position, info):
+        return self.ast.PermLtCmp(left, right, position, info)
+
+    def PermLeCmp(self, left, right, position, info):
+        return self.ast.PermLeCmp(left, right, position, info)
+
+    def PermGtCmp(self, left, right, position, info):
+        return self.ast.PermGtCmp(left, right, position, info)
+
+    def PermGeCmp(self, left, right, position, info):
+        return self.ast.PermGeCmp(left, right, position, info)
 
     def Not(self, expr, position, info):
         return self.ast.Not(expr, position, info)
