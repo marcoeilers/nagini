@@ -21,8 +21,10 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/result_translator.py \
 	src/py2viper_translation/translators/obligation.py
 CHECKED_CONTRACT_FILES:=\
-							deps/py2viper-contracts/src/py2viper_contracts/io.py \
-							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py
+	deps/py2viper-contracts/src/py2viper_contracts/io.py \
+	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
+	deps/py2viper-contracts/src/py2viper_contracts/obligations.py
+
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
 CHECKED_TRANSLATOR_MODULES:=$(subst /,.,$(CHECKED_TRANSLATOR_FILES:src/%.py=%))
@@ -33,7 +35,7 @@ BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
 test: bin/py.test
-	bin/py.test -x src/py2viper_translation/tests.py
+	bin/py.test -v -x src/py2viper_translation/tests.py
 
 mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
