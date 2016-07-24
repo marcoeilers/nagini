@@ -9,6 +9,7 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/lib/errors/messages.py \
 	src/py2viper_translation/lib/errors/rules.py \
 	src/py2viper_translation/lib/errors/wrappers.py \
+	src/py2viper_translation/lib/obligation_context.py \
 	src/py2viper_translation/translators/io_operation/common.py \
 	src/py2viper_translation/translators/io_operation/definition.py \
 	src/py2viper_translation/translators/io_operation/__init__.py \
@@ -17,7 +18,8 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/use.py \
 	src/py2viper_translation/translators/io_operation/utils.py \
 	src/py2viper_translation/translators/io_operation/opener.py \
-	src/py2viper_translation/translators/io_operation/result_translator.py
+	src/py2viper_translation/translators/io_operation/result_translator.py \
+	src/py2viper_translation/translators/obligation.py
 CHECKED_CONTRACT_FILES:=\
 							deps/py2viper-contracts/src/py2viper_contracts/io.py \
 							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py

@@ -17,7 +17,7 @@ from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class PythonScope:
@@ -337,7 +337,8 @@ class PythonMethod(PythonNode, PythonScope):
                  superscope: PythonScope,
                  pure: bool, contract_only: bool,
                  node_factory: 'ProgramNodeFactory',
-                 interface: bool = False):
+                 interface: bool = False,
+                 interface_dict: Dict[str, Any] = None):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or program) this method belongs to
@@ -375,6 +376,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
+        self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.labels = [END_LABEL]
 

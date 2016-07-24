@@ -1,0 +1,48 @@
+field Measure$acc: Seq[Ref]
+
+method Measure$topInit() returns (res: Ref)
+  ensures acc(res.Measure$acc)
+  ensures res.Measure$acc == Seq[Ref]()
+{
+  assume false
+}
+
+function Measure$contains(self: Ref, key: Ref): Bool
+  requires acc(self.Measure$acc, wildcard)
+  ensures result == (key in self.Measure$acc)
+
+function Measure$value(self: Ref, key: Ref): Int
+  requires acc(self.Measure$acc, wildcard)
+  requires Measure$contains(self, key)
+
+function Measure$check(self: Ref, key: Ref, value: Int): Bool
+  requires acc(self.Measure$acc, wildcard)
+  // TODO: Check if this is not affected by Silver issue #154.
+  ensures (
+      Measure$contains(self, key) ==>
+      Measure$value(self, key) > value
+      ) == result
+
+function Measure$min2(x1: Int, x2: Int): Int
+{
+  (x1 > x2 ? x2 : x1)
+}
+
+method Measure$set(self: Ref, key: Ref, value: Int)
+  requires acc(self.Measure$acc)
+  ensures acc(self.Measure$acc)
+  ensures self.Measure$acc == old(self.Measure$acc) ++ Seq(key)
+  ensures old(!Measure$contains(self, key)) ==>
+      Measure$value(self, key) == value
+  ensures old(Measure$contains(self, key)) ==>
+      Measure$value(self, key) == Measure$min2(value, old(Measure$value(self, key)))
+  ensures (forall k: Ref ::
+      { Measure$value(self, k) }
+      { old(Measure$value(self, k)) }
+      old(Measure$contains(self, k)) && (k != key) ==>
+      Measure$contains(self, k) &&
+      (Measure$value(self, k) == old(Measure$value(self, k)))
+      )
+{
+  assume false
+}
