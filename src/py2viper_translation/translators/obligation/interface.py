@@ -1,4 +1,4 @@
-"""Classes for translating obligations."""
+"""Public interface to obligation translator."""
 
 
 import ast
@@ -10,6 +10,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
 from py2viper_translation.lib.typedefs import (
+    Field,
+    Predicate,
     Stmt,
     StmtsAndExpr,
 )
@@ -17,14 +19,6 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.translators.common import CommonTranslator
-
-
-class Predicates(List['viper_ast.Predicate']):
-    """Type alias for a list of predicates."""
-
-
-class Fields(List['viper_ast.Field']):
-    """Type alias for a list of fields."""
 
 
 class ObligationTranslator(CommonTranslator):
@@ -49,7 +43,7 @@ class ObligationTranslator(CommonTranslator):
 
     def get_obligation_preamble(
             self,
-            ctx: Context) -> Tuple[Predicates, Fields]:
+            ctx: Context) -> Tuple[List[Predicate], List[Field]]:
         """Construct obligation preamble."""
         # TODO: This method is a stub.
         return [], []
