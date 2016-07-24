@@ -85,6 +85,7 @@ class MethodTranslator(CommonTranslator):
         """
         Translates the postconditions specified for 'method'.
         """
+        ctx.obligation_context.is_translating_posts = True
         posts = []
         no_error = self.viper.EqCmp(err_var,
                                     self.viper.NullLit(self.no_position(ctx),
@@ -101,6 +102,7 @@ class MethodTranslator(CommonTranslator):
                                           self.no_info(ctx))
             posts.append(expr)
 
+        ctx.obligation_context.is_translating_posts = False
         return posts
 
     def _translate_exceptional_posts(self, method: PythonMethod,

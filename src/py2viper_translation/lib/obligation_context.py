@@ -27,6 +27,9 @@ class ObligationContext:
     def __init__(self) -> None:
         self._loop_stack = []
 
+        self.is_translating_posts = False
+        """Are we currently translating a postcondition?"""
+
     @property
     def _current_loop_info(self) -> LoopInfo:
         """Get info of the inner most loop."""

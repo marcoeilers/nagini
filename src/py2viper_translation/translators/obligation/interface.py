@@ -16,6 +16,8 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    get_func_name,
+    InvalidProgramException,
     UnsupportedException,
 )
 from py2viper_translation.translators.common import CommonTranslator
@@ -39,7 +41,23 @@ class ObligationTranslator(CommonTranslator):
     def translate_obligation_contractfunc_call(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to obligation contract function."""
-        raise UnsupportedException(node, 'Method is a stub.')
+        func_name = get_func_name(node)
+        if func_name == 'MustTerminate':
+            return self._translate_must_terminate(node, ctx)
+        else:
+            raise UnsupportedException(node,
+                                       'Unsupported contract function.')
+
+    def _translate_must_terminate(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``MustTerminate``."""
+        if ctx.obligation_context.is_translating_loop():
+            raise UnsupportedException(node, 'Method is a stub.')
+        elif ctx.obligation_context.is_translating_posts:
+            raise InvalidProgramException(
+                node, 'obligation.must_terminate.in_postcondition')
+        else:
+            raise UnsupportedException(node, 'Method is a stub.')
 
     def get_obligation_preamble(
             self,
