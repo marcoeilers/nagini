@@ -6,11 +6,9 @@ import ast
 from typing import List, Tuple
 
 from py2viper_translation.lib.context import Context
-from py2viper_translation.lib.program_nodes import (
-    PythonMethod,
-)
 from py2viper_translation.lib.typedefs import (
     Field,
+    Method,
     Predicate,
     Stmt,
     StmtsAndExpr,
@@ -21,6 +19,15 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.translators.common import CommonTranslator
+from py2viper_translation.translators.obligation.loop import (
+    LoopObligationTranslator,
+)
+from py2viper_translation.translators.obligation.manager import (
+    obligation_manager,
+)
+from py2viper_translation.translators.obligation.method import (
+    MethodObligationTranslator,
+)
 
 
 class ObligationTranslator(CommonTranslator):
@@ -28,15 +35,22 @@ class ObligationTranslator(CommonTranslator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # TODO: This method is a stub.
+        self._method_translator = MethodObligationTranslator(
+            *args, **kwargs)
+        self._loop_translator = LoopObligationTranslator(
+            *args, **kwargs)
 
     def enter_loop_translation(self, node, ctx) -> None:
         """Update context with info needed to translate loop."""
-        # TODO: This method is a stub.
+        self._loop_translator.enter_loop_translation(node, ctx)
 
     def leave_loop_translation(self, ctx) -> None:
         """Remove loop translation info from context."""
-        # TODO: This method is a stub.
+        self._loop_translator.leave_loop_translation(ctx)
+
+    def create_while_node(self, *args, **kwargs) -> List[Stmt]:
+        """Construct a while loop AST node with obligation stuff."""
+        return self._loop_translator.create_while_node(*args, **kwargs)
 
     def translate_obligation_contractfunc_call(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -45,102 +59,32 @@ class ObligationTranslator(CommonTranslator):
         if func_name == 'MustTerminate':
             return self._translate_must_terminate(node, ctx)
         else:
-            raise UnsupportedException(node,
-                                       'Unsupported contract function.')
+            raise UnsupportedException(
+                node, 'Unsupported contract function.')
 
     def _translate_must_terminate(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to ``MustTerminate``."""
         if ctx.obligation_context.is_translating_loop():
-            raise UnsupportedException(node, 'Method is a stub.')
+            return self._loop_translator.translate_must_terminate(node, ctx)
         elif ctx.obligation_context.is_translating_posts:
             raise InvalidProgramException(
                 node, 'obligation.must_terminate.in_postcondition')
         else:
-            raise UnsupportedException(node, 'Method is a stub.')
+            return self._method_translator.translate_must_terminate(node, ctx)
 
     def get_obligation_preamble(
             self,
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
         """Construct obligation preamble."""
-        # TODO: This method is a stub.
-        return [], []
+        predicates = obligation_manager.create_predicates(self)
+        return predicates, []
 
-    def _find_method_by_sil_name(self, ctx, sil_name) -> PythonMethod:
-        for method in ctx.program.methods.values():
-            if method.sil_name == sil_name:
-                return method
-        for cls in ctx.program.classes.values():
-            for method in cls.methods.values():
-                if method.sil_name == sil_name:
-                    return method
-        return None
-
-    def create_method_node(
-            self, ctx, name, original_args, returns, pres, posts,
-            local_vars, body, position, info,
-            method=None) -> 'viper_ast.Method':
+    def create_method_node(self, *args, **kwargs) -> Method:
         """Construct method AST node with additional obligation stuff."""
-        # TODO: This method is a stub.
+        return self._method_translator.create_method_node(*args, **kwargs)
 
-        if method is None:
-            method = self._find_method_by_sil_name(ctx, name)
-        if method is None:
-            # Assume that this is a method that is never called from
-            # Python and, as a result, does not need obligation stuff.
-            return self.viper.Method(
-                name, original_args, returns, pres, posts, local_vars, body,
-                position, info)
-
-        # Update arguments.
-        args = original_args
-
-        # Update body.
-        if isinstance(body, self.jvm.viper.silver.ast.Seqn):
-            # Axiomatized method, do nothing with body.
-            body_block = body
-        else:
-            # Convert body to Scala.
-            body_block = self.translate_block(
-                body, position, info)
-
-        return self.viper.Method(
-            name, args, returns, pres, posts, local_vars, body_block,
-            position, info)
-
-    def create_method_call_node(
-            self, ctx, methodname, original_args, targets, position,
-            info, target_method=None, target_node=None) -> List[Stmt]:
+    def create_method_call_node(self, *args, **kwargs) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
-        # TODO: This method is a stub.
-
-        statements = []
-
-        # Update arguments.
-        args = original_args
-
-        # Call method.
-        call = self.viper.MethodCall(methodname, args, targets, position, info)
-        statements.append(call)
-
-        return statements
-
-    def create_while_node(
-            self, ctx, cond, invariants, local_vars, body, node) -> List[Stmt]:
-        """Construct a while loop AST node with obligation stuff."""
-        # TODO: This method is a stub.
-
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-
-        statements = []
-
-        body_block = self.translate_block(body,
-                                          self.to_position(node, ctx),
-                                          self.no_info(ctx))
-
-        loop = self.viper.While(
-            cond, invariants, local_vars, body_block, position, info)
-        statements.append(loop)
-
-        return statements
+        return self._method_translator.create_method_call_node(
+            *args, **kwargs)

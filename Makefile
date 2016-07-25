@@ -20,7 +20,15 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/opener.py \
 	src/py2viper_translation/translators/io_operation/result_translator.py \
 	src/py2viper_translation/translators/obligation/__init__.py \
-	src/py2viper_translation/translators/obligation/interface.py
+	src/py2viper_translation/translators/obligation/common.py \
+	src/py2viper_translation/translators/obligation/interface.py \
+	src/py2viper_translation/translators/obligation/loop.py \
+	src/py2viper_translation/translators/obligation/method.py \
+	src/py2viper_translation/translators/obligation/manager.py \
+	src/py2viper_translation/translators/obligation/utils.py \
+	src/py2viper_translation/translators/obligation/types/__init__.py \
+	src/py2viper_translation/translators/obligation/types/base.py \
+	src/py2viper_translation/translators/obligation/types/must_terminate.py
 CHECKED_CONTRACT_FILES:=\
 	deps/py2viper-contracts/src/py2viper_contracts/io.py \
 	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
