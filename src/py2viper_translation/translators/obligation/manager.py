@@ -7,6 +7,9 @@ from py2viper_translation.lib.typedefs import (
     Predicate,
 )
 from py2viper_translation.translators.common import CommonTranslator
+from py2viper_translation.translators.obligation.types.base import (
+    Obligation,
+)
 from py2viper_translation.translators.obligation.types.must_terminate import (
     MustTerminateObligation,
 )
@@ -26,6 +29,11 @@ class ObligationManager:
         """Get ``MustTerminate`` obligation."""
         return self._must_terminate_obligation
 
+    @property
+    def obligations(self) -> List[Obligation]:
+        """Get a list of all obligations."""
+        return self._obligations
+
     def create_predicates(
             self, translator: CommonTranslator) -> List[Predicate]:
         """Get all predicates that are used to represent obligations."""
@@ -33,6 +41,3 @@ class ObligationManager:
         for obligation in self._obligations:
             predicates.extend(obligation.create_predicates(translator))
         return predicates
-
-
-obligation_manager = ObligationManager()    # pylint: disable=invalid-name

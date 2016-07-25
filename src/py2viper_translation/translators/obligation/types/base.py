@@ -22,6 +22,11 @@ class ObligationInstance(abc.ABC):
     specific measure and other properties.
     """
 
+    def __init__(self, node: ast.expr) -> None:
+        super().__init__()
+        self.node = node
+        """AST node from which this obligation was instantiated."""
+
     @abc.abstractmethod
     def is_fresh(self) -> bool:
         """Return if this a fresh obligation."""

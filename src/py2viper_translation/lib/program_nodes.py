@@ -379,6 +379,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.labels = [END_LABEL]
+        self.obligation_info = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -395,6 +396,7 @@ class PythonMethod(PythonNode, PythonScope):
         if self.kw_arg:
             self.kw_arg.process(self.get_fresh_name(self.kw_arg.name),
                                 translator)
+        self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
             return
         func_type = self.get_program().types.get_func_type(
