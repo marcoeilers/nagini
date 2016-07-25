@@ -17,6 +17,10 @@ from py2viper_translation.translators.obligation.types.base import (
 class MustTerminateObligationInstance(ObligationInstance):
     """Class representing instance of ``MustTerminate`` obligation."""
 
+    def __init__(self, node: ast.expr, measure: ast.expr) -> None:
+        super().__init__(node)
+        self._measure = measure
+
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.
 
@@ -42,6 +46,8 @@ class MustTerminateObligation(Obligation):
             node: ast.Call) -> Optional[MustTerminateObligationInstance]:
         if (isinstance(node.func, ast.Name) and
                 node.func.id == self.OBLIGATION_NAME):
-            raise UnsupportedException(node, 'Not implemented.')
+            measure = node.args[0]
+            instance = MustTerminateObligationInstance(node, measure)
+            return instance
         else:
             return None

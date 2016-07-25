@@ -6,6 +6,9 @@ import ast
 from typing import List, Tuple
 
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+)
 from py2viper_translation.lib.typedefs import (
     Field,
     Method,
@@ -23,10 +26,13 @@ from py2viper_translation.translators.obligation.loop import (
     LoopObligationTranslator,
 )
 from py2viper_translation.translators.obligation.manager import (
-    obligation_manager,
+    ObligationManager,
 )
 from py2viper_translation.translators.obligation.method import (
     MethodObligationTranslator,
+)
+from py2viper_translation.translators.obligation.visitors import (
+    PythonMethodObligationInfo,
 )
 
 
@@ -35,6 +41,7 @@ class ObligationTranslator(CommonTranslator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._obligation_manager = ObligationManager()
         self._method_translator = MethodObligationTranslator(
             *args, **kwargs)
         self._loop_translator = LoopObligationTranslator(
@@ -77,7 +84,7 @@ class ObligationTranslator(CommonTranslator):
             self,
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
         """Construct obligation preamble."""
-        predicates = obligation_manager.create_predicates(self)
+        predicates = self._obligation_manager.create_predicates(self)
         return predicates, []
 
     def create_method_node(self, *args, **kwargs) -> Method:
@@ -88,3 +95,10 @@ class ObligationTranslator(CommonTranslator):
         """Construct a method call AST node with obligation stuff."""
         return self._method_translator.create_method_call_node(
             *args, **kwargs)
+
+    def create_obligation_info(self, method: PythonMethod) -> object:
+        """Create obligation info for the method."""
+        visitor = PythonMethodObligationInfo(self._obligation_manager)
+        visitor.traverse_preconditions(method)
+        visitor.traverse_postconditions(method)
+        return visitor

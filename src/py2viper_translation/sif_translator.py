@@ -74,6 +74,7 @@ class SIFTranslator(Translator):
         config.type_factory = TypeDomainFactory(viper_ast, self)
         config.func_triple_factory = FuncTripleDomainFactory(viper_ast, config)
 
+        self.obligation_translator = config.obligation_translator
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
