@@ -27,7 +27,19 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
                 'viper_ast.Predicate',
                 List['viper_ast.Function'],
                 List['viper_ast.Method']]:
-        """Translate IO operation to Silver."""
+        """Translate IO operation to Silver.
+
+        This means:
+
+        1.  Create a predicate representing IO operation.
+        2.  Create body-less functions for all IO operation results.
+        3.  Create a method for IO operation termination check.
+
+        .. todo:: Vytautas
+
+            Change from ``List`` of methods to single method, if it
+            turns out that we need only one method.
+        """
         args = [
             arg.decl
             for arg in operation.get_parameters()
@@ -61,7 +73,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
     def _translate_defining_getters(
             self, main_operation: PythonIOOperation,
             ctx: Context) -> None:
-        """Translate defining getters of existential variables."""
+        """Translate defining getter instances of existential variables."""
         assert not main_operation.is_basic()
         assert ctx.current_function is None
         ctx.current_function = main_operation

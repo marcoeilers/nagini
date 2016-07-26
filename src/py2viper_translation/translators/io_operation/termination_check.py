@@ -61,6 +61,7 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
             super().visit_Call(node)
 
     def _create_termination_checks(self, node: ast.Call) -> None:
+        """Create termination checks for sub-operation."""
         assert self._current_operation is None
         assert self._current_identifier is None
         assert self._current_guard_condition is None
