@@ -6,6 +6,10 @@ import ast
 
 from typing import List, Optional
 
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+    PythonVar,
+)
 from py2viper_translation.lib.typedefs import (
     Predicate,
 )
@@ -38,6 +42,10 @@ class ObligationInstance(abc.ABC):
         If obligation is fresh, the behaviour of this call is undefined.
         """
 
+    @abc.abstractmethod
+    def get_target(self) -> PythonVar:
+        """Return a variable to which obligation is attached."""
+
 
 class Obligation(abc.ABC):
     """A base class for all obligations."""
@@ -50,7 +58,10 @@ class Obligation(abc.ABC):
         """Unique identifier of this obligation type."""
 
     @abc.abstractmethod
-    def check_node(self, node: ast.Call) -> Optional[ObligationInstance]:
+    def check_node(
+            self, node: ast.Call,
+            obligation_info: 'PythonMethodObligationInfo',
+            method: PythonMethod) -> Optional[ObligationInstance]:
         """Check if node represents this obligation type.
 
         If check is successful, an obligation instance object is

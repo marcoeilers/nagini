@@ -98,7 +98,8 @@ class ObligationTranslator(CommonTranslator):
 
     def create_obligation_info(self, method: PythonMethod) -> object:
         """Create obligation info for the method."""
-        visitor = PythonMethodObligationInfo(self._obligation_manager)
-        visitor.traverse_preconditions(method)
-        visitor.traverse_postconditions(method)
-        return visitor
+        info = PythonMethodObligationInfo(
+            self._obligation_manager, method, self.translator)
+        info.traverse_preconditions()
+        info.traverse_postconditions()
+        return info
