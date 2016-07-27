@@ -11,11 +11,18 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
 )
-from py2viper_translation.lib.util import (
-    UnsupportedException,
-)
 from py2viper_translation.translators.obligation.common import (
     CommonObligationTranslator,
+)
+from py2viper_translation.translators.obligation.method_node import (
+    ObligationMethod,
+    ObligationsMethodNodeConstructor,
+)
+from py2viper_translation.translators.obligation.method_call_node import (
+    ObligationsMethodCallNodeConstructor,
+)
+from py2viper_translation.translators.obligation.types import (
+    must_terminate,
 )
 from py2viper_translation.translators.obligation.utils import (
     find_method_by_sil_name,
@@ -28,15 +35,24 @@ class MethodObligationTranslator(CommonObligationTranslator):
     def translate_must_terminate(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``MustTerminate`` in loop invariant."""
-        raise UnsupportedException(node, 'Method is a stub.')
+        obligation_info = ctx.actual_function.obligation_info
+        guarded_obligation_instance = obligation_info.get_instance(node)
+        obligation_instance = guarded_obligation_instance.obligation_instance
+        assert isinstance(obligation_instance,
+                          must_terminate.MustTerminateObligationInstance)
+
+        inhale_exhale = obligation_instance.get_use_method(ctx)
+
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        expr = inhale_exhale.translate(self, ctx, position, info)
+        return ([], expr)
 
     def create_method_node(
             self, ctx, name, original_args, returns, pres, posts,
             local_vars, body, position, info,
             method=None) -> Method:
         """Construct method AST node with additional obligation stuff."""
-        # TODO: This method is a stub.
-
         if method is None:
             method = find_method_by_sil_name(ctx, name)
         if method is None:
@@ -46,35 +62,20 @@ class MethodObligationTranslator(CommonObligationTranslator):
                 name, original_args, returns, pres, posts, local_vars, body,
                 position, info)
 
-        # Update arguments.
-        args = original_args
+        obligation_method = ObligationMethod(
+            name, original_args, returns, pres, posts, local_vars, body)
+        constructor = ObligationsMethodNodeConstructor(
+            obligation_method, method, self, ctx, position, info)
+        constructor.add_obligations()
 
-        # Update body.
-        if isinstance(body, self.jvm.viper.silver.ast.Seqn):
-            # Axiomatized method, do nothing with body.
-            body_block = body
-        else:
-            # Convert body to Scala.
-            body_block = self.translate_block(
-                body, position, info)
-
-        return self.viper.Method(
-            name, args, returns, pres, posts, local_vars, body_block,
-            position, info)
+        return constructor.construct_node()
 
     def create_method_call_node(
             self, ctx, methodname, original_args, targets, position,
             info, target_method=None, target_node=None) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
-        # TODO: This method is a stub.
-
-        statements = []
-
-        # Update arguments.
-        args = original_args
-
-        # Call method.
-        call = self.viper.MethodCall(methodname, args, targets, position, info)
-        statements.append(call)
-
-        return statements
+        constructor = ObligationsMethodCallNodeConstructor(
+            methodname, original_args, targets, position, info, self, ctx,
+            target_method, target_node)
+        constructor.construct_call()
+        return constructor.get_statements()
