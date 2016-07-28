@@ -609,6 +609,8 @@ class PythonIOOperation(PythonNode, PythonScope):
         """
         if self._terminates is None:
             self._terminates = ast.NameConstant(False)
+            self._terminates.lineno = self.node.lineno
+            self._terminates.col_offset = self.node.col_offset
         return self._terminates
 
     def set_termination_measure(self, expression: ast.AST) -> bool:
@@ -629,6 +631,8 @@ class PythonIOOperation(PythonNode, PythonScope):
         """
         if self._termination_measure is None:
             self._termination_measure = ast.Num(1)
+            self._termination_measure.lineno = self.node.lineno
+            self._termination_measure.col_offset = self.node.col_offset
         return self._termination_measure
 
     def is_basic(self) -> bool:
