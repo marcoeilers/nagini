@@ -117,5 +117,9 @@ class Translator:
         Create an obligation info for method. This method should be
         called during the processing stage of the method before any
         translation is done.
+
+        This return type of this method is ``object`` to indicate that
+        the returned value is opaque for all code except obligation
+        translator.
         """
         return self.obligation_translator.create_obligation_info(method)

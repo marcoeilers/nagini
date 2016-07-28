@@ -83,7 +83,11 @@ class ObligationTranslator(CommonTranslator):
     def get_obligation_preamble(
             self,
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
-        """Construct obligation preamble."""
+        """Construct obligation preamble.
+
+        To track each obligation we use predicates which are defined in
+        this preamble.
+        """
         predicates = self._obligation_manager.create_predicates(self)
         return predicates, []
 
