@@ -4,11 +4,13 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/lib/io_context.py \
 	src/py2viper_translation/lib/io_checkers.py \
 	src/py2viper_translation/lib/guard_collectors.py \
+	src/py2viper_translation/lib/expressions.py \
 	src/py2viper_translation/lib/errors/__init__.py \
 	src/py2viper_translation/lib/errors/manager.py \
 	src/py2viper_translation/lib/errors/messages.py \
 	src/py2viper_translation/lib/errors/rules.py \
 	src/py2viper_translation/lib/errors/wrappers.py \
+	src/py2viper_translation/lib/obligation_context.py \
 	src/py2viper_translation/translators/io_operation/common.py \
 	src/py2viper_translation/translators/io_operation/definition.py \
 	src/py2viper_translation/translators/io_operation/__init__.py \
@@ -17,10 +19,26 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/use.py \
 	src/py2viper_translation/translators/io_operation/utils.py \
 	src/py2viper_translation/translators/io_operation/opener.py \
-	src/py2viper_translation/translators/io_operation/result_translator.py
+	src/py2viper_translation/translators/io_operation/result_translator.py \
+	src/py2viper_translation/translators/obligation/__init__.py \
+	src/py2viper_translation/translators/obligation/common.py \
+	src/py2viper_translation/translators/obligation/interface.py \
+	src/py2viper_translation/translators/obligation/loop.py \
+	src/py2viper_translation/translators/obligation/manager.py \
+	src/py2viper_translation/translators/obligation/measures.py \
+	src/py2viper_translation/translators/obligation/method.py \
+	src/py2viper_translation/translators/obligation/method_call_node.py \
+	src/py2viper_translation/translators/obligation/method_node.py \
+	src/py2viper_translation/translators/obligation/utils.py \
+	src/py2viper_translation/translators/obligation/visitors.py \
+	src/py2viper_translation/translators/obligation/types/__init__.py \
+	src/py2viper_translation/translators/obligation/types/base.py \
+	src/py2viper_translation/translators/obligation/types/must_terminate.py
 CHECKED_CONTRACT_FILES:=\
-							deps/py2viper-contracts/src/py2viper_contracts/io.py \
-							deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py
+	deps/py2viper-contracts/src/py2viper_contracts/io.py \
+	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
+	deps/py2viper-contracts/src/py2viper_contracts/obligations.py
+
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
 CHECKED_TRANSLATOR_MODULES:=$(subst /,.,$(CHECKED_TRANSLATOR_FILES:src/%.py=%))
@@ -31,7 +49,7 @@ BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
 test: bin/py.test
-	bin/py.test -x src/py2viper_translation/tests.py
+	bin/py.test -v -x src/py2viper_translation/tests.py
 
 mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)

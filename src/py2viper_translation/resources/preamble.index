@@ -3,7 +3,8 @@
     "methods": {
         "__init__": {
             "args": [],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "append": {
             "args": ["list", "object"],
@@ -109,10 +110,6 @@
             "args": ["dict", "object"],
             "type": "object",
             "generic_type": 1
-        },
-        "keys": {
-            "args": ["dict"],
-            "type": "set"
         },
         "__bool__": {
             "args": ["dict"],
@@ -284,6 +281,9 @@
             "type": null
         }
     },
+    "extends": "object"
+},
+"Thread": {
     "extends": "object"
 }
 }

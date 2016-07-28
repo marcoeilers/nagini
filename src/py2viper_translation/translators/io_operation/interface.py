@@ -11,6 +11,9 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
+    Function,
+    Method,
+    Predicate,
     Stmt,
     StmtsAndExpr,
 )
@@ -38,9 +41,9 @@ class IOOperationTranslator:
     def translate_io_operation(
             self, operation: PythonIOOperation,
             ctx: Context) -> Tuple[
-                'viper_ast.Predicate',
-                List['viper_ast.Function'],
-                List['viper_ast.Method']]:
+                Predicate,
+                List[Function],
+                List[Method]]:
         """Translate IO operation to Silver."""
         return self._definition_translator.translate_io_operation(
             operation, ctx)
