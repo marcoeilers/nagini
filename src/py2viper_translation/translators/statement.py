@@ -20,6 +20,7 @@ from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     is_get_ghost_output,
+    is_invariant,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -219,7 +220,8 @@ class StatementTranslator(CommonTranslator):
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
-                      node: ast.AST, ctx: Context) -> Tuple[PythonVar, Stmt]:
+                      node: ast.AST,
+                      ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
         iter_class = ctx.program.classes['Iterator']
         iter_var = ctx.actual_function.create_variable('iter', iter_class,
                                                        self.translator)
@@ -233,7 +235,8 @@ class StatementTranslator(CommonTranslator):
         return iter_var, iter_assign
 
     def _get_next_call(self, iter_var: PythonVar, target_var: PythonVar,
-                       node: ast.For, ctx: Context) -> Tuple[PythonVar, Stmt]:
+                       node: ast.For,
+                       ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
 
         if target_var.type.name in PRIMITIVES:
             boxed_target_type = ctx.program.classes['__boxed_' +
@@ -267,7 +270,7 @@ class StatementTranslator(CommonTranslator):
         return err_var, next_call, target_assign
 
     def _get_iterator_delete(self, iter_var: PythonVar, node: ast.For,
-                             ctx: Context) -> Stmt:
+                             ctx: Context) -> List[Stmt]:
         iter_class = ctx.program.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
@@ -276,6 +279,7 @@ class StatementTranslator(CommonTranslator):
         return iter_del
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
+        self.enter_loop_translation(node, ctx)
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
@@ -290,28 +294,26 @@ class StatementTranslator(CommonTranslator):
                                                     err_var, iterable,
                                                     iterable_type, node, ctx)
         bodyindex = 0
-        while self.is_invariant(node.body[bodyindex]):
+        while is_invariant(node.body[bodyindex]):
             inv_node = node.body[bodyindex]
             user_inv = self.translate_contract(inv_node, ctx)
             invariant.append(user_inv)
             bodyindex += 1
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
-        body.append(next_call)
+        body.extend(next_call)
         body.append(target_assign)
-        body_block = self.translate_block(body,
-                                          self.to_position(node, ctx),
-                                          self.no_info(ctx))
         del ctx.loop_iterators[node]
         cond = self.viper.EqCmp(err_var.ref(),
                                 self.viper.NullLit(self.no_position(ctx),
                                                    self.no_info(ctx)),
                                 self.to_position(node, ctx),
                                 self.no_info(ctx))
-        loop = self.viper.While(cond, invariant, [], body_block,
-                                self.to_position(node, ctx), self.no_info(ctx))
+        loop = self.create_while_node(
+            ctx, cond, invariant, [], body, node)
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
-        return [iter_assign, next_call, target_assign, loop, iter_del]
+        self.leave_loop_translation(ctx)
+        return iter_assign + next_call + [target_assign] + loop + iter_del
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
@@ -417,7 +419,7 @@ class StatementTranslator(CommonTranslator):
             arg_types = [None, index_type, rhs_type]
             call = self.get_method_call(target_cls, '__setitem__', args,
                                         arg_types, [], node, ctx)
-            return lhs_stmt + ind_stmt + [call]
+            return lhs_stmt + ind_stmt + call
         target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
         if isinstance(target, ast.Name):
@@ -458,28 +460,25 @@ class StatementTranslator(CommonTranslator):
         lhs_stmt = self.assign_to(target, rhs, None, rhs_type, node, ctx)
         return lhs_stmt
 
-    def is_invariant(self, stmt: ast.AST) -> bool:
-        return get_func_name(stmt) == 'Invariant'
-
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
+        self.enter_loop_translation(node, ctx)
         cond_stmt, cond = self.translate_to_bool(node.test, ctx)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         invariants = []
         locals = []
         bodyindex = 0
-        while self.is_invariant(node.body[bodyindex]):
+        while is_invariant(node.body[bodyindex]):
             invariants.append(self.translate_contract(node.body[bodyindex],
                                                       ctx))
             bodyindex += 1
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
-        body = self.translate_block(body, self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        return [self.viper.While(cond, invariants, locals, body,
-                                 self.to_position(node, ctx),
-                                 self.no_info(ctx))]
+        loop = self.create_while_node(
+            ctx, cond, invariants, locals, body, node)
+        self.leave_loop_translation(ctx)
+        return loop
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
         if not node.value:

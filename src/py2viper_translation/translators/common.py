@@ -131,7 +131,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         arg_types: List[PythonType],
                         targets: List['silver.ast.LocalVarRef'],
                         node: ast.AST,
-                        ctx: Context) -> 'silver.ast.MethodCall':
+                        ctx: Context) -> List[Stmt]:
         """
         Creates a method call to the methoc called func_name, with
         the given receiver and arguments. Boxes arguments if necessary.
@@ -153,9 +153,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 actual_arg = arg
             actual_args.append(actual_arg)
         sil_name = func.sil_name
-        call = self.viper.MethodCall(sil_name, actual_args, targets,
-                                     self.to_position(node, ctx),
-                                     self.no_info(ctx))
+        call = self.create_method_call_node(
+            ctx, sil_name, actual_args, targets, self.to_position(node, ctx),
+            self.no_info(ctx), target_method=func, target_node=node)
         return call
 
     def get_error_var(self, stmt: ast.AST,

@@ -85,7 +85,7 @@ class ExpressionTranslator(CommonTranslator):
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
-        stmt = [constr_call]
+        stmt = constr_call
         for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key, ctx)
             key_type = self.get_type(key, ctx)
@@ -95,7 +95,7 @@ class ExpressionTranslator(CommonTranslator):
             arg_types = [None, key_type, val_type]
             append_call = self.get_method_call(dict_class, '__setitem__', args,
                                                arg_types, [], node, ctx)
-            stmt += key_stmt + val_stmt + [append_call]
+            stmt += key_stmt + val_stmt + append_call
         return stmt, res_var.ref(node, ctx)
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
@@ -104,7 +104,7 @@ class ExpressionTranslator(CommonTranslator):
             set_class, self.translator)
         constr_call = self.get_method_call(set_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
-        stmt = [constr_call]
+        stmt = constr_call
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
             el_type = self.get_type(el, ctx)
@@ -112,7 +112,7 @@ class ExpressionTranslator(CommonTranslator):
             arg_types = [None, el_type]
             append_call = self.get_method_call(set_class, 'add', args,
                                                arg_types, [], node, ctx)
-            stmt += el_stmt + [append_call]
+            stmt += el_stmt + append_call
         return stmt, res_var.ref(node, ctx)
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
@@ -123,7 +123,7 @@ class ExpressionTranslator(CommonTranslator):
 
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
-        stmt = [constr_call]
+        stmt = constr_call
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
             el_type = self.get_type(element, ctx)
@@ -131,7 +131,7 @@ class ExpressionTranslator(CommonTranslator):
             arg_types = [None, el_type]
             append_call = self.get_method_call(list_class, 'append', args,
                                                arg_types, [], node, ctx)
-            stmt += el_stmt + [append_call]
+            stmt += el_stmt + append_call
         return stmt, res_var.ref(node, ctx)
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
