@@ -44,7 +44,8 @@ class MustTerminateObligationInstance(ObligationInstance):
         obligation_info = ctx.actual_function.obligation_info
         cthread = obligation_info.current_thread_var
 
-        predicate = expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+        predicate = expr.PredicateAccess(
+            _PREDICATE_NAME, expr.VarRef(cthread))
 
         # Inhale part.
         inhale = expr.Implies(

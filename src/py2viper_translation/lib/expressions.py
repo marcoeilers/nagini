@@ -37,7 +37,7 @@ class Location(Expression):
     """Denotes an access to specific location."""
 
 
-class Predicate(Location):
+class PredicateAccess(Location):
     """A predicate with one ``Ref`` argument access."""
 
     def __init__(self, name: str, reference: 'RefExpression') -> None:
@@ -110,6 +110,8 @@ class PythonIntExpression(IntExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
+        int_class = ctx.program.classes['int']
+        assert translator.get_type(self._node, ctx) is int_class
         stmt, expr = translator.translate_expr(
             self._node, ctx, expression=True)
         assert not stmt
