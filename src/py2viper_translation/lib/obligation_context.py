@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import List
+from typing import List, Union
 
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
@@ -14,7 +14,9 @@ class LoopInfo:
     """Information about loop."""
 
     def __init__(
-            self, node, invariants, measure_map, loop_check_before) -> None:
+            self, node: Union[ast.While, ast.For],
+            invariants: List[ast.expr], measure_map: 'MeasureMap',
+            loop_check_before: PythonVar) -> None:
         self.node = node
         self.invariants = invariants
         self.measure_map = measure_map
@@ -37,7 +39,9 @@ class ObligationContext:
         return self._loop_stack[-1]
 
     def push_loop_info(
-            self, node, invariants, measure_map, loop_check_before) -> None:
+            self, node: Union[ast.While, ast.For],
+            invariants: List[ast.expr], measure_map: 'MeasureMap',
+            loop_check_before: PythonVar) -> None:
         """Push loop information to loop stack.
 
         This method should be called just before a new loop is being
