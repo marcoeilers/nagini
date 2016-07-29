@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import List
+from typing import List, Union
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.typedefs import (
@@ -21,11 +21,12 @@ from py2viper_translation.translators.obligation.common import (
 class LoopObligationTranslator(CommonObligationTranslator):
     """Class for translating obligations in loops."""
 
-    def enter_loop_translation(self, node, ctx) -> None:
+    def enter_loop_translation(
+            self, node: Union[ast.While, ast.For], ctx: Context) -> None:
         """Update context with info needed to translate loop."""
         # TODO: This method is a stub.
 
-    def leave_loop_translation(self, ctx) -> None:
+    def leave_loop_translation(self, ctx: Context) -> None:
         """Remove loop translation info from context."""
         # TODO: This method is a stub.
 
