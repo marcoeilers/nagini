@@ -7,8 +7,10 @@ from typing import List, Union
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.typedefs import (
+    Expr,
     Stmt,
     StmtsAndExpr,
+    VarDecl,
 )
 from py2viper_translation.lib.util import (
     UnsupportedException,
@@ -36,7 +38,10 @@ class LoopObligationTranslator(CommonObligationTranslator):
         raise UnsupportedException(node, 'Method is a stub.')
 
     def create_while_node(
-            self, ctx, cond, invariants, local_vars, body, node) -> List[Stmt]:
+            self, ctx: Context, cond: Expr,
+            invariants: List[Expr],
+            local_vars: List[VarDecl],
+            body: Stmt, node: Union[ast.While, ast.For]) -> List[Stmt]:
         """Construct a while loop AST node with obligation stuff."""
         # TODO: This method is a stub.
 
