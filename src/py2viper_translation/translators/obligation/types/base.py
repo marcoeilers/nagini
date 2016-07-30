@@ -26,8 +26,10 @@ class ObligationInstance(abc.ABC):
     specific measure and other properties.
     """
 
-    def __init__(self, node: ast.expr) -> None:
+    def __init__(self, obligation: 'Obligation', node: ast.expr) -> None:
         super().__init__()
+        self.obligation = obligation
+        """Actual obligation type."""
         self.node = node
         """AST node from which this obligation was instantiated."""
 

@@ -85,6 +85,7 @@ class ObligationsMethodNodeConstructor:
         if not self._need_skip_body():
             self._set_up_measures()
             self._add_book_keeping_vars()
+        # TODO: self._add_leak_check()
         # TODO: Finish implementation.
 
     def _is_body_native_silver(self) -> bool:
@@ -119,7 +120,6 @@ class ObligationsMethodNodeConstructor:
             precondition.translate(
                 self._translator, self._ctx, self._position, self._info)
             for precondition in preconditions])
-        # TODO: Add assumptions about measures being positive.
 
     def _set_up_measures(self) -> None:
         """Create and initialize method's measure map."""

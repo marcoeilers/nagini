@@ -148,6 +148,26 @@ class VarRef(RefExpression):
 class IntExpression(Expression):
     """A base class for all integer expressions."""
 
+    def __gt__(self, other) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return GtCmp(self, other)
+
+    def __ge__(self, other) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return GeCmp(self, other)
+
+    def __lt__(self, other) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return LtCmp(self, other)
+
+    def __le__(self, other) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return LeCmp(self, other)
+
 
 class PythonIntExpression(IntExpression):
     """An integer expression represented by Python int expression."""
@@ -200,6 +220,12 @@ class Sum(IntExpression):
 
 class BoolExpression(Expression):
     """A base class for all boolean expressions."""
+
+    def is_always_true(self) -> bool:
+        """Return if this expression translation would always yield True."""
+
+    def is_always_false(self) -> bool:
+        """Return if this expression translation would always yield False."""
 
 
 class PythonBoolExpression(BoolExpression):
@@ -327,6 +353,9 @@ class BigAnd(BoolExpression):
         """Check if have any conjuncts."""
         return not self._conjuncts
 
+    def is_always_true(self) -> bool:
+        return self.is_empty()
+
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
         if not self._conjuncts:
@@ -354,13 +383,17 @@ class Implies(BoolOp):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        condition = self._condition.translate(translator, ctx, position, info)
         value = self._value.translate(translator, ctx, position, info)
-        return translator.viper.Implies(
-            condition, value, position, info)
+        if self._condition.is_always_true():
+            return value
+        else:
+            condition = self._condition.translate(
+                translator, ctx, position, info)
+            return translator.viper.Implies(
+                condition, value, position, info)
 
 
-class EqCmp(Expression):
+class EqCmp(BoolExpression):
     """Equality comparison."""
 
     def __init__(self, left: Expression, right: Expression) -> None:
@@ -375,7 +408,7 @@ class EqCmp(Expression):
             left, right, position, info)
 
 
-class NeCmp(Expression):
+class NeCmp(BoolExpression):
     """Inequality comparison."""
 
     def __init__(self, left: Expression, right: Expression) -> None:
@@ -387,6 +420,66 @@ class NeCmp(Expression):
         left = self._left.translate(translator, ctx, position, info)
         right = self._right.translate(translator, ctx, position, info)
         return translator.viper.NeCmp(
+            left, right, position, info)
+
+
+class GtCmp(BoolExpression):
+    """Greater than comparison."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.GtCmp(
+            left, right, position, info)
+
+
+class GeCmp(BoolExpression):
+    """Greater equal comparison."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.GeCmp(
+            left, right, position, info)
+
+
+class LtCmp(BoolExpression):
+    """Less than comparison."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.LtCmp(
+            left, right, position, info)
+
+
+class LeCmp(BoolExpression):
+    """Less equal comparison."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.LeCmp(
             left, right, position, info)
 
 
@@ -485,6 +578,18 @@ class Exhale(Statement):
                   position: Position, info: Info) -> Expr:
         value = self._value.translate(translator, ctx, position, info)
         return translator.viper.Exhale(value, position, info)
+
+
+class Assert(Statement):
+    """Assert statement."""
+
+    def __init__(self, value: Expression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.Assert(value, position, info)
 
 
 class Assign(Statement):

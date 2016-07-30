@@ -3,16 +3,23 @@
 
 import ast
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
+    PythonIOExistentialVar,
     PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
+    Info,
+    Position,
     Stmt,
+)
+from py2viper_translation.lib.util import (
+    pprint,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.obligation.manager import (
@@ -29,6 +36,7 @@ class ObligationMethodCall:
 
     def __init__(self, name, args, targets) -> None:
         self.name = name
+        self.original_args = args[:]
         self.args = args
         self.targets = targets
 
@@ -63,8 +71,10 @@ class ObligationsMethodCallNodeConstructor:
 
     def construct_call(self) -> None:
         """Construct statements to perform a call."""
+        # TODO: Emit meaningful info comment for each step.
         self._add_aditional_arguments()
-        # self._check_measures_are_positive()
+        if not self._is_target_axiomatized():
+            self._check_measures_are_positive()
         self._save_must_terminate_amount(
             self._obligation_info.original_must_terminate_var)
         self._inhale_additional_must_terminate()
@@ -84,6 +94,32 @@ class ObligationsMethodCallNodeConstructor:
                 self._node, self._ctx),
         ]
         self._obligation_method_call.prepend_args(args)
+
+    def _check_measures_are_positive(self) -> None:
+        """Check that callee measures are positive."""
+        instances = self._obligation_info.get_all_precondition_instances()
+        with self._ctx.aliases_context():
+            self._set_up_method_arg_aliases()
+            for instance in instances:
+
+                guard_expression = instance.create_guard_expression()
+                check = expr.Implies(
+                    guard_expression,
+                    instance.obligation_instance.get_measure() > 0)
+                assertion = expr.Assert(check)
+
+                obligation_node = instance.obligation_instance.node
+                measure_position = self._to_position(obligation_node)
+                self._ctx.position.append(('call target', measure_position))
+                call_position = self._to_position(
+                    conversion_rules=rules.OBLIGATION_MEASURE_NON_POSITIVE,
+                    error_node=obligation_node)
+                info = self._to_info(
+                    'Positive measure check for {} at ({}:{})',
+                    instance.obligation_instance.obligation.identifier(),
+                    obligation_node.lineno, obligation_node.col_offset)
+                self._append_statement(assertion, call_position, info)
+                self._ctx.position.pop()
 
     def _save_must_terminate_amount(
             self, amount_var: PythonVar) -> None:
@@ -146,7 +182,52 @@ class ObligationsMethodCallNodeConstructor:
         cthread = self._obligation_info.current_thread_var
         return self._must_terminate.create_predicate_access(cthread)
 
-    def _append_statement(self, statement: expr.Statement) -> None:
+    def _to_position(
+            self, node: ast.AST = None,
+            conversion_rules: Rules = None,
+            error_node: Union[str, ast.AST] = None) -> Position:
+        error_string = None
+        if error_node is not None:
+            if isinstance(error_node, ast.AST):
+                error_string = pprint(error_node)
+            else:
+                error_string = error_node
+        return self._translator.to_position(
+            node or self._node, self._ctx, error_string=error_string,
+            rules=conversion_rules)
+
+    def _to_info(self, template, *args, **kwargs) -> Info:
+        return self._translator.to_info(
+            [template.format(*args, **kwargs)], self._ctx)
+
+    def _set_up_method_arg_aliases(self) -> None:
+        """Set up aliases from parameters to arguments."""
+        if self._node is None:
+            # self._node is None only when we do behavioural subtyping
+            # check. In this case, all arguments are the same and we do
+            # not need to set up aliases.
+            return
+        triples = zip(
+            self._method.args.values(),
+            self._node.args,
+            self._obligation_method_call.original_args)
+        # TODO: Refactor: This loop is identical to
+        # set_up_io_operation_input_aliases.
+        for parameter, py_arg, sil_arg in triples:
+            var_type = self._translator.get_type(py_arg, self._ctx)
+            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
+            var.set_ref(sil_arg)
+            self._ctx.set_alias(parameter.name, var)
+
+    def _append_statement(
+            self, statement: expr.Statement,
+            position: Position = None, info: Info = None) -> None:
         translated = statement.translate(
-            self._translator, self._ctx, self._position, self._info)
+            self._translator, self._ctx,
+            position or self._position,
+            info or self._info)
         self._statements.append(translated)
+
+    def _is_target_axiomatized(self) -> bool:
+        """Check if target is axiomatic method."""
+        return self._method.interface

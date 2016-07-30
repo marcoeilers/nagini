@@ -24,9 +24,10 @@ _PREDICATE_NAME = _OBLIGATION_NAME
 class MustTerminateObligationInstance(ObligationInstance):
     """Class representing instance of ``MustTerminate`` obligation."""
 
-    def __init__(self, node: ast.expr, measure: ast.expr,
-                 target: PythonVar) -> None:
-        super().__init__(node)
+    def __init__(
+            self, obligation: 'MustTerminateObligation', node: ast.expr,
+            measure: ast.expr, target: PythonVar) -> None:
+        super().__init__(obligation, node)
         self._measure = measure
         self._target = target
 
@@ -47,9 +48,12 @@ class MustTerminateObligationInstance(ObligationInstance):
         predicate = expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
 
         # Inhale part.
-        inhale = expr.Implies(
-            expr.CurrentPerm(predicate) == expr.NoPerm(),
-            expr.Acc(predicate))
+        inhale = expr.BigAnd([
+            self.get_measure() > 0,
+            expr.Implies(
+                expr.CurrentPerm(predicate) == expr.NoPerm(),
+                expr.Acc(predicate))
+        ])
 
         # Exhale part.
         check = obligation_info.caller_measure_map.check(
@@ -76,7 +80,7 @@ class MustTerminateObligation(Obligation):
                 node.func.id == _OBLIGATION_NAME):
             measure = node.args[0]
             instance = MustTerminateObligationInstance(
-                node, measure, obligation_info.current_thread_var)
+                self, node, measure, obligation_info.current_thread_var)
             return instance
         else:
             return None

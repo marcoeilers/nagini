@@ -10,7 +10,7 @@ class Rules(Dict[Tuple[str, str], Tuple[str, str]]):
 
 TERMINATION_CHECK_MEASURE_NON_POSITIVE = {
     ('assert.failed', 'assertion.false'):
-        ('termination_check.failed', 'measure.non_positive')
+        ('termination_check.failed', 'termination_measure.non_positive')
 }
 TERMINATION_CHECK_MEASURE_NON_DECREASING = {
     ('assert.failed', 'assertion.false'):
@@ -25,6 +25,11 @@ TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED = {
         ('termination_check.failed', 'child_termination.not_implied')
 }
 
+OBLIGATION_MEASURE_NON_POSITIVE = {
+    ('assert.failed', 'assertion.false'):
+        ('call.precondition', 'obligation_measure.non_positive')
+}
+
 
 __all__ = (
     'Rules',
@@ -32,4 +37,5 @@ __all__ = (
     'TERMINATION_CHECK_MEASURE_NON_DECREASING',
     'TERMINATION_CHECK_GAP_ENABLED',
     'TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED',
+    'OBLIGATION_MEASURE_NON_POSITIVE',
 )
