@@ -80,3 +80,7 @@ class MustTerminateObligation(Obligation):
             return instance
         else:
             return None
+
+    def create_predicate_access(self, cthread: PythonVar) -> expr.Predicate:
+        """Create a predicate access expression."""
+        return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))

@@ -15,6 +15,7 @@ from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
     Position,
+    Stmt,
 )
 from py2viper_translation.lib.util import (
     join_expressions,
@@ -30,7 +31,23 @@ class Expression(abc.ABC):
         """Translate to Silver expression."""
 
     def __eq__(self, other) -> 'Expression':
+        if other is None:
+            other = Null()
         return EqCmp(self, other)
+
+    def __ne__(self, other) -> 'Expression':
+        if other is None:
+            other = Null()
+        return NeCmp(self, other)
+
+
+class Statement(abc.ABC):
+    """A base class for all statements."""
+
+    @abc.abstractmethod
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Stmt:
+        """Translate to Silver Statement."""
 
 
 class Location(Expression):
@@ -51,6 +68,24 @@ class Predicate(Location):
             [reference], self._name, position, info)
 
 
+class FieldAccess(Location):
+    """Field access."""
+
+    def __init__(self, var: PythonVar, field_name: str,
+                 field_type: 'Type') -> None:
+        self._var = var
+        self._field_name = field_name
+        self._field_type = field_type
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        field = translator.viper.Field(
+            self._field_name, self._field_type.translate(translator),
+            position, info)
+        return translator.viper.FieldAccess(
+            self._var.ref(), field, position, info)
+
+
 class Acc(Expression):
     """Access to specific location."""
 
@@ -64,8 +99,12 @@ class Acc(Expression):
                   position: Position, info: Info) -> Expr:
         location = self._location.translate(translator, ctx, position, info)
         perm = self._perm.translate(translator, ctx, position, info)
-        return translator.viper.PredicateAccessPredicate(
-            location, perm, position, info)
+        if isinstance(self._location, Predicate):
+            return translator.viper.PredicateAccessPredicate(
+                location, perm, position, info)
+        else:
+            return translator.viper.FieldAccessPredicate(
+                location, perm, position, info)
 
 
 class InhaleExhale(Expression):
@@ -85,6 +124,14 @@ class InhaleExhale(Expression):
 
 class RefExpression(Expression):
     """A base class for all reference expressions."""
+
+
+class Null(RefExpression):
+    """A null reference."""
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return translator.viper.NullLit(position, info)
 
 
 class VarRef(RefExpression):
@@ -114,6 +161,41 @@ class PythonIntExpression(IntExpression):
             self._node, ctx, expression=True)
         assert not stmt
         return expr
+
+
+class RawIntExpression(IntExpression):
+    """Just a raw integer."""
+
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return translator.viper.IntLit(self._value, position, info)
+
+
+class Sum(IntExpression):
+    """A sum of 0 or more elements."""
+
+    def __init__(self, elements) -> None:
+        self._elements = elements
+
+    def is_empty(self) -> None:
+        """Check if have any elements."""
+        return not self._elements
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        if not self._elements:
+            return translator.viper.IntLit(0, position, info)
+        else:
+            elements = [
+                element.translate(translator, ctx, position, info)
+                for element in self._elements]
+            plus_operator = (
+                lambda left, right:
+                translator.viper.Add(left, right, position, info))
+            return join_expressions(plus_operator, elements)
 
 
 class BoolExpression(Expression):
@@ -170,6 +252,17 @@ class RefType(Type):
 
 
 REF = RefType()
+
+
+class SeqType(Type):
+    """A sequence type."""
+
+    def __init__(self, element_type: Type) -> None:
+        self._element_type = element_type
+
+    def translate(self, translator: 'AbstractTranslator') -> Expr:
+        element_type = self._element_type.translate(translator)
+        return translator.viper.SeqType(element_type)
 
 
 class CallArg:
@@ -282,8 +375,41 @@ class EqCmp(Expression):
             left, right, position, info)
 
 
+class NeCmp(Expression):
+    """Inequality comparison."""
+
+    def __init__(self, left: Expression, right: Expression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.NeCmp(
+            left, right, position, info)
+
+
 class PermExpression(Expression):
     """A base class for all perm typed expressions."""
+
+    def __sub__(self, other: 'PermExpression') -> 'PermExpression':
+        return PermSub(self, other)
+
+
+class PermSub(PermExpression):
+    """A subtraction of two permission values."""
+
+    def __init__(self, left: PermExpression, right: PermExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.PermSub(
+            left, right, position, info)
 
 
 class NoPerm(PermExpression):
@@ -302,6 +428,14 @@ class FullPerm(PermExpression):
         return translator.viper.FullPerm(position, info)
 
 
+class WildcardPerm(PermExpression):
+    """Full permission."""
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return translator.viper.WildcardPerm(position, info)
+
+
 class CurrentPerm(PermExpression):
     """The current permission amount to a predicate."""
 
@@ -313,3 +447,55 @@ class CurrentPerm(PermExpression):
         location = self._location.translate(translator, ctx, position, info)
         return translator.viper.CurrentPerm(
             location, position, info)
+
+
+class IntegerPerm(PermExpression):
+    """A multiplication of full permission."""
+
+    def __init__(self, value: IntExpression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        full_perm = translator.viper.FullPerm(position, info)
+        return translator.viper.IntPermMul(
+            value, full_perm, position, info)
+
+
+class Inhale(Statement):
+    """Inhale statement."""
+
+    def __init__(self, value: Expression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.Inhale(value, position, info)
+
+
+class Exhale(Statement):
+    """Exhale statement."""
+
+    def __init__(self, value: Expression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.Exhale(value, position, info)
+
+
+class Assign(Statement):
+    """Assign statement."""
+
+    def __init__(self, var: PythonVar, value: Expression) -> None:
+        self._var = var
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.LocalVarAssign(
+            self._var.ref(), value, position, info)

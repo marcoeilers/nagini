@@ -47,6 +47,7 @@ def test_dict_2() -> None:
 
 def test_dict_values() -> None:
     r = {3 : 7, 4: 8,5: 9}
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(Forall(r.values(), lambda i: (i > 5, [])))
 
 

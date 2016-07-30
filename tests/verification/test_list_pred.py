@@ -11,6 +11,7 @@ def main() -> None:
     Assert(value[2][0] == 'dd')
     append_bla_45(value)
     Assert(value[2][0] == 'dd')
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(get_second(value) == 23)
     Assert(len(value) == 4)
     Assert(value[3][0] == 'bla')

@@ -6,6 +6,7 @@ import ast
 from typing import List, Tuple
 
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
@@ -16,11 +17,14 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
 )
+from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
     UnsupportedException,
 )
+from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.translators.abstract import TranslatorConfig
 from py2viper_translation.translators.common import CommonTranslator
 from py2viper_translation.translators.obligation.loop import (
     LoopObligationTranslator,
@@ -39,13 +43,16 @@ from py2viper_translation.translators.obligation.visitors import (
 class ObligationTranslator(CommonTranslator):
     """Translator for obligations."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, config: TranslatorConfig, jvm: JVM, source_file: str,
+                 type_info: TypeInfo, viper_ast: ViperAST) -> None:
+        super().__init__(config, jvm, source_file, type_info, viper_ast)
         self._obligation_manager = ObligationManager()
         self._method_translator = MethodObligationTranslator(
-            *args, **kwargs)
+            config, jvm, source_file, type_info, viper_ast,
+            self._obligation_manager)
         self._loop_translator = LoopObligationTranslator(
-            *args, **kwargs)
+            config, jvm, source_file, type_info, viper_ast,
+            self._obligation_manager)
 
     def enter_loop_translation(self, node, ctx) -> None:
         """Update context with info needed to translate loop."""
@@ -99,7 +106,7 @@ class ObligationTranslator(CommonTranslator):
     def create_obligation_info(self, method: PythonMethod) -> object:
         """Create obligation info for the method."""
         info = PythonMethodObligationInfo(
-            self._obligation_manager, method, self.translator)
+            self._obligation_manager, method, self)
         info.traverse_preconditions()
         info.traverse_postconditions()
         return info

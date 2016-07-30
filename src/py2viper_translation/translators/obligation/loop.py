@@ -7,6 +7,9 @@ from typing import List
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.typedefs import (
+    Expr,
+    Info,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -44,12 +47,24 @@ class LoopObligationTranslator(CommonObligationTranslator):
 
         statements = []
 
-        body_block = self.translate_block(body,
-                                          self.to_position(node, ctx),
-                                          self.no_info(ctx))
+        body_block = self.translate_block(body, position, info)
+        self._add_additional_invariants(invariants, ctx, position, info)
 
         loop = self.viper.While(
             cond, invariants, local_vars, body_block, position, info)
         statements.append(loop)
 
         return statements
+
+    def _add_additional_invariants(
+            self, invariants: List[Expr], ctx: Context,
+            position: Position, info: Info) -> None:
+
+        obligation_info = ctx.actual_function.obligation_info
+        measure_map = obligation_info.method_measure_map
+        permission = measure_map.get_contents_access()
+        assertion = measure_map.get_contents_preserved_assertion()
+        invariants[0:0] = [
+            permission.translate(self, ctx, position, info),
+            assertion.translate(self, ctx, position, info),
+        ]

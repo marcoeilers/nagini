@@ -1,6 +1,7 @@
 """Code for constructing Silver Method nodes with obligation stuff."""
 
 
+from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -37,6 +38,10 @@ class ObligationMethod:
     def prepend_body(self, statements) -> None:
         """Prepend ``statements`` to body."""
         self.body = statements + self.body
+
+    def prepend_precondition(self, preconditions) -> None:
+        """Prepend ``preconditions`` to precondition list."""
+        self.pres = preconditions + self.pres
 
     def add_local(self, var: PythonVar) -> None:
         """Add local variable to variables list."""
@@ -76,8 +81,10 @@ class ObligationsMethodNodeConstructor:
     def add_obligations(self) -> None:
         """Add obligation stuff to Method."""
         self._add_aditional_parameters()
+        self._add_additional_preconditions()
         if not self._need_skip_body():
             self._set_up_measures()
+            self._add_book_keeping_vars()
         # TODO: Finish implementation.
 
     def _is_body_native_silver(self) -> bool:
@@ -98,6 +105,22 @@ class ObligationsMethodNodeConstructor:
             self._obligation_info.caller_measure_map.get_var().decl,
         ])
 
+    def _add_additional_preconditions(self) -> None:
+        """Add preconditions about current thread and caller measures."""
+        cthread = expr.VarRef(self._obligation_info.current_thread_var)
+        measure_map = self._obligation_info.caller_measure_map
+        measures = expr.VarRef(measure_map.get_var())
+        preconditions = [
+            cthread != None,        # noqa: E711
+            measures != None,       # noqa: E711
+            measure_map.get_contents_access(),
+        ]
+        self._obligation_method.prepend_precondition([
+            precondition.translate(
+                self._translator, self._ctx, self._position, self._info)
+            for precondition in preconditions])
+        # TODO: Add assumptions about measures being positive.
+
     def _set_up_measures(self) -> None:
         """Create and initialize method's measure map."""
         instances = self._obligation_info.get_all_precondition_instances()
@@ -106,6 +129,14 @@ class ObligationsMethodNodeConstructor:
         self._obligation_method.prepend_body(statements)
         self._obligation_method.add_local(
             self._obligation_info.method_measure_map.get_var())
+        self._obligation_method.add_local(
+            self._obligation_info.method_measure_map.get_contents_var())
+
+    def _add_book_keeping_vars(self) -> None:
+        self._obligation_method.add_local(
+            self._obligation_info.original_must_terminate_var)
+        self._obligation_method.add_local(
+            self._obligation_info.increased_must_terminate_var)
 
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:

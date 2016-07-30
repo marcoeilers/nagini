@@ -22,8 +22,10 @@ from py2viper_translation.translators.obligation.types.base import (
 class MeasureMap:
     """Abstraction over map from obligation references to their measures."""
 
-    def __init__(self, measure_map_var: PythonVar) -> None:
+    def __init__(self, measure_map_var: PythonVar,
+                 contents_var: PythonVar = None) -> None:
         self._map_var = measure_map_var
+        self._contents_var = contents_var
 
     def check(self, reference: PythonVar,
               value: expr.IntExpression) -> expr.BoolExpression:
@@ -38,6 +40,18 @@ class MeasureMap:
     def get_var(self) -> PythonVar:
         """Return a variable representing the measure map."""
         return self._map_var
+
+    def get_contents_var(self) -> PythonVar:
+        """Return a variable representing this measure map contents.
+
+        This variable is used in loop invariants to show that measure
+        map has not changed.
+        """
+        return self._contents_var
+
+    def get_contents_access(self) -> expr.Acc:
+        """Return access to measure map contents field."""
+        return expr.Acc(self._contents_access, expr.WildcardPerm())
 
     def initialize(
             self, obligation_instances: List['GuardedObligationInstance'],
@@ -65,7 +79,24 @@ class MeasureMap:
                     translator.translate_block([], position, info),
                     position, info)
             statements.append(statement)
+        if self._contents_var is not None:
+            assign = expr.Assign(self._contents_var, self._contents_access)
+            statement = assign.translate(translator, ctx, position, info)
+            statements.append(statement)
         return statements
+
+    def get_contents_preserved_assertion(self) -> expr.BoolExpression:
+        """Construct an assertion that contents has not changed.
+
+        This assertion is used in loop invariants.
+        """
+        assert self._contents_var is not None
+        return expr.VarRef(self._contents_var) == self._contents_access
+
+    @property
+    def _contents_access(self) -> expr.FieldAccess:
+        return expr.FieldAccess(
+            self._map_var, 'Measure$acc', expr.SeqType(expr.REF))
 
     def _create_measure_set_call(
             self, obligation_instance: ObligationInstance,

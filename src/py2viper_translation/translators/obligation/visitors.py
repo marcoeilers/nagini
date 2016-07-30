@@ -1,4 +1,9 @@
-"""Visitors for collecting information about obligation use."""
+"""Visitors for collecting information about obligation use.
+
+.. todo:: Vytautas
+
+    Rename this file to something more meaningful.
+"""
 
 
 import ast
@@ -28,6 +33,29 @@ from py2viper_translation.translators.obligation.types.base import (
 CURRENT_THREAD_NAME = '_cthread'
 MEASURES_CALLER_NAME = '_caller_measures'
 MEASURES_METHOD_NAME = '_method_measures'
+MEASURES_METHOD_CONTENTS_NAME = '_method_measures_contents'
+ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_original_must_terminate'
+INCREASED_MUST_TERMINATE_AMOUNT_NAME = '_increased_must_terminate'
+
+
+class SilverVar:
+    """A silver variable that has no representation in Python.
+
+    This class is a structural subtype of ``PythonVar`` that allows to
+    manage variables non-representable with ``PythonVar`` (like the ones
+    that have ``Perm`` type) in the same way as all other variables.
+    """
+
+    def __init__(self, decl: 'viper_ast.LocalVarDecl',
+                 ref: 'viper_ast.LocalVarRef') -> None:
+        self.decl = decl
+        """A variable declaration."""
+
+        self._ref = ref
+
+    def ref(self) -> 'viper_ast.LocalVarRef':
+        """A variable reference."""
+        return self._ref
 
 
 class GuardedObligationInstance:
@@ -53,7 +81,7 @@ class PythonMethodObligationInfo(GuardCollectingVisitor):
 
     def __init__(
             self, obligaton_manager: ObligationManager,
-            method: PythonMethod, translator: 'Translator') -> None:
+            method: PythonMethod, translator: 'AbstractTranslator') -> None:
         super().__init__()
         self._obligation_manager = obligaton_manager
         self._all_instances = {}
@@ -66,13 +94,20 @@ class PythonMethodObligationInfo(GuardCollectingVisitor):
         self._current_instance_map = None
         self._method = method
         self.current_thread_var = self._create_var(
-            CURRENT_THREAD_NAME, 'Thread', translator)
+            CURRENT_THREAD_NAME, 'Thread', translator.translator)
         caller_measure_map_var = self._create_var(
-            MEASURES_CALLER_NAME, 'object', translator)
+            MEASURES_CALLER_NAME, 'object', translator.translator)
         self.caller_measure_map = MeasureMap(caller_measure_map_var)
         method_measure_map_var = self._create_var(
-            MEASURES_METHOD_NAME, 'object', translator)
-        self.method_measure_map = MeasureMap(method_measure_map_var)
+            MEASURES_METHOD_NAME, 'object', translator.translator)
+        method_measure_map_contents_var = self._create_seq_var(
+            MEASURES_METHOD_CONTENTS_NAME, translator)
+        self.method_measure_map = MeasureMap(
+            method_measure_map_var, method_measure_map_contents_var)
+        self.original_must_terminate_var = self._create_perm_var(
+            ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator)
+        self.increased_must_terminate_var = self._create_perm_var(
+            INCREASED_MUST_TERMINATE_AMOUNT_NAME, translator)
 
     def traverse_preconditions(self) -> None:
         """Collect all needed information about obligations."""
@@ -90,7 +125,12 @@ class PythonMethodObligationInfo(GuardCollectingVisitor):
             self.traverse(postcondition)
         self._current_instance_map = None
 
-    def get_all_precondition_instances(self) -> None:
+    def get_precondition_instances(
+            self, obligation_id: str) -> List[ObligationInstance]:
+        """Return precondition instances of specific obligation type."""
+        return self._precondition_instances[obligation_id]
+
+    def get_all_precondition_instances(self) -> List[ObligationInstance]:
         """Return all precondition instances."""
         all_instances = []
         for instances in self._precondition_instances.values():
@@ -128,3 +168,27 @@ class PythonMethodObligationInfo(GuardCollectingVisitor):
         cls = program.classes[class_name]
         return self._method.create_variable(
             name, cls, translator, local=False)
+
+    def _create_silver_var(
+            self, name: str, translator: 'AbstractTranslator',
+            typ: 'viper_ast.Type') -> SilverVar:
+        sil_name = self._method.get_fresh_name(name)
+        decl = translator.viper.LocalVarDecl(
+            sil_name, typ, translator.viper.NoPosition,
+            translator.viper.NoInfo)
+        ref = translator.viper.LocalVar(
+            sil_name, typ, translator.viper.NoPosition,
+            translator.viper.NoInfo)
+        return SilverVar(decl, ref)
+
+    def _create_perm_var(
+            self, name: str,
+            translator: 'AbstractTranslator') -> PythonVar:
+        return self._create_silver_var(
+            name, translator, translator.viper.Perm)
+
+    def _create_seq_var(
+            self, name: str,
+            translator: 'AbstractTranslator') -> PythonVar:
+        return self._create_silver_var(
+            name, translator, translator.viper.SeqType(translator.viper.Ref))
