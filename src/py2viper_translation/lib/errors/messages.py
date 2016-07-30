@@ -64,7 +64,7 @@ REASONS = {
     'insufficient.permission':
         lambda n: ('There might be insufficient permission to '
                    'access {}.').format(pprint(n)),
-    'measure.non_positive':
+    'termination_measure.non_positive':
         lambda n: ('Termination measure {} might be '
                    'non-positive.').format(pprint(n)),
     'measure.non_decreasing':
@@ -76,4 +76,7 @@ REASONS = {
     'child_termination.not_implied':
         lambda n: ('Parent IO operation termination condition does not '
                    'imply {} termination condition.').format(pprint(n)),
+    'obligation_measure.non_positive':
+        lambda n: ('Obligation {} measure might be '
+                   'non-positive.').format(pprint(n)),
 }
