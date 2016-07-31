@@ -11,8 +11,19 @@ from py2viper_contracts.obligations import *
 # Test for name conflicts with builtin names.
 
 
+def over_in_conflict_callee() -> None:
+    Requires(MustTerminate(1))
+
+
 def over_in_conflict(_cthread: int) -> None:
     Requires(MustTerminate(_cthread))
+    Requires(_cthread > 1)
+    over_in_conflict_callee()
+
+
+def over_in_conflict_caller() -> None:
+    Requires(MustTerminate(3))
+    over_in_conflict(2)
 
 
 # Test that measures are always positive.

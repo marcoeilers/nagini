@@ -14,11 +14,11 @@ from py2viper_translation.translators.obligation.common import (
 )
 from py2viper_translation.translators.obligation.method_node import (
     ObligationMethod,
-    ObligationsMethodNodeConstructor,
+    ObligationMethodNodeConstructor,
 )
 from py2viper_translation.translators.obligation.method_call_node import (
     ObligationMethodCall,
-    ObligationsMethodCallNodeConstructor,
+    ObligationMethodCallNodeConstructor,
 )
 from py2viper_translation.translators.obligation.types.must_terminate import (
     MustTerminateObligationInstance,
@@ -58,7 +58,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
 
         obligation_method = ObligationMethod(
             name, original_args, returns, pres, posts, local_vars, body)
-        constructor = ObligationsMethodNodeConstructor(
+        constructor = ObligationMethodNodeConstructor(
             obligation_method, method, self, ctx, position, info)
         constructor.add_obligations()
 
@@ -70,7 +70,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
         """Construct a method call AST node with obligation stuff."""
         obligation_method_call = ObligationMethodCall(
             methodname, original_args, targets)
-        constructor = ObligationsMethodCallNodeConstructor(
+        constructor = ObligationMethodCallNodeConstructor(
             obligation_method_call, position, info, self, ctx,
             self._obligation_manager, target_method, target_node)
         constructor.construct_call()

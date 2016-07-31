@@ -48,7 +48,7 @@ class ObligationMethod:
         self.local_vars.append(var.decl)
 
 
-class ObligationsMethodNodeConstructor:
+class ObligationMethodNodeConstructor:
     """A class that creates a method node with obligation stuff."""
 
     def __init__(
