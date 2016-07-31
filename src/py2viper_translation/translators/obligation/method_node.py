@@ -13,7 +13,7 @@ from py2viper_translation.lib.typedefs import (
     Position,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.translators.obligation.visitors import (
+from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
 

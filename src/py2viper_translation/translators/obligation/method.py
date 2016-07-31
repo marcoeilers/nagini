@@ -23,7 +23,7 @@ from py2viper_translation.translators.obligation.method_call_node import (
 from py2viper_translation.translators.obligation.types.must_terminate import (
     MustTerminateObligationInstance,
 )
-from py2viper_translation.translators.obligation.visitors import (
+from py2viper_translation.translators.obligation.obligation_info import (
     BaseObligationInfo,
 )
 from py2viper_translation.translators.obligation.utils import (

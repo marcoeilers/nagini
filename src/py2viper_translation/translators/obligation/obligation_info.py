@@ -1,9 +1,4 @@
-"""Visitors for collecting information about obligation use.
-
-.. todo:: Vytautas
-
-    Rename this file to something more meaningful.
-"""
+"""Information about obligation use in contracts."""
 
 
 import ast

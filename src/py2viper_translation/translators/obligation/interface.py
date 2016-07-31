@@ -35,7 +35,7 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.method import (
     MethodObligationTranslator,
 )
-from py2viper_translation.translators.obligation.visitors import (
+from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
 
