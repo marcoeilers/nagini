@@ -50,6 +50,8 @@ ERRORS = {
                    'well-formed.').format(get_containing_member(n).name),
     'termination_check.failed':
         lambda n: 'Operation might not terminate.',
+    'leak_check.failed':
+        lambda n: 'Obligation leak check failed.',
 }
 
 REASONS = {
@@ -79,4 +81,7 @@ REASONS = {
     'obligation_measure.non_positive':
         lambda n: ('Obligation {} measure might be '
                    'non-positive.').format(pprint(n)),
+    'must_terminate.not_taken':
+        lambda n: ('Callee {} did not take MustTerminate '
+                   'obligation.').format(pprint(n)),
 }

@@ -81,7 +81,7 @@ class ObligationsMethodCallNodeConstructor:
         self._save_must_terminate_amount(
             self._obligation_info.increased_must_terminate_var)
         self._add_call()
-        # self._check_must_terminate()
+        self._check_must_terminate()
         self._reset_must_terminate()
         # TODO: Finish implementation.
 
@@ -153,13 +153,36 @@ class ObligationsMethodCallNodeConstructor:
             self._position, self._info)
         self._statements.append(statement)
 
+    def _check_must_terminate(self) -> None:
+        """Check if callee picked MustTerminate obligation."""
+        original_amount = self._obligation_info.original_must_terminate_var
+        increased_amount = self._obligation_info.increased_must_terminate_var
+        predicate = self._get_must_terminate_predicate()
+        check = expr.Implies(
+            expr.NoPerm() < expr.VarRef(original_amount),
+            expr.CurrentPerm(predicate) < expr.VarRef(increased_amount))
+        assertion = expr.Assert(check)
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)
+        info = self._to_info('Check that callee took MustTerminate.')
+        self._append_statement(assertion, position, info)
+
     def _reset_must_terminate(self) -> None:
-        """Reset ``MustTerminate`` permission to its original level."""
+        """Reset ``MustTerminate`` permission to its original level.
+
+        .. note::
+
+            Implication is needed because in Silicon if callee took all
+            permission, the ``exhale acc(..., none)`` would fail, even
+            though this exhale does nothing.
+        """
         predicate = self._get_must_terminate_predicate()
         original_amount = expr.VarRef(
             self._obligation_info.original_must_terminate_var)
         perm = expr.CurrentPerm(predicate) - original_amount
-        exhale = expr.Exhale(expr.Acc(predicate, perm))
+        exhale = expr.Exhale(expr.Implies(
+            expr.CurrentPerm(predicate) > expr.NoPerm(),
+            expr.Acc(predicate, perm)))
         self._append_statement(exhale)
 
     def _is_axiomatized_target(self) -> bool:
