@@ -1,23 +1,25 @@
 """Obligation translator in loops."""
 
 
-import ast
-
 from typing import List
 
+from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
     Position,
     Stmt,
-    StmtsAndExpr,
-)
-from py2viper_translation.lib.util import (
-    UnsupportedException,
 )
 from py2viper_translation.translators.obligation.common import (
     CommonObligationTranslator
+)
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    MustTerminateObligationInstance,
+)
+from py2viper_translation.translators.obligation.visitors import (
+    BaseObligationInfo,
+    PythonLoopObligationInfo,
 )
 
 
@@ -26,16 +28,22 @@ class LoopObligationTranslator(CommonObligationTranslator):
 
     def enter_loop_translation(self, node, ctx) -> None:
         """Update context with info needed to translate loop."""
-        # TODO: This method is a stub.
+        info = PythonLoopObligationInfo(
+            self._obligation_manager, node, self, ctx.actual_function)
+        info.traverse_invariants()
+        ctx.obligation_context.push_loop_info(info)
 
     def leave_loop_translation(self, ctx) -> None:
         """Remove loop translation info from context."""
-        # TODO: This method is a stub.
+        ctx.obligation_context.pop_loop_info()
 
-    def translate_must_terminate(
-            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate ``MustTerminate`` in method precondition."""
-        raise UnsupportedException(node, 'Method is a stub.')
+    def _get_obligation_info(self, ctx: Context) -> BaseObligationInfo:
+        return ctx.obligation_context.current_loop_info
+
+    def _create_must_terminate_use(
+            self, obligation_instance: MustTerminateObligationInstance,
+            ctx: Context) -> expr.InhaleExhale:
+        return obligation_instance.get_use_loop(ctx)
 
     def create_while_node(
             self, ctx, cond, invariants, local_vars, body, node) -> List[Stmt]:
