@@ -57,8 +57,14 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
     def construct_loop(self) -> None:
         """Construct statements to perform a loop."""
         self._add_method_measure_map_preserved_invariant()
+        # TODO: self._check_measures_are_positive()
+        # TODO: self._set_up_measures()
+        # TODO: self._check_loop_promises_terminate()
+        # TODO: self._check_loop_preserves_termination()
+        # TODO: self._add_leak_check()
         self._add_loop()
-        # TODO: Implement.
+        # TODO: self._reset_must_terminate() – terminating loop in
+        # non-terminating method.
 
     def _add_loop(self) -> None:
         """Add the actual loop node."""
