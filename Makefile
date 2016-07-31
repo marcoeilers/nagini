@@ -24,11 +24,13 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/obligation/common.py \
 	src/py2viper_translation/translators/obligation/interface.py \
 	src/py2viper_translation/translators/obligation/loop.py \
+	src/py2viper_translation/translators/obligation/loop_node.py \
 	src/py2viper_translation/translators/obligation/manager.py \
 	src/py2viper_translation/translators/obligation/measures.py \
 	src/py2viper_translation/translators/obligation/method.py \
 	src/py2viper_translation/translators/obligation/method_call_node.py \
 	src/py2viper_translation/translators/obligation/method_node.py \
+	src/py2viper_translation/translators/obligation/node_constructor.py \
 	src/py2viper_translation/translators/obligation/obligation_info.py \
 	src/py2viper_translation/translators/obligation/utils.py \
 	src/py2viper_translation/translators/obligation/types/__init__.py \
