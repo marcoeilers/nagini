@@ -71,7 +71,6 @@ class ObligationsMethodCallNodeConstructor:
 
     def construct_call(self) -> None:
         """Construct statements to perform a call."""
-        # TODO: Emit meaningful info comment for each step.
         self._add_aditional_arguments()
         if not self._is_target_axiomatized():
             self._check_measures_are_positive()
@@ -83,7 +82,6 @@ class ObligationsMethodCallNodeConstructor:
         self._add_call()
         self._check_must_terminate()
         self._reset_must_terminate()
-        # TODO: Finish implementation.
 
     def _add_aditional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
@@ -126,7 +124,8 @@ class ObligationsMethodCallNodeConstructor:
         """Save the original permission amount to a variable."""
         predicate = self._get_must_terminate_predicate()
         assign = expr.Assign(amount_var, expr.CurrentPerm(predicate))
-        self._append_statement(assign)
+        info = self._to_info('Save current MustTerminate amount.')
+        self._append_statement(assign, info=info)
 
     def _inhale_additional_must_terminate(self) -> None:
         """Inhale additional permission to ``MustTerminate``.
@@ -143,7 +142,8 @@ class ObligationsMethodCallNodeConstructor:
             count = expr.RawIntExpression(len(instances))
         predicate = self._get_must_terminate_predicate()
         inhale = expr.Inhale(expr.Acc(predicate, expr.IntegerPerm(count)))
-        self._append_statement(inhale)
+        info = self._to_info('Inhale additional MustTerminate amount.')
+        self._append_statement(inhale, info=info)
 
     def _add_call(self) -> None:
         """Add the actual code node."""
@@ -183,7 +183,8 @@ class ObligationsMethodCallNodeConstructor:
         exhale = expr.Exhale(expr.Implies(
             expr.CurrentPerm(predicate) > expr.NoPerm(),
             expr.Acc(predicate, perm)))
-        self._append_statement(exhale)
+        info = self._to_info('Reset MustTerminate amount to original level.')
+        self._append_statement(exhale, info=info)
 
     def _is_axiomatized_target(self) -> bool:
         """Check if call target is an axiomatic method."""
