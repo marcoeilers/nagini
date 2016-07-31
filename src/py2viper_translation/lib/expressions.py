@@ -489,6 +489,18 @@ class PermExpression(Expression):
     def __sub__(self, other: 'PermExpression') -> 'PermExpression':
         return PermSub(self, other)
 
+    def __gt__(self, other: 'PermExpression') -> 'PermExpression':
+        return PermGtCmp(self, other)
+
+    def __ge__(self, other: 'PermExpression') -> 'PermExpression':
+        return PermGeCmp(self, other)
+
+    def __lt__(self, other: 'PermExpression') -> 'PermExpression':
+        return PermLtCmp(self, other)
+
+    def __le__(self, other: 'PermExpression') -> 'PermExpression':
+        return PermLeCmp(self, other)
+
 
 class PermSub(PermExpression):
     """A subtraction of two permission values."""
@@ -502,6 +514,66 @@ class PermSub(PermExpression):
         left = self._left.translate(translator, ctx, position, info)
         right = self._right.translate(translator, ctx, position, info)
         return translator.viper.PermSub(
+            left, right, position, info)
+
+
+class PermGtCmp(BoolExpression):
+    """Greater than permission comparison."""
+
+    def __init__(self, left: PermExpression, right: PermExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.PermGtCmp(
+            left, right, position, info)
+
+
+class PermGeCmp(BoolExpression):
+    """Greater equal permission comparison."""
+
+    def __init__(self, left: PermExpression, right: PermExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.PermGeCmp(
+            left, right, position, info)
+
+
+class PermLtCmp(BoolExpression):
+    """Less than permission comparison."""
+
+    def __init__(self, left: PermExpression, right: PermExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.PermLtCmp(
+            left, right, position, info)
+
+
+class PermLeCmp(BoolExpression):
+    """Less equal permission comparison."""
+
+    def __init__(self, left: PermExpression, right: PermExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.PermLeCmp(
             left, right, position, info)
 
 

@@ -29,6 +29,10 @@ OBLIGATION_MEASURE_NON_POSITIVE = {
     ('assert.failed', 'assertion.false'):
         ('call.precondition', 'obligation_measure.non_positive')
 }
+OBLIGATION_MUST_TERMINATE_NOT_TAKEN = {
+    ('assert.failed', 'assertion.false'):
+        ('leak_check.failed', 'must_terminate.not_taken')
+}
 
 
 __all__ = (
