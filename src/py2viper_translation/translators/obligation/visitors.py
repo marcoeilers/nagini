@@ -19,6 +19,11 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
+from py2viper_translation.lib.util import (
+    is_io_existential,
+    is_invariant,
+    UnsupportedException,
+)
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -34,8 +39,10 @@ CURRENT_THREAD_NAME = '_cthread'
 MEASURES_CALLER_NAME = '_caller_measures'
 MEASURES_METHOD_NAME = '_method_measures'
 MEASURES_METHOD_CONTENTS_NAME = '_method_measures_contents'
+MEASURES_LOOP_NAME = '_loop_measures'
 ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_original_must_terminate'
 INCREASED_MUST_TERMINATE_AMOUNT_NAME = '_increased_must_terminate'
+LOOP_CHECK_BEFORE_NAME = '_loop_check_before'
 
 
 class SilverVar:
@@ -76,66 +83,17 @@ class GuardedObligationInstance:
         return conjunction
 
 
-class PythonMethodObligationInfo(GuardCollectingVisitor):
-    """Info about the obligation use in a specific method."""
+class BaseObligationInfo(GuardCollectingVisitor):
+    """Info about the obligation use."""
 
     def __init__(
             self, obligaton_manager: ObligationManager,
-            method: PythonMethod, translator: 'AbstractTranslator') -> None:
+            method: PythonMethod) -> None:
         super().__init__()
+        self._current_instance_map = None
         self._obligation_manager = obligaton_manager
-        self._all_instances = {}
-        self._precondition_instances = {}
-        self._postcondition_instances = {}
-        for obligation in self._obligation_manager.obligations:
-            obligation_id = obligation.identifier()
-            self._precondition_instances[obligation_id] = []
-            self._postcondition_instances[obligation_id] = []
-        self._current_instance_map = None
         self._method = method
-        self.current_thread_var = self._create_var(
-            CURRENT_THREAD_NAME, 'Thread', translator.translator)
-        caller_measure_map_var = self._create_var(
-            MEASURES_CALLER_NAME, 'object', translator.translator)
-        self.caller_measure_map = MeasureMap(caller_measure_map_var)
-        method_measure_map_var = self._create_var(
-            MEASURES_METHOD_NAME, 'object', translator.translator)
-        method_measure_map_contents_var = self._create_seq_var(
-            MEASURES_METHOD_CONTENTS_NAME, translator)
-        self.method_measure_map = MeasureMap(
-            method_measure_map_var, method_measure_map_contents_var)
-        self.original_must_terminate_var = self._create_perm_var(
-            ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator)
-        self.increased_must_terminate_var = self._create_perm_var(
-            INCREASED_MUST_TERMINATE_AMOUNT_NAME, translator)
-
-    def traverse_preconditions(self) -> None:
-        """Collect all needed information about obligations."""
-        assert self._current_instance_map is None
-        self._current_instance_map = self._precondition_instances
-        for precondition, aliases in self._method.precondition:
-            self.traverse(precondition)
-        self._current_instance_map = None
-
-    def traverse_postconditions(self) -> None:
-        """Collect all needed information about obligations."""
-        assert self._current_instance_map is None
-        self._current_instance_map = self._postcondition_instances
-        for postcondition, aliases in self._method.postcondition:
-            self.traverse(postcondition)
-        self._current_instance_map = None
-
-    def get_precondition_instances(
-            self, obligation_id: str) -> List[ObligationInstance]:
-        """Return precondition instances of specific obligation type."""
-        return self._precondition_instances[obligation_id]
-
-    def get_all_precondition_instances(self) -> List[ObligationInstance]:
-        """Return all precondition instances."""
-        all_instances = []
-        for instances in self._precondition_instances.values():
-            all_instances.extend(instances)
-        return all_instances
+        self._all_instances = {}
 
     def visit_Call(self, node: ast.Call) -> None:
         for obligation in self._obligation_manager.obligations:
@@ -192,3 +150,97 @@ class PythonMethodObligationInfo(GuardCollectingVisitor):
             translator: 'AbstractTranslator') -> PythonVar:
         return self._create_silver_var(
             name, translator, translator.viper.SeqType(translator.viper.Ref))
+
+
+class PythonMethodObligationInfo(BaseObligationInfo):
+    """Info about the obligation use in a specific method."""
+
+    def __init__(
+            self, obligaton_manager: ObligationManager,
+            method: PythonMethod, translator: 'AbstractTranslator') -> None:
+        super().__init__(obligaton_manager, method)
+        self._precondition_instances = {}
+        self._postcondition_instances = {}
+        for obligation in self._obligation_manager.obligations:
+            obligation_id = obligation.identifier()
+            self._precondition_instances[obligation_id] = []
+            self._postcondition_instances[obligation_id] = []
+        self.current_thread_var = self._create_var(
+            CURRENT_THREAD_NAME, 'Thread', translator.translator)
+        caller_measure_map_var = self._create_var(
+            MEASURES_CALLER_NAME, 'object', translator.translator)
+        self.caller_measure_map = MeasureMap(caller_measure_map_var)
+        method_measure_map_var = self._create_var(
+            MEASURES_METHOD_NAME, 'object', translator.translator)
+        method_measure_map_contents_var = self._create_seq_var(
+            MEASURES_METHOD_CONTENTS_NAME, translator)
+        self.method_measure_map = MeasureMap(
+            method_measure_map_var, method_measure_map_contents_var)
+        self.original_must_terminate_var = self._create_perm_var(
+            ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator)
+        self.increased_must_terminate_var = self._create_perm_var(
+            INCREASED_MUST_TERMINATE_AMOUNT_NAME, translator)
+
+    def traverse_preconditions(self) -> None:
+        """Collect all needed information about obligations."""
+        assert self._current_instance_map is None
+        self._current_instance_map = self._precondition_instances
+        for precondition, aliases in self._method.precondition:
+            self.traverse(precondition)
+        self._current_instance_map = None
+
+    def traverse_postconditions(self) -> None:
+        """Collect all needed information about obligations."""
+        assert self._current_instance_map is None
+        self._current_instance_map = self._postcondition_instances
+        for postcondition, aliases in self._method.postcondition:
+            self.traverse(postcondition)
+        self._current_instance_map = None
+
+    def get_precondition_instances(
+            self, obligation_id: str) -> List[ObligationInstance]:
+        """Return precondition instances of specific obligation type."""
+        return self._precondition_instances[obligation_id]
+
+    def get_all_precondition_instances(self) -> List[ObligationInstance]:
+        """Return all precondition instances."""
+        all_instances = []
+        for instances in self._precondition_instances.values():
+            all_instances.extend(instances)
+        return all_instances
+
+
+class PythonLoopObligationInfo(BaseObligationInfo):
+    """Info about the obligation use in a loop."""
+
+    def __init__(
+            self, obligaton_manager: ObligationManager,
+            node: ast.While, translator: 'AbstractTranslator',
+            method: PythonMethod) -> None:
+        super().__init__(obligaton_manager, method)
+        self.node = node
+        self._instances = dict(
+            (obligation.identifier(), [])
+            for obligation in self._obligation_manager.obligations)
+        loop_measure_map_var = self._create_var(
+            MEASURES_LOOP_NAME, 'object', translator.translator)
+        self.loop_measure_map = MeasureMap(loop_measure_map_var)
+        self.loop_check_before = self._create_var(
+            LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator)
+
+    @property
+    def current_thread_var(self) -> PythonVar:
+        """Return the variable that denotes current thread in method."""
+        return self._method.obligation_info.current_thread_var
+
+    def traverse_invariants(self) -> None:
+        """Collect all needed information about obligations."""
+        assert self._current_instance_map is None
+        self._current_instance_map = self._instances
+        for statement in self.node.body:
+            if is_invariant(statement):
+                self.traverse(statement.value.args[0])
+            elif is_io_existential(statement):
+                # TODO: Implement IOExists in loop.
+                raise UnsupportedException(self.node, 'IOExists in loop.')
+        self._current_instance_map = None

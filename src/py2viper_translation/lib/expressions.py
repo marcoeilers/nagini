@@ -223,9 +223,35 @@ class BoolExpression(Expression):
 
     def is_always_true(self) -> bool:
         """Return if this expression translation would always yield True."""
+        return False
 
     def is_always_false(self) -> bool:
         """Return if this expression translation would always yield False."""
+        return False
+
+
+class TrueLit(BoolExpression):
+    """``True`` literal."""
+
+    def is_always_true(self) -> bool:
+        """Return if this expression translation would always yield True."""
+        return True
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return translator.viper.TrueLit(position, info)
+
+
+class FalseLit(BoolExpression):
+    """``False`` literal."""
+
+    def is_always_false(self) -> bool:
+        """Return if this expression translation would always yield False."""
+        return True
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return translator.viper.FalseLit(position, info)
 
 
 class PythonBoolExpression(BoolExpression):

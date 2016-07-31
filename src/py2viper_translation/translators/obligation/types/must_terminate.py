@@ -40,25 +40,53 @@ class MustTerminateObligationInstance(ObligationInstance):
     def get_target(self) -> PythonVar:
         return self._target
 
-    def get_use_method(self, ctx: Context) -> expr.Expression:
-        """Get inhale exhale pair for use in method contract."""
+    def _create_predicate_access(self, ctx) -> expr.Predicate:
         obligation_info = ctx.actual_function.obligation_info
         cthread = obligation_info.current_thread_var
+        return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
 
-        predicate = expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+    def _create_permission_inhale(
+            self, predicate: expr.Predicate) -> expr.BoolExpression:
+        return expr.Implies(
+            expr.CurrentPerm(predicate) == expr.NoPerm(),
+            expr.Acc(predicate))
+
+    def get_use_method(self, ctx: Context) -> expr.Expression:
+        """Get inhale exhale pair for use in method contract."""
+        predicate = self._create_predicate_access(ctx)
 
         # Inhale part.
         inhale = expr.BigAnd([
             self.get_measure() > 0,
-            expr.Implies(
-                expr.CurrentPerm(predicate) == expr.NoPerm(),
-                expr.Acc(predicate))
+            self._create_permission_inhale(predicate)
         ])
 
         # Exhale part.
+        obligation_info = ctx.actual_function.obligation_info
+        cthread = obligation_info.current_thread_var
         check = obligation_info.caller_measure_map.check(
             cthread, self.get_measure())
         exhale = expr.Implies(check, expr.Acc(predicate))
+
+        return expr.InhaleExhale(inhale, exhale)
+
+    def get_use_loop(self, ctx: Context) -> expr.Expression:
+        """Get inhale exhale pair for use in loop invariant."""
+        predicate = self._create_predicate_access(ctx)
+
+        # Inhale part.
+        node = ctx.obligation_context.current_loop_info.node
+        assumptions = []
+        if isinstance(node, ast.While):
+            # TODO: Implement support for ast.For.
+            assumptions.append(expr.Implies(
+                expr.PythonBoolExpression(node.test),
+                self.get_measure() > 0))
+        assumptions.append(self._create_permission_inhale(predicate))
+        inhale = expr.BigAnd(assumptions)
+
+        # Exhale part.
+        exhale = expr.TrueLit()
 
         return expr.InhaleExhale(inhale, exhale)
 

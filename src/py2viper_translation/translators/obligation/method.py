@@ -1,15 +1,13 @@
 """Obligation translator in methods."""
 
 
-import ast
-
 from typing import List
 
+from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.typedefs import (
     Method,
     Stmt,
-    StmtsAndExpr,
 )
 from py2viper_translation.translators.obligation.common import (
     CommonObligationTranslator,
@@ -22,8 +20,11 @@ from py2viper_translation.translators.obligation.method_call_node import (
     ObligationMethodCall,
     ObligationsMethodCallNodeConstructor,
 )
-from py2viper_translation.translators.obligation.types import (
-    must_terminate,
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    MustTerminateObligationInstance,
+)
+from py2viper_translation.translators.obligation.visitors import (
+    BaseObligationInfo,
 )
 from py2viper_translation.translators.obligation.utils import (
     find_method_by_sil_name,
@@ -33,21 +34,13 @@ from py2viper_translation.translators.obligation.utils import (
 class MethodObligationTranslator(CommonObligationTranslator):
     """Class for translating obligations in methods."""
 
-    def translate_must_terminate(
-            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate ``MustTerminate`` in loop invariant."""
-        obligation_info = ctx.actual_function.obligation_info
-        guarded_obligation_instance = obligation_info.get_instance(node)
-        obligation_instance = guarded_obligation_instance.obligation_instance
-        assert isinstance(obligation_instance,
-                          must_terminate.MustTerminateObligationInstance)
+    def _get_obligation_info(self, ctx: Context) -> BaseObligationInfo:
+        return ctx.actual_function.obligation_info
 
-        inhale_exhale = obligation_instance.get_use_method(ctx)
-
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        expr = inhale_exhale.translate(self, ctx, position, info)
-        return ([], expr)
+    def _create_must_terminate_use(
+            self, obligation_instance: MustTerminateObligationInstance,
+            ctx: Context) -> expr.InhaleExhale:
+        return obligation_instance.get_use_method(ctx)
 
     def create_method_node(
             self, ctx, name, original_args, returns, pres, posts,
