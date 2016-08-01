@@ -33,6 +33,14 @@ OBLIGATION_MUST_TERMINATE_NOT_TAKEN = {
     ('assert.failed', 'assertion.false'):
         ('leak_check.failed', 'must_terminate.not_taken')
 }
+OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING = {
+    ('assert.failed', 'assertion.false'):
+        ('leak_check.failed', 'must_terminate.loop_not_promised')
+}
+OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL = {
+    ('assert.failed', 'assertion.false'):
+        ('leak_check.failed', 'must_terminate.loop_promise_not_kept')
+}
 
 
 __all__ = (

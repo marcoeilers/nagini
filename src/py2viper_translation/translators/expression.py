@@ -284,12 +284,13 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
+    def translate_to_bool(self, node: ast.AST, ctx: Context,
+                          expression: bool = False) -> StmtsAndExpr:
         """
         Translates node as a normal expression, then applies Python's auto-
         conversion to a boolean value (using the __bool__ function)
         """
-        stmt, res = self.translate_expr(node, ctx)
+        stmt, res = self.translate_expr(node, ctx, expression)
         type = self.get_type(node, ctx)
         if type is ctx.program.classes[BOOL_TYPE]:
             return stmt, res

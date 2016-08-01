@@ -11,7 +11,6 @@ from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonIOExistentialVar,
-    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Info,
@@ -70,7 +69,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
             self._obligation_info.increased_must_terminate_var)
         self._add_call()
         self._check_must_terminate()
-        self._reset_must_terminate()
+        self._reset_must_terminate(
+            self._obligation_info.original_must_terminate_var)
 
     def _add_aditional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
@@ -108,14 +108,6 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
                     obligation_node.lineno, obligation_node.col_offset)
                 self._append_statement(assertion, call_position, info)
                 self._ctx.position.pop()
-
-    def _save_must_terminate_amount(
-            self, amount_var: PythonVar) -> None:
-        """Save the original permission amount to a variable."""
-        predicate = self._get_must_terminate_predicate()
-        assign = expr.Assign(amount_var, expr.CurrentPerm(predicate))
-        info = self._to_info('Save current MustTerminate amount.')
-        self._append_statement(assign, info=info)
 
     def _inhale_additional_must_terminate(self) -> None:
         """Inhale additional permission to ``MustTerminate``.
@@ -156,25 +148,6 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
             conversion_rules=rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)
         info = self._to_info('Check that callee took MustTerminate.')
         self._append_statement(assertion, position, info)
-
-    def _reset_must_terminate(self) -> None:
-        """Reset ``MustTerminate`` permission to its original level.
-
-        .. note::
-
-            Implication is needed because in Silicon if callee took all
-            permission, the ``exhale acc(..., none)`` would fail, even
-            though this exhale does nothing.
-        """
-        predicate = self._get_must_terminate_predicate()
-        original_amount = expr.VarRef(
-            self._obligation_info.original_must_terminate_var)
-        perm = expr.CurrentPerm(predicate) - original_amount
-        exhale = expr.Exhale(expr.Implies(
-            expr.CurrentPerm(predicate) > expr.NoPerm(),
-            expr.Acc(predicate, perm)))
-        info = self._to_info('Reset MustTerminate amount to original level.')
-        self._append_statement(exhale, info=info)
 
     def _is_axiomatized_target(self) -> bool:
         """Check if call target is an axiomatic method."""
