@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
@@ -19,6 +19,21 @@ from py2viper_translation.translators.obligation.types.base import (
 
 _OBLIGATION_NAME = 'MustTerminate'
 _PREDICATE_NAME = _OBLIGATION_NAME
+
+
+def _create_predicate_access(cthread: PythonVar) -> expr.Predicate:
+    """Create a predicate access expression."""
+    return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+
+
+def _create_method_exhale(
+        obligation_info: 'PythonMethodObligationInfo',
+        measure: expr.IntExpression) -> expr.Exhale:
+    """Create ``MustTerminate`` exhale to be mentioned in precondition."""
+    cthread = obligation_info.current_thread_var
+    predicate = _create_predicate_access(cthread)
+    check = obligation_info.caller_measure_map.check(cthread, measure)
+    return expr.Implies(check, expr.Acc(predicate))
 
 
 class MustTerminateObligationInstance(ObligationInstance):
@@ -43,7 +58,7 @@ class MustTerminateObligationInstance(ObligationInstance):
     def _create_predicate_access(self, ctx) -> expr.Predicate:
         obligation_info = ctx.actual_function.obligation_info
         cthread = obligation_info.current_thread_var
-        return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+        return _create_predicate_access(cthread)
 
     def _create_permission_inhale(
             self, predicate: expr.Predicate) -> expr.BoolExpression:
@@ -62,11 +77,9 @@ class MustTerminateObligationInstance(ObligationInstance):
         ])
 
         # Exhale part.
-        obligation_info = ctx.actual_function.obligation_info
-        cthread = obligation_info.current_thread_var
-        check = obligation_info.caller_measure_map.check(
-            cthread, self.get_measure())
-        exhale = expr.Implies(check, expr.Acc(predicate))
+        exhale = _create_method_exhale(
+            ctx.actual_function.obligation_info,
+            self.get_measure())
 
         return expr.InhaleExhale(inhale, exhale)
 
@@ -74,21 +87,26 @@ class MustTerminateObligationInstance(ObligationInstance):
         """Get inhale exhale pair for use in loop invariant."""
         predicate = self._create_predicate_access(ctx)
 
-        # Inhale part.
+        # Measures positive.
         node = ctx.obligation_context.current_loop_info.node
-        assumptions = []
         if isinstance(node, ast.While):
-            # TODO: Implement support for ast.For.
-            assumptions.append(expr.Implies(
-                expr.PythonBoolExpression(node.test),
-                self.get_measure() > 0))
-        assumptions.append(self._create_permission_inhale(predicate))
-        inhale = expr.BigAnd(assumptions)
+            loop_condition = expr.PythonBoolExpression(node.test)
+        else:
+            iteration_err_var = expr.VarRef(
+                ctx.obligation_context.current_loop_info.iteration_err_var)
+            loop_condition = iteration_err_var == None  # noqa: E711
+        measures_positive = expr.Implies(
+            loop_condition, self.get_measure() > 0)
+
+        # Inhale part.
+        inhale = self._create_permission_inhale(predicate)
 
         # Exhale part.
         exhale = expr.TrueLit()
 
-        return expr.InhaleExhale(inhale, exhale)
+        return expr.BigAnd([
+            measures_positive,
+            expr.InhaleExhale(inhale, exhale)])
 
 
 class MustTerminateObligation(Obligation):
@@ -115,4 +133,16 @@ class MustTerminateObligation(Obligation):
 
     def create_predicate_access(self, cthread: PythonVar) -> expr.Predicate:
         """Create a predicate access expression."""
-        return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+        return _create_predicate_access(cthread)
+
+    def generate_axiomatized_preconditions(
+            self, obligation_info: 'PythonMethodObligationInfo',
+            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+        """Add ``MustTerminate(1)`` to axiomatic method precondition."""
+        if (_OBLIGATION_NAME in interface_dict and
+                interface_dict[_OBLIGATION_NAME]):
+            exhale = _create_method_exhale(
+                obligation_info, expr.RawIntExpression(1))
+            return [exhale]
+        else:
+            return []

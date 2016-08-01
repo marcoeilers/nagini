@@ -20,6 +20,9 @@ from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
 )
+from py2viper_translation.translators.obligation.measures import (
+    MeasureMap,
+)
 from py2viper_translation.translators.obligation.types import (
     must_terminate,
 )
@@ -60,8 +63,13 @@ class StatementNodeConstructorBase:
 
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:
-        """The surrounding method obligation info."""
+        """Get the surrounding method obligation info."""
         return self._ctx.actual_function.obligation_info
+
+    @property
+    def _method_measure_map(self) -> MeasureMap:
+        """Get the surrounding method measure map."""
+        return self._obligation_info.method_measure_map
 
     def _get_must_terminate_predicate(self) -> expr.Predicate:
         cthread = self._obligation_info.current_thread_var

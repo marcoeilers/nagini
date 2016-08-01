@@ -17,6 +17,9 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.node_constructor import (
     StatementNodeConstructorBase,
 )
+from py2viper_translation.translators.obligation.obligation_info import (
+    PythonLoopObligationInfo,
+)
 
 
 class ObligationLoop:
@@ -66,6 +69,18 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         # TODO: self._reset_must_terminate() – terminating loop in
         # non-terminating method.
 
+    def _add_method_measure_map_preserved_invariant(self) -> None:
+        """Add invariant that method measure map is not changed."""
+        measure_map = self._method_measure_map
+        permission = measure_map.get_contents_access()
+        assertion = measure_map.get_contents_preserved_assertion()
+        self._obligation_loop.prepend_invariants([
+            permission.translate(
+                self._translator, self._ctx, self._position, self._info),
+            assertion.translate(
+                self._translator, self._ctx, self._position, self._info),
+        ])
+
     def _add_loop(self) -> None:
         """Add the actual loop node."""
         body_block = self._translator.translate_block(
@@ -76,16 +91,5 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._position, self._info)
         self._statements.append(loop)
 
-    def _add_method_measure_map_preserved_invariant(self) -> None:
-        """Add invariant that method measure map is not changed."""
-        # TODO: Clean up obligation_info set up.
-        obligation_info = self._ctx.actual_function.obligation_info
-        measure_map = obligation_info.method_measure_map
-        permission = measure_map.get_contents_access()
-        assertion = measure_map.get_contents_preserved_assertion()
-        self._obligation_loop.prepend_invariants([
-            permission.translate(
-                self._translator, self._ctx, self._position, self._info),
-            assertion.translate(
-                self._translator, self._ctx, self._position, self._info),
-        ])
+    def _loop_obligation_info(self) -> PythonLoopObligationInfo:
+        return self._ctx.obligation_context.current_loop_info

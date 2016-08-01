@@ -13,6 +13,9 @@ from py2viper_translation.lib.typedefs import (
     Position,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
+from py2viper_translation.translators.obligation.manager import (
+    ObligationManager,
+)
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
@@ -54,11 +57,13 @@ class ObligationMethodNodeConstructor:
     def __init__(
             self, obligation_method: ObligationMethod,
             python_method: PythonMethod, translator: 'AbstractTranslator',
-            ctx: Context, position: Position, info: Info) -> None:
+            ctx: Context, obligation_manager: ObligationManager,
+            position: Position, info: Info) -> None:
         self._obligation_method = obligation_method
         self._python_method = python_method
         self._translator = translator
         self._ctx = ctx
+        self._obligation_manager = obligation_manager
         self._position = position
         self._info = info
 
@@ -116,6 +121,14 @@ class ObligationMethodNodeConstructor:
             measures != None,       # noqa: E711
             measure_map.get_contents_access(),
         ]
+        if self._is_body_native_silver():
+            # Add obligations described in interface_dict.
+            assert self._python_method.interface
+            for obligation in self._obligation_manager.obligations:
+                preconditions.extend(
+                    obligation.generate_axiomatized_preconditions(
+                        self._obligation_info,
+                        self._python_method.interface_dict))
         self._obligation_method.prepend_precondition([
             precondition.translate(
                 self._translator, self._ctx, self._position, self._info)

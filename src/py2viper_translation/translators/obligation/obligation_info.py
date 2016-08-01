@@ -211,7 +211,7 @@ class PythonLoopObligationInfo(BaseObligationInfo):
     def __init__(
             self, obligaton_manager: ObligationManager,
             node: ast.While, translator: 'AbstractTranslator',
-            method: PythonMethod) -> None:
+            method: PythonMethod, err_var: PythonVar = None) -> None:
         super().__init__(obligaton_manager, method)
         self.node = node
         self._instances = dict(
@@ -222,6 +222,8 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
         self.loop_check_before = self._create_var(
             LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator)
+        self.iteration_err_var = err_var
+        """In the for loop translation holds ``__iter__`` result."""
 
     @property
     def current_thread_var(self) -> PythonVar:

@@ -61,3 +61,15 @@ def test_call_non_terminating_4() -> None:
             j += 1
             #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
             non_terminating()
+
+
+def test_call_non_terminating_5() -> None:
+    Requires(MustTerminate(2))
+    a = [1, 2, 3]
+    i = 0
+    for elem in a:
+        #:: ExpectedOutput(invariant.not.preserved:assertion.false)
+        Invariant(MustTerminate(len(a) - i))
+        i += 1
+    #:: OptionalOutput(leak_check.failed:must_terminate.not_taken)
+    non_terminating()

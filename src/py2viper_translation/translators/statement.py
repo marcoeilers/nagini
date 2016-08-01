@@ -279,7 +279,6 @@ class StatementTranslator(CommonTranslator):
         return iter_del
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
-        self.enter_loop_translation(node, ctx)
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
@@ -289,6 +288,7 @@ class StatementTranslator(CommonTranslator):
         err_var, next_call, target_assign = self._get_next_call(iter_var,
                                                                 target_var,
                                                                 node, ctx)
+        self.enter_loop_translation(node, ctx, err_var)
 
         invariant = self._create_for_loop_invariant(iter_var, target_var,
                                                     err_var, iterable,
