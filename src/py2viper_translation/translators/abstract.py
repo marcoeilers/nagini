@@ -212,9 +212,11 @@ class AbstractTranslator(metaclass=ABCMeta):
             ctx, methodname, args, targets, position, info, target_method,
             target_node)
 
-    def enter_loop_translation(self, node, ctx) -> None:
+    def enter_loop_translation(
+            self, node: Union[ast.While, ast.For], ctx: Context,
+            err_var: PythonVar = None) -> None:
         translator = self.config.obligation_translator
-        return translator.enter_loop_translation(node, ctx)
+        return translator.enter_loop_translation(node, ctx, err_var)
 
     def leave_loop_translation(self, ctx) -> None:
         translator = self.config.obligation_translator

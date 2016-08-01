@@ -7,6 +7,9 @@ from typing import List, Union
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.program_nodes import (
+    PythonVar,
+)
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -31,10 +34,13 @@ from py2viper_translation.translators.obligation.obligation_info import (
 class LoopObligationTranslator(CommonObligationTranslator):
     """Class for translating obligations in loops."""
 
-    def enter_loop_translation(self, node, ctx) -> None:
+    def enter_loop_translation(
+            self, node: Union[ast.While, ast.For], ctx: Context,
+            err_var: PythonVar = None) -> None:
         """Update context with info needed to translate loop."""
         info = PythonLoopObligationInfo(
-            self._obligation_manager, node, self, ctx.actual_function)
+            self._obligation_manager, node, self, ctx.actual_function,
+            err_var)
         info.traverse_invariants()
         ctx.obligation_context.push_loop_info(info)
 

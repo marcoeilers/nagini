@@ -3,12 +3,13 @@
 
 import ast
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
+    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Field,
@@ -54,9 +55,11 @@ class ObligationTranslator(CommonTranslator):
             config, jvm, source_file, type_info, viper_ast,
             self._obligation_manager)
 
-    def enter_loop_translation(self, node, ctx) -> None:
+    def enter_loop_translation(
+            self, node: Union[ast.While, ast.For], ctx: Context,
+            err_var: PythonVar = None) -> None:
         """Update context with info needed to translate loop."""
-        self._loop_translator.enter_loop_translation(node, ctx)
+        self._loop_translator.enter_loop_translation(node, ctx, err_var)
 
     def leave_loop_translation(self, ctx) -> None:
         """Remove loop translation info from context."""

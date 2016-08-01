@@ -59,7 +59,8 @@ class MethodObligationTranslator(CommonObligationTranslator):
         obligation_method = ObligationMethod(
             name, original_args, returns, pres, posts, local_vars, body)
         constructor = ObligationMethodNodeConstructor(
-            obligation_method, method, self, ctx, position, info)
+            obligation_method, method, self, ctx, self._obligation_manager,
+            position, info)
         constructor.add_obligations()
 
         return constructor.construct_node()
