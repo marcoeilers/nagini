@@ -107,21 +107,6 @@ class Acc(Expression):
                 location, perm, position, info)
 
 
-class InhaleExhale(Expression):
-    """Inhale exhale expression."""
-
-    def __init__(self, inhale, exhale) -> None:
-        self._inhale = inhale
-        self._exhale = exhale
-
-    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
-                  position: Position, info: Info) -> Expr:
-        inhale = self._inhale.translate(translator, ctx, position, info)
-        exhale = self._exhale.translate(translator, ctx, position, info)
-        return translator.viper.InhaleExhaleExp(
-            inhale, exhale, position, info)
-
-
 class RefExpression(Expression):
     """A base class for all reference expressions."""
 
@@ -293,6 +278,21 @@ class BoolVar(BoolExpression):
         return self._var.ref()
 
 
+class InhaleExhale(BoolExpression):
+    """Inhale exhale expression."""
+
+    def __init__(self, inhale, exhale) -> None:
+        self._inhale = inhale
+        self._exhale = exhale
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        inhale = self._inhale.translate(translator, ctx, position, info)
+        exhale = self._exhale.translate(translator, ctx, position, info)
+        return translator.viper.InhaleExhaleExp(
+            inhale, exhale, position, info)
+
+
 class Type:
     """A class for types."""
 
@@ -407,14 +407,22 @@ class BigAnd(BoolExpression):
     def is_always_true(self) -> bool:
         return self.is_empty()
 
+    def is_always_false(self) -> bool:
+        return any(
+            conjunct.is_always_false()
+            for conjunct in self._conjuncts)
+
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        if not self._conjuncts:
+        if self.is_always_false():
+            return translator.viper.FalseLit(position, info)
+        conjuncts = [
+            conjunct.translate(translator, ctx, position, info)
+            for conjunct in self._conjuncts
+            if not conjunct.is_always_true()]
+        if not conjuncts:
             return translator.viper.TrueLit(position, info)
         else:
-            conjuncts = [
-                conjunct.translate(translator, ctx, position, info)
-                for conjunct in self._conjuncts]
             and_operator = (
                 lambda left, right:
                 translator.viper.And(left, right, position, info))
@@ -434,17 +442,25 @@ class BigOr(BoolExpression):
         """Check if have any elements."""
         return not self._disjuncts
 
+    def is_always_true(self) -> bool:
+        return any(
+            disjunct.is_always_true()
+            for disjunct in self._disjuncts)
+
     def is_always_false(self) -> bool:
         return self.is_empty()
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        if not self._disjuncts:
+        if self.is_always_true():
+            return translator.viper.TrueLit(position, info)
+        disjuncts = [
+            disjunct.translate(translator, ctx, position, info)
+            for disjunct in self._disjuncts
+            if not disjunct.is_always_false()]
+        if not disjuncts:
             return translator.viper.FalseLit(position, info)
         else:
-            disjuncts = [
-                disjunct.translate(translator, ctx, position, info)
-                for disjunct in self._disjuncts]
             or_operator = (
                 lambda left, right:
                 translator.viper.Or(left, right, position, info))
