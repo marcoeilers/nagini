@@ -73,3 +73,35 @@ def test_call_non_terminating_5() -> None:
         i += 1
     #:: OptionalOutput(leak_check.failed:must_terminate.not_taken)
     non_terminating()
+
+
+# Check that measures are non-negative.
+
+
+def test_measures_1() -> None:
+    while True:
+        #:: ExpectedOutput(invariant.not.established:assertion.false)
+        Invariant(MustTerminate(-1))
+        a = 2
+
+
+def test_measures_2() -> None:
+    while False:
+        # Negative measure is ok because loop is never executed.
+        Invariant(MustTerminate(-1))
+        a = 2
+
+
+def test_measures_3() -> None:
+    i = 5
+    while i > 0:
+        Invariant(MustTerminate(i))
+        i -= 1
+
+
+def test_measures_4() -> None:
+    i = 5
+    while i > -1:
+        #:: ExpectedOutput(invariant.not.preserved:assertion.false)
+        Invariant(MustTerminate(i))
+        i -= 1
