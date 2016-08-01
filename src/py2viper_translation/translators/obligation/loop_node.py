@@ -105,10 +105,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         instances = self._loop_obligation_info.get_instances(
             self._obligation_manager.must_terminate_obligation.identifier())
         disjuncts = [
-            expr.Not(self._loop_obligation_info.construct_loop_condition())]
-        for instance in instances:
-            guard = instance.create_guard_expression()
-            disjuncts.append(guard)
+            instance.create_guard_expression()
+            for instance in instances]
         assign = expr.Assign(
             self._loop_obligation_info.termination_flag_var,
             expr.BigOr(disjuncts))
@@ -120,7 +118,11 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         predicate = self._get_must_terminate_predicate()
         check = expr.Implies(
             expr.CurrentPerm(predicate) > expr.NoPerm(),
-            expr.VarRef(self._loop_obligation_info.termination_flag_var))
+            expr.BigOr([
+                expr.BoolVar(self._loop_obligation_info.termination_flag_var),
+                expr.Not(self._loop_obligation_info.construct_loop_condition())
+            ])
+        )
         info = self._to_info('Check if loop terminates.')
         position = self._to_position(
             conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING)
