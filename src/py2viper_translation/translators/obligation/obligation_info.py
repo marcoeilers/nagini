@@ -6,6 +6,7 @@ import ast
 from typing import List
 
 from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonProgram,
@@ -38,6 +39,8 @@ MEASURES_LOOP_NAME = '_loop_measures'
 ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_original_must_terminate'
 INCREASED_MUST_TERMINATE_AMOUNT_NAME = '_increased_must_terminate'
 LOOP_CHECK_BEFORE_NAME = '_loop_check_before'
+LOOP_TERMINATION_FLAG_NAME = '_loop_termination_flag'
+LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_loop_original_must_terminate'
 
 
 class SilverVar:
@@ -48,16 +51,25 @@ class SilverVar:
     that have ``Perm`` type) in the same way as all other variables.
     """
 
-    def __init__(self, decl: 'viper_ast.LocalVarDecl',
+    def __init__(self, name: str, decl: 'viper_ast.LocalVarDecl',
                  ref: 'viper_ast.LocalVarRef') -> None:
+        self.name = name
+        self.sil_name = name
         self.decl = decl
         """A variable declaration."""
 
         self._ref = ref
 
-    def ref(self) -> 'viper_ast.LocalVarRef':
-        """A variable reference."""
+    def ref(self, node: ast.AST = None,
+            ctx: Context = None) -> 'viper_ast.LocalVarRef':
+        """A variable reference.
+
+        Arguments are ignored.
+        """
         return self._ref
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """Just do nothing."""
 
 
 class GuardedObligationInstance:
@@ -116,15 +128,15 @@ class BaseObligationInfo(GuardCollectingVisitor):
 
     def _create_var(
             self, name: str, class_name: str,
-            translator: 'Translator') -> PythonVar:
+            translator: 'Translator', local: bool = False) -> PythonVar:
         program = self._get_program()
         cls = program.classes[class_name]
         return self._method.create_variable(
-            name, cls, translator, local=False)
+            name, cls, translator, local=local)
 
     def _create_silver_var(
             self, name: str, translator: 'AbstractTranslator',
-            typ: 'viper_ast.Type') -> SilverVar:
+            typ: 'viper_ast.Type', local: bool = False) -> SilverVar:
         sil_name = self._method.get_fresh_name(name)
         decl = translator.viper.LocalVarDecl(
             sil_name, typ, translator.viper.NoPosition,
@@ -132,13 +144,16 @@ class BaseObligationInfo(GuardCollectingVisitor):
         ref = translator.viper.LocalVar(
             sil_name, typ, translator.viper.NoPosition,
             translator.viper.NoInfo)
-        return SilverVar(decl, ref)
+        var = SilverVar(sil_name, decl, ref)
+        if local:
+            self._method.add_local(sil_name, var)
+        return var
 
     def _create_perm_var(
-            self, name: str,
-            translator: 'AbstractTranslator') -> PythonVar:
+            self, name: str, translator: 'AbstractTranslator',
+            local: bool = False) -> PythonVar:
         return self._create_silver_var(
-            name, translator, translator.viper.Perm)
+            name, translator, translator.viper.Perm, local=local)
 
     def _create_seq_var(
             self, name: str,
@@ -218,10 +233,18 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             (obligation.identifier(), [])
             for obligation in self._obligation_manager.obligations)
         loop_measure_map_var = self._create_var(
-            MEASURES_LOOP_NAME, 'object', translator.translator)
+            MEASURES_LOOP_NAME, 'object', translator.translator,
+            local=True)
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
-        self.loop_check_before = self._create_var(
-            LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator)
+        self.loop_check_before_var = self._create_var(
+            LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator,
+            local=True)
+        self.termination_flag_var = self._create_var(
+            LOOP_TERMINATION_FLAG_NAME, 'bool', translator.translator,
+            local=True)
+        self.original_must_terminate_var = self._create_perm_var(
+            LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator,
+            local=True)
         self.iteration_err_var = err_var
         """In the for loop translation holds ``__iter__`` result."""
 
@@ -241,3 +264,18 @@ class PythonLoopObligationInfo(BaseObligationInfo):
                 # TODO: Implement IOExists in loop.
                 raise UnsupportedException(self.node, 'IOExists in loop.')
         self._current_instance_map = None
+
+    def get_all_instances(self) -> List[ObligationInstance]:
+        """Return all invariant instances."""
+        return list(self._all_instances.values())
+
+    def get_instances(self, obligation_id: str) -> List[ObligationInstance]:
+        """Return invariant instances of specific obligation type."""
+        return self._instances[obligation_id]
+
+    def construct_loop_condition(self) -> expr.BoolExpression:
+        """Construct loop condition."""
+        if isinstance(self.node, ast.While):
+            return expr.PythonBoolExpression(self.node.test)
+        else:
+            return expr.VarRef(self.iteration_err_var) == None  # noqa: E711

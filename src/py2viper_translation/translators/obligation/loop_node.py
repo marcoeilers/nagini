@@ -5,7 +5,9 @@ import ast
 
 from typing import List, Union
 
+from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -37,6 +39,14 @@ class ObligationLoop:
         """Prepend ``invariants`` to the invariants list."""
         self.invariants[0:0] = invariants
 
+    def prepend_body(self, statements) -> None:
+        """Prepend ``statements`` to body."""
+        self.body[0:0] = statements
+
+    def append_body(self, statement) -> None:
+        """Append ``statement`` to body."""
+        self.body.append(statement)
+
 
 class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
     """A class that creates a while loop node with obligation stuff."""
@@ -60,14 +70,16 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
     def construct_loop(self) -> None:
         """Construct statements to perform a loop."""
         self._add_method_measure_map_preserved_invariant()
-        # TODO: self._check_measures_are_positive()
-        # TODO: self._set_up_measures()
-        # TODO: self._check_loop_promises_terminate()
-        # TODO: self._check_loop_preserves_termination()
+        self._set_up_measures()
+        self._save_must_terminate_amount(
+            self._loop_obligation_info.original_must_terminate_var)
+        self._save_loop_termination()
+        self._check_loop_promises_terminate()
+        self._check_loop_preserves_termination()
         # TODO: self._add_leak_check()
         self._add_loop()
-        # TODO: self._reset_must_terminate() – terminating loop in
-        # non-terminating method.
+        self._reset_must_terminate(
+            self._loop_obligation_info.original_must_terminate_var)
 
     def _add_method_measure_map_preserved_invariant(self) -> None:
         """Add invariant that method measure map is not changed."""
@@ -81,6 +93,62 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
                 self._translator, self._ctx, self._position, self._info),
         ])
 
+    def _set_up_measures(self) -> None:
+        """Create and initialize loop's measure map."""
+        instances = self._loop_obligation_info.get_all_instances()
+        statements = self._loop_obligation_info.loop_measure_map.initialize(
+            instances, self._translator, self._ctx)
+        self._obligation_loop.prepend_body(statements)
+
+    def _save_loop_termination(self) -> None:
+        """Save if loop promises to terminate into a variable."""
+        instances = self._loop_obligation_info.get_instances(
+            self._obligation_manager.must_terminate_obligation.identifier())
+        disjuncts = [
+            expr.Not(self._loop_obligation_info.construct_loop_condition())]
+        for instance in instances:
+            guard = instance.create_guard_expression()
+            disjuncts.append(guard)
+        assign = expr.Assign(
+            self._loop_obligation_info.termination_flag_var,
+            expr.BigOr(disjuncts))
+        info = self._to_info('Save loop termination promise.')
+        self._append_statement(assign, info=info)
+
+    def _check_loop_promises_terminate(self) -> None:
+        """Check that loop promises to terminate if it has to."""
+        predicate = self._get_must_terminate_predicate()
+        check = expr.Implies(
+            expr.CurrentPerm(predicate) > expr.NoPerm(),
+            expr.VarRef(self._loop_obligation_info.termination_flag_var))
+        info = self._to_info('Check if loop terminates.')
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING)
+        self._append_statement(expr.Assert(check), position, info)
+
+    def _check_loop_preserves_termination(self) -> None:
+        """Check that loop keeps the promise to terminate."""
+        instances = self._loop_obligation_info.get_instances(
+            self._obligation_manager.must_terminate_obligation.identifier())
+        disjuncts = [
+            expr.Not(self._loop_obligation_info.construct_loop_condition())]
+        for instance in instances:
+            guard = instance.create_guard_expression()
+            measure_check = self._loop_obligation_info.loop_measure_map.check(
+                self._obligation_info.current_thread_var,
+                instance.obligation_instance.get_measure())
+            disjuncts.append(expr.BigAnd([guard, measure_check]))
+        check = expr.Implies(
+            expr.BoolVar(self._loop_obligation_info.termination_flag_var),
+            expr.BigOr(disjuncts))
+        assertion = expr.Assert(check)
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL)
+        info = self._to_info('Check if loop continues to terminate.')
+        statement = assertion.translate(
+            self._translator, self._ctx, position, info)
+        self._obligation_loop.append_body(statement)
+
     def _add_loop(self) -> None:
         """Add the actual loop node."""
         body_block = self._translator.translate_block(
@@ -91,5 +159,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._position, self._info)
         self._statements.append(loop)
 
+    @property
     def _loop_obligation_info(self) -> PythonLoopObligationInfo:
         return self._ctx.obligation_context.current_loop_info

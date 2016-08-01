@@ -8,6 +8,9 @@ from typing import List, Union
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
+from py2viper_translation.lib.program_nodes import (
+    PythonVar,
+)
 from py2viper_translation.lib.typedefs import (
     Info,
     Stmt,
@@ -52,6 +55,32 @@ class StatementNodeConstructorBase:
     def get_statements(self) -> List[Stmt]:
         """Get all generated statements."""
         return self._statements
+
+    def _save_must_terminate_amount(
+            self, amount_var: PythonVar) -> None:
+        """Save the original permission amount to a variable."""
+        predicate = self._get_must_terminate_predicate()
+        assign = expr.Assign(amount_var, expr.CurrentPerm(predicate))
+        info = self._to_info('Save current MustTerminate amount.')
+        self._append_statement(assign, info=info)
+
+    def _reset_must_terminate(self, amount_var: PythonVar) -> None:
+        """Reset ``MustTerminate`` permission to its original level.
+
+        .. note::
+
+            Implication is needed because in Silicon if callee took all
+            permission, the ``exhale acc(..., none)`` would fail, even
+            though this exhale does nothing.
+        """
+        predicate = self._get_must_terminate_predicate()
+        original_amount = expr.VarRef(amount_var)
+        perm = expr.CurrentPerm(predicate) - original_amount
+        exhale = expr.Exhale(expr.Implies(
+            expr.CurrentPerm(predicate) > expr.NoPerm(),
+            expr.Acc(predicate, perm)))
+        info = self._to_info('Reset MustTerminate amount to original level.')
+        self._append_statement(exhale, info=info)
 
     @property
     def _viper(self) -> ViperAST:

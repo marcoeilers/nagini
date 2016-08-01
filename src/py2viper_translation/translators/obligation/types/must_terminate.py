@@ -88,13 +88,8 @@ class MustTerminateObligationInstance(ObligationInstance):
         predicate = self._create_predicate_access(ctx)
 
         # Measures positive.
-        node = ctx.obligation_context.current_loop_info.node
-        if isinstance(node, ast.While):
-            loop_condition = expr.PythonBoolExpression(node.test)
-        else:
-            iteration_err_var = expr.VarRef(
-                ctx.obligation_context.current_loop_info.iteration_err_var)
-            loop_condition = iteration_err_var == None  # noqa: E711
+        loop_info = ctx.obligation_context.current_loop_info
+        loop_condition = loop_info.construct_loop_condition()
         measures_positive = expr.Implies(
             loop_condition, self.get_measure() > 0)
 

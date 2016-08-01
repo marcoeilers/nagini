@@ -254,6 +254,18 @@ class FalseLit(BoolExpression):
         return translator.viper.FalseLit(position, info)
 
 
+class Not(BoolExpression):
+    """Negation of other expression."""
+
+    def __init__(self, value: BoolExpression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.Not(value, position, info)
+
+
 class PythonBoolExpression(BoolExpression):
     """An boolean expression represented by Python bool expression."""
 
@@ -262,10 +274,23 @@ class PythonBoolExpression(BoolExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        stmt, expr = translator.translate_expr(
+        stmt, expr = translator.translate_to_bool(
             self._node, ctx, expression=True)
         assert not stmt
         return expr
+
+
+class BoolVar(BoolExpression):
+    """A boolean variable reference."""
+
+    def __init__(self, var: PythonVar) -> None:
+        self._var = var
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        bool_class = ctx.program.classes['bool']
+        assert self._var.type is bool_class
+        return self._var.ref()
 
 
 class Type:
@@ -394,6 +419,36 @@ class BigAnd(BoolExpression):
                 lambda left, right:
                 translator.viper.And(left, right, position, info))
             return join_expressions(and_operator, conjuncts)
+
+
+class BigOr(BoolExpression):
+    """A disjunction of 0 or more elements.
+
+    If it has zero elements, then it is equivalent to ``False``.
+    """
+
+    def __init__(self, disjuncts) -> None:
+        self._disjuncts = disjuncts
+
+    def is_empty(self) -> None:
+        """Check if have any elements."""
+        return not self._disjuncts
+
+    def is_always_false(self) -> bool:
+        return self.is_empty()
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        if not self._disjuncts:
+            return translator.viper.FalseLit(position, info)
+        else:
+            disjuncts = [
+                disjunct.translate(translator, ctx, position, info)
+                for disjunct in self._disjuncts]
+            or_operator = (
+                lambda left, right:
+                translator.viper.Or(left, right, position, info))
+            return join_expressions(or_operator, disjuncts)
 
 
 class CmpOp(BoolOp):
