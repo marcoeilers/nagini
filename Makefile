@@ -51,7 +51,7 @@ BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
 test: bin/py.test
-	bin/py.test -v -x src/py2viper_translation/tests.py
+	bin/py.test -v src/py2viper_translation/tests.py
 
 mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
