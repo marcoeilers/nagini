@@ -27,7 +27,7 @@ def putchar(c: str, t1: Place) -> Tuple[bool, Place]:
     IOExists2(Place, bool)(
         lambda t2, success: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             write_char_io(t1, stdout, c, success, t2)
         ),
         Ensures(

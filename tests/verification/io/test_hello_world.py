@@ -10,7 +10,7 @@ def hello(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_string_io(t1, "Hello World!", t2)
         ),
         Ensures(
@@ -29,7 +29,7 @@ def hello2(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_string_io(t1, "Hello World!", t2)
         ),
         Ensures(
@@ -49,7 +49,7 @@ def hello3(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             write_string_io(t1, "Hello World!", t2)
         ),
         Ensures(

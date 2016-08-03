@@ -56,7 +56,7 @@ def read_int_twice1(t1: Place) -> Tuple[Place, int, int]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2)
         ),
         Ensures(
@@ -80,7 +80,7 @@ def read_int_twice2(t1: Place) -> Tuple[Place, int, int]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2)
         ),
         Ensures(
@@ -105,7 +105,7 @@ def read_int_twice3(t1: Place) -> Tuple[Place, int, int]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2)
         ),
         Ensures(
@@ -129,7 +129,7 @@ def read_int_twice4(t1: Place) -> Tuple[Place, int, int]:
     IOExists3(Place, int, int)(
         lambda t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2)
         ),
         Ensures(
@@ -156,7 +156,7 @@ def read_write_int_twice1(t1: Place) -> Place:
     IOExists4(Place, Place, int, int)(
         lambda t2, t3, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2) and
             write_int_twice_io(t2, value1, value2, t3)
         ),
@@ -184,7 +184,7 @@ def read_write_int_twice2(t1: Place) -> Place:
     IOExists4(Place, Place, int, int)(
         lambda t2, t3, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2) and
             write_int_twice_io(t2, value1, value2, t3)
         ),
@@ -213,7 +213,7 @@ def read_write_int_twice3(t1: Place) -> Place:
     IOExists4(Place, Place, int, int)(
         lambda t2, t3, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2) and
             write_int_twice_io(t2, value1, value2, t3)
         ),
@@ -240,7 +240,7 @@ def read_write_int_twice4(t1: Place) -> Place:
     IOExists4(Place, Place, int, int)(
         lambda t2, t3, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_twice_io(t1, value1, value2, t2) and
             write_int_twice_io(t2, value1, value2, t3)
         ),
