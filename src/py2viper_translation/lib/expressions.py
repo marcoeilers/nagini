@@ -217,6 +217,20 @@ class Sum(IntExpression):
             return join_expressions(plus_operator, elements)
 
 
+class Inc(IntExpression):
+    """Some expression + 1."""
+
+    def __init__(self, value: IntExpression) -> None:
+        self._value = value
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        value = self._value.translate(translator, ctx, position, info)
+        return translator.viper.Add(
+            value, translator.viper.IntLit(1, position, info), position,
+            info)
+
+
 class BoolExpression(Expression):
     """A base class for all boolean expressions."""
 

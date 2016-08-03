@@ -25,7 +25,7 @@ class WriterSuper:
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2)
             ),
@@ -46,7 +46,7 @@ def client1(t1: Place, value: int) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 3) and
             write_int_io(t1, value, t2)
         ),
         Ensures(
@@ -68,7 +68,7 @@ class WriterSub(WriterSuper):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2)
             ),
@@ -89,7 +89,7 @@ def client2(t1: Place, value: int) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 3) and
             write_int_io(t1, value, t2)
         ),
         Ensures(

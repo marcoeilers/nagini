@@ -83,7 +83,7 @@ REASONS = {
                    'non-positive.').format(pprint(n)),
     'must_terminate.not_taken':
         lambda n: ('Callee {} did not take MustTerminate '
-                   'obligation.').format(pprint(n)),
+                   'obligation.').format(get_target_name(n)),
     'must_terminate.loop_not_promised':
         lambda n: ('Loop does not promise to terminate.'),
     'must_terminate.loop_promise_not_kept':

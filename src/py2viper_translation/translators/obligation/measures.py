@@ -55,26 +55,30 @@ class MeasureMap:
 
     def initialize(
             self, obligation_instances: List['GuardedObligationInstance'],
-            translator: 'AbstractTranslator', ctx: Context) -> List[Stmt]:
-        """Construct a list of statements that initialize measure map."""
+            translator: 'AbstractTranslator', ctx: Context,
+            overriding: bool = False) -> List[Stmt]:
+        """Construct a list of statements that initialize measure map.
+
+        If ``overriding`` is ``True``, then adds to measures ``1`` to
+        allow overridden method to have the same measure.
+        """
         position = translator.no_position(ctx)
         info = translator.no_info(ctx)
-        viper = translator.viper
         statements = []
-        init_call = viper.MethodCall(
+        init_call = translator.viper.MethodCall(
             'Measure$topInit', [], [self._map_var.ref()], position, info)
         statements.append(init_call)
         for instance in obligation_instances:
             guard_expression = instance.create_guard_expression()
             call = self._create_measure_set_call(
                 instance.obligation_instance, position, info,
-                translator, ctx)
+                translator, ctx, overriding)
             if guard_expression.is_empty():
                 statement = call
             else:
                 condition = guard_expression.translate(
                     translator, ctx, position, info)
-                statement = viper.If(
+                statement = translator.viper.If(
                     condition, call,
                     translator.translate_block([], position, info),
                     position, info)
@@ -101,10 +105,13 @@ class MeasureMap:
     def _create_measure_set_call(
             self, obligation_instance: ObligationInstance,
             position: Position, info: Info,
-            translator: 'AbstractTranslator', ctx: Context) -> Expr:
+            translator: 'AbstractTranslator', ctx: Context,
+            overriding: bool) -> Expr:
         reference = obligation_instance.get_target()
         reference_expr = reference.translate(translator, ctx, position, info)
         measure = obligation_instance.get_measure()
+        if overriding:
+            measure = expr.Inc(measure)
         measure_expr = measure.translate(translator, ctx, position, info)
         args = [self._map_var.ref(), reference_expr, measure_expr]
         return translator.viper.MethodCall(
