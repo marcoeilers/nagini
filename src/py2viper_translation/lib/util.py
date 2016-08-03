@@ -157,6 +157,10 @@ def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
     return fields
 
 
+def is_invariant(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Invariant'
+
+
 def is_pre(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Requires'
 

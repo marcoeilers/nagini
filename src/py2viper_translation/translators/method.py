@@ -85,6 +85,7 @@ class MethodTranslator(CommonTranslator):
         """
         Translates the postconditions specified for 'method'.
         """
+        ctx.obligation_context.is_translating_posts = True
         posts = []
         no_error = self.viper.EqCmp(err_var,
                                     self.viper.NullLit(self.no_position(ctx),
@@ -101,6 +102,7 @@ class MethodTranslator(CommonTranslator):
                                           self.no_info(ctx))
             posts.append(expr)
 
+        ctx.obligation_context.is_translating_posts = False
         return posts
 
     def _translate_exceptional_posts(self, method: PythonMethod,
@@ -390,15 +392,13 @@ class MethodTranslator(CommonTranslator):
             locals = [local.decl for local in method.get_locals()
                       if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
-        body_block = self.translate_block(body,
-                                          self.to_position(method.node, ctx),
-                                          self.no_info(ctx))
-        ctx.current_function = old_function
         name = method.sil_name
-        return self.viper.Method(name, args, results, pres, posts,
-                                 locals, body_block,
-                                 self.to_position(method.node, ctx),
-                                 self.no_info(ctx))
+        nodes = self.create_method_node(
+            ctx, name, args, results, pres, posts, locals, body,
+            self.to_position(method.node, ctx), self.no_info(ctx),
+            method=method)
+        ctx.current_function = old_function
+        return nodes
 
     def translate_finally(self, block: PythonTryBlock,
                           ctx: Context) -> List[Stmt]:
