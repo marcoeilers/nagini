@@ -51,8 +51,18 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
             obligation_manager: ObligationManager,
             target_method: Optional[PythonMethod],
             target_node: Optional[ast.AST]) -> None:
+        """Constructor.
+
+        If ``target_node`` is ``None``, then:
+
+        1.  It is assumed that we are translating a behavioural
+            subtyping check.
+        2.  ``target_method.node`` is used for computing default
+            position.
+        """
         super().__init__(
-            translator, ctx, obligation_manager, position, info, target_node)
+            translator, ctx, obligation_manager, position, info,
+            target_node or target_method.node)
         self._obligation_method_call = obligation_method_call
         self._target_method = target_method
         self._target_node = target_node

@@ -174,7 +174,7 @@ class ProgramTranslator(CommonTranslator):
         result = self.create_method_node(
             ctx, mname, params, results, pres, posts, [], body,
             self.no_position(ctx), self.no_info(ctx),
-            method=method.overrides)
+            method=method.overrides, overriding=True)
 
         ctx.current_function = old_function
         self.info = None

@@ -27,7 +27,7 @@ class SuperA:
         IOExists2(Place, int)(
             lambda t2, value: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 read_int_io(t1, value, t2)
             ),
             Ensures(
@@ -47,7 +47,7 @@ class SuperA:
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, value, t2) and
                 write_int_io(t1, self.int_field, t2)
@@ -69,7 +69,7 @@ class SuperA:
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2) and
                 write_int_io(t1, value, t2)
@@ -94,7 +94,7 @@ class SubA0(SuperA):
         IOExists2(Place, int)(
             lambda t2, value: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 read_int_io(t1, value, t2)
             ),
             Ensures(
@@ -114,7 +114,7 @@ class SubA0(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, value, t2) and
                 write_int_io(t1, self.int_field, t2)
@@ -135,7 +135,7 @@ class SubA0(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2) and
                 write_int_io(t1, value, t2)
@@ -160,7 +160,7 @@ class SubA1(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 write_int_io(t1, value, t2)
             ),
             Ensures(
@@ -178,7 +178,7 @@ class SubA1(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 write_int_io(t1, value, t2)
             ),
             Ensures(
@@ -205,7 +205,7 @@ class SubA2(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2)
             ),
@@ -227,7 +227,7 @@ class SubA2(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/2) and
                 write_int_io(t1, self.int_field, t2)
             ),
@@ -255,7 +255,7 @@ class SubA3(SuperA):
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 2) and
                 Acc(self.int_field, 1/4) and # Ask less permission.
                 write_int_io(t1, self.int_field, t2)
             ),

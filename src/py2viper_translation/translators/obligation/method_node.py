@@ -58,7 +58,7 @@ class ObligationMethodNodeConstructor:
             self, obligation_method: ObligationMethod,
             python_method: PythonMethod, translator: 'AbstractTranslator',
             ctx: Context, obligation_manager: ObligationManager,
-            position: Position, info: Info) -> None:
+            position: Position, info: Info, overriding: bool) -> None:
         self._obligation_method = obligation_method
         self._python_method = python_method
         self._translator = translator
@@ -66,6 +66,8 @@ class ObligationMethodNodeConstructor:
         self._obligation_manager = obligation_manager
         self._position = position
         self._info = info
+        self._overriding = overriding
+        """Are we translating a behavioral subtyping check?"""
 
     def construct_node(self) -> Method:
         """Construct a Silver node that represents a method."""
@@ -138,7 +140,7 @@ class ObligationMethodNodeConstructor:
         """Create and initialize method's measure map."""
         instances = self._obligation_info.get_all_precondition_instances()
         statements = self._obligation_info.method_measure_map.initialize(
-            instances, self._translator, self._ctx)
+            instances, self._translator, self._ctx, self._overriding)
         self._obligation_method.prepend_body(statements)
         self._obligation_method.add_local(
             self._obligation_info.method_measure_map.get_var())
