@@ -56,6 +56,7 @@ class Tree:
     def work(self, call_height: int) -> None:
         Requires(self.valid())
         Requires(call_height >= 0)
+        #:: UnexpectedOutput(not.wellformed:insufficient.permission, /carbon/issue/150/)
         Requires(Unfolding(self.valid(), self.height == call_height))
         Requires(MustTerminate(call_height + 1))
         Ensures(self.valid())
@@ -63,7 +64,9 @@ class Tree:
         if call_height > 0:
             Unfold(self.valid())
             if self.left is not None:
+                #:: UnexpectedOutput(leak_check.failed:must_terminate.not_taken, /carbon/issue/151/)
                 self.left.work(call_height - 1)
             if self.right is not None:
+                #:: UnexpectedOutput(leak_check.failed:must_terminate.not_taken, /carbon/issue/151/)
                 self.right.work(call_height - 1)
             Fold(self.valid())
