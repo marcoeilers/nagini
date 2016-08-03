@@ -4,11 +4,12 @@
 import abc
 import ast
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
-    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Predicate,
@@ -45,8 +46,16 @@ class ObligationInstance(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_target(self) -> PythonVar:
-        """Return a variable to which obligation is attached."""
+    def get_target(self) -> expr.RefExpression:
+        """Return an expression to which obligation is attached."""
+
+    @abc.abstractmethod
+    def get_use_method(self, ctx: Context) -> expr.Expression:
+        """Get inhale exhale pair for use in method contract."""
+
+    @abc.abstractmethod
+    def get_use_loop(self, ctx: Context) -> expr.Expression:
+        """Get inhale exhale pair for use in loop invariant."""
 
 
 class Obligation(abc.ABC):
@@ -69,6 +78,12 @@ class Obligation(abc.ABC):
         If check is successful, an obligation instance object is
         returned. Otherwise – ``None``.
         """
+
+    @abc.abstractmethod
+    def generate_axiomatized_preconditions(
+            self, obligation_info: 'PythonMethodObligationInfo',
+            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+        """Add obligations to axiomatic method precondition."""
 
     def create_predicates(
             self, translator: CommonTranslator) -> List[Predicate]:

@@ -60,8 +60,8 @@ class SilverVar:
 
         self._ref = ref
 
-    def ref(self, node: ast.AST = None,
-            ctx: Context = None) -> 'viper_ast.LocalVarRef':
+    def ref(self, node: ast.AST = None,                         # pylint: disable=unused-argument
+            ctx: Context = None) -> 'viper_ast.LocalVarRef':    # pylint: disable=unused-argument
         """A variable reference.
 
         Arguments are ignored.
@@ -195,7 +195,7 @@ class PythonMethodObligationInfo(BaseObligationInfo):
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._precondition_instances
-        for precondition, aliases in self._method.precondition:
+        for precondition, _ in self._method.precondition:
             self.traverse(precondition)
         self._current_instance_map = None
 
@@ -203,7 +203,7 @@ class PythonMethodObligationInfo(BaseObligationInfo):
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._postcondition_instances
-        for postcondition, aliases in self._method.postcondition:
+        for postcondition, _ in self._method.postcondition:
             self.traverse(postcondition)
         self._current_instance_map = None
 

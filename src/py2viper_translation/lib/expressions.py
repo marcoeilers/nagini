@@ -130,6 +130,20 @@ class VarRef(RefExpression):
         return self._var.ref()
 
 
+class PythonRefExpression(RefExpression):
+    """An reference expression represented by Python reference expression."""
+
+    def __init__(self, node: ast.expr) -> None:
+        self._node = node
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        stmt, expr = translator.translate_expr(
+            self._node, ctx, expression=True)
+        assert not stmt
+        return expr
+
+
 class IntExpression(Expression):
     """A base class for all integer expressions."""
 
@@ -281,7 +295,7 @@ class BoolVar(BoolExpression):
 class InhaleExhale(BoolExpression):
     """Inhale exhale expression."""
 
-    def __init__(self, inhale, exhale) -> None:
+    def __init__(self, inhale: BoolExpression, exhale: BoolExpression) -> None:
         self._inhale = inhale
         self._exhale = exhale
 
@@ -465,6 +479,24 @@ class BigOr(BoolExpression):
                 lambda left, right:
                 translator.viper.Or(left, right, position, info))
             return join_expressions(or_operator, disjuncts)
+
+
+class BoolCondExp(BoolExpression):
+    """A ternary operator with boolean result."""
+
+    def __init__(self, condition: BoolExpression, then: BoolExpression,
+                 els: BoolExpression) -> None:
+        self._condition = condition
+        self._then = then
+        self._els = els
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        condition = self._condition.translate(translator, ctx, position, info)
+        then = self._then.translate(translator, ctx, position, info)
+        els = self._els.translate(translator, ctx, position, info)
+        return translator.viper.CondExp(
+            condition, then, els, position, info)
 
 
 class CmpOp(BoolOp):

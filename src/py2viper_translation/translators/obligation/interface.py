@@ -79,6 +79,14 @@ class ObligationTranslator(CommonTranslator):
             raise UnsupportedException(
                 node, 'Unsupported contract function.')
 
+    def translate_must_invoke_token(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``token``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_invoke(node, ctx)
+        else:
+            return self._method_translator.translate_must_invoke(node, ctx)
+
     def _translate_must_terminate(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to ``MustTerminate``."""
