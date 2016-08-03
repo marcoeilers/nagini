@@ -100,7 +100,7 @@ class StatementNodeConstructorBase:
         """Get the surrounding method measure map."""
         return self._obligation_info.method_measure_map
 
-    def _get_must_terminate_predicate(self) -> expr.Predicate:
+    def _get_must_terminate_predicate(self) -> expr.PredicateAccess:
         cthread = self._obligation_info.current_thread_var
         return self._must_terminate.create_predicate_access(cthread)
 

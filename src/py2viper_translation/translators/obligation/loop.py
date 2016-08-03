@@ -47,7 +47,7 @@ class LoopObligationTranslator(CommonObligationTranslator):
         info.traverse_invariants()
         ctx.obligation_context.push_loop_info(info)
 
-    def leave_loop_translation(self, ctx) -> None:
+    def leave_loop_translation(self, ctx: Context) -> None:
         """Remove loop translation info from context."""
         ctx.obligation_context.pop_loop_info()
 

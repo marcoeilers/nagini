@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import cast
+from typing import cast, List
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.io_context import IOOpenContext
@@ -12,6 +12,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
     StmtsAndExpr,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
@@ -23,6 +25,18 @@ from py2viper_translation.translators.io_operation.utils import (
 )
 
 
+def _get_opened_operation(
+        node: ast.Call, ctx: Context) -> PythonIOOperation:
+    """Get the operation that is being opened."""
+    if (len(node.args) == 1 and
+            isinstance(node.args[0], ast.Call) and
+            isinstance(node.args[0].func, ast.Name)):
+        name = node.args[0].func.id
+        if name in ctx.program.io_operations:
+            return ctx.program.io_operations[name]
+    raise_invalid_operation_use('open_non_io_operation', node)
+
+
 class Opener:
     """A class responsible for translating ``Open`` call."""
 
@@ -31,15 +45,10 @@ class Opener:
                  full_perm: 'viper_ast.FullPerm') -> None:
         self._node = node
         self._ctx = ctx
-        self._operation = self._get_opened_operation()
+        self._operation = _get_opened_operation(node, ctx)
         self._operation_call = cast(ast.Call, node.args[0])
         self._translator = translator
         self._full_perm = full_perm
-
-        # Translated stuff.
-        self._sil_args = None
-        self._body_expression = None
-        self._statements = []
 
     @property
     def _io_ctx(self) -> IOOpenContext:
@@ -59,28 +68,17 @@ class Opener:
 
     def translate(self) -> StmtsAndExpr:
         """Translate IO operation open."""
-        assert not self._statements, "translate is called twice."
         self._io_ctx.start_io_operation_open()
 
+        statements = []
+
         self._check()
-        self._translate_arguments()
-        self._translate_exhale()
-        self._translate_inhale()
+        sil_args = self._translate_arguments()
+        statements.append(self._translate_exhale(sil_args))
+        statements.extend(self._translate_inhale(sil_args))
 
         self._io_ctx.stop_io_operation_open()
-        return (self._statements, None)
-
-    def _get_opened_operation(self) -> PythonIOOperation:
-        """Get the operation that is being opened."""
-        node = self._node
-        ctx = self._ctx
-        if (len(node.args) == 1 and
-                isinstance(node.args[0], ast.Call) and
-                isinstance(node.args[0].func, ast.Name)):
-            name = node.args[0].func.id
-            if name in ctx.program.io_operations:
-                return ctx.program.io_operations[name]
-        raise_invalid_operation_use('open_non_io_operation', node)
+        return (statements, None)
 
     def _check(self) -> None:
         """Check that operation open is well-formed."""
@@ -91,27 +89,28 @@ class Opener:
                 len(self._operation.get_parameters())):
             raise_invalid_operation_use('result_used_argument', self._node)
 
-    def _translate_arguments(self) -> None:
-        self._sil_args = self._translator.translate_args(
+    def _translate_arguments(self) -> List[Expr]:
+        return self._translator.translate_args(
             self._operation_call.args, self._ctx)
 
-    def _translate_exhale(self) -> None:
+    def _translate_exhale(self, sil_args: List[Expr]) -> Stmt:
         """Translate exhale of IO operation."""
         predicate = self._translator.create_predicate_access(
-            self._operation.sil_name, self._sil_args, self._full_perm,
+            self._operation.sil_name, sil_args, self._full_perm,
             self._node, self._ctx)
         exhale = self._viper.Exhale(predicate, self._position, self._info)
-        self._statements.append(exhale)
+        return exhale
 
-    def _translate_inhale(self) -> None:
+    def _translate_inhale(self, sil_args: List[Expr]) -> List[Stmt]:
         """Translate inhale of IO operation."""
         with self._ctx.aliases_context():
             self._define_input_aliases()
-            self._define_output_aliases()
+            self._define_output_aliases(sil_args)
             self._define_existential_variables()
-            self._translate_body()
-        self._emit_existential_variable_definitions()
-        self._emit_body_inhale()
+            body = self._translate_body()
+        statements = self._emit_existential_variable_definitions()
+        statements.append(self._emit_body_inhale(body))
+        return statements
 
     def _define_existential_variables(self) -> None:
         """Define fresh local variables for stuff mentioned in IOExists.
@@ -136,7 +135,7 @@ class Opener:
         self._translator.set_up_io_operation_input_aliases(
             self._operation, self._operation_call, self._ctx)
 
-    def _define_output_aliases(self) -> None:
+    def _define_output_aliases(self, sil_args: List[Expr]) -> None:
         """Set up aliases for output.
 
         The same idea as with IOExists stuff, just we immediately
@@ -148,10 +147,10 @@ class Opener:
             self._add_local_var(name, var)
             getter = self._translator.create_result_getter(
                 self._operation_call, result, self._ctx,
-                sil_args=self._sil_args)
+                sil_args=sil_args)
             self._io_ctx.define_variable(name, getter)
 
-    def _translate_body(self) -> None:
+    def _translate_body(self) -> Expr:
         """Translate body.
 
         During translation defining getters are stored in the context
@@ -160,26 +159,29 @@ class Opener:
         not allowed because both use cases (fields and Result()) are
         forbidden inside IO operations.
         """
-        statements, self._body_expression = self._translator.translate_expr(
+        statements, body_expression = self._translator.translate_expr(
             self._operation.get_body(), self._ctx, expression=True)
         assert not statements
+        return body_expression
 
-    def _emit_existential_variable_definitions(self) -> None:
+    def _emit_existential_variable_definitions(self) -> List[Stmt]:
         """Emit existential variable definitions.
 
         Emit equalities between created variables and their
         corresponding defining getters.
         """
+        statements = []
         for var, definition in self._io_ctx.get_ordered_variable_defs():
             assignment = self._viper.LocalVarAssign(
                 var.ref(), definition, self._position, self._info)
-            self._statements.append(assignment)
+            statements.append(assignment)
+        return statements
 
-    def _emit_body_inhale(self) -> None:
+    def _emit_body_inhale(self, body: Expr) -> Stmt:
         """Emit inhale of the translate IO operation body."""
         inhale = self._viper.Inhale(
-            self._body_expression, self._position, self._info)
-        self._statements.append(inhale)
+            body, self._position, self._info)
+        return inhale
 
     def _add_local_var(self, name, var) -> None:
         sil_name = self._ctx.actual_function.get_fresh_name(name)

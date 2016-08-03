@@ -21,9 +21,9 @@ _OBLIGATION_NAME = 'MustTerminate'
 _PREDICATE_NAME = _OBLIGATION_NAME
 
 
-def _create_predicate_access(cthread: PythonVar) -> expr.Predicate:
+def _create_predicate_access(cthread: PythonVar) -> expr.PredicateAccess:
     """Create a predicate access expression."""
-    return expr.Predicate(_PREDICATE_NAME, expr.VarRef(cthread))
+    return expr.PredicateAccess(_PREDICATE_NAME, expr.VarRef(cthread))
 
 
 def _create_method_exhale(
@@ -57,7 +57,7 @@ class MustTerminateObligationInstance(ObligationInstance):
         return expr.VarRef(self._target)
 
     def _create_permission_inhale(
-            self, predicate: expr.Predicate) -> expr.BoolExpression:
+            self, predicate: expr.PredicateAccess) -> expr.BoolExpression:
         return expr.Implies(
             expr.CurrentPerm(predicate) == expr.NoPerm(),
             expr.Acc(predicate))
@@ -120,7 +120,8 @@ class MustTerminateObligation(Obligation):
         else:
             return None
 
-    def create_predicate_access(self, cthread: PythonVar) -> expr.Predicate:
+    def create_predicate_access(
+            self, cthread: PythonVar) -> expr.PredicateAccess:
         """Create a predicate access expression."""
         return _create_predicate_access(cthread)
 
