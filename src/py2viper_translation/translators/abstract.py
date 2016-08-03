@@ -15,6 +15,11 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
     Expr,
+    Info,
+    Field,
+    VarDecl,
+    Predicate,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -199,21 +204,28 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def get_obligation_preamble(
             self,
-            ctx: Context) -> Tuple['viper_ast.Predicate', 'viper_ast.Field']:
+            ctx: Context) -> Tuple[List[Predicate], List[Field]]:
         translator = self.config.obligation_translator
         return translator.get_obligation_preamble(ctx)
 
     def create_method_node(
-            self, ctx, name, args, returns, pres, posts, locals, body,
-            position, info, method=None, overriding=False) -> List[Stmt]:
+            self, ctx: Context, name: str,
+            args: List[VarDecl], returns: List[VarDecl],
+            pres: List[Expr], posts: List[Expr],
+            locals: List[VarDecl], body: List[Stmt],
+            position: Position, info: Info,
+            method: PythonMethod = None,
+            overriding: bool = False) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_method_node(
             ctx, name, args, returns, pres, posts, locals, body,
             position, info, method, overriding)
 
     def create_method_call_node(
-            self, ctx, methodname, args, targets, position, info,
-            target_method=None, target_node=None) -> List[Stmt]:
+            self, ctx: Context, methodname: str, args: List[Expr],
+            targets: List[Expr], position: Position, info: Info,
+            target_method: PythonMethod = None,
+            target_node: ast.Call = None) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_method_call_node(
             ctx, methodname, args, targets, position, info, target_method,
@@ -225,12 +237,15 @@ class AbstractTranslator(metaclass=ABCMeta):
         translator = self.config.obligation_translator
         return translator.enter_loop_translation(node, ctx, err_var)
 
-    def leave_loop_translation(self, ctx) -> None:
+    def leave_loop_translation(self, ctx: Context) -> None:
         translator = self.config.obligation_translator
         return translator.leave_loop_translation(ctx)
 
     def create_while_node(
-            self, ctx, cond, invariants, locals, body, node) -> List[Stmt]:
+            self, ctx: Context, cond: Expr,
+            invariants: List[Expr],
+            locals: List[VarDecl],
+            body: Stmt, node: Union[ast.While, ast.For]) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_while_node(
             ctx, cond, invariants, locals, body, node)

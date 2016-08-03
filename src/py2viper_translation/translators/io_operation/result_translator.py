@@ -27,8 +27,8 @@ from py2viper_translation.translators.io_operation.utils import (
 )
 
 
-class ResultTranslationContext:
-    """Translation context of a specific IO operation result."""
+class IOOperationResult:
+    """Translation state of a specific IO operation result."""
 
     def __init__(self, node: ast.Call, definition: PythonVar,
                  instance: ast.expr) -> None:
@@ -142,20 +142,20 @@ class ResultTranslator:
         if len(self._result_definitions) != len(self._result_instances):
             raise_invalid_operation_use('result_mismatch', self._node)
 
-    def _create_result_contexts(self) -> List[ResultTranslationContext]:
+    def _create_result_contexts(self) -> List[IOOperationResult]:
         contexts = [
-            ResultTranslationContext(self._node, definition, instance)
+            IOOperationResult(self._node, definition, instance)
             for definition, instance in zip(
                 self._result_definitions, self._result_instances)
         ]
         return contexts
 
-    def _add_equation(self, result: ResultTranslationContext) -> None:
+    def _add_equation(self, result: IOOperationResult) -> None:
         equation = self._viper.EqCmp(result.getter, result.var.ref(),
                                      self._position, self._info)
         self._equations.append(equation)
 
-    def _set_variable(self, result: ResultTranslationContext) -> None:
+    def _set_variable(self, result: IOOperationResult) -> None:
         instance = cast(ast.Name, result.instance)
         var_name = instance.id
         result.var_name = var_name
@@ -165,7 +165,7 @@ class ResultTranslator:
             result.var = self._ctx.actual_function.get_variable(var_name)
 
     def _handle_opener_result_var(
-            self, result: ResultTranslationContext) -> None:
+            self, result: IOOperationResult) -> None:
         assert isinstance(result.var, PythonVar)
         if self._io_ctx.is_variable_defined(result.var_name):
             self._add_equation(result)
@@ -173,13 +173,13 @@ class ResultTranslator:
             self._io_ctx.define_variable(result.var_name, result.getter)
 
     def _handle_existential_var(
-            self, result: ResultTranslationContext) -> None:
+            self, result: IOOperationResult) -> None:
         assert isinstance(result.var, PythonIOExistentialVar)
         if result.var.is_defined():
             self._add_equation(result)
         else:
             result.var.set_ref(result.getter)
 
-    def _handle_normal_var(self, result: ResultTranslationContext) -> None:
+    def _handle_normal_var(self, result: IOOperationResult) -> None:
         assert isinstance(result.var, (PythonVar, PythonGlobalVar))
         self._add_equation(result)

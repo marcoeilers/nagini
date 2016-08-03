@@ -1,13 +1,22 @@
 """Obligation translator in methods."""
 
 
+import ast
+
 from typing import List
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+)
 from py2viper_translation.lib.typedefs import (
+    Expr,
+    Info,
     Method,
     Stmt,
+    Position,
+    VarDecl,
 )
 from py2viper_translation.translators.obligation.common import (
     CommonObligationTranslator,
@@ -51,8 +60,12 @@ class MethodObligationTranslator(CommonObligationTranslator):
         return obligation_instance.get_use_method(ctx)
 
     def create_method_node(
-            self, ctx, name, original_args, returns, pres, posts,
-            local_vars, body, position, info, method=None,
+            self, ctx: Context, name: str,
+            original_args: List[VarDecl], returns: List[VarDecl],
+            pres: List[Expr], posts: List[Expr],
+            local_vars: List[VarDecl], body: List[Stmt],
+            position: Position, info: Info,
+            method: PythonMethod = None,
             overriding: bool = False) -> Method:
         """Construct method AST node with additional obligation stuff."""
         if method is None:
@@ -74,8 +87,10 @@ class MethodObligationTranslator(CommonObligationTranslator):
         return constructor.construct_node()
 
     def create_method_call_node(
-            self, ctx, methodname, original_args, targets, position,
-            info, target_method=None, target_node=None) -> List[Stmt]:
+            self, ctx: Context, methodname: str, original_args: List[Expr],
+            targets: List[Expr], position: Position, info: Info,
+            target_method: PythonMethod = None,
+            target_node: ast.Call = None) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
         obligation_method_call = ObligationMethodCall(
             methodname, original_args, targets)

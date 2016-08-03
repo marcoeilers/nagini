@@ -43,11 +43,11 @@ class MustInvokeObligationInstance(ObligationInstance):
         return expr.PythonRefExpression(self._target)
 
     def get_use_method(self, ctx: Context) -> expr.Expression:
-        bounded = expr.Predicate(
+        bounded = expr.PredicateAccess(
             _BOUNDED_PREDICATE_NAME, self.get_target())
-        unbounded = expr.Predicate(
+        unbounded = expr.PredicateAccess(
             _UNBOUNDED_PREDICATE_NAME, self.get_target())
-        credit = expr.Predicate(
+        credit = expr.PredicateAccess(
             _CREDIT_PREDICATE_NAME, self.get_target())
         # TODO: Refactor code duplication.
 
@@ -81,11 +81,11 @@ class MustInvokeObligationInstance(ObligationInstance):
         return expr.InhaleExhale(inhale, exhale)
 
     def get_use_loop(self, ctx: Context) -> expr.Expression:
-        bounded = expr.Predicate(
+        bounded = expr.PredicateAccess(
             _BOUNDED_PREDICATE_NAME, self.get_target())
-        unbounded = expr.Predicate(
+        unbounded = expr.PredicateAccess(
             _UNBOUNDED_PREDICATE_NAME, self.get_target())
-        credit = expr.Predicate(
+        credit = expr.PredicateAccess(
             _CREDIT_PREDICATE_NAME, self.get_target())
         # TODO: Refactor code duplication.
 
