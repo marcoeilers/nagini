@@ -20,7 +20,7 @@ def read_int(t1: Place) -> Tuple[Place, int]:
     IOExists2(Place, int)(
         lambda t2, value: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             read_int_io(t1, value, t2)
         ),
         Ensures(
@@ -45,7 +45,7 @@ def write_int(t1: Place, value: int) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             write_int_io(t1, value, t2)
         ),
         Ensures(
@@ -69,7 +69,7 @@ def write_string(t1: Place, value: str) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             write_string_io(t1, value, t2)
         ),
         Ensures(

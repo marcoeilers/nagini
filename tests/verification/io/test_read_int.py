@@ -18,7 +18,7 @@ def read_int1(t1: Place) -> Tuple[int, Place]:
     IOExists2(Place, int)(
         lambda t2, value: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value, t2)
         ),
         Ensures(
@@ -38,7 +38,7 @@ def read_int2(t1: Place) -> Tuple[int, int, Place]:
     IOExists4(Place, Place, int, int)(
         lambda t3, t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value1, t2) and
             read_int_io(t2, value2, t3)
         ),
@@ -61,7 +61,7 @@ def read_int3(t1: Place) -> Tuple[int, int, Place]:
     IOExists4(Place, Place, int, int)(
         lambda t3, t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value1, t2) and
             read_int_io(t2, value2, t3)
         ),
@@ -88,7 +88,7 @@ def read_write_int1(t1: Place) -> Place:
     IOExists3(Place, Place, int)(
         lambda t2, t3, value: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value, t2) and
             write_int_io(t2, value, t3)
         ),
@@ -109,7 +109,7 @@ def read_write_int2(t1: Place) -> Place:
     IOExists6(Place, Place, Place, Place, int, int)(
         lambda t2, t3, t4, t5, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value1, t2) and
             read_int_io(t2, value2, t3) and
             write_int_io(t3, value1, t4) and
@@ -134,7 +134,7 @@ def read_write_int3(t1: Place) -> Place:
     IOExists6(Place, Place, Place, Place, int, int)(
         lambda t2, t3, t4, t5, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value1, t2) and
             read_int_io(t2, value2, t3) and
             write_int_io(t3, value1, t4) and

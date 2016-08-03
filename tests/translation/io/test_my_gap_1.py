@@ -18,7 +18,7 @@ def my_gap(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             my_gap_io(t1, t2)
         ),
         Ensures(

@@ -27,7 +27,7 @@ def yes_io(t_pre: Place) -> bool:
 
 def main(t1: Place) -> None:
     Requires(
-        token(t1) and
+        token(t1, 2) and
         yes_io(t1)
     )
     Ensures(
@@ -38,7 +38,7 @@ def main(t1: Place) -> None:
 
     while True:
         Invariant(
-            token(t) and
+            token(t, 1) and
             yes_io(t)
             )
 

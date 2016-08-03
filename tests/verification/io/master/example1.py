@@ -1,6 +1,8 @@
 from py2viper_contracts.contracts import (
+    Assert,
     ContractOnly,
     Ensures,
+    Implies,
     Import,
     Invariant,
     Pure,
@@ -17,6 +19,9 @@ from py2viper_contracts.io_builtins import (
     Join,
 )
 Import('io_builtins')
+from py2viper_contracts.obligations import (
+    MustTerminate,
+)
 from typing import Tuple
 
 
@@ -38,8 +43,9 @@ def create_server_socket(t1: Place) -> Tuple[Socket, Place]:
     IOExists2(Socket, Place)(
         lambda socket, t2: (
             Requires(
-                token(t1) and
-                create_server_socket_io(t1, socket, t2)
+                token(t1, 1) and
+                create_server_socket_io(t1, socket, t2) and
+                MustTerminate(1)
             ),
             Ensures(
                 token(t2) and
@@ -67,7 +73,7 @@ def accept(t1: Place, server_socket: Socket) -> Tuple[Socket, Place]:
     IOExists2(Socket, Place)(
         lambda client_socket, t2: (
             Requires(
-                token(t1) and
+                token(t1, 1) and
                 accept_io(t1, server_socket, client_socket, t2)
             ),
             Ensures(
@@ -100,8 +106,9 @@ def read_all(t1: Place, socket: Socket, timeout: int) -> Tuple[str, Place]:
     IOExists2(str, Place)(
         lambda data, t2: (
             Requires(
-                token(t1) and
-                read_all_io(t1, socket, timeout, data, t2)
+                token(t1, 1) and
+                read_all_io(t1, socket, timeout, data, t2) and
+                Implies(timeout > 0, MustTerminate(1))
             ),
             Ensures(
                 token(t2) and
@@ -132,8 +139,9 @@ def print_int(t1: Place, value: int) -> Place:
     IOExists1(Place)(
         lambda t2: (
             Requires(
-                token(t1) and
-                print_io(t1, value, t2)
+                token(t1, 1) and
+                print_io(t1, value, t2) and
+                MustTerminate(1)
             ),
             Ensures(
                 token(t2) and
@@ -158,10 +166,11 @@ def send(t1: Place, socket: Socket, data: str) -> Place:
     IOExists1(Place)(
         lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 1) and
                 send_io(t1, socket, data, t2) and
                 data is not None and
-                socket != None
+                socket != None and
+                MustTerminate(1)
             ),
             Ensures(
                 token(t2) and
@@ -185,9 +194,10 @@ def close(t1: Place, socket: Socket) -> Place:
     IOExists1(Place)(
         lambda t2: (
             Requires(
-                token(t1) and
+                token(t1, 1) and
                 close_io(t1, socket, t2) and
-                socket != None
+                socket != None and
+                MustTerminate(1)
             ),
             Ensures(
                 token(t2) and
@@ -248,7 +258,7 @@ def listener_io(
 
 
 def run(t1: Place) -> None:
-    Requires(token(t1) and listener_io(t1))
+    Requires(token(t1, 2) and listener_io(t1))
     Ensures(False)
 
     Open(listener_io(t1))
@@ -257,7 +267,7 @@ def run(t1: Place) -> None:
 
     while True:
         Invariant(
-            token(t_loop) and
+            token(t_loop, 1) and
             listener_loop_io(t_loop, server_socket) and
             server_socket != None
         )

@@ -2,6 +2,8 @@
 This test illustrates the problem of using heap dependent IO operations
 in non-deterministic choice.
 """
+
+
 from py2viper_contracts.contracts import (
     Acc,
     Requires,
@@ -34,14 +36,14 @@ class WriterSuper:
             lambda t2: (
             Requires(
                 #:: ExpectedOutput(not.wellformed:insufficient.permission)
-                token(t1) and
-                (
+                token(t1, 2) and
+                ((
                     Acc(self.int_field1, 1/2) and
                     write_int_io(t1, self.int_field1, t2)
                 ) if b else (
                     Acc(self.int_field2, 1/2) and
                     write_int_io(t1, self.int_field2, t2)
-                )
+                ))
             ),
             Ensures(
                 (Acc(self.int_field1, 1/2)
@@ -62,7 +64,7 @@ def client1(t1: Place, value: int) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 3) and
             write_int_io(t1, value, t2)
         ),
         Ensures(

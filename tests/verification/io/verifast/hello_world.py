@@ -18,7 +18,7 @@ def main(t1: Place) -> Place:
     IOExists4(Place, Place, bool, bool)(
         lambda t2, t3, success1, success2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_char_io(t1, stdout, 'h', success1, t2) and
             write_char_io(t2, stdout, 'i', success2, t3)
         ),
