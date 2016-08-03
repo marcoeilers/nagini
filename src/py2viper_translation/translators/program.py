@@ -120,15 +120,16 @@ class ProgramTranslator(CommonTranslator):
         stmts += self.add_handlers_for_inlines(ctx)
 
         stmts.append(end_lbl)
-        body = self.translate_block(stmts, self.no_position(ctx),
-                                    self.no_info(ctx))
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]
+        result = self.create_method_node(
+            ctx, mname, params, results, pres, posts, locals, stmts,
+            self.no_position(ctx), self.no_info(ctx),
+            method=method)
+
         ctx.current_function = old_function
-        result = self.viper.Method(mname, params, results, pres, posts, locals,
-                                   body, self.no_position(ctx),
-                                   self.no_info(ctx))
+
         ctx.position.pop()
         self.info = None
         return result
@@ -171,9 +172,10 @@ class ProgramTranslator(CommonTranslator):
         results, targets, body = self._create_override_check_body_impure(
             method, has_subtype, called_name, args, ctx)
         ctx.current_function = old_function
-        result = self.viper.Method(mname, params, results, pres, posts, [],
-                                   body, self.no_position(ctx),
-                                   self.no_info(ctx))
+        result = self.create_method_node(
+            ctx, mname, params, results, pres, posts, [], body,
+            self.no_position(ctx), self.no_info(ctx),
+            method=method.overrides)
 
         self.info = None
         return result
@@ -182,7 +184,7 @@ class ProgramTranslator(CommonTranslator):
             has_subtype: Expr, calledname: str,
             args: List[Expr], ctx: Context) -> Tuple[List['ast.LocalVarDecl'],
                                                      List['ast.LocalVar'],
-                                                     Stmt]:
+                                                     List[Stmt]]:
         results = []
         targets = []
         if method.type:
@@ -226,16 +228,15 @@ class ProgramTranslator(CommonTranslator):
         ctx.position.append(('overridden method',
                              self.viper.to_position(method.overrides.node,
                                                     ctx.position)))
-        call = self.viper.MethodCall(calledname, args, targets,
-                                     self.to_position(method.node, ctx),
-                                     self.no_info(ctx))
+        call = self.create_method_call_node(
+            ctx, calledname, args, targets,
+            self.to_position(method.node, ctx), self.no_info(ctx),
+            target_method=method)
         ctx.position.pop()
         subtype_assume = self.viper.Inhale(has_subtype, self.no_position(ctx),
                                            self.no_info(ctx))
-        body = default_checks + [subtype_assume, call]
-        body_block = self.translate_block(body, self.no_position(ctx),
-                                          self.no_info(ctx))
-        return results, targets, body_block
+        body = default_checks + [subtype_assume] + call
+        return results, targets, body
 
     def _check_override_validity(self, method: PythonMethod,
                                  ctx: Context) -> None:
@@ -289,7 +290,23 @@ class ProgramTranslator(CommonTranslator):
                         if d.name() != 'PyType']
             functions += self.viper.to_list(sil_prog.functions())
             predicates += self.viper.to_list(sil_prog.predicates())
-            methods += self.viper.to_list(sil_prog.methods())
+
+            converted_methods = []
+            for method in self.viper.to_list(sil_prog.methods()):
+                converted_method = self.create_method_node(
+                    ctx=ctx,
+                    name=method.name(),
+                    args=self.viper.to_list(method.formalArgs()),
+                    returns=self.viper.to_list(method.formalReturns()),
+                    pres=self.viper.to_list(method.pres()),
+                    posts=self.viper.to_list(method.posts()),
+                    locals=self.viper.to_list(method.locals()),
+                    body=method.body(),
+                    position=method.pos(),
+                    info=method.info(),
+                    )
+                converted_methods.append(converted_method)
+            methods += converted_methods
 
         # predefined fields
         fields.append(self.viper.Field('__container', self.viper.Ref,
@@ -313,6 +330,10 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SetType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+        fields.append(self.viper.Field('Measure$acc',
+                                       self.viper.SeqType(self.viper.Ref),
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
 
         # predefined IO stuff
         io_constructor = IOPreambleConstructor(
@@ -322,6 +343,11 @@ class ProgramTranslator(CommonTranslator):
         functions.extend(io_getters)
         predicates.extend(io_predicates)
         methods.extend(io_methods)
+
+        # predefined obligation stuff
+        obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
+        predicates.extend(obl_predicates)
+        fields.extend(obl_fields)
 
         type_funcs = self.type_factory.get_default_functions(ctx)
         type_axioms = self.type_factory.get_default_axioms(ctx)
