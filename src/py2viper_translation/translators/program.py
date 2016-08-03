@@ -171,12 +171,12 @@ class ProgramTranslator(CommonTranslator):
         ctx.position.pop()
         results, targets, body = self._create_override_check_body_impure(
             method, has_subtype, called_name, args, ctx)
-        ctx.current_function = old_function
         result = self.create_method_node(
             ctx, mname, params, results, pres, posts, [], body,
             self.no_position(ctx), self.no_info(ctx),
             method=method.overrides)
 
+        ctx.current_function = old_function
         self.info = None
         return result
 

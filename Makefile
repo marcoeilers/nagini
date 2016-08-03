@@ -35,7 +35,8 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/obligation/utils.py \
 	src/py2viper_translation/translators/obligation/types/__init__.py \
 	src/py2viper_translation/translators/obligation/types/base.py \
-	src/py2viper_translation/translators/obligation/types/must_terminate.py
+	src/py2viper_translation/translators/obligation/types/must_terminate.py \
+	src/py2viper_translation/translators/obligation/types/must_invoke.py
 CHECKED_CONTRACT_FILES:=\
 	deps/py2viper-contracts/src/py2viper_contracts/io.py \
 	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \

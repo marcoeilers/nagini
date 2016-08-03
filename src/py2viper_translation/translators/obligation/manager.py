@@ -13,6 +13,9 @@ from py2viper_translation.translators.obligation.types.base import (
 from py2viper_translation.translators.obligation.types.must_terminate import (
     MustTerminateObligation,
 )
+from py2viper_translation.translators.obligation.types.must_invoke import (
+    MustInvokeObligation,
+)
 
 
 class ObligationManager:
@@ -20,8 +23,10 @@ class ObligationManager:
 
     def __init__(self) -> None:
         self._must_terminate_obligation = MustTerminateObligation()
+        self._must_invoke_obligation = MustInvokeObligation()
         self._obligations = [
             self._must_terminate_obligation,
+            self._must_invoke_obligation,
         ]
 
     @property

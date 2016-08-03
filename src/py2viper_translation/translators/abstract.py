@@ -192,6 +192,11 @@ class AbstractTranslator(metaclass=ABCMeta):
         translator = self.config.obligation_translator
         return translator.translate_obligation_contractfunc_call(node, ctx)
 
+    def translate_must_invoke_token(self, node: ast.Call,
+                                    ctx: Context) -> StmtsAndExpr:
+        translator = self.config.obligation_translator
+        return translator.translate_must_invoke_token(node, ctx)
+
     def get_obligation_preamble(
             self,
             ctx: Context) -> Tuple['viper_ast.Predicate', 'viper_ast.Field']:

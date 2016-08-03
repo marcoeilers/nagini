@@ -89,6 +89,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         with self._ctx.aliases_context():
             self._set_up_method_arg_aliases()
             for instance in instances:
+                if instance.obligation_instance.is_fresh():
+                    continue
 
                 guard_expression = instance.create_guard_expression()
                 check = expr.Implies(
@@ -164,14 +166,20 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
             # check. In this case, all arguments are the same and we do
             # not need to set up aliases.
             return
-        triples = zip(
-            self._target_method.args.values(),
-            self._target_node.args,
-            self._obligation_method_call.original_args)
+        parameters = list(self._target_method.args.values())
+        if self._target_method.var_arg:
+            parameters.append(self._target_method.var_arg)
+        if self._target_method.kw_arg:
+            parameters.append(self._target_method.kw_arg)
+        args = self._obligation_method_call.original_args
+        if 2 * len(parameters) + 1 == len(args):
+            # TODO: Find out a proper way to check if we are running
+            # under SIF.
+            args = args[0:-1:2]
+        assert len(parameters) == len(args)
         # TODO: Refactor: This loop is identical to
         # set_up_io_operation_input_aliases.
-        for parameter, py_arg, sil_arg in triples:
-            var_type = self._translator.get_type(py_arg, self._ctx)
-            var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
+        for parameter, sil_arg in zip(parameters, args):
+            var = PythonIOExistentialVar(parameter.name, None, parameter.type)
             var.set_ref(sil_arg)
             self._ctx.set_alias(parameter.name, var)

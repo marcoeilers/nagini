@@ -27,12 +27,12 @@ class MeasureMap:
         self._map_var = measure_map_var
         self._contents_var = contents_var
 
-    def check(self, reference: PythonVar,
+    def check(self, reference: expr.RefExpression,
               value: expr.IntExpression) -> expr.BoolExpression:
         """Generate a check if current value is smaller than in map."""
         args = [
             expr.CallArg('self', expr.REF, expr.VarRef(self._map_var)),
-            expr.CallArg('key', expr.REF, expr.VarRef(reference)),
+            expr.CallArg('key', expr.REF, reference),
             expr.CallArg('value', expr.INT, value),
         ]
         return expr.BoolCall('Measure$check', args)
@@ -103,8 +103,9 @@ class MeasureMap:
             position: Position, info: Info,
             translator: 'AbstractTranslator', ctx: Context) -> Expr:
         reference = obligation_instance.get_target()
+        reference_expr = reference.translate(translator, ctx, position, info)
         measure = obligation_instance.get_measure()
         measure_expr = measure.translate(translator, ctx, position, info)
-        args = [self._map_var.ref(), reference.ref(), measure_expr]
+        args = [self._map_var.ref(), reference_expr, measure_expr]
         return translator.viper.MethodCall(
             'Measure$set', args, [], position, info)

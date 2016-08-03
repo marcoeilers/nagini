@@ -32,7 +32,8 @@ def _create_method_exhale(
     """Create ``MustTerminate`` exhale to be mentioned in precondition."""
     cthread = obligation_info.current_thread_var
     predicate = _create_predicate_access(cthread)
-    check = obligation_info.caller_measure_map.check(cthread, measure)
+    check = obligation_info.caller_measure_map.check(
+        expr.VarRef(cthread), measure)
     return expr.Implies(check, expr.Acc(predicate))
 
 
@@ -52,13 +53,8 @@ class MustTerminateObligationInstance(ObligationInstance):
     def get_measure(self) -> expr.IntExpression:
         return expr.PythonIntExpression(self._measure)
 
-    def get_target(self) -> PythonVar:
-        return self._target
-
-    def _create_predicate_access(self, ctx) -> expr.Predicate:
-        obligation_info = ctx.actual_function.obligation_info
-        cthread = obligation_info.current_thread_var
-        return _create_predicate_access(cthread)
+    def get_target(self) -> expr.RefExpression:
+        return expr.VarRef(self._target)
 
     def _create_permission_inhale(
             self, predicate: expr.Predicate) -> expr.BoolExpression:
@@ -67,8 +63,7 @@ class MustTerminateObligationInstance(ObligationInstance):
             expr.Acc(predicate))
 
     def get_use_method(self, ctx: Context) -> expr.Expression:
-        """Get inhale exhale pair for use in method contract."""
-        predicate = self._create_predicate_access(ctx)
+        predicate = _create_predicate_access(self._target)
 
         # Inhale part.
         inhale = expr.BigAnd([
@@ -84,8 +79,7 @@ class MustTerminateObligationInstance(ObligationInstance):
         return expr.InhaleExhale(inhale, exhale)
 
     def get_use_loop(self, ctx: Context) -> expr.Expression:
-        """Get inhale exhale pair for use in loop invariant."""
-        predicate = self._create_predicate_access(ctx)
+        predicate = _create_predicate_access(self._target)
 
         # Measures positive.
         loop_info = ctx.obligation_context.current_loop_info

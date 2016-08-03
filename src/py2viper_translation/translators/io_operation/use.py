@@ -187,21 +187,11 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
     def _translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to IO contract function ``token``.
 
-        .. todo:: Vytautas
+        .. note::
 
-            Implement support for obligations. Currently, providing a
-            measure for a token gives an assertion error.
+            Translation is handled by obligation translator.
         """
-        if len(node.args) != 1:
-            raise UnsupportedException(
-                node, "Obligations not implemented.")
-        place = node.args[0]
-        place_stmt, place_expr = self.translate_expr(place, ctx,
-                                                     expression=True)
-        assert not place_stmt
-        perm = self._construct_full_perm(node, ctx)
-        return [], self.create_predicate_access('token', [place_expr], perm,
-                                                node, ctx)
+        return self.translate_must_invoke_token(node, ctx)
 
     def _translate_ctoken(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to IO contract function ``ctoken``."""

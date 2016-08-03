@@ -74,7 +74,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         self._save_must_terminate_amount(
             self._loop_obligation_info.original_must_terminate_var)
         self._save_loop_termination()
+        self._set_loop_check_before()
         self._check_loop_promises_terminate()
+        self._set_loop_check_after_body()
         self._check_loop_preserves_termination()
         # TODO: self._add_leak_check()
         self._add_loop()
@@ -95,10 +97,21 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _set_up_measures(self) -> None:
         """Create and initialize loop's measure map."""
+        # Set up measures.
+        loop_measure_map = self._loop_obligation_info.loop_measure_map
         instances = self._loop_obligation_info.get_all_instances()
-        statements = self._loop_obligation_info.loop_measure_map.initialize(
+        statements = loop_measure_map.initialize(
             instances, self._translator, self._ctx)
         self._obligation_loop.prepend_body(statements)
+        # Add access permission to invariant.
+        loop_check_before = expr.BoolVar(
+            self._loop_obligation_info.loop_check_before_var)
+        permission = loop_measure_map.get_contents_access()
+        invariant = expr.Implies(expr.Not(loop_check_before), permission)
+        self._obligation_loop.prepend_invariants([
+            invariant.translate(
+                self._translator, self._ctx, self._position, self._info),
+        ])
 
     def _save_loop_termination(self) -> None:
         """Save if loop promises to terminate into a variable."""
@@ -111,6 +124,14 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._loop_obligation_info.termination_flag_var,
             expr.BigOr(disjuncts))
         info = self._to_info('Save loop termination promise.')
+        self._append_statement(assign, info=info)
+
+    def _set_loop_check_before(self) -> None:
+        """Set the variable indicating that we are before loop."""
+        assign = expr.Assign(
+            self._loop_obligation_info.loop_check_before_var,
+            expr.TrueLit())
+        info = self._to_info('We are before loop.')
         self._append_statement(assign, info=info)
 
     def _check_loop_promises_terminate(self) -> None:
@@ -128,6 +149,16 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING)
         self._append_statement(expr.Assert(check), position, info)
 
+    def _set_loop_check_after_body(self) -> None:
+        """Set the variable indicating that we are after loop body."""
+        assign = expr.Assign(
+            self._loop_obligation_info.loop_check_before_var,
+            expr.FalseLit())
+        info = self._to_info('We are after loop body.')
+        statement = assign.translate(
+            self._translator, self._ctx, self._position, info)
+        self._obligation_loop.append_body(statement)
+
     def _check_loop_preserves_termination(self) -> None:
         """Check that loop keeps the promise to terminate."""
         instances = self._loop_obligation_info.get_instances(
@@ -137,7 +168,7 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         for instance in instances:
             guard = instance.create_guard_expression()
             measure_check = self._loop_obligation_info.loop_measure_map.check(
-                self._obligation_info.current_thread_var,
+                expr.VarRef(self._obligation_info.current_thread_var),
                 instance.obligation_instance.get_measure())
             disjuncts.append(expr.BigAnd([guard, measure_check]))
         check = expr.Implies(
