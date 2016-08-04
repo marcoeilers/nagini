@@ -39,6 +39,10 @@ class ObligationLoop:
         """Prepend ``invariants`` to the invariants list."""
         self.invariants[0:0] = invariants
 
+    def append_invariant(self, invariant) -> None:
+        """Append ``invariant`` to the invariants list."""
+        self.invariants.append(invariant)
+
     def prepend_body(self, statements) -> None:
         """Prepend ``statements`` to body."""
         self.body[0:0] = statements
@@ -70,6 +74,7 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
     def construct_loop(self) -> None:
         """Construct statements to perform a loop."""
         self._add_method_measure_map_preserved_invariant()
+        self._add_leak_check()
         self._set_up_measures()
         self._save_must_terminate_amount(
             self._loop_obligation_info.original_must_terminate_var)
@@ -78,7 +83,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         self._check_loop_promises_terminate()
         self._set_loop_check_after_body()
         self._check_loop_preserves_termination()
-        # TODO: self._add_leak_check()
         self._add_loop()
         self._reset_must_terminate(
             self._loop_obligation_info.original_must_terminate_var)
@@ -94,6 +98,37 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             assertion.translate(
                 self._translator, self._ctx, self._position, self._info),
         ])
+
+    def _add_leak_check(self) -> None:
+        """Add leak checks to invariant."""
+        reference_name = self._ctx.actual_function.get_fresh_name('_r')
+        leak_check = self._obligation_manager.create_leak_check(reference_name)
+        loop_check_before = expr.BoolVar(
+            self._loop_obligation_info.loop_check_before_var)
+        termination_flag = expr.BoolVar(
+            self._loop_obligation_info.termination_flag_var)
+
+        before_loop_leak_check = expr.InhaleExhale(
+            expr.TrueLit(),
+            expr.Implies(
+                loop_check_before,
+                expr.Implies(expr.Not(termination_flag), leak_check)))
+        info = self._to_info('Leak check for context.')
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
+        self._obligation_loop.append_invariant(
+            before_loop_leak_check.translate(
+                self._translator, self._ctx, position, info))
+
+        body_leak_check = expr.InhaleExhale(
+            expr.TrueLit(),
+            expr.Implies(expr.Not(loop_check_before), leak_check))
+        info = self._to_info('Leak check for loop body.')
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL)
+        self._obligation_loop.append_invariant(
+            body_leak_check.translate(
+                self._translator, self._ctx, position, info))
 
     def _set_up_measures(self) -> None:
         """Create and initialize loop's measure map."""

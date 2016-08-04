@@ -94,4 +94,9 @@ REASONS = {
     'method_body.leaks_obligations':
         lambda n: ('Method {} body might leak '
                    'obligations.'.format(get_target_name(n))),
+    'loop_context.has_unsatisfied_obligations':
+        lambda n: ('Loop might not take all unsatisfied obligations '
+                   'from the context.'),
+    'loop_body.leaks_obligations':
+        lambda n: ('Loop body might leak obligations.'),
 }
