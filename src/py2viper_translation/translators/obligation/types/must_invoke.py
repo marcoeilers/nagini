@@ -160,3 +160,9 @@ class MustInvokeObligation(Obligation):
             self, obligation_info: 'PythonMethodObligationInfo',
             interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
         return []
+
+    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+        return [
+            self._create_leak_for_perm(_BOUNDED_PREDICATE_NAME, var_name),
+            self._create_leak_for_perm(_UNBOUNDED_PREDICATE_NAME, var_name),
+        ]

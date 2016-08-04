@@ -136,3 +136,6 @@ class MustTerminateObligation(Obligation):
             return [exhale]
         else:
             return []
+
+    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+        return [self._create_leak_for_perm(_PREDICATE_NAME, var_name)]

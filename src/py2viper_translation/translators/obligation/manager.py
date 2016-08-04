@@ -3,6 +3,7 @@
 
 from typing import List
 
+from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.typedefs import (
     Predicate,
 )
@@ -46,3 +47,13 @@ class ObligationManager:
         for obligation in self._obligations:
             predicates.extend(obligation.create_predicates(translator))
         return predicates
+
+    def create_leak_check(
+            self, var_name: str) -> expr.BoolExpression:
+        """Create a leak check for all obligation except termination."""
+        checks = []
+        for obligation in self._obligations:
+            if obligation is self._must_terminate_obligation:
+                continue
+            checks.extend(obligation.create_leak_check(var_name))
+        return expr.BigAnd(checks)

@@ -15,9 +15,6 @@ from py2viper_translation.lib.typedefs import (
     Predicate,
 )
 from py2viper_translation.translators.common import CommonTranslator
-from py2viper_translation.translators.obligation.utils import (
-    create_obligation_predicate,
-)
 
 
 class ObligationInstance(abc.ABC):
@@ -85,10 +82,30 @@ class Obligation(abc.ABC):
             interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
         """Add obligations to axiomatic method precondition."""
 
+    @abc.abstractmethod
+    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+        """Create a leak check for this obligation.
+
+        :param var_name: variable name to be used in ``ForPerm``
+        """
+
+    def _create_leak_for_perm(
+            self, predicate_name: str, var_name: str) -> expr.ForPerm:
+        """Create a Forperm expression for use in leak check."""
+        return expr.ForPerm(
+            var_name,
+            [expr.Predicate(predicate_name, var_name)],
+            expr.FalseLit())
+
     def create_predicates(
             self, translator: CommonTranslator) -> List[Predicate]:
         """Create predicates that are used to represent this obligation."""
+        position = translator.viper.NoPosition
+        info = translator.viper.NoInfo
         predicates = [
-            create_obligation_predicate(name, translator)
+            expr.Predicate(name, 'r')
             for name in self._predicate_names]
-        return predicates
+        translated_predicates = [
+            predicate.translate(translator, None, position, info)
+            for predicate in predicates]
+        return translated_predicates

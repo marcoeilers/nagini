@@ -41,6 +41,10 @@ OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL = {
     ('assert.failed', 'assertion.false'):
         ('leak_check.failed', 'must_terminate.loop_promise_not_kept')
 }
+OBLIGATION_CALL_LEAK_CHECK_FAIL = {
+    ('call.precondition', 'assertion.false'):
+        ('leak_check.failed', 'caller.has_unsatisfied_obligations')
+}
 
 
 __all__ = (

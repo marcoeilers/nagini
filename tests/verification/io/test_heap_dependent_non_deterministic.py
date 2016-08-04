@@ -12,6 +12,7 @@ from py2viper_contracts.contracts import (
     Import,
 )
 from py2viper_contracts.io import *
+from py2viper_contracts.obligations import MustTerminate
 from typing import Tuple
 
 from resources.library import (
@@ -24,6 +25,7 @@ Import('resources/library.py')
 class WriterSuper:
 
     def __init__(self, value: int) -> None:
+        Requires(MustTerminate(1))
         Ensures(Acc(self.int_field1))       # type: ignore
         Ensures(self.int_field1==value)     # type: ignore
         Ensures(Acc(self.int_field2))       # type: ignore
