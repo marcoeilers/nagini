@@ -45,6 +45,10 @@ OBLIGATION_CALL_LEAK_CHECK_FAIL = {
     ('call.precondition', 'assertion.false'):
         ('leak_check.failed', 'caller.has_unsatisfied_obligations')
 }
+OBLIGATION_BODY_LEAK_CHECK_FAIL = {
+    ('postcondition.violated', 'assertion.false'):
+        ('leak_check.failed', 'method_body.leaks_obligations')
+}
 
 
 __all__ = (

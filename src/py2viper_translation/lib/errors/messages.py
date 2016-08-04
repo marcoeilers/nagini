@@ -91,4 +91,7 @@ REASONS = {
     'caller.has_unsatisfied_obligations':
         lambda n: ('Callee {} might not take all unsatisfied obligations '
                    'from the caller.'.format(get_target_name(n))),
+    'method_body.leaks_obligations':
+        lambda n: ('Method {} body might leak '
+                   'obligations.'.format(get_target_name(n))),
 }
