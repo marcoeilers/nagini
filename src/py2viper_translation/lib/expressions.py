@@ -6,7 +6,7 @@
 import abc
 import ast
 
-from typing import List
+from typing import List, Union
 
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
@@ -22,7 +22,16 @@ from py2viper_translation.lib.util import (
 )
 
 
-class Expression(abc.ABC):
+class Node(abc.ABC):
+    """A base class for all nodes."""
+
+    @abc.abstractmethod
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        """Translate to Silver."""
+
+
+class Expression(Node):
     """A base class for all expressions."""
 
     @abc.abstractmethod
@@ -41,7 +50,7 @@ class Expression(abc.ABC):
         return NeCmp(self, other)
 
 
-class Statement(abc.ABC):
+class Statement(Node):
     """A base class for all statements."""
 
     @abc.abstractmethod
@@ -130,6 +139,17 @@ class VarRef(RefExpression):
         return self._var.ref()
 
 
+class VarDecl(Expression):
+    """A variable declaration."""
+
+    def __init__(self, var: PythonVar) -> None:
+        self._var = var
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return self._var.decl
+
+
 class PythonRefExpression(RefExpression):
     """An reference expression represented by Python reference expression."""
 
@@ -147,25 +167,63 @@ class PythonRefExpression(RefExpression):
 class IntExpression(Expression):
     """A base class for all integer expressions."""
 
-    def __gt__(self, other) -> 'IntExpression':
+    def __gt__(self, other: Union['IntExpression', int]) -> 'BoolExpression':
         if isinstance(other, int):
             other = RawIntExpression(other)
         return GtCmp(self, other)
 
-    def __ge__(self, other) -> 'IntExpression':
+    def __ge__(self, other: Union['IntExpression', int]) -> 'BoolExpression':
         if isinstance(other, int):
             other = RawIntExpression(other)
         return GeCmp(self, other)
 
-    def __lt__(self, other) -> 'IntExpression':
+    def __lt__(self, other: Union['IntExpression', int]) -> 'BoolExpression':
         if isinstance(other, int):
             other = RawIntExpression(other)
         return LtCmp(self, other)
 
-    def __le__(self, other) -> 'IntExpression':
+    def __le__(self, other: Union['IntExpression', int]) -> 'BoolExpression':
         if isinstance(other, int):
             other = RawIntExpression(other)
         return LeCmp(self, other)
+
+    def __add__(self, other: Union['IntExpression', int]) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return Add(self, other)
+
+    def __sub__(self, other: Union['IntExpression', int]) -> 'IntExpression':
+        if isinstance(other, int):
+            other = RawIntExpression(other)
+        return Sub(self, other)
+
+
+class Add(IntExpression):
+    """Add to integers."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.Add(left, right, position, info)
+
+
+class Sub(IntExpression):
+    """Subtract to integers."""
+
+    def __init__(self, left: IntExpression, right: IntExpression) -> None:
+        self._left = left
+        self._right = right
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        left = self._left.translate(translator, ctx, position, info)
+        right = self._right.translate(translator, ctx, position, info)
+        return translator.viper.Sub(left, right, position, info)
 
 
 class PythonIntExpression(IntExpression):
@@ -189,6 +247,16 @@ class RawIntExpression(IntExpression):
 
     def __init__(self, value: int) -> None:
         self._value = value
+
+    def __add__(self, other: Union['IntExpression', int]) -> 'IntExpression':
+        if isinstance(other, int):
+            return RawIntExpression(self._value + other)
+        return Add(self, other)
+
+    def __sub__(self, other: Union['IntExpression', int]) -> 'IntExpression':
+        if isinstance(other, int):
+            return RawIntExpression(self._value - other)
+        return Sub(self, other)
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
@@ -231,6 +299,25 @@ class Inc(IntExpression):
         return translator.viper.Add(
             value, translator.viper.IntLit(1, position, info), position,
             info)
+
+
+class CondInc(IntExpression):
+    """Some expression + 1 if condition holds."""
+
+    def __init__(
+            self, condition: 'BoolExpression', value: IntExpression) -> None:
+        self._condition = condition
+        self._value = value
+        self._increased_value = value + 1
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        condition = self._condition.translate(translator, ctx, position, info)
+        value = self._value.translate(translator, ctx, position, info)
+        increased_value = self._increased_value.translate(
+            translator, ctx, position, info)
+        return translator.viper.CondExp(
+            condition, increased_value, value, position, info)
 
 
 class BoolExpression(Expression):
@@ -279,6 +366,28 @@ class Not(BoolExpression):
                   position: Position, info: Info) -> Expr:
         value = self._value.translate(translator, ctx, position, info)
         return translator.viper.Not(value, position, info)
+
+
+class ForPerm(BoolExpression):
+    """ForPerm expression."""
+
+    def __init__(
+            self, var_name: str, targets: List['Predicate'],
+            body: BoolExpression) -> None:
+        self._var_name = var_name
+        self._targets = targets
+        self._body = body
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        var = translator.viper.LocalVarDecl(
+            self._var_name, translator.viper.Ref, position, info)
+        targets = [
+            target.translate(translator, ctx, position, info)
+            for target in self._targets]
+        body = self._body.translate(translator, ctx, position, info)
+        return translator.viper.ForPerm(
+            var, targets, body, position, info)
 
 
 class PythonBoolExpression(BoolExpression):
@@ -821,3 +930,18 @@ class Assign(Statement):
         value = self._value.translate(translator, ctx, position, info)
         return translator.viper.LocalVarAssign(
             self._var.ref(), value, position, info)
+
+
+class Predicate(Node):
+    """Bodyless predicate with one ``Ref`` argument definition."""
+
+    def __init__(self, name: str, var_name: str) -> None:
+        self._name = name
+        self._var_name = var_name
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        var = translator.viper.LocalVarDecl(
+            self._var_name, translator.viper.Ref, position, info)
+        return translator.viper.Predicate(
+            self._name, [var], None, position, info)

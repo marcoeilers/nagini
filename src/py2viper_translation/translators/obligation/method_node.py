@@ -1,16 +1,24 @@
 """Code for constructing Silver Method nodes with obligation stuff."""
 
 
+import ast
+
+from typing import List
+
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
+    Expr,
     Info,
     Method,
     Position,
+    Stmt,
+    VarDecl,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.obligation.manager import (
@@ -24,8 +32,10 @@ from py2viper_translation.translators.obligation.obligation_info import (
 class ObligationMethod:
     """Info for generating Silver ``Method`` AST node."""
 
-    def __init__(self, name, args, returns, pres, posts,
-                 local_vars, body) -> None:
+    def __init__(
+            self, name: str, args: List[VarDecl], returns: List[VarDecl],
+            pres: List[Expr], posts: List[Expr], local_vars: List[VarDecl],
+            body: List[Stmt]) -> None:
         self.name = name
         self.args = args
         self.returns = returns
@@ -34,17 +44,21 @@ class ObligationMethod:
         self.local_vars = local_vars
         self.body = body
 
-    def prepend_args(self, args) -> None:
+    def prepend_args(self, args: List[VarDecl]) -> None:
         """Prepend ``args`` to the argument list."""
-        self.args = args + self.args
+        self.args[0:0] = args
 
-    def prepend_body(self, statements) -> None:
+    def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
-        self.body = statements + self.body
+        self.body[0:0] = statements
 
-    def prepend_precondition(self, preconditions) -> None:
+    def prepend_precondition(self, preconditions: List[Expr]) -> None:
         """Prepend ``preconditions`` to precondition list."""
-        self.pres = preconditions + self.pres
+        self.pres[0:0] = preconditions
+
+    def append_precondition(self, precondition: Expr) -> None:
+        """Append ``precondition`` to precondition list."""
+        self.pres.append(precondition)
 
     def add_local(self, var: PythonVar) -> None:
         """Add local variable to variables list."""
@@ -92,8 +106,8 @@ class ObligationMethodNodeConstructor:
         if not self._need_skip_body():
             self._set_up_measures()
             self._add_book_keeping_vars()
-        # TODO: self._add_leak_check()
-        # TODO: Finish implementation.
+        self._add_caller_leak_check()
+        # TODO: self._add_body_leak_check()
 
     def _is_body_native_silver(self) -> bool:
         """Check if body is already in Silver."""
@@ -152,6 +166,39 @@ class ObligationMethodNodeConstructor:
             self._obligation_info.original_must_terminate_var)
         self._obligation_method.add_local(
             self._obligation_info.increased_must_terminate_var)
+
+    def _add_caller_leak_check(self) -> None:
+        """Add a leak check.
+
+        Check that if callee is not terminating, caller has no
+        obligations.
+        """
+        must_terminate = self._obligation_manager.must_terminate_obligation
+        if self._python_method.interface:
+            count = expr.RawIntExpression(2)
+        else:
+            instances = self._obligation_info.get_precondition_instances(
+                must_terminate.identifier())
+            count = expr.RawIntExpression(len(instances) + 1)
+        cthread = self._obligation_info.current_thread_var
+        predicate = must_terminate.create_predicate_access(cthread)
+        reference_name = self._python_method.get_fresh_name('_r')
+        check = expr.Implies(
+            expr.CurrentPerm(predicate) == expr.IntegerPerm(count),
+            self._obligation_manager.create_leak_check(reference_name))
+        if self._python_method.node is None:
+            # TODO: Handle interface methods properly.
+            node = ast.AST()
+            node.lineno = 0
+            node.col_offset = 0
+        else:
+            node = self._python_method.node
+        position = self._translator.to_position(
+            node, self._ctx, rules=rules.OBLIGATION_CALL_LEAK_CHECK_FAIL)
+        info = self._translator.to_info(["Caller side leak check"], self._ctx)
+        precondition = check.translate(
+            self._translator, self._ctx, position, info)
+        self._obligation_method.append_precondition(precondition)
 
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:

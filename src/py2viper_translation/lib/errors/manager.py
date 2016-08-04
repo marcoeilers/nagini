@@ -60,16 +60,22 @@ class ErrorManager:
             return self._items[node_id]
         return None
 
-    def _convert_error(
-            self, error: 'AbstractVerificationError') -> Error:
-
-        reason_item = self._get_item(error.reason().offendingNode().pos())
-        position = error.pos()
-        rules = {}      # type: Rules
+    def _get_conversion_rules(
+            self, position: 'ast.AbstractSourcePosition') -> Optional[Rules]:
         if hasattr(position, 'id'):
             node_id = position.id()
             if node_id in self._conversion_rules:
-                rules = self._conversion_rules[node_id]
+                return self._conversion_rules[node_id]
+        return None
+
+    def _convert_error(
+            self, error: 'AbstractVerificationError') -> Error:
+        reason_pos = error.reason().offendingNode().pos()
+        reason_item = self._get_item(reason_pos)
+        position = error.pos()
+        rules = self._get_conversion_rules(position)
+        if rules is None:
+            rules = self._get_conversion_rules(reason_pos) or {}
         error_item = self._get_item(position)
         if error_item:
             return Error(error, rules, reason_item, error_item.node,

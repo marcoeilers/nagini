@@ -128,14 +128,31 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         missing permission to ``MustTerminate``. For example, this can
         happen when non-terminating method calls a terminating one.
         """
+        predicate = self._get_must_terminate_predicate()
+
+        # Check that we have an expected amount of MustTerminate
+        # permission.
+        # This assert is for testing purposes only. It can be removed as
+        # soon as we are sure that obligation encoding works.
+        assertion = expr.Assert(expr.BigOr([
+            expr.CurrentPerm(predicate) == expr.NoPerm(),
+            expr.CurrentPerm(predicate) == expr.FullPerm(),
+        ]))
+        info = self._to_info(
+            'Check that we have expected amount of MustTerminate.')
+        self._append_statement(assertion, info=info)
+
+        # Inhale additional MustTerminate permission so that we have the
+        # amount mentioned in the precondition + 1.
         if self._is_axiomatized_target():
             count = expr.RawIntExpression(1)
         else:
             instances = self._target_obligation_info.get_precondition_instances(
                 self._must_terminate.identifier())
             count = expr.RawIntExpression(len(instances))
-        predicate = self._get_must_terminate_predicate()
-        inhale = expr.Inhale(expr.Acc(predicate, expr.IntegerPerm(count)))
+        inc_count = expr.CondInc(
+            expr.CurrentPerm(predicate) == expr.NoPerm(), count)
+        inhale = expr.Inhale(expr.Acc(predicate, expr.IntegerPerm(inc_count)))
         info = self._to_info('Inhale additional MustTerminate amount.')
         self._append_statement(inhale, info=info)
 

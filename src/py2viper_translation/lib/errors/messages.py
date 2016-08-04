@@ -88,4 +88,7 @@ REASONS = {
         lambda n: ('Loop does not promise to terminate.'),
     'must_terminate.loop_promise_not_kept':
         lambda n: ('Loop does not keep promise to terminate.'),
+    'caller.has_unsatisfied_obligations':
+        lambda n: ('Callee {} might not take all unsatisfied obligations '
+                   'from the caller.'.format(get_target_name(n))),
 }
