@@ -49,6 +49,14 @@ OBLIGATION_BODY_LEAK_CHECK_FAIL = {
     ('postcondition.violated', 'assertion.false'):
         ('leak_check.failed', 'method_body.leaks_obligations')
 }
+OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL = {
+    ('invariant.not.established', 'assertion.false'):
+        ('leak_check.failed', 'loop_context.has_unsatisfied_obligations')
+}
+OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL = {
+    ('invariant.not.preserved', 'assertion.false'):
+        ('leak_check.failed', 'loop_body.leaks_obligations')
+}
 
 
 __all__ = (
@@ -58,4 +66,11 @@ __all__ = (
     'TERMINATION_CHECK_GAP_ENABLED',
     'TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED',
     'OBLIGATION_MEASURE_NON_POSITIVE',
+    'OBLIGATION_MUST_TERMINATE_NOT_TAKEN',
+    'OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING',
+    'OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL',
+    'OBLIGATION_CALL_LEAK_CHECK_FAIL',
+    'OBLIGATION_BODY_LEAK_CHECK_FAIL',
+    'OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL',
+    'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
 )
