@@ -60,6 +60,10 @@ class ObligationMethod:
         """Append ``precondition`` to precondition list."""
         self.pres.append(precondition)
 
+    def append_postcondition(self, postcondition: Expr) -> None:
+        """Append ``postcondition`` to postcondition list."""
+        self.posts.append(postcondition)
+
     def add_local(self, var: PythonVar) -> None:
         """Add local variable to variables list."""
         self.local_vars.append(var.decl)
@@ -106,8 +110,8 @@ class ObligationMethodNodeConstructor:
         if not self._need_skip_body():
             self._set_up_measures()
             self._add_book_keeping_vars()
+            self._add_body_leak_check()
         self._add_caller_leak_check()
-        # TODO: self._add_body_leak_check()
 
     def _is_body_native_silver(self) -> bool:
         """Check if body is already in Silver."""
@@ -129,7 +133,8 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
-        cthread = expr.VarRef(self._obligation_info.current_thread_var)
+        cthread_var = self._obligation_info.current_thread_var
+        cthread = expr.VarRef(cthread_var)
         measure_map = self._obligation_info.caller_measure_map
         measures = expr.VarRef(measure_map.get_var())
         preconditions = [
@@ -145,10 +150,14 @@ class ObligationMethodNodeConstructor:
                     obligation.generate_axiomatized_preconditions(
                         self._obligation_info,
                         self._python_method.interface_dict))
-        self._obligation_method.prepend_precondition([
+        translated = [
             precondition.translate(
                 self._translator, self._ctx, self._position, self._info)
-            for precondition in preconditions])
+            for precondition in preconditions]
+        translated.append(self._translator.var_type_check(
+            cthread_var.sil_name, cthread_var.type, self._position,
+            self._ctx))
+        self._obligation_method.prepend_precondition(translated)
 
     def _set_up_measures(self) -> None:
         """Create and initialize method's measure map."""
@@ -167,6 +176,24 @@ class ObligationMethodNodeConstructor:
         self._obligation_method.add_local(
             self._obligation_info.increased_must_terminate_var)
 
+    def _add_body_leak_check(self) -> None:
+        """Add a leak check.
+
+        Check that method body does not leak obligations.
+        """
+        reference_name = self._python_method.get_fresh_name('_r')
+        check = expr.InhaleExhale(
+            expr.TrueLit(),
+            self._obligation_manager.create_leak_check(reference_name))
+        node = self._python_method.node
+        assert node
+        position = self._translator.to_position(
+            node, self._ctx, rules=rules.OBLIGATION_BODY_LEAK_CHECK_FAIL)
+        info = self._translator.to_info(["Body leak check."], self._ctx)
+        postcondition = check.translate(
+            self._translator, self._ctx, position, info)
+        self._obligation_method.append_postcondition(postcondition)
+
     def _add_caller_leak_check(self) -> None:
         """Add a leak check.
 
@@ -183,9 +210,9 @@ class ObligationMethodNodeConstructor:
         cthread = self._obligation_info.current_thread_var
         predicate = must_terminate.create_predicate_access(cthread)
         reference_name = self._python_method.get_fresh_name('_r')
-        check = expr.Implies(
+        check = expr.InhaleExhale(expr.TrueLit(), expr.Implies(
             expr.CurrentPerm(predicate) == expr.IntegerPerm(count),
-            self._obligation_manager.create_leak_check(reference_name))
+            self._obligation_manager.create_leak_check(reference_name)))
         if self._python_method.node is None:
             # TODO: Handle interface methods properly.
             node = ast.AST()
