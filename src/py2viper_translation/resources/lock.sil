@@ -1,0 +1,24 @@
+field MustReleaseBounded: Int
+field MustReleaseUnbounded: Int
+
+
+method Lock___init__(self: Ref)
+{
+}
+
+method Lock_acquire(self: Ref)
+    // TODO: Implement waitlevels.
+    requires perm(self.MustReleaseBounded) == none
+    requires perm(self.MustReleaseUnbounded) == none
+    ensures acc(self.MustReleaseUnbounded)
+{
+    assume false
+}
+
+method Lock_release(self: Ref)
+    requires (perm(self.MustReleaseBounded) > none ?
+              acc(self.MustReleaseBounded) :
+              acc(self.MustReleaseUnbounded))
+{
+    assume false
+}

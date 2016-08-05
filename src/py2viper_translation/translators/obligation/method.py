@@ -59,7 +59,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
             ctx: Context) -> expr.InhaleExhale:
         return obligation_instance.get_use_method(ctx)
 
-    def create_method_node(
+    def create_method_node(     # pylint: disable=too-many-arguments
             self, ctx: Context, name: str,
             original_args: List[VarDecl], returns: List[VarDecl],
             pres: List[Expr], posts: List[Expr],

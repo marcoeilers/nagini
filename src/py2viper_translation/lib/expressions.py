@@ -80,19 +80,20 @@ class PredicateAccess(Location):
 class FieldAccess(Location):
     """Field access."""
 
-    def __init__(self, var: PythonVar, field_name: str,
+    def __init__(self, target: 'RefExpression', field_name: str,
                  field_type: 'Type') -> None:
-        self._var = var
+        self._target = target
         self._field_name = field_name
         self._field_type = field_type
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
+        target = self._target.translate(translator, ctx, position, info)
         field = translator.viper.Field(
             self._field_name, self._field_type.translate(translator),
             position, info)
         return translator.viper.FieldAccess(
-            self._var.ref(), field, position, info)
+            target, field, position, info)
 
 
 class Acc(Expression):
@@ -945,3 +946,17 @@ class Predicate(Node):
             self._var_name, translator.viper.Ref, position, info)
         return translator.viper.Predicate(
             self._name, [var], None, position, info)
+
+
+class Field(Node):
+    """Field definition."""
+
+    def __init__(self, name: str, typ: Type) -> None:
+        self._name = name
+        self._type = typ
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        typ = self._type.translate(translator)
+        return translator.viper.Field(
+            self._name, typ, position, info)

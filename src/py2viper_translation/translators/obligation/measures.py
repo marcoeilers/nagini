@@ -100,7 +100,7 @@ class MeasureMap:
     @property
     def _contents_access(self) -> expr.FieldAccess:
         return expr.FieldAccess(
-            self._map_var, 'Measure$acc', expr.SeqType(expr.REF))
+            expr.VarRef(self._map_var), 'Measure$acc', expr.SeqType(expr.REF))
 
     def _create_measure_set_call(
             self, obligation_instance: ObligationInstance,

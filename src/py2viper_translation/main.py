@@ -54,7 +54,7 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
     sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
-                 'func_triple.sil', 'measures.sil']
+                 'func_triple.sil', 'measures.sil', 'lock.sil']
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
