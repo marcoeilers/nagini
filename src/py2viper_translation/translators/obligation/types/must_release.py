@@ -1,4 +1,4 @@
-"""``MustInvoke`` obligation implementation."""
+"""``MustRelease`` obligation implementation."""
 
 
 import ast
@@ -19,18 +19,17 @@ from py2viper_translation.translators.obligation.types.base import (
 )
 
 
-_OBLIGATION_NAME = 'MustInvoke'
-_BOUNDED_PREDICATE_NAME = _OBLIGATION_NAME + 'Bounded'
-_UNBOUNDED_PREDICATE_NAME = _OBLIGATION_NAME + 'Unbounded'
-_CREDIT_PREDICATE_NAME = _OBLIGATION_NAME + 'Credit'
+_OBLIGATION_NAME = 'MustRelease'
+_BOUNDED_FIELD_NAME = _OBLIGATION_NAME + 'Bounded'
+_UNBOUNDED_FIELD_NAME = _OBLIGATION_NAME + 'Unbounded'
 
 
-class MustInvokeObligationInstance(
+class MustReleaseObligationInstance(
         InexhaleObligationInstanceMixin, ObligationInstance):
-    """Class representing instance of ``MustInvoke`` obligation."""
+    """Class representing instance of ``MustRelease`` obligation."""
 
     def __init__(
-            self, obligation: 'MustInvokeObligation', node: ast.expr,
+            self, obligation: 'MustReleaseObligation', node: ast.expr,
             measure: Optional[ast.expr], target: ast.expr) -> None:
         super().__init__(obligation, node)
         self._measure = measure
@@ -38,9 +37,10 @@ class MustInvokeObligationInstance(
 
     def _get_inexhale(self) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
-            expr.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
-            expr.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),
-            expr.PredicateAccess(_CREDIT_PREDICATE_NAME, self.get_target()))
+            expr.FieldAccess(
+                self.get_target(), _BOUNDED_FIELD_NAME, expr.INT),
+            expr.FieldAccess(
+                self.get_target(), _UNBOUNDED_FIELD_NAME, expr.INT))
 
     def is_fresh(self) -> bool:
         return self._measure is None
@@ -53,14 +53,13 @@ class MustInvokeObligationInstance(
         return expr.PythonRefExpression(self._target)
 
 
-class MustInvokeObligation(Obligation):
-    """Class representing ``MustInvoke`` obligation."""
+class MustReleaseObligation(Obligation):
+    """Class representing ``MustRelease`` obligation."""
 
     def __init__(self) -> None:
-        super().__init__([
-            _BOUNDED_PREDICATE_NAME,
-            _UNBOUNDED_PREDICATE_NAME,
-            _CREDIT_PREDICATE_NAME], [])
+        super().__init__([], [
+            _BOUNDED_FIELD_NAME,
+            _UNBOUNDED_FIELD_NAME])
 
     def identifier(self) -> str:
         return _OBLIGATION_NAME
@@ -68,13 +67,12 @@ class MustInvokeObligation(Obligation):
     def check_node(
             self, node: ast.Call,
             obligation_info: 'PythonMethodObligationInfo',
-            method: PythonMethod) -> Optional[MustInvokeObligationInstance]:
-        # TODO: Add support for ctoken.
+            method: PythonMethod) -> Optional[MustReleaseObligationInstance]:
         if (isinstance(node.func, ast.Name) and
-                node.func.id == 'token'):
+                node.func.id == _OBLIGATION_NAME):
             target = node.args[0]
             measure = node.args[1] if len(node.args) > 1 else None
-            instance = MustInvokeObligationInstance(
+            instance = MustReleaseObligationInstance(
                 self, node, measure, target)
             return instance
         else:
@@ -87,8 +85,6 @@ class MustInvokeObligation(Obligation):
 
     def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
         return [
-            self._create_predicate_for_perm(
-                _BOUNDED_PREDICATE_NAME, var_name),
-            self._create_predicate_for_perm(
-                _UNBOUNDED_PREDICATE_NAME, var_name),
+            self._create_field_for_perm(_BOUNDED_FIELD_NAME, var_name),
+            self._create_field_for_perm(_UNBOUNDED_FIELD_NAME, var_name),
         ]

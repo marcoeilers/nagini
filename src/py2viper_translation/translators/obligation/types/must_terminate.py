@@ -102,7 +102,7 @@ class MustTerminateObligation(Obligation):
     """Class representing ``MustTerminate`` obligation."""
 
     def __init__(self) -> None:
-        super().__init__([_PREDICATE_NAME])
+        super().__init__([_PREDICATE_NAME], [])
 
     def identifier(self) -> str:
         return _OBLIGATION_NAME
@@ -138,4 +138,4 @@ class MustTerminateObligation(Obligation):
             return []
 
     def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
-        return [self._create_leak_for_perm(_PREDICATE_NAME, var_name)]
+        return [self._create_predicate_for_perm(_PREDICATE_NAME, var_name)]

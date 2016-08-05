@@ -58,8 +58,9 @@ class ObligationInstance(abc.ABC):
 class Obligation(abc.ABC):
     """A base class for all obligations."""
 
-    def __init__(self, predicate_names) -> None:
+    def __init__(self, predicate_names, field_names) -> None:
         self._predicate_names = predicate_names
+        self._field_names = field_names
 
     @abc.abstractmethod
     def identifier(self) -> str:
@@ -89,12 +90,20 @@ class Obligation(abc.ABC):
         :param var_name: variable name to be used in ``ForPerm``
         """
 
-    def _create_leak_for_perm(
+    def _create_predicate_for_perm(
             self, predicate_name: str, var_name: str) -> expr.ForPerm:
-        """Create a Forperm expression for use in leak check."""
+        """Create a ForPerm expression with predicate for use in leak check."""
         return expr.ForPerm(
             var_name,
             [expr.Predicate(predicate_name, var_name)],
+            expr.FalseLit())
+
+    def _create_field_for_perm(
+            self, field_name: str, var_name: str) -> expr.ForPerm:
+        """Create a ForPerm expression with field for use in leak check."""
+        return expr.ForPerm(
+            var_name,
+            [expr.Field(field_name, expr.INT)],
             expr.FalseLit())
 
     def create_predicates(
@@ -109,3 +118,16 @@ class Obligation(abc.ABC):
             predicate.translate(translator, None, position, info)
             for predicate in predicates]
         return translated_predicates
+
+    def create_fields(
+            self, translator: CommonTranslator) -> List[Predicate]:
+        """Create fields that are used to represent this obligation."""
+        position = translator.viper.NoPosition
+        info = translator.viper.NoInfo
+        fields = [
+            expr.Field(name, expr.INT)
+            for name in self._field_names]
+        translated_fields = [
+            field.translate(translator, None, position, info)
+            for field in fields]
+        return translated_fields

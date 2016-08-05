@@ -116,9 +116,10 @@ class ObligationTranslator(CommonTranslator):
         this preamble.
         """
         predicates = self._obligation_manager.create_predicates(self)
-        return predicates, []
+        fields = self._obligation_manager.create_fields(self)
+        return predicates, fields
 
-    def create_method_node(
+    def create_method_node(     # pylint: disable=too-many-arguments
             self, ctx: Context, name: str,
             args: List[VarDecl], returns: List[VarDecl],
             pres: List[Expr], posts: List[Expr],
