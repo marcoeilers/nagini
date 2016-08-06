@@ -29,11 +29,8 @@ from py2viper_translation.translators.obligation.method_call_node import (
     ObligationMethodCall,
     ObligationMethodCallNodeConstructor,
 )
-from py2viper_translation.translators.obligation.types.must_invoke import (
-    MustInvokeObligationInstance,
-)
-from py2viper_translation.translators.obligation.types.must_terminate import (
-    MustTerminateObligationInstance,
+from py2viper_translation.translators.obligation.types.base import (
+    ObligationInstance,
 )
 from py2viper_translation.translators.obligation.obligation_info import (
     BaseObligationInfo,
@@ -49,13 +46,8 @@ class MethodObligationTranslator(CommonObligationTranslator):
     def _get_obligation_info(self, ctx: Context) -> BaseObligationInfo:
         return ctx.actual_function.obligation_info
 
-    def _create_must_terminate_use(
-            self, obligation_instance: MustTerminateObligationInstance,
-            ctx: Context) -> expr.InhaleExhale:
-        return obligation_instance.get_use_method(ctx)
-
-    def _create_must_invoke_use(
-            self, obligation_instance: MustInvokeObligationInstance,
+    def _create_obligation_instance_use(
+            self, obligation_instance: ObligationInstance,
             ctx: Context) -> expr.InhaleExhale:
         return obligation_instance.get_use_method(ctx)
 
