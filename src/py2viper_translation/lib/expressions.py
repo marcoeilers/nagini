@@ -96,27 +96,6 @@ class FieldAccess(Location):
             target, field, position, info)
 
 
-class Acc(Expression):
-    """Access to specific location."""
-
-    def __init__(
-            self, location: Location,
-            perm: 'PermExpression' = None) -> None:
-        self._location = location
-        self._perm = perm or FullPerm()
-
-    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
-                  position: Position, info: Info) -> Expr:
-        location = self._location.translate(translator, ctx, position, info)
-        perm = self._perm.translate(translator, ctx, position, info)
-        if isinstance(self._location, PredicateAccess):
-            return translator.viper.PredicateAccessPredicate(
-                location, perm, position, info)
-        else:
-            return translator.viper.FieldAccessPredicate(
-                location, perm, position, info)
-
-
 class RefExpression(Expression):
     """A base class for all reference expressions."""
 
@@ -431,6 +410,27 @@ class InhaleExhale(BoolExpression):
         exhale = self._exhale.translate(translator, ctx, position, info)
         return translator.viper.InhaleExhaleExp(
             inhale, exhale, position, info)
+
+
+class Acc(BoolExpression):
+    """Access to specific location."""
+
+    def __init__(
+            self, location: Location,
+            perm: 'PermExpression' = None) -> None:
+        self._location = location
+        self._perm = perm or FullPerm()
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        location = self._location.translate(translator, ctx, position, info)
+        perm = self._perm.translate(translator, ctx, position, info)
+        if isinstance(self._location, PredicateAccess):
+            return translator.viper.PredicateAccessPredicate(
+                location, perm, position, info)
+        else:
+            return translator.viper.FieldAccessPredicate(
+                location, perm, position, info)
 
 
 class Type:

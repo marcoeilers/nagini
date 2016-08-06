@@ -3,10 +3,11 @@
 
 import abc
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules, rules
 
 
 class ObligationInhaleExhale:
@@ -45,12 +46,16 @@ class ObligationInhaleExhale:
     def _credit_acc(self) -> expr.Acc:
         return expr.Acc(self._credit)
 
-    def _construct_inhale(self, fresh: bool) -> expr.Acc:
+    def _construct_inhale(
+            self, fresh: bool,
+            measure_positive_check: Optional[expr.BoolExpression]) -> expr.Acc:
         """Construct obligation inhale."""
         if fresh:
             return self._unbounded_acc
-        else:
+        elif measure_positive_check is None:
             return self._bounded_acc
+        else:
+            return expr.BigAnd([self._bounded_acc, measure_positive_check])
 
     def _construct_unbounded_exhale(self) -> expr.BoolExpression:
         """Construct unbounded obligation exhale."""
@@ -77,23 +82,34 @@ class ObligationInhaleExhale:
             self._bounded_acc,
             self._construct_unbounded_exhale())
 
-    def construct_use_method(
-            self, measure_check: Optional[expr.BoolExpression],
-            fresh: bool, is_postconditon: bool) -> expr.BoolExpression:
-        """Construct inhale exhale pair for use in method contract."""
-        if fresh:
-            exhale = self._construct_unbounded_exhale()
-        else:
-            exhale = self._construct_bounded_exhale(
-                measure_check if not is_postconditon else None)
-        return expr.InhaleExhale(self._construct_inhale(fresh), exhale)
+    def construct_use_method_unbounded(self) -> expr.BoolExpression:
+        """Construct inhale exhale pair for use in method contract.
+
+        Used for fresh obligations.
+        """
+        return expr.InhaleExhale(
+            self._construct_inhale(True, None),
+            self._construct_unbounded_exhale())
+
+    def construct_use_method_bounded(
+            self, measure_check: expr.BoolExpression,
+            measure_positive_check: expr.BoolExpression,
+            is_postconditon: bool) -> expr.BoolExpression:
+        """Construct inhale exhale pair for use in method contract.
+
+        Used for bounded obligations.
+        """
+        return expr.InhaleExhale(
+            self._construct_inhale(False, measure_positive_check),
+            self._construct_bounded_exhale(
+                measure_check if not is_postconditon else None))
 
     def construct_use_loop(
             self, measure_check: expr.BoolExpression,
             loop_check_before_var: expr.BoolVar) -> expr.BoolExpression:
         """Construct inhale exhale pair for use in loop invariant."""
         return expr.InhaleExhale(
-            self._construct_inhale(False),
+            self._construct_inhale(False, None),
             expr.BoolCondExp(
                 loop_check_before_var,
                 self._construct_bounded_exhale(None),
@@ -107,26 +123,36 @@ class InexhaleObligationInstanceMixin(abc.ABC):
     def _get_inexhale(self) -> ObligationInhaleExhale:
         """Create ``ObligationInhaleExhale`` instance."""
 
-    def get_use_method(self, ctx: Context) -> expr.Expression:
+    def get_use_method(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         """Default implementation for obligation use in method contract."""
         inexhale = self._get_inexhale()
         obligation_info = ctx.actual_function.obligation_info
         if self.is_fresh():
-            measure_check = None
+            return [(inexhale.construct_use_method_unbounded(), None)]
         else:
             measure_check = obligation_info.caller_measure_map.check(
                 self.get_target(), self.get_measure())
-        return inexhale.construct_use_method(
-            measure_check,
-            self.is_fresh(),
-            ctx.obligation_context.is_translating_posts)
+            return [(inexhale.construct_use_method_bounded(
+                measure_check, self.get_measure() > 0,
+                ctx.obligation_context.is_translating_posts), None)]
 
-    def get_use_loop(self, ctx: Context) -> expr.Expression:
+    def get_use_loop(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         """Default implementation for obligation use in loop invariant."""
-        inexhale = self._get_inexhale()
         obligation_info = ctx.obligation_context.current_loop_info
+
+        # Positive measure.
+        loop_condition = obligation_info.construct_loop_condition()
+        positive_measure = expr.Implies(loop_condition, self.get_measure() > 0)
+
+        # Actual inhale / exhale.
+        inexhale = self._get_inexhale()
         measure_check = obligation_info.loop_measure_map.check(
             self.get_target(), self.get_measure())
-        return inexhale.construct_use_loop(
-            measure_check,
-            expr.BoolVar(obligation_info.loop_check_before_var))
+        inhale_exhale = inexhale.construct_use_loop(
+            measure_check, expr.BoolVar(obligation_info.loop_check_before_var))
+
+        return [
+            (positive_measure, rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE),
+            (inhale_exhale, None)]

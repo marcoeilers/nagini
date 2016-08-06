@@ -3,10 +3,14 @@ from threading import Lock
 from py2viper_contracts.contracts import (
     Assert,
     Invariant,
+    Implies,
     Requires,
     Ensures,
 )
 from py2viper_contracts.obligations import *
+
+
+# Check acquiring a lock.
 
 
 #:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
@@ -39,6 +43,28 @@ def acquire_5(l: Lock) -> None:
     l.acquire()
 
 
+# Check releasing a lock.
+
+
+def release_1(l: Lock) -> None:
+    Requires(MustRelease(l, 2))
+    l.release()
+
+
+def release_2(l: Lock) -> None:
+    #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(call.precondition:insufficient.permission)
+    l.release()
+
+
+def release_3(l: Lock) -> None:
+    Requires(l is not None)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    l.release()
+
+
+# Check termination of primitives.
+
+
 def terminating_1() -> None:
     Requires(MustTerminate(2))
     l = Lock()
@@ -56,4 +82,87 @@ def terminating_2(l: Lock) -> None:
 def terminating_3(l: Lock) -> None:
     Requires(MustRelease(l, 2))
     Requires(MustTerminate(2))
+    l.release()
+
+
+# Check that measures are positive in methods.
+
+
+def over_in_minus_one(l: Lock) -> None:
+    #:: Label(over_in_minus_one__MustRelease)
+    Requires(MustRelease(l, -1))
+    # Negative measure is equivalent to False.
+    Assert(False)
+
+
+def check_over_in_minus_one() -> None:
+    l = Lock()
+    l.acquire()
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one__MustRelease)
+    over_in_minus_one(l)
+
+
+def over_in_minus_one_conditional(l: Lock, b: bool) -> None:
+    Requires(Implies(b, MustRelease(l, 1)))
+    #:: Label(over_in_minus_one_conditional__MustRelease__False)
+    Requires(Implies(not b, MustRelease(l, -1)))
+    # Negative measure is equivalent to False.
+    Assert(Implies(not b, False))
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(False)
+
+
+def check_over_in_minus_one_conditional_1() -> None:
+    l = Lock()
+    l.acquire()
+    over_in_minus_one_conditional(l, True)
+
+
+def check_over_in_minus_one_conditional_2() -> None:
+    l = Lock()
+    l.acquire()
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one_conditional__MustRelease__False)
+    over_in_minus_one_conditional(l, False)
+
+
+# Check that measures are positive in loops.
+
+
+def test_measures_1() -> None:
+    l = Lock()
+    l.acquire()
+    while True:
+        #:: ExpectedOutput(invariant.not.established:obligation_measure.non_positive)
+        Invariant(MustRelease(l, -1))
+        a = 2
+
+
+def test_measures_2() -> None:
+    l = Lock()
+    l.acquire()
+    while False:
+        # Negative measure is ok because loop is never executed.
+        Invariant(MustRelease(l, -1))
+        a = 2
+    l.release()
+
+
+def test_measures_3() -> None:
+    l = Lock()
+    l.acquire()
+    i = 5
+    while i > 0:
+        Invariant(MustRelease(l, i))
+        i -= 1
+    l.release()
+
+
+def test_measures_4() -> None:
+    l = Lock()
+    l.acquire()
+    i = 5
+    while i > -1:
+        #:: ExpectedOutput(invariant.not.preserved:obligation_measure.non_positive)
+        Invariant(MustRelease(l, i))
+        i -= 1
     l.release()
