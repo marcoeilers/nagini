@@ -3,14 +3,16 @@
 
 import ast
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import expressions as expr
-from py2viper_translation.lib.context import Context
-from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
+)
+from py2viper_translation.translators.obligation.inexhale import (
+    InexhaleObligationInstanceMixin,
+    ObligationInhaleExhale,
 )
 from py2viper_translation.translators.obligation.types.base import (
     ObligationInstance,
@@ -38,7 +40,8 @@ def _create_method_exhale(
     return expr.Implies(check, expr.Acc(predicate))
 
 
-class MustTerminateObligationInstance(ObligationInstance):
+class MustTerminateObligationInstance(
+        InexhaleObligationInstanceMixin, ObligationInstance):
     """Class representing instance of ``MustTerminate`` obligation."""
 
     def __init__(
@@ -48,6 +51,11 @@ class MustTerminateObligationInstance(ObligationInstance):
         self._measure = measure
         self._target = target
 
+    def _get_inexhale(self) -> ObligationInhaleExhale:
+        return ObligationInhaleExhale(
+            _create_predicate_access(self._target),
+            max_one_inhale=True)
+
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.
 
@@ -56,49 +64,6 @@ class MustTerminateObligationInstance(ObligationInstance):
 
     def get_target(self) -> expr.RefExpression:
         return expr.VarRef(self._target)
-
-    def _create_permission_inhale(
-            self, predicate: expr.PredicateAccess) -> expr.BoolExpression:
-        return expr.Implies(
-            expr.CurrentPerm(predicate) == expr.NoPerm(),
-            expr.Acc(predicate))
-
-    def get_use_method(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
-        predicate = _create_predicate_access(self._target)
-
-        # Inhale part.
-        inhale = expr.BigAnd([
-            self.get_measure() > 0,
-            self._create_permission_inhale(predicate)
-        ])
-
-        # Exhale part.
-        exhale = _create_method_exhale(
-            ctx.actual_function.obligation_info,
-            self.get_measure())
-
-        return [(expr.InhaleExhale(inhale, exhale), None)]
-
-    def get_use_loop(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
-        predicate = _create_predicate_access(self._target)
-
-        # Measures positive.
-        loop_info = ctx.obligation_context.current_loop_info
-        loop_condition = loop_info.construct_loop_condition()
-        measures_positive = expr.Implies(
-            loop_condition, self.get_measure() > 0)
-
-        # Inhale part.
-        inhale = self._create_permission_inhale(predicate)
-
-        # Exhale part.
-        exhale = expr.TrueLit()
-
-        return [
-            (measures_positive, rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE),
-            (expr.InhaleExhale(inhale, exhale), None)]
 
 
 class MustTerminateObligation(Obligation):
