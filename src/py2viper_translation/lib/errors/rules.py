@@ -57,6 +57,12 @@ OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL = {
     ('invariant.not.preserved', 'assertion.false'):
         ('leak_check.failed', 'loop_body.leaks_obligations')
 }
+OBLIGATION_LOOP_MEASURE_NON_POSITIVE = {
+    ('invariant.not.established', 'assertion.false'):
+        ('invariant.not.established', 'obligation_measure.non_positive'),
+    ('invariant.not.preserved', 'assertion.false'):
+        ('invariant.not.preserved', 'obligation_measure.non_positive')
+}
 
 
 __all__ = (
@@ -73,4 +79,5 @@ __all__ = (
     'OBLIGATION_BODY_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
+    'OBLIGATION_LOOP_MEASURE_NON_POSITIVE',
 )

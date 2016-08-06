@@ -3,10 +3,11 @@
 
 import ast
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
@@ -62,7 +63,8 @@ class MustTerminateObligationInstance(ObligationInstance):
             expr.CurrentPerm(predicate) == expr.NoPerm(),
             expr.Acc(predicate))
 
-    def get_use_method(self, ctx: Context) -> expr.Expression:
+    def get_use_method(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         predicate = _create_predicate_access(self._target)
 
         # Inhale part.
@@ -76,9 +78,10 @@ class MustTerminateObligationInstance(ObligationInstance):
             ctx.actual_function.obligation_info,
             self.get_measure())
 
-        return expr.InhaleExhale(inhale, exhale)
+        return [(expr.InhaleExhale(inhale, exhale), None)]
 
-    def get_use_loop(self, ctx: Context) -> expr.Expression:
+    def get_use_loop(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         predicate = _create_predicate_access(self._target)
 
         # Measures positive.
@@ -93,9 +96,9 @@ class MustTerminateObligationInstance(ObligationInstance):
         # Exhale part.
         exhale = expr.TrueLit()
 
-        return expr.BigAnd([
-            measures_positive,
-            expr.InhaleExhale(inhale, exhale)])
+        return [
+            (measures_positive, rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE),
+            (expr.InhaleExhale(inhale, exhale), None)]
 
 
 class MustTerminateObligation(Obligation):

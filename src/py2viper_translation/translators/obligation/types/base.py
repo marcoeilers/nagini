@@ -4,10 +4,11 @@
 import abc
 import ast
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
@@ -47,11 +48,13 @@ class ObligationInstance(abc.ABC):
         """Return an expression to which obligation is attached."""
 
     @abc.abstractmethod
-    def get_use_method(self, ctx: Context) -> expr.Expression:
+    def get_use_method(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         """Get inhale exhale pair for use in method contract."""
 
     @abc.abstractmethod
-    def get_use_loop(self, ctx: Context) -> expr.Expression:
+    def get_use_loop(
+            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
         """Get inhale exhale pair for use in loop invariant."""
 
 

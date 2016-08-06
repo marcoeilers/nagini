@@ -68,7 +68,7 @@ def test_call_non_terminating_5() -> None:
     a = [1, 2, 3]
     i = 0
     for elem in a:
-        #:: ExpectedOutput(invariant.not.preserved:assertion.false)
+        #:: ExpectedOutput(invariant.not.preserved:obligation_measure.non_positive)
         Invariant(MustTerminate(len(a) - i))
         i += 1
     #:: OptionalOutput(leak_check.failed:must_terminate.not_taken)
@@ -80,7 +80,7 @@ def test_call_non_terminating_5() -> None:
 
 def test_measures_1() -> None:
     while True:
-        #:: ExpectedOutput(invariant.not.established:assertion.false)
+        #:: ExpectedOutput(invariant.not.established:obligation_measure.non_positive)
         Invariant(MustTerminate(-1))
         a = 2
 
@@ -102,7 +102,7 @@ def test_measures_3() -> None:
 def test_measures_4() -> None:
     i = 5
     while i > -1:
-        #:: ExpectedOutput(invariant.not.preserved:assertion.false)
+        #:: ExpectedOutput(invariant.not.preserved:obligation_measure.non_positive)
         Invariant(MustTerminate(i))
         i -= 1
 

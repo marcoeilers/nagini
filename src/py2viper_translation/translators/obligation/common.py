@@ -13,6 +13,7 @@ from py2viper_translation.lib.typedefs import (
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     InvalidProgramException,
+    join_expressions,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import TranslatorConfig
@@ -77,13 +78,20 @@ class CommonObligationTranslator(CommonTranslator):
                 raise InvalidProgramException(
                     node, 'obligation.fresh.in_precondition')
 
-        inhale_exhale = self._create_obligation_instance_use(
+        pairs = self._create_obligation_instance_use(
             obligation_instance, ctx)
 
-        position = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        expression = inhale_exhale.translate(self, ctx, position, info)
-        return ([], expression)
+        translated_expressions = []
+        for expression, rules in pairs:
+            position = self.to_position(node, ctx, rules=rules)
+            translated_expression = expression.translate(
+                self, ctx, position, info)
+            translated_expressions.append(translated_expression)
+        and_operator = (
+            lambda left, right:
+            self.viper.And(left, right, position, info))
+        return ([], join_expressions(and_operator, translated_expressions))
 
     def translate_must_invoke(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
