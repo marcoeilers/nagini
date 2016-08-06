@@ -37,3 +37,23 @@ def acquire_5(l: Lock) -> None:
     Requires(l is not None)
     Ensures(MustRelease(l, 10))
     l.acquire()
+
+
+def terminating_1() -> None:
+    Requires(MustTerminate(2))
+    l = Lock()
+
+
+def terminating_2(l: Lock) -> None:
+    Requires(l is not None)
+    Requires(MustTerminate(2))
+    # TODO: Figure out conditions under which it is sound to assume that
+    # acquire is terminating.
+    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    l.acquire()
+
+
+def terminating_3(l: Lock) -> None:
+    Requires(MustRelease(l, 2))
+    Requires(MustTerminate(2))
+    l.release()
