@@ -3,11 +3,13 @@ field MustReleaseUnbounded: Int
 
 
 method Lock___init__(self: Ref)
+    requires self != null
 {
 }
 
 method Lock_acquire(self: Ref)
     // TODO: Implement waitlevels.
+    requires self != null
     requires perm(self.MustReleaseBounded) == none
     requires perm(self.MustReleaseUnbounded) == none
     ensures acc(self.MustReleaseUnbounded)
@@ -16,6 +18,7 @@ method Lock_acquire(self: Ref)
 }
 
 method Lock_release(self: Ref)
+    requires self != null
     requires (perm(self.MustReleaseBounded) > none ?
               acc(self.MustReleaseBounded) :
               acc(self.MustReleaseUnbounded))
