@@ -183,3 +183,22 @@ def test_generation_1() -> None:
         Invariant(MustTerminate(5 - i))
         i += 1
     non_terminating()
+
+
+# Check that exhale always succeeds.
+
+
+def test_exhale_1() -> None:
+    i = 0
+    while i < 5:
+        Invariant(MustTerminate(5 - i))
+        Invariant(MustTerminate(6 - i))
+        i += 1
+
+
+def test_exhale_2() -> None:
+    i = 0
+    while i < 5:
+        Invariant(Implies(i > 0, MustTerminate(5 - i)))
+        Invariant(Implies(i > 0, MustTerminate(6 - i)))
+        i += 1

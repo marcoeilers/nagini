@@ -20,18 +20,29 @@ class ObligationInhaleExhale:
     """
 
     def __init__(
-            self, bounded: expr.Location, unbounded: expr.Location,
-            credit: Optional[expr.Location] = None) -> None:
+            self, bounded: expr.Location,
+            unbounded: Optional[expr.Location] = None,
+            credit: Optional[expr.Location] = None,
+            max_one_inhale: bool = False) -> None:
+        """Constructor.
+
+        :param max_one_inhale:
+            Indicates that at most one write permission to this
+            obligation can be inhaled.
+        """
         self._bounded = bounded
         self._unbounded = unbounded
         self._credit = credit
+        self._max_one_inhale = max_one_inhale
 
     @property
     def _unbounded_positive(self) -> expr.BoolExpression:
+        assert self._unbounded is not None
         return expr.CurrentPerm(self._unbounded) > expr.NoPerm()
 
     @property
     def _unbounded_acc(self) -> expr.Acc:
+        assert self._unbounded is not None
         return expr.Acc(self._unbounded)
 
     @property
@@ -44,6 +55,7 @@ class ObligationInhaleExhale:
 
     @property
     def _credit_acc(self) -> expr.Acc:
+        assert self._credit is not None
         return expr.Acc(self._credit)
 
     def _construct_inhale(
@@ -52,13 +64,21 @@ class ObligationInhaleExhale:
         """Construct obligation inhale."""
         if fresh:
             return self._unbounded_acc
-        elif measure_positive_check is None:
-            return self._bounded_acc
+        if self._max_one_inhale:
+            acc = expr.Implies(
+                expr.CurrentPerm(self._bounded) == expr.NoPerm(),
+                expr.Acc(self._bounded))
         else:
-            return expr.BigAnd([self._bounded_acc, measure_positive_check])
+            acc = self._bounded_acc
+        if measure_positive_check is None:
+            return acc
+        else:
+            return expr.BigAnd([acc, measure_positive_check])
 
     def _construct_unbounded_exhale(self) -> expr.BoolExpression:
         """Construct unbounded obligation exhale."""
+        if self._unbounded is None:
+            return expr.TrueLit()
         if self._credit is None:
             return self._unbounded_acc
         else:
