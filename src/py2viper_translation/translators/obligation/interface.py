@@ -84,6 +84,8 @@ class ObligationTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'MustTerminate':
             return self._translate_must_terminate(node, ctx)
+        elif func_name == 'MustRelease':
+            return self._translate_must_release(node, ctx)
         else:
             raise UnsupportedException(
                 node, 'Unsupported contract function.')
@@ -106,6 +108,14 @@ class ObligationTranslator(CommonTranslator):
                 node, 'obligation.must_terminate.in_postcondition')
         else:
             return self._method_translator.translate_must_terminate(node, ctx)
+
+    def _translate_must_release(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``MustRelease``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_release(node, ctx)
+        else:
+            return self._method_translator.translate_must_release(node, ctx)
 
     def get_obligation_preamble(
             self,
