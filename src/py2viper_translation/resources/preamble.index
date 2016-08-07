@@ -309,7 +309,8 @@
         },
         "acquire": {
             "args": ["Lock"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "release": {
             "args": ["Lock"],

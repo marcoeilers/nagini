@@ -70,12 +70,10 @@ def terminating_1() -> None:
     l = Lock()
 
 
+#:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
 def terminating_2(l: Lock) -> None:
     Requires(l is not None)
     Requires(MustTerminate(2))
-    # TODO: Figure out conditions under which it is sound to assume that
-    # acquire is terminating.
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
     l.acquire()
 
 
