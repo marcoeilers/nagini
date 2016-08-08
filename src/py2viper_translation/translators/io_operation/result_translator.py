@@ -139,7 +139,7 @@ class ResultTranslator:
 
     def _check(self) -> None:
         """Perform some well-formedness checks."""
-        if len(self._result_definitions) != len(self._result_instances):
+        if len(self._result_definitions) < len(self._result_instances):
             raise_invalid_operation_use('result_mismatch', self._node)
 
     def _create_result_contexts(self) -> List[IOOperationResult]:
