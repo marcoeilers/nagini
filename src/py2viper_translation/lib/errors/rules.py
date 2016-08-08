@@ -61,7 +61,9 @@ OBLIGATION_LOOP_MEASURE_NON_POSITIVE = {
     ('invariant.not.established', 'assertion.false'):
         ('invariant.not.established', 'obligation_measure.non_positive'),
     ('invariant.not.preserved', 'assertion.false'):
-        ('invariant.not.preserved', 'obligation_measure.non_positive')
+        ('invariant.not.preserved', 'obligation_measure.non_positive'),
+    ('not.wellformed', 'insufficient.permission'):
+        ('not.wellformed', 'loop_condition.not_framed_for_obligation_use'),
 }
 
 

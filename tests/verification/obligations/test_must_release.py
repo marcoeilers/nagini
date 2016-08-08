@@ -1,6 +1,7 @@
 from threading import Lock
 
 from py2viper_contracts.contracts import (
+    Acc,
     Assert,
     Invariant,
     Implies,
@@ -162,5 +163,45 @@ def test_measures_4() -> None:
     while i > -1:
         #:: ExpectedOutput(invariant.not.preserved:obligation_measure.non_positive)
         Invariant(MustRelease(l, i))
+        i -= 1
+    l.release()
+
+
+# Check that obligation encoding is properly framed.
+
+
+class A:
+
+    def __init__(self) -> None:
+        Ensures(Acc(self.steps) and self.steps == 0)
+        self.steps = 0  # type: int
+
+
+def test_loop_condition_framing_1() -> None:
+    a = A()
+    l = Lock()
+    l.acquire()
+    i = 5
+    #:: UnexpectedOutput(while.failed:insufficient.permission, /carbon/issue/70/)
+    while a.steps < 5:
+        #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)|MissingOutput(not.wellformed:loop_condition.not_framed_for_obligation_use, /carbon/issue/70/)
+        Invariant(MustRelease(l, i))
+        Invariant(Acc(a.steps))
+        Invariant(i == 5 - a.steps)
+        a.steps += 1
+        i -= 1
+    l.release()
+
+
+def test_loop_condition_framing_2() -> None:
+    a = A()
+    l = Lock()
+    l.acquire()
+    i = 5
+    while a.steps < 5:
+        Invariant(Acc(a.steps))
+        Invariant(MustRelease(l, i))
+        Invariant(i == 5 - a.steps)
+        a.steps += 1
         i -= 1
     l.release()

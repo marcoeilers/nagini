@@ -99,4 +99,7 @@ REASONS = {
                    'from the context.'),
     'loop_body.leaks_obligations':
         lambda n: ('Loop body might leak obligations.'),
+    'loop_condition.not_framed_for_obligation_use':
+        lambda n: ('Loop condition part {} is not framed at the point where '
+                   'obligation is used.'.format(pprint(n))),
 }
