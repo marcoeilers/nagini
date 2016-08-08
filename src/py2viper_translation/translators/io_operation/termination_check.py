@@ -133,8 +133,19 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         self._current_operation_node = None
 
     def _check_gap(self) -> None:
-        """Check that ``gap_io`` is disabled under termination condition."""
-        if self._current_operation.name == 'gap_io':
+        """Check that ``gap_io`` is disabled under termination condition.
+
+        .. note::
+
+            It is acceptable to have a gap that has no result::
+
+                gap_io(t1)
+
+            because the returned ``ctoken`` would be in unknown place
+            and could not be used.
+        """
+        if (self._current_operation.name == 'gap_io' and
+                len(self._current_operation_node.args) > 1):
             position = self._position(
                 rules.TERMINATION_CHECK_GAP_ENABLED)
             false = self._viper.FalseLit(position, self._no_info())
