@@ -1,3 +1,9 @@
+"""
+A variation of example 1 where client handling is performed in a
+separate function that in theory can be forked.
+"""
+
+
 from py2viper_contracts.contracts import (
     Assert,
     ContractOnly,
@@ -17,6 +23,8 @@ from py2viper_contracts.io_builtins import (
     Split,
     join_io,
     Join,
+    gap_io,
+    Gap,
 )
 Import('io_builtins')
 from py2viper_contracts.obligations import (
@@ -44,17 +52,32 @@ Import('library.py')
 
 
 @IOOperation
+def handle_client_io(
+        t_pre: Place,
+        client_socket: Socket) -> bool:
+    Terminates(True)
+    TerminationMeasure(3)
+    return IOExists4(Place, Place, Place, str)(
+        lambda t2, t3, t4, data: (
+            read_all_io(t_pre, client_socket, 1, data, t2) and
+            output_io(t2, client_socket, data, t3) and
+            close_io(t3, client_socket, t4) and
+            gap_io(t4)
+        )
+    )
+
+
+@IOOperation
 def listener_loop_io(
         t_pre: Place,
         server_socket: Socket) -> bool:
     Terminates(False)
-    return IOExists6(Place, Place, Place, Place, Socket, str)(
-        lambda t2, t3, t4, t5, client_socket, data: (
+    return IOExists4(Place, Place, Place, Socket)(
+        lambda t2, t3, t4, client_socket: (
             accept_io(t_pre, server_socket, client_socket, t2) and
-            read_all_io(t2, client_socket, 1, data, t3) and
-            output_io(t3, client_socket, data, t4) and
-            close_io(t4, client_socket, t5) and
-            listener_loop_io(t5, server_socket)
+            split_io(t2, t3, t4) and
+            handle_client_io(t3, client_socket) and
+            listener_loop_io(t4, server_socket)
         )
     )
 
@@ -69,6 +92,33 @@ def listener_io(
             listener_loop_io(t2, server_socket)
         )
     )
+
+
+def handle_client(client_socket: Socket, t1: Place) -> None:
+    Requires(client_socket is not None)
+    Requires(token(t1, 2) and handle_client_io(t1, client_socket))
+    Requires(MustTerminate(2))
+
+    Open(handle_client_io(t1, client_socket))
+
+    data, t4 = read_all(t1, client_socket, timeout=1)
+
+    Open(output_io(t4, client_socket, data))
+
+    if data is not None:
+        t5, t6 = Split(t4)
+
+        t7 = print_int(t6, get_address(client_socket))
+
+        t8 = send(t5, client_socket, data)
+
+        t9 = Join(t8, t7)
+    else:
+        t9 = NoOp(t4)
+
+    t10 = close(t9, client_socket)
+
+    Gap(t10)
 
 
 def run(t1: Place) -> None:
@@ -90,19 +140,6 @@ def run(t1: Place) -> None:
 
         client_socket, t3 = accept(t_loop, server_socket)
 
-        data, t4 = read_all(t3, client_socket, timeout=1)
+        t4, t_loop = Split(t3)
 
-        Open(output_io(t4, client_socket, data))
-
-        if data is not None:
-            t5, t6 = Split(t4)
-
-            t7 = print_int(t6, get_address(client_socket))
-
-            t8 = send(t5, client_socket, data)
-
-            t9 = Join(t8, t7)
-        else:
-            t9 = NoOp(t4)
-
-        t_loop = close(t9, client_socket)
+        handle_client(client_socket, t4)
