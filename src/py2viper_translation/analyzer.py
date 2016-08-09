@@ -364,7 +364,7 @@ class Analyzer(ast.NodeVisitor):
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
-                    node.args[1])
+                    (node.args[1], self._aliases.copy()))
         if (isinstance(node.func, ast.Name) and
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(

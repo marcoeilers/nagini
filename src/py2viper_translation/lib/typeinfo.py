@@ -43,6 +43,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
                 return True
+            if node.callee.name == 'GhostException':
+                return True
         return False
 
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
@@ -58,8 +60,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if var is not None:
                 self.set_type(self.prefix + [var.name], self.type_of(var),
                               var.line, col(var))
-        for block in node.handlers:
-            block.accept(self)
+        super().visit_try_stmt(node)
 
     def visit_name_expr(self, node: mypy.nodes.NameExpr):
         if not node.name in LITERALS:

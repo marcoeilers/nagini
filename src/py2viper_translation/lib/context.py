@@ -18,6 +18,7 @@ class Context:
     def __init__(self) -> None:
         self.current_function = None
         self.current_class = None
+        self.current_contract_exception = None
         self.var_aliases = {}
         self.old_aliases = {}
         self.label_aliases = {}
