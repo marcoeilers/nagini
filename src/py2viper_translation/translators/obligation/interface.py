@@ -156,6 +156,5 @@ class ObligationTranslator(CommonTranslator):
         """Create obligation info for the method."""
         info = PythonMethodObligationInfo(
             self._obligation_manager, method, self)
-        info.traverse_preconditions()
-        info.traverse_postconditions()
+        info.traverse_contract()
         return info

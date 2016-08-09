@@ -191,7 +191,13 @@ class PythonMethodObligationInfo(BaseObligationInfo):
         self.increased_must_terminate_var = self._create_perm_var(
             INCREASED_MUST_TERMINATE_AMOUNT_NAME, translator)
 
-    def traverse_preconditions(self) -> None:
+    def traverse_contract(self) -> None:
+        """Collect all needed information about obligations."""
+        self._traverse_preconditions()
+        self._traverse_postconditions()
+        self._traverse_declared_exceptions()
+
+    def _traverse_preconditions(self) -> None:
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._precondition_instances
@@ -199,12 +205,21 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             self.traverse(precondition)
         self._current_instance_map = None
 
-    def traverse_postconditions(self) -> None:
+    def _traverse_postconditions(self) -> None:
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._postcondition_instances
         for postcondition, _ in self._method.postcondition:
             self.traverse(postcondition)
+        self._current_instance_map = None
+
+    def _traverse_declared_exceptions(self) -> None:
+        """Collect all needed information about obligations."""
+        assert self._current_instance_map is None
+        self._current_instance_map = self._postcondition_instances
+        for postconditions in self._method.declared_exceptions.values():
+            for postcondition, _ in postconditions:
+                self.traverse(postcondition)
         self._current_instance_map = None
 
     def get_precondition_instances(

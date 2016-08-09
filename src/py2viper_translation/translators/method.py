@@ -111,6 +111,7 @@ class MethodTranslator(CommonTranslator):
         """
         Translates the exceptional postconditions specified for 'method'.
         """
+        ctx.obligation_context.is_translating_posts = True
         posts = []
         error = self.viper.NeCmp(err_var,
                                  self.viper.NullLit(self.no_position(ctx),
@@ -129,14 +130,18 @@ class MethodTranslator(CommonTranslator):
             error_type_conds.append(has_type)
             condition = self.viper.And(error, has_type, self.no_position(ctx),
                                        self.no_info(ctx))
-            for post in method.declared_exceptions[exception]:
-                stmt, expr = self.translate_expr(post, ctx)
+            assert ctx.current_contract_exception is None
+            ctx.current_contract_exception = ctx.program.classes[exception]
+            for post, aliases in method.declared_exceptions[exception]:
+                with ctx.additional_aliases(aliases):
+                    stmt, expr = self.translate_expr(post, ctx)
                 if stmt:
                     raise InvalidProgramException(post, 'purity.violated')
                 expr = self.viper.Implies(condition, expr,
                                           self.to_position(post, ctx),
                                           self.no_info(ctx))
                 posts.append(expr)
+            ctx.current_contract_exception = None
 
         error_type_cond = None
         for type in error_type_conds:
@@ -151,6 +156,7 @@ class MethodTranslator(CommonTranslator):
                                             error_type_pos,
                                             self.no_info(ctx)))
 
+        ctx.obligation_context.is_translating_posts = False
         return posts
 
     def _create_typeof_pres(self, func: PythonMethod, is_constructor: bool,

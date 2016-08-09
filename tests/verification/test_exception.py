@@ -161,14 +161,12 @@ def nested(out: Container) -> None:
 
         try:
             raise MyException()
-            Assert(False)
         except MyException:
             out.value = 33
         except Exception:
             Assert(False)
         if out.value == 33:
             raise MyOtherException()
-            Assert(False)
         else:
             Assert(False)
         Assert(False)
@@ -183,14 +181,12 @@ def nested_2(out: Container) -> None:
 
         try:
             raise MyException()
-            out.value = 33
         except MyException:
             out.value = 34
         except Exception:
             Assert(False)
         if out.value == 33:
             raise MyOtherException()
-            Assert(False)
         else:
             #:: ExpectedOutput(assert.failed:assertion.false)
             Assert(False)
@@ -207,7 +203,6 @@ def nested_else_finally(out: Container) -> None:
 
         try:
             raise MyException()
-            Assert(False)
         except MyException as e:
             out.value = 33
         except Exception:
@@ -218,7 +213,6 @@ def nested_else_finally(out: Container) -> None:
             out.value += 1
         if out.value == 34:
             raise MyOtherException()
-            Assert(False)
         else:
             Assert(False)
         Assert(False)
@@ -234,7 +228,6 @@ def nested_else_finally_2(out: Container) -> None:
 
         try:
             raise MyException()
-            Assert(False)
         except MyException as e:
             out.value = 33
         except Exception:
@@ -245,7 +238,6 @@ def nested_else_finally_2(out: Container) -> None:
             out.value += 1
         if out.value == 33:
             raise MyOtherException()
-            Assert(False)
         else:
             #:: ExpectedOutput(assert.failed:assertion.false)
             Assert(False)
@@ -276,7 +268,6 @@ def nested_try_finally(out: Container) -> None:
             out.value += 1
         if out.value == 34:
             raise MyOtherException()
-            Assert(False)
         else:
             Assert(False)
         Assert(False)
@@ -305,7 +296,6 @@ def nested_try_finally_2(out: Container) -> None:
             out.value += 1
         if out.value == 33:
             raise MyOtherException()
-            Assert(False)
         else:
             #:: ExpectedOutput(assert.failed:assertion.false)
             Assert(False)
@@ -382,7 +372,6 @@ def exception_use(out: Container) -> None:
     Ensures(Acc(out.value) and out.value == 104)
     try:
         raise ParameterizedException(52)
-        Assert(False)
     except MyException as e:
         Assert(False)
     except ParameterizedException as e2:
@@ -401,7 +390,6 @@ def exception_use_2(out: Container, inp: bool) -> None:
             raise ParameterizedException(23)
         else:
             raise MyException()
-        Assert(False)
     except MyException as e:
         out.value = 36
     except ParameterizedException as e2:
@@ -421,7 +409,6 @@ def exception_use_3(out: Container, inp: bool) -> None:
             raise ParameterizedException(45)
         else:
             raise MyException()
-        Assert(False)
     except MyException as e:
         out.value = 36
     except ParameterizedException as e2:
