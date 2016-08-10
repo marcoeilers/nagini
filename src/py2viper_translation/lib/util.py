@@ -197,7 +197,7 @@ def is_io_existential(stmt: ast.AST) -> bool:
 def get_body_start_index(statements: List[ast.AST]) -> int:
     """
     Returns the index of the first statement that is not a method
-    contract.
+    or loop contract.
 
     .. note::
 
@@ -210,6 +210,8 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
             body_index += 1
         while is_io_existential(statements[body_index]):
             body_index += 1
+        while is_invariant(statements[body_index]):
+            body_index += 1
         while is_pre(statements[body_index]):
             body_index += 1
         while is_post(statements[body_index]):
@@ -217,7 +219,7 @@ def get_body_start_index(statements: List[ast.AST]) -> int:
         while is_exception_decl(statements[body_index]):
             body_index += 1
     except IndexError:
-        # This exception means that the method has only a contract.
+        # This exception means that the method/loop has only a contract.
         pass
     return body_index
 
