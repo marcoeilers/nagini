@@ -98,6 +98,23 @@ class ObligationTranslator(CommonTranslator):
         else:
             return self._method_translator.translate_must_invoke(node, ctx)
 
+    def translate_must_invoke_ctoken(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``ctoken``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_invoke_credit(
+                node, ctx)
+        elif ctx.obligation_context.is_translating_posts:
+            if ctx.actual_function.name != 'Gap':
+                raise InvalidProgramException(
+                    node, 'invalid.postcondition.ctoken_not_allowed')
+            else:
+                return self._method_translator.translate_must_invoke_credit(
+                    node, ctx)
+        else:
+            return self._method_translator.translate_must_invoke_credit(
+                node, ctx)
+
     def _translate_must_terminate(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to ``MustTerminate``."""
