@@ -69,7 +69,6 @@ class MustInvokeObligation(Obligation):
             self, node: ast.Call,
             obligation_info: 'PythonMethodObligationInfo',
             method: PythonMethod) -> Optional[MustInvokeObligationInstance]:
-        # TODO: Add support for ctoken.
         if (isinstance(node.func, ast.Name) and
                 node.func.id == 'token'):
             target = node.args[0]
@@ -92,3 +91,8 @@ class MustInvokeObligation(Obligation):
             self._create_predicate_for_perm(
                 _UNBOUNDED_PREDICATE_NAME, var_name),
         ]
+
+    def create_ctoken_use(self, node: ast.Call) -> expr.Acc:
+        """Create a ``ctoken`` use in contract."""
+        target = expr.PythonRefExpression(node.args[0])
+        return expr.Acc(expr.PredicateAccess(_CREDIT_PREDICATE_NAME, target))

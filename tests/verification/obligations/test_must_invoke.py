@@ -64,3 +64,19 @@ def test2(t: Place, value: int) -> None:
         Invariant(token(t, 1) and write_int_loop_io(t, value))
         Open(write_int_loop_io(t, value))
         t = write_int(t, value)
+
+
+def test3(t1: Place) -> Place:
+    IOExists1(Place)(
+        lambda t2: (
+            Requires(
+                ctoken(t1) and
+                write_int_io(t1, 0, t2)
+            ),
+            Ensures(
+                token(t2) and
+                t2 == Result()
+            ),
+        )
+    )
+    return write_int(t1, 0)

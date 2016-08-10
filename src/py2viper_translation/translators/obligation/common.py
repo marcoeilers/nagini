@@ -99,6 +99,14 @@ class CommonObligationTranslator(CommonTranslator):
         return self._translate_obligation_use(
             node, ctx, MustInvokeObligationInstance)
 
+    def translate_must_invoke_credit(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate ``ctoken`` in a contract."""
+        obligation = self._obligation_manager.must_invoke_obligation
+        use = obligation.create_ctoken_use(node)
+        position = self.to_position(node, ctx)
+        return ([], use.translate(self, ctx, position, self.no_info(ctx)))
+
     def translate_must_release(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``MustRelease`` in a contract."""
