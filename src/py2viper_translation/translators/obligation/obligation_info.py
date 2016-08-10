@@ -15,11 +15,6 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
-from py2viper_translation.lib.util import (
-    is_io_existential,
-    is_invariant,
-    UnsupportedException,
-)
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -272,12 +267,11 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._instances
-        for statement in self.node.body:
-            if is_invariant(statement):
-                self.traverse(statement.value.args[0])
-            elif is_io_existential(statement):
-                # TODO: Implement IOExists in loop.
-                raise UnsupportedException(self.node, 'IOExists in loop.')
+        for invariant, _ in self._method.loop_invariants[self.node]:
+            if isinstance(invariant, ast.Expr):
+                self.traverse(invariant.value.args[0])
+            else:
+                self.traverse(invariant.args[0])
         self._current_instance_map = None
 
     def get_all_instances(self) -> List[ObligationInstance]:

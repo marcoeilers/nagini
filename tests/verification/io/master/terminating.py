@@ -1,6 +1,8 @@
 from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
+    Implies,
+    Invariant,
     Pure,
     Result,
     Requires,
@@ -60,7 +62,7 @@ def print_sequence_io(
     )
 
 
-def print_sequence(t1: Place, n: int) -> Place:
+def print_sequence1(t1: Place, n: int) -> Place:
     """Prints n(n-1)...1."""
     IOExists1(Place)(
         lambda t2: (
@@ -82,8 +84,132 @@ def print_sequence(t1: Place, n: int) -> Place:
     t3 = print_int(t1, n)
 
     if n > 1:
-        t2 = print_sequence(t3, n-1)
+        t2 = print_sequence1(t3, n-1)
     else:
         t2 = t3
 
     return t2
+
+
+def print_sequence2(t1: Place, n: int) -> Place:
+    """Prints n(n-1)...1."""
+    IOExists1(Place)(
+        lambda t2: (
+            Requires(
+                n > 0 and
+                token(t1, 2) and
+                print_sequence_io(t1, n, t2) and
+                MustTerminate(2)
+            ),
+            Ensures(
+                token(t2) and
+                t2 == Result()
+            ),
+        )
+    )
+
+    t = t1
+
+    t2 = GetGhostOutput(print_sequence_io(t, n), 't_post')  # type: Place
+
+    while n > 1:
+        Invariant(
+            token(t, 1) and
+            print_sequence_io(t, n, t2) and
+            MustTerminate(n)
+        )
+        Open(print_sequence_io(t, n))
+        t = print_int(t, n)
+        n -= 1
+
+    Open(print_sequence_io(t, n))
+    t = print_int(t, 1)
+    return t
+
+
+def print_sequence3(t1: Place, n: int) -> Place:
+    """Prints n(n-1)...1."""
+    IOExists1(Place)(
+        lambda t2: (
+            Requires(
+                n > 0 and
+                token(t1, 2) and
+                print_sequence_io(t1, n, t2) and
+                MustTerminate(2)
+            ),
+            Ensures(
+                token(t2) and
+                t2 == Result()
+            ),
+        )
+    )
+
+    t = t1
+    Open(print_sequence_io(t, n))
+    t2 = GetGhostOutput(print_sequence_io(t, n), 't_post')  # type: Place
+
+    while n > 1:
+        IOExists1(Place)(
+            lambda t_next: (
+                Invariant(
+                    token(t, 1) and
+                    Implies(n > 1,
+                        print_int_io(t, n, t_next) and
+                        print_sequence_io(t_next, n-1, t2)) and
+                    Implies(not n > 1,
+                        print_int_io(t, n, t2))
+                ),
+                Invariant(
+                    MustTerminate(n)
+                ),
+            )
+        )
+        t = print_int(t, n)
+        n -= 1
+        Open(print_sequence_io(t, n))
+
+    t = print_int(t, n)
+    return t
+
+
+def print_sequence4(t1: Place, n: int) -> Place:
+    """Prints n(n-1)...1."""
+    IOExists1(Place)(
+        lambda t2: (
+            Requires(
+                n > 0 and
+                token(t1, 2) and
+                print_sequence_io(t1, n, t2) and
+                MustTerminate(2)
+            ),
+            Ensures(
+                token(t2) and
+                t2 == Result()
+            ),
+        )
+    )
+
+    t = t1
+    Open(print_sequence_io(t, n))
+    t2 = GetGhostOutput(print_sequence_io(t, n), 't_post')  # type: Place
+
+    while n > 1:
+        IOExists1(Place)(
+            lambda t_next: (
+                Invariant(
+                    token(t, 1) and
+                    Implies(n > 1,
+                        print_int_io(t, n, t_next) and
+                        print_sequence_io(t_next, n-1, t2)) and
+                    Implies(not n > 1,
+                        print_int_io(t, n, t2)) and
+                    MustTerminate(n)
+                )
+            )
+        )
+        t = print_int(t, n)
+        n -= 1
+        Open(print_sequence_io(t, n))
+
+    t = print_int(t, n)
+    return t

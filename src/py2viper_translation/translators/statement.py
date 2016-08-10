@@ -16,6 +16,7 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.util import (
     flatten,
+    get_body_start_index,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
@@ -468,11 +469,10 @@ class StatementTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
         invariants = []
         locals = []
-        bodyindex = 0
-        while is_invariant(node.body[bodyindex]):
-            invariants.append(self.translate_contract(node.body[bodyindex],
-                                                      ctx))
-            bodyindex += 1
+        for expr, aliases in ctx.actual_function.loop_invariants[node]:
+            with ctx.additional_aliases(aliases):
+                invariants.append(self.translate_contract(expr, ctx))
+        bodyindex = get_body_start_index(node.body)
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         loop = self.create_while_node(

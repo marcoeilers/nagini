@@ -380,6 +380,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.node_factory = node_factory
         self.labels = [END_LABEL]
         self.obligation_info = None
+        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
