@@ -17,19 +17,24 @@ import glob
 import os
 import sys
 
+from typing import List
 
 
-class ObligationConfig:
+class SectionConfig:
+    """A base class for configuration sections."""
 
-    def __init__(self, config_file) -> None:
-        self.config = configparser.ConfigParser()
-        self.config.read(config_file)
-        if 'Obligations' not in self.config:
-            self.config['Obligations'] = {}
+    def __init__(self, config, section_name) -> None:
+        self.config = config
+        if section_name not in self.config:
+            self.config[section_name] = {}
+        self._info = self.config[section_name]
 
-    @property
-    def _info(self):
-        return self.config['Obligations']
+
+class ObligationConfig(SectionConfig):
+    """Obligation translation configuration."""
+
+    def __init__(self, config) -> None:
+        super().__init__(config, 'Obligations')
 
     @property
     def disable_measure_check(self):
@@ -66,6 +71,27 @@ class ObligationConfig:
         """Disable all termination checks."""
         return self._info.getboolean('disable_termination_check', False)
 
+
+class TestConfig(SectionConfig):
+    """Testing configuration."""
+
+    def __init__(self, config) -> None:
+        super().__init__(config, 'Tests')
+        ignore_tests_value = self._info.get('ignore_tests')
+        if not ignore_tests_value:
+            self.ignore_tests = set([])
+        else:
+            self.ignore_tests = set(ignore_tests_value.strip().splitlines())
+
+
+class FileConfig:
+    """Configuration stored in the config file."""
+
+    def __init__(self, config_file) -> None:
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file)
+        self.obligation_config = ObligationConfig(self.config)
+        self.test_config = TestConfig(self.config)
 
 
 def _construct_classpath():
@@ -193,9 +219,21 @@ MYPY search path. Initialized by calling :py:func:`_get_mypy_path`.
 """
 
 
-obligation_config = ObligationConfig('py2viper.cfg')
+file_config = FileConfig('py2viper.cfg')
+"""
+Configuration read from ``py2viper.cfg`` file.
+"""
+
+
+obligation_config = file_config.obligation_config
 """
 Obligation configuration.
+"""
+
+
+test_config = file_config.test_config
+"""
+Test configuration.
 """
 
 
