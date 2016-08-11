@@ -29,15 +29,15 @@ from py2viper_translation.verifier import (
 
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
+    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
     parsed = parser.parse(text, None)
-    assert (isinstance(parsed, getattr(jvm.fastparse.core,
-                                       'Parsed$Success')))
-    parse_result = parsed.value()
-    parse_result.initProperties()
+    assert (isinstance(parsed, getattr(jvm.scala.util.parsing.combinator,
+                                       'Parsers$Success')))
+    parse_result = parsed.result()
+    parse_result.initTreeProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
