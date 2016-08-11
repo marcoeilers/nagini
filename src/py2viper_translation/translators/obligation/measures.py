@@ -4,6 +4,7 @@
 from typing import List
 
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
@@ -30,6 +31,9 @@ class MeasureMap:
     def check(self, reference: expr.RefExpression,
               value: expr.IntExpression) -> expr.BoolExpression:
         """Generate a check if current value is smaller than in map."""
+        if (obligation_config.disable_measures or
+                obligation_config.disable_measure_check):
+            return expr.TrueLit()
         args = [
             expr.CallArg('self', expr.REF, expr.VarRef(self._map_var)),
             expr.CallArg('key', expr.REF, reference),

@@ -10,9 +10,62 @@ False
 False
 
 """
+
+
+import configparser
 import glob
 import os
 import sys
+
+
+
+class ObligationConfig:
+
+    def __init__(self, config_file) -> None:
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file)
+        if 'Obligations' not in self.config:
+            self.config['Obligations'] = {}
+
+    @property
+    def _info(self):
+        return self.config['Obligations']
+
+    @property
+    def disable_measure_check(self):
+        """Replace obligation measure checks with ``True``."""
+        return self._info.getboolean('disable_measure_check', False)
+
+    @property
+    def disable_measures(self):
+        """Completely disable obligation measures."""
+        return self._info.getboolean('disable_measures', False)
+
+    @property
+    def disable_method_body_leak_check(self):
+        """Disable leak check at the end of method body."""
+        return self._info.getboolean('disable_method_body_leak_check', False)
+
+    @property
+    def disable_loop_body_leak_check(self):
+        """Disable leak check at the end of loop body."""
+        return self._info.getboolean('disable_loop_body_leak_check', False)
+
+    @property
+    def disable_call_context_leak_check(self):
+        """Disable leak check at the caller side."""
+        return self._info.getboolean('disable_call_context_leak_check', False)
+
+    @property
+    def disable_loop_context_leak_check(self):
+        """Disable leak check at the loop surrounding context."""
+        return self._info.getboolean('disable_loop_context_leak_check', False)
+
+    @property
+    def disable_termination_check(self):
+        """Disable all termination checks."""
+        return self._info.getboolean('disable_termination_check', False)
+
 
 
 def _construct_classpath():
@@ -140,4 +193,17 @@ MYPY search path. Initialized by calling :py:func:`_get_mypy_path`.
 """
 
 
-__all__ = ['classpath', 'boogie_path', 'z3_path', 'mypy_path', 'mypy_dir']
+obligation_config = ObligationConfig('py2viper.cfg')
+"""
+Obligation configuration.
+"""
+
+
+__all__ = (
+    'classpath',
+    'boogie_path',
+    'z3_path',
+    'mypy_path',
+    'mypy_dir',
+    'obligation_config',
+)

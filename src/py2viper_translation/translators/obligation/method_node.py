@@ -6,6 +6,7 @@ import ast
 from typing import List
 
 from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.program_nodes import (
@@ -44,9 +45,9 @@ class ObligationMethod:
         self.local_vars = local_vars
         self.body = body
 
-    def prepend_args(self, args: List[VarDecl]) -> None:
+    def prepend_arg(self, arg: VarDecl) -> None:
         """Prepend ``args`` to the argument list."""
-        self.args[0:0] = args
+        self.args.insert(0, arg)
 
     def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
@@ -126,10 +127,11 @@ class ObligationMethodNodeConstructor:
 
     def _add_aditional_parameters(self) -> None:
         """Add current thread and caller measures parameters."""
-        self._obligation_method.prepend_args([
-            self._obligation_info.current_thread_var.decl,
-            self._obligation_info.caller_measure_map.get_var().decl,
-        ])
+        if not obligation_config.disable_measures:
+            self._obligation_method.prepend_arg(
+                self._obligation_info.caller_measure_map.get_var().decl)
+        self._obligation_method.prepend_arg(
+            self._obligation_info.current_thread_var.decl)
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
@@ -139,10 +141,14 @@ class ObligationMethodNodeConstructor:
         measures = expr.VarRef(measure_map.get_var())
         preconditions = [
             cthread != None,        # noqa: E711
-            measures != None,       # noqa: E711
-            measure_map.get_contents_access(),
         ]
-        if self._is_body_native_silver():
+        if not obligation_config.disable_measures:
+            preconditions.extend([
+                measures != None,       # noqa: E711
+                measure_map.get_contents_access(),
+            ])
+        if (self._is_body_native_silver() and
+                not obligation_config.disable_termination_check):
             # Add obligations described in interface_dict.
             assert self._python_method.interface
             for obligation in self._obligation_manager.obligations:
@@ -161,6 +167,8 @@ class ObligationMethodNodeConstructor:
 
     def _set_up_measures(self) -> None:
         """Create and initialize method's measure map."""
+        if obligation_config.disable_measures:
+            return
         instances = self._obligation_info.get_all_precondition_instances()
         statements = self._obligation_info.method_measure_map.initialize(
             instances, self._translator, self._ctx, self._overriding)
@@ -181,6 +189,8 @@ class ObligationMethodNodeConstructor:
 
         Check that method body does not leak obligations.
         """
+        if obligation_config.disable_method_body_leak_check:
+            return
         reference_name = self._python_method.get_fresh_name('_r')
         check = expr.InhaleExhale(
             expr.TrueLit(),
@@ -200,6 +210,8 @@ class ObligationMethodNodeConstructor:
         Check that if callee is not terminating, caller has no
         obligations.
         """
+        if obligation_config.disable_call_context_leak_check:
+            return
         must_terminate = self._obligation_manager.must_terminate_obligation
         if self._python_method.interface:
             count = expr.RawIntExpression(2)
