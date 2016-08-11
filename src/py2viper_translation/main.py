@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 
 from jpype import JavaException
@@ -167,6 +168,12 @@ def main() -> None:
         type=_parse_log_level,
         help='log level',
         default='WARNING')
+    parser.add_argument(
+        '--benchmark',
+        type=int,
+        help=('run verification the given number of times to benchmark '
+              'performance'),
+        default=-1)
     args = parser.parse_args()
 
     python_file = args.python_file
@@ -194,8 +201,17 @@ def main() -> None:
         elif args.verifier == 'carbon':
             backend = ViperVerifier.carbon
         else:
-            raise ValueError('Unknown verifier specified: ' + args.backend)
-        vresult = verify(prog, python_file, jvm, backend=backend)
+            raise ValueError('Unknown verifier specified: ' + args.verifier)
+        if args.benchmark > 1:
+            for i in range(args.benchmark):
+                start = time.clock()
+                vresult = verify(prog, python_file, jvm, backend=backend)
+                end = time.clock()
+                assert vresult
+                print("RUN,{},{},{},{},{}".format(
+                    i, args.benchmark, start, end, end - start))
+        else:
+            vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
             print("Verification completed.")
         print(vresult)
