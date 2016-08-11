@@ -204,6 +204,13 @@ def test_gap_io9(
         )
     )
 
+@IOOperation
+def test_gap_io10(
+        t_pre: Place) -> bool:
+    TerminationMeasure(2)
+    Terminates(True)
+    return gap_io(t_pre)
+
 # Termination condition implication.
 
 @IOOperation
