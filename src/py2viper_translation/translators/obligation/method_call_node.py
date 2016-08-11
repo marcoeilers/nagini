@@ -3,9 +3,10 @@
 
 import ast
 
-from typing import Optional
+from typing import List, Optional
 
 from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.program_nodes import (
@@ -13,6 +14,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonIOExistentialVar,
 )
 from py2viper_translation.lib.typedefs import (
+    Expr,
     Info,
     Position,
 )
@@ -30,15 +32,16 @@ from py2viper_translation.translators.obligation.obligation_info import (
 class ObligationMethodCall:
     """Info for generating Silver ``MethodCall`` AST node."""
 
-    def __init__(self, name, args, targets) -> None:
+    def __init__(
+            self, name: str, args: List[Expr], targets: List[Expr]) -> None:
         self.name = name
         self.original_args = args[:]
         self.args = args
         self.targets = targets
 
-    def prepend_args(self, args) -> None:
+    def prepend_arg(self, arg: Expr) -> None:
         """Prepend ``args`` to the argument list."""
-        self.args = args + self.args
+        self.args.insert(0, arg)
 
 
 class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
@@ -84,16 +87,18 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def _add_aditional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
-        args = [
+        if not obligation_config.disable_measures:
+            self._obligation_method_call.prepend_arg(
+                self._obligation_info.method_measure_map.get_var().ref(
+                    self._target_node, self._ctx))
+        self._obligation_method_call.prepend_arg(
             self._obligation_info.current_thread_var.ref(
-                self._target_node, self._ctx),
-            self._obligation_info.method_measure_map.get_var().ref(
-                self._target_node, self._ctx),
-        ]
-        self._obligation_method_call.prepend_args(args)
+                self._target_node, self._ctx))
 
     def _check_measures_are_positive(self) -> None:
         """Check that callee measures are positive."""
+        if obligation_config.disable_measures:
+            return
         target_info = self._target_obligation_info
         instances = target_info.get_all_precondition_instances()
         with self._ctx.aliases_context():
@@ -128,6 +133,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         missing permission to ``MustTerminate``. For example, this can
         happen when non-terminating method calls a terminating one.
         """
+        if obligation_config.disable_termination_check:
+            return
         predicate = self._get_must_terminate_predicate()
 
         # Check that we have an expected amount of MustTerminate
@@ -166,6 +173,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def _check_must_terminate(self) -> None:
         """Check if callee picked MustTerminate obligation."""
+        if obligation_config.disable_termination_check:
+            return
         original_amount = self._obligation_info.original_must_terminate_var
         increased_amount = self._obligation_info.increased_must_terminate_var
         predicate = self._get_must_terminate_predicate()

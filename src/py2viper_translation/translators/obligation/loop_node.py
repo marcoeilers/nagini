@@ -6,6 +6,7 @@ import ast
 from typing import List, Union
 
 from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import rules
 from py2viper_translation.lib.typedefs import (
@@ -89,6 +90,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _add_method_measure_map_preserved_invariant(self) -> None:
         """Add invariant that method measure map is not changed."""
+        if obligation_config.disable_measures:
+            return
         measure_map = self._method_measure_map
         permission = measure_map.get_contents_access()
         assertion = measure_map.get_contents_preserved_assertion()
@@ -108,30 +111,34 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         termination_flag = expr.BoolVar(
             self._loop_obligation_info.termination_flag_var)
 
-        before_loop_leak_check = expr.InhaleExhale(
-            expr.TrueLit(),
-            expr.Implies(
-                loop_check_before,
-                expr.Implies(expr.Not(termination_flag), leak_check)))
-        info = self._to_info('Leak check for context.')
-        position = self._to_position(
-            conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
-        self._obligation_loop.append_invariant(
-            before_loop_leak_check.translate(
-                self._translator, self._ctx, position, info))
+        if not obligation_config.disable_loop_context_leak_check:
+            before_loop_leak_check = expr.InhaleExhale(
+                expr.TrueLit(),
+                expr.Implies(
+                    loop_check_before,
+                    expr.Implies(expr.Not(termination_flag), leak_check)))
+            info = self._to_info('Leak check for context.')
+            position = self._to_position(
+                conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
+            self._obligation_loop.append_invariant(
+                before_loop_leak_check.translate(
+                    self._translator, self._ctx, position, info))
 
-        body_leak_check = expr.InhaleExhale(
-            expr.TrueLit(),
-            expr.Implies(expr.Not(loop_check_before), leak_check))
-        info = self._to_info('Leak check for loop body.')
-        position = self._to_position(
-            conversion_rules=rules.OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL)
-        self._obligation_loop.append_invariant(
-            body_leak_check.translate(
-                self._translator, self._ctx, position, info))
+        if not obligation_config.disable_loop_body_leak_check:
+            body_leak_check = expr.InhaleExhale(
+                expr.TrueLit(),
+                expr.Implies(expr.Not(loop_check_before), leak_check))
+            info = self._to_info('Leak check for loop body.')
+            position = self._to_position(
+                conversion_rules=rules.OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL)
+            self._obligation_loop.append_invariant(
+                body_leak_check.translate(
+                    self._translator, self._ctx, position, info))
 
     def _set_up_measures(self) -> None:
         """Create and initialize loop's measure map."""
+        if obligation_config.disable_measures:
+            return
         # Set up measures.
         loop_measure_map = self._loop_obligation_info.loop_measure_map
         instances = self._loop_obligation_info.get_all_instances()
@@ -150,6 +157,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _save_loop_termination(self) -> None:
         """Save if loop promises to terminate into a variable."""
+        if obligation_config.disable_termination_check:
+            return
         instances = self._loop_obligation_info.get_instances(
             self._obligation_manager.must_terminate_obligation.identifier())
         disjuncts = [
@@ -171,6 +180,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _check_loop_promises_terminate(self) -> None:
         """Check that loop promises to terminate if it has to."""
+        if obligation_config.disable_termination_check:
+            return
         predicate = self._get_must_terminate_predicate()
         check = expr.Implies(
             expr.CurrentPerm(predicate) > expr.NoPerm(),
@@ -196,6 +207,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _check_loop_preserves_termination(self) -> None:
         """Check that loop keeps the promise to terminate."""
+        if obligation_config.disable_termination_check:
+            return
         instances = self._loop_obligation_info.get_instances(
             self._obligation_manager.must_terminate_obligation.identifier())
         disjuncts = [

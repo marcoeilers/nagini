@@ -6,6 +6,7 @@ import ast
 from typing import List, Union
 
 from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
@@ -59,6 +60,8 @@ class StatementNodeConstructorBase:
     def _save_must_terminate_amount(
             self, amount_var: PythonVar) -> None:
         """Save the original permission amount to a variable."""
+        if obligation_config.disable_termination_check:
+            return
         predicate = self._get_must_terminate_predicate()
         assign = expr.Assign(amount_var, expr.CurrentPerm(predicate))
         info = self._to_info('Save current MustTerminate amount.')
@@ -73,6 +76,8 @@ class StatementNodeConstructorBase:
             permission, the ``exhale acc(..., none)`` would fail, even
             though this exhale does nothing.
         """
+        if obligation_config.disable_termination_check:
+            return
         predicate = self._get_must_terminate_predicate()
         original_amount = expr.VarRef(amount_var)
         perm = expr.CurrentPerm(predicate) - original_amount
