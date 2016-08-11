@@ -174,6 +174,14 @@ def test_terminate_keep_promise_3() -> None:
             j -= 1
 
 
+def test_terminate_keep_promise_4() -> None:
+    b = True
+    while b:
+        Invariant(Implies(b, MustTerminate(1)))
+        Invariant(Implies(not b, MustTerminate(1)))
+        b = False
+
+
 # Check that loop does not generate obligations.
 
 
