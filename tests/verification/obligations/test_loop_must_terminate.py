@@ -210,3 +210,14 @@ def test_exhale_2() -> None:
         Invariant(Implies(i > 0, MustTerminate(5 - i)))
         Invariant(Implies(i > 0, MustTerminate(6 - i)))
         i += 1
+
+
+# Check with non-boolean guards.
+
+
+def test_non_boolean_guards() -> None:
+    i = 5
+    while i:
+        Invariant(MustTerminate(i) if i + 1 else True)
+        Invariant(i >= 0)
+        i -= 1

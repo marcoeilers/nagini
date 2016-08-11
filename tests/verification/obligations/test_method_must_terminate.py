@@ -160,3 +160,21 @@ def terminating_caller() -> None:
     Requires(MustTerminate(2))
     #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
     non_terminating3()
+
+
+# Check with non-boolean guards.
+
+
+def test_non_boolean_guards_callee(i: int) -> None:
+    Requires(MustTerminate(1) if i else True)
+
+
+def test_non_boolean_guards_1(i: int) -> None:
+    Requires(MustTerminate(2))
+    test_non_boolean_guards_callee(2)
+
+
+def test_non_boolean_guards_2(i: int) -> None:
+    Requires(MustTerminate(2))
+    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    test_non_boolean_guards_callee(0)
