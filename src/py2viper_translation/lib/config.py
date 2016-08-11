@@ -77,11 +77,18 @@ class TestConfig(SectionConfig):
 
     def __init__(self, config) -> None:
         super().__init__(config, 'Tests')
+
         ignore_tests_value = self._info.get('ignore_tests')
         if not ignore_tests_value:
             self.ignore_tests = set([])
         else:
             self.ignore_tests = set(ignore_tests_value.strip().splitlines())
+
+        verifiers_value = self._info.get('verifiers')
+        if not verifiers_value:
+            self.verifiers = ['silicon', 'carbon']
+        else:
+            self.verifiers = verifiers_value.strip().split()
 
 
 class FileConfig:
