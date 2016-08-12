@@ -212,6 +212,8 @@ class ObligationMethodNodeConstructor:
         """
         if obligation_config.disable_call_context_leak_check:
             return
+        if self._obligation_info.always_terminates():
+            return
         must_terminate = self._obligation_manager.must_terminate_obligation
         if self._python_method.interface:
             count = expr.RawIntExpression(2)
