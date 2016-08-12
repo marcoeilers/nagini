@@ -162,9 +162,14 @@ class InexhaleObligationInstanceMixin(abc.ABC):
         """Default implementation for obligation use in loop invariant."""
         obligation_info = ctx.obligation_context.current_loop_info
 
+        terms = []
+
         # Positive measure.
         loop_condition = obligation_info.construct_loop_condition()
         positive_measure = expr.Implies(loop_condition, self.get_measure() > 0)
+        if not positive_measure.is_always_true():
+            terms.append((positive_measure,
+                          rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE))
 
         # Actual inhale / exhale.
         inexhale = self._get_inexhale()
@@ -172,7 +177,6 @@ class InexhaleObligationInstanceMixin(abc.ABC):
             self.get_target(), self.get_measure())
         inhale_exhale = inexhale.construct_use_loop(
             measure_check, expr.BoolVar(obligation_info.loop_check_before_var))
+        terms.append((inhale_exhale, None))
 
-        return [
-            (positive_measure, rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE),
-            (inhale_exhale, None)]
+        return terms
