@@ -111,7 +111,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         termination_flag = expr.BoolVar(
             self._loop_obligation_info.termination_flag_var)
 
-        if not obligation_config.disable_loop_context_leak_check:
+        if (not obligation_config.disable_loop_context_leak_check and
+                not self._loop_obligation_info.always_terminates()):
             before_loop_leak_check = expr.InhaleExhale(
                 expr.TrueLit(),
                 expr.Implies(

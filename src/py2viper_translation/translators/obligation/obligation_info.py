@@ -229,6 +229,38 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             all_instances.extend(instances)
         return all_instances
 
+    def always_terminates(self) -> bool:
+        """Check if method always terminates.
+
+        +   Normal method is guaranteed to always terminate if it has
+            unguarded ``MustTerminate`` in its precondition.
+
+            .. note::
+
+                If method has unguarded ``MustTerminate`` in its
+                precondition, then it is guaranteed to take at least one
+                ``MustTerminate`` obligation:
+
+                +   In the case when caller is terminating, the
+                    ``MustTerminate`` leak check would ensure that
+                    callee takes at least one obligation.
+                +   In the case when caller is not terminating, the
+                    ``MustTerminate`` measure would be top and callee is
+                    guaranteed to take the unguarded obligation.
+        +   Axiomatized method is guaranteed to terminate if it is
+            annotated to do so in ``preamble.index``.
+        """
+        must_terminate = self._obligation_manager.must_terminate_obligation
+        if self._method.interface:
+            return must_terminate.is_interface_method_terminating(
+                self._method.interface_dict)
+        else:
+            for instance in self._precondition_instances[
+                    must_terminate.identifier()]:
+                if not instance.guard:
+                    return True
+            return False
+
 
 class PythonLoopObligationInfo(BaseObligationInfo):
     """Info about the obligation use in a loop."""
@@ -288,3 +320,12 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             return expr.PythonBoolExpression(self.node.test)
         else:
             return expr.VarRef(self.iteration_err_var) == None  # noqa: E711
+
+    def always_terminates(self) -> bool:
+        """Check if loop always terminates."""
+        instances = self._instances[
+            self._obligation_manager.must_terminate_obligation.identifier()]
+        for instance in instances:
+            if not instance.guard:
+                return True
+        return False

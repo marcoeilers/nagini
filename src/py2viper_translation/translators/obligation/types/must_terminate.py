@@ -93,12 +93,17 @@ class MustTerminateObligation(Obligation):
         """Create a predicate access expression."""
         return _create_predicate_access(cthread)
 
+    def is_interface_method_terminating(
+            self, interface_dict: Dict[str, Any]) -> bool:
+        """Check if interface method is annotated as terminating or not."""
+        return (_OBLIGATION_NAME in interface_dict and
+                interface_dict[_OBLIGATION_NAME])
+
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
             interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
         """Add ``MustTerminate(1)`` to axiomatic method precondition."""
-        if (_OBLIGATION_NAME in interface_dict and
-                interface_dict[_OBLIGATION_NAME]):
+        if self.is_interface_method_terminating(interface_dict):
             exhale = _create_method_exhale(
                 obligation_info, expr.RawIntExpression(1))
             return [exhale]
