@@ -204,9 +204,9 @@ def main() -> None:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark > 1:
             for i in range(args.benchmark):
-                start = time.clock()
+                start = time.time()
                 vresult = verify(prog, python_file, jvm, backend=backend)
-                end = time.clock()
+                end = time.time()
                 assert vresult
                 print("RUN,{},{},{},{},{}".format(
                     i, args.benchmark, start, end, end - start))
