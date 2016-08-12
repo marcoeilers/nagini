@@ -111,6 +111,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
                 check = expr.Implies(
                     guard_expression,
                     instance.obligation_instance.get_measure() > 0)
+                if check.is_always_true():
+                    continue
                 assertion = expr.Assert(check)
 
                 obligation_node = instance.obligation_instance.node
