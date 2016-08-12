@@ -5,7 +5,7 @@ import abc
 
 from typing import List, Optional, Tuple
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules, rules
 
@@ -20,9 +20,9 @@ class ObligationInhaleExhale:
     """
 
     def __init__(
-            self, bounded: expr.Location,
-            unbounded: Optional[expr.Location] = None,
-            credit: Optional[expr.Location] = None,
+            self, bounded: sil.Location,
+            unbounded: Optional[sil.Location] = None,
+            credit: Optional[sil.Location] = None,
             max_one_inhale: bool = False) -> None:
         """Constructor.
 
@@ -36,60 +36,60 @@ class ObligationInhaleExhale:
         self._max_one_inhale = max_one_inhale
 
     @property
-    def _unbounded_positive(self) -> expr.BoolExpression:
+    def _unbounded_positive(self) -> sil.BoolExpression:
         assert self._unbounded is not None
-        return expr.CurrentPerm(self._unbounded) > expr.NoPerm()
+        return sil.CurrentPerm(self._unbounded) > sil.NoPerm()
 
     @property
-    def _unbounded_acc(self) -> expr.Acc:
+    def _unbounded_acc(self) -> sil.Acc:
         assert self._unbounded is not None
-        return expr.Acc(self._unbounded)
+        return sil.Acc(self._unbounded)
 
     @property
-    def _bounded_positive(self) -> expr.BoolExpression:
-        return expr.CurrentPerm(self._bounded) > expr.NoPerm()
+    def _bounded_positive(self) -> sil.BoolExpression:
+        return sil.CurrentPerm(self._bounded) > sil.NoPerm()
 
     @property
-    def _bounded_acc(self) -> expr.Acc:
-        return expr.Acc(self._bounded)
+    def _bounded_acc(self) -> sil.Acc:
+        return sil.Acc(self._bounded)
 
     @property
-    def _credit_acc(self) -> expr.Acc:
+    def _credit_acc(self) -> sil.Acc:
         assert self._credit is not None
-        return expr.Acc(self._credit)
+        return sil.Acc(self._credit)
 
     def _construct_inhale(
             self, fresh: bool,
-            measure_positive_check: Optional[expr.BoolExpression]) -> expr.Acc:
+            measure_positive_check: Optional[sil.BoolExpression]) -> sil.Acc:
         """Construct obligation inhale."""
         if fresh:
             return self._unbounded_acc
         if self._max_one_inhale:
-            acc = expr.Implies(
-                expr.CurrentPerm(self._bounded) == expr.NoPerm(),
-                expr.Acc(self._bounded))
+            acc = sil.Implies(
+                sil.CurrentPerm(self._bounded) == sil.NoPerm(),
+                sil.Acc(self._bounded))
         else:
             acc = self._bounded_acc
         if measure_positive_check is None:
             return acc
         else:
-            return expr.BigAnd([acc, measure_positive_check])
+            return sil.BigAnd([acc, measure_positive_check])
 
-    def _construct_unbounded_exhale(self) -> expr.BoolExpression:
+    def _construct_unbounded_exhale(self) -> sil.BoolExpression:
         """Construct unbounded obligation exhale."""
         if self._unbounded is None:
-            return expr.TrueLit()
+            return sil.TrueLit()
         if self._credit is None:
             return self._unbounded_acc
         else:
-            return expr.BoolCondExp(
+            return sil.BoolCondExp(
                 self._unbounded_positive,
                 self._unbounded_acc,
                 self._credit_acc)
 
     def _construct_bounded_exhale(
             self,
-            check: Optional[expr.BoolExpression]) -> expr.BoolExpression:
+            check: Optional[sil.BoolExpression]) -> sil.BoolExpression:
         """Construct bounded obligation exhale.
 
         :param check: check if measure is positive
@@ -97,40 +97,40 @@ class ObligationInhaleExhale:
         checks = [self._bounded_positive]
         if check is not None:
             checks.append(check)
-        return expr.BoolCondExp(
-            expr.BigAnd(checks),
+        return sil.BoolCondExp(
+            sil.BigAnd(checks),
             self._bounded_acc,
             self._construct_unbounded_exhale())
 
-    def construct_use_method_unbounded(self) -> expr.BoolExpression:
+    def construct_use_method_unbounded(self) -> sil.BoolExpression:
         """Construct inhale exhale pair for use in method contract.
 
         Used for fresh obligations.
         """
-        return expr.InhaleExhale(
+        return sil.InhaleExhale(
             self._construct_inhale(True, None),
             self._construct_unbounded_exhale())
 
     def construct_use_method_bounded(
-            self, measure_check: expr.BoolExpression,
-            measure_positive_check: expr.BoolExpression,
-            is_postconditon: bool) -> expr.BoolExpression:
+            self, measure_check: sil.BoolExpression,
+            measure_positive_check: sil.BoolExpression,
+            is_postconditon: bool) -> sil.BoolExpression:
         """Construct inhale exhale pair for use in method contract.
 
         Used for bounded obligations.
         """
-        return expr.InhaleExhale(
+        return sil.InhaleExhale(
             self._construct_inhale(False, measure_positive_check),
             self._construct_bounded_exhale(
                 measure_check if not is_postconditon else None))
 
     def construct_use_loop(
-            self, measure_check: expr.BoolExpression,
-            loop_check_before_var: expr.BoolVar) -> expr.BoolExpression:
+            self, measure_check: sil.BoolExpression,
+            loop_check_before_var: sil.BoolVar) -> sil.BoolExpression:
         """Construct inhale exhale pair for use in loop invariant."""
-        return expr.InhaleExhale(
+        return sil.InhaleExhale(
             self._construct_inhale(False, None),
-            expr.BoolCondExp(
+            sil.BoolCondExp(
                 loop_check_before_var,
                 self._construct_bounded_exhale(None),
                 self._construct_bounded_exhale(measure_check)))
@@ -144,7 +144,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
         """Create ``ObligationInhaleExhale`` instance."""
 
     def get_use_method(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Default implementation for obligation use in method contract."""
         inexhale = self._get_inexhale()
         obligation_info = ctx.actual_function.obligation_info
@@ -158,7 +158,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
                 ctx.obligation_context.is_translating_posts), None)]
 
     def get_use_loop(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Default implementation for obligation use in loop invariant."""
         obligation_info = ctx.obligation_context.current_loop_info
 
@@ -166,7 +166,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
 
         # Positive measure.
         loop_condition = obligation_info.construct_loop_condition()
-        positive_measure = expr.Implies(loop_condition, self.get_measure() > 0)
+        positive_measure = sil.Implies(loop_condition, self.get_measure() > 0)
         if not positive_measure.is_always_true():
             terms.append((positive_measure,
                           rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE))
@@ -176,7 +176,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
         measure_check = obligation_info.loop_measure_map.check(
             self.get_target(), self.get_measure())
         inhale_exhale = inexhale.construct_use_loop(
-            measure_check, expr.BoolVar(obligation_info.loop_check_before_var))
+            measure_check, sil.BoolVar(obligation_info.loop_check_before_var))
         terms.append((inhale_exhale, None))
 
         return terms

@@ -3,13 +3,25 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/lib/io_context.py \
 	src/py2viper_translation/lib/io_checkers.py \
 	src/py2viper_translation/lib/guard_collectors.py \
-	src/py2viper_translation/lib/expressions.py \
 	src/py2viper_translation/lib/errors/__init__.py \
 	src/py2viper_translation/lib/errors/manager.py \
 	src/py2viper_translation/lib/errors/messages.py \
 	src/py2viper_translation/lib/errors/rules.py \
 	src/py2viper_translation/lib/errors/wrappers.py \
 	src/py2viper_translation/lib/obligation_context.py \
+	src/py2viper_translation/lib/silver_nodes/__init__.py \
+	src/py2viper_translation/lib/silver_nodes/base.py \
+	src/py2viper_translation/lib/silver_nodes/bool_expr.py \
+	src/py2viper_translation/lib/silver_nodes/expression.py \
+	src/py2viper_translation/lib/silver_nodes/int_cmp_expr.py \
+	src/py2viper_translation/lib/silver_nodes/int_expr.py \
+	src/py2viper_translation/lib/silver_nodes/location_expr.py \
+	src/py2viper_translation/lib/silver_nodes/perm_cmp_expr.py \
+	src/py2viper_translation/lib/silver_nodes/perm_expr.py \
+	src/py2viper_translation/lib/silver_nodes/program.py \
+	src/py2viper_translation/lib/silver_nodes/reference_expr.py \
+	src/py2viper_translation/lib/silver_nodes/statement.py \
+	src/py2viper_translation/lib/silver_nodes/types.py \
 	src/py2viper_translation/translators/io_operation/common.py \
 	src/py2viper_translation/translators/io_operation/definition.py \
 	src/py2viper_translation/translators/io_operation/__init__.py \
@@ -59,7 +71,7 @@ mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
-	bin/flake8 --ignore=F401,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
+	bin/flake8 --ignore=F401,F403,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
 
 pylint: bin/pylint
 	bin/pylint $(CHECKED_MODULES)

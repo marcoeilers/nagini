@@ -5,7 +5,7 @@ import ast
 
 from typing import List
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -76,10 +76,10 @@ class GuardedObligationInstance:
         self.guard = guard
         self.obligation_instance = obligation_instance
 
-    def create_guard_expression(self) -> expr.BigAnd:
+    def create_guard_expression(self) -> sil.BigAnd:
         """Create a conjunction representing a guard."""
-        conjunction = expr.BigAnd([
-            expr.PythonBoolExpression(part)
+        conjunction = sil.BigAnd([
+            sil.PythonBoolExpression(part)
             for part in self.guard
         ])
         return conjunction
@@ -314,12 +314,12 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         """Return invariant instances of specific obligation type."""
         return self._instances[obligation_id]
 
-    def construct_loop_condition(self) -> expr.BoolExpression:
+    def construct_loop_condition(self) -> sil.BoolExpression:
         """Construct loop condition."""
         if isinstance(self.node, ast.While):
-            return expr.PythonBoolExpression(self.node.test)
+            return sil.PythonBoolExpression(self.node.test)
         else:
-            return expr.VarRef(self.iteration_err_var) == None  # noqa: E711
+            return sil.VarRef(self.iteration_err_var) == None  # noqa: E711
 
     def always_terminates(self) -> bool:
         """Check if loop always terminates."""

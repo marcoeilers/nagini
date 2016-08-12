@@ -5,7 +5,7 @@ import ast
 
 from typing import Any, Dict, List, Optional
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
@@ -37,20 +37,20 @@ class MustReleaseObligationInstance(
 
     def _get_inexhale(self) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
-            expr.FieldAccess(
-                self.get_target(), _BOUNDED_FIELD_NAME, expr.INT),
-            expr.FieldAccess(
-                self.get_target(), _UNBOUNDED_FIELD_NAME, expr.INT))
+            sil.FieldAccess(
+                self.get_target(), _BOUNDED_FIELD_NAME, sil.INT),
+            sil.FieldAccess(
+                self.get_target(), _UNBOUNDED_FIELD_NAME, sil.INT))
 
     def is_fresh(self) -> bool:
         return self._measure is None
 
-    def get_measure(self) -> expr.IntExpression:
+    def get_measure(self) -> sil.IntExpression:
         assert not self.is_fresh()
-        return expr.PythonIntExpression(self._measure)
+        return sil.PythonIntExpression(self._measure)
 
-    def get_target(self) -> expr.RefExpression:
-        return expr.PythonRefExpression(self._target)
+    def get_target(self) -> sil.RefExpression:
+        return sil.PythonRefExpression(self._target)
 
 
 class MustReleaseObligation(Obligation):
@@ -80,10 +80,10 @@ class MustReleaseObligation(Obligation):
 
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
-            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+            interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
         return []
 
-    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+    def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
         return [
             self._create_field_for_perm(_BOUNDED_FIELD_NAME, var_name),
             self._create_field_for_perm(_UNBOUNDED_FIELD_NAME, var_name),

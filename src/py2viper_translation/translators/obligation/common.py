@@ -4,7 +4,7 @@
 import abc
 import ast
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
@@ -54,7 +54,7 @@ class CommonObligationTranslator(CommonTranslator):
     @abc.abstractmethod
     def _create_obligation_instance_use(
             self, obligation_instance: ObligationInstance,
-            ctx: Context) -> expr.InhaleExhale:
+            ctx: Context) -> sil.InhaleExhale:
         """Create obligation use from the obligation instance."""
 
     def _translate_obligation_use(

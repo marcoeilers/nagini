@@ -5,7 +5,7 @@ import ast
 
 from typing import List
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import rules
@@ -136,9 +136,9 @@ class ObligationMethodNodeConstructor:
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
         cthread_var = self._obligation_info.current_thread_var
-        cthread = expr.VarRef(cthread_var)
+        cthread = sil.VarRef(cthread_var)
         measure_map = self._obligation_info.caller_measure_map
-        measures = expr.VarRef(measure_map.get_var())
+        measures = sil.VarRef(measure_map.get_var())
         preconditions = [
             cthread != None,        # noqa: E711
         ]
@@ -192,8 +192,8 @@ class ObligationMethodNodeConstructor:
         if obligation_config.disable_method_body_leak_check:
             return
         reference_name = self._python_method.get_fresh_name('_r')
-        check = expr.InhaleExhale(
-            expr.TrueLit(),
+        check = sil.InhaleExhale(
+            sil.TrueLit(),
             self._obligation_manager.create_leak_check(reference_name))
         node = self._python_method.node
         assert node
@@ -216,16 +216,16 @@ class ObligationMethodNodeConstructor:
             return
         must_terminate = self._obligation_manager.must_terminate_obligation
         if self._python_method.interface:
-            count = expr.RawIntExpression(2)
+            count = sil.RawIntExpression(2)
         else:
             instances = self._obligation_info.get_precondition_instances(
                 must_terminate.identifier())
-            count = expr.RawIntExpression(len(instances) + 1)
+            count = sil.RawIntExpression(len(instances) + 1)
         cthread = self._obligation_info.current_thread_var
         predicate = must_terminate.create_predicate_access(cthread)
         reference_name = self._python_method.get_fresh_name('_r')
-        check = expr.InhaleExhale(expr.TrueLit(), expr.Implies(
-            expr.CurrentPerm(predicate) == expr.IntegerPerm(count),
+        check = sil.InhaleExhale(sil.TrueLit(), sil.Implies(
+            sil.CurrentPerm(predicate) == sil.IntegerPerm(count),
             self._obligation_manager.create_leak_check(reference_name)))
         if self._python_method.node is None:
             # TODO: Handle interface methods properly.

@@ -5,7 +5,7 @@ import ast
 
 from typing import Any, Dict, List, Optional
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
@@ -38,19 +38,19 @@ class MustInvokeObligationInstance(
 
     def _get_inexhale(self) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
-            expr.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
-            expr.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),
-            expr.PredicateAccess(_CREDIT_PREDICATE_NAME, self.get_target()))
+            sil.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
+            sil.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),
+            sil.PredicateAccess(_CREDIT_PREDICATE_NAME, self.get_target()))
 
     def is_fresh(self) -> bool:
         return self._measure is None
 
-    def get_measure(self) -> expr.IntExpression:
+    def get_measure(self) -> sil.IntExpression:
         assert not self.is_fresh()
-        return expr.PythonIntExpression(self._measure)
+        return sil.PythonIntExpression(self._measure)
 
-    def get_target(self) -> expr.RefExpression:
-        return expr.PythonRefExpression(self._target)
+    def get_target(self) -> sil.RefExpression:
+        return sil.PythonRefExpression(self._target)
 
 
 class MustInvokeObligation(Obligation):
@@ -81,10 +81,10 @@ class MustInvokeObligation(Obligation):
 
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
-            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+            interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
         return []
 
-    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+    def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
         return [
             self._create_predicate_for_perm(
                 _BOUNDED_PREDICATE_NAME, var_name),
@@ -92,7 +92,7 @@ class MustInvokeObligation(Obligation):
                 _UNBOUNDED_PREDICATE_NAME, var_name),
         ]
 
-    def create_ctoken_use(self, node: ast.Call) -> expr.Acc:
+    def create_ctoken_use(self, node: ast.Call) -> sil.Acc:
         """Create a ``ctoken`` use in contract."""
-        target = expr.PythonRefExpression(node.args[0])
-        return expr.Acc(expr.PredicateAccess(_CREDIT_PREDICATE_NAME, target))
+        target = sil.PythonRefExpression(node.args[0])
+        return sil.Acc(sil.PredicateAccess(_CREDIT_PREDICATE_NAME, target))

@@ -5,7 +5,7 @@ import ast
 
 from typing import Any, Dict, List, Optional
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
@@ -24,20 +24,20 @@ _OBLIGATION_NAME = 'MustTerminate'
 _PREDICATE_NAME = _OBLIGATION_NAME
 
 
-def _create_predicate_access(cthread: PythonVar) -> expr.PredicateAccess:
+def _create_predicate_access(cthread: PythonVar) -> sil.PredicateAccess:
     """Create a predicate access expression."""
-    return expr.PredicateAccess(_PREDICATE_NAME, expr.VarRef(cthread))
+    return sil.PredicateAccess(_PREDICATE_NAME, sil.VarRef(cthread))
 
 
 def _create_method_exhale(
         obligation_info: 'PythonMethodObligationInfo',
-        measure: expr.IntExpression) -> expr.Exhale:
+        measure: sil.IntExpression) -> sil.Exhale:
     """Create ``MustTerminate`` exhale to be mentioned in precondition."""
     cthread = obligation_info.current_thread_var
     predicate = _create_predicate_access(cthread)
     check = obligation_info.caller_measure_map.check(
-        expr.VarRef(cthread), measure)
-    return expr.Implies(check, expr.Acc(predicate))
+        sil.VarRef(cthread), measure)
+    return sil.Implies(check, sil.Acc(predicate))
 
 
 class MustTerminateObligationInstance(
@@ -59,11 +59,11 @@ class MustTerminateObligationInstance(
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.
 
-    def get_measure(self) -> expr.IntExpression:
-        return expr.PythonIntExpression(self._measure)
+    def get_measure(self) -> sil.IntExpression:
+        return sil.PythonIntExpression(self._measure)
 
-    def get_target(self) -> expr.RefExpression:
-        return expr.VarRef(self._target)
+    def get_target(self) -> sil.RefExpression:
+        return sil.VarRef(self._target)
 
 
 class MustTerminateObligation(Obligation):
@@ -89,7 +89,7 @@ class MustTerminateObligation(Obligation):
             return None
 
     def create_predicate_access(
-            self, cthread: PythonVar) -> expr.PredicateAccess:
+            self, cthread: PythonVar) -> sil.PredicateAccess:
         """Create a predicate access expression."""
         return _create_predicate_access(cthread)
 
@@ -101,14 +101,14 @@ class MustTerminateObligation(Obligation):
 
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
-            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+            interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
         """Add ``MustTerminate(1)`` to axiomatic method precondition."""
         if self.is_interface_method_terminating(interface_dict):
             exhale = _create_method_exhale(
-                obligation_info, expr.RawIntExpression(1))
+                obligation_info, sil.RawIntExpression(1))
             return [exhale]
         else:
             return []
 
-    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+    def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
         return [self._create_predicate_for_perm(_PREDICATE_NAME, var_name)]

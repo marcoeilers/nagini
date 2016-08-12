@@ -5,7 +5,7 @@ import ast
 
 from typing import List
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -48,7 +48,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
 
     def _create_obligation_instance_use(
             self, obligation_instance: ObligationInstance,
-            ctx: Context) -> expr.InhaleExhale:
+            ctx: Context) -> sil.InhaleExhale:
         return obligation_instance.get_use_method(ctx)
 
     def create_method_node(     # pylint: disable=too-many-arguments
