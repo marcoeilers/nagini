@@ -6,7 +6,7 @@ import ast
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
@@ -44,17 +44,17 @@ class ObligationInstance(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_target(self) -> expr.RefExpression:
+    def get_target(self) -> sil.RefExpression:
         """Return an expression to which obligation is attached."""
 
     @abc.abstractmethod
     def get_use_method(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Get inhale exhale pair for use in method contract."""
 
     @abc.abstractmethod
     def get_use_loop(
-            self, ctx: Context) -> List[Tuple[expr.Expression, Rules]]:
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Get inhale exhale pair for use in loop invariant."""
 
 
@@ -83,31 +83,31 @@ class Obligation(abc.ABC):
     @abc.abstractmethod
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
-            interface_dict: Dict[str, Any]) -> List[expr.BoolExpression]:
+            interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
         """Add obligations to axiomatic method precondition."""
 
     @abc.abstractmethod
-    def create_leak_check(self, var_name: str) -> List[expr.BoolExpression]:
+    def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
         """Create a leak check for this obligation.
 
         :param var_name: variable name to be used in ``ForPerm``
         """
 
     def _create_predicate_for_perm(
-            self, predicate_name: str, var_name: str) -> expr.ForPerm:
+            self, predicate_name: str, var_name: str) -> sil.ForPerm:
         """Create a ForPerm expression with predicate for use in leak check."""
-        return expr.ForPerm(
+        return sil.ForPerm(
             var_name,
-            [expr.Predicate(predicate_name, var_name)],
-            expr.FalseLit())
+            [sil.Predicate(predicate_name, var_name)],
+            sil.FalseLit())
 
     def _create_field_for_perm(
-            self, field_name: str, var_name: str) -> expr.ForPerm:
+            self, field_name: str, var_name: str) -> sil.ForPerm:
         """Create a ForPerm expression with field for use in leak check."""
-        return expr.ForPerm(
+        return sil.ForPerm(
             var_name,
-            [expr.Field(field_name, expr.INT)],
-            expr.FalseLit())
+            [sil.Field(field_name, sil.INT)],
+            sil.FalseLit())
 
     def create_predicates(
             self, translator: CommonTranslator) -> List[Predicate]:
@@ -115,7 +115,7 @@ class Obligation(abc.ABC):
         position = translator.viper.NoPosition
         info = translator.viper.NoInfo
         predicates = [
-            expr.Predicate(name, 'r')
+            sil.Predicate(name, 'r')
             for name in self._predicate_names]
         translated_predicates = [
             predicate.translate(translator, None, position, info)
@@ -128,7 +128,7 @@ class Obligation(abc.ABC):
         position = translator.viper.NoPosition
         info = translator.viper.NoInfo
         fields = [
-            expr.Field(name, expr.INT)
+            sil.Field(name, sil.INT)
             for name in self._field_names]
         translated_fields = [
             field.translate(translator, None, position, info)

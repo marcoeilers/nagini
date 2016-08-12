@@ -5,7 +5,7 @@ import ast
 
 from typing import List, Optional
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import rules
@@ -108,12 +108,12 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
                     continue
 
                 guard_expression = instance.create_guard_expression()
-                check = expr.Implies(
+                check = sil.Implies(
                     guard_expression,
                     instance.obligation_instance.get_measure() > 0)
                 if check.is_always_true():
                     continue
-                assertion = expr.Assert(check)
+                assertion = sil.Assert(check)
 
                 obligation_node = instance.obligation_instance.node
                 measure_position = self._to_position(obligation_node)
@@ -143,9 +143,9 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         # permission.
         # This assert is for testing purposes only. It can be removed as
         # soon as we are sure that obligation encoding works.
-        assertion = expr.Assert(expr.BigOr([
-            expr.CurrentPerm(predicate) == expr.NoPerm(),
-            expr.CurrentPerm(predicate) == expr.FullPerm(),
+        assertion = sil.Assert(sil.BigOr([
+            sil.CurrentPerm(predicate) == sil.NoPerm(),
+            sil.CurrentPerm(predicate) == sil.FullPerm(),
         ]))
         info = self._to_info(
             'Check that we have expected amount of MustTerminate.')
@@ -154,14 +154,14 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         # Inhale additional MustTerminate permission so that we have the
         # amount mentioned in the precondition + 1.
         if self._is_axiomatized_target():
-            count = expr.RawIntExpression(1)
+            count = sil.RawIntExpression(1)
         else:
             instances = self._target_obligation_info.get_precondition_instances(
                 self._must_terminate.identifier())
-            count = expr.RawIntExpression(len(instances))
-        inc_count = expr.CondInc(
-            expr.CurrentPerm(predicate) == expr.NoPerm(), count)
-        inhale = expr.Inhale(expr.Acc(predicate, expr.IntegerPerm(inc_count)))
+            count = sil.RawIntExpression(len(instances))
+        inc_count = sil.CondInc(
+            sil.CurrentPerm(predicate) == sil.NoPerm(), count)
+        inhale = sil.Inhale(sil.Acc(predicate, sil.IntegerPerm(inc_count)))
         info = self._to_info('Inhale additional MustTerminate amount.')
         self._append_statement(inhale, info=info)
 
@@ -180,10 +180,10 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         original_amount = self._obligation_info.original_must_terminate_var
         increased_amount = self._obligation_info.increased_must_terminate_var
         predicate = self._get_must_terminate_predicate()
-        check = expr.Implies(
-            expr.NoPerm() < expr.VarRef(original_amount),
-            expr.CurrentPerm(predicate) < expr.VarRef(increased_amount))
-        assertion = expr.Assert(check)
+        check = sil.Implies(
+            sil.NoPerm() < sil.VarRef(original_amount),
+            sil.CurrentPerm(predicate) < sil.VarRef(increased_amount))
+        assertion = sil.Assert(check)
         position = self._to_position(
             conversion_rules=rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)
         info = self._to_info('Check that callee took MustTerminate.')

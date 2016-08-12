@@ -3,9 +3,9 @@
 
 from typing import List
 
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.config import obligation_config
-from py2viper_translation.lib import expressions as expr
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
@@ -28,18 +28,18 @@ class MeasureMap:
         self._map_var = measure_map_var
         self._contents_var = contents_var
 
-    def check(self, reference: expr.RefExpression,
-              value: expr.IntExpression) -> expr.BoolExpression:
+    def check(self, reference: sil.RefExpression,
+              value: sil.IntExpression) -> sil.BoolExpression:
         """Generate a check if current value is smaller than in map."""
         if (obligation_config.disable_measures or
                 obligation_config.disable_measure_check):
-            return expr.TrueLit()
+            return sil.TrueLit()
         args = [
-            expr.CallArg('self', expr.REF, expr.VarRef(self._map_var)),
-            expr.CallArg('key', expr.REF, reference),
-            expr.CallArg('value', expr.INT, value),
+            sil.CallArg('self', sil.REF, sil.VarRef(self._map_var)),
+            sil.CallArg('key', sil.REF, reference),
+            sil.CallArg('value', sil.INT, value),
         ]
-        return expr.BoolCall('Measure$check', args)
+        return sil.BoolCall('Measure$check', args)
 
     def get_var(self) -> PythonVar:
         """Return a variable representing the measure map."""
@@ -53,9 +53,9 @@ class MeasureMap:
         """
         return self._contents_var
 
-    def get_contents_access(self) -> expr.Acc:
+    def get_contents_access(self) -> sil.Acc:
         """Return access to measure map contents field."""
-        return expr.Acc(self._contents_access, expr.WildcardPerm())
+        return sil.Acc(self._contents_access, sil.WildcardPerm())
 
     def initialize(
             self, obligation_instances: List['GuardedObligationInstance'],
@@ -88,23 +88,23 @@ class MeasureMap:
                     position, info)
             statements.append(statement)
         if self._contents_var is not None:
-            assign = expr.Assign(self._contents_var, self._contents_access)
+            assign = sil.Assign(self._contents_var, self._contents_access)
             statement = assign.translate(translator, ctx, position, info)
             statements.append(statement)
         return statements
 
-    def get_contents_preserved_assertion(self) -> expr.BoolExpression:
+    def get_contents_preserved_assertion(self) -> sil.BoolExpression:
         """Construct an assertion that contents has not changed.
 
         This assertion is used in loop invariants.
         """
         assert self._contents_var is not None
-        return expr.VarRef(self._contents_var) == self._contents_access
+        return sil.VarRef(self._contents_var) == self._contents_access
 
     @property
-    def _contents_access(self) -> expr.FieldAccess:
-        return expr.FieldAccess(
-            expr.VarRef(self._map_var), 'Measure$acc', expr.SeqType(expr.REF))
+    def _contents_access(self) -> sil.FieldAccess:
+        return sil.FieldAccess(
+            sil.VarRef(self._map_var), 'Measure$acc', sil.SeqType(sil.REF))
 
     def _create_measure_set_call(
             self, obligation_instance: ObligationInstance,
@@ -115,7 +115,7 @@ class MeasureMap:
         reference_expr = reference.translate(translator, ctx, position, info)
         measure = obligation_instance.get_measure()
         if overriding:
-            measure = expr.Inc(measure)
+            measure = sil.Inc(measure)
         measure_expr = measure.translate(translator, ctx, position, info)
         args = [self._map_var.ref(), reference_expr, measure_expr]
         return translator.viper.MethodCall(

@@ -3,7 +3,7 @@
 
 from typing import List
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.typedefs import (
     Predicate,
 )
@@ -67,11 +67,11 @@ class ObligationManager:
         return fields
 
     def create_leak_check(
-            self, var_name: str) -> expr.BoolExpression:
+            self, var_name: str) -> sil.BoolExpression:
         """Create a leak check for all obligation except termination."""
         checks = []
         for obligation in self._obligations:
             if obligation is self._must_terminate_obligation:
                 continue
             checks.extend(obligation.create_leak_check(var_name))
-        return expr.BigAnd(checks)
+        return sil.BigAnd(checks)

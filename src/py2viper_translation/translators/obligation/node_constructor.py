@@ -5,7 +5,7 @@ import ast
 
 from typing import List, Union
 
-from py2viper_translation.lib import expressions as expr
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
@@ -63,7 +63,7 @@ class StatementNodeConstructorBase:
         if obligation_config.disable_termination_check:
             return
         predicate = self._get_must_terminate_predicate()
-        assign = expr.Assign(amount_var, expr.CurrentPerm(predicate))
+        assign = sil.Assign(amount_var, sil.CurrentPerm(predicate))
         info = self._to_info('Save current MustTerminate amount.')
         self._append_statement(assign, info=info)
 
@@ -79,11 +79,11 @@ class StatementNodeConstructorBase:
         if obligation_config.disable_termination_check:
             return
         predicate = self._get_must_terminate_predicate()
-        original_amount = expr.VarRef(amount_var)
-        perm = expr.CurrentPerm(predicate) - original_amount
-        exhale = expr.Exhale(expr.Implies(
-            expr.CurrentPerm(predicate) > expr.NoPerm(),
-            expr.Acc(predicate, perm)))
+        original_amount = sil.VarRef(amount_var)
+        perm = sil.CurrentPerm(predicate) - original_amount
+        exhale = sil.Exhale(sil.Implies(
+            sil.CurrentPerm(predicate) > sil.NoPerm(),
+            sil.Acc(predicate, perm)))
         info = self._to_info('Reset MustTerminate amount to original level.')
         self._append_statement(exhale, info=info)
 
@@ -105,7 +105,7 @@ class StatementNodeConstructorBase:
         """Get the surrounding method measure map."""
         return self._obligation_info.method_measure_map
 
-    def _get_must_terminate_predicate(self) -> expr.PredicateAccess:
+    def _get_must_terminate_predicate(self) -> sil.PredicateAccess:
         cthread = self._obligation_info.current_thread_var
         return self._must_terminate.create_predicate_access(cthread)
 
@@ -128,7 +128,7 @@ class StatementNodeConstructorBase:
             [template.format(*args, **kwargs)], self._ctx)
 
     def _append_statement(
-            self, statement: expr.Statement,
+            self, statement: sil.Statement,
             position: Position = None, info: Info = None) -> None:
         translated = statement.translate(
             self._translator, self._ctx,
