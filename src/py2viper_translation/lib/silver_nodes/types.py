@@ -55,3 +55,13 @@ class SeqType(Type):
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         element_type = self._element_type.translate(translator)
         return translator.viper.SeqType(element_type)
+
+
+class DomainType(Type):
+    """A domain type."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def translate(self, translator: 'AbstractTranslator') -> Expr:
+        return translator.viper.DomainType(self._name, {}, [])
