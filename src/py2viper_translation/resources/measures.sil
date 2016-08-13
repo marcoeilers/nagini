@@ -1,21 +1,28 @@
 domain Measure$ {
 
-    function Measure$create(key: Ref, value: Int): Measure$
+    function Measure$create(guard: Bool, key: Ref, value: Int): Measure$
+
+    function Measure$guard(m: Measure$): Bool
 
     function Measure$key(m: Measure$): Ref
 
     function Measure$value(m: Measure$): Int
 
+    axiom Measure$A0 {
+        (forall g: Bool, k: Ref, v: Int :: Measure$guard(Measure$create(g, k, v)) == g)
+    }
+
     axiom Measure$A1 {
-        (forall k: Ref, v: Int :: Measure$key(Measure$create(k, v)) == k)
+        (forall g: Bool, k: Ref, v: Int :: Measure$key(Measure$create(g, k, v)) == k)
     }
 
     axiom Measure$A2 {
-        (forall k: Ref, v: Int :: Measure$value(Measure$create(k, v)) == v)
+        (forall g: Bool, k: Ref, v: Int :: Measure$value(Measure$create(g, k, v)) == v)
     }
 }
 
 function Measure$check(map: Seq[Measure$], key: Ref, value: Int): Bool
 {
-    (forall m: Measure$ :: m in map ==> (Measure$key(m) == key ==> Measure$value(m) > value))
+    (forall m: Measure$ :: m in map ==>
+     ((Measure$guard(m) && Measure$key(m) == key) ==> Measure$value(m) > value))
 }
