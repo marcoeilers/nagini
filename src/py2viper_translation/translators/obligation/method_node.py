@@ -137,16 +137,9 @@ class ObligationMethodNodeConstructor:
         """Add preconditions about current thread and caller measures."""
         cthread_var = self._obligation_info.current_thread_var
         cthread = sil.VarRef(cthread_var)
-        measure_map = self._obligation_info.caller_measure_map
-        measures = sil.VarRef(measure_map.get_var())
         preconditions = [
             cthread != None,        # noqa: E711
         ]
-        if not obligation_config.disable_measures:
-            preconditions.extend([
-                measures != None,       # noqa: E711
-                measure_map.get_contents_access(),
-            ])
         if (self._is_body_native_silver() and
                 not obligation_config.disable_termination_check):
             # Add obligations described in interface_dict.
@@ -175,8 +168,6 @@ class ObligationMethodNodeConstructor:
         self._obligation_method.prepend_body(statements)
         self._obligation_method.add_local(
             self._obligation_info.method_measure_map.get_var())
-        self._obligation_method.add_local(
-            self._obligation_info.method_measure_map.get_contents_var())
 
     def _add_book_keeping_vars(self) -> None:
         self._obligation_method.add_local(

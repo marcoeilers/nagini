@@ -74,7 +74,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def construct_loop(self) -> None:
         """Construct statements to perform a loop."""
-        self._add_method_measure_map_preserved_invariant()
         self._add_leak_check()
         self._set_up_measures()
         self._save_must_terminate_amount(
@@ -87,20 +86,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         self._add_loop()
         self._reset_must_terminate(
             self._loop_obligation_info.original_must_terminate_var)
-
-    def _add_method_measure_map_preserved_invariant(self) -> None:
-        """Add invariant that method measure map is not changed."""
-        if obligation_config.disable_measures:
-            return
-        measure_map = self._method_measure_map
-        permission = measure_map.get_contents_access()
-        assertion = measure_map.get_contents_preserved_assertion()
-        self._obligation_loop.prepend_invariants([
-            permission.translate(
-                self._translator, self._ctx, self._position, self._info),
-            assertion.translate(
-                self._translator, self._ctx, self._position, self._info),
-        ])
 
     def _add_leak_check(self) -> None:
         """Add leak checks to invariant."""
@@ -146,15 +131,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         statements = loop_measure_map.initialize(
             instances, self._translator, self._ctx)
         self._obligation_loop.prepend_body(statements)
-        # Add access permission to invariant.
-        loop_check_before = sil.BoolVar(
-            self._loop_obligation_info.loop_check_before_var)
-        permission = loop_measure_map.get_contents_access()
-        invariant = sil.Implies(sil.Not(loop_check_before), permission)
-        self._obligation_loop.prepend_invariants([
-            invariant.translate(
-                self._translator, self._ctx, self._position, self._info),
-        ])
 
     def _save_loop_termination(self) -> None:
         """Save if loop promises to terminate into a variable."""

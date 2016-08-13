@@ -156,6 +156,13 @@ class BaseObligationInfo(GuardCollectingVisitor):
         return self._create_silver_var(
             name, translator, translator.viper.SeqType(translator.viper.Ref))
 
+    def _create_measure_var(
+            self, name: str, translator: 'AbstractTranslator',
+            local: bool = False) -> PythonVar:
+        typ = translator.viper.SeqType(
+            translator.viper.DomainType('Measure$', {}, []))
+        return self._create_silver_var(name, translator, typ, local=local)
+
 
 class PythonMethodObligationInfo(BaseObligationInfo):
     """Info about the obligation use in a specific method."""
@@ -172,15 +179,13 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             self._postcondition_instances[obligation_id] = []
         self.current_thread_var = self._create_var(
             CURRENT_THREAD_NAME, 'Thread', translator.translator)
-        caller_measure_map_var = self._create_var(
-            MEASURES_CALLER_NAME, 'object', translator.translator)
+        caller_measure_map_var = self._create_measure_var(
+            MEASURES_CALLER_NAME, translator)
         self.caller_measure_map = MeasureMap(caller_measure_map_var)
-        method_measure_map_var = self._create_var(
-            MEASURES_METHOD_NAME, 'object', translator.translator)
-        method_measure_map_contents_var = self._create_seq_var(
-            MEASURES_METHOD_CONTENTS_NAME, translator)
+        method_measure_map_var = self._create_measure_var(
+            MEASURES_METHOD_NAME, translator)
         self.method_measure_map = MeasureMap(
-            method_measure_map_var, method_measure_map_contents_var)
+            method_measure_map_var)
         self.original_must_terminate_var = self._create_perm_var(
             ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator)
         self.increased_must_terminate_var = self._create_perm_var(
@@ -274,9 +279,8 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         self._instances = dict(
             (obligation.identifier(), [])
             for obligation in self._obligation_manager.obligations)
-        loop_measure_map_var = self._create_var(
-            MEASURES_LOOP_NAME, 'object', translator.translator,
-            local=True)
+        loop_measure_map_var = self._create_measure_var(
+            MEASURES_LOOP_NAME, translator, local=True)
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
         self.loop_check_before_var = self._create_var(
             LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator,
