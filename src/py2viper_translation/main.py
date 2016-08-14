@@ -56,7 +56,7 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     builtins = []
     sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
                  'func_triple.sil', 'lock.sil']
-    if not config.disable_measures:
+    if not config.obligation_config.disable_measures:
         sil_files.append('measures.sil')
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
