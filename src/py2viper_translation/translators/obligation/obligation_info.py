@@ -6,6 +6,7 @@ import ast
 from typing import List
 
 from py2viper_translation.lib import silver_nodes as sil
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -280,7 +281,8 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             (obligation.identifier(), [])
             for obligation in self._obligation_manager.obligations)
         loop_measure_map_var = self._create_measure_var(
-            MEASURES_LOOP_NAME, translator, local=True)
+            MEASURES_LOOP_NAME, translator,
+            local=not obligation_config.disable_measures)
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
         self.loop_check_before_var = self._create_var(
             LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator,
