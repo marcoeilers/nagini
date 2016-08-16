@@ -16,6 +16,7 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.util import (
     flatten,
+    get_body_start_index,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
@@ -279,7 +280,6 @@ class StatementTranslator(CommonTranslator):
         return iter_del
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
-        self.enter_loop_translation(node, ctx)
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
@@ -289,6 +289,7 @@ class StatementTranslator(CommonTranslator):
         err_var, next_call, target_assign = self._get_next_call(iter_var,
                                                                 target_var,
                                                                 node, ctx)
+        self.enter_loop_translation(node, ctx, err_var)
 
         invariant = self._create_for_loop_invariant(iter_var, target_var,
                                                     err_var, iterable,
@@ -468,11 +469,10 @@ class StatementTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'purity.violated')
         invariants = []
         locals = []
-        bodyindex = 0
-        while is_invariant(node.body[bodyindex]):
-            invariants.append(self.translate_contract(node.body[bodyindex],
-                                                      ctx))
-            bodyindex += 1
+        for expr, aliases in ctx.actual_function.loop_invariants[node]:
+            with ctx.additional_aliases(aliases):
+                invariants.append(self.translate_contract(expr, ctx))
+        bodyindex = get_body_start_index(node.body)
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         loop = self.create_while_node(

@@ -8,6 +8,7 @@ from typing import Any, List, Optional
 
 from py2viper_translation.lib.errors.wrappers import Error
 from py2viper_translation.lib.errors.rules import Rules
+from py2viper_translation.lib.jvmaccess import JVM
 
 
 Item = namedtuple('Item', 'node vias reason_string')
@@ -38,13 +39,14 @@ class ErrorManager:
 
     def convert(
             self,
-            errors: List['AbstractVerificationError']) -> List[Error]:
+            errors: List['AbstractVerificationError'],
+            jvm: Optional[JVM]) -> List[Error]:
         """Convert Viper errors into py2viper errors.
 
         It does that by wrapping in ``Error`` subclasses.
         """
         new_errors = [
-            self._convert_error(error)
+            self._convert_error(error, jvm)
             for error in errors
         ]
         return new_errors
@@ -60,16 +62,31 @@ class ErrorManager:
             return self._items[node_id]
         return None
 
-    def _convert_error(
-            self, error: 'AbstractVerificationError') -> Error:
-
-        reason_item = self._get_item(error.reason().offendingNode().pos())
-        position = error.pos()
-        rules = {}      # type: Rules
+    def _get_conversion_rules(
+            self, position: 'ast.AbstractSourcePosition') -> Optional[Rules]:
         if hasattr(position, 'id'):
             node_id = position.id()
             if node_id in self._conversion_rules:
-                rules = self._conversion_rules[node_id]
+                return self._conversion_rules[node_id]
+        return None
+
+    def _convert_error(
+            self, error: 'AbstractVerificationError',
+            jvm: Optional[JVM]) -> Error:
+        reason_pos = error.reason().offendingNode().pos()
+        reason_item = self._get_item(reason_pos)
+        position = error.pos()
+        rules = self._get_conversion_rules(position)
+        if rules is None and jvm:
+            # TODO: Due to optimizations, Silicon sometimes returns not
+            # the correct offending node, but an And that contains it.
+            # This is an attempt to work around this problem.
+            node = error.offendingNode()
+            if isinstance(node, jvm.viper.silver.ast.And):
+                rules = (self._get_conversion_rules(node.left().pos()) or
+                         self._get_conversion_rules(node.right().pos()))
+        if rules is None:
+            rules = self._get_conversion_rules(reason_pos) or {}
         error_item = self._get_item(position)
         if error_item:
             return Error(error, rules, reason_item, error_item.node,

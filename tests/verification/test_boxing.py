@@ -32,6 +32,7 @@ def test_dict_subscript() -> None:
     super3 = Super()
     mydict = {1: super1, 7: super3}
     empty_dict = {} # type: Dict[int, Super]
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[1] == super1)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mydict[7] == super2)
@@ -43,6 +44,7 @@ def test_dict_get() -> None:
     super3 = Super()
     mydict = {1: super1, 7 : super3}
     empty_dict = {} # type: Dict[int, Super]
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict.get(1) == super1)
     Assert(mydict.get(7) == super3)
     Assert(mydict.get(44) == None)
@@ -57,11 +59,13 @@ def test_dict_values() -> None:
     empty_dict[4] = 2
     Assert(4 in empty_dict)
     Assert(empty_dict[4] == 2)
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[1] == 1)
     Assert(not (1 in empty_dict))
     mydict[1] = 3
     Assert(mydict[1] == 3)
     Assert(1 in mydict)
+    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[7] == 3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mydict[1] == 1)

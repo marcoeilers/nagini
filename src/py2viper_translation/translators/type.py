@@ -190,6 +190,9 @@ class TypeTranslator(CommonTranslator):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
                         return ctx.actual_function.type
+                    elif node.func.id == 'GhostException':
+                        assert ctx.current_contract_exception is not None
+                        return ctx.current_contract_exception
                     elif node.func.id == 'Acc':
                         return ctx.program.classes[BOOL_TYPE]
                     elif node.func.id == 'Old':

@@ -26,3 +26,5 @@ Type = 'silver.ast.Type'
 Position = 'silver.ast.Position'
 
 Info = 'silver.ast.Info'
+
+Node = 'silver.ast.Node'

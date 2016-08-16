@@ -82,8 +82,10 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.expr_translator.translate_expr(
             node, ctx, expression)
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context) -> StmtsAndExpr:
-        return self.config.expr_translator.translate_to_bool(node, ctx)
+    def translate_to_bool(self, node: ast.AST, ctx: Context,
+                          expression: bool = False) -> StmtsAndExpr:
+        return self.config.expr_translator.translate_to_bool(
+            node, ctx, expression)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
@@ -195,6 +197,16 @@ class AbstractTranslator(metaclass=ABCMeta):
         translator = self.config.obligation_translator
         return translator.translate_obligation_contractfunc_call(node, ctx)
 
+    def translate_must_invoke_token(self, node: ast.Call,
+                                    ctx: Context) -> StmtsAndExpr:
+        translator = self.config.obligation_translator
+        return translator.translate_must_invoke_token(node, ctx)
+
+    def translate_must_invoke_ctoken(self, node: ast.Call,
+                                     ctx: Context) -> StmtsAndExpr:
+        translator = self.config.obligation_translator
+        return translator.translate_must_invoke_ctoken(node, ctx)
+
     def get_obligation_preamble(
             self,
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
@@ -207,11 +219,12 @@ class AbstractTranslator(metaclass=ABCMeta):
             pres: List[Expr], posts: List[Expr],
             locals: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
-            method: PythonMethod = None) -> List[Stmt]:
+            method: PythonMethod = None,
+            overriding: bool = False) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_method_node(
             ctx, name, args, returns, pres, posts, locals, body,
-            position, info, method)
+            position, info, method, overriding)
 
     def create_method_call_node(
             self, ctx: Context, methodname: str, args: List[Expr],
@@ -224,9 +237,10 @@ class AbstractTranslator(metaclass=ABCMeta):
             target_node)
 
     def enter_loop_translation(
-            self, node: Union[ast.While, ast.For], ctx: Context) -> None:
+            self, node: Union[ast.While, ast.For], ctx: Context,
+            err_var: PythonVar = None) -> None:
         translator = self.config.obligation_translator
-        return translator.enter_loop_translation(node, ctx)
+        return translator.enter_loop_translation(node, ctx, err_var)
 
     def leave_loop_translation(self, ctx: Context) -> None:
         translator = self.config.obligation_translator

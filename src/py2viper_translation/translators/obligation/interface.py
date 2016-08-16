@@ -9,11 +9,13 @@ from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
+    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
     Field,
+    Method,
     Position,
     Predicate,
     Stmt,
@@ -38,7 +40,7 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.method import (
     MethodObligationTranslator,
 )
-from py2viper_translation.translators.obligation.visitors import (
+from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
 
@@ -51,14 +53,17 @@ class ObligationTranslator(CommonTranslator):
         super().__init__(config, jvm, source_file, type_info, viper_ast)
         self._obligation_manager = ObligationManager()
         self._method_translator = MethodObligationTranslator(
-            config, jvm, source_file, type_info, viper_ast)
+            config, jvm, source_file, type_info, viper_ast,
+            self._obligation_manager)
         self._loop_translator = LoopObligationTranslator(
-            config, jvm, source_file, type_info, viper_ast)
+            config, jvm, source_file, type_info, viper_ast,
+            self._obligation_manager)
 
     def enter_loop_translation(
-            self, node: Union[ast.While, ast.For], ctx: Context) -> None:
+            self, node: Union[ast.While, ast.For], ctx: Context,
+            err_var: PythonVar = None) -> None:
         """Update context with info needed to translate loop."""
-        self._loop_translator.enter_loop_translation(node, ctx)
+        self._loop_translator.enter_loop_translation(node, ctx, err_var)
 
     def leave_loop_translation(self, ctx: Context) -> None:
         """Remove loop translation info from context."""
@@ -79,9 +84,36 @@ class ObligationTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'MustTerminate':
             return self._translate_must_terminate(node, ctx)
+        elif func_name == 'MustRelease':
+            return self._translate_must_release(node, ctx)
         else:
             raise UnsupportedException(
                 node, 'Unsupported contract function.')
+
+    def translate_must_invoke_token(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``token``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_invoke(node, ctx)
+        else:
+            return self._method_translator.translate_must_invoke(node, ctx)
+
+    def translate_must_invoke_ctoken(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``ctoken``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_invoke_credit(
+                node, ctx)
+        elif ctx.obligation_context.is_translating_posts:
+            if ctx.actual_function.name != 'Gap':
+                raise InvalidProgramException(
+                    node, 'invalid.postcondition.ctoken_not_allowed')
+            else:
+                return self._method_translator.translate_must_invoke_credit(
+                    node, ctx)
+        else:
+            return self._method_translator.translate_must_invoke_credit(
+                node, ctx)
 
     def _translate_must_terminate(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -94,6 +126,14 @@ class ObligationTranslator(CommonTranslator):
         else:
             return self._method_translator.translate_must_terminate(node, ctx)
 
+    def _translate_must_release(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """Translate a call to ``MustRelease``."""
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_must_release(node, ctx)
+        else:
+            return self._method_translator.translate_must_release(node, ctx)
+
     def get_obligation_preamble(
             self,
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
@@ -103,19 +143,21 @@ class ObligationTranslator(CommonTranslator):
         this preamble.
         """
         predicates = self._obligation_manager.create_predicates(self)
-        return predicates, []
+        fields = self._obligation_manager.create_fields(self)
+        return predicates, fields
 
-    def create_method_node(
+    def create_method_node(     # pylint: disable=too-many-arguments
             self, ctx: Context, name: str,
             args: List[VarDecl], returns: List[VarDecl],
             pres: List[Expr], posts: List[Expr],
             local_vars: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
-            method: PythonMethod = None) -> List[Stmt]:
+            method: PythonMethod = None,
+            overriding: bool = False) -> Method:
         """Construct method AST node with additional obligation stuff."""
         return self._method_translator.create_method_node(
             ctx, name, args, returns, pres, posts, local_vars, body,
-            position, info, method)
+            position, info, method, overriding)
 
     def create_method_call_node(
             self, ctx: Context, methodname: str, args: List[Expr],
@@ -130,7 +172,6 @@ class ObligationTranslator(CommonTranslator):
     def create_obligation_info(self, method: PythonMethod) -> object:
         """Create obligation info for the method."""
         info = PythonMethodObligationInfo(
-            self._obligation_manager, method, self.translator)
-        info.traverse_preconditions()
-        info.traverse_postconditions()
+            self._obligation_manager, method, self)
+        info.traverse_contract()
         return info

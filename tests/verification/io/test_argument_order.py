@@ -24,7 +24,7 @@ def read_something(t1: Place) -> Tuple[Place, int, bool]:
     IOExists3(Place, int, bool)(
         lambda t2, value1, value2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             read_something_io(t1, value1, value2, t2)
         ),
         Ensures(
@@ -52,7 +52,7 @@ def write_something(t1: Place, value1: int, value2: bool) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 1) and
             write_something_io(t1, value1, value2, t2)
         ),
         Ensures(

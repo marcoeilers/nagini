@@ -57,7 +57,7 @@ def infinite_counter_io(
 
 def main(t1: Place) -> None:
     Requires(
-        token(t1) and
+        token(t1, 2) and
         infinite_counter_io(t1, 0)
     )
     Ensures(
@@ -69,7 +69,7 @@ def main(t1: Place) -> None:
 
     while True:
         Invariant(
-            token(t_cur) and
+            token(t_cur, 1) and
             infinite_counter_io(t_cur, count) and
             count >= 0
             )
@@ -83,7 +83,7 @@ def main(t1: Place) -> None:
 
         while (unary_count != count):
             Invariant(
-                token(t1_unary) and
+                token(t1_unary, 1) and
                 print_unary_io(t1_unary, count - unary_count, t_unary_end) and
                 unary_count <= count
                 )
