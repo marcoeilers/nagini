@@ -16,7 +16,10 @@ def test_list() -> None:
 
 def test_list2() -> None:
     Requires(MustTerminate(1))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    # TODO: Figure out how to have normal errors like
+    # leak_check.failed:must_terminate.not_taken for axiomatized methods
+    # that have no position.
+    #:: ExpectedOutput(call.precondition:assertion.false)
     a = [1, 2, 3]
 
 

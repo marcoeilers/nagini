@@ -149,19 +149,6 @@ def over_in_two8() -> None:
     over_in_many(False)
 
 
-# Calling non-terminating is not-allowed.
-
-
-def non_terminating3() -> None:
-    pass
-
-
-def terminating_caller() -> None:
-    Requires(MustTerminate(2))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
-    non_terminating3()
-
-
 # Check with non-boolean guards.
 
 

@@ -32,6 +32,15 @@ class SubIncreased(Super):
         lock.release()
 
 
+class SubIncreased2(Super):
+
+    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken,Super__do_stuff)
+    def do_stuff(self) -> None:
+        """Measure increased. Error."""
+        Requires(MustTerminate(3))
+        Requires(MustTerminate(3))
+
+
 class SubDecreased(Super):
 
     def do_stuff(self) -> None:

@@ -6,6 +6,7 @@ import ast
 from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import silver_nodes as sil
+from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
 )
@@ -36,7 +37,8 @@ class MustInvokeObligationInstance(
         self._measure = measure
         self._target = target
 
-    def _get_inexhale(self) -> ObligationInhaleExhale:
+    def _get_inexhale(
+            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             sil.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
             sil.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),

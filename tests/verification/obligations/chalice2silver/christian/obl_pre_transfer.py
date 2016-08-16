@@ -67,6 +67,7 @@ class A:
 
     def mustTerminate_still_applies(self) -> None:
         Requires(MustTerminate(3))
+        Requires(MustTerminate(3))
         r = Lock()
         r.acquire()
         self.skip(r)

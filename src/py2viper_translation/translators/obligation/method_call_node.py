@@ -18,6 +18,9 @@ from py2viper_translation.lib.typedefs import (
     Info,
     Position,
 )
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+)
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -26,6 +29,9 @@ from py2viper_translation.translators.obligation.node_constructor import (
 )
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
+)
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    TerminationGuarantee,
 )
 
 
@@ -72,18 +78,72 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def construct_call(self) -> None:
         """Construct statements to perform a call."""
+        self._check_valid_call()
         self._add_aditional_arguments()
         if not self._is_axiomatized_target():
             self._check_measures_are_positive()
-        self._save_must_terminate_amount(
-            self._obligation_info.original_must_terminate_var)
-        self._inhale_additional_must_terminate()
-        self._save_must_terminate_amount(
-            self._obligation_info.increased_must_terminate_var)
+        if not self._check_skip_normal_termination_checks():
+            self._save_must_terminate_amount(
+                self._obligation_info.original_must_terminate_var)
+            self._inhale_additional_must_terminate()
+            self._save_must_terminate_amount(
+                self._obligation_info.increased_must_terminate_var)
+        elif self._check_no_forced_termination_needed():
+            self._check_no_forced_termination()
         self._add_call()
-        self._check_must_terminate()
-        self._reset_must_terminate(
-            self._obligation_info.original_must_terminate_var)
+        if not self._check_skip_normal_termination_checks():
+            self._check_must_terminate()
+            self._reset_must_terminate(
+                self._obligation_info.original_must_terminate_var)
+
+    def _get_context_termination(self) -> TerminationGuarantee:
+        if self._ctx.obligation_context.is_translating_loop():
+            obligation_info = self._ctx.obligation_context.current_loop_info
+        else:
+            obligation_info = self._ctx.actual_function.obligation_info
+        return obligation_info.get_termination_guarantee()
+
+    def _get_target_termination(self) -> TerminationGuarantee:
+        obligation_info = self._target_method.obligation_info
+        return obligation_info.get_termination_guarantee()
+
+    def _check_skip_normal_termination_checks(self) -> bool:
+        """Check if we can skip termination checks."""
+        return (self._get_target_termination() is not
+                TerminationGuarantee.may_terminating)
+
+    def _check_no_forced_termination_needed(self) -> bool:
+        """Check if we need to guarantee not-having termination obligation."""
+        return (self._get_context_termination() is
+                TerminationGuarantee.may_terminating and
+                self._get_target_termination() is
+                TerminationGuarantee.potentially_non_terminating)
+
+    def _check_valid_call(self) -> None:
+        """Check that terminating context does not call non-terminating."""
+        if (self._get_context_termination() is
+                TerminationGuarantee.always_terminating):
+            if (self._get_target_termination() is
+                    TerminationGuarantee.potentially_non_terminating):
+                raise InvalidProgramException(
+                    self._target_node,
+                    'non_terminating_call_in_terminating_context')
+
+    def _check_no_forced_termination(self) -> None:
+        """Check that termination is not required.
+
+        Check that ``may_terminating`` does not require
+        ``potentially_non_terminating`` to terminate.
+        """
+        if obligation_config.disable_termination_check:
+            return
+        predicate = self._get_must_terminate_predicate()
+        assertion = sil.Assert(sil.CurrentPerm(predicate) == sil.NoPerm())
+        position = self._to_position(
+            conversion_rules=rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)
+        info = self._to_info(
+            'Check that callee is not required to terminate.')
+        self._append_statement(assertion, position, info)
 
     def _add_aditional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
