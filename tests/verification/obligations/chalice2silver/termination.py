@@ -81,12 +81,6 @@ def f4() -> None:
     i_time(10)
 
 
-def f5() -> None:
-    Requires(MustTerminate(5))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
-    no_time()
-
-
 def loop1() -> None:
     Requires(MustTerminate(2))
     i = 0

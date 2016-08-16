@@ -25,6 +25,9 @@ from py2viper_translation.translators.obligation.measures import (
 from py2viper_translation.translators.obligation.types.base import (
     ObligationInstance,
 )
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    TerminationGuarantee,
+)
 
 
 CURRENT_THREAD_NAME = '_cthread'
@@ -235,37 +238,27 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             all_instances.extend(instances)
         return all_instances
 
-    def always_terminates(self) -> bool:
-        """Check if method always terminates.
-
-        +   Normal method is guaranteed to always terminate if it has
-            unguarded ``MustTerminate`` in its precondition.
-
-            .. note::
-
-                If method has unguarded ``MustTerminate`` in its
-                precondition, then it is guaranteed to take at least one
-                ``MustTerminate`` obligation:
-
-                +   In the case when caller is terminating, the
-                    ``MustTerminate`` leak check would ensure that
-                    callee takes at least one obligation.
-                +   In the case when caller is not terminating, the
-                    ``MustTerminate`` measure would be top and callee is
-                    guaranteed to take the unguarded obligation.
-        +   Axiomatized method is guaranteed to terminate if it is
-            annotated to do so in ``preamble.index``.
-        """
+    def get_termination_guarantee(self) -> TerminationGuarantee:
+        """Get the method's termination guarantee."""
         must_terminate = self._obligation_manager.must_terminate_obligation
         if self._method.interface:
-            return must_terminate.is_interface_method_terminating(
+            terminating = must_terminate.is_interface_method_terminating(
                 self._method.interface_dict)
+            if terminating:
+                return TerminationGuarantee.always_terminating
+            else:
+                return TerminationGuarantee.potentially_non_terminating
         else:
-            for instance in self._precondition_instances[
-                    must_terminate.identifier()]:
-                if not instance.guard:
-                    return True
-            return False
+            instances = self._precondition_instances[
+                must_terminate.identifier()]
+            if not instances:
+                return TerminationGuarantee.potentially_non_terminating
+            if len(instances) != 1:
+                return TerminationGuarantee.may_terminating
+            if instances[0].guard:
+                return TerminationGuarantee.may_terminating
+            else:
+                return TerminationGuarantee.always_terminating
 
 
 class PythonLoopObligationInfo(BaseObligationInfo):
@@ -327,11 +320,15 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         else:
             return sil.VarRef(self.iteration_err_var) == None  # noqa: E711
 
-    def always_terminates(self) -> bool:
-        """Check if loop always terminates."""
-        instances = self._instances[
-            self._obligation_manager.must_terminate_obligation.identifier()]
-        for instance in instances:
-            if not instance.guard:
-                return True
-        return False
+    def get_termination_guarantee(self) -> TerminationGuarantee:
+        """Get the loop's termination guarantee."""
+        must_terminate = self._obligation_manager.must_terminate_obligation
+        instances = self._instances[must_terminate.identifier()]
+        if not instances:
+            return TerminationGuarantee.potentially_non_terminating
+        if len(instances) != 1:
+            return TerminationGuarantee.may_terminating
+        if instances[0].guard:
+            return TerminationGuarantee.may_terminating
+        else:
+            return TerminationGuarantee.always_terminating

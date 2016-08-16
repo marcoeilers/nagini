@@ -23,6 +23,9 @@ from py2viper_translation.translators.obligation.node_constructor import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonLoopObligationInfo,
 )
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    TerminationGuarantee,
+)
 
 
 class ObligationLoop:
@@ -96,8 +99,11 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         termination_flag = sil.BoolVar(
             self._loop_obligation_info.termination_flag_var)
 
+        always_terminating = (
+            self._loop_obligation_info.get_termination_guarantee() is
+            TerminationGuarantee.always_terminating)
         if (not obligation_config.disable_loop_context_leak_check and
-                not self._loop_obligation_info.always_terminates()):
+                not always_terminating):
             before_loop_leak_check = sil.InhaleExhale(
                 sil.TrueLit(),
                 sil.Implies(

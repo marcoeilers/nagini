@@ -28,6 +28,9 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
+from py2viper_translation.translators.obligation.types.must_terminate import (
+    TerminationGuarantee,
+)
 
 
 class ObligationMethod:
@@ -203,7 +206,8 @@ class ObligationMethodNodeConstructor:
         """
         if obligation_config.disable_call_context_leak_check:
             return
-        if self._obligation_info.always_terminates():
+        if (self._obligation_info.get_termination_guarantee() is
+                TerminationGuarantee.always_terminating):
             return
         must_terminate = self._obligation_manager.must_terminate_obligation
         if self._python_method.interface:
@@ -215,9 +219,15 @@ class ObligationMethodNodeConstructor:
         cthread = self._obligation_info.current_thread_var
         predicate = must_terminate.create_predicate_access(cthread)
         reference_name = self._python_method.get_fresh_name('_r')
-        check = sil.InhaleExhale(sil.TrueLit(), sil.Implies(
-            sil.CurrentPerm(predicate) == sil.IntegerPerm(count),
-            self._obligation_manager.create_leak_check(reference_name)))
+        leak_check = self._obligation_manager.create_leak_check(reference_name)
+        if (self._obligation_info.get_termination_guarantee() is
+                TerminationGuarantee.potentially_non_terminating):
+            exhale = leak_check
+        else:
+            exhale = sil.Implies(
+                sil.CurrentPerm(predicate) == sil.IntegerPerm(count),
+                leak_check)
+        check = sil.InhaleExhale(sil.TrueLit(), exhale)
         if self._python_method.node is None:
             # TODO: Handle interface methods properly.
             node = ast.AST()

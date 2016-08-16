@@ -57,6 +57,7 @@ class A:
         #:: Label(quick_release__MustRelease)
         Requires(MustRelease(other.a, other.b))
 
+        #:: UnexpectedOutput(call.precondition:assertion.false, /py2viper/issue/56/)
         other.a.release()
 
     def timed_release_unbounded(self) -> None:

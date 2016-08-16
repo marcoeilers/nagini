@@ -23,17 +23,22 @@ class ObligationInhaleExhale:
             self, bounded: sil.Location,
             unbounded: Optional[sil.Location] = None,
             credit: Optional[sil.Location] = None,
-            max_one_inhale: bool = False) -> None:
+            max_one_inhale: bool = False,
+            exhale_only_check_measure: bool = False) -> None:
         """Constructor.
 
         :param max_one_inhale:
             Indicates that at most one write permission to this
             obligation can be inhaled.
+        :param exhale_only_check_measure:
+            Indicates that it should only be checked that the measure
+            decreases (instead of trying to exhale access).
         """
         self._bounded = bounded
         self._unbounded = unbounded
         self._credit = credit
         self._max_one_inhale = max_one_inhale
+        self._exhale_only_check_measure = exhale_only_check_measure
 
     @property
     def _unbounded_positive(self) -> sil.BoolExpression:
@@ -119,10 +124,14 @@ class ObligationInhaleExhale:
 
         Used for bounded obligations.
         """
+        if self._exhale_only_check_measure:
+            exhale = measure_check
+        else:
+            exhale = self._construct_bounded_exhale(
+                measure_check if not is_postconditon else None)
         return sil.InhaleExhale(
             self._construct_inhale(False, measure_positive_check),
-            self._construct_bounded_exhale(
-                measure_check if not is_postconditon else None))
+            exhale)
 
     def construct_use_loop(
             self, measure_check: sil.BoolExpression,
@@ -140,13 +149,17 @@ class InexhaleObligationInstanceMixin(abc.ABC):
     """Mixin that provides obligation use methods for obligation instances."""
 
     @abc.abstractmethod
-    def _get_inexhale(self) -> ObligationInhaleExhale:
-        """Create ``ObligationInhaleExhale`` instance."""
+    def _get_inexhale(
+            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
+        """Create ``ObligationInhaleExhale`` instance.
+
+        :param is_method: ``True`` if translating method contract.
+        """
 
     def get_use_method(
             self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Default implementation for obligation use in method contract."""
-        inexhale = self._get_inexhale()
+        inexhale = self._get_inexhale(True, ctx)
         obligation_info = ctx.actual_function.obligation_info
         if self.is_fresh():
             return [(inexhale.construct_use_method_unbounded(), None)]
@@ -172,7 +185,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
                           rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE))
 
         # Actual inhale / exhale.
-        inexhale = self._get_inexhale()
+        inexhale = self._get_inexhale(False, ctx)
         measure_check = obligation_info.loop_measure_map.check(
             self.get_target(), self.get_measure())
         inhale_exhale = inexhale.construct_use_loop(

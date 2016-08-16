@@ -61,11 +61,10 @@ def g3(a: Lock) -> None:
 
 
 def h1(a: Lock) -> None:
-    Requires(MustTerminate(5))
     Requires(a is not None)
     Requires(MustRelease(a, 2))
 
-    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)|OptionalOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     t()
     a.release()
 
@@ -80,10 +79,9 @@ def h2(a: Lock) -> None:
 
 
 def h3(a: Lock) -> None:
-    Requires(MustTerminate(5))
     Requires(a is not None)
     Requires(MustRelease(a, 2))
 
-    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)|OptionalOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     t()
     a.release()
