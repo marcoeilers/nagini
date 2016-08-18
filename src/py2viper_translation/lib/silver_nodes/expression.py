@@ -36,7 +36,19 @@ class VarDecl(Expression):
         return self._var.decl
 
 
+class AnyVar(Expression):
+    """A variable of a unknown type."""
+
+    def __init__(self, var: PythonVar) -> None:
+        self._var = var
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return self._var.ref()
+
+
 __all__ = (
+    'AnyVar',
     'Expression',
     'VarDecl',
 )

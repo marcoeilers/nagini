@@ -17,14 +17,14 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
+    end_io,
+    End,
     no_op_io,
     NoOp,
     split_io,
     Split,
     join_io,
     Join,
-    gap_io,
-    Gap,
 )
 Import('io_builtins')
 from py2viper_contracts.obligations import (
@@ -62,7 +62,7 @@ def handle_client_io(
             read_all_io(t_pre, client_socket, 1, data, t2) and
             output_io(t2, client_socket, data, t3) and
             close_io(t3, client_socket, t4) and
-            gap_io(t4)
+            end_io(t4)
         )
     )
 
@@ -118,7 +118,7 @@ def handle_client(client_socket: Socket, t1: Place) -> None:
 
     t10 = close(t9, client_socket)
 
-    Gap(t10)
+    End(t10)
 
 
 def run(t1: Place) -> None:

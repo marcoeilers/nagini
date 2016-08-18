@@ -40,10 +40,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.ignored_lines = ignored_lines
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
+        """Checks if call is either ``Result`` or ``RaisedException``."""
         if isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
                 return True
-            if node.callee.name == 'GhostException':
+            if node.callee.name == 'RaisedException':
                 return True
         return False
 

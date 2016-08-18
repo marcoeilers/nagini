@@ -146,7 +146,11 @@ class ObligationInhaleExhale:
 
 
 class InexhaleObligationInstanceMixin(abc.ABC):
-    """Mixin that provides obligation use methods for obligation instances."""
+    """Mixin that provides obligation use methods for obligation instances.
+
+    This mix-in should be mixed into ``ObligationInstance`` that desire
+    to have default ``get_use_method`` and ``get_use_loop`` behaviour.
+    """
 
     @abc.abstractmethod
     def _get_inexhale(

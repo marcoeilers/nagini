@@ -8,7 +8,7 @@ from py2viper_contracts.contracts import (
     Implies,
     Requires,
     Result,
-    GhostException,
+    RaisedException,
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
@@ -61,7 +61,7 @@ def mkdir(t1: Place, path: str) -> Place:
                 ex is None
             ),
             Exsures(OSErrorWrapper,
-                ex == GhostException() and
+                ex == RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, OSError)
             ),
@@ -96,7 +96,7 @@ def is_dir(t1: Place, path: str) -> Tuple[bool, Place]:
                     success == Result()[0]
                 ),
                 Exsures(OSErrorWrapper,
-                    ex == GhostException() and
+                    ex == RaisedException() and
                     Acc(ex.place) and ex.place == t2 and token(t2) and
                     Acc(ex.exception) and isinstance(ex.exception, OSError)
                 ),
@@ -235,7 +235,7 @@ def ensure_dir_exists2(t1: Place, path: str) -> Place:
             ),
             Exsures(OSErrorWrapper,
                 #:: UnexpectedOutput(postcondition.violated:assertion.false, /py2viper/issue/55/)
-                ex == GhostException() and
+                ex == RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, OSError)
             ),

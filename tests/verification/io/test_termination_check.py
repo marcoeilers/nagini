@@ -6,6 +6,7 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
+    end_io,
     gap_io,
     no_op_io,
 )
@@ -209,7 +210,7 @@ def test_gap_io10(
         t_pre: Place) -> bool:
     TerminationMeasure(2)
     Terminates(True)
-    return gap_io(t_pre)
+    return end_io(t_pre)
 
 # Termination condition implication.
 

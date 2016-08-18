@@ -81,6 +81,8 @@ class ErrorManager:
             # TODO: Due to optimizations, Silicon sometimes returns not
             # the correct offending node, but an And that contains it.
             # This is an attempt to work around this problem.
+            # In the long term we should discuss with Malte how to solve
+            # this problem properly.
             node = error.offendingNode()
             if isinstance(node, jvm.viper.silver.ast.And):
                 rules = (self._get_conversion_rules(node.left().pos()) or

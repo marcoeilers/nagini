@@ -1,6 +1,9 @@
 """Permission typed Silver expressions."""
 
 
+from py2viper_translation.lib.program_nodes import (
+    PythonVar,
+)
 from py2viper_translation.lib.silver_nodes.expression import Expression
 from py2viper_translation.lib.silver_nodes.perm_cmp_expr import (
     PermGtCmp,
@@ -98,3 +101,15 @@ class IntegerPerm(PermExpression):
         full_perm = translator.viper.FullPerm(position, info)
         return translator.viper.IntPermMul(
             value, full_perm, position, info)
+
+
+class PermVar(PermExpression):
+    """A reference to a Perm-typed variable."""
+
+    def __init__(self, var: PythonVar) -> None:
+        self._var = var
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        assert self._var.decl.typ() == translator.viper.Perm
+        return self._var.ref()

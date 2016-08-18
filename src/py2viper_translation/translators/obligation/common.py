@@ -21,6 +21,9 @@ from py2viper_translation.translators.common import CommonTranslator
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
 )
+from py2viper_translation.translators.obligation.obligation_info import (
+    BaseObligationInfo,
+)
 from py2viper_translation.translators.obligation.types.base import (
     ObligationInstance,
 )
@@ -32,9 +35,6 @@ from py2viper_translation.translators.obligation.types.must_release import (
 )
 from py2viper_translation.translators.obligation.types.must_terminate import (
     MustTerminateObligationInstance,
-)
-from py2viper_translation.translators.obligation.obligation_info import (
-    BaseObligationInfo,
 )
 
 
@@ -78,12 +78,12 @@ class CommonObligationTranslator(CommonTranslator):
                 raise InvalidProgramException(
                     node, 'obligation.fresh.in_precondition')
 
-        pairs = self._create_obligation_instance_use(
+        exprs_with_rules = self._create_obligation_instance_use(
             obligation_instance, ctx)
 
         info = self.no_info(ctx)
         translated_expressions = []
-        for expression, rules in pairs:
+        for expression, rules in exprs_with_rules:
             position = self.to_position(node, ctx, rules=rules)
             translated_expression = expression.translate(
                 self, ctx, position, info)
@@ -99,7 +99,7 @@ class CommonObligationTranslator(CommonTranslator):
         return self._translate_obligation_use(
             node, ctx, MustInvokeObligationInstance)
 
-    def translate_must_invoke_credit(
+    def translate_may_invoke(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``ctoken`` in a contract."""
         obligation = self._obligation_manager.must_invoke_obligation

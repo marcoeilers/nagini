@@ -59,7 +59,7 @@ class StatementNodeConstructorBase:
 
     def _save_must_terminate_amount(
             self, amount_var: PythonVar) -> None:
-        """Save the original permission amount to a variable."""
+        """Save the current permission amount to a variable."""
         if obligation_config.disable_termination_check:
             return
         predicate = self._get_must_terminate_predicate()
@@ -79,7 +79,7 @@ class StatementNodeConstructorBase:
         if obligation_config.disable_termination_check:
             return
         predicate = self._get_must_terminate_predicate()
-        original_amount = sil.VarRef(amount_var)
+        original_amount = sil.PermVar(amount_var)
         perm = sil.CurrentPerm(predicate) - original_amount
         exhale = sil.Exhale(sil.Implies(
             sil.CurrentPerm(predicate) > sil.NoPerm(),

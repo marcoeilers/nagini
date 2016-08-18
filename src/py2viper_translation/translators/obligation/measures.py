@@ -40,7 +40,7 @@ class MeasureMap:
             return sil.TrueLit()
         args = [
             sil.CallArg('map', self._measure_var_type,
-                        sil.VarRef(self._map_var)),
+                        sil.AnyVar(self._map_var)),
             sil.CallArg('key', sil.REF, reference),
             sil.CallArg('value', sil.INT, value),
         ]
@@ -53,11 +53,11 @@ class MeasureMap:
     def initialize(
             self, obligation_instances: List['GuardedObligationInstance'],
             translator: 'AbstractTranslator', ctx: Context,
-            overriding: bool = False) -> List[Stmt]:
+            overriding_check: bool = False) -> List[Stmt]:
         """Construct a list of statements that initialize measure map.
 
-        If ``overriding`` is ``True``, then adds to measures ``1`` to
-        allow overridden method to have the same measure.
+        If ``overriding_check`` is ``True``, then adds to measures ``1``
+        to allow overridden method to have the same measure.
         """
         position = translator.no_position(ctx)
         info = translator.no_info(ctx)
@@ -65,7 +65,7 @@ class MeasureMap:
         for instance in obligation_instances:
             guard_expression = instance.create_guard_expression()
             value = instance.obligation_instance.get_measure()
-            if overriding:
+            if overriding_check:
                 value = sil.Inc(value)
             measure = self._create_measure(
                 guard_expression,

@@ -3,6 +3,7 @@
 
 import ast
 
+from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
@@ -36,14 +37,15 @@ class Null(RefExpression):
         return translator.viper.NullLit(position, info)
 
 
-class VarRef(RefExpression):
-    """A reference typed variable."""
+class RefVar(RefExpression):
+    """A reference to a Ref-typed variable."""
 
     def __init__(self, var: PythonVar) -> None:
         self._var = var
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
+        assert self._var.decl.typ() == translator.viper.Ref
         return self._var.ref()
 
 
@@ -58,4 +60,7 @@ class PythonRefExpression(RefExpression):
         stmt, expr = translator.translate_expr(
             self._node, ctx, expression=True)
         assert not stmt
+        typ = translator.get_type(self._node, ctx)
+        for primitive in PRIMITIVES:
+            assert typ is not ctx.program.classes[primitive]
         return expr

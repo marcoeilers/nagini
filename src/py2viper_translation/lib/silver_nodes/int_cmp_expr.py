@@ -12,7 +12,10 @@ from py2viper_translation.lib.typedefs import (
 
 
 class IntComparison(BoolExpression):   # pylint: disable=abstract-method
-    """A base class for all integer comparison operators."""
+    """A base class for all integer comparison operators.
+
+    Except ``!=`` and ``==``, which are defined for all expressions.
+    """
 
     def __init__(self, left: 'IntExpression', right: 'IntExpression') -> None:
         self._left = left
@@ -20,9 +23,14 @@ class IntComparison(BoolExpression):   # pylint: disable=abstract-method
 
     @abc.abstractmethod
     def _compare(self, left: int, right: int) -> bool:
-        """Compare ``left`` to ``right``."""
+        """Compare ``left`` to ``right``.
+
+        That is, if the value is known statically, it evaluates the
+        expression.
+        """
 
     def is_always_true(self) -> bool:
+        """Check if it is statically known that comparison is ``True``."""
         left_value = self._left.get_value()
         if left_value is None:
             return False
@@ -32,6 +40,7 @@ class IntComparison(BoolExpression):   # pylint: disable=abstract-method
         return self._compare(left_value, right_value)
 
     def is_always_false(self) -> bool:
+        """Check if it is statically known that comparison is ``False``."""
         left_value = self._left.get_value()
         if left_value is None:
             return False

@@ -58,7 +58,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
             local_vars: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
             method: PythonMethod = None,
-            overriding: bool = False) -> Method:
+            overriding_check: bool = False) -> Method:
         """Construct method AST node with additional obligation stuff."""
         if method is None:
             method = find_method_by_sil_name(ctx, name)
@@ -73,7 +73,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
             name, original_args, returns, pres, posts, local_vars, body)
         constructor = ObligationMethodNodeConstructor(
             obligation_method, method, self, ctx, self._obligation_manager,
-            position, info, overriding)
+            position, info, overriding_check)
         constructor.add_obligations()
 
         return constructor.construct_node()

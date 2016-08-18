@@ -27,11 +27,11 @@ class Expression(Node):
     """A base class for all expressions."""
 
     @abc.abstractmethod
-    def __eq__(self, other) -> 'Expression':
+    def __eq__(self, other: 'Expression') -> 'Expression':
         """Check equality."""
 
     @abc.abstractmethod
-    def __ne__(self, other) -> 'Expression':
+    def __ne__(self, other: 'Expression') -> 'Expression':
         """Check inequality."""
 
 
