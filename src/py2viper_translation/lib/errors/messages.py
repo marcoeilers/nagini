@@ -82,12 +82,12 @@ REASONS = {
         lambda n: ('Obligation {} measure might be '
                    'non-positive.').format(pprint(n)),
     'must_terminate.not_taken':
-        lambda n: ('Callee {} did not take MustTerminate '
+        lambda n: ('Callee {} might not take MustTerminate '
                    'obligation.').format(get_target_name(n)),
     'must_terminate.loop_not_promised':
-        lambda n: ('Loop does not promise to terminate.'),
+        lambda n: ('Loop might not promise to terminate.'),
     'must_terminate.loop_promise_not_kept':
-        lambda n: ('Loop does not keep promise to terminate.'),
+        lambda n: ('Loop might not keep promise to terminate.'),
     'caller.has_unsatisfied_obligations':
         lambda n: ('Callee {} might not take all unsatisfied obligations '
                    'from the caller.'.format(get_target_name(n))),
