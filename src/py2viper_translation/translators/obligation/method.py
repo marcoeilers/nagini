@@ -5,6 +5,7 @@ import ast
 
 from typing import List
 
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -12,9 +13,9 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
-    Position,
+    Method,
     Stmt,
-    StmtsAndExpr,
+    Position,
     VarDecl,
 )
 from py2viper_translation.translators.obligation.common import (
@@ -22,13 +23,17 @@ from py2viper_translation.translators.obligation.common import (
 )
 from py2viper_translation.translators.obligation.method_node import (
     ObligationMethod,
-    ObligationsMethodNodeConstructor,
+    ObligationMethodNodeConstructor,
 )
 from py2viper_translation.translators.obligation.method_call_node import (
-    ObligationsMethodCallNodeConstructor,
+    ObligationMethodCall,
+    ObligationMethodCallNodeConstructor,
 )
-from py2viper_translation.translators.obligation.types import (
-    must_terminate,
+from py2viper_translation.translators.obligation.types.base import (
+    ObligationInstance,
+)
+from py2viper_translation.translators.obligation.obligation_info import (
+    BaseObligationInfo,
 )
 from py2viper_translation.translators.obligation.utils import (
     find_method_by_sil_name,
@@ -38,29 +43,22 @@ from py2viper_translation.translators.obligation.utils import (
 class MethodObligationTranslator(CommonObligationTranslator):
     """Class for translating obligations in methods."""
 
-    def translate_must_terminate(
-            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate ``MustTerminate`` in loop invariant."""
-        obligation_info = ctx.actual_function.obligation_info
-        guarded_obligation_instance = obligation_info.get_instance(node)
-        obligation_instance = guarded_obligation_instance.obligation_instance
-        assert isinstance(obligation_instance,
-                          must_terminate.MustTerminateObligationInstance)
+    def _get_obligation_info(self, ctx: Context) -> BaseObligationInfo:
+        return ctx.actual_function.obligation_info
 
-        inhale_exhale = obligation_instance.get_use_method(ctx)
+    def _create_obligation_instance_use(
+            self, obligation_instance: ObligationInstance,
+            ctx: Context) -> sil.InhaleExhale:
+        return obligation_instance.get_use_method(ctx)
 
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        expr = inhale_exhale.translate(self, ctx, position, info)
-        return ([], expr)
-
-    def create_method_node(
+    def create_method_node(     # pylint: disable=too-many-arguments
             self, ctx: Context, name: str,
             original_args: List[VarDecl], returns: List[VarDecl],
             pres: List[Expr], posts: List[Expr],
             local_vars: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
-            method: PythonMethod = None) -> List[Stmt]:
+            method: PythonMethod = None,
+            overriding_check: bool = False) -> Method:
         """Construct method AST node with additional obligation stuff."""
         if method is None:
             method = find_method_by_sil_name(ctx, name)
@@ -73,8 +71,9 @@ class MethodObligationTranslator(CommonObligationTranslator):
 
         obligation_method = ObligationMethod(
             name, original_args, returns, pres, posts, local_vars, body)
-        constructor = ObligationsMethodNodeConstructor(
-            obligation_method, method, self, ctx, position, info)
+        constructor = ObligationMethodNodeConstructor(
+            obligation_method, method, self, ctx, self._obligation_manager,
+            position, info, overriding_check)
         constructor.add_obligations()
 
         return constructor.construct_node()
@@ -85,8 +84,10 @@ class MethodObligationTranslator(CommonObligationTranslator):
             target_method: PythonMethod = None,
             target_node: ast.Call = None) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
-        constructor = ObligationsMethodCallNodeConstructor(
-            methodname, original_args, targets, position, info, self, ctx,
-            target_method, target_node)
+        obligation_method_call = ObligationMethodCall(
+            methodname, original_args, targets)
+        constructor = ObligationMethodCallNodeConstructor(
+            obligation_method_call, position, info, self, ctx,
+            self._obligation_manager, target_method, target_node)
         constructor.construct_call()
         return constructor.get_statements()

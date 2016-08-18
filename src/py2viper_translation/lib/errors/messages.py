@@ -50,6 +50,8 @@ ERRORS = {
                    'well-formed.').format(get_containing_member(n).name),
     'termination_check.failed':
         lambda n: 'Operation might not terminate.',
+    'leak_check.failed':
+        lambda n: 'Obligation leak check failed.',
 }
 
 REASONS = {
@@ -64,7 +66,7 @@ REASONS = {
     'insufficient.permission':
         lambda n: ('There might be insufficient permission to '
                    'access {}.').format(pprint(n)),
-    'measure.non_positive':
+    'termination_measure.non_positive':
         lambda n: ('Termination measure {} might be '
                    'non-positive.').format(pprint(n)),
     'measure.non_decreasing':
@@ -76,4 +78,28 @@ REASONS = {
     'child_termination.not_implied':
         lambda n: ('Parent IO operation termination condition does not '
                    'imply {} termination condition.').format(pprint(n)),
+    'obligation_measure.non_positive':
+        lambda n: ('Obligation {} measure might be '
+                   'non-positive.').format(pprint(n)),
+    'must_terminate.not_taken':
+        lambda n: ('Callee {} might not take MustTerminate '
+                   'obligation.').format(get_target_name(n)),
+    'must_terminate.loop_not_promised':
+        lambda n: ('Loop might not promise to terminate.'),
+    'must_terminate.loop_promise_not_kept':
+        lambda n: ('Loop might not keep promise to terminate.'),
+    'caller.has_unsatisfied_obligations':
+        lambda n: ('Callee {} might not take all unsatisfied obligations '
+                   'from the caller.'.format(get_target_name(n))),
+    'method_body.leaks_obligations':
+        lambda n: ('Method {} body might leak '
+                   'obligations.'.format(get_target_name(n))),
+    'loop_context.has_unsatisfied_obligations':
+        lambda n: ('Loop might not take all unsatisfied obligations '
+                   'from the context.'),
+    'loop_body.leaks_obligations':
+        lambda n: ('Loop body might leak obligations.'),
+    'loop_condition.not_framed_for_obligation_use':
+        lambda n: ('Loop condition part {} is not framed at the point where '
+                   'obligation is used.'.format(pprint(n))),
 }

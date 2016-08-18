@@ -17,7 +17,6 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.util import (
     get_func_name,
-    InvalidProgramException,
     UnsupportedException,
 )
 from py2viper_translation.translators.io_operation.common import (
@@ -28,7 +27,6 @@ from py2viper_translation.translators.io_operation.result_translator import (
     ResultTranslator,
 )
 from py2viper_translation.translators.io_operation.utils import (
-    get_parent,
     get_variable,
     is_top_level_assertion,
     raise_invalid_operation_use,
@@ -175,56 +173,14 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         """
         func_name = get_func_name(node)
         if func_name == 'token':
-            return self._translate_token(node, ctx)
+            return self.translate_must_invoke_token(node, ctx)
         elif func_name == 'ctoken':
-            return self._translate_ctoken(node, ctx)
+            return self.translate_must_invoke_ctoken(node, ctx)
         elif func_name == 'Open':
             return self._translate_open(node, ctx)
         else:
             raise UnsupportedException(node,
                                        'Unsupported contract function.')
-
-    def _translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate a call to IO contract function ``token``.
-
-        .. todo:: Vytautas
-
-            Implement support for obligations. Currently, providing a
-            measure for a token gives an assertion error.
-        """
-        if len(node.args) != 1:
-            raise UnsupportedException(
-                node, "Obligations not implemented.")
-        place = node.args[0]
-        place_stmt, place_expr = self.translate_expr(place, ctx,
-                                                     expression=True)
-        assert not place_stmt
-        perm = self._construct_full_perm(node, ctx)
-        return [], self.create_predicate_access('token', [place_expr], perm,
-                                                node, ctx)
-
-    def _translate_ctoken(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate a call to IO contract function ``ctoken``."""
-        assert len(node.args) == 1
-        if ctx.actual_function.name != 'Gap':
-            parent = get_parent(node)
-            while parent is not None:
-                if (isinstance(parent, ast.Call) and
-                        isinstance(parent.func, ast.Name) and
-                        parent.func.id == 'Ensures'):
-                    # ctoken in postcondition is unsound.
-                    raise InvalidProgramException(
-                        node,
-                        'invalid.postcondition.ctoken_not_allowed',
-                    )
-                parent = get_parent(parent)
-        place = node.args[0]
-        place_stmt, place_expr = self.translate_expr(
-            place, ctx, expression=True)
-        assert not place_stmt
-        perm = self._construct_full_perm(node, ctx)
-        return [], self.create_predicate_access('ctoken', [place_expr], perm,
-                                                node, ctx)
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

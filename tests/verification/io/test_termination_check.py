@@ -6,6 +6,7 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
+    end_io,
     gap_io,
     no_op_io,
 )
@@ -83,7 +84,7 @@ def test_measure_io3_basic(
         value: int,
         t_post: Place = Result()) -> bool:
     Terminates(True)
-    #:: ExpectedOutput(termination_check.failed:measure.non_positive)
+    #:: ExpectedOutput(termination_check.failed:termination_measure.non_positive)
     TerminationMeasure(value)
 
 @IOOperation
@@ -92,7 +93,7 @@ def test_measure_io3_non_basic(
         value: int,
         t_post: Place = Result()) -> bool:
     Terminates(True)
-    #:: ExpectedOutput(termination_check.failed:measure.non_positive)
+    #:: ExpectedOutput(termination_check.failed:termination_measure.non_positive)
     TerminationMeasure(value)
     #:: OptionalOutput(termination_check.failed:measure.non_decreasing)
     return no_op_io(t_pre, t_post)
@@ -203,6 +204,13 @@ def test_gap_io9(
             no_op_io(t2, t_post)
         )
     )
+
+@IOOperation
+def test_gap_io10(
+        t_pre: Place) -> bool:
+    TerminationMeasure(2)
+    Terminates(True)
+    return end_io(t_pre)
 
 # Termination condition implication.
 

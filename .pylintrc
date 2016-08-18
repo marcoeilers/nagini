@@ -60,7 +60,7 @@ confidence=
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
-disable=basestring-builtin,map-builtin-not-iterating,backtick,indexing-exception,intern-builtin,old-division,suppressed-message,reload-builtin,parameter-unpacking,round-builtin,input-builtin,old-raise-syntax,setslice-method,zip-builtin-not-iterating,dict-view-method,import-star-module-level,unpacking-in-except,nonzero-method,next-method-called,long-builtin,file-builtin,old-octal-literal,useless-suppression,delslice-method,metaclass-assignment,xrange-builtin,raw_input-builtin,filter-builtin-not-iterating,coerce-builtin,execfile-builtin,cmp-method,dict-iter-method,buffer-builtin,old-ne-operator,standarderror-builtin,using-cmp-argument,cmp-builtin,raising-string,reduce-builtin,range-builtin-not-iterating,hex-method,oct-method,unichr-builtin,apply-builtin,no-absolute-import,getslice-method,long-suffix,unicode-builtin,coerce-method,print-statement,invalid-sequence-index,bad-whitespace,duplicate-code
+disable=basestring-builtin,map-builtin-not-iterating,backtick,indexing-exception,intern-builtin,old-division,suppressed-message,reload-builtin,parameter-unpacking,round-builtin,input-builtin,old-raise-syntax,setslice-method,zip-builtin-not-iterating,dict-view-method,import-star-module-level,unpacking-in-except,nonzero-method,next-method-called,long-builtin,file-builtin,old-octal-literal,useless-suppression,delslice-method,metaclass-assignment,xrange-builtin,raw_input-builtin,filter-builtin-not-iterating,coerce-builtin,execfile-builtin,cmp-method,dict-iter-method,buffer-builtin,old-ne-operator,standarderror-builtin,using-cmp-argument,cmp-builtin,raising-string,reduce-builtin,range-builtin-not-iterating,hex-method,oct-method,unichr-builtin,apply-builtin,no-absolute-import,getslice-method,long-suffix,unicode-builtin,coerce-method,print-statement,invalid-sequence-index,bad-whitespace,duplicate-code,singleton-comparison,no-self-use,redefined-variable-type
 
 
 [REPORTS]
@@ -131,7 +131,7 @@ ignore-comments=yes
 ignore-docstrings=yes
 
 # Ignore imports when computing similarities.
-ignore-imports=no
+ignore-imports=yes
 
 
 [FORMAT]
@@ -174,7 +174,7 @@ expected-line-ending-format=LF
 spelling-dict=en_GB
 
 # List of comma separated words that should not be checked.
-spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–,str,existentials,var
+spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–,str,existentials,var,acc,SIF,wildcard
 
 # A path to a file that contains private dictionary; one word per line.
 spelling-private-dict-file=

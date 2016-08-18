@@ -4,19 +4,18 @@
 import abc
 import ast
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from py2viper_translation.lib import silver_nodes as sil
+from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
-    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Predicate,
 )
 from py2viper_translation.translators.common import CommonTranslator
-from py2viper_translation.translators.obligation.utils import (
-    create_obligation_predicate,
-)
 
 
 class ObligationInstance(abc.ABC):
@@ -26,8 +25,10 @@ class ObligationInstance(abc.ABC):
     specific measure and other properties.
     """
 
-    def __init__(self, node: ast.expr) -> None:
+    def __init__(self, obligation: 'Obligation', node: ast.expr) -> None:
         super().__init__()
+        self.obligation = obligation
+        """Actual obligation type."""
         self.node = node
         """AST node from which this obligation was instantiated."""
 
@@ -43,15 +44,26 @@ class ObligationInstance(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_target(self) -> PythonVar:
-        """Return a variable to which obligation is attached."""
+    def get_target(self) -> sil.RefExpression:
+        """Return an expression to which obligation is attached."""
+
+    @abc.abstractmethod
+    def get_use_method(
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
+        """Get inhale exhale pair for use in method contract."""
+
+    @abc.abstractmethod
+    def get_use_loop(
+            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
+        """Get inhale exhale pair for use in loop invariant."""
 
 
 class Obligation(abc.ABC):
     """A base class for all obligations."""
 
-    def __init__(self, predicate_names) -> None:
+    def __init__(self, predicate_names, field_names) -> None:
         self._predicate_names = predicate_names
+        self._field_names = field_names
 
     @abc.abstractmethod
     def identifier(self) -> str:
@@ -68,10 +80,57 @@ class Obligation(abc.ABC):
         returned. Otherwise – ``None``.
         """
 
+    @abc.abstractmethod
+    def generate_axiomatized_preconditions(
+            self, obligation_info: 'PythonMethodObligationInfo',
+            interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
+        """Generate obligations for axiomatic method precondition."""
+
+    @abc.abstractmethod
+    def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
+        """Create a leak check for this obligation.
+
+        :param var_name: variable name to be used in ``ForPerm``
+        """
+
+    def _create_predicate_for_perm(
+            self, predicate_name: str, var_name: str) -> sil.ForPerm:
+        """Create a ForPerm expression with predicate for use in leak check."""
+        return sil.ForPerm(
+            var_name,
+            [sil.Predicate(predicate_name, var_name)],
+            sil.FalseLit())
+
+    def _create_field_for_perm(
+            self, field_name: str, var_name: str) -> sil.ForPerm:
+        """Create a ForPerm expression with field for use in leak check."""
+        return sil.ForPerm(
+            var_name,
+            [sil.Field(field_name, sil.INT)],
+            sil.FalseLit())
+
     def create_predicates(
             self, translator: CommonTranslator) -> List[Predicate]:
         """Create predicates that are used to represent this obligation."""
+        position = translator.viper.NoPosition
+        info = translator.viper.NoInfo
         predicates = [
-            create_obligation_predicate(name, translator)
+            sil.Predicate(name, 'r')
             for name in self._predicate_names]
-        return predicates
+        translated_predicates = [
+            predicate.translate(translator, None, position, info)
+            for predicate in predicates]
+        return translated_predicates
+
+    def create_fields(
+            self, translator: CommonTranslator) -> List[Predicate]:
+        """Create fields that are used to represent this obligation."""
+        position = translator.viper.NoPosition
+        info = translator.viper.NoInfo
+        fields = [
+            sil.Field(name, sil.INT)
+            for name in self._field_names]
+        translated_fields = [
+            field.translate(translator, None, position, info)
+            for field in fields]
+        return translated_fields

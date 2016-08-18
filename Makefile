@@ -1,16 +1,27 @@
 CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/analyzer_io.py \
-	src/py2viper_translation/lib/preamble_constructor.py \
 	src/py2viper_translation/lib/io_context.py \
 	src/py2viper_translation/lib/io_checkers.py \
 	src/py2viper_translation/lib/guard_collectors.py \
-	src/py2viper_translation/lib/expressions.py \
 	src/py2viper_translation/lib/errors/__init__.py \
 	src/py2viper_translation/lib/errors/manager.py \
 	src/py2viper_translation/lib/errors/messages.py \
 	src/py2viper_translation/lib/errors/rules.py \
 	src/py2viper_translation/lib/errors/wrappers.py \
 	src/py2viper_translation/lib/obligation_context.py \
+	src/py2viper_translation/lib/silver_nodes/__init__.py \
+	src/py2viper_translation/lib/silver_nodes/base.py \
+	src/py2viper_translation/lib/silver_nodes/bool_expr.py \
+	src/py2viper_translation/lib/silver_nodes/expression.py \
+	src/py2viper_translation/lib/silver_nodes/int_cmp_expr.py \
+	src/py2viper_translation/lib/silver_nodes/int_expr.py \
+	src/py2viper_translation/lib/silver_nodes/location_expr.py \
+	src/py2viper_translation/lib/silver_nodes/perm_cmp_expr.py \
+	src/py2viper_translation/lib/silver_nodes/perm_expr.py \
+	src/py2viper_translation/lib/silver_nodes/program.py \
+	src/py2viper_translation/lib/silver_nodes/reference_expr.py \
+	src/py2viper_translation/lib/silver_nodes/statement.py \
+	src/py2viper_translation/lib/silver_nodes/types.py \
 	src/py2viper_translation/translators/io_operation/common.py \
 	src/py2viper_translation/translators/io_operation/definition.py \
 	src/py2viper_translation/translators/io_operation/__init__.py \
@@ -22,17 +33,22 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/io_operation/result_translator.py \
 	src/py2viper_translation/translators/obligation/__init__.py \
 	src/py2viper_translation/translators/obligation/common.py \
+	src/py2viper_translation/translators/obligation/inexhale.py \
 	src/py2viper_translation/translators/obligation/interface.py \
 	src/py2viper_translation/translators/obligation/loop.py \
+	src/py2viper_translation/translators/obligation/loop_node.py \
 	src/py2viper_translation/translators/obligation/manager.py \
 	src/py2viper_translation/translators/obligation/measures.py \
 	src/py2viper_translation/translators/obligation/method.py \
 	src/py2viper_translation/translators/obligation/method_call_node.py \
 	src/py2viper_translation/translators/obligation/method_node.py \
+	src/py2viper_translation/translators/obligation/node_constructor.py \
+	src/py2viper_translation/translators/obligation/obligation_info.py \
 	src/py2viper_translation/translators/obligation/utils.py \
-	src/py2viper_translation/translators/obligation/visitors.py \
 	src/py2viper_translation/translators/obligation/types/__init__.py \
 	src/py2viper_translation/translators/obligation/types/base.py \
+	src/py2viper_translation/translators/obligation/types/must_invoke.py \
+	src/py2viper_translation/translators/obligation/types/must_release.py \
 	src/py2viper_translation/translators/obligation/types/must_terminate.py
 CHECKED_CONTRACT_FILES:=\
 	deps/py2viper-contracts/src/py2viper_contracts/io.py \
@@ -49,16 +65,19 @@ BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
 test: bin/py.test
-	bin/py.test -v -x src/py2viper_translation/tests.py
+	bin/py.test -v src/py2viper_translation/tests.py
 
 mypy: bin/mypy
 	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
-	bin/flake8 --ignore=F401,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
+	bin/flake8 --ignore=F401,F403,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
 
 pylint: bin/pylint
 	bin/pylint $(CHECKED_MODULES)
+
+pylint_silent: bin/pylint
+	bin/pylint --disable=I $(CHECKED_MODULES)
 
 pylint_report: bin/pylint
 	bin/pylint --reports=y $(CHECKED_MODULES)

@@ -7,7 +7,7 @@ def test() -> None:
     IOExists1(Place)(
         lambda t: (
             #:: ExpectedOutput(invalid.program:io_existential_var.use_of_undefined)
-            Requires(token(t))
+            Requires(token(t, 1))
         ),
     )
 

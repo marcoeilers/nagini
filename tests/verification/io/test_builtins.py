@@ -39,7 +39,7 @@ def test(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t_end: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             test_io(t1, t_end)
         ),
         Ensures(

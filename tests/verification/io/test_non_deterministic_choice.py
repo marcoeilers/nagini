@@ -17,7 +17,7 @@ def write_implementation_defined1(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_string_io(t1, "Hello!", t2) and
             write_string_io(t1, "Hallo!", t2) and
             write_string_io(t1, "Sveikas!", t2)
@@ -37,7 +37,7 @@ def write_implementation_defined2(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_string_io(t1, "Hello!", t2) and
             write_string_io(t1, "Hallo!", t2) and
             write_string_io(t1, "Sveikas!", t2)
@@ -57,7 +57,7 @@ def write_implementation_defined3(t1: Place) -> Place:
     IOExists1(Place)(
         lambda t2: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             write_string_io(t1, "Hello!", t2) and
             write_string_io(t1, "Hallo!", t2) and
             write_string_io(t1, "Sveikas!", t2)
@@ -77,7 +77,7 @@ def write_non_negative(t1: Place) -> Place:
     IOExists3(Place, Place, int)(
         lambda t2, t3, value: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value, t2) and
             (
                 write_int_io(t2, value, t3)
@@ -107,7 +107,7 @@ def write_only_positive(t1: Place) -> Place:
     IOExists3(Place, Place, int)(
         lambda t2, t3, value: (
         Requires(
-            token(t1) and
+            token(t1, 2) and
             read_int_io(t1, value, t2) and
             write_int_io(t2, value, t3)
         ),

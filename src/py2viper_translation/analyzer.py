@@ -60,7 +60,7 @@ class Analyzer(ast.NodeVisitor):
         self._is_io_existential = False     # Are we defining an
                                             # IOExists block?
         self._aliases = {}                  # Dict[str, PythonBaseVar]
-        # TODO: Remove this one.
+        self.current_loop_invariant = None
 
     def define_new(self, container: Union[PythonProgram, PythonClass],
                    name: str, node: ast.AST) -> None:
@@ -278,6 +278,30 @@ class Analyzer(ast.NodeVisitor):
                 self.visit(child, node)
         self.current_function = None
 
+    def visit_loop(self, node: Union[ast.While, ast.For]) -> None:
+        assert self.current_function is not None
+        old_loop_invariant = self.current_loop_invariant
+        self.current_function.loop_invariants[node] = []
+        self.current_loop_invariant = self.current_function.loop_invariants[
+            node]
+        if isinstance(node, ast.While):
+            self.visit(node.test, node)
+        else:
+            self.visit(node.target, node)
+        for child in node.body:
+            if is_io_existential(child):
+                self._is_io_existential = True
+                self.visit(child.value.args[0], node)
+            else:
+                self.visit(child, node)
+        self.current_loop_invariant = old_loop_invariant
+
+    def visit_While(self, node: ast.While) -> None:
+        self.visit_loop(node)
+
+    def visit_For(self, node: ast.While) -> None:
+        self.visit_loop(node)
+
     def visit_arguments(self, node: ast.arguments) -> None:
         assert self.current_function is not None
         for arg in node.args:
@@ -364,7 +388,10 @@ class Analyzer(ast.NodeVisitor):
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
-                    node.args[1])
+                    (node.args[1], self._aliases.copy()))
+            elif node.func.id == 'Invariant':
+                self.current_loop_invariant.append(
+                    (node, self._aliases.copy()))
         if (isinstance(node.func, ast.Name) and
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(

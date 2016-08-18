@@ -60,11 +60,8 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         if (isinstance(node.func, ast.Name) and
                 node.func.id in self._program.io_operations):
             operation = self._program.io_operations[node.func.id]
-            result_count = len(operation.get_results())
-            if result_count > 0:
-                results = node.args[-result_count:]
-            else:
-                results = []
+            parameter_count = len(operation.get_parameters())
+            results = node.args[parameter_count:]
             for i, arg in enumerate(results):
                 if not isinstance(arg, ast.Name):
                     _raise_error(node, 'not_variable_in_result_position')

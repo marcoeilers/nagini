@@ -1,3 +1,4 @@
+import abc
 import ast
 import mypy
 
@@ -380,6 +381,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.node_factory = node_factory
         self.labels = [END_LABEL]
         self.obligation_info = None
+        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -822,7 +824,7 @@ class PythonVarBase(PythonNode):
         self.sil_name = sil_name
 
 
-class PythonVar(PythonVarBase):
+class PythonVar(PythonVarBase, abc.ABC):
     """
     Represents a variable in Python. Can be a local variable or a
     function parameter.
