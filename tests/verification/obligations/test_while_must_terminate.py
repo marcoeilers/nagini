@@ -19,14 +19,12 @@ def test_measures_1() -> None:
     while True:
         #:: ExpectedOutput(invariant.not.established:obligation_measure.non_positive)
         Invariant(MustTerminate(-1))
-        a = 2
 
 
 def test_measures_2() -> None:
     while False:
         # Negative measure is ok because loop is never executed.
         Invariant(MustTerminate(-1))
-        a = 2
 
 
 def test_measures_3() -> None:
