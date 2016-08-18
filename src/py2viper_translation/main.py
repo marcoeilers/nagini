@@ -204,7 +204,7 @@ def main() -> None:
             backend = ViperVerifier.carbon
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
-        if args.benchmark > 1:
+        if args.benchmark >= 1:
             for i in range(args.benchmark):
                 start = time.time()
                 vresult = verify(prog, python_file, jvm, backend=backend)
