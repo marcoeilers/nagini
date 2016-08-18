@@ -173,32 +173,14 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         """
         func_name = get_func_name(node)
         if func_name == 'token':
-            return self._translate_token(node, ctx)
+            return self.translate_must_invoke_token(node, ctx)
         elif func_name == 'ctoken':
-            return self._translate_ctoken(node, ctx)
+            return self.translate_must_invoke_ctoken(node, ctx)
         elif func_name == 'Open':
             return self._translate_open(node, ctx)
         else:
             raise UnsupportedException(node,
                                        'Unsupported contract function.')
-
-    def _translate_token(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate a call to IO contract function ``token``.
-
-        .. note::
-
-            Translation is handled by obligation translator.
-        """
-        return self.translate_must_invoke_token(node, ctx)
-
-    def _translate_ctoken(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """Translate a call to IO contract function ``ctoken``.
-
-        .. note::
-
-            Translation is handled by obligation translator.
-        """
-        return self.translate_must_invoke_ctoken(node, ctx)
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

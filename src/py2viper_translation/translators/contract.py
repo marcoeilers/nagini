@@ -60,10 +60,10 @@ class ContractTranslator(CommonTranslator):
                                           self.to_position(node, ctx),
                                           self.no_info(ctx)))
 
-    def translate_ghost_exception(
+    def translate_raised_exception(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
-        Translates a call to the GhostException() contract function to a
+        Translates a call to the RaisedException() contract function to a
         expression.
         """
         assert len(node.args) == 0
@@ -386,8 +386,8 @@ class ContractTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'Result':
             return self.translate_result(node, ctx)
-        elif func_name == 'GhostException':
-            return self.translate_ghost_exception(node, ctx)
+        elif func_name == 'RaisedException':
+            return self.translate_raised_exception(node, ctx)
         elif func_name == 'Acc':
             perm = self._get_perm(node, ctx)
             if isinstance(node.args[0], ast.Call):

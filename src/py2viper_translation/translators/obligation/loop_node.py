@@ -39,19 +39,19 @@ class ObligationLoop:
         self.local_vars = local_vars
         self.body = body
 
-    def prepend_invariants(self, invariants) -> None:
+    def prepend_invariants(self, invariants: List[Expr]) -> None:
         """Prepend ``invariants`` to the invariants list."""
         self.invariants[0:0] = invariants
 
-    def append_invariant(self, invariant) -> None:
+    def append_invariant(self, invariant: Expr) -> None:
         """Append ``invariant`` to the invariants list."""
         self.invariants.append(invariant)
 
-    def prepend_body(self, statements) -> None:
+    def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
         self.body[0:0] = statements
 
-    def append_body(self, statement) -> None:
+    def append_body(self, statement: Stmt) -> None:
         """Append ``statement`` to body."""
         self.body.append(statement)
 
@@ -199,7 +199,7 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         for instance in instances:
             guard = instance.create_guard_expression()
             measure_check = self._loop_obligation_info.loop_measure_map.check(
-                sil.VarRef(self._obligation_info.current_thread_var),
+                sil.RefVar(self._obligation_info.current_thread_var),
                 instance.obligation_instance.get_measure())
             disjuncts.append(sil.BigAnd([guard, measure_check]))
         check = sil.Implies(

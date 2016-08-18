@@ -220,11 +220,11 @@ class AbstractTranslator(metaclass=ABCMeta):
             locals: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
             method: PythonMethod = None,
-            overriding: bool = False) -> List[Stmt]:
+            overriding_check: bool = False) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_method_node(
             ctx, name, args, returns, pres, posts, locals, body,
-            position, info, method, overriding)
+            position, info, method, overriding_check)
 
     def create_method_call_node(
             self, ctx: Context, methodname: str, args: List[Expr],

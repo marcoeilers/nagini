@@ -10,6 +10,8 @@ from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
     gap_io,
     Gap,
+    end_io,
+    End,
 )
 Import('io_builtins')
 from py2viper_contracts.obligations import (
@@ -131,7 +133,7 @@ def notify_io(
     return IOExists1(Place)(
         lambda t2: (
             send_io(t_pre, t2) and
-            gap_io(t2)
+            end_io(t2)
         )
     )
 
@@ -167,7 +169,7 @@ def notify(t1: Place) -> None:
 
     t2 = send(t1);
 
-    t3 = Gap(t2)
+    t3 = End(t2)
 
 
 def run(t_pre1: Place, t_pre2: Place, file_name: str) -> Place:

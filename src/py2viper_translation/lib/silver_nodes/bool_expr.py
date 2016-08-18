@@ -182,7 +182,7 @@ class BigAnd(BoolExpression):
     If it has zero elements, then it is equivalent to ``True``.
     """
 
-    def __init__(self, conjuncts) -> None:
+    def __init__(self, conjuncts: List[BoolExpression]) -> None:
         self._conjuncts = conjuncts
 
     def is_empty(self) -> None:
@@ -191,11 +191,6 @@ class BigAnd(BoolExpression):
 
     def is_always_true(self) -> bool:
         return self.is_empty()
-
-    def is_always_false(self) -> bool:
-        return any(
-            conjunct.is_always_false()
-            for conjunct in self._conjuncts)
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
@@ -220,17 +215,12 @@ class BigOr(BoolExpression):
     If it has zero elements, then it is equivalent to ``False``.
     """
 
-    def __init__(self, disjuncts) -> None:
+    def __init__(self, disjuncts: List[BoolExpression]) -> None:
         self._disjuncts = disjuncts
 
     def is_empty(self) -> None:
         """Check if have any elements."""
         return not self._disjuncts
-
-    def is_always_true(self) -> bool:
-        return any(
-            disjunct.is_always_true()
-            for disjunct in self._disjuncts)
 
     def is_always_false(self) -> bool:
         return self.is_empty()

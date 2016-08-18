@@ -82,7 +82,7 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         self._add_aditional_arguments()
         if not self._is_axiomatized_target():
             self._check_measures_are_positive()
-        if not self._check_skip_normal_termination_checks():
+        if not self._can_skip_normal_termination_checks():
             self._save_must_terminate_amount(
                 self._obligation_info.original_must_terminate_var)
             self._inhale_additional_must_terminate()
@@ -91,7 +91,7 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         elif self._check_no_forced_termination_needed():
             self._check_no_forced_termination()
         self._add_call()
-        if not self._check_skip_normal_termination_checks():
+        if not self._can_skip_normal_termination_checks():
             self._check_must_terminate()
             self._reset_must_terminate(
                 self._obligation_info.original_must_terminate_var)
@@ -107,15 +107,15 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         obligation_info = self._target_method.obligation_info
         return obligation_info.get_termination_guarantee()
 
-    def _check_skip_normal_termination_checks(self) -> bool:
+    def _can_skip_normal_termination_checks(self) -> bool:
         """Check if we can skip termination checks."""
         return (self._get_target_termination() is not
-                TerminationGuarantee.may_terminating)
+                TerminationGuarantee.unknown_termination)
 
     def _check_no_forced_termination_needed(self) -> bool:
         """Check if we need to guarantee not-having termination obligation."""
         return (self._get_context_termination() is
-                TerminationGuarantee.may_terminating and
+                TerminationGuarantee.unknown_termination and
                 self._get_target_termination() is
                 TerminationGuarantee.potentially_non_terminating)
 
@@ -132,7 +132,7 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
     def _check_no_forced_termination(self) -> None:
         """Check that termination is not required.
 
-        Check that ``may_terminating`` does not require
+        Check that ``unknown_termination`` does not require
         ``potentially_non_terminating`` to terminate.
         """
         if obligation_config.disable_termination_check:
@@ -201,8 +201,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
         # Check that we have an expected amount of MustTerminate
         # permission.
-        # This assert is for testing purposes only. It can be removed as
-        # soon as we are sure that obligation encoding works.
+        # TODO: This assert is for testing purposes only. It can be
+        # removed as soon as we are sure that obligation encoding works.
         assertion = sil.Assert(sil.BigOr([
             sil.CurrentPerm(predicate) == sil.NoPerm(),
             sil.CurrentPerm(predicate) == sil.FullPerm(),
@@ -241,8 +241,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         increased_amount = self._obligation_info.increased_must_terminate_var
         predicate = self._get_must_terminate_predicate()
         check = sil.Implies(
-            sil.NoPerm() < sil.VarRef(original_amount),
-            sil.CurrentPerm(predicate) < sil.VarRef(increased_amount))
+            sil.NoPerm() < sil.PermVar(original_amount),
+            sil.CurrentPerm(predicate) < sil.PermVar(increased_amount))
         assertion = sil.Assert(check)
         position = self._to_position(
             conversion_rules=rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)

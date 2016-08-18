@@ -10,7 +10,6 @@ from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
-    PythonProgram,
     PythonVar,
 )
 from py2viper_translation.lib.guard_collectors import (
@@ -42,6 +41,7 @@ LOOP_TERMINATION_FLAG_NAME = '_loop_termination_flag'
 LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_loop_original_must_terminate'
 
 
+@PythonVar.register         # pylint: disable=no-member
 class SilverVar:
     """A silver variable that has no representation in Python.
 
@@ -90,7 +90,7 @@ class GuardedObligationInstance:
 
 
 class BaseObligationInfo(GuardCollectingVisitor):
-    """Info about the obligation use."""
+    """Info about the obligation use in loop/method contract."""
 
     def __init__(
             self, obligaton_manager: ObligationManager,
@@ -119,16 +119,10 @@ class BaseObligationInfo(GuardCollectingVisitor):
         """Get ``GuardedObligationInstance`` represented by node."""
         return self._all_instances[node]
 
-    def _get_program(self) -> PythonProgram:
-        scope = self._method
-        while scope.superscope:
-            scope = scope.superscope
-        return scope
-
     def _create_var(
             self, name: str, class_name: str,
             translator: 'Translator', local: bool = False) -> PythonVar:
-        program = self._get_program()
+        program = self._method.get_program()
         cls = program.classes[class_name]
         return self._method.create_variable(
             name, cls, translator, local=local)
@@ -254,9 +248,9 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             if not instances:
                 return TerminationGuarantee.potentially_non_terminating
             if len(instances) != 1:
-                return TerminationGuarantee.may_terminating
+                return TerminationGuarantee.unknown_termination
             if instances[0].guard:
-                return TerminationGuarantee.may_terminating
+                return TerminationGuarantee.unknown_termination
             else:
                 return TerminationGuarantee.always_terminating
 
@@ -318,7 +312,7 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         if isinstance(self.node, ast.While):
             return sil.PythonBoolExpression(self.node.test)
         else:
-            return sil.VarRef(self.iteration_err_var) == None  # noqa: E711
+            return sil.RefVar(self.iteration_err_var) == None  # noqa: E711
 
     def get_termination_guarantee(self) -> TerminationGuarantee:
         """Get the loop's termination guarantee."""
@@ -327,8 +321,8 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         if not instances:
             return TerminationGuarantee.potentially_non_terminating
         if len(instances) != 1:
-            return TerminationGuarantee.may_terminating
+            return TerminationGuarantee.unknown_termination
         if instances[0].guard:
-            return TerminationGuarantee.may_terminating
+            return TerminationGuarantee.unknown_termination
         else:
             return TerminationGuarantee.always_terminating

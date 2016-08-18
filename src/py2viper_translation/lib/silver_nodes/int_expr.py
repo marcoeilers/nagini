@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from py2viper_translation.lib.silver_nodes.expression import Expression
 from py2viper_translation.lib.silver_nodes.int_cmp_expr import (
@@ -136,7 +136,7 @@ class Sub(IntExpression):
 class Sum(IntExpression):
     """A sum of 0 or more elements."""
 
-    def __init__(self, elements) -> None:
+    def __init__(self, elements: List[IntExpression]) -> None:
         self._elements = elements
 
     def is_empty(self) -> None:

@@ -102,17 +102,17 @@ class ObligationTranslator(CommonTranslator):
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate a call to ``ctoken``."""
         if ctx.obligation_context.is_translating_loop():
-            return self._loop_translator.translate_must_invoke_credit(
+            return self._loop_translator.translate_may_invoke(
                 node, ctx)
         elif ctx.obligation_context.is_translating_posts:
             if ctx.actual_function.name != 'Gap':
                 raise InvalidProgramException(
                     node, 'invalid.postcondition.ctoken_not_allowed')
             else:
-                return self._method_translator.translate_must_invoke_credit(
+                return self._method_translator.translate_may_invoke(
                     node, ctx)
         else:
-            return self._method_translator.translate_must_invoke_credit(
+            return self._method_translator.translate_may_invoke(
                 node, ctx)
 
     def _translate_must_terminate(
@@ -153,11 +153,11 @@ class ObligationTranslator(CommonTranslator):
             local_vars: List[VarDecl], body: List[Stmt],
             position: Position, info: Info,
             method: PythonMethod = None,
-            overriding: bool = False) -> Method:
+            overriding_check: bool = False) -> Method:
         """Construct method AST node with additional obligation stuff."""
         return self._method_translator.create_method_node(
             ctx, name, args, returns, pres, posts, local_vars, body,
-            position, info, method, overriding)
+            position, info, method, overriding_check)
 
     def create_method_call_node(
             self, ctx: Context, methodname: str, args: List[Expr],

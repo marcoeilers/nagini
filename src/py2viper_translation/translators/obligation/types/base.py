@@ -84,7 +84,7 @@ class Obligation(abc.ABC):
     def generate_axiomatized_preconditions(
             self, obligation_info: 'PythonMethodObligationInfo',
             interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
-        """Add obligations to axiomatic method precondition."""
+        """Generate obligations for axiomatic method precondition."""
 
     @abc.abstractmethod
     def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:

@@ -25,22 +25,22 @@ method call. If the context is:
     1.  ``always_terminating``: check that measure is positive and
         decreases;
     2.  ``potentially_non_terminating``: invalid program error.
-    3.  ``may_terminating``: use non-optimized encoding.
+    3.  ``unknown_termination``: use non-optimized encoding.
 
 2.  ``potentially_non_terminating`` and the callee is
 
     1.  ``always_terminating``: check that measure is positive and
         decreases;
     2.  ``potentially_non_terminating``: just do the context leak check;
-    3.  ``may_terminating``: use non-optimized encoding.
+    3.  ``unknown_termination``: use non-optimized encoding.
 
-3.  ``may_terminating`` and the callee is
+3.  ``unknown_termination`` and the callee is
 
     1.  ``always_terminating``: check that measure is positive and
         decreases;
     2.  ``potentially_non_terminating``: do the context leak check and
         check that ``perm(MustTerminate) == none``.
-    3.  ``may_terminating``: use non-optimized encoding.
+    3.  ``unknown_termination``: use non-optimized encoding.
 
 Optimizations for method definition:
 
@@ -53,7 +53,7 @@ Optimizations for method definition:
 
 Optimization for method call encoding:
 
-1.  If the callee is not ``may_terminating``, drop explicit
+1.  If the callee is not ``unknown_termination``, drop explicit
     ``MustTerminate`` check and all variable assignments, inhales, and
     exhales related to it. In addition:
 
@@ -62,16 +62,13 @@ Optimization for method call encoding:
         error.
         TODO: Check the case when calling a non-terminating method
         inside a terminating loop defined in a non-terminating method.
-    2.  If surrounding context is ``may_terminating`` add callee is
+    2.  If surrounding context is ``unknown_termination`` add callee is
         ``potentially_non_terminating`` add an explicit check that
         callee is not required to terminate.
 
 .. todo::
 
     Rewrite this thing as a table for better readability.
-
-TODO: Check axiomatic method preconditions. Replace predicate exhale
-with measure check.
 """
 
 
@@ -103,7 +100,7 @@ _PREDICATE_NAME = _OBLIGATION_NAME
 
 def _create_predicate_access(cthread: PythonVar) -> sil.PredicateAccess:
     """Create a predicate access expression."""
-    return sil.PredicateAccess(_PREDICATE_NAME, sil.VarRef(cthread))
+    return sil.PredicateAccess(_PREDICATE_NAME, sil.RefVar(cthread))
 
 
 class TerminationGuarantee(Enum):
@@ -129,7 +126,7 @@ class TerminationGuarantee(Enum):
     +   method is axiomatized as non-terminating in ``preamble.index``.
     """
 
-    may_terminating = 3
+    unknown_termination = 3
     """Statically unknown termination.
 
     All cases not-covered by ``always_terminating`` and
@@ -175,7 +172,7 @@ class MustTerminateObligationInstance(
         return sil.PythonIntExpression(self._measure)
 
     def get_target(self) -> sil.RefExpression:
-        return sil.VarRef(self._target)
+        return sil.RefVar(self._target)
 
 
 class MustTerminateObligation(Obligation):
@@ -216,7 +213,7 @@ class MustTerminateObligation(Obligation):
             interface_dict: Dict[str, Any]) -> List[sil.BoolExpression]:
         """Add ``MustTerminate(1)`` to axiomatic method precondition."""
         if self.is_interface_method_terminating(interface_dict):
-            cthread = sil.VarRef(obligation_info.current_thread_var)
+            cthread = sil.RefVar(obligation_info.current_thread_var)
             check = obligation_info.caller_measure_map.check(
                 cthread, sil.RawIntExpression(1))
             return [check]

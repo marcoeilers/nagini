@@ -1,3 +1,4 @@
+import abc
 import ast
 import mypy
 
@@ -823,7 +824,7 @@ class PythonVarBase(PythonNode):
         self.sil_name = sil_name
 
 
-class PythonVar(PythonVarBase):
+class PythonVar(PythonVarBase, abc.ABC):
     """
     Represents a variable in Python. Can be a local variable or a
     function parameter.
