@@ -1,0 +1,65 @@
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    function get_type_arg1(obj: Ref, index: Int): PyType
+    function get_type_arg2(obj: Ref, index: Int, index2: Int): PyType
+    function get_type_arg3(obj: Ref, index: Int, index2: Int, index3: Int): PyType
+    function get_type_arg4(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int): PyType
+    function get_type_arg5(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): PyType
+    function get_type_arg6(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int, index6: Int): PyType
+    function get_type_nargs0(r: Ref): Int
+    function get_type_nargs1(r: Ref, index: Int): Int
+    function get_type_nargs2(r: Ref, index: Int, index2: Int): Int
+    function get_type_nargs3(r: Ref, index: Int, index2: Int, index3: Int): Int
+    function get_type_nargs4(r: Ref, index: Int, index2: Int, index3: Int, index4: Int): Int
+    function get_type_nargs5(r: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): Int
+    unique function tuple(): PyType
+}
+
+function tuple___create0__(): Ref
+    ensures tuple___len__(result) == 0
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 0
+
+function tuple___create1__(arg0 : Ref): Ref
+    ensures tuple___len__(result) == 1 && tuple___getitem__(result, 0) == arg0
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 1
+
+function tuple___create2__(arg0 : Ref, arg1: Ref): Ref
+    ensures tuple___len__(result) == 2 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 2
+
+function tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref): Ref
+    ensures tuple___len__(result) == 3 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 3
+
+function tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref): Ref
+    ensures tuple___len__(result) == 4 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 4
+
+function tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref): Ref
+    ensures tuple___len__(result) == 5 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 5
+
+function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref): Ref
+    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
+    ensures typeof(result) == tuple()
+    ensures get_type_nargs0(result) == 6
+
+function tuple___len__(self: Ref): Int
+{
+	(get_type_nargs0(self) != -1) ? get_type_nargs0(self) : tuple___len__unknown(self)
+}
+
+function tuple___len__unknown(self: Ref): Int
+
+function tuple___getitem__(self: Ref, key: Int): Ref
+    requires key >= 0
+    requires key < tuple___len__(self)
+    ensures get_type_nargs0(self) != -1 ==> issubtype(typeof(result), get_type_arg1(self, key))
+    ensures get_type_nargs0(self) == -1 ==> issubtype(typeof(result), get_type_arg1(self, 0))

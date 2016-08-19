@@ -1,0 +1,32 @@
+from py2viper_contracts.contracts import Requires, Result
+from py2viper_contracts.io import *
+
+
+@IOOperation
+def read_int_io(
+        t_pre: Place,
+        result: int = Result(),
+        t_post: Place = Result(),
+        ) -> bool:
+    Terminates(True)
+
+
+@IOOperation
+def read_int_io2(
+        t_pre: Place,
+        result: int = Result(),
+        t_post: Place = Result(),
+        ) -> bool:
+    Terminates(True)
+    return read_int_io(t_pre, result, t_post)
+
+
+def test(t1: Place) -> None:
+    IOExists3(Place, int, int)(
+        lambda t2, value1, value2: (
+        #:: ExpectedOutput(type.error:"Open" does not return a value)
+        Requires(
+            Open(read_int_io2(t1))
+        ),
+        )
+    )
