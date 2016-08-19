@@ -107,5 +107,4 @@ def test_exhale_1(a: List[int]) -> None:
     Requires(Acc(list_pred(a)))
     for i in a:
         Invariant(MustTerminate(len(a) - len(Previous(i))))
-        #:: UnexpectedOutput(invariant.not.preserved:insufficient.permission, /silicon/issue/231/)
         Invariant(MustTerminate(1 + len(a) - len(Previous(i))))

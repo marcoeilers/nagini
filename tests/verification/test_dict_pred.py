@@ -4,23 +4,20 @@ from typing import Tuple
 
 def main() -> None:
     value = {0: ('asd', 46), 1: ('b', 23), 2: ('dd', 2)}
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(value[0][0] == 'asd')
     Assert(value[2][0] == 'dd')
     s = get_second(value)
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(s == 23)
     Assert(value[2][0] == 'dd')
     append_bla_45(value)
     Assert(value[2][0] == 'dd')
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)|UnexpectedOutput(call.precondition:assertion.false, /py2viper/issue/48/, carbon)
     Assert(get_second(value) == 23)
     Assert(len(value) == 4)
     Assert(value[3][0] == 'bla')
     # TODO: without assertions above, this assertion fails (sometimes)
     Assert(value[2][0] == 'dd')
     Assert(value[3][1] == 45)
-    #:: ExpectedOutput(assert.failed:assertion.false)|UnexpectedOutput(application.precondition:assertion.false, /py2viper/issue/48/, carbon)|MissingOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
+    #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(value[0][1] == 47)
 
 

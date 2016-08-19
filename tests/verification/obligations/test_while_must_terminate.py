@@ -135,7 +135,6 @@ def test_exhale_1() -> None:
     i = 0
     while i < 5:
         Invariant(MustTerminate(5 - i))
-        #:: UnexpectedOutput(invariant.not.preserved:insufficient.permission, /silicon/issue/231/)
         Invariant(MustTerminate(6 - i))
         i += 1
 
@@ -144,7 +143,6 @@ def test_exhale_2() -> None:
     i = 0
     while i < 5:
         Invariant(Implies(i > 0, MustTerminate(5 - i)))
-        #:: UnexpectedOutput(invariant.not.preserved:insufficient.permission, /silicon/issue/231/)
         Invariant(Implies(i > 0, MustTerminate(6 - i)))
         i += 1
 

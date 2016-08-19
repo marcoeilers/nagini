@@ -8,7 +8,6 @@ def main() -> None:
     Assert(('dd', 2) in value)
     Assert(('bla', 45) not in value)
     append_bla_45(value)
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(('dd', 2) in value)
     Assert(len(value) == 4)
     Assert(('bla', 45) in value)

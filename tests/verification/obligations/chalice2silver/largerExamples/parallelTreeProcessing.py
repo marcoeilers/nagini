@@ -64,9 +64,7 @@ class Tree:
         if call_height > 0:
             Unfold(self.valid())
             if self.left is not None:
-                #:: UnexpectedOutput(leak_check.failed:must_terminate.not_taken, /carbon/issue/151/)
                 self.left.work(call_height - 1)
             if self.right is not None:
-                #:: UnexpectedOutput(leak_check.failed:must_terminate.not_taken, /carbon/issue/151/)
                 self.right.work(call_height - 1)
             Fold(self.valid())

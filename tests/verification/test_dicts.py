@@ -43,7 +43,6 @@ def test_subscript() -> None:
     super3 = Super()
     mydict = {key1: super1, key7: super3}
     empty_dict = {} # type: Dict[Key, Super]
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[key1] == super1)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mydict[key7] == super2)
@@ -59,7 +58,6 @@ def test_get() -> None:
     super3 = Super()
     mydict = {key1: super1, key7: super3}
     empty_dict = {} # type: Dict[Key, Super]
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict.get(key1) == super1)
     Assert(mydict.get(key7) == super3)
     Assert(mydict.get(key44) == None)
@@ -80,13 +78,11 @@ def test_set() -> None:
     empty_dict[key4] = super2
     Assert(key4 in empty_dict)
     Assert(empty_dict[key4] == super2)
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[key1] == super1)
     Assert(not (key1 in empty_dict))
     mydict[key1] = super3
     Assert(mydict[key1] == super3)
     Assert(key1 in mydict)
-    #:: UnexpectedOutput(assert.failed:assertion.false, /py2viper/issue/48/, carbon)
     Assert(mydict[key7] == super3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mydict[key1] == super1)
