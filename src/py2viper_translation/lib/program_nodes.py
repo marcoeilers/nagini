@@ -622,6 +622,8 @@ class PythonTryBlock(PythonNode):
         self.node_factory = node_factory
         self.finally_name = None
         self.post_name = None
+        self.with_item = None
+        self.with_var = None
         method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
@@ -673,8 +675,6 @@ class PythonVar(PythonNode):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node)
-        if name == 'Whatever':
-            print("343345")
         self.type = type
         self.decl = None
         self._ref = None
