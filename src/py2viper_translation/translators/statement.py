@@ -313,6 +313,57 @@ class StatementTranslator(CommonTranslator):
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         return [iter_assign, next_call, target_assign, loop, iter_del]
 
+    def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
+        try_block = None
+        for block in ctx.actual_function.try_blocks:
+            if block.node is node:
+                try_block = block
+                break
+        assert try_block
+        code_var = try_block.get_finally_var(self.translator)
+        if code_var.sil_name in ctx.var_aliases:
+            code_var = ctx.var_aliases[code_var.sil_name]
+        code_var = code_var.ref()
+        zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
+        # get context mgr
+        ctx_stmt, ctx_mgr = self.translate_expr(try_block.with_item.context_expr, ctx)
+        ctx_type = self.get_type(try_block.with_item.context_expr, ctx)
+        enter_method = ctx_type.get_method('__enter__')
+        # create temp var
+        enter_res_type = enter_method.type
+        with_ctx = ctx.current_function.create_variable('with_ctx',
+                                                         ctx_type,
+                                                         self.translator)
+        try_block.with_var = with_ctx
+        ctx_assign = self.viper.LocalVarAssign(with_ctx.ref(), ctx_mgr, self.no_position(ctx), self.no_info(ctx))
+        enter_res = ctx.current_function.create_variable('enter_res', enter_res_type, self.translator)
+        # call enter
+        enter_call = self.get_method_call(ctx_type, '__enter__', [with_ctx.ref()], [ctx_type], [enter_res.ref(node, ctx)], node, ctx)
+        assign = self.viper.LocalVarAssign(code_var, zero,
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+        if try_block.with_item.optional_vars:
+            as_expr = try_block.with_item.optional_vars
+            as_var = ctx.current_function.get_variable(as_expr.id)
+            enter_assign = self.viper.LocalVarAssign(as_var.ref(as_expr, ctx),
+                                                     enter_res.ref(),
+                                                     self.to_position(as_expr, ctx),
+                                                     self.no_info(ctx))
+            body = [enter_assign, assign]
+        else:
+            body = [assign]
+        body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        finally_name = ctx.get_label_name(try_block.finally_name)
+        goto = self.viper.Goto(finally_name,
+                               self.to_position(node, ctx),
+                               self.no_info(ctx))
+        body.append(goto)
+        label_name = ctx.get_label_name(try_block.post_name)
+        end_label = self.viper.Label(label_name,
+                                     self.to_position(node, ctx),
+                                     self.no_info(ctx))
+        return ctx_stmt + [ctx_assign, enter_call] + body + [end_label]
+
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None
         for block in ctx.actual_function.try_blocks:
@@ -497,7 +548,7 @@ class StatementTranslator(CommonTranslator):
         tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            node)
         for try_block in tries:
-            if try_block.finally_block:
+            if try_block.finally_block or try_block.with_item:
                 lhs = try_block.get_finally_var(self.translator).ref()
                 rhs = self.viper.IntLit(1, self.no_position(ctx),
                                         self.no_info(ctx))

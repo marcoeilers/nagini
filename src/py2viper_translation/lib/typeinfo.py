@@ -61,6 +61,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
         rectype = self.type_of(node.expr)
         if (not self._is_result_call(node.expr) and
+                not isinstance(node.expr, mypy.nodes.IndexExpr) and
                 not isinstance(rectype, mypy.types.CallableType) and
                 not isinstance(rectype, str)):
             self.set_type(rectype.type.fullname().split('.') + [node.name],

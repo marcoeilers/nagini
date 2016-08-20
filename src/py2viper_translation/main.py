@@ -1,4 +1,5 @@
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -27,15 +28,15 @@ from py2viper_translation.verifier import (
 
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "Parser$"), "MODULE$")
+    parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
     parsed = parser.parse(text, None)
-    assert (isinstance(parsed, getattr(jvm.scala.util.parsing.combinator,
-                                       'Parsers$Success')))
-    parse_result = parsed.result()
-    parse_result.initTreeProperties()
+    assert (isinstance(parsed, getattr(jvm.fastparse.core,
+                                       'Parsed$Success')))
+    parse_result = parsed.value()
+    parse_result.initProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()

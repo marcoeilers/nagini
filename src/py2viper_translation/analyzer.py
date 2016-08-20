@@ -183,8 +183,6 @@ class Analyzer(ast.NodeVisitor):
             cls.defined = True
             if 'extends' in if_cls:
                 superclass = self.get_class(if_cls['extends'], program=self.program.global_prog)
-                if not superclass:
-                    print("asdasdasdasdasdd")
                 cls.superclass = superclass
             for method_name in if_cls.get('methods', []):
                 if_method = if_cls['methods'][method_name]
@@ -319,8 +317,6 @@ class Analyzer(ast.NodeVisitor):
             raise UnsupportedException(node)
         if len(node.bases) == 1:
             superclass = self.get_target_class(node.bases[0])
-            if not superclass:
-                print('asdasdasdlkjklsdjfjklsdkldjklf')
             cls.superclass = superclass
         else:
             cls.superclass = self.get_class(OBJECT_TYPE)
@@ -538,7 +534,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         self.visit_default(node)
-        if not isinstance(node._parent, ast.Call) and not isinstance(self.get_target(node.value, self.program), PythonProgram):
+        if not isinstance(node._parent, ast.Call) and not isinstance(node.value, ast.Subscript) and not isinstance(self.get_target(node.value, self.program), PythonProgram):
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
@@ -650,6 +646,26 @@ class Analyzer(ast.NodeVisitor):
             return node.id
         else:
             return self._get_basic_name(node.value)
+
+    def visit_With(self, node: ast.With) -> None:
+        assert self.current_function is not None
+        self.visit_default(node)
+        try_name = self.current_function.get_fresh_name('with')
+        try_block = PythonTryBlock(node, try_name, self.node_factory,
+                                   self.current_function, node.body)
+        try_block.sil_name = try_name
+        self.current_function.labels.append(try_name)
+        post_name = self.current_function.get_fresh_name('post_with')
+        try_block.post_name = post_name
+        self.current_function.labels.append(post_name)
+        finally_name = self.current_function.get_fresh_name('with_finally')
+        # try_block.finally_block = node.finalbody
+        if len(node.items) != 1:
+            raise UnsupportedException(node)
+        try_block.with_item = node.items[0]
+        try_block.finally_name = finally_name
+        self.current_function.labels.append(finally_name)
+        self.current_function.try_blocks.append(try_block)
 
     def visit_Try(self, node: ast.Try) -> None:
         assert self.current_function is not None

@@ -251,7 +251,7 @@ class MethodTranslator(CommonTranslator):
         # create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
-        posts = type_pres + posts
+        # posts = type_pres + posts
         no_pos = self.no_position(ctx)
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref(method.node, ctx),
@@ -379,7 +379,7 @@ class MethodTranslator(CommonTranslator):
                     body += self.translate_handler(handler, ctx)
                 if block.else_block:
                     body += self.translate_handler(block.else_block, ctx)
-                if block.finally_block:
+                if block.finally_block or block.with_item:
                     body += self.translate_finally(block, ctx)
             body += self.add_handlers_for_inlines(ctx)
             locals = [local.decl for local in method.get_locals()
@@ -408,8 +408,24 @@ class MethodTranslator(CommonTranslator):
                                  self.to_position(block.node, ctx),
                                  self.no_info(ctx))
         body = [label]
-        for stmt in block.finally_block:
-            body += self.translate_stmt(stmt, ctx)
+        if block.finally_block:
+            for stmt in block.finally_block:
+                body += self.translate_stmt(stmt, ctx)
+        else:
+            # with-block
+            ctx_type = self.get_type(block.with_item.context_expr, ctx)
+            ctx_var = block.with_var
+            exit_type = ctx_type.get_method('__exit__').type
+            exit_res = ctx.current_function.create_variable('exit_res',
+                                                            exit_type,
+                                                            self.translator)
+            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            exit_call = self.get_method_call(ctx_type, '__exit__',
+                                             [ctx_var.ref(), null, null, null],
+                                             [ctx_type, None, None, None],
+                                             [exit_res.ref()],
+                                             block.with_item.context_expr, ctx)
+            body.append(exit_call)
         finally_var = block.get_finally_var(self.translator)
         if finally_var.sil_name in ctx.var_aliases:
             finally_var = ctx.var_aliases[finally_var.sil_name]
