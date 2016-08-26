@@ -29,7 +29,7 @@ class SIFPythonMethod(PythonMethod):
                  interface: bool = False):
         super().__init__(name, node, cls, superscope, pure, contract_only,
                          node_factory, interface)
-        bool_type = superscope.get_program().classes[BOOL_TYPE]
+        bool_type = superscope.get_program().global_prog.classes[BOOL_TYPE]
         self.tl_var = PythonVar(TL_VAR_NAME, None, bool_type)
         self.new_tl_var = PythonVar(NEW_TL_VAR_NAME, None, bool_type)
         self._set_preserves_tl()

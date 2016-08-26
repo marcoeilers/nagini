@@ -129,8 +129,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                     self.alt_types[key] = {}
                 self.alt_types[key][(line, col)] = type
                 return
-        if key[0] is None:
-            print("111")
         self.all_types[key] = type
 
     def type_equals(self, t1, t2):

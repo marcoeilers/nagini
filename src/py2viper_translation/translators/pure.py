@@ -82,7 +82,7 @@ class PureTranslator(CommonTranslator):
         """
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.program.classes[BOOL_TYPE], self.translator)
+            ctx.program.global_prog.classes[BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.name, conds, cond, node)
         then_cond = conds + [cond_var.name]
         else_cond = conds + [NotWrapper(cond_var.name)]

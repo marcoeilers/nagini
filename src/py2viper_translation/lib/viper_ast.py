@@ -260,8 +260,6 @@ class ViperAST:
         return self.ast.CondExp(cond, then, els, position, info)
 
     def EqCmp(self, left, right, position, info):
-        print(left)
-        print(right)
         return self.ast.EqCmp(left, right, position, info)
 
     def NeCmp(self, left, right, position, info):

@@ -232,7 +232,8 @@ class TranslationTests(AnnotatedTests):
         labels = annotations['Label']
         labels_dict = {key: value for (key, value) in labels}
         try:
-            translate(path, jvm)
+            prog = translate(path, jvm)
+            print(prog)
             assert False
         except InvalidProgramException as e1:
             code = 'invalid.program:' + e1.code

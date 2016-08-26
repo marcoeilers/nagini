@@ -1,7 +1,7 @@
 
 LITERALS = ['True', 'False', 'None']
 
-BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super', 'range']
+BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super', 'range', 'type']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 

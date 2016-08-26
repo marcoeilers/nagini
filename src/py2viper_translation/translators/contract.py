@@ -124,10 +124,9 @@ class ContractTranslator(CommonTranslator):
                 return arg_stmts, self.translate_builtin_predicate(call, perm,
                                                                    args, ctx)
             else:
-                pred = self.get_target(call.func, ctx.actual_function if ctx.actual_function else ctx.program)
+                pred = self.get_target(call.func, ctx)
         elif isinstance(call.func, ast.Attribute):
-            receiver = self.get_target(call.func.value,
-                                       ctx.actual_function if ctx.actual_function else ctx.program)
+            receiver = self.get_target(call.func.value, ctx)
             if isinstance(receiver, PythonProgram):
                 pred = receiver.predicates[call.func.attr]
             else:
@@ -159,6 +158,22 @@ class ContractTranslator(CommonTranslator):
         pred = self.viper.FieldAccessPredicate(fieldacc, perm,
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
+        # add field information
+        field_type = self.get_type(node.args[0], ctx)
+        if field_type.name not in PRIMITIVES:
+            type_info = self.type_check(fieldacc, field_type,
+                                        self.no_position(ctx), ctx)
+            not_null = self.viper.NeCmp(fieldacc,
+                                        self.viper.NullLit(self.no_position(ctx),
+                                                           self.no_info(ctx)),
+                                        self.to_position(node, ctx),
+                                        self.no_info(ctx))
+            implication = self.viper.Implies(not_null, type_info,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
+            pred = self.viper.And(pred, type_info,
+                                  self.to_position(node, ctx),
+                                  self.no_info(ctx))
         return [], pred
 
     def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:

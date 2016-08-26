@@ -7,6 +7,7 @@ from py2viper_translation.lib.constants import (
     RESULT_NAME
 )
 from py2viper_translation.lib.program_nodes import (
+    MethodType,
     PythonClass,
     PythonField,
     PythonMethod,
@@ -19,7 +20,8 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
@@ -52,8 +54,6 @@ class ProgramTranslator(CommonTranslator):
         Creates a Viper function representing the given global variable.
         """
         type = self.translate_type(var.type, ctx)
-        if type == self.viper.Ref:
-            raise UnsupportedException(var.node)
         position = self.to_position(var.node, ctx)
         posts = []
         result = self.viper.Result(type, position, self.no_info(ctx))
@@ -97,13 +97,14 @@ class ProgramTranslator(CommonTranslator):
                                            '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
-        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
-                                    self.viper.NullLit(self.no_position(ctx),
-                                                       self.no_info(ctx)),
-                                    self.no_position(ctx), self.no_info(ctx))
-        new_type = self.type_factory.concrete_type_check(
-            next(iter(method.args.values())).ref(), cls, pos, ctx)
-        pres = [not_null, new_type] + pres
+        if method.method_type == MethodType.normal:
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
+                                        self.viper.NullLit(self.no_position(ctx),
+                                                           self.no_info(ctx)),
+                                        self.no_position(ctx), self.no_info(ctx))
+            new_type = self.type_factory.concrete_type_check(
+                next(iter(method.args.values())).ref(), cls, pos, ctx)
+            pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
             args.append(arg)
@@ -150,6 +151,26 @@ class ProgramTranslator(CommonTranslator):
         mname = ctx.program.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
+        self_arg = method.overrides.args[next(iter(method.overrides.args))]
+        if method.name == '__init__':
+            full_perm = self.viper.FullPerm(self.no_position(ctx),
+                                            self.no_info(ctx))
+            for cls in [method.cls, method.cls.superclass]:
+                for name, field in cls.fields.items():
+                    if field.inherited:
+                        continue
+                    field = self.viper.Field(field.sil_name,
+                                             self.translate_type(field.type,
+                                                                 ctx),
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
+                    field_acc = self.viper.FieldAccess(self_arg.ref(), field,
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
+                    acc = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                                                          self.no_position(ctx),
+                                                          self.no_info(ctx))
+                    pres.append(acc)
         if method.cls:
             not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
                                         self.viper.NullLit(self.no_position(ctx),
@@ -160,7 +181,7 @@ class ProgramTranslator(CommonTranslator):
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref())
-        self_arg = method.overrides.args[next(iter(method.overrides.args))]
+
         has_subtype = self.var_type_check(self_arg.sil_name, method.cls, pos,
                                           ctx, inhale_exhale=False)
         called_name = method.sil_name
@@ -365,14 +386,25 @@ class ProgramTranslator(CommonTranslator):
                     if method.interface:
                         continue
                     methods.append(self.translate_method(method, ctx))
-                    if method_name != '__init__' and method.overrides:
+                    if ((method_name != '__init__' or
+                             (cls.superclass and
+                              cls.superclass.has_classmethod)) and
+                            method.overrides):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.get_all_methods():
                     method = cls.get_method(method_name)
-                    if (method.cls and method.cls != cls and method_name != '__init__' and
-                            not cls.name.startswith('Dummy_Sub')):
+                    if (method.cls and method.cls != cls and
+                            method_name != '__init__' and
+                            method.method_type == MethodType.normal):
                         # inherited
-                        methods.append(self.create_inherit_check(method, cls, ctx))
+                        methods.append(self.create_inherit_check(method, cls,
+                                                                 ctx))
+                for field_name in cls.static_fields:
+                    field = cls.static_fields[field_name]
+                    if cls.superclass:
+                        if cls.superclass.get_static_field(field_name):
+                            raise InvalidProgramException(field.node,
+                                                          'invalid.override')
                 for pred_name in cls.predicates:
                     pred = cls.predicates[pred_name]
                     cpred = pred

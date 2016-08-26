@@ -285,5 +285,6 @@
         }
     },
     "extends": "object"
-}
+},
+"type": {}
 }

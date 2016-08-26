@@ -60,6 +60,8 @@ class TypeTranslator(CommonTranslator):
         """
         if 'builtins.' + cls.name in self.builtins:
             return self.builtins['builtins.' + cls.name]
+        elif cls.name == 'type':
+            return self.type_factory.type_type()
         else:
             return self.viper.Ref
 
@@ -67,7 +69,7 @@ class TypeTranslator(CommonTranslator):
         """
         Returns the type of the expression represented by node as a PythonClass
         """
-        target = self.get_target(node, ctx.actual_function if ctx.actual_function else ctx.program)
+        target = self.get_target(node, ctx)
         if target:
             if isinstance(target, PythonVar):
                 col = node.col_offset if hasattr(node, 'col_offset') else None
@@ -77,13 +79,22 @@ class TypeTranslator(CommonTranslator):
                 else:
                     return target.type
             if isinstance(target, PythonMethod):
+                # if target.name == '__init__':
+                #     return target.cls
+                if isinstance(node.func, ast.Attribute):
+                    rec_target = self.get_target(node.func.value, ctx)
+                    if not isinstance(rec_target, PythonProgram):
+                        rectype = self.get_type(node.func.value, ctx)
+                        if target.generic_type != -1:
+                            return rectype.type_args[target.generic_type]
                 return target.type
             if isinstance(target, PythonClass):
                 return target
 
         if isinstance(node, ast.Attribute):
             receiver = self.get_type(node.value, ctx)
-            return receiver.get_field(node.attr).type
+            rec_field = receiver.get_field(node.attr)
+            return rec_field.type
         elif isinstance(node, ast.Name):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
@@ -97,9 +108,6 @@ class TypeTranslator(CommonTranslator):
                     var = ctx.var_aliases[node.id]
                 col = node.col_offset if hasattr(node, 'col_offset') else None
                 key = (node.lineno, col)
-                if var is None:
-                    self.get_target(node._parent._parent._parent.func,
-                                    ctx.actual_function if ctx.actual_function else ctx.program)
                 if key in var.alt_types:
                     return var.alt_types[key]
                 else:
@@ -338,6 +346,8 @@ class TypeTranslator(CommonTranslator):
         if type.name in PRIMITIVES:
             boxed = ctx.program.classes['__boxed_' + type.name]
             result = self.type_factory.type_check(lhs, boxed, position, ctx)
+        elif type.name == 'type':
+            result = self.viper.TrueLit(position, self.no_info(ctx))
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
 
