@@ -3,6 +3,7 @@ import mypy
 
 from abc import ABCMeta
 from collections import OrderedDict
+from enum import Enum
 from py2viper_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
@@ -77,9 +78,9 @@ class PythonProgram(PythonScope):
         self.from_imports = []
         self.node_factory = node_factory
         self.types = types
-        for primitive in PRIMITIVES:
-            self.classes[primitive] = node_factory.create_python_class(
-                primitive, self, node_factory)
+        # for primitive in PRIMITIVES:
+        #     self.classes[primitive] = node_factory.create_python_class(
+        #         primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():
@@ -190,8 +191,6 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
-        if name == 'Super':
-            print("asdasd")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
@@ -205,6 +204,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
+        self._has_classmethod = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -239,6 +239,18 @@ class PythonClass(PythonType, PythonNode, PythonScope):
             return self.fields[name]
         elif self.superclass is not None:
             return self.superclass.get_field(name)
+        else:
+            return None
+
+    def get_static_field(self, name: str) -> Optional['PythonVar']:
+        """
+        Returns the static field with the given name in this class or a
+        superclass.
+        """
+        if name in self.static_fields:
+            return self.static_fields[name]
+        elif self.superclass is not None:
+            return self.superclass.get_static_field(name)
         else:
             return None
 
@@ -293,7 +305,6 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
-
         return fields
 
     def get_all_sil_fields(self) -> List['silver.ast.Field']:
@@ -307,8 +318,15 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
-
         return fields
+
+    @property
+    def has_classmethod(self) -> bool:
+        if self._has_classmethod:
+            return True
+        if self.superclass:
+            return self.superclass.has_classmethod
+        return False
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -404,6 +422,12 @@ class GenericType(PythonType):
         return self.get_class().get_predicate(name)
 
 
+class MethodType(Enum):
+    normal = 0
+    static_method = 1
+    class_method = 2
+
+
 class PythonMethod(PythonNode, PythonScope):
     """
     Represents a Python function which may be pure or impure, belong
@@ -414,7 +438,8 @@ class PythonMethod(PythonNode, PythonScope):
                  superscope: PythonScope,
                  pure: bool, contract_only: bool,
                  node_factory: 'ProgramNodeFactory',
-                 interface: bool = False):
+                 interface: bool = False,
+                 method_type: MethodType = MethodType.normal):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or program) this method belongs to
@@ -453,6 +478,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.interface = interface
         self.node_factory = node_factory
         self.labels = [END_LABEL]
+        self.method_type = method_type
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -486,7 +512,8 @@ class PythonMethod(PythonNode, PythonScope):
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         for name in self.special_vars:
-            self.special_vars[name].process(self.get_fresh_name(name), translator)
+            self.special_vars[name].process(self.get_fresh_name(name),
+                                            translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -516,6 +543,15 @@ class PythonMethod(PythonNode, PythonScope):
 
     def add_local(self, name: str, local: 'PythonVar'):
         self._locals[name] = local
+
+    @property
+    def special_args(self) -> Dict:
+        result = {}
+        if self.kw_arg:
+            result[self.kw_arg.name] = self.kw_arg
+        if self.var_arg:
+            result[self.var_arg.name] = self.var_arg
+        return result
 
     @property
     def special_vars(self) -> OrderedDict:
@@ -624,6 +660,7 @@ class PythonTryBlock(PythonNode):
         self.post_name = None
         self.with_item = None
         self.with_var = None
+        self.handler_aliases = {}
         method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
@@ -638,7 +675,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_program().classes[INT_TYPE]
+        int_type = self.method.get_program().global_prog.classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)

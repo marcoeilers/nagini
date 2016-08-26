@@ -596,6 +596,26 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
+    def dynamic_type_check(self, lhs: 'Expr',
+                           type: 'Expr', position: 'silver.ast.Position',
+                           ctx: Context):
+        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                             self.type_type(), [lhs],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        result = self.viper.EqCmp(type_func, type, self.no_position(ctx),
+                                  self.no_info(ctx))
+        return result
+
+    def typeof(self, arg: 'Expr', ctx: Context) -> 'Expr':
+        type_func = self.viper.DomainFuncApp('typeof', [arg], {},
+                                             self.type_type(), [arg],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        return type_func
+
     def type_check(self, lhs: 'Expr', type: 'PythonType',
                    position: 'silver.ast.Position',
                    ctx: Context) -> Expr:
@@ -603,16 +623,16 @@ class TypeDomainFactory:
         Creates an expression checking if the given lhs expression
         is of the given type
         """
-        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
-                                             self.type_type(), [lhs],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
         supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
                                                   self.type_type(), [],
                                                   self.no_position(ctx),
                                                   self.no_info(ctx),
                                                   self.type_domain)
+        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                             self.type_type(), [lhs],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
@@ -626,6 +646,15 @@ class TypeDomainFactory:
                                           self.no_info(ctx),
                                           self.type_domain)
         return result
+
+    def translate_type_literal(self, type: 'PythonClass', node: ast.AST,
+                               ctx: Context) -> Expr:
+        type_func = self.viper.DomainFuncApp(type.sil_name, [], {},
+                                             self.type_type(), [],
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        return type_func
 
     def type_arg_check(self, lhs: Expr, arg: 'PythonType',
                        indices: List['Expr'], ctx: Context) -> 'Expr':

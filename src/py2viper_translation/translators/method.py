@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
+    MethodType,
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
@@ -63,7 +64,7 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
 
-        if method.cls:
+        if method.cls and method.method_type is MethodType.normal:
             error_string = '"call receiver is not None"'
             pos = self.to_position(method.node, ctx, error_string)
             not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
@@ -335,7 +336,7 @@ class MethodTranslator(CommonTranslator):
         body_index = get_body_start_index(statements)
         body = self._create_method_prolog(method, ctx)
         # translate body
-        if method.cls:
+        if method.cls and method.method_type == MethodType.normal:
             no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
                 next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
@@ -516,13 +517,13 @@ class MethodTranslator(CommonTranslator):
                                  self.to_position(handler.node, ctx),
                                  self.no_info(ctx))
         old_var_aliases = ctx.var_aliases
+        ctx.var_aliases = handler.try_block.handler_aliases
         if handler.exception_name:
-            if not ctx.var_aliases:
-                ctx.var_aliases = {}
             err_var = handler.try_block.get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             ctx.var_aliases[handler.exception_name] = err_var
+            err_var.type = handler.exception
         body = []
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)

@@ -4,9 +4,11 @@ from abc import ABCMeta
 from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
+    GenericType,
     get_included_programs,
     PythonClass,
     PythonExceptionHandler,
+    PythonField,
     PythonMethod,
     PythonNode,
     PythonProgram,
@@ -22,8 +24,10 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
+    get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    is_two_arg_super_call,
     UnsupportedException
 )
 from py2viper_translation.lib.viper_ast import ViperAST
@@ -267,16 +271,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result += pow(256, index) * ord(char)
         return result
 
-    def get_target(self, node: ast.AST, container: PythonNode) -> PythonProgram:
+    def get_target(self, node: ast.AST, ctx: Context) -> PythonProgram:
+        container = ctx.actual_function if ctx.actual_function else ctx.program
+        containers = [ctx]
         if isinstance(node, ast.Name):
             if isinstance(container, PythonMethod):
-                containers = [container]
+                containers.append(container)
                 containers.extend(get_included_programs(container.get_program()))
             else:
                 # assume program
-                containers = get_included_programs(container)
+                containers.extend(get_included_programs(container))
             for ctx in containers:
-                for field in ['var_aliases', 'locals', 'classes', 'functions',
+                for field in ['var_aliases', 'args', 'special_args',
+                              'special_vars', 'locals', 'classes', 'functions',
                               'global_vars', 'methods', 'predicates',
                               'namespaces']:
                     if hasattr(ctx, field):
@@ -285,20 +292,42 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                             return field_val[node.id]
             return None
         elif isinstance(node, ast.Call):
-            return self.get_target(node.func, container)
+            func_name = get_func_name(node)
+            if func_name == 'Result' and isinstance(container, PythonMethod):
+                return container.type
+            elif func_name == 'super' and isinstance(container, PythonMethod):
+                if len(node.args) == 2:
+                    if not is_two_arg_super_call(node, ctx):
+                        raise InvalidProgramException(node,
+                                                      'invalid.super.call')
+                elif node.args:
+                    raise InvalidProgramException(node,
+                                                  'invalid.super.call')
+                return container.cls.superclass
+            return self.get_target(node.func, ctx)
         elif isinstance(node, ast.Attribute):
-            ctx = self.get_target(node.value, container)
-            if isinstance(ctx, (PythonVar, PythonMethod)):
+            ctx = self.get_target(node.value, ctx)
+            if isinstance(ctx, (PythonMethod, PythonField)):
                 ctx = ctx.type
+            elif isinstance(ctx, PythonVar):
+                col = node.col_offset if hasattr(node, 'col_offset') else None
+                key = (node.lineno, col)
+                if key in ctx.alt_types:
+                    ctx = ctx.alt_types[key]
+                else:
+                    ctx = ctx.type
+            if isinstance(ctx, GenericType):
+                ctx = ctx.cls
             if isinstance(ctx, PythonProgram):
-                containers = get_included_programs(ctx, include_global=False)
+                containers.extend(get_included_programs(ctx,
+                                                        include_global=False))
             else:
-                containers = [ctx]
-            while isinstance(containers[-1], PythonClass) and containers[
-                -1].superclass:
+                containers.append(ctx)
+            while (isinstance(containers[-1], PythonClass) and
+                   containers[-1].superclass):
                 containers.append(containers[-1].superclass)
             for ctx in containers:
-                for field in ['classes', 'functions', 'global_vars',
+                for field in ['classes', 'fields', 'functions', 'global_vars',
                               'methods', 'predicates', 'namespaces']:
                     if hasattr(ctx, field):
                         field_val = getattr(ctx, field)

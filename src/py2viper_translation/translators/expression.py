@@ -25,6 +25,7 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException,
@@ -287,10 +288,15 @@ class ExpressionTranslator(CommonTranslator):
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
+            target = self.get_target(node, ctx)
+            if isinstance(target, PythonClass):
+                return [], self.type_factory.translate_type_literal(target,
+                                                                    node,
+                                                                    ctx)
             if node.id in ctx.var_aliases:
                 return [], ctx.var_aliases[node.id].ref(node, ctx)
             else:
-                return [], ctx.current_function.get_variable(node.id).ref(node,
+                return [], ctx.actual_function.get_variable(node.id).ref(node,
                                                                           ctx)
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
@@ -315,10 +321,10 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
-        target = self.get_target(node.value, ctx.actual_function if ctx.actual_function else ctx.program)
+        target = self.get_target(node.value, ctx)
+        func_name = get_func_name(node.value)
         if isinstance(target, PythonProgram):
-            target = self.get_target(node,
-                                     ctx.actual_function if ctx.actual_function else ctx.program)
+            target = self.get_target(node, ctx)
             if isinstance(target, PythonVar):
                 # global var?
                 pos = self.to_position(node, ctx)
@@ -327,7 +333,7 @@ class ExpressionTranslator(CommonTranslator):
                 return [], self.viper.FuncApp(target.sil_name, [], pos, info, var_type, [])
             else:
                 raise UnsupportedException(node)
-        elif isinstance(target, PythonClass):
+        elif isinstance(target, PythonClass) and func_name != 'Result':
             field = target.static_fields[node.attr]
             type = self.translate_type(field.type, ctx)
             func_app = self.viper.FuncApp(field.sil_name, [],

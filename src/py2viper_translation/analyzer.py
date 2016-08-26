@@ -10,6 +10,7 @@ from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS, OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
     GenericType,
+    MethodType,
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
@@ -177,12 +178,17 @@ class Analyzer(ast.NodeVisitor):
         that have native Silver representations and won't be created by the
         translator.
         """
+        # create global classes first
         for class_name in interface:
-            if_cls = interface[class_name]
-            cls = self.get_class(class_name, interface=True, program=self.program.global_prog)
+            cls = self.get_class(class_name, interface=True,
+                                 program=self.program.global_prog)
             cls.defined = True
+        for class_name in interface:
+            cls = self.get_class(class_name)
+            if_cls = interface[class_name]
             if 'extends' in if_cls:
-                superclass = self.get_class(if_cls['extends'], program=self.program.global_prog)
+                superclass = self.get_class(if_cls['extends'],
+                                            program=self.program.global_prog)
                 cls.superclass = superclass
             for method_name in if_cls.get('methods', []):
                 if_method = if_cls['methods'][method_name]
@@ -349,11 +355,16 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            cls = self.current_class if not self.is_static_method(node) else None
+            cls = self.current_class
             func = self.node_factory.create_python_method(name, node,
                 cls, scope_container, self.is_pure(node),
                 self.contract_only, self.node_factory)
             container[name] = func
+        if self.is_static_method(node):
+            func.method_type = MethodType.static_method
+        elif self.is_class_method(node):
+            func.method_type = MethodType.class_method
+            self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
         functype = self.program.get_func_type(func.get_scope_prefix())
         if func.pure and not functype:
@@ -619,6 +630,11 @@ class Analyzer(ast.NodeVisitor):
             type, _ = self.program.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):
+            # special case for cls parameter of classmethods:
+            if self.current_function.method_type == MethodType.class_method:
+                args_list = self.current_function.node.args.args
+                if args_list and node is args_list[0]:
+                    return self.program.global_prog.classes['type']
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
@@ -669,7 +685,6 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Try(self, node: ast.Try) -> None:
         assert self.current_function is not None
-        self.visit_default(node)
         try_name = self.current_function.get_fresh_name('try')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
@@ -678,6 +693,7 @@ class Analyzer(ast.NodeVisitor):
         post_name = self.current_function.get_fresh_name('post_try')
         try_block.post_name = post_name
         self.current_function.labels.append(post_name)
+        self.current_function.try_blocks.append(try_block)
         for handler in node.handlers:
             handler_name = self.current_function.get_fresh_name(
                 'handler' + self._get_basic_name(handler.type))
@@ -697,7 +713,7 @@ class Analyzer(ast.NodeVisitor):
             try_block.finally_block = node.finalbody
             try_block.finally_name = finally_name
             self.current_function.labels.append(finally_name)
-        self.current_function.try_blocks.append(try_block)
+        self.visit_default(node)
 
     def _incompatible_decorators(self, decorators: Set[str]) -> bool:
         return ('Predicate' in decorators) and ('Pure' in decorators)
@@ -719,4 +735,10 @@ class Analyzer(ast.NodeVisitor):
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'staticmethod' in decorators
+
+    def is_class_method(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'classmethod' in decorators
 

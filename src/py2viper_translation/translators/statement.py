@@ -313,6 +313,13 @@ class StatementTranslator(CommonTranslator):
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         return [iter_assign, next_call, target_assign, loop, iter_del]
 
+    def translate_stmt_Assert(self, node: ast.Assert,
+                              ctx: Context) -> List[Stmt]:
+        stmt, expr = self.translate_expr(node.test, ctx)
+        assertion = self.viper.Assert(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion]
+
     def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
         try_block = None
         for block in ctx.actual_function.try_blocks:
@@ -381,6 +388,7 @@ class StatementTranslator(CommonTranslator):
                                            self.no_info(ctx))
         body = [assign]
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        try_block.handler_aliases = ctx.var_aliases.copy()
         if try_block.else_block:
             else_label = ctx.get_label_name(try_block.else_block.name)
             goto = self.viper.Goto(else_label,
