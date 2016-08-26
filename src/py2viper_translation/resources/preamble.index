@@ -1,4 +1,28 @@
 {
+"Seq": {
+    "functions": {
+        "__add__": {
+            "args": ["Seq", "Seq"],
+            "type": "Seq"
+        },
+        "__len__": {
+            "args": ["Seq"],
+            "type": "int"
+        },
+        "__contains__": {
+            "args": ["Seq", "object"],
+            "type": "bool"
+        },
+        "__getitem__": {
+            "args": ["Seq", "int"],
+            "type": "object"
+        },
+        "set": {
+            "args": ["Seq", "object"],
+            "type": null
+        }
+    }
+},
 "list": {
     "methods": {
         "__init__": {

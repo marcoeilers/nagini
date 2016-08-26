@@ -572,7 +572,6 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Try(self, node: ast.Try) -> None:
         assert self.current_function is not None
-        self.visit_default(node)
         try_name = self.current_function.get_fresh_name('try')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
@@ -581,6 +580,7 @@ class Analyzer(ast.NodeVisitor):
         post_name = self.current_function.get_fresh_name('post_try')
         try_block.post_name = post_name
         self.current_function.labels.append(post_name)
+        self.current_function.try_blocks.append(try_block)
         for handler in node.handlers:
             handler_name = self.current_function.get_fresh_name(
                 'handler' + handler.type.id)
@@ -600,7 +600,7 @@ class Analyzer(ast.NodeVisitor):
             try_block.finally_block = node.finalbody
             try_block.finally_name = finally_name
             self.current_function.labels.append(finally_name)
-        self.current_function.try_blocks.append(try_block)
+        self.visit_default(node)
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or

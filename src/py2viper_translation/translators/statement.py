@@ -331,6 +331,7 @@ class StatementTranslator(CommonTranslator):
                                            self.no_info(ctx))
         body = [assign]
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        try_block.handler_aliases = ctx.var_aliases.copy()
         if try_block.else_block:
             else_label = ctx.get_label_name(try_block.else_block.name)
             goto = self.viper.Goto(else_label,

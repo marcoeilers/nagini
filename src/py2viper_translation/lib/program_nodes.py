@@ -713,6 +713,7 @@ class PythonIOOperation(PythonNode, PythonScope):
                 return var.create_io_existential_variable_instance()
         return None
 
+
 class PythonExceptionHandler(PythonNode):
     """
     Represents an except-block belonging to a try-block.
@@ -760,6 +761,7 @@ class PythonTryBlock(PythonNode):
         self.node_factory = node_factory
         self.finally_name = None
         self.post_name = None
+        self.handler_aliases = {}
         method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':

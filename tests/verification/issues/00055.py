@@ -1,4 +1,3 @@
-#:: IgnoreFile(/py2viper/issue/55/)
 from py2viper_contracts.contracts import (
     Assert,
 )

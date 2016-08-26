@@ -346,6 +346,9 @@ class ViperAST:
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info)
 
+    def SeqUpdate(self, s, index, elem, position, info):
+        return self.ast.SeqUpdate(s, index, elem, position, info)
+
     def SeqContains(self, elem, s, position, info):
         return self.ast.SeqContains(elem, s, position, info)
 

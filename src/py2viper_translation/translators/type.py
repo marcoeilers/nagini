@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
+    SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -49,13 +50,19 @@ class TypeTranslator(CommonTranslator):
         self.builtins = {'builtins.int': viper_ast.Int,
                          'builtins.bool': viper_ast.Bool}
 
-    def translate_type(self, cls: PythonClass,
+    def translate_type(self, cls: PythonType,
                        ctx: Context) -> 'silver.ast.Type':
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
         if 'builtins.' + cls.name in self.builtins:
             return self.builtins['builtins.' + cls.name]
+        elif cls.name == 'Seq':
+            if isinstance(cls, GenericType):
+                arg_type = self.translate_type(cls.type_args[0], ctx)
+            else:
+                arg_type = self.viper.Ref
+            return self.viper.SeqType(arg_type)
         else:
             return self.viper.Ref
 
@@ -103,6 +110,8 @@ class TypeTranslator(CommonTranslator):
                 return value_type.type_args[1]
             elif value_type.name == RANGE_TYPE:
                 return ctx.program.classes['int']
+            elif value_type.name == SEQ_TYPE:
+                return value_type.type_args[0]
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Str):
@@ -208,6 +217,23 @@ class TypeTranslator(CommonTranslator):
                     elif node.func.id == 'Previous':
                         arg_type = self.get_type(node.args[0], ctx)
                         return GenericType(LIST_TYPE, ctx.program, [arg_type])
+                    elif node.func.id == SEQ_TYPE:
+                        if node.args:
+                            arg_types = [self.get_type(arg, ctx) for arg in
+                                         node.args]
+                            args = [self.common_supertype(arg_types)]
+                        elif node._parent and isinstance(node._parent,
+                                                         ast.Assign):
+                            # empty constructor is assigned to variable;
+                            # we get the type of the empty dict from the type of the
+                            # variable it's assigned to.
+                            args = self.get_type(node._parent.targets[0],
+                                                 ctx).type_args
+                        else:
+                            object_class = ctx.program.classes[OBJECT_TYPE]
+                            args = [object_class, object_class]
+                        type = GenericType(SEQ_TYPE, ctx.program, args)
+                        return type
                     else:
                         raise UnsupportedException(node)
                 elif node.func.id in BUILTINS:

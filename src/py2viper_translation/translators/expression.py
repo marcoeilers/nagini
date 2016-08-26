@@ -7,6 +7,7 @@ from py2viper_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     PRIMITIVES,
+    SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -163,12 +164,23 @@ class ExpressionTranslator(CommonTranslator):
                                       node, ctx)
         return stmts, call
 
+    def translate_seq_subscript(self, node: ast.Subscript,
+                                ctx: Context) -> StmtsAndExpr:
+        target_stmt, target = self.translate_expr(node.value, ctx)
+        index_stmt, index = self.translate_expr(node.slice.value, ctx)
+        index_type = self.get_type(node.slice.value, ctx)
+        access = self.viper.SeqIndex(target, index, self.to_position(node, ctx),
+                                     self.no_info(ctx))
+        return target_stmt + index_stmt, access
+
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
         if not isinstance(node.slice, ast.Index):
             raise UnsupportedException(node)
-        target_stmt, target = self.translate_expr(node.value, ctx)
         target_type = self.get_type(node.value, ctx)
+        if target_type.name == SEQ_TYPE:
+            return self.translate_seq_subscript(node, ctx)
+        target_stmt, target = self.translate_expr(node.value, ctx)
         index_stmt, index = self.translate_expr(node.slice.value, ctx)
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
@@ -388,9 +400,19 @@ class ExpressionTranslator(CommonTranslator):
         left_type = self.get_type(node.left, ctx)
         right_type = self.get_type(node.right, ctx)
         if left_type.name != INT_TYPE:
-            call = self.get_function_call(left_type, '__add__', [left, right],
-                                          [left_type, right_type], node, ctx)
-            return stmt, call
+            if left_type.name == SEQ_TYPE:
+                append = self.viper.SeqAppend(left, right,
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx))
+                return stmt, append
+            if isinstance(node.op, ast.Add):
+                call = self.get_function_call(left_type, '__add__',
+                                              [left, right],
+                                              [left_type, right_type], node,
+                                              ctx)
+                return stmt, call
+            else:
+                raise UnsupportedException(node)
         if isinstance(node.op, ast.Add):
             return (stmt, self.viper.Add(left, right,
                                          self.to_position(node, ctx),
@@ -471,10 +493,15 @@ class ExpressionTranslator(CommonTranslator):
                                             self.to_position(node, ctx),
                                             self.no_info(ctx)))
         elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
-            args = [right, left]
-            arg_types = [right_type, left_type]
-            app = self.get_function_call(right_type, '__contains__',
-                                         args, arg_types, node, ctx)
+            if right_type.name == SEQ_TYPE:
+                app = self.viper.SeqContains(left, right,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
+            else:
+                args = [right, left]
+                arg_types = [right_type, left_type]
+                app = self.get_function_call(right_type, '__contains__',
+                                             args, arg_types, node, ctx)
             if isinstance(node.ops[0], ast.NotIn):
                 app = self.viper.Not(app, self.to_position(node, ctx),
                                      self.no_info(ctx))

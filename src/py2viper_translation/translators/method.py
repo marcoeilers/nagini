@@ -511,13 +511,13 @@ class MethodTranslator(CommonTranslator):
                                  self.to_position(handler.node, ctx),
                                  self.no_info(ctx))
         old_var_aliases = ctx.var_aliases
+        ctx.var_aliases = handler.try_block.handler_aliases
         if handler.exception_name:
-            if not ctx.var_aliases:
-                ctx.var_aliases = {}
             err_var = handler.try_block.get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             ctx.var_aliases[handler.exception_name] = err_var
+            err_var.type = handler.exception
         body = []
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)

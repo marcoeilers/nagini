@@ -243,6 +243,26 @@ class ContractTranslator(CommonTranslator):
                                            self.no_info(ctx))
         return [], field_acc
 
+    def translate_seq_constructor(self, node: ast.Call,
+                                  ctx: Context) -> StmtsAndExpr:
+        seq_type = self.get_type(node, ctx)
+        viper_type = self.translate_type(seq_type.type_args[0], ctx)
+        if node.args:
+            vals = []
+            val_stmts = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSeq(vals, self.to_position(node, ctx),
+                                            self.no_info(ctx))
+            return val_stmts, result
+        else:
+            result = self.viper.EmptySeq(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+            return [], result
+
     def translate_unfold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Unfold() contract function.
@@ -412,5 +432,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_forall(node, ctx)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
+        elif func_name == 'Seq':
+            return self.translate_seq_constructor(node, ctx)
         else:
             raise UnsupportedException(node)

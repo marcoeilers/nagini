@@ -112,6 +112,8 @@ DICT_TYPE = 'dict'
 
 SET_TYPE = 'set'
 
+SEQ_TYPE = 'Seq'
+
 STRING_TYPE = 'str'
 
 INT_TYPE = 'int'

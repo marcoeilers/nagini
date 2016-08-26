@@ -15,6 +15,7 @@ from py2viper_translation.lib.constants import (
     PRIMITIVES,
     RANGE_TYPE,
     RESULT_NAME,
+    SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -56,8 +57,12 @@ class CallTranslator(CommonTranslator):
     def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
+        if arg_type.name == SEQ_TYPE:
+            return stmt, self.viper.SeqLength(target,
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx))
+        args = [target]
         call = self.get_function_call(arg_type, '__len__', [target], [None],
                                       node, ctx)
         return stmt, call
@@ -595,17 +600,34 @@ class CallTranslator(CommonTranslator):
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
         """
-        if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
-            raise InvalidProgramException(node, 'invalid.contract.position')
-        elif get_func_name(node) in CONTRACT_FUNCS:
-            return self.translate_contractfunc_call(node, ctx)
-        elif get_func_name(node) in IO_CONTRACT_FUNCS:
-            return self.translate_io_contractfunc_call(node, ctx)
-        elif get_func_name(node) in OBLIGATION_CONTRACT_FUNCS:
-            return self.translate_obligation_contractfunc_call(node, ctx)
-        elif get_func_name(node) in BUILTINS:
-            return self.translate_builtin_func(node, ctx)
-        elif get_func_name(node) in ctx.program.io_operations:
-            return self.translate_io_operation_call(node, ctx)
-        else:
-            return self.translate_normal_call(node, ctx)
+        # TODO: move this somewhere else, this should be checked along
+        # with other contract functions, and the translation should happen
+        # in the contract translator
+        if isinstance(node.func, ast.Attribute):
+            rec_type = self.get_type(node.func.value, ctx)
+            if rec_type.name == SEQ_TYPE and node.func.attr == 'set':
+                return self.translate_seq_set(node, ctx)
+        if isinstance(node.func, ast.Name):
+            if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
+                raise InvalidProgramException(node, 'invalid.contract.position')
+            elif get_func_name(node) in CONTRACT_FUNCS:
+                return self.translate_contractfunc_call(node, ctx)
+            elif get_func_name(node) in IO_CONTRACT_FUNCS:
+                return self.translate_io_contractfunc_call(node, ctx)
+            elif get_func_name(node) in OBLIGATION_CONTRACT_FUNCS:
+                return self.translate_obligation_contractfunc_call(node, ctx)
+            elif get_func_name(node) in BUILTINS:
+                return self.translate_builtin_func(node, ctx)
+            elif get_func_name(node) in ctx.program.io_operations:
+                return self.translate_io_operation_call(node, ctx)
+        return self.translate_normal_call(node, ctx)
+
+    def translate_seq_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
+        idx_stmt, index = self.translate_expr(node.args[0], ctx)
+        val_stmt, new_val = self.translate_expr(node.args[1], ctx)
+        update = self.viper.SeqUpdate(receiver, index, new_val,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        stmt = rec_stmt + idx_stmt + val_stmt
+        return stmt, update
