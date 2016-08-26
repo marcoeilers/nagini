@@ -604,13 +604,15 @@ class CallTranslator(CommonTranslator):
                 # method called on an object
                 rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
                 receiver_type = self.get_type(node.func.value, ctx)
-                if target.method_type == MethodType.class_method:
+                if (target.method_type == MethodType.class_method and
+                        receiver_type.name != 'type'):
                     receiver = self.type_factory.typeof(receiver, ctx)
                 is_predicate = target.predicate
                 receiver_class = target.cls
-                arg_stmts = rec_stmt + arg_stmts
-                args = [receiver] + args
-                arg_types = [receiver_type] + arg_types
+                if target.method_type != MethodType.static_method:
+                    arg_stmts = rec_stmt + arg_stmts
+                    args = [receiver] + args
+                    arg_types = [receiver_type] + arg_types
         else:
             # global function/method called
             receiver_class = None

@@ -487,9 +487,9 @@ class TypeDomainFactory:
         Creates the reflexivity axiom for the PyType domain:
         forall type: PyType :: { issubtype(type, type) } issubtype(type, type)
         """
-        arg = self.viper.LocalVarDecl('type', self.type_type(),
+        arg = self.viper.LocalVarDecl('type_', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
-        var = self.viper.LocalVar('type', self.type_type(),
+        var = self.viper.LocalVar('type_', self.type_type(),
                                   self.no_position(ctx), self.no_info(ctx))
         reflexive_subtype = self.viper.DomainFuncApp('issubtype', [var, var],
                                                      {}, self.viper.Bool,
@@ -615,6 +615,28 @@ class TypeDomainFactory:
                                              self.no_info(ctx),
                                              self.type_domain)
         return type_func
+
+    def subtype_check(self, subtype: 'Expr', type: 'PythonType',
+                      position: 'silver.ast.Position',
+                      ctx: Context) -> Expr:
+        supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
+                                                  self.type_type(), [],
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx),
+                                                  self.type_domain)
+        var_sub = self.viper.LocalVar('sub', self.type_type(),
+                                      self.no_position(ctx), self.no_info(ctx))
+        var_super = self.viper.LocalVar('super', self.type_type(),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        result = self.viper.DomainFuncApp('issubtype',
+                                          [subtype, supertype_func], {},
+                                          self.viper.Bool,
+                                          [var_sub, var_super],
+                                          position,
+                                          self.no_info(ctx),
+                                          self.type_domain)
+        return result
 
     def type_check(self, lhs: 'Expr', type: 'PythonType',
                    position: 'silver.ast.Position',

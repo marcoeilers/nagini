@@ -304,13 +304,16 @@ class ExpressionTranslator(CommonTranslator):
         Returns the PythonField for a given ast.Attribute node.
         """
         recv = self.get_type(node.value, ctx)
+        if recv.name == 'type':
+            recv = recv.type_args[0]
         field = recv.get_field(node.attr)
         if not field:
-            if isinstance(recv, PythonClass) and node.attr in recv.static_fields:
+            if (isinstance(recv, PythonClass) and
+                    recv.get_static_field(node.attr)):
                 var = recv.static_fields[node.attr]
                 return var
             recv = self.get_type(node.value, ctx)
-            raise InvalidProgramException(node, 'field.nonexistant')
+            raise InvalidProgramException(node, 'field.nonexistent')
         while field.inherited is not None:
             field = field.inherited
         if field.is_mangled() and (field.cls is not ctx.current_class and

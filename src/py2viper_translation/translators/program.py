@@ -151,7 +151,24 @@ class ProgramTranslator(CommonTranslator):
         mname = ctx.program.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
-        self_arg = method.overrides.args[next(iter(method.overrides.args))]
+        self_arg = None
+        has_subtype = None
+        if method.cls and method.method_type == MethodType.normal:
+            self_arg = method.overrides.args[next(iter(method.overrides.args))]
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
+                                        self.viper.NullLit(
+                                            self.no_position(ctx),
+                                            self.no_info(ctx)),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+            pres = [not_null] + pres
+            has_subtype = self.var_type_check(self_arg.sil_name, method.cls,
+                                              pos,
+                                              ctx, inhale_exhale=False)
+        elif method.method_type == MethodType.class_method:
+            cls_arg = next(iter(method.args.values())).ref()
+            has_subtype = self.type_factory.subtype_check(cls_arg, method.cls,
+                                                          pos, ctx)
         if method.name == '__init__':
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
@@ -171,19 +188,11 @@ class ProgramTranslator(CommonTranslator):
                                                           self.no_position(ctx),
                                                           self.no_info(ctx))
                     pres.append(acc)
-        if method.cls:
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
-                                        self.viper.NullLit(self.no_position(ctx),
-                                                           self.no_info(ctx)),
-                                        self.no_position(ctx),
-                                        self.no_info(ctx))
-            pres = [not_null] + pres
+
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref())
 
-        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, pos,
-                                          ctx, inhale_exhale=False)
         called_name = method.sil_name
         ctx.position.pop()
         results, targets, body = self._create_override_check_body_impure(
@@ -248,9 +257,13 @@ class ProgramTranslator(CommonTranslator):
                                      self.to_position(method.node, ctx),
                                      self.no_info(ctx))
         ctx.position.pop()
-        subtype_assume = self.viper.Inhale(has_subtype, self.no_position(ctx),
-                                           self.no_info(ctx))
-        body = default_checks + [subtype_assume, call]
+        if has_subtype:
+            subtype_assume = self.viper.Inhale(has_subtype,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+            body = default_checks + [subtype_assume, call]
+        else:
+            body = default_checks + [call]
         body_block = self.translate_block(body, self.no_position(ctx),
                                           self.no_info(ctx))
         return results, targets, body_block
