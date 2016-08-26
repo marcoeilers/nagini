@@ -17,8 +17,8 @@ class B(A):
 
 
 class C(A):
+    #:: Label(L1)
     @staticmethod
     def static_method() -> int:
-        #:: Label(L1)
         Ensures(Result() > 0)
         return 666

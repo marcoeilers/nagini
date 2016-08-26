@@ -93,7 +93,11 @@ class TypeTranslator(CommonTranslator):
 
         if isinstance(node, ast.Attribute):
             receiver = self.get_type(node.value, ctx)
+            if receiver.name == 'type':
+                receiver = receiver.type_args[0]
             rec_field = receiver.get_field(node.attr)
+            if not rec_field:
+                return receiver.get_static_field(node.attr)
             return rec_field.type
         elif isinstance(node, ast.Name):
             if node.id in ctx.program.global_vars:

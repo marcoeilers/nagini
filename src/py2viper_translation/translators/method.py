@@ -156,8 +156,18 @@ class MethodTranslator(CommonTranslator):
         args = func.args
         pres = []
         for arg in args.values():
-            if not (arg.type.name in PRIMITIVES or
-                    (is_constructor and arg == next(iter(args)))):
+            if not (arg.type.name in PRIMITIVES):
+                if arg == next(iter(args.values())):
+                    if is_constructor:
+                        continue
+                    if func.method_type == MethodType.class_method:
+                        cls_arg = arg.ref()
+                        type_check = self.type_factory.subtype_check(cls_arg,
+                                                                  func.cls,
+                                                                  self.no_position(ctx),
+                                                                  ctx)
+                        pres.append(type_check)
+                        continue
                 type_check = self.get_parameter_typeof(arg, ctx)
                 pres.append(type_check)
         if func.var_arg:

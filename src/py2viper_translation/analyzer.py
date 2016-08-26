@@ -634,7 +634,9 @@ class Analyzer(ast.NodeVisitor):
             if self.current_function.method_type == MethodType.class_method:
                 args_list = self.current_function.node.args.args
                 if args_list and node is args_list[0]:
-                    return self.program.global_prog.classes['type']
+                    cls = self.program.global_prog.classes['type']
+                    arg = self.current_class
+                    return GenericType(cls, [arg])
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)

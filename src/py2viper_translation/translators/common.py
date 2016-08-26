@@ -316,6 +316,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     ctx = ctx.alt_types[key]
                 else:
                     ctx = ctx.type
+            if isinstance(ctx, GenericType) and ctx.name == 'type':
+                ctx = ctx.type_args[0]
             if isinstance(ctx, GenericType):
                 ctx = ctx.cls
             if isinstance(ctx, PythonProgram):

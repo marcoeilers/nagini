@@ -34,6 +34,7 @@ class D:
     @classmethod
     def construct(cls) -> D:
         Ensures(isinstance(Result(), cls))
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L2)
         Ensures(Acc(Result().val) and Result().val > 7)
         return cls()
 
@@ -47,6 +48,7 @@ class E(D):
 
 
 class F(D):
+    #:: Label(L2)
     @classmethod
     def construct(cls) -> D:
         Ensures(isinstance(Result(), cls))
