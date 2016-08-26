@@ -605,8 +605,13 @@ class CallTranslator(CommonTranslator):
         # in the contract translator
         if isinstance(node.func, ast.Attribute):
             rec_type = self.get_type(node.func.value, ctx)
-            if rec_type.name == SEQ_TYPE and node.func.attr == 'set':
-                return self.translate_seq_set(node, ctx)
+            if rec_type.name == SEQ_TYPE:
+                if node.func.attr == 'update':
+                    return self.translate_seq_update(node, ctx)
+                elif node.func.attr == 'take':
+                    return self.translate_seq_take(node, ctx)
+                elif node.func.attr == 'drop':
+                    return self.translate_seq_drop(node, ctx)
         if isinstance(node.func, ast.Name):
             if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
@@ -622,7 +627,8 @@ class CallTranslator(CommonTranslator):
                 return self.translate_io_operation_call(node, ctx)
         return self.translate_normal_call(node, ctx)
 
-    def translate_seq_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_seq_update(self, node: ast.Call,
+                             ctx: Context) -> StmtsAndExpr:
         rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
         idx_stmt, index = self.translate_expr(node.args[0], ctx)
         val_stmt, new_val = self.translate_expr(node.args[1], ctx)
@@ -631,3 +637,19 @@ class CallTranslator(CommonTranslator):
                                       self.no_info(ctx))
         stmt = rec_stmt + idx_stmt + val_stmt
         return stmt, update
+
+    def translate_seq_take(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
+        n_stmt, n = self.translate_expr(node.args[0], ctx)
+        take = self.viper.SeqTake(receiver, n, self.to_position(node, ctx),
+                                  self.no_info(ctx))
+        stmt = rec_stmt + n_stmt
+        return stmt, take
+
+    def translate_seq_drop(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
+        n_stmt, n = self.translate_expr(node.args[0], ctx)
+        drop = self.viper.SeqDrop(receiver, n, self.to_position(node, ctx),
+                                  self.no_info(ctx))
+        stmt = rec_stmt + n_stmt
+        return stmt, drop

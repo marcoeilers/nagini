@@ -361,6 +361,9 @@ class ViperAST:
     def SeqTake(self, s, end, postion, info):
         return self.ast.SeqTake(s, end, postion, info)
 
+    def SeqDrop(self, s, end, postion, info):
+        return self.ast.SeqDrop(s, end, postion, info)
+
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info)
 

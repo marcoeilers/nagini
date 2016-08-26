@@ -17,9 +17,17 @@
             "args": ["Seq", "int"],
             "type": "object"
         },
-        "set": {
+        "update": {
             "args": ["Seq", "object"],
             "type": null
+        },
+        "take": {
+            "args": ["Seq", "int"],
+            "type": "Seq"
+        },
+        "drop": {
+            "args": ["Seq", "int"],
+            "type": "Seq"
         }
     }
 },

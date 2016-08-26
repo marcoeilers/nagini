@@ -12,7 +12,7 @@ def test() -> None:
     s = Seq(1, 2, 3)
     i = s[3]
     s2 = s + Seq(4)
-    s4 = s2.set(1, 6)
+    s4 = s2.update(1, 6)
     Assert(s4[1] == 6)
     Assert(len(s4) == 4)
     Assert(s4[2] == 3)
@@ -30,7 +30,13 @@ def test_2() -> None:
     s = Seq(c1, c2, c3)
     i = s[3]
     s2 = s + Seq(c4)
-    s4 = s2.set(1, c6)
+    s3 = s.take(2)
+    Assert(s3[0] == c1)
+    Assert(len(s3) == 2)
+    s5 = s.drop(2)
+    Assert(s5[0] == c3)
+    Assert(len(s5) == 1)
+    s4 = s2.update(1, c6)
     Assert(s4[1] == c6)
     Assert(len(s4) == 4)
     Assert(s4[2] == c3)
