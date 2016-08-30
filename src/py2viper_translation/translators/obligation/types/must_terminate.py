@@ -1,74 +1,208 @@
-"""``MustTerminate`` obligation implementation.
+# pragma pylint: disable=wrong-spelling-in-docstring
+
+r"""``MustTerminate`` obligation implementation.
+
+.. todo::
+
+    This method should verify (create a test for it)::
+
+        method m()
+        {
+            b := true
+            while (b)
+                invariant !b ==> mustTerminate(1)
+            {
+                b := false
+            }
+            while (true) {}
+        }
+
+The reasons why we do not follow original paper [Obligations]_ directly
+are:
+
+1.  We want to reuse Viper constructs as much as possible, which means
+    that we would like to avoid replacing a method call with an exhale
+    inhale pair.
+2.  We do not want to have an additional argument, which indicates if
+    the caller has an obligation to terminate or not.
+3.  We want to have a consistent encoding for loops and methods.
+
+``MustTerminate`` obligation encoding implemented in Chalice2Silver
+([C2SObligations]_) turned out to be unsound (see issue `84
+<https://bitbucket.org/viperproject/chalice2silver/issues/84/>`_). The
+problem is that the callee's promise to terminate is checked after the
+method call. If callee's postcondition is ``False`` (a possible
+postcondition for non-terminating method), the check trivially passes.
+Nagini therefore uses a different encoding.
+
+``MustTerminate`` in Contracts
+==============================
+
+Like in [C2SObligations]_, ``MustTerminate`` mentioned in method
+preconditions and loop invariants are translated into inhale/exhale
+pair:
+
++   Unlike in [C2SObligations]_, we do not need to guarantee that we
+    have at most full permission to ``MustTerminate``. We therefore just
+    inhale a full permission to ``MustTerminate`` each time.
+    TODO: Implement.
++   We do not exhale ``MustTerminate`` obligation (unlike in
+    [C2SObligations]_), we only check that measure is strictly positive.
+    TODO: Implement.
+
+Promise to Terminate
+====================
+
+As described in the previous section, we do not exhale
+``MustTerminate``. We therefore need a different mechanism for detecting
+if a method call / loop promised to terminate. The idea is to generate a
+boolean expression that is ``True`` iff method call / loop promised to
+terminate. That is if there is at least one ``MustTerminate`` whose
+guarding condition and measure check evaluates to ``True``. More
+precisely, we define termination condition as:
+
+.. math::
+
+    tcond := \lor \left\{%
+        guard(o) \land measure_check(o) :
+        o \in \text{MustTerminate obligations in contract}
+    \right\}
+
+We also define a version that ignores measures:
+
+.. math::
+
+    tcond_no_measure := \lor \left\{%
+        guard(o) :
+        o \in \text{MustTerminate obligations in contract}
+    \right\}
+
+.. note::
+
+    In subsequent sections :math:`tcond` and :math:`tcond_no_measure`
+    are used as a macros.
+
+TODO: Implement in obligation_info and add a reference to
+implementation.
+
+Method Encoding
+===============
+
+At the end of each method precondition, we add a leak check guarded by
+:math:`tcond`. The whole expression added to the precondition in the
+optimized form:
+
+.. math::
+
+    tcond \lor
+    (perm(cthread) == none \land \text{leak check for other obligation types})
+
+:math:`perm(cthread) == none` is an optimized form of the leak check for
+``MustTerminate`` obligation. Note that in our encoding like in
+[C2SObligations]_, leak check does not include ``MustTerminate``
+obligation type.
+
+TODO: Implement.
+
+.. note::
+
+    Unlike in [C2SObligations]_, we do not emit any additional code on
+    the caller side.
+
+.. note::
+
+    For axiomatic methods (the ones that are defined in
+    ``preamble.index``) we add additional precondition:
+
+    1.  If method is marked as terminating, we add a check that caller
+        termination measure is bigger than 1:
+
+        .. math::
+
+            measure_check(cthread, 1)
+
+    2.  If method is not marked as terminating, we add a leak check:
+
+        .. math::
+
+            (perm(cthread) == none \land
+                \text{leak check for other obligation types})
+
+Optimization: if we can statically know that method is always
+terminating (it has exactly one unconditional ``MustTerminate``), we can
+optimize the check to this expression (:math:`o` is ``MustTerminate``
+obligation):
+
+.. math::
+
+    measure_check(o)
+
+TODO: Implement.
+
+Loop Encoding
+=============
+
+1.  We save ``MustTerminate`` amount in a variable so that we can
+    restore it after the loop (like in [C2SObligations]_). Otherwise,
+    terminating loop in non-terminating method would generate
+    termination obligations.
+2.  We save loop's termination promise:
+    :math:`termination_flag := tcond_no_measure`.
+3.  Like in [C2SObligations]_, to distinguish if we are exhaling before
+    the loop or after the loop, we use a boolean local variable
+    ``exhale_before_loop_var``. Before loop it is set to ``True`` and at
+    the end of the loop body – to ``False``.
+4.  At the end of the loop invariant (similarly to [C2SObligations]_,
+    but the check is not the same), we add a leak check that guarantees
+    that either loop promised to terminate, or that context does not
+    have any obligations:
+
+    .. math::
+
+        exhale_before_loop_var \Rightarrow
+            termination_flag \lor
+                (perm(cthread) == none \land
+                    \text{leak check for other obligation types})
+
+    .. note::
+
+        This check is almost identical to the one for method encoding.
+
+5.  At the end of the loop invariant (similarly to [C2SObligations]_,
+    but the check is not the same), we add a leak check that guarantees
+    that loop body does not leak obligations and that loop upholds its
+    promise to terminate:
+
+    .. math::
+
+        !exhale_before_loop_var \Rightarrow (
+            (termination_flag \Rightarrow tcond) \land
+            \text{leak check for other obligation types}
+        )
+
+TODO: Implement.
 
 Optimization
 ============
 
-Observations:
-
-1.  Handling ``MustTerminate`` significantly slows down the verifier (in
-    ``example1`` test, Carbon slows down about 5 times).
-2.  Most methods are either always terminating (have ``MustTerminate``
-    in their precondition), or non-terminating (have no
-    ``MustTerminate`` in their precondition).
-
-Idea: detect three cases (always terminating, non-terminating, unknown)
-and try to optimize encoding.
-
-Usually there are many more method calls compared to loops. Therefore,
-optimize only method calls.
-
-The context is either a loop or a method that directly surrounds the
-method call. If the context is:
-
-1.  ``always_terminating`` and the callee is:
-
-    1.  ``always_terminating``: check that measure is positive and
-        decreases;
-    2.  ``potentially_non_terminating``: invalid program error.
-    3.  ``unknown_termination``: use non-optimized encoding.
-
-2.  ``potentially_non_terminating`` and the callee is
-
-    1.  ``always_terminating``: check that measure is positive and
-        decreases;
-    2.  ``potentially_non_terminating``: just do the context leak check;
-    3.  ``unknown_termination``: use non-optimized encoding.
-
-3.  ``unknown_termination`` and the callee is
-
-    1.  ``always_terminating``: check that measure is positive and
-        decreases;
-    2.  ``potentially_non_terminating``: do the context leak check and
-        check that ``perm(MustTerminate) == none``.
-    3.  ``unknown_termination``: use non-optimized encoding.
-
-Optimizations for method definition:
-
-1.  If the method is ``always_terminating``, then replace
-    ``MustTerminate`` predicate exhale with decreased measure check.
-2.  If the method is ``always_terminating``, then remove the context
-    leak check.
-3.  If the method is ``potentially_non_terminating``, then make
-    the caller context leak check unguarded.
-
-Optimization for method call encoding:
-
-1.  If the callee is not ``unknown_termination``, drop explicit
-    ``MustTerminate`` check and all variable assignments, inhales, and
-    exhales related to it. In addition:
-
-    1.  If surrounding context is ``always_terminating`` and callee is
-        ``potentially_non_terminating``, report an invalid program
-        error.
-        TODO: Check the case when calling a non-terminating method
-        inside a terminating loop defined in a non-terminating method.
-    2.  If surrounding context is ``unknown_termination`` add callee is
-        ``potentially_non_terminating`` add an explicit check that
-        callee is not required to terminate.
-
 .. todo::
 
-    Rewrite this thing as a table for better readability.
+    Take out optimization and compare the performance of unsound
+    unoptimized implemenetation, unsound optimized implementation and
+    the final code base.
+
+.. rubric:: References
+
+..  [C2SObligations]
+    Verification of Finite Blocking in Chalice
+    Robert Meier, SS 2015
+    https://www.ethz.ch/content/dam/ethz/special-interest/infk/chair-program-method/pm/documents/Education/Theses/Robert%20_Meier_MA_report.pdf
+
+..  [Obligations]
+    Modular Verification of Finite Blocking in Non-terminating Programs
+    P. Boström and P. Müller
+    European Conference on Object-Oriented Programming (ECOOP), 2015.
+    http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=BostromMueller15.pdf
 """
 
 
