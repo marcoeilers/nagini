@@ -16,6 +16,18 @@ def non_terminating() -> None:
     pass
 
 
+# Check that loop does not “eat” termination obligation.
+
+
+def test_call_non_terminating_5() -> None:
+    Requires(MustTerminate(2))
+    a = [1, 2, 3]
+    for elem in a:
+        Invariant(MustTerminate(len(a) - len(Previous(elem))))
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
+    non_terminating()
+
+
 # Check that measures are non-negative.
 
 
@@ -53,7 +65,7 @@ def test_measures_4(a: List[int]) -> None:
 def test_terminate_promise_1(a: List[int]) -> None:
     Requires(MustTerminate(2))
     Requires(Acc(list_pred(a)))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     for i in a:
         pass
 
@@ -74,7 +86,7 @@ def test_terminate_promise_4(a: List[int], b: List[int]) -> None:
         # TODO: This is actually an instance of bug #59.
         #:: OptionalOutput(invariant.not.preserved:insufficient.permission)
         Invariant(Acc(list_pred(b)))
-        #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+        #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
         for j in b:
             pass
 

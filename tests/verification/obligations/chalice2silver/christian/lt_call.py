@@ -37,7 +37,7 @@ class A:
 
     def dx(self) -> None:
         Requires(MustTerminate(1))
-        #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+        #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
         self.d2()
 
     def fib(self, n: int) -> int:
@@ -72,7 +72,7 @@ class A:
         x.a = Lock()
         x.a.acquire()
         x.b = -1
-        #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,quick_release__MustRelease)
+        #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
         self.quick_release(x)
 
     def timed_release_bounded_subzero(self, x: A) -> None:

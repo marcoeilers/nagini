@@ -26,7 +26,7 @@ TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED = {
 }
 
 OBLIGATION_MEASURE_NON_POSITIVE = {
-    ('assert.failed', 'assertion.false'):
+    ('call.precondition', 'assertion.false'):
         ('call.precondition', 'obligation_measure.non_positive')
 }
 OBLIGATION_MUST_TERMINATE_NOT_TAKEN = {
