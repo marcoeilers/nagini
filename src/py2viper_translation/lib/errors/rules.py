@@ -29,16 +29,6 @@ OBLIGATION_MEASURE_NON_POSITIVE = {
     ('call.precondition', 'assertion.false'):
         ('call.precondition', 'obligation_measure.non_positive')
 }
-OBLIGATION_MUST_TERMINATE_NOT_TAKEN = {
-    ('assert.failed', 'assertion.false'):
-        ('leak_check.failed', 'must_terminate.not_taken'),
-    ('call.precondition', 'assertion.false'):
-        ('leak_check.failed', 'must_terminate.not_taken')
-}
-OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING = {
-    ('assert.failed', 'assertion.false'):
-        ('leak_check.failed', 'must_terminate.loop_not_promised')
-}
 OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL = {
     ('assert.failed', 'assertion.false'):
         ('leak_check.failed', 'must_terminate.loop_promise_not_kept')
@@ -76,8 +66,6 @@ __all__ = (
     'TERMINATION_CHECK_GAP_ENABLED',
     'TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED',
     'OBLIGATION_MEASURE_NON_POSITIVE',
-    'OBLIGATION_MUST_TERMINATE_NOT_TAKEN',
-    'OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING',
     'OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL',
     'OBLIGATION_CALL_LEAK_CHECK_FAIL',
     'OBLIGATION_BODY_LEAK_CHECK_FAIL',

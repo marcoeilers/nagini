@@ -161,15 +161,6 @@ Loop Encoding
 
         termination_flag \Rightarrow (tcond \lor \not{loop_condition})
 
-Optimization
-============
-
-.. todo::
-
-    Take out optimization and compare the performance of unsound
-    unoptimized implementation, unsound optimized implementation and
-    the final code base.
-
 .. rubric:: References
 
 ..  [C2SObligations]
@@ -187,7 +178,6 @@ Optimization
 
 import ast
 
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import silver_nodes as sil
@@ -213,37 +203,6 @@ _PREDICATE_NAME = _OBLIGATION_NAME
 def _create_predicate_access(cthread: PythonVar) -> sil.PredicateAccess:
     """Create a predicate access expression."""
     return sil.PredicateAccess(_PREDICATE_NAME, sil.RefVar(cthread))
-
-
-class TerminationGuarantee(Enum):
-    """What guarantees a method provides about its termination."""
-
-    always_terminating = 1
-    """The method is always terminating.
-
-    That is:
-
-    +   method precondition has exactly one ``MustTerminate`` and it is
-        unguarded, or
-    +   method is axiomatized as terminating by annotation in
-        ``preamble.index``.
-    """
-
-    potentially_non_terminating = 2
-    """The method provides no termination guarantees.
-
-    That is:
-
-    +   method precondition has no ``MustTerminate``, or
-    +   method is axiomatized as non-terminating in ``preamble.index``.
-    """
-
-    unknown_termination = 3
-    """Statically unknown termination.
-
-    All cases not-covered by ``always_terminating`` and
-    ``potentially_non_terminating``.
-    """
 
 
 class MustTerminateObligationInstance(

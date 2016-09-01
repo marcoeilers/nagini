@@ -25,9 +25,6 @@ from py2viper_translation.translators.obligation.measures import (
 from py2viper_translation.translators.obligation.types.base import (
     ObligationInstance,
 )
-from py2viper_translation.translators.obligation.types.must_terminate import (
-    TerminationGuarantee,
-)
 
 
 CURRENT_THREAD_NAME = '_cthread'
@@ -265,28 +262,6 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             all_instances.extend(instances)
         return all_instances
 
-    def get_termination_guarantee(self) -> TerminationGuarantee:
-        """Get the method's termination guarantee."""
-        must_terminate = self._obligation_manager.must_terminate_obligation
-        if self._method.interface:
-            terminating = must_terminate.is_interface_method_terminating(
-                self._method.interface_dict)
-            if terminating:
-                return TerminationGuarantee.always_terminating
-            else:
-                return TerminationGuarantee.potentially_non_terminating
-        else:
-            instances = self._precondition_instances[
-                must_terminate.identifier()]
-            if not instances:
-                return TerminationGuarantee.potentially_non_terminating
-            if len(instances) != 1:
-                return TerminationGuarantee.unknown_termination
-            if instances[0].guard:
-                return TerminationGuarantee.unknown_termination
-            else:
-                return TerminationGuarantee.always_terminating
-
 
 class PythonLoopObligationInfo(BaseObligationInfo):
     """Info about the obligation use in a loop."""
@@ -355,16 +330,3 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             return sil.PythonBoolExpression(self.node.test)
         else:
             return sil.RefVar(self.iteration_err_var) == None  # noqa: E711
-
-    def get_termination_guarantee(self) -> TerminationGuarantee:
-        """Get the loop's termination guarantee."""
-        must_terminate = self._obligation_manager.must_terminate_obligation
-        instances = self._instances[must_terminate.identifier()]
-        if not instances:
-            return TerminationGuarantee.potentially_non_terminating
-        if len(instances) != 1:
-            return TerminationGuarantee.unknown_termination
-        if instances[0].guard:
-            return TerminationGuarantee.unknown_termination
-        else:
-            return TerminationGuarantee.always_terminating
