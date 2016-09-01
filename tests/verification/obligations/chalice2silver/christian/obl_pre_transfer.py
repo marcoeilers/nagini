@@ -71,5 +71,5 @@ class A:
         r = Lock()
         r.acquire()
         self.skip(r)
-        #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+        #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
         self.does_release(r)

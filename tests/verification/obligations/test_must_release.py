@@ -97,7 +97,7 @@ def over_in_minus_one(l: Lock) -> None:
 def check_over_in_minus_one() -> None:
     l = Lock()
     l.acquire()
-    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one__MustRelease)
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one(l)
 
 
@@ -120,7 +120,7 @@ def check_over_in_minus_one_conditional_1() -> None:
 def check_over_in_minus_one_conditional_2() -> None:
     l = Lock()
     l.acquire()
-    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one_conditional__MustRelease__False)
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one_conditional(l, False)
 
 

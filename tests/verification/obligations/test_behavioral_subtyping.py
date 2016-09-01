@@ -20,7 +20,7 @@ class Super:
 
 class SubIncreased(Super):
 
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken,Super__do_stuff)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations,Super__do_stuff)
     def do_stuff(self) -> None:
         """Measure increased. Error."""
         Requires(MustTerminate(3))
@@ -34,7 +34,7 @@ class SubIncreased(Super):
 
 class SubIncreased2(Super):
 
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken,Super__do_stuff)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations,Super__do_stuff)
     def do_stuff(self) -> None:
         """Measure increased. Error."""
         Requires(MustTerminate(3))
