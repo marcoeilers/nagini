@@ -36,8 +36,7 @@ class MustReleaseObligationInstance(
         self._measure = measure
         self._target = target
 
-    def _get_inexhale(
-            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
+    def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             sil.FieldAccess(
                 self.get_target(), _BOUNDED_FIELD_NAME, sil.INT),

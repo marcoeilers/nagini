@@ -63,6 +63,8 @@ class MeasureMap:
         info = translator.no_info(ctx)
         measures = []
         for instance in obligation_instances:
+            if instance.obligation_instance.is_fresh():
+                continue
             guard_expression = instance.create_guard_expression()
             value = instance.obligation_instance.get_measure()
             if overriding_check:
