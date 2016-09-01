@@ -28,6 +28,9 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
+from py2viper_translation.translators.obligation.utils import (
+    bound_obligations,
+)
 
 
 class ObligationMethod:
@@ -110,6 +113,7 @@ class ObligationMethodNodeConstructor:
         self._add_additional_preconditions()
         if not self._need_skip_body():
             self._set_up_measures()
+            self._bound_obligations()
             self._add_body_leak_check()
         self._add_caller_leak_check()
 
@@ -167,6 +171,13 @@ class ObligationMethodNodeConstructor:
         self._obligation_method.prepend_body(statements)
         self._obligation_method.add_local(
             self._obligation_info.method_measure_map.get_var())
+
+    def _bound_obligations(self) -> None:
+        """Convert all unbounded obligations to bounded ones."""
+        statements = bound_obligations(
+            self._obligation_info.get_all_precondition_instances(),
+            self._translator, self._ctx, self._position, self._info)
+        self._obligation_method.prepend_body(statements)
 
     def _add_body_leak_check(self) -> None:
         """Add a leak check.

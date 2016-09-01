@@ -57,6 +57,10 @@ class ObligationInstance(abc.ABC):
             self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Get inhale exhale pair for use in loop invariant."""
 
+    @abc.abstractmethod
+    def get_bound_pair(self, ctx: Context) -> Tuple[sil.Exhale, sil.Inhale]:
+        """Get exhale/inhale pair that bounds obligation."""
+
 
 class Obligation(abc.ABC):
     """A base class for all obligations."""

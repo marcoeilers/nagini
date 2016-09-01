@@ -37,8 +37,7 @@ class MustInvokeObligationInstance(
         self._measure = measure
         self._target = target
 
-    def _get_inexhale(
-            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
+    def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             sil.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
             sil.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),

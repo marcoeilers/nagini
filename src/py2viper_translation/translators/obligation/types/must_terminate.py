@@ -178,7 +178,7 @@ Loop Encoding
 
 import ast
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
@@ -216,11 +216,13 @@ class MustTerminateObligationInstance(
         self._measure = measure
         self._target = target
 
-    def _get_inexhale(
-            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
+    def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             _create_predicate_access(self._target),
             skip_exhale=True)
+
+    def get_bound_pair(self, ctx: Context) -> Tuple[sil.Exhale, sil.Inhale]:
+        assert False    # MustTerminate is never fresh.
 
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.

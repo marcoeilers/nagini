@@ -23,6 +23,9 @@ from py2viper_translation.translators.obligation.node_constructor import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonLoopObligationInfo,
 )
+from py2viper_translation.translators.obligation.utils import (
+    bound_obligations,
+)
 
 
 class ObligationLoop:
@@ -76,6 +79,7 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         """Construct statements to perform a loop."""
         self._add_leak_check()
         self._set_up_measures()
+        self._bound_obligations()
         self._save_must_terminate_amount(
             self._loop_obligation_info.original_must_terminate_var)
         self._save_loop_termination()
@@ -139,6 +143,13 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         instances = self._loop_obligation_info.get_all_instances()
         statements = loop_measure_map.initialize(
             instances, self._translator, self._ctx)
+        self._obligation_loop.prepend_body(statements)
+
+    def _bound_obligations(self) -> None:
+        """Convert all unbounded obligations to bounded ones."""
+        statements = bound_obligations(
+            self._loop_obligation_info.get_all_instances(),
+            self._translator, self._ctx, self._position, self._info)
         self._obligation_loop.prepend_body(statements)
 
     def _save_loop_termination(self) -> None:
