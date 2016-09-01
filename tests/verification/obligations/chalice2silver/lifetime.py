@@ -26,5 +26,5 @@ def do_release_caller(l: Lock) -> None:
     Requires(l is not None)
     Requires(MustRelease(l, 1))
 
-    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,do_release__MustTerminate)
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     do_release(l)

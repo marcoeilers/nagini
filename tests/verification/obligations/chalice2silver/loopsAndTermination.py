@@ -38,7 +38,7 @@ def f() -> None:
 
 def f1() -> None:
     Requires(MustTerminate(10))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while True:
         pass
 
@@ -64,7 +64,7 @@ def f4() -> None:
     Requires(MustTerminate(5))
     i = 0
     n = 10
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while i < n:
         i += 1
 
@@ -77,7 +77,7 @@ def f5() -> None:
         Invariant(MustTerminate(n-i+1))
         i += 1
         j = 0
-        #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+        #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
         while j < n:
             j += 1
 
@@ -99,7 +99,7 @@ def f7() -> None:
     Requires(MustTerminate(5))
     i = 0
     n = 10
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while i < n:
         i += 1
         # fork x()
@@ -116,7 +116,7 @@ def f8() -> None:
     Requires(MustTerminate(5))
     i = 0
     n = 10
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while i < n:
         i += 1
         j = 0

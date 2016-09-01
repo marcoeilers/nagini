@@ -23,7 +23,7 @@ class A:
     def m1(self) -> None:
         Requires(MustTerminate(1))
         x = 1
-        #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+        #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
         while x < 5:
             Invariant(True)
             x += 1
@@ -42,7 +42,7 @@ class A:
         while x < 5:
             Invariant(MustTerminate(10-x))
             x += 1
-            #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+            #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
             while y < 5:
                 Invariant(True)
                 y += 1
@@ -64,7 +64,7 @@ class A:
         while x < 5:
             Invariant(MustTerminate(10-x))
             x += 1
-            #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+            #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
             while y < 5:
                 Invariant(True)
                 y += 1

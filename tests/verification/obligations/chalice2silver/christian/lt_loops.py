@@ -66,7 +66,7 @@ class A:
             y = 500
             while y > 100:
                 Invariant(MustTerminate(y))
-                #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+                #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
                 self.d2()
                 y -= 2
             x -= 1
