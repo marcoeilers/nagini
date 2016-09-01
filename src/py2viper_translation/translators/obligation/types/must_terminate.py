@@ -2,21 +2,6 @@
 
 r"""``MustTerminate`` obligation implementation.
 
-.. todo::
-
-    This method should verify (create a test for it)::
-
-        method m()
-        {
-            b := true
-            while (b)
-                invariant !b ==> mustTerminate(1)
-            {
-                b := false
-            }
-            while (true) {}
-        }
-
 The reasons why we do not follow original paper [Obligations]_ directly
 are:
 
@@ -45,10 +30,8 @@ pair:
 +   Unlike in [C2SObligations]_, we do not need to guarantee that we
     have at most full permission to ``MustTerminate``. We therefore just
     inhale a full permission to ``MustTerminate`` each time.
-    TODO: Implement.
 +   We do not exhale ``MustTerminate`` obligation (unlike in
     [C2SObligations]_), we only check that measure is strictly positive.
-    TODO: Implement.
 
 Promise to Terminate
 ====================
@@ -82,8 +65,8 @@ We also define a version that ignores measures:
     In subsequent sections :math:`tcond` and :math:`tcond_no_measure`
     are used as a macros.
 
-TODO: Implement in obligation_info and add a reference to
-implementation.
+:math:`tcond` and :math:`tcond_no_measure` implementation is provided by
+:py:class:`BaseObligationInfo.create_termination_check`.
 
 Method Encoding
 ===============
@@ -101,8 +84,6 @@ optimized form:
 ``MustTerminate`` obligation. Note that in our encoding like in
 [C2SObligations]_, leak check does not include ``MustTerminate``
 obligation type.
-
-TODO: Implement.
 
 .. note::
 
@@ -128,17 +109,6 @@ TODO: Implement.
             (perm(cthread) == none \land
                 \text{leak check for other obligation types})
 
-Optimization: if we can statically know that method is always
-terminating (it has exactly one unconditional ``MustTerminate``), we can
-optimize the check to this expression (:math:`o` is ``MustTerminate``
-obligation):
-
-.. math::
-
-    measure_check(o)
-
-TODO: Implement.
-
 Loop Encoding
 =============
 
@@ -160,6 +130,7 @@ Loop Encoding
     .. math::
 
         exhale_before_loop_var \Rightarrow
+            \not{loop_condition} \lor
             termination_flag \lor
                 (perm(cthread) == none \land
                     \text{leak check for other obligation types})
@@ -168,19 +139,27 @@ Loop Encoding
 
         This check is almost identical to the one for method encoding.
 
-5.  At the end of the loop invariant (similarly to [C2SObligations]_,
-    but the check is not the same), we add a leak check that guarantees
-    that loop body does not leak obligations and that loop upholds its
-    promise to terminate:
+5.  At the end of the loop invariant (similarly to [C2SObligations]_),
+    we add a leak check that guarantees that loop body does not leak
+    obligations:
 
     .. math::
 
         !exhale_before_loop_var \Rightarrow (
-            (termination_flag \Rightarrow tcond) \land
             \text{leak check for other obligation types}
         )
 
-TODO: Implement.
+    .. note::
+
+        This leak check does not check if loop upholds its termination
+        promise.
+
+6.  At the end of loop body we add a check that loop upholds its promise
+    to terminate:
+
+    .. math::
+
+        termination_flag \Rightarrow (tcond \lor \not{loop_condition})
 
 Optimization
 ============
@@ -188,7 +167,7 @@ Optimization
 .. todo::
 
     Take out optimization and compare the performance of unsound
-    unoptimized implemenetation, unsound optimized implementation and
+    unoptimized implementation, unsound optimized implementation and
     the final code base.
 
 .. rubric:: References
@@ -209,11 +188,10 @@ Optimization
 import ast
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.context import Context
-from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
@@ -281,23 +259,9 @@ class MustTerminateObligationInstance(
 
     def _get_inexhale(
             self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
-        if is_method:
-            obligation_info = ctx.actual_function.obligation_info
-            if (obligation_info.get_termination_guarantee() is
-                    TerminationGuarantee.always_terminating):
-                return ObligationInhaleExhale(
-                    _create_predicate_access(self._target),
-                    max_one_inhale=False,   # We have only one MustTerminate.
-                    exhale_only_check_measure=True)
         return ObligationInhaleExhale(
             _create_predicate_access(self._target),
-            max_one_inhale=True)
-
-    def get_use_method(
-            self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
-        exprs = super().get_use_method(ctx)
-        assert len(exprs) == 1
-        return [(exprs[0][0], rules.OBLIGATION_MUST_TERMINATE_NOT_TAKEN)]
+            skip_exhale=True)
 
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.

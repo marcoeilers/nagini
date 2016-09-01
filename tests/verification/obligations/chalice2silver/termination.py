@@ -33,7 +33,7 @@ def no_time() -> None:
 
 def f1() -> None:
     Requires(MustTerminate(1))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     over_in_one()
 
 
@@ -77,7 +77,7 @@ def f4() -> None:
     i_time(9)
     i_time(7)
     i_time(8)
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     i_time(10)
 
 
@@ -85,7 +85,7 @@ def loop1() -> None:
     Requires(MustTerminate(2))
     i = 0
     n = 10
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while i < n:
         pass
 
@@ -108,7 +108,7 @@ def loop3() -> None:
     n = 10
     while i < n:
         Invariant(MustTerminate(n-i+1))
-        #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,i_time__MustTerminate)|OptionalOutput(leak_check.failed:must_terminate.not_taken)
+        #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(leak_check.failed:caller.has_unsatisfied_obligations)
         i_time(i)
         i = i + 1
 
@@ -120,7 +120,7 @@ def loop3_a() -> None:
     while i < n:
         Invariant(MustTerminate(n-i+1))
         Invariant(i > 0)
-        #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+        #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
         i_time(i)
         i = i + 1
 
@@ -139,7 +139,7 @@ def hidden_obligation() -> None:
     Requires(MustTerminate(2))
     i = 0
     n = 10
-    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_not_promised)
+    #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
     while i < n:
         Invariant(Implies(i > n, MustTerminate(n-i)))
         i = i + 1

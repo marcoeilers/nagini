@@ -23,9 +23,6 @@ from py2viper_translation.translators.obligation.node_constructor import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonLoopObligationInfo,
 )
-from py2viper_translation.translators.obligation.types.must_terminate import (
-    TerminationGuarantee,
-)
 
 
 class ObligationLoop:
@@ -83,7 +80,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._loop_obligation_info.original_must_terminate_var)
         self._save_loop_termination()
         self._set_loop_check_before()
-        self._check_loop_promises_terminate()
         self._set_loop_check_after_body()
         self._check_loop_preserves_termination()
         self._add_loop()
@@ -99,16 +95,23 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         termination_flag = sil.BoolVar(
             self._loop_obligation_info.termination_flag_var)
 
-        always_terminating = (
-            self._loop_obligation_info.get_termination_guarantee() is
-            TerminationGuarantee.always_terminating)
-        if (not obligation_config.disable_loop_context_leak_check and
-                not always_terminating):
+        if not obligation_config.disable_loop_context_leak_check:
+            must_terminate = self._obligation_manager.must_terminate_obligation
+            predicate = must_terminate.create_predicate_access(
+                self._obligation_info.current_thread_var)
+            termination_leak_check = sil.CurrentPerm(predicate) == sil.NoPerm()
+            loop_cond = self._loop_obligation_info.construct_loop_condition()
             before_loop_leak_check = sil.InhaleExhale(
                 sil.TrueLit(),
                 sil.Implies(
                     loop_check_before,
-                    sil.Implies(sil.Not(termination_flag), leak_check)))
+                    sil.BigOr([
+                        termination_flag,
+                        sil.Not(loop_cond),
+                        sil.BigAnd([termination_leak_check, leak_check])
+                    ])
+                )
+            )
             info = self._to_info('Leak check for context.')
             position = self._to_position(
                 conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
@@ -142,14 +145,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         """Save if loop promises to terminate into a variable."""
         if obligation_config.disable_termination_check:
             return
-        instances = self._loop_obligation_info.get_instances(
-            self._obligation_manager.must_terminate_obligation.identifier())
-        disjuncts = [
-            instance.create_guard_expression()
-            for instance in instances]
         assign = sil.Assign(
             self._loop_obligation_info.termination_flag_var,
-            sil.BigOr(disjuncts))
+            self._loop_obligation_info.create_termination_check(True))
         info = self._to_info('Save loop termination promise.')
         self._append_statement(assign, info=info)
 
@@ -160,23 +158,6 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             sil.TrueLit())
         info = self._to_info('We are before loop.')
         self._append_statement(assign, info=info)
-
-    def _check_loop_promises_terminate(self) -> None:
-        """Check that loop promises to terminate if it has to."""
-        if obligation_config.disable_termination_check:
-            return
-        predicate = self._get_must_terminate_predicate()
-        check = sil.Implies(
-            sil.CurrentPerm(predicate) > sil.NoPerm(),
-            sil.BigOr([
-                sil.BoolVar(self._loop_obligation_info.termination_flag_var),
-                sil.Not(self._loop_obligation_info.construct_loop_condition())
-            ])
-        )
-        info = self._to_info('Check if loop terminates.')
-        position = self._to_position(
-            conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_MISSING)
-        self._append_statement(sil.Assert(check), position, info)
 
     def _set_loop_check_after_body(self) -> None:
         """Set the variable indicating that we are after loop body."""
@@ -192,19 +173,13 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         """Check that loop keeps the promise to terminate."""
         if obligation_config.disable_termination_check:
             return
-        instances = self._loop_obligation_info.get_instances(
-            self._obligation_manager.must_terminate_obligation.identifier())
-        disjuncts = [
-            sil.Not(self._loop_obligation_info.construct_loop_condition())]
-        for instance in instances:
-            guard = instance.create_guard_expression()
-            measure_check = self._loop_obligation_info.loop_measure_map.check(
-                sil.RefVar(self._obligation_info.current_thread_var),
-                instance.obligation_instance.get_measure())
-            disjuncts.append(sil.BigAnd([guard, measure_check]))
         check = sil.Implies(
             sil.BoolVar(self._loop_obligation_info.termination_flag_var),
-            sil.BigOr(disjuncts))
+            sil.BigOr([
+                sil.Not(self._loop_obligation_info.construct_loop_condition()),
+                self._loop_obligation_info.create_termination_check(False)
+            ])
+        )
         assertion = sil.Assert(check)
         position = self._to_position(
             conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL)

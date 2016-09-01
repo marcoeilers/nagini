@@ -1,5 +1,6 @@
 from py2viper_contracts.contracts import (
     Requires,
+    Ensures,
     Invariant,
     Implies,
     Assert,
@@ -28,15 +29,15 @@ def over_in_conflict_caller() -> None:
 
 # Test that measures are always positive.
 
+
 def over_in_minus_one() -> None:
-    #:: Label(over_in_minus_one__MustTerminate)
     Requires(MustTerminate(-1))
     # Negative measure is equivalent to False.
     Assert(False)
 
 
 def check_over_in_minus_one() -> None:
-    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one__MustTerminate)
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one()
 
 
@@ -55,7 +56,7 @@ def check_over_in_minus_one_conditional_1() -> None:
 
 
 def check_over_in_minus_one_conditional_2() -> None:
-    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive,over_in_minus_one_conditional__MustTerminate__False)
+    #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one_conditional(False)
 
 
@@ -70,14 +71,14 @@ def over_in_one() -> None:
 def over_in_two_1() -> None:
     Requires(MustTerminate(1))
     Requires(MustTerminate(2))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     over_in_one()
 
 
 def over_in_two_2() -> None:
     Requires(MustTerminate(2))
     Requires(MustTerminate(1))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     over_in_one()
 
 
@@ -95,7 +96,7 @@ def over_in_two_4() -> None:
 
 def over_in_two_5() -> None:
     Requires(MustTerminate(2))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     over_in_two_4()
 
 
@@ -163,5 +164,45 @@ def test_non_boolean_guards_1(i: int) -> None:
 
 def test_non_boolean_guards_2(i: int) -> None:
     Requires(MustTerminate(2))
-    #:: ExpectedOutput(leak_check.failed:must_terminate.not_taken)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     test_non_boolean_guards_callee(0)
+
+
+# Check calling method with False postcondition.
+
+
+def test_false_postcondition() -> None:
+    Requires(Implies(False, MustTerminate(1)))
+    Ensures(False)
+    while True:
+        pass
+
+
+def test_false_postcondition_caller() -> None:
+    Requires(MustTerminate(2))
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
+    test_false_postcondition()
+    Assert(False)
+
+
+# Check calling non-terminating caller.
+
+
+def non_terminating3() -> None:
+    pass
+
+
+def terminating_caller() -> None:
+    Requires(MustTerminate(2))
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
+    non_terminating3()
+
+
+def test_call_non_terminating_1() -> None:
+    Requires(MustTerminate(2))
+    i = 0
+    while i < 5:
+        Invariant(MustTerminate(5 - i))
+        i += 1
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
+    non_terminating()

@@ -70,25 +70,43 @@ class ErrorManager:
                 return self._conversion_rules[node_id]
         return None
 
+    def _try_get_rules_workaround(
+            self, node: 'ast.Node', jvm: Optional[JVM]) -> Optional[Rules]:
+        """Try to extract rules out of ``node``.
+
+        Due to optimizations, Silicon sometimes returns not the correct
+        offending node, but an And that contains it. This method tries
+        to work around this problem.
+
+        .. todo::
+
+            In the long term we should discuss with Malte how to solve
+            this problem properly.
+        """
+        rules = self._get_conversion_rules(node.pos())
+        if rules or not jvm:
+            return rules
+        if (isinstance(node, jvm.viper.silver.ast.And) or
+                isinstance(node, jvm.viper.silver.ast.Implies)):
+            return (self._get_conversion_rules(node.left().pos()) or
+                    self._get_conversion_rules(node.right().pos()) or
+                    self._try_get_rules_workaround(node.left(), jvm) or
+                    self._try_get_rules_workaround(node.right(), jvm))
+        return
+
     def _convert_error(
             self, error: 'AbstractVerificationError',
             jvm: Optional[JVM]) -> Error:
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
         position = error.pos()
-        rules = self._get_conversion_rules(position)
-        if rules is None and jvm:
-            # TODO: Due to optimizations, Silicon sometimes returns not
-            # the correct offending node, but an And that contains it.
-            # This is an attempt to work around this problem.
-            # In the long term we should discuss with Malte how to solve
-            # this problem properly.
-            node = error.offendingNode()
-            if isinstance(node, jvm.viper.silver.ast.And):
-                rules = (self._get_conversion_rules(node.left().pos()) or
-                         self._get_conversion_rules(node.right().pos()))
+        rules = self._try_get_rules_workaround(
+            error.offendingNode(), jvm)
         if rules is None:
-            rules = self._get_conversion_rules(reason_pos) or {}
+            rules = self._try_get_rules_workaround(
+                error.reason().offendingNode(), jvm)
+        if rules is None:
+            rules = {}
         error_item = self._get_item(position)
         if error_item:
             return Error(error, rules, reason_item, error_item.node,

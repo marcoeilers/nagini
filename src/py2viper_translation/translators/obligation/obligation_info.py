@@ -1,6 +1,7 @@
 """Information about obligation use in contracts."""
 
 
+import abc
 import ast
 
 from typing import List
@@ -119,6 +120,33 @@ class BaseObligationInfo(GuardCollectingVisitor):
         """Get ``GuardedObligationInstance`` represented by node."""
         return self._all_instances[node]
 
+    @abc.abstractmethod
+    def _get_must_terminate_instances(self) -> List[GuardedObligationInstance]:
+        """Get all ``MustTerminate`` obligation instances."""
+
+    @abc.abstractmethod
+    def _check_must_terminate_measure_decrease(
+            self, measure: sil.IntExpression) -> sil.BoolExpression:
+        """Create a check if provided measure is smaller than current."""
+
+    def create_termination_check(
+            self, ignore_measures: bool) -> sil.BoolExpression:
+        """Create a check if callee is going to terminate.
+
+        This method is essentially a ``tcond`` macro as defined in
+        ``MustTerminate`` documentation.
+        """
+        disjuncts = []
+        for instance in self._get_must_terminate_instances():
+            guard = instance.create_guard_expression()
+            if ignore_measures:
+                disjuncts.append(guard)
+            else:
+                measure_check = self._check_must_terminate_measure_decrease(
+                    instance.obligation_instance.get_measure())
+                disjuncts.append(sil.BigAnd([guard, measure_check]))
+        return sil.BigOr(disjuncts)
+
     def _create_var(
             self, name: str, class_name: str,
             translator: 'Translator', local: bool = False) -> PythonVar:
@@ -184,10 +212,6 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             MEASURES_METHOD_NAME, translator)
         self.method_measure_map = MeasureMap(
             method_measure_map_var)
-        self.original_must_terminate_var = self._create_perm_var(
-            ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator)
-        self.increased_must_terminate_var = self._create_perm_var(
-            INCREASED_MUST_TERMINATE_AMOUNT_NAME, translator)
 
     def traverse_contract(self) -> None:
         """Collect all needed information about obligations."""
@@ -219,6 +243,15 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             for postcondition, _ in postconditions:
                 self.traverse(postcondition)
         self._current_instance_map = None
+
+    def _get_must_terminate_instances(self) -> List[GuardedObligationInstance]:
+        return self.get_precondition_instances(
+            self._obligation_manager.must_terminate_obligation.identifier())
+
+    def _check_must_terminate_measure_decrease(
+            self, measure: sil.IntExpression) -> sil.BoolExpression:
+        return self.caller_measure_map.check(
+            sil.RefVar(self.current_thread_var), measure)
 
     def get_precondition_instances(
             self, obligation_id: str) -> List[ObligationInstance]:
@@ -298,6 +331,15 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             else:
                 self.traverse(invariant.args[0])
         self._current_instance_map = None
+
+    def _get_must_terminate_instances(self) -> List[GuardedObligationInstance]:
+        return self.get_instances(
+            self._obligation_manager.must_terminate_obligation.identifier())
+
+    def _check_must_terminate_measure_decrease(
+            self, measure: sil.IntExpression) -> sil.BoolExpression:
+        return self.loop_measure_map.check(
+            sil.RefVar(self.current_thread_var), measure)
 
     def get_all_instances(self) -> List[ObligationInstance]:
         """Return all invariant instances."""
