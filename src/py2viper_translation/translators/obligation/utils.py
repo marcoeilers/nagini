@@ -33,9 +33,8 @@ def bound_obligations(
     for instance in instances:
         if not instance.obligation_instance.is_fresh():
             continue
-        exhale, inhale = instance.obligation_instance.get_bound_pair(ctx)
-        statements.append(exhale)
-        statements.append(inhale)
+        statement = instance.obligation_instance.get_obligation_bound(ctx)
+        statements.append(statement)
     translated_statements = [
         statement.translate(translator, ctx, position, info)
         for statement in statements]
