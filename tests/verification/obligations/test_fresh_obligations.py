@@ -68,3 +68,23 @@ def infinite_recursion(l: Lock) -> None:
     Requires(MustRelease(l))
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     infinite_recursion(l)
+
+
+# Sometimes we do not have fresh obligation.
+
+
+def no_obligation_1(l: Lock) -> None:
+    Requires(Implies(False, MustRelease(l)))
+    Requires(l is not None)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    l.release()
+
+
+def no_obligation_2(l: Lock) -> None:
+    Requires(l is not None)
+    i = 5
+    while i > 0:
+        Invariant(Implies(False, MustRelease(l)))
+        #:: ExpectedOutput(call.precondition:insufficient.permission)
+        l.release()
+        i -= 1

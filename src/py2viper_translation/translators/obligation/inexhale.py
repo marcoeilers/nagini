@@ -134,9 +134,12 @@ class ObligationInhaleExhale:
         inhale = self._construct_inhale(measure_check is None)
         return sil.InhaleExhale(inhale, exhale)
 
-    def construct_bound_pair(self) -> Tuple[sil.Exhale, sil.Inhale]:
-        """Construct exhale and inhale for bounding obligation."""
-        return sil.Exhale(self._unbounded_acc), sil.Inhale(self._bounded_acc)
+    def construct_obligation_bound(self) -> sil.Statement:
+        """Construct statement for bounding obligation."""
+        return sil.If(
+            self._unbounded_positive,
+            [sil.Exhale(self._unbounded_acc), sil.Inhale(self._bounded_acc)],
+            [])
 
 
 class InexhaleObligationInstanceMixin(abc.ABC):
@@ -206,8 +209,8 @@ class InexhaleObligationInstanceMixin(abc.ABC):
 
         return terms
 
-    def get_bound_pair(self, ctx: Context) -> Tuple[sil.Exhale, sil.Inhale]:
+    def get_obligation_bound(self, ctx: Context) -> sil.Statement:
         """Default implementation for bounding an obligation."""
         assert self.is_fresh()
         inexhale = self._get_inexhale(ctx)
-        return inexhale.construct_bound_pair()
+        return inexhale.construct_obligation_bound()
