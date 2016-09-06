@@ -88,3 +88,36 @@ def no_obligation_2(l: Lock) -> None:
         #:: ExpectedOutput(call.precondition:insufficient.permission)
         l.release()
         i -= 1
+
+
+# Behavioral subtyping.
+
+
+class A:
+
+    def release(self, l: Lock) -> None:
+        Requires(MustRelease(l))
+        l.release()
+
+
+class ASub(A):
+
+    def release(self, l: Lock) -> None:
+        Requires(MustRelease(l))
+        l.release()
+
+
+class B:
+
+    #:: Label(B_release)
+    def release(self, l: Lock) -> None:
+        Requires(MustRelease(l, 1))
+        l.release()
+
+
+class BSub(B):
+
+    #:: ExpectedOutput(call.precondition:insufficient.permission,B_release)
+    def release(self, l: Lock) -> None:
+        Requires(MustRelease(l))
+        l.release()
