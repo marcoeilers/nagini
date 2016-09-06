@@ -126,7 +126,8 @@ class ObligationMethodNodeConstructor:
     def _need_skip_body(self) -> bool:
         """Check if altering body should not be done."""
         return (self._is_body_native_silver() or
-                self._python_method.contract_only)
+                (self._python_method.contract_only and
+                 not self._overriding_check))
 
     def _add_aditional_parameters(self) -> None:
         """Add current thread and caller measures parameters."""
