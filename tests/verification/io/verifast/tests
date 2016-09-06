@@ -5,3 +5,4 @@ user_sets_contract/untrusted_implementation.py
 tee/tee_unbuffered.py
 tee/tee_out.py
 output_anything/output_any_char.py
+matching_brackets/matching_brackets_output.py
