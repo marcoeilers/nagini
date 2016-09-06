@@ -4,3 +4,4 @@ never_ending_program/yes.py
 user_sets_contract/untrusted_implementation.py
 tee/tee_unbuffered.py
 tee/tee_out.py
+output_anything/output_any_char.py
