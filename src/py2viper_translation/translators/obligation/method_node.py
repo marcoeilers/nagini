@@ -175,6 +175,8 @@ class ObligationMethodNodeConstructor:
 
     def _bound_obligations(self) -> None:
         """Convert all unbounded obligations to bounded ones."""
+        if self._overriding_check:
+            return
         statements = bound_obligations(
             self._obligation_info.get_all_precondition_instances(),
             self._translator, self._ctx, self._position, self._info)
