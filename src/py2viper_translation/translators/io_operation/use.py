@@ -110,7 +110,7 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             raise_invalid_existential_var(
                 'defining_expression_type_mismatch', node)
 
-        var.set_ref(right)
+        var.set_ref(right, self.viper.Old(right, right.pos(), right.info()))
 
     def translate_get_ghost_output(
             self, node: ast.Assign, ctx: Context) -> List[Stmt]:
