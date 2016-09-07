@@ -49,6 +49,11 @@ class IOOperationResult:
         self._var = None
 
     @property
+    def node(self) -> ast.Call:
+        """Get the AST node for position."""
+        return self._node
+
+    @property
     def var(self) -> PythonVarBase:
         """The resolved variable that was referred by ``var_name``."""
         assert self._var is not None
@@ -151,7 +156,8 @@ class ResultTranslator:
         return contexts
 
     def _add_equation(self, result: IOOperationResult) -> None:
-        equation = self._viper.EqCmp(result.getter, result.var.ref(),
+        equation = self._viper.EqCmp(result.getter,
+                                     result.var.ref(result.node, self._ctx),
                                      self._position, self._info)
         self._equations.append(equation)
 
@@ -178,7 +184,9 @@ class ResultTranslator:
         if result.var.is_defined():
             self._add_equation(result)
         else:
-            result.var.set_ref(result.getter)
+            getter = result.getter
+            old_getter = self._viper.Old(getter, getter.pos(), getter.info())
+            result.var.set_ref(getter, old_getter)
 
     def _handle_normal_var(self, result: IOOperationResult) -> None:
         assert isinstance(result.var, (PythonVar, PythonGlobalVar))
