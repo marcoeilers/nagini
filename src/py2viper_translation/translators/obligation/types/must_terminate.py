@@ -216,11 +216,13 @@ class MustTerminateObligationInstance(
         self._measure = measure
         self._target = target
 
-    def _get_inexhale(
-            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
+    def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             _create_predicate_access(self._target),
             skip_exhale=True)
+
+    def get_obligation_bound(self, ctx: Context) -> sil.Statement:
+        assert False    # MustTerminate is never fresh.
 
     def is_fresh(self) -> bool:
         return False    # MustTerminate is never fresh.

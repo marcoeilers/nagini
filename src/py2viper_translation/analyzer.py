@@ -4,6 +4,7 @@ import mypy
 import os
 import py2viper_contracts.io_builtins
 import py2viper_translation.external.astpp
+import tokenize
 
 from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -87,7 +88,7 @@ class Analyzer(ast.NodeVisitor):
         Scans the parsed file for Import-statements and adds all imported paths
         to self.modules.
         """
-        with open(abs_path, 'r') as file:
+        with tokenize.open(abs_path) as file:
             text = file.read()
         parse_result = ast.parse(text)
         try:

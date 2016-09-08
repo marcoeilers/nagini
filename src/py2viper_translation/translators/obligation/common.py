@@ -12,7 +12,6 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
-    InvalidProgramException,
     join_expressions,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
@@ -64,19 +63,6 @@ class CommonObligationTranslator(CommonTranslator):
         guarded_obligation_instance = obligation_info.get_instance(node)
         obligation_instance = guarded_obligation_instance.obligation_instance
         assert isinstance(obligation_instance, expected_type)
-
-        if obligation_instance.is_fresh():
-            # Fresh obligations are allowed only in postconditions.
-            if ctx.obligation_context.is_translating_loop():
-                # TODO: Think how to lift this restriction. The problem
-                # is that unlike in original paper, we do not perform
-                # explicit conversion of fresh obligations into bounded
-                # ones.
-                raise InvalidProgramException(
-                    node, 'obligation.fresh.in_loop')
-            elif not ctx.obligation_context.is_translating_posts:
-                raise InvalidProgramException(
-                    node, 'obligation.fresh.in_precondition')
 
         exprs_with_rules = self._create_obligation_instance_use(
             obligation_instance, ctx)

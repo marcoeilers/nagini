@@ -53,7 +53,6 @@ class SuperA:
                 write_int_io(t1, self.int_field, t2)
             ),
             Ensures(
-                #:: ExpectedOutput(postcondition.violated:insufficient.permission,SuperA__write_int1)
                 token(t2) and
                 t2 == Result()
             ),
@@ -196,11 +195,6 @@ class SubA1(SuperA):
 class SubA2(SuperA):
     """Remove heap non-dependent."""
 
-    # Defining getter is changed from heap non-dependent to heap
-    # dependent. If overriding method takes all permission, then
-    # information provided in the precondition about getter equality is
-    # havoced and verifier fails to prove equality.
-    #:: Label(SuperA__write_int1)
     def write_int1(self, t1: Place, value: int) -> Place:
         IOExists1(Place)(
             lambda t2: (

@@ -28,6 +28,9 @@ from py2viper_translation.translators.obligation.manager import (
 from py2viper_translation.translators.obligation.obligation_info import (
     PythonMethodObligationInfo,
 )
+from py2viper_translation.translators.obligation.utils import (
+    bound_obligations,
+)
 
 
 class ObligationMethod:
@@ -110,6 +113,7 @@ class ObligationMethodNodeConstructor:
         self._add_additional_preconditions()
         if not self._need_skip_body():
             self._set_up_measures()
+            self._bound_obligations()
             self._add_body_leak_check()
         self._add_caller_leak_check()
 
@@ -122,7 +126,8 @@ class ObligationMethodNodeConstructor:
     def _need_skip_body(self) -> bool:
         """Check if altering body should not be done."""
         return (self._is_body_native_silver() or
-                self._python_method.contract_only)
+                (self._python_method.contract_only and
+                 not self._overriding_check))
 
     def _add_aditional_parameters(self) -> None:
         """Add current thread and caller measures parameters."""
@@ -167,6 +172,15 @@ class ObligationMethodNodeConstructor:
         self._obligation_method.prepend_body(statements)
         self._obligation_method.add_local(
             self._obligation_info.method_measure_map.get_var())
+
+    def _bound_obligations(self) -> None:
+        """Convert all unbounded obligations to bounded ones."""
+        if self._overriding_check:
+            return
+        statements = bound_obligations(
+            self._obligation_info.get_all_precondition_instances(),
+            self._translator, self._ctx, self._position, self._info)
+        self._obligation_method.prepend_body(statements)
 
     def _add_body_leak_check(self) -> None:
         """Add a leak check.

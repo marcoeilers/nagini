@@ -878,6 +878,7 @@ class PythonIOExistentialVar(PythonVarBase):
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
         self._ref = None
+        self._old_ref = None
 
     def is_defined(self) -> bool:
         """
@@ -892,16 +893,23 @@ class PythonIOExistentialVar(PythonVarBase):
         """
         # TODO (Vytautas): Update to new API.
         assert not self._ref is None, self.name
-        return self._ref
+        if ctx.obligation_context.is_translating_posts:
+            assert not self._old_ref is None, self.name
+            return self._old_ref
+        else:
+            return self._ref
 
-    def set_ref(self, ref: Expr) -> None:
+    def set_ref(self, ref: Expr, old_ref: Optional[Expr]) -> None:
         """
         Sets a Silver expression node that can be used to refer to this
         variable.
         """
         # TODO (Vytautas): Update to new API.
         assert self._ref is None
+        assert self._old_ref is None
+        assert ref is not None
         self._ref = ref
+        self._old_ref = old_ref
 
 
 class PythonVarCreator:
@@ -981,7 +989,7 @@ class PythonVarCreator:
         """
         var = PythonIOExistentialVar(self._name, self._node, self._type)
         assert self._existential_ref
-        var.set_ref(self._existential_ref)
+        var.set_ref(self._existential_ref, None)
         return var
 
 
