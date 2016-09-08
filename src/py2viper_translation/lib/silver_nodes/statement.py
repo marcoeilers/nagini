@@ -1,6 +1,8 @@
 """Silver statements."""
 
 
+from typing import List
+
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
@@ -65,9 +67,35 @@ class Assign(Statement):
             self._var.ref(), value, position, info)
 
 
+class If(Statement):
+    """If statement."""
+
+    def __init__(
+            self, condition: 'BoolExpression', thn: List[Statement],
+            els: List[Statement]) -> None:
+        self._condition = condition
+        self._then = thn
+        self._else = els
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Stmt:
+        condition = self._condition.translate(translator, ctx, position, info)
+        then_body = translator.translate_block(
+            [statement.translate(translator, ctx, position, info)
+             for statement in self._then],
+            position, info)
+        else_body = translator.translate_block(
+            [statement.translate(translator, ctx, position, info)
+             for statement in self._else],
+            position, info)
+        return translator.viper.If(
+            condition, then_body, else_body, position, info)
+
+
 __all__ = (
     'Inhale',
     'Exhale',
     'Assert',
     'Assign',
+    'If',
 )

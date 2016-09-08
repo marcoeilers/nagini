@@ -68,7 +68,7 @@ class IOOperationCommonTranslator(CommonTranslator):
         for parameter, py_arg, sil_arg in zip(parameters, py_args, sil_args):
             var_type = self.get_type(py_arg, ctx)
             var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
-            var.set_ref(sil_arg)
+            var.set_ref(sil_arg, None)
             ctx.set_alias(parameter.name, var)
             aliases.append(parameter.name)
 

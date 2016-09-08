@@ -115,17 +115,31 @@ class ObligationInhaleExhale:
         return sil.InhaleExhale(self._construct_inhale(False), exhale)
 
     def construct_use_loop(
-            self, measure_check: sil.BoolExpression,
+            self, measure_check: Optional[sil.BoolExpression],
             loop_check_before_var: sil.BoolVar) -> sil.BoolExpression:
-        """Construct inhale exhale pair for use in loop invariant."""
+        """Construct inhale exhale pair for use in loop invariant.
+
+        ``measure_check is None`` indicates that obligation is fresh.
+        """
         if self._skip_exhale:
             exhale = sil.TrueLit()
         else:
-            exhale = sil.BoolCondExp(
-                loop_check_before_var,
-                self._construct_bounded_exhale(None),
-                self._construct_bounded_exhale(measure_check))
-        return sil.InhaleExhale(self._construct_inhale(False), exhale)
+            if measure_check is None:
+                exhale = self._construct_unbounded_exhale()
+            else:
+                exhale = sil.BoolCondExp(
+                    loop_check_before_var,
+                    self._construct_bounded_exhale(None),
+                    self._construct_bounded_exhale(measure_check))
+        inhale = self._construct_inhale(measure_check is None)
+        return sil.InhaleExhale(inhale, exhale)
+
+    def construct_obligation_bound(self) -> sil.Statement:
+        """Construct statement for bounding obligation."""
+        return sil.If(
+            self._unbounded_positive,
+            [sil.Exhale(self._unbounded_acc), sil.Inhale(self._bounded_acc)],
+            [])
 
 
 class InexhaleObligationInstanceMixin(abc.ABC):
@@ -136,17 +150,13 @@ class InexhaleObligationInstanceMixin(abc.ABC):
     """
 
     @abc.abstractmethod
-    def _get_inexhale(
-            self, is_method: bool, ctx: Context) -> ObligationInhaleExhale:
-        """Create ``ObligationInhaleExhale`` instance.
-
-        :param is_method: ``True`` if translating method contract.
-        """
+    def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
+        """Create ``ObligationInhaleExhale`` instance."""
 
     def get_use_method(
             self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Default implementation for obligation use in method contract."""
-        inexhale = self._get_inexhale(True, ctx)
+        inexhale = self._get_inexhale(ctx)
         obligation_info = ctx.actual_function.obligation_info
         if self.is_fresh():
             return [(inexhale.construct_use_method_unbounded(), None)]
@@ -178,18 +188,29 @@ class InexhaleObligationInstanceMixin(abc.ABC):
         terms = []
 
         # Positive measure.
-        loop_condition = obligation_info.construct_loop_condition()
-        positive_measure = sil.Implies(loop_condition, self.get_measure() > 0)
-        if not positive_measure.is_always_true():
-            terms.append((positive_measure,
-                          rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE))
+        if not self.is_fresh():
+            loop_condition = obligation_info.construct_loop_condition()
+            positive_measure = sil.Implies(
+                loop_condition, self.get_measure() > 0)
+            if not positive_measure.is_always_true():
+                terms.append((positive_measure,
+                              rules.OBLIGATION_LOOP_MEASURE_NON_POSITIVE))
 
         # Actual inhale / exhale.
-        inexhale = self._get_inexhale(False, ctx)
-        measure_check = obligation_info.loop_measure_map.check(
-            self.get_target(), self.get_measure())
+        inexhale = self._get_inexhale(ctx)
+        if self.is_fresh():
+            measure_check = None
+        else:
+            measure_check = obligation_info.loop_measure_map.check(
+                self.get_target(), self.get_measure())
         inhale_exhale = inexhale.construct_use_loop(
             measure_check, sil.BoolVar(obligation_info.loop_check_before_var))
         terms.append((inhale_exhale, None))
 
         return terms
+
+    def get_obligation_bound(self, ctx: Context) -> sil.Statement:
+        """Default implementation for bounding an obligation."""
+        assert self.is_fresh()
+        inexhale = self._get_inexhale(ctx)
+        return inexhale.construct_obligation_bound()

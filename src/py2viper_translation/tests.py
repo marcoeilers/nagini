@@ -51,11 +51,11 @@ class AnnotatedTests():
         """
         Retrieves test annotations from the given Python source file
         """
-        with open(path, 'r') as file:
-            text = file.read()
-        filebytes = io.BytesIO(bytes(text, 'utf-8'))
-        tokens = tokenize.tokenize(filebytes.readline)
-        test_annotations = [tk for tk in tokens if self._is_annotation(tk)]
+        with open(path, 'rb') as fp:
+            test_annotations = [
+                token
+                for token in tokenize.tokenize(fp.readline)
+                if self._is_annotation(token)]
         return test_annotations
 
     def extract_annotations(self, token) -> Dict[str, List[Any]]:
