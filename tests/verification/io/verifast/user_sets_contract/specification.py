@@ -6,6 +6,9 @@ from py2viper_contracts.contracts import (
     Result,
 )
 from py2viper_contracts.io import *
+from py2viper_contracts.obligations import (
+    MustTerminate,
+)
 from verifast.stdio_simple import (
     stdout,
     write_char_io,
@@ -37,7 +40,8 @@ class Interface:
             lambda t2: (
                 Requires(
                     token(t1, 2) and
-                    example_io(t1, t2)
+                    example_io(t1, t2) and
+                    MustTerminate(2)
                 ),
                 Ensures(
                     token(t2) and

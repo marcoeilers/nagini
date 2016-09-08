@@ -13,6 +13,9 @@ from py2viper_contracts.io_builtins import (
     split_io,
 )
 Import('io_builtins')
+from py2viper_contracts.obligations import (
+    MustTerminate,
+)
 from verifast.stdio_simple import (
     stdout,
     stderr,
@@ -45,7 +48,8 @@ def tee_out(t1: Place, c: str) -> Place:
         lambda t2: (
             Requires(
                 token(t1, 2) and
-                tee_out_io(t1, c, t2)
+                tee_out_io(t1, c, t2) and
+                MustTerminate(2)
             ),
             Ensures(
                 token(t2) and
