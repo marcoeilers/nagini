@@ -5,6 +5,9 @@ from py2viper_contracts.contracts import (
     Result,
 )
 from py2viper_contracts.io import *
+from py2viper_contracts.obligations import (
+    MustTerminate,
+)
 
 from verifast.stdio_simple import (
     stdout,
@@ -20,7 +23,8 @@ def main(t1: Place) -> Place:
         Requires(
             token(t1, 2) and
             write_char_io(t1, stdout, 'h', success1, t2) and
-            write_char_io(t2, stdout, 'i', success2, t3)
+            write_char_io(t2, stdout, 'i', success2, t3) and
+            MustTerminate(2)
         ),
         Ensures(
             token(t3) and
