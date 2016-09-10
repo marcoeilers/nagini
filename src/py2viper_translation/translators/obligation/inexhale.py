@@ -23,7 +23,8 @@ class ObligationInhaleExhale:
             self, bounded: sil.Location,
             unbounded: Optional[sil.Location] = None,
             credit: Optional[sil.Location] = None,
-            skip_exhale: bool = False) -> None:
+            skip_exhale: bool = False,
+            skip_inhale: bool = False) -> None:
         """Constructor.
 
         :param skip_exhale:
@@ -33,6 +34,7 @@ class ObligationInhaleExhale:
         self._unbounded = unbounded
         self._credit = credit
         self._skip_exhale = skip_exhale
+        self._skip_inhale = skip_inhale
 
     @property
     def _unbounded_positive(self) -> sil.BoolExpression:
@@ -59,6 +61,8 @@ class ObligationInhaleExhale:
 
     def _construct_inhale(self, fresh: bool) -> sil.Acc:
         """Construct obligation inhale."""
+        if self._skip_inhale:
+            return sil.TrueLit()
         if fresh:
             return self._unbounded_acc
         else:
