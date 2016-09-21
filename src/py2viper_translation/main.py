@@ -5,12 +5,13 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
-from py2viper_translation.lib.errors import cache
+from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
@@ -49,12 +50,14 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
-    cache.clear()
+    error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
     sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
-                 'func_triple.sil']
+                 'func_triple.sil', 'lock.sil']
+    if not config.obligation_config.disable_measures:
+        sil_files.append('measures.sil')
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
@@ -112,7 +115,6 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        print(prog)
         vresult = verifier.verify(prog)
         return vresult
     except JavaException as je:
@@ -163,6 +165,10 @@ def main() -> None:
         action='store_true',
         help='print generated Silver program')
     parser.add_argument(
+        '--write-silver-to-file',
+        default=None,
+        help='write generated Silver program to specified file')
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -180,6 +186,12 @@ def main() -> None:
         type=_parse_log_level,
         help='log level',
         default='WARNING')
+    parser.add_argument(
+        '--benchmark',
+        type=int,
+        help=('run verification the given number of times to benchmark '
+              'performance'),
+        default=-1)
     args = parser.parse_args()
 
     python_file = args.python_file
@@ -199,13 +211,25 @@ def main() -> None:
             if args.verbose:
                 print('Result:')
             print(prog)
+        if args.write_silver_to_file:
+            with open(args.write_silver_to_file, 'w') as fp:
+                fp.write(str(prog))
         if args.verifier == 'silicon':
             backend = ViperVerifier.silicon
         elif args.verifier == 'carbon':
             backend = ViperVerifier.carbon
         else:
-            raise ValueError('Unknown verifier specified: ' + args.backend)
-        vresult = verify(prog, python_file, jvm, backend=backend)
+            raise ValueError('Unknown verifier specified: ' + args.verifier)
+        if args.benchmark >= 1:
+            for i in range(args.benchmark):
+                start = time.time()
+                vresult = verify(prog, python_file, jvm, backend=backend)
+                end = time.time()
+                assert vresult
+                print("RUN,{},{},{},{},{}".format(
+                    i, args.benchmark, start, end, end - start))
+        else:
+            vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
             print("Verification completed.")
         print(vresult)

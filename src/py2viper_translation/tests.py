@@ -6,7 +6,7 @@ import tokenize
 
 from os.path import isfile, join
 from py2viper_translation.lib import config, jvmaccess
-from py2viper_translation.lib.errors import cache
+from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.typeinfo import TypeException
 from py2viper_translation.lib.util import InvalidProgramException, flatten, flatten_dict
 from py2viper_translation.main import translate, verify
@@ -22,6 +22,10 @@ os.environ['MYPYPATH'] = config.mypy_path
 verifiers = [ViperVerifier.silicon]
 if config.boogie_path:
     verifiers.append(ViperVerifier.carbon)
+verifiers = [
+    verifier
+    for verifier in verifiers
+    if verifier.name in config.test_config.verifiers]
 
 assert config.classpath
 jvm = jvmaccess.JVM(config.classpath)
@@ -47,23 +51,45 @@ class AnnotatedTests():
         """
         Retrieves test annotations from the given Python source file
         """
-        with open(path, 'r') as file:
-            text = file.read()
-        filebytes = io.BytesIO(bytes(text, 'utf-8'))
-        tokens = tokenize.tokenize(filebytes.readline)
-        test_annotations = [tk for tk in tokens if self._is_annotation(tk)]
+        with open(path, 'rb') as fp:
+            test_annotations = [
+                token
+                for token in tokenize.tokenize(fp.readline)
+                if self._is_annotation(token)]
         return test_annotations
 
     def extract_annotations(self, token) -> Dict[str, List[Any]]:
+        issue_matcher = re.compile(
+            '([a-zA-Z]+)'
+            '\('
+            '([a-zA-z\._:;\d ?\'"]+), '
+            '/([a-z0-9]+)/issue/([0-9]+)/'
+            '(, ([a-z]+))?'
+            '\)')
         matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,_:;\d ?\'"]+)\)')
         result = {'ExpectedOutput': [],
                   'OptionalOutput': [],
+                  'UnexpectedOutput': [],
+                  'MissingOutput': [],
                   'Label': []}
         content = token.string.strip()[3:].strip()
         stripped_list = [part.strip() for part in content.split('|')]
         for part in stripped_list:
+            issue_match = issue_matcher.match(part)
             match = matcher.match(part)
-            if match:
+            if issue_match:
+                type, content, tracker, backend = issue_match.group(1, 2, 3, 6)
+                if not backend:
+                    backend = tracker
+                if type == 'UnexpectedOutput':
+                    result['UnexpectedOutput'].append(
+                        self.token_to_unexpected(content, backend, token))
+                elif type == 'MissingOutput':
+                    result['MissingOutput'].append(
+                        self.token_to_unexpected(content, backend, token))
+                else:
+                    raise ValueError(type)
+            elif match:
                 type, content = match.group(1, 2)
                 if type == 'ExpectedOutput':
                     result['ExpectedOutput'].append(
@@ -80,7 +106,14 @@ class AnnotatedTests():
                 raise ValueError(part)
         return result
 
+    def token_to_unexpected(self, content, backend, token):
+        return (token.start, content, backend)
+
     def token_to_expected(self, content, token):
+        if content.startswith('type.error:'):
+            # Type errors need special treatment because they contain
+            # error text, not ids.
+            return (token.start, (content, ()))
         split = content.split(',')
         id = split[0]
         vias = split[1:]
@@ -90,25 +123,24 @@ class AnnotatedTests():
         return (content, token.start[0])
 
     def get_vias(self, error) -> str:
-        reason_pos = error.reason().offendingNode().pos()
-        if hasattr(reason_pos, 'id'):
-            reason_pos = reason_pos.id()
-            reason_entry = cache[reason_pos]
-            if reason_entry[1]:
-                return [via[1].line() for via in reason_entry[1]]
-        error_pos = error.pos()
-        if hasattr(error_pos, 'id'):
-            error_pos = error_pos.id()
-            error_entry = cache[error_pos]
-            return [via[1].line() for via in error_entry[1]]
+        reason_pos = error.reason.position
+        if reason_pos.node_id:
+            vias = error_manager.get_vias(reason_pos.node_id)
+            if vias:
+                return [via[1].line() for via in vias]
+        error_pos = error.position
+        if error_pos.node_id:
+            vias = error_manager.get_vias(error_pos.node_id)
+            return [via[1].line() for via in vias]
         return []
 
     def failure_to_actual(self, error: 'silver.verifier.AbstractError') \
-            -> Tuple[int, int, str, str, List[int]]:
-        return ((error.pos().line(), error.pos().column()), error.fullId(),
-                error.readableMessage(), self.get_vias(error))
+            -> Tuple[int, int, str, List[int]]:
+        return ((error.pos().line(), error.pos().column()), error.full_id,
+                self.get_vias(error))
 
-    def compare_actual_expected(self, actual, expected, optional, labels):
+    def compare_actual_expected(
+            self, actual, expected, optional, labels, unexpected, missing):
         actual_unexpected = []
         missing_expected = []
         expected = [(l, i, [labels[i] for i in v]) for (l, i, v) in expected]
@@ -116,13 +148,18 @@ class AnnotatedTests():
             (line, id, vias) = ae
             vias_decrement = [via - 1 for via in vias]
             key = (line - 1, id, vias_decrement)
-            if not key in expected or key in optional:
-                actual_unexpected += [ae]
-        for ee in expected:
+            if (not key in expected and
+                    not key in optional and
+                    not key in unexpected):
+                actual_unexpected.append(ae)
+            if key in missing:
+                actual_unexpected.append(ae)
+        for ee in expected + unexpected:
             (line, id, vias) = ee
             vias_increment = [via + 1 for via in vias]
-            if not (line + 1, id, vias_increment) in actual:
-                missing_expected += [ee]
+            if (not (line + 1, id, vias_increment) in actual and
+                    not (line, id, vias_increment) in missing):
+                missing_expected.append(ee)
         assert not actual_unexpected
         assert not missing_expected
 
@@ -135,10 +172,11 @@ class VerificationTests(AnnotatedTests):
         prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
-        self.evaluate_result(vresult, path, test_annotations, jvm)
+        self.evaluate_result(vresult, path, test_annotations, jvm, verifier)
 
     def evaluate_result(self, vresult: VerificationResult, file_path: str,
-                        test_annotations: List, jvm: jvmaccess.JVM):
+                        test_annotations: List, jvm: jvmaccess.JVM,
+                        verifier: ViperVerifier):
         """
         Evaluates the verification result w.r.t. the test annotations in
         the file
@@ -148,7 +186,8 @@ class VerificationTests(AnnotatedTests):
                                     in test_annotations
                                     if ann.string.strip().startswith('#::')],
                                    {'ExpectedOutput', 'OptionalOutput',
-                                    'Label'})
+                                    'Label', 'UnexpectedOutput',
+                                    'MissingOutput'})
         expected = annotations['ExpectedOutput']
         expected_lo = [(line, id, vias) for ((line, col), (id, vias)) in
                        expected]
@@ -157,6 +196,16 @@ class VerificationTests(AnnotatedTests):
                        optional]
         labels = annotations['Label']
         labels_dict = {key: value for (key, value) in labels}
+        unexpected = annotations['UnexpectedOutput']
+        unexpected_lo = [
+            (line, id, [])
+            for ((line, col), id, backend) in unexpected
+            if backend in ('py2viper', verifier.name)]
+        missing = annotations['MissingOutput']
+        missing_lo = [
+            (line, id, [])
+            for ((line, col), id, backend) in missing
+            if backend in ('py2viper', verifier.name)]
         if vresult:
             assert not expected
         else:
@@ -167,11 +216,12 @@ class VerificationTests(AnnotatedTests):
                                            jvm.viper.silver.ast.HasLineColumn)]
             actual = [self.failure_to_actual(error) for error in vresult.errors
                       if not error in missing_info]
-            actual_lo = [(line, id, via) for ((line, col), id, msg, via) in
+            actual_lo = [(line, id, via) for ((line, col), id, via) in
                          actual]
             assert not missing_info
-            self.compare_actual_expected(actual_lo, expected_lo, optional_lo,
-                                         labels_dict)
+            self.compare_actual_expected(
+                actual_lo, expected_lo, optional_lo, labels_dict,
+                unexpected_lo, missing_lo)
 
 
 verification_tester = VerificationTests()
@@ -182,13 +232,25 @@ def _test_files(test_dir):
     for root, dir_names, file_names in os.walk(
             test_dir,
             topdown=True):
+        if 'tests' in file_names:
+            # tests file lists all tests in this directory, so we read
+            # its contents and do not proceed deeper.
+            with open(join(root, 'tests')) as fp:
+                for file_name in fp:
+                    result.append(join(root, file_name.strip()))
+            dir_names.clear()
+            continue
         if 'resources' in dir_names:
             # Skip resources directory.
             dir_names.remove('resources')
         for file_name in file_names:
             if file_name.endswith('.py'):
                 result.append(join(root, file_name))
-    return sorted(result)
+    result = [
+        path
+        for path in sorted(result)
+        if path not in config.test_config.ignore_tests]
+    return result
 
 
 def verification_test_files():
@@ -222,15 +284,22 @@ class TranslationTests(AnnotatedTests):
                                     in test_annotations
                                     if ann.string.strip().startswith('#::')],
                                    {'ExpectedOutput', 'OptionalOutput',
-                                    'Label'})
+                                    'Label', 'UnexpectedOutput',
+                                    'MissingOutput'})
         expected = annotations['ExpectedOutput']
         expected_lo = [(line, id, vias) for ((line, col), (id, vias)) in
                        expected]
         optional = annotations['OptionalOutput']
         optional_lo = [(line, id, vias) for ((line, col), (id, vias)) in
                        optional]
-        labels = annotations['Label']
-        labels_dict = {key: value for (key, value) in labels}
+        unexpected = annotations['UnexpectedOutput']
+        unexpected_lo = [
+            (line, id, [])
+            for ((line, col), id, backend) in unexpected]
+        missing = annotations['MissingOutput']
+        missing_lo = [
+            (line, id, [])
+            for ((line, col), id, backend) in missing]
         try:
             prog = translate(path, jvm)
             print(prog)
@@ -243,7 +312,8 @@ class TranslationTests(AnnotatedTests):
             actual = [self.extract_mypy_error(msg) for msg in e2.messages if
                       mypy_error_matcher.match(msg)]
 
-        self.compare_actual_expected(actual, expected_lo, optional_lo, {})
+        self.compare_actual_expected(
+            actual, expected_lo, optional_lo, {}, unexpected_lo, missing_lo)
 
 
 translation_tester = TranslationTests()

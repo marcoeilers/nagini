@@ -3,8 +3,9 @@ import ast
 from abc import ABCMeta
 from enum import Enum
 from py2viper_translation.lib import config
-from py2viper_translation.lib.errors import error_msg
+from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
+from typing import Optional
 
 
 class ViperVerifier(Enum):
@@ -33,14 +34,16 @@ class Failure(VerificationResult):
     Encodes a verification failure and provides access to the errors
     """
 
-    def __init__(self, errors: 'silver.verifier.AbstractError'):
-        self.errors = errors
+    def __init__(
+            self, errors: 'silver.verifier.AbstractError',
+            jvm: Optional[JVM] = None):
+        self.errors = error_manager.convert(errors, jvm)
 
     def __bool__(self):
         return False
 
     def __str__(self):
-        all_errors = [error_msg(error) for error in self.errors]
+        all_errors = [str(error) for error in self.errors]
         return "Verification failed.\nErrors:\n" + '\n'.join(
             all_errors)
 
@@ -51,6 +54,7 @@ class Silicon:
     """
 
     def __init__(self, jvm: JVM, filename: str):
+        self._jvm = jvm
         self.silver = jvm.viper.silver
         self.silicon = jvm.viper.silicon.Silicon()
         args = jvm.scala.collection.mutable.ArraySeq(3)
@@ -74,7 +78,7 @@ class Silicon:
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors)
+            return Failure(errors, self._jvm)
         else:
             return Success()
 

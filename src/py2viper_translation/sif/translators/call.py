@@ -100,10 +100,11 @@ class SIFCallTranslator(CallTranslator):
                 raise UnsupportedException(node, "Exceptions not supported.")
             # Add timeLevel to targets.
             targets.append(ctx.current_function.new_tl_var.ref())
-            init = self.viper.MethodCall(target.sil_name, args, targets,
-                                         self.to_position(node, ctx),
-                                         info)
-            stmts.append(init)
+            init = self.create_method_call_node(
+                ctx, target.sil_name, args, targets,
+                self.to_position(node, ctx), info,
+                target_method=target, target_node=node)
+            stmts.extend(init)
 
         return arg_stmts + stmts, call_results.next()
 
@@ -170,11 +171,12 @@ class SIFCallTranslator(CallTranslator):
         # Add timeLevel to targets.
         targets.append(ctx.current_function.new_tl_var.ref())
 
-        call = self.viper.MethodCall(target.sil_name, args, targets,
-                                     position, self.no_info(ctx))
+        call = self.create_method_call_node(
+            ctx, target.sil_name, args, targets, position, self.no_info(ctx),
+            target_method=target, target_node=node)
         res_expr = call_results.next() if target.type else None
 
-        return arg_stmts + [call], res_expr
+        return arg_stmts + call, res_expr
 
     def _translate_args(self, node: ast.Call,
                         ctx: SIFContext) -> Tuple[List[Stmt], List[Expr],

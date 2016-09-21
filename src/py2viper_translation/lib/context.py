@@ -1,6 +1,13 @@
+from contextlib import contextmanager
 from py2viper_translation.lib.constants import ERROR_NAME, RESULT_NAME
-from py2viper_translation.lib.program_nodes import PythonMethod, PythonVar
-from typing import List
+from py2viper_translation.lib.io_context import IOOpenContext
+from py2viper_translation.lib.obligation_context import ObligationContext
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+    PythonVar,
+    PythonVarBase,
+)
+from typing import Dict, List
 
 
 class Context:
@@ -11,6 +18,7 @@ class Context:
     def __init__(self) -> None:
         self.current_function = None
         self.current_class = None
+        self.current_contract_exception = None
         self.var_aliases = {}
         self.old_aliases = {}
         self.label_aliases = {}
@@ -21,6 +29,10 @@ class Context:
         self.ignore_family_folds = False
         self.added_handlers = []
         self.loop_iterators = {}
+        self.io_open_context = IOOpenContext()
+        self.obligation_context = ObligationContext()
+        self._alias_context_stack = []
+        self._current_alias_context = []
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []
@@ -74,6 +86,34 @@ class Context:
             return self.label_aliases[name]
         return name
 
+    @contextmanager
+    def additional_aliases(self, aliases: Dict[str, PythonVarBase]) -> None:
+        """
+        Execute in a context with additional aliases.
+        """
+        for name, var in aliases.items():
+            self.set_alias(name, var, None)
+        try:
+            yield
+        finally:
+            for name in aliases:
+                self.remove_alias(name)
+
+    @contextmanager
+    def aliases_context(self) -> None:
+        """
+        All aliases added in this context are automatically removed at
+        the end of it.
+        """
+        self._alias_context_stack.append(self._current_alias_context)
+        self._current_alias_context = []
+        try:
+            yield
+        finally:
+            for name in self._current_alias_context:
+                self.remove_alias(name)
+            self._current_alias_context = self._alias_context_stack.pop()
+
     def set_alias(self, name: str, var: PythonVar,
                   replaces: PythonVar=None) -> None:
         """
@@ -90,6 +130,7 @@ class Context:
                 assert not var.alt_types
                 var.alt_types = replaces.alt_types
         self.var_aliases[name] = var
+        self._current_alias_context.append(name)
 
     def remove_alias(self, name: str) -> None:
         """

@@ -15,7 +15,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonTryBlock,
     PythonType,
-    PythonVar
+    PythonVar,
+    PythonVarBase,
 )
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
@@ -52,14 +53,16 @@ class MethodTranslator(CommonTranslator):
         result = self.var_type_check(param.sil_name, param.type, no_pos, ctx)
         return result
 
+
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
         """
         Translates the preconditions specified for 'method'.
         """
         pres = []
-        for pre in method.precondition:
-            stmt, expr = self.translate_expr(pre, ctx)
+        for pre, aliases in method.precondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(pre, ctx)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -83,13 +86,15 @@ class MethodTranslator(CommonTranslator):
         """
         Translates the postconditions specified for 'method'.
         """
+        ctx.obligation_context.is_translating_posts = True
         posts = []
         no_error = self.viper.EqCmp(err_var,
                                     self.viper.NullLit(self.no_position(ctx),
                                                        self.no_info(ctx)),
                                     self.no_position(ctx), self.no_info(ctx))
-        for post in method.postcondition:
-            stmt, expr = self.translate_expr(post, ctx)
+        for post, aliases in method.postcondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(post, ctx)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -98,6 +103,7 @@ class MethodTranslator(CommonTranslator):
                                           self.no_info(ctx))
             posts.append(expr)
 
+        ctx.obligation_context.is_translating_posts = False
         return posts
 
     def _translate_exceptional_posts(self, method: PythonMethod,
@@ -106,6 +112,7 @@ class MethodTranslator(CommonTranslator):
         """
         Translates the exceptional postconditions specified for 'method'.
         """
+        ctx.obligation_context.is_translating_posts = True
         posts = []
         error = self.viper.NeCmp(err_var,
                                  self.viper.NullLit(self.no_position(ctx),
@@ -124,14 +131,18 @@ class MethodTranslator(CommonTranslator):
             error_type_conds.append(has_type)
             condition = self.viper.And(error, has_type, self.no_position(ctx),
                                        self.no_info(ctx))
-            for post in method.declared_exceptions[exception]:
-                stmt, expr = self.translate_expr(post, ctx)
+            assert ctx.current_contract_exception is None
+            ctx.current_contract_exception = ctx.program.classes[exception]
+            for post, aliases in method.declared_exceptions[exception]:
+                with ctx.additional_aliases(aliases):
+                    stmt, expr = self.translate_expr(post, ctx)
                 if stmt:
                     raise InvalidProgramException(post, 'purity.violated')
                 expr = self.viper.Implies(condition, expr,
                                           self.to_position(post, ctx),
                                           self.no_info(ctx))
                 posts.append(expr)
+            ctx.current_contract_exception = None
 
         error_type_cond = None
         for type in error_type_conds:
@@ -146,6 +157,7 @@ class MethodTranslator(CommonTranslator):
                                             error_type_pos,
                                             self.no_info(ctx)))
 
+        ctx.obligation_context.is_translating_posts = False
         return posts
 
     def _create_typeof_pres(self, func: PythonMethod, is_constructor: bool,
@@ -222,8 +234,9 @@ class MethodTranslator(CommonTranslator):
         pres = self._translate_pres(func, ctx)
         # create postconditions
         posts = []
-        for post in func.postcondition:
-            stmt, expr = self.translate_expr(post, ctx)
+        for post, aliases in func.postcondition:
+            with ctx.additional_aliases(aliases):
+                stmt, expr = self.translate_expr(post, ctx)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -342,8 +355,6 @@ class MethodTranslator(CommonTranslator):
 
         args = self._translate_params(method, ctx)
 
-        statements = method.node.body
-        body_index = get_body_start_index(statements)
         body = self._create_method_prolog(method, ctx)
         # translate body
         if method.cls and method.method_type == MethodType.normal:
@@ -361,6 +372,8 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
+            statements = method.node.body
+            body_index = get_body_start_index(statements)
             if method.declared_exceptions:
                 body.append(self.viper.LocalVarAssign(error_var_ref,
                     self.viper.NullLit(self.no_position(ctx),
@@ -396,15 +409,13 @@ class MethodTranslator(CommonTranslator):
             locals = [local.decl for local in method.get_locals()
                       if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
-        body_block = self.translate_block(body,
-                                          self.to_position(method.node, ctx),
-                                          self.no_info(ctx))
-        ctx.current_function = old_function
         name = method.sil_name
-        return self.viper.Method(name, args, results, pres, posts,
-                                 locals, body_block,
-                                 self.to_position(method.node, ctx),
-                                 self.no_info(ctx))
+        nodes = self.create_method_node(
+            ctx, name, args, results, pres, posts, locals, body,
+            self.to_position(method.node, ctx), self.no_info(ctx),
+            method=method)
+        ctx.current_function = old_function
+        return nodes
 
     def translate_finally(self, block: PythonTryBlock,
                           ctx: Context) -> List[Stmt]:

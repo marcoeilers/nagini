@@ -2,6 +2,9 @@ import ast
 
 from py2viper_translation.analyzer import PythonProgram, PythonVar
 from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.program_nodes import (
+    PythonMethod,
+)
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (
@@ -12,7 +15,13 @@ from py2viper_translation.translators.abstract import (
 from py2viper_translation.translators.call import CallTranslator
 from py2viper_translation.translators.contract import ContractTranslator
 from py2viper_translation.translators.expression import ExpressionTranslator
+from py2viper_translation.translators.io_operation import (
+    IOOperationTranslator,
+)
 from py2viper_translation.translators.method import MethodTranslator
+from py2viper_translation.translators.obligation import (
+    ObligationTranslator,
+)
 from py2viper_translation.translators.permission import PermTranslator
 from py2viper_translation.translators.predicate import PredicateTranslator
 from py2viper_translation.translators.program import ProgramTranslator
@@ -48,6 +57,10 @@ class Translator:
                                                       type_info, viper_ast)
         config.pred_translator = PredicateTranslator(config, jvm, source_file,
                                                      type_info, viper_ast)
+        config.io_operation_translator = IOOperationTranslator(
+            config, jvm, source_file, type_info, viper_ast)
+        config.obligation_translator = ObligationTranslator(
+            config, jvm, source_file, type_info, viper_ast)
         config.stmt_translator = StatementTranslator(config, jvm, source_file,
                                                      type_info, viper_ast)
         config.perm_translator = PermTranslator(config, jvm, source_file,
@@ -59,6 +72,7 @@ class Translator:
         config.method_translator = MethodTranslator(config, jvm, source_file,
                                                     type_info, viper_ast)
         config.type_factory = TypeDomainFactory(viper_ast, self)
+        self.obligation_translator = config.obligation_translator
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
@@ -67,7 +81,7 @@ class Translator:
         ctx = Context()
         ctx.current_class = None
         ctx.current_function = None
-        # ctx.program = program
+        ctx.program = programs[0]
         return self.prog_translator.translate_program(programs, sil_progs, ctx)
 
     def translate_pythonvar_decl(self, var: PythonVar,
@@ -97,3 +111,15 @@ class Translator:
 
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
+
+    def create_obligation_info(self, method: PythonMethod) -> object:
+        """
+        Create an obligation info for method. This method should be
+        called during the processing stage of the method before any
+        translation is done.
+
+        This return type of this method is ``object`` to indicate that
+        the returned value is opaque for all code except obligation
+        translator.
+        """
+        return self.obligation_translator.create_obligation_info(method)

@@ -5,6 +5,8 @@ from py2viper_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
+from py2viper_contracts.io import IO_CONTRACT_FUNCS
+from py2viper_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from py2viper_translation.lib.constants import (
     BUILTINS,
     DICT_TYPE,
@@ -136,11 +138,10 @@ class CallTranslator(CommonTranslator):
                 error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
             method_name = target_class.get_method('__init__').sil_name
-            init = self.viper.MethodCall(method_name,
-                                         args, targets,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx))
-            stmts.append(init)
+            init = self.create_method_call_node(
+                ctx, method_name, args, targets, self.to_position(node, ctx),
+                self.no_info(ctx), target_method=target, target_node=node)
+            stmts.extend(init)
             if target.declared_exceptions:
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
@@ -157,7 +158,7 @@ class CallTranslator(CommonTranslator):
         targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        return [constr_call], res_var.ref()
+        return constr_call, res_var.ref()
 
     def translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
@@ -220,9 +221,9 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        call = [self.viper.MethodCall(target.sil_name, args, targets,
-                                      position,
-                                      self.no_info(ctx))]
+        call = self.create_method_call_node(
+            ctx, target.sil_name, args, targets, position, self.no_info(ctx),
+            target_method=target, target_node=node)
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
@@ -407,7 +408,7 @@ class CallTranslator(CommonTranslator):
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
-        stmt = [constr_call]
+        stmt = constr_call
         str_type = ctx.program.global_prog.classes[STRING_TYPE]
         for key, val in args.items():
             # key string literal
@@ -429,7 +430,7 @@ class CallTranslator(CommonTranslator):
             arg_types = [None, str_type, val_type]
             append_call = self.get_method_call(dict_class, '__setitem__', args,
                                                arg_types, [], node, ctx)
-            stmt += val_stmt + [append_call]
+            stmt += val_stmt + append_call
         return stmt, res_var.ref()
 
     def inline_method(self, method: PythonMethod, args: List[PythonVar],
@@ -668,10 +669,16 @@ class CallTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.position')
         elif get_func_name(node) in CONTRACT_FUNCS:
             return self.translate_contractfunc_call(node, ctx)
+        elif get_func_name(node) in IO_CONTRACT_FUNCS:
+            return self.translate_io_contractfunc_call(node, ctx)
+        elif get_func_name(node) in OBLIGATION_CONTRACT_FUNCS:
+            return self.translate_obligation_contractfunc_call(node, ctx)
         elif get_func_name(node) in BUILTINS:
             return self.translate_builtin_func(node, ctx)
         elif self._is_cls_call(node, ctx):
             return self.translate_cls_call(node, ctx)
+        elif get_func_name(node) in ctx.program.io_operations:
+            return self.translate_io_operation_call(node, ctx)
         else:
             return self.translate_normal_call(node, ctx)
 

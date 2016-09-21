@@ -32,12 +32,6 @@ To run doctests::
 
     make doctest
 
-Known Issues
-============
-
-``mypy-lang`` is downloaded from different source because of
-`this issue <https://github.com/python/mypy/issues/1252>`_.
-
 Build Status
 ============
 

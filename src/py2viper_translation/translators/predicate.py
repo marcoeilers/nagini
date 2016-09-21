@@ -65,7 +65,10 @@ class PredicateTranslator(CommonTranslator):
             if len(instance.node.body) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
-            stmt, current = self.translate_expr(instance.node.body[0], ctx)
+            stmt, current = self.translate_expr(
+                    instance.node.body[0],
+                    ctx,
+                    expression=True)
             if stmt:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')

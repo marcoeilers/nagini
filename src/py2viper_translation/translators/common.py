@@ -3,6 +3,7 @@ import ast
 from abc import ABCMeta
 from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
     GenericType,
     get_included_programs,
@@ -62,13 +63,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
-    def to_position(self, node: ast.AST, ctx: Context,
-                    error_string: str=None) -> 'silver.ast.Position':
+    def to_position(
+            self, node: ast.AST, ctx: Context, error_string: str=None,
+            rules: Rules=None) -> 'silver.ast.Position':
         """
         Extracts the position from a node, assigns an ID to the node and stores
         the node and the position in the context for it.
         """
-        return self.viper.to_position(node, ctx.position, error_string)
+        return self.viper.to_position(node, ctx.position, error_string, rules)
 
     def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.to_position(None, ctx)
@@ -139,7 +141,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         arg_types: List[PythonType],
                         targets: List['silver.ast.LocalVarRef'],
                         node: ast.AST,
-                        ctx: Context) -> 'silver.ast.MethodCall':
+                        ctx: Context) -> List[Stmt]:
         """
         Creates a method call to the methoc called func_name, with
         the given receiver and arguments. Boxes arguments if necessary.
@@ -161,9 +163,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 actual_arg = arg
             actual_args.append(actual_arg)
         sil_name = func.sil_name
-        call = self.viper.MethodCall(sil_name, actual_args, targets,
-                                     self.to_position(node, ctx),
-                                     self.no_info(ctx))
+        call = self.create_method_call_node(
+            ctx, sil_name, actual_args, targets, self.to_position(node, ctx),
+            self.no_info(ctx), target_method=func, target_node=node)
         return call
 
     def get_error_var(self, stmt: ast.AST,

@@ -3,19 +3,23 @@
     "methods": {
         "__init__": {
             "args": [],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "append": {
             "args": ["list", "object"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "__setitem__": {
             "args": ["list", "int", "object"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "__iter__": {
             "args": ["list"],
-            "type": "Iterator"
+            "type": "Iterator",
+            "MustTerminate": true
         }
     },
     "functions": {
@@ -42,19 +46,23 @@
     "methods": {
         "__init__": {
             "args": [],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "add": {
             "args": ["set", "object"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "clear": {
             "args": ["set"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "__iter__": {
             "args": ["set"],
-            "type": "Iterator"
+            "type": "Iterator",
+            "MustTerminate": true
         }
     },
     "functions": {
@@ -77,23 +85,28 @@
     "methods": {
         "__init__": {
             "args": [],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "keys": {
             "args": ["dict"],
-            "type": "set"
+            "type": "set",
+            "MustTerminate": true
         },
         "__setitem__": {
             "args": ["dict", "object", "object"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
         },
         "__iter__": {
             "args": ["dict"],
-            "type": "Iterator"
+            "type": "Iterator",
+            "MustTerminate": true
         },
         "values": {
             "args": ["dict"],
-            "type": "set"
+            "type": "set",
+            "MustTerminate": true
         }
     },
     "functions": {
@@ -109,10 +122,6 @@
             "args": ["dict", "object"],
             "type": "object",
             "generic_type": 1
-        },
-        "keys": {
-            "args": ["dict"],
-            "type": "set"
         },
         "__bool__": {
             "args": ["dict"],
@@ -277,14 +286,40 @@
     "methods":{
         "__next__": {
             "args": ["Iterator"],
-            "type": "object"
+            "type": "object",
+            "MustTerminate": true
         },
         "__del__": {
             "args": ["Iterator"],
-            "type": null
+            "type": null,
+            "MustTerminate": true
+        }
+    },
+    "extends": "object"
+},
+"Thread": {
+    "extends": "object"
+},
+"Lock": {
+    "methods":{
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "acquire": {
+            "args": ["Lock"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "release": {
+            "args": ["Lock"],
+            "type": null,
+            "MustTerminate": true
         }
     },
     "extends": "object"
 },
 "type": {}
 }
+
