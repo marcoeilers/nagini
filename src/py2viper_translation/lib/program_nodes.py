@@ -4,6 +4,7 @@ import mypy
 
 from abc import ABCMeta
 from collections import OrderedDict
+from enum import Enum
 from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
     END_LABEL,
@@ -63,18 +64,28 @@ class PythonScope:
 
 class PythonProgram(PythonScope):
     def __init__(self, types: TypeInfo,
-                 node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
+                 node_factory: 'ProgramNodeFactory',
+                 type_prefix: str,
+                 global_prog: 'PythonProgram',
+                 sil_names: List[str] = None) -> None:
+        if sil_names is None:
+            sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
+        super().__init__(sil_names, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.predicates = OrderedDict()
         self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
+        self.namespaces = OrderedDict()
+        self.global_prog = global_prog
+        self.type_prefix = type_prefix
+        self.from_imports = []
+        self.node_factory = node_factory
         self.types = types
-        for primitive in PRIMITIVES:
-            self.classes[primitive] = node_factory.create_python_class(
-                primitive, self, node_factory)
+        # for primitive in PRIMITIVES:
+        #     self.classes[primitive] = node_factory.create_python_class(
+        #         primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():
@@ -94,10 +105,70 @@ class PythonProgram(PythonScope):
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
-        if name in self.functions:
-            return self.functions[name]
-        else:
-            return self.methods[name]
+        for cont in [self] + self.from_imports + [self.global_prog]:
+            if name in cont.functions:
+                return cont.functions[name]
+            elif name in cont.methods:
+                return cont.methods[name]
+
+    def get_type(self, prefix: List[str], name: str):
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefix)
+        return self.types.get_type(actual_prefix, name)
+
+    def get_func_type(self, prefix: List[str]):
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefix)
+        return self.types.get_func_type(actual_prefix)
+
+
+class LazyDict:
+    def __init__(self, names: List[Tuple[str, str]], prog: PythonProgram, field: str):
+        self.prog = prog
+        self.field = field
+        self.names = {}
+        for name, as_name in names:
+            new_name = as_name if as_name else name
+            self.names[new_name] = name
+
+    def __getitem__(self, item):
+        if item in self.names:
+            key = self.names[item]
+            progs = get_included_programs(self.prog, include_global=False)
+            actuals = [getattr(p, self.field) for p in progs]
+            for actual in actuals:
+                if key in actual:
+                    return actual[key]
+        raise KeyError(item)
+
+    def __contains__(self, item):
+        if item in self.names:
+            key = self.names[item]
+            progs = get_included_programs(self.prog, include_global=False)
+            actuals = [getattr(p, self.field) for p in progs]
+            for actual in actuals:
+                if key in actual:
+                    return True
+        return False
+
+
+def get_included_programs(prog: PythonProgram,
+                          include_global: bool = True) -> List[PythonProgram]:
+    result = [prog]
+    for p in prog.from_imports:
+        result.extend(get_included_programs(p, include_global=False))
+    result.append(prog.global_prog)
+    return result
+
+
+class PythonProgramView(PythonProgram):
+    def __init__(self, prog: PythonProgram, names: List[Tuple[str, str]]):
+        super().__init__(prog.types, prog.node_factory, prog.type_prefix,
+                         prog.global_prog, prog.sil_names)
+        for field in ['functions', 'methods', 'namespaces', 'predicates',
+                      'classes', 'global_vars']:
+            lazy_dict = LazyDict(names, prog, field)
+            setattr(self, field, lazy_dict)
 
 
 class PythonNode:
@@ -133,11 +204,14 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.superclass = superclass
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.static_methods = OrderedDict()
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
+        self.static_fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
+        self._has_classmethod = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -155,6 +229,9 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         if name in self.fields:
             field = self.fields[name]
             assert field.type == type
+        elif name in self.static_fields:
+            field = self.static_fields[name]
+            assert field.type == type
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -169,6 +246,18 @@ class PythonClass(PythonType, PythonNode, PythonScope):
             return self.fields[name]
         elif self.superclass is not None:
             return self.superclass.get_field(name)
+        else:
+            return None
+
+    def get_static_field(self, name: str) -> Optional['PythonVar']:
+        """
+        Returns the static field with the given name in this class or a
+        superclass.
+        """
+        if name in self.static_fields:
+            return self.static_fields[name]
+        elif self.superclass is not None:
+            return self.superclass.get_static_field(name)
         else:
             return None
 
@@ -223,7 +312,6 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
-
         return fields
 
     def get_all_sil_fields(self) -> List['silver.ast.Field']:
@@ -237,8 +325,15 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
-
         return fields
+
+    @property
+    def has_classmethod(self) -> bool:
+        if self._has_classmethod:
+            return True
+        if self.superclass:
+            return self.superclass.has_classmethod
+        return False
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -252,12 +347,18 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         for name, method in self.methods.items():
             method_name = self.name + '_' + name
             method.process(self.get_fresh_name(method_name), translator)
+        for name, method in self.static_methods.items():
+            method_name = self.name + '_' + name
+            method.process(self.get_fresh_name(method_name), translator)
         for name, predicate in self.predicates.items():
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)
         for name, field in self.fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name))
+        for name, field in self.static_fields.items():
+            field_name = self.name + '_' + name
+            field.process(self.get_fresh_name(field_name), translator)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -274,11 +375,11 @@ class GenericType(PythonType):
     behaves like the underlying PythonClass (in this case list).
     """
 
-    def __init__(self, name: str, program: PythonProgram,
+    def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
-        self.name = name
-        self.program = program
-        self.cls = self.program.classes[self.name]
+        self.name = cls.name
+        self.program = cls.get_program()
+        self.cls = cls
         self.type_args = args
         self.exact_length = True
 
@@ -328,6 +429,12 @@ class GenericType(PythonType):
         return self.get_class().get_predicate(name)
 
 
+class MethodType(Enum):
+    normal = 0
+    static_method = 1
+    class_method = 2
+
+
 class PythonMethod(PythonNode, PythonScope):
     """
     Represents a Python function which may be pure or impure, belong
@@ -339,7 +446,8 @@ class PythonMethod(PythonNode, PythonScope):
                  pure: bool, contract_only: bool,
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
-                 interface_dict: Dict[str, Any] = None):
+                 interface_dict: Dict[str, Any] = None,
+                 method_type: MethodType = MethodType.normal):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or program) this method belongs to
@@ -380,6 +488,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.labels = [END_LABEL]
+        self.method_type = method_type
         self.obligation_info = None
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
 
@@ -416,7 +525,8 @@ class PythonMethod(PythonNode, PythonScope):
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         for name in self.special_vars:
-            self.special_vars[name].process(self.get_fresh_name(name), translator)
+            self.special_vars[name].process(self.get_fresh_name(name),
+                                            translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -446,6 +556,15 @@ class PythonMethod(PythonNode, PythonScope):
 
     def add_local(self, name: str, local: 'PythonVar'):
         self._locals[name] = local
+
+    @property
+    def special_args(self) -> Dict:
+        result = {}
+        if self.kw_arg:
+            result[self.kw_arg.name] = self.kw_arg
+        if self.var_arg:
+            result[self.var_arg.name] = self.var_arg
+        return result
 
     @property
     def special_vars(self) -> OrderedDict:
@@ -760,6 +879,9 @@ class PythonTryBlock(PythonNode):
         self.node_factory = node_factory
         self.finally_name = None
         self.post_name = None
+        self.with_item = None
+        self.with_var = None
+        self.handler_aliases = {}
         method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
@@ -774,7 +896,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_program().classes[INT_TYPE]
+        int_type = self.method.get_program().global_prog.classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -790,7 +912,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_program().classes['Exception']
+        exc_type = self.method.get_program().global_prog.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)

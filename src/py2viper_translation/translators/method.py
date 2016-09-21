@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
+    MethodType,
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
@@ -66,7 +67,7 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
 
-        if method.cls:
+        if method.cls and method.method_type is MethodType.normal:
             error_string = '"call receiver is not None"'
             pos = self.to_position(method.node, ctx, error_string)
             not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
@@ -120,11 +121,11 @@ class MethodTranslator(CommonTranslator):
         error_type_conds = []
         error_string = '"method only raises exceptions of type{0} {1}"'.format(
             's' if len(method.declared_exceptions) > 1 else '',
-            ', '.join(method.declared_exceptions))
+            ', '.join([e.name for e in method.declared_exceptions]))
         error_type_pos = self.to_position(method.node, ctx, error_string)
         for exception in method.declared_exceptions:
             has_type = self.var_type_check(ERROR_NAME,
-                                           ctx.program.classes[exception],
+                                           exception,
                                            error_type_pos,
                                            ctx, inhale_exhale=False)
             error_type_conds.append(has_type)
@@ -167,8 +168,18 @@ class MethodTranslator(CommonTranslator):
         args = func.args
         pres = []
         for arg in args.values():
-            if not (arg.type.name in PRIMITIVES or
-                    (is_constructor and arg == next(iter(args)))):
+            if not (arg.type.name in PRIMITIVES):
+                if arg == next(iter(args.values())):
+                    if is_constructor:
+                        continue
+                    if func.method_type == MethodType.class_method:
+                        cls_arg = arg.ref()
+                        type_check = self.type_factory.subtype_check(cls_arg,
+                                                                  func.cls,
+                                                                  self.no_position(ctx),
+                                                                  ctx)
+                        pres.append(type_check)
+                        continue
                 type_check = self.get_parameter_typeof(arg, ctx)
                 pres.append(type_check)
         if func.var_arg:
@@ -264,7 +275,7 @@ class MethodTranslator(CommonTranslator):
         # create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
-        posts = type_pres + posts
+        # posts = type_pres + posts
         no_pos = self.no_position(ctx)
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref(method.node, ctx),
@@ -330,7 +341,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = method
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.classes['Exception'])
+                              ctx.program.global_prog.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()
@@ -346,7 +357,7 @@ class MethodTranslator(CommonTranslator):
 
         body = self._create_method_prolog(method, ctx)
         # translate body
-        if method.cls:
+        if method.cls and method.method_type == MethodType.normal:
             no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
                 next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
@@ -392,7 +403,7 @@ class MethodTranslator(CommonTranslator):
                     body += self.translate_handler(handler, ctx)
                 if block.else_block:
                     body += self.translate_handler(block.else_block, ctx)
-                if block.finally_block:
+                if block.finally_block or block.with_item:
                     body += self.translate_finally(block, ctx)
             body += self.add_handlers_for_inlines(ctx)
             locals = [local.decl for local in method.get_locals()
@@ -419,8 +430,24 @@ class MethodTranslator(CommonTranslator):
                                  self.to_position(block.node, ctx),
                                  self.no_info(ctx))
         body = [label]
-        for stmt in block.finally_block:
-            body += self.translate_stmt(stmt, ctx)
+        if block.finally_block:
+            for stmt in block.finally_block:
+                body += self.translate_stmt(stmt, ctx)
+        else:
+            # with-block
+            ctx_type = self.get_type(block.with_item.context_expr, ctx)
+            ctx_var = block.with_var
+            exit_type = ctx_type.get_method('__exit__').type
+            exit_res = ctx.current_function.create_variable('exit_res',
+                                                            exit_type,
+                                                            self.translator)
+            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            exit_call = self.get_method_call(ctx_type, '__exit__',
+                                             [ctx_var.ref(), null, null, null],
+                                             [ctx_type, None, None, None],
+                                             [exit_res.ref()],
+                                             block.with_item.context_expr, ctx)
+            body.append(exit_call)
         finally_var = block.get_finally_var(self.translator)
         if finally_var.sil_name in ctx.var_aliases:
             finally_var = ctx.var_aliases[finally_var.sil_name]
@@ -511,13 +538,13 @@ class MethodTranslator(CommonTranslator):
                                  self.to_position(handler.node, ctx),
                                  self.no_info(ctx))
         old_var_aliases = ctx.var_aliases
+        ctx.var_aliases = handler.try_block.handler_aliases
         if handler.exception_name:
-            if not ctx.var_aliases:
-                ctx.var_aliases = {}
             err_var = handler.try_block.get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             ctx.var_aliases[handler.exception_name] = err_var
+            err_var.type = handler.exception
         body = []
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)

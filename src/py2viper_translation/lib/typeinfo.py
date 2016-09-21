@@ -48,11 +48,27 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return True
         return False
 
+    def visit_import(self, node: mypy.nodes.Import):
+        for fqn, id in node.ids:
+            if not id:
+                id = fqn
+            self.set_type([id], fqn, None, None)
+        super().visit_import(node)
+
+    def visit_import_all(self, node: mypy.nodes.ImportAll):
+        super().visit_import_all(node)
+
+    def visit_import_from(self, node: mypy.nodes.ImportFrom):
+        super().visit_import_from(node)
+
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
         rectype = self.type_of(node.expr)
         if (not self._is_result_call(node.expr) and
-                not isinstance(rectype, mypy.types.CallableType)):
-            self.set_type([rectype.type.name(), node.name], self.type_of(node),
+                not isinstance(node.expr, mypy.nodes.IndexExpr) and
+                not isinstance(rectype, mypy.types.CallableType) and
+                not isinstance(rectype, str)):
+            self.set_type(rectype.type.fullname().split('.') + [node.name],
+                          self.type_of(node),
                           node.line, col(node))
         super().visit_member_expr(node)
 
@@ -135,9 +151,15 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         node.callee.accept(self)
 
     def type_of(self, node):
+        if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
+            return node.fullname
         if isinstance(node, mypy.nodes.FuncDef):
             if node.type:
                 return node.type
+        if isinstance(node, mypy.nodes.NameExpr):
+            key = (node.name,)
+            if key in self.all_types:
+                return self.all_types[key]
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
                 type = self.all_types[tuple(self.prefix)]
@@ -168,6 +190,7 @@ class TypeInfo:
     def __init__(self):
         self.all_types = {}
         self.alt_types = {}
+        self.files = {}
 
     def check(self, filename: str) -> bool:
         """
@@ -189,16 +212,31 @@ class TypeInfo:
                 )
             if res.errors:
                 report_errors(res.errors)
-            visitor = TypeVisitor(res.types, filename,
-                                  res.files['__main__'].ignored_lines)
-            # for df in res.files['__main__'].defs:
-            # print(df)
-            res.files['__main__'].accept(visitor)
-            self.all_types.update(visitor.all_types)
-            self.alt_types.update(visitor.alt_types)
+            for name, file in res.files.items():
+                if name in {'builtins', 'py2viper_contracts',
+                            'py2viper_contracts.contracts', 'typing', 'abc'}:
+                    continue
+                self.files[name] = file.path
+                visitor = TypeVisitor(res.types, name,
+                                      file.ignored_lines)
+                visitor.prefix = [name]
+                # for df in res.files['__main__'].defs:
+                # print(df)
+                file.accept(visitor)
+                self.all_types.update(visitor.all_types)
+                self.alt_types.update(visitor.alt_types)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
+
+    def get_type_prefix(self, name: str) -> str:
+        if name.endswith('.py'):
+            name = name[:-3]
+        name = name.replace('/', '.')
+        name = name.replace('\\', '.')
+        for key in self.all_types:
+            if name.endswith(key[0]):
+                return key[0]
 
     def get_type(self, prefix: List[str], name: str):
         """

@@ -2,7 +2,7 @@ import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.constants import BUILTIN_PREDICATES, PRIMITIVES
-from py2viper_translation.lib.program_nodes import PythonVar
+from py2viper_translation.lib.program_nodes import PythonProgram, PythonVar
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -134,14 +134,18 @@ class ContractTranslator(CommonTranslator):
                 return arg_stmts, self.translate_builtin_predicate(call, perm,
                                                                    args, ctx)
             else:
-                pred = ctx.program.predicates[call.func.id]
+                pred = self.get_target(call.func, ctx)
         elif isinstance(call.func, ast.Attribute):
-            rec_stmt, receiver = self.translate_expr(call.func.value, ctx)
-            assert not rec_stmt
-            receiver_class = self.get_type(call.func.value, ctx)
-            name = call.func.attr
-            pred = receiver_class.get_predicate(name)
-            args = [receiver] + args
+            receiver = self.get_target(call.func.value, ctx)
+            if isinstance(receiver, PythonProgram):
+                pred = receiver.predicates[call.func.attr]
+            else:
+                rec_stmt, receiver = self.translate_expr(call.func.value, ctx)
+                assert not rec_stmt
+                receiver_class = self.get_type(call.func.value, ctx)
+                name = call.func.attr
+                pred = receiver_class.get_predicate(name)
+                args = [receiver] + args
         else:
             raise UnsupportedException(node)
         pred_name = pred.sil_name
@@ -164,6 +168,22 @@ class ContractTranslator(CommonTranslator):
         pred = self.viper.FieldAccessPredicate(fieldacc, perm,
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
+        # add field information
+        field_type = self.get_type(node.args[0], ctx)
+        if field_type.name not in PRIMITIVES:
+            type_info = self.type_check(fieldacc, field_type,
+                                        self.no_position(ctx), ctx)
+            not_null = self.viper.NeCmp(fieldacc,
+                                        self.viper.NullLit(self.no_position(ctx),
+                                                           self.no_info(ctx)),
+                                        self.to_position(node, ctx),
+                                        self.no_info(ctx))
+            implication = self.viper.Implies(not_null, type_info,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
+            pred = self.viper.And(pred, type_info,
+                                  self.to_position(node, ctx),
+                                  self.no_info(ctx))
         return [], pred
 
     def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:

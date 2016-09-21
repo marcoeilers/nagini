@@ -64,7 +64,7 @@ class SIFPureTranslator(PureTranslator):
         tl_let = TLAssignWrapper(TL_VAR_NAME, conds, node.test, node)
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.program.classes[BOOL_TYPE], self.translator)
+            ctx.program.global_prog.classes[BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.name, conds, cond, node)
         then_cond = conds + [cond_var.name]
         else_cond = conds + [NotWrapper(cond_var.name)]
@@ -192,7 +192,7 @@ class SIFPureTranslator(PureTranslator):
                                ctx: SIFContext) -> List[Wrapper]:
         # Add a wrapper for '__tl_0 = __tl'
         tl_var = ctx.current_function.create_variable(TL_VAR_NAME,
-           ctx.program.classes[BOOL_TYPE], self.translator)
+           ctx.program.global_prog.classes[BOOL_TYPE], self.translator)
         node = ast.Name(id=ctx.current_function.tl_var.name, ctx=ast.Load())
         tl_wrapper = TLAssignWrapper(tl_var.name, [], node, None, False)
         return [tl_wrapper] + super()._translate_to_wrappers(nodes, ctx)

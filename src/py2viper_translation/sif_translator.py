@@ -78,13 +78,13 @@ class SIFTranslator(Translator):
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
-    def translate_program(self, program: PythonProgram,
+    def translate_program(self, programs: List[PythonProgram],
                           sil_progs: List) -> 'silver.ast.Program':
         ctx = SIFContext()
         ctx.current_class = None
         ctx.current_function = None
-        ctx.program = program
-        return self.prog_translator.translate_program(program, sil_progs, ctx)
+        # ctx.program = program
+        return self.prog_translator.translate_program(programs, sil_progs, ctx)
 
     def translate_pythonvar_decl(self, var: SIFPythonVar,
             program: PythonProgram) -> 'silver.ast.LocalVarDecl':

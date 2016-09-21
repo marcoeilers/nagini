@@ -7,6 +7,7 @@ from py2viper_translation.lib.constants import (
     RESULT_NAME
 )
 from py2viper_translation.lib.program_nodes import (
+    MethodType,
     PythonClass,
     PythonField,
     PythonMethod,
@@ -19,7 +20,8 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
@@ -52,8 +54,6 @@ class ProgramTranslator(CommonTranslator):
         Creates a Viper function representing the given global variable.
         """
         type = self.translate_type(var.type, ctx)
-        if type == self.viper.Ref:
-            raise UnsupportedException(var.node)
         position = self.to_position(var.node, ctx)
         posts = []
         result = self.viper.Result(type, position, self.no_info(ctx))
@@ -86,7 +86,7 @@ class ProgramTranslator(CommonTranslator):
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.classes['Exception'])
+                              ctx.program.global_prog.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
@@ -97,13 +97,14 @@ class ProgramTranslator(CommonTranslator):
                                            '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
-        not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
-                                    self.viper.NullLit(self.no_position(ctx),
-                                                       self.no_info(ctx)),
-                                    self.no_position(ctx), self.no_info(ctx))
-        new_type = self.type_factory.concrete_type_check(
-            next(iter(method.args.values())).ref(), cls, pos, ctx)
-        pres = [not_null, new_type] + pres
+        if method.method_type == MethodType.normal:
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
+                                        self.viper.NullLit(self.no_position(ctx),
+                                                           self.no_info(ctx)),
+                                        self.no_position(ctx), self.no_info(ctx))
+            new_type = self.type_factory.concrete_type_check(
+                next(iter(method.args.values())).ref(), cls, pos, ctx)
+            pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
             args.append(arg)
@@ -151,19 +152,48 @@ class ProgramTranslator(CommonTranslator):
         mname = ctx.program.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
-        if method.cls:
+        self_arg = None
+        has_subtype = None
+        if method.cls and method.method_type == MethodType.normal:
+            self_arg = method.overrides.args[next(iter(method.overrides.args))]
             not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
-                                        self.viper.NullLit(self.no_position(ctx),
-                                                           self.no_info(ctx)),
+                                        self.viper.NullLit(
+                                            self.no_position(ctx),
+                                            self.no_info(ctx)),
                                         self.no_position(ctx),
                                         self.no_info(ctx))
             pres = [not_null] + pres
+            has_subtype = self.var_type_check(self_arg.sil_name, method.cls,
+                                              pos,
+                                              ctx, inhale_exhale=False)
+        elif method.method_type == MethodType.class_method:
+            cls_arg = next(iter(method.args.values())).ref()
+            has_subtype = self.type_factory.subtype_check(cls_arg, method.cls,
+                                                          pos, ctx)
+        if method.name == '__init__':
+            full_perm = self.viper.FullPerm(self.no_position(ctx),
+                                            self.no_info(ctx))
+            for cls in [method.cls, method.cls.superclass]:
+                for name, field in cls.fields.items():
+                    if field.inherited:
+                        continue
+                    field = self.viper.Field(field.sil_name,
+                                             self.translate_type(field.type,
+                                                                 ctx),
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
+                    field_acc = self.viper.FieldAccess(self_arg.ref(), field,
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
+                    acc = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                                                          self.no_position(ctx),
+                                                          self.no_info(ctx))
+                    pres.append(acc)
+
         for arg in method.overrides.args:
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref())
-        self_arg = method.overrides.args[next(iter(method.overrides.args))]
-        has_subtype = self.var_type_check(self_arg.sil_name, method.cls, pos,
-                                          ctx, inhale_exhale=False)
+
         called_name = method.sil_name
         ctx.position.pop()
         results, targets, body = self._create_override_check_body_impure(
@@ -230,9 +260,13 @@ class ProgramTranslator(CommonTranslator):
             self.to_position(method.node, ctx), self.no_info(ctx),
             target_method=method)
         ctx.position.pop()
-        subtype_assume = self.viper.Inhale(has_subtype, self.no_position(ctx),
-                                           self.no_info(ctx))
-        body = default_checks + [subtype_assume] + call
+        if has_subtype:
+            subtype_assume = self.viper.Inhale(has_subtype,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+            body = default_checks + [subtype_assume, call]
+        else:
+            body = default_checks + [call]
         return results, targets, body
 
     def _check_override_validity(self, method: PythonMethod,
@@ -243,12 +277,10 @@ class ProgramTranslator(CommonTranslator):
         """
         if len(method.args) != len(method.overrides.args):
             raise InvalidProgramException(method.node, 'invalid.override')
-        for exc in method.declared_exceptions:
-            exc_class = ctx.program.classes[exc]
+        for exc_class in method.declared_exceptions:
             allowed = False
             for superexc in method.overrides.declared_exceptions:
-                superexcclass = ctx.program.classes[superexc]
-                if exc_class.issubtype(superexcclass):
+                if exc_class.issubtype(superexc):
                     allowed = True
                     break
             if not allowed:
@@ -270,7 +302,7 @@ class ProgramTranslator(CommonTranslator):
                     raise InvalidProgramException(arg.default, 'purity.violated')
                 arg.default_expr = expr
 
-    def translate_program(self, program: PythonProgram,
+    def translate_program(self, programs: List[PythonProgram],
                           sil_progs: List,
                           ctx: Context) -> 'silver.ast.Program':
         """
@@ -342,80 +374,104 @@ class ProgramTranslator(CommonTranslator):
 
         predicate_families = OrderedDict()
 
-        for var in program.global_vars:
-            functions.append(
-                self.create_global_var_function(program.global_vars[var], ctx))
+        for program in programs:
+            ctx.program = program
+            for var in program.global_vars:
+                functions.append(
+                    self.create_global_var_function(program.global_vars[var], ctx))
 
-        for class_name, cls in program.classes.items():
-            if class_name in PRIMITIVES:
-                continue
-            fields += self._translate_fields(cls, ctx)
-
-        # translate default args
-        containers = [program] + list(program.classes.values())
-        for container in containers:
-            for function in container.functions.values():
-                self.translate_default_args(function, ctx)
-            for method in container.methods.values():
-                self.translate_default_args(method, ctx)
-            for pred in container.predicates.values():
-                self.translate_default_args(pred, ctx)
-
-        for function in program.functions.values():
-            functions.append(self.translate_function(function, ctx))
-        for method in program.methods.values():
-            methods.append(self.translate_method(method, ctx))
-        for pred in program.predicates.values():
-            predicates.append(self.translate_predicate(pred, ctx))
-        for operation in program.io_operations.values():
-            predicate, getters, checkers = self.translate_io_operation(
-                    operation,
-                    ctx)
-            predicates.append(predicate)
-            functions.extend(getters)
-            methods.extend(checkers)
-
-        for class_name, cls in program.classes.items():
-            if class_name in PRIMITIVES:
-                continue
-            old_class = ctx.current_class
-            ctx.current_class = cls
-            funcs, axioms = self.type_factory.create_type(cls, ctx)
-            type_funcs.append(funcs)
-            if axioms:
-                type_axioms.append(axioms)
-            for func_name in cls.functions:
-                func = cls.functions[func_name]
-                if func.interface:
+            for class_name, cls in program.classes.items():
+                if class_name in PRIMITIVES:
                     continue
-                functions.append(self.translate_function(func, ctx))
-                if func.overrides:
-                    raise InvalidProgramException(func.node,
-                                                  'invalid.override')
-            for method_name in cls.methods:
-                method = cls.methods[method_name]
-                if method.interface:
-                    continue
+                fields += self._translate_fields(cls, ctx)
+                for name, field in cls.static_fields.items():
+                    functions.append(self.create_global_var_function(field, ctx))
+
+            # translate default args
+            containers = [program] + list(program.classes.values())
+            for container in containers:
+                for function in container.functions.values():
+                    self.translate_default_args(function, ctx)
+                for method in container.methods.values():
+                    self.translate_default_args(method, ctx)
+                for pred in container.predicates.values():
+                    self.translate_default_args(pred, ctx)
+
+            for function in program.functions.values():
+                functions.append(self.translate_function(function, ctx))
+            for method in program.methods.values():
                 methods.append(self.translate_method(method, ctx))
-                if method_name != '__init__' and method.overrides:
-                    methods.append(self.create_override_check(method, ctx))
-            for method_name in cls.get_all_methods():
-                method = cls.get_method(method_name)
-                if (method.cls != cls and method_name != '__init__' and
-                        not cls.name.startswith('Dummy_Sub')):
-                    # inherited
-                    methods.append(self.create_inherit_check(method, cls, ctx))
-            for pred_name in cls.predicates:
-                pred = cls.predicates[pred_name]
-                cpred = pred
-                while cpred.overrides:
-                    cpred = cpred.overrides
-                if cpred in predicate_families:
-                    predicate_families[cpred].append(pred)
-                else:
-                    predicate_families[cpred] = [pred]
-            # methods.append(self.create_constructor(cls))
-            ctx.current_class = old_class
+            for pred in program.predicates.values():
+                predicates.append(self.translate_predicate(pred, ctx))
+            for operation in program.io_operations.values():
+                predicate, getters, checkers = self.translate_io_operation(
+                        operation,
+                        ctx)
+                predicates.append(predicate)
+                functions.extend(getters)
+                methods.extend(checkers)
+            for class_name, cls in program.classes.items():
+                if class_name in PRIMITIVES:
+                    continue
+                old_class = ctx.current_class
+                ctx.current_class = cls
+                funcs, axioms = self.type_factory.create_type(cls, ctx)
+                type_funcs.append(funcs)
+                if axioms:
+                    type_axioms.append(axioms)
+                for func_name in cls.functions:
+                    func = cls.functions[func_name]
+                    if func.interface:
+                        continue
+                old_class = ctx.current_class
+                ctx.current_class = cls
+                funcs, axioms = self.type_factory.create_type(cls, ctx)
+                type_funcs.append(funcs)
+                if axioms:
+                    type_axioms.append(axioms)
+                for func_name in cls.functions:
+                    func = cls.functions[func_name]
+                    if func.interface:
+                        continue
+                    functions.append(self.translate_function(func, ctx))
+                    if func.overrides:
+                        raise InvalidProgramException(func.node,
+                                                      'invalid.override')
+                for method_name in cls.methods:
+                    method = cls.methods[method_name]
+                    if method.interface:
+                        continue
+                    methods.append(self.translate_method(method, ctx))
+                    if ((method_name != '__init__' or
+                             (cls.superclass and
+                              cls.superclass.has_classmethod)) and
+                            method.overrides):
+                        methods.append(self.create_override_check(method, ctx))
+                for method_name in cls.get_all_methods():
+                    method = cls.get_method(method_name)
+                    if (method.cls and method.cls != cls and
+                            method_name != '__init__' and
+                            method.method_type == MethodType.normal):
+                        # inherited
+                        methods.append(self.create_inherit_check(method, cls,
+                                                                 ctx))
+                for field_name in cls.static_fields:
+                    field = cls.static_fields[field_name]
+                    if cls.superclass:
+                        if cls.superclass.get_static_field(field_name):
+                            raise InvalidProgramException(field.node,
+                                                          'invalid.override')
+                for pred_name in cls.predicates:
+                    pred = cls.predicates[pred_name]
+                    cpred = pred
+                    while cpred.overrides:
+                        cpred = cpred.overrides
+                    if cpred in predicate_families:
+                        predicate_families[cpred].append(pred)
+                    else:
+                        predicate_families[cpred] = [pred]
+                # methods.append(self.create_constructor(cls))
+                ctx.current_class = old_class
 
         for root in predicate_families:
             pf = self.translate_predicate_family(root, predicate_families[root],

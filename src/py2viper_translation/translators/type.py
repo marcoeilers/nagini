@@ -17,7 +17,11 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     GenericType,
     PythonClass,
+    PythonMethod,
+    PythonNode,
+    PythonProgram,
     PythonType,
+    PythonVar,
 )
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
@@ -56,6 +60,8 @@ class TypeTranslator(CommonTranslator):
         """
         if 'builtins.' + cls.name in self.builtins:
             return self.builtins['builtins.' + cls.name]
+        elif cls.name == 'type':
+            return self.type_factory.type_type()
         else:
             return self.viper.Ref
 
@@ -63,9 +69,36 @@ class TypeTranslator(CommonTranslator):
         """
         Returns the type of the expression represented by node as a PythonClass
         """
+        target = self.get_target(node, ctx)
+        if target:
+            if isinstance(target, PythonVar):
+                col = node.col_offset if hasattr(node, 'col_offset') else None
+                key = (node.lineno, col)
+                if key in target.alt_types:
+                    return target.alt_types[key]
+                else:
+                    return target.type
+            if isinstance(target, PythonMethod):
+                # if target.name == '__init__':
+                #     return target.cls
+                if isinstance(node.func, ast.Attribute):
+                    rec_target = self.get_target(node.func.value, ctx)
+                    if not isinstance(rec_target, PythonProgram):
+                        rectype = self.get_type(node.func.value, ctx)
+                        if target.generic_type != -1:
+                            return rectype.type_args[target.generic_type]
+                return target.type
+            if isinstance(target, PythonClass):
+                return target
+
         if isinstance(node, ast.Attribute):
             receiver = self.get_type(node.value, ctx)
-            return receiver.get_field(node.attr).type
+            if receiver.name == 'type':
+                receiver = receiver.type_args[0]
+            rec_field = receiver.get_field(node.attr)
+            if not rec_field:
+                return receiver.get_static_field(node.attr)
+            return rec_field.type
         elif isinstance(node, ast.Name):
             if node.id in ctx.program.global_vars:
                 return ctx.program.global_vars[node.id].type
@@ -84,10 +117,11 @@ class TypeTranslator(CommonTranslator):
                 else:
                     return var.type
         elif isinstance(node, ast.Num):
-            return ctx.program.classes[INT_TYPE]
+            return ctx.program.global_prog.classes[INT_TYPE]
         elif isinstance(node, ast.Tuple):
             args = [self.get_type(arg, ctx) for arg in node.elts]
-            type = GenericType(TUPLE_TYPE, ctx.program, args)
+            type = GenericType(ctx.program.global_prog.classes[TUPLE_TYPE],
+                               args)
             return type
         elif isinstance(node, ast.Subscript):
             value_type = self.get_type(node.value, ctx)
@@ -102,15 +136,15 @@ class TypeTranslator(CommonTranslator):
             elif value_type.name == DICT_TYPE:
                 return value_type.type_args[1]
             elif value_type.name == RANGE_TYPE:
-                return ctx.program.classes['int']
+                return ctx.program.global_prog.classes[INT_TYPE]
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Str):
-            return ctx.program.classes[STRING_TYPE]
+            return ctx.program.global_prog.classes[STRING_TYPE]
         elif isinstance(node, ast.Compare):
-            return ctx.program.classes[BOOL_TYPE]
+            return ctx.program.global_prog.classes[BOOL_TYPE]
         elif isinstance(node, ast.BoolOp):
-            return ctx.program.classes[BOOL_TYPE]
+            return ctx.program.global_prog.classes[BOOL_TYPE]
         elif isinstance(node, ast.List):
             if node.elts:
                 el_types = [self.get_type(el, ctx) for el in node.elts]
@@ -121,8 +155,9 @@ class TypeTranslator(CommonTranslator):
                 # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
-                args = [ctx.program.classes[OBJECT_TYPE]]
-            type = GenericType(LIST_TYPE, ctx.program, args)
+                args = [ctx.program.global_prog.classes[OBJECT_TYPE]]
+            type = GenericType(ctx.program.global_prog.classes[LIST_TYPE],
+                               args)
             return type
         elif isinstance(node, ast.Set):
             if node.elts:
@@ -134,8 +169,9 @@ class TypeTranslator(CommonTranslator):
                 # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
-                args = [ctx.program.classes[OBJECT_TYPE]]
-            type = GenericType('set', ctx.program, args)
+                args = [ctx.program.global_prog.classes[OBJECT_TYPE]]
+            type = GenericType(ctx.program.global_prog.classes[SET_TYPE],
+                               args)
             return type
         elif isinstance(node, ast.Dict):
             if node.keys:
@@ -149,9 +185,10 @@ class TypeTranslator(CommonTranslator):
                 # variable it's assigned to.
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
-                object_class = ctx.program.classes[OBJECT_TYPE]
+                object_class = ctx.program.global_prog.classes[OBJECT_TYPE]
                 args = [object_class, object_class]
-            type = GenericType(DICT_TYPE, ctx.program, args)
+            type = GenericType(ctx.program.global_prog.classes[DICT_TYPE],
+                               args)
             return type
         elif isinstance(node, ast.IfExp):
             body_type = self.get_type(node.body, ctx)
@@ -161,16 +198,16 @@ class TypeTranslator(CommonTranslator):
             return self.get_type(node.left, ctx)
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
-                return ctx.program.classes[BOOL_TYPE]
+                return ctx.program.global_prog.classes[BOOL_TYPE]
             elif isinstance(node.op, ast.USub):
-                return ctx.program.classes[INT_TYPE]
+                return ctx.program.global_prog.classes[INT_TYPE]
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.NameConstant):
             if (node.value is True) or (node.value is False):
-                return ctx.program.classes[BOOL_TYPE]
+                return ctx.program.global_prog.classes[BOOL_TYPE]
             elif node.value is None:
-                return ctx.program.classes[OBJECT_TYPE]
+                return ctx.program.global_prog.classes[OBJECT_TYPE]
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call):
@@ -185,7 +222,7 @@ class TypeTranslator(CommonTranslator):
                 else:
                     raise InvalidProgramException(node, 'invalid.super.call')
             if get_func_name(node) == 'len':
-                return ctx.program.classes[INT_TYPE]
+                return ctx.program.global_prog.classes[INT_TYPE]
             if isinstance(node.func, ast.Name):
                 if node.func.id in CONTRACT_FUNCS:
                     if node.func.id == 'Result':
@@ -194,29 +231,30 @@ class TypeTranslator(CommonTranslator):
                         assert ctx.current_contract_exception is not None
                         return ctx.current_contract_exception
                     elif node.func.id == 'Acc':
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                     elif node.func.id == 'Old':
                         return self.get_type(node.args[0], ctx)
                     elif node.func.id == 'Implies':
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                     elif node.func.id == 'Forall':
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                     elif node.func.id == 'Exists':
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                     elif node.func.id == 'Unfolding':
                         return self.get_type(node.args[1], ctx)
                     elif node.func.id == 'Previous':
                         arg_type = self.get_type(node.args[0], ctx)
-                        return GenericType(LIST_TYPE, ctx.program, [arg_type])
+                        return GenericType(ctx.program.global_prog.classes[LIST_TYPE],
+                                           [arg_type])
                     else:
                         raise UnsupportedException(node)
                 elif node.func.id in BUILTINS:
                     if node.func.id == 'isinstance':
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                     elif node.func.id == BOOL_TYPE:
-                        return ctx.program.classes[BOOL_TYPE]
+                        return ctx.program.global_prog.classes[BOOL_TYPE]
                 if node.func.id in ctx.program.classes:
-                    return ctx.program.classes[node.func.id]
+                    return ctx.program.global_prog.classes[node.func.id]
                 elif ctx.program.get_func_or_method(node.func.id) is not None:
                     target = ctx.program.get_func_or_method(node.func.id)
                     return target.type
@@ -267,7 +305,7 @@ class TypeTranslator(CommonTranslator):
             lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
             indices = prefix + [lit]
             if arg.name in PRIMITIVES:
-                arg = ctx.program.classes['__boxed_' + arg.name]
+                arg = ctx.program.global_prog.classes['__boxed_' + arg.name]
             check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
             result = self.viper.And(result, check, self.no_position(ctx),
                                     self.no_info(ctx))
@@ -315,6 +353,8 @@ class TypeTranslator(CommonTranslator):
         if type.name in PRIMITIVES:
             boxed = ctx.program.classes['__boxed_' + type.name]
             result = self.type_factory.type_check(lhs, boxed, position, ctx)
+        elif type.name == 'type':
+            result = self.viper.TrueLit(position, self.no_info(ctx))
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
 

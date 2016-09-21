@@ -301,7 +301,8 @@ class TranslationTests(AnnotatedTests):
             (line, id, [])
             for ((line, col), id, backend) in missing]
         try:
-            translate(path, jvm)
+            prog = translate(path, jvm)
+            print(prog)
             assert False
         except InvalidProgramException as e1:
             code = 'invalid.program:' + e1.code
