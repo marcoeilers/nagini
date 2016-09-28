@@ -22,6 +22,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonProgram,
     PythonType,
     PythonVar,
+    PythonVarBase,
 )
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
@@ -71,7 +72,7 @@ class TypeTranslator(CommonTranslator):
         """
         target = self.get_target(node, ctx)
         if target:
-            if isinstance(target, PythonVar):
+            if isinstance(target, PythonVarBase):
                 col = node.col_offset if hasattr(node, 'col_offset') else None
                 key = (node.lineno, col)
                 if key in target.alt_types:

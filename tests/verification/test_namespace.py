@@ -1,8 +1,6 @@
 from py2viper_contracts.contracts import *
 import resources.namespace_test as nt
 from resources.namespace_test_3 import a_function, P as PPP
-# Import('resources/namespace_test.py', 'nt')
-# Import('resources/namespace_test_3.py')
 
 
 class Sub(nt.resources.namespace_test_2.Super):

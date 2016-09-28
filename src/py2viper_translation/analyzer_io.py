@@ -125,7 +125,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._current_io_operation.set_preset(in_places)
             return []
         if not inputs or self._typeof(inputs[0]) != self._place_class:
-            t = self._typeof(inputs[0])
+            # t = self._typeof(inputs[0])
             self._raise_invalid_operation('invalid_preset')
         for inp in inputs[1:]:
             if self._typeof(inp) == self._place_class:

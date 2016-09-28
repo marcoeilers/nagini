@@ -83,7 +83,7 @@ class SIFTranslator(Translator):
         ctx = SIFContext()
         ctx.current_class = None
         ctx.current_function = None
-        # ctx.program = program
+        ctx.program = programs[0]
         return self.prog_translator.translate_program(programs, sil_progs, ctx)
 
     def translate_pythonvar_decl(self, var: SIFPythonVar,

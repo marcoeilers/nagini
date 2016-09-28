@@ -10,7 +10,6 @@ from py2viper_contracts.io_builtins import (
     gap_io,
     no_op_io,
 )
-Import('io_builtins')
 
 # Helpers.
 

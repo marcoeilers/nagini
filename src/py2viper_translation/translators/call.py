@@ -733,12 +733,14 @@ class CallTranslator(CommonTranslator):
             if target.declared_exceptions:
                 error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
-            method_name = target_class.get_method('__init__').sil_name
-            init = self.viper.MethodCall(method_name,
-                                         args, targets,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx))
-            stmts.append(init)
+            target_method = target_class.get_method('__init__')
+            method_name = target_method.sil_name
+            init = self.create_method_call_node(ctx, method_name, args, targets,
+                                                self.to_position(node, ctx),
+                                                self.no_info(ctx),
+                                                target_method=target_method,
+                                                target_node=node)
+            stmts.extend(init)
             if target.declared_exceptions:
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
