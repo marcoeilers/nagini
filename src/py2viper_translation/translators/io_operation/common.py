@@ -40,7 +40,7 @@ class IOOperationCommonTranslator(CommonTranslator):
         info = self.no_info(ctx)
 
         operation_name = cast(ast.Name, node.func).id
-        operation = ctx.program.io_operations[operation_name]
+        operation = self.get_target(node, ctx)
 
         if sil_args is None:
             py_args = node.args[:len(operation.get_parameters())]

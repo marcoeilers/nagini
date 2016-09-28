@@ -214,7 +214,11 @@ class TypeInfo:
                 report_errors(res.errors)
             for name, file in res.files.items():
                 if name in {'builtins', 'py2viper_contracts',
-                            'py2viper_contracts.contracts', 'typing', 'abc'}:
+                            'py2viper_contracts.contracts',
+                            'py2viper_contracts.io',
+                            'py2viper_contracts.obligations',
+                            'typing', 'abc',
+                            'threading'}:
                     continue
                 self.files[name] = file.path
                 visitor = TypeVisitor(res.types, name,

@@ -264,9 +264,9 @@ class ProgramTranslator(CommonTranslator):
             subtype_assume = self.viper.Inhale(has_subtype,
                                                self.no_position(ctx),
                                                self.no_info(ctx))
-            body = default_checks + [subtype_assume, call]
+            body = default_checks + [subtype_assume] + call
         else:
-            body = default_checks + [call]
+            body = default_checks + call
         return results, targets, body
 
     def _check_override_validity(self, method: PythonMethod,
@@ -413,16 +413,6 @@ class ProgramTranslator(CommonTranslator):
             for class_name, cls in program.classes.items():
                 if class_name in PRIMITIVES:
                     continue
-                old_class = ctx.current_class
-                ctx.current_class = cls
-                funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.append(funcs)
-                if axioms:
-                    type_axioms.append(axioms)
-                for func_name in cls.functions:
-                    func = cls.functions[func_name]
-                    if func.interface:
-                        continue
                 old_class = ctx.current_class
                 ctx.current_class = cls
                 funcs, axioms = self.type_factory.create_type(cls, ctx)

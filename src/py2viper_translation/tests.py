@@ -171,6 +171,7 @@ class VerificationTests(AnnotatedTests):
             pytest.skip()
         prog = translate(path, jvm, sif)
         assert prog is not None
+        print(prog)
         vresult = verify(prog, path, jvm, verifier)
         self.evaluate_result(vresult, path, test_annotations, jvm, verifier)
 

@@ -18,7 +18,6 @@ from py2viper_contracts.io_builtins import (
     join_io,
     Join,
 )
-Import('io_builtins')
 from py2viper_contracts.obligations import (
     MustTerminate,
 )
@@ -40,7 +39,6 @@ from library import (
     send,
     Socket,
 )
-Import('library.py')
 
 
 @IOOperation

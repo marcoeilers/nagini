@@ -22,6 +22,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     MethodType,
     PythonClass,
+    PythonIOOperation,
     PythonMethod,
     PythonProgram,
     PythonType,
@@ -677,7 +678,7 @@ class CallTranslator(CommonTranslator):
             return self.translate_builtin_func(node, ctx)
         elif self._is_cls_call(node, ctx):
             return self.translate_cls_call(node, ctx)
-        elif get_func_name(node) in ctx.program.io_operations:
+        elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
         else:
             return self.translate_normal_call(node, ctx)
@@ -688,6 +689,7 @@ class CallTranslator(CommonTranslator):
         method.
         """
         if (ctx.actual_function and
+            isinstance(ctx.actual_function, PythonMethod) and
             ctx.actual_function.method_type == MethodType.class_method):
             if isinstance(node.func, ast.Name):
                 if node.func.id == next(iter(ctx.actual_function.args.keys())):

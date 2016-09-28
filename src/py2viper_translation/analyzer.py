@@ -89,6 +89,12 @@ class Analyzer(ast.NodeVisitor):
                     name in container.predicates):
             raise InvalidProgramException(node, 'multiple.definitions')
 
+    IGNORED_IMPORTS = {'py2viper_contracts.contracts',
+                       'typing',
+                       'py2viper_contracts.io',
+                       'py2viper_contracts.obligations',
+                       'threading'}
+
     def collect_imports(self, abs_path: str) -> None:
         """
         Parses the file at the given location, puts the result into self.asts.
@@ -113,7 +119,7 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(stmt, ast.Import):
                 for name in stmt.names:
                     module = name.name
-                    if module == 'typing':
+                    if module in self.IGNORED_IMPORTS:
                         continue
                     as_ = name.asname
                     assert module in self.types.files
@@ -121,10 +127,9 @@ class Analyzer(ast.NodeVisitor):
                     self.add_module(path, abs_path, as_ if as_ else module)
             elif isinstance(stmt, ast.ImportFrom):
                 module = stmt.module
-                if (module == 'py2viper_contracts.contracts' or
-                            module == 'typing'):
+                if (module in self.IGNORED_IMPORTS):
                     continue
-                if module == 'io_builtins':
+                if module == 'py2viper_contracts.io_builtins':
                     path = py2viper_contracts.io_builtins.__file__
                 else:
                     assert module in self.types.files

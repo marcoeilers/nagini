@@ -36,3 +36,16 @@ for name in dir(ASTConverter):
     m = getattr(ASTConverter, name)
     if callable(m) and name.startswith('visit_'):
         setattr(ASTConverter, name, with_column(m))
+
+
+# def visit_generic_mod(f):
+#     @wraps(f)
+#     def wrapper(self, node):
+#         if node.__class__.__name__ == 'Dict':
+#             return mypy.types.AnyType()
+#         else:
+#             return f(self, node)
+#     return wrapper
+#
+# TypeConverter = mypy.fastparse.TypeConverter
+# TypeConverter.generic_visit = visit_generic_mod(TypeConverter.generic_visit)

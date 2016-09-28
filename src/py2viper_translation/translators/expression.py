@@ -14,6 +14,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
+    PythonGlobalVar,
     PythonIOExistentialVar,
     PythonProgram,
     PythonTryBlock,
@@ -307,15 +308,15 @@ class ExpressionTranslator(CommonTranslator):
         return self.translate_expr(node.value, ctx)
 
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
-        if node.id in ctx.program.global_vars:
-            var = ctx.program.global_vars[node.id]
+        target = self.get_target(node, ctx)
+        if isinstance(target, PythonGlobalVar):
+            var = target
             type = self.translate_type(var.type, ctx)
             func_app = self.viper.FuncApp(var.sil_name, [],
                                           self.to_position(node, ctx),
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
-            target = self.get_target(node, ctx)
             if isinstance(target, PythonClass):
                 return [], self.type_factory.translate_type_literal(target,
                                                                     node,
