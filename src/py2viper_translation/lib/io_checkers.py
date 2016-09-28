@@ -5,7 +5,7 @@ import ast
 
 from typing import List
 
-from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.util import _get_target, get_included_programs, InvalidProgramException
 
 
 def _raise_error(node, error_type) -> None:
@@ -57,9 +57,11 @@ class IOOperationBodyChecker(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         """Check IO operation use and define existential variables."""
-        if (isinstance(node.func, ast.Name) and
-                node.func.id in self._program.io_operations):
-            operation = self._program.io_operations[node.func.id]
+        containers = [self._program]
+        containers.extend(get_included_programs(self._program))
+        target = _get_target(node, containers, None)
+        if target.__class__.__name__ == 'PythonIOOperation':
+            operation = target
             parameter_count = len(operation.get_parameters())
             results = node.args[parameter_count:]
             for i, arg in enumerate(results):

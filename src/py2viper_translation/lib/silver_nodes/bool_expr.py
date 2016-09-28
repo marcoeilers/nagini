@@ -111,7 +111,7 @@ class BoolVar(BoolExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        bool_class = ctx.program.classes['bool']
+        bool_class = ctx.program.global_prog.classes['bool']
         assert self._var.type is bool_class
         return self._var.ref()
 

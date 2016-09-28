@@ -18,7 +18,10 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.util import (
+    get_included_programs,
+    InvalidProgramException,
+)
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
@@ -50,6 +53,8 @@ class PythonScope:
             return name
 
     def get_scope_prefix(self) -> List[str]:
+        if isinstance(self, PythonIOOperation):
+            print("333")
         if self.superscope is None:
             return [self.name]
         else:
@@ -152,21 +157,12 @@ class LazyDict:
         return False
 
 
-def get_included_programs(prog: PythonProgram,
-                          include_global: bool = True) -> List[PythonProgram]:
-    result = [prog]
-    for p in prog.from_imports:
-        result.extend(get_included_programs(p, include_global=False))
-    result.append(prog.global_prog)
-    return result
-
-
 class PythonProgramView(PythonProgram):
     def __init__(self, prog: PythonProgram, names: List[Tuple[str, str]]):
         super().__init__(prog.types, prog.node_factory, prog.type_prefix,
                          prog.global_prog, prog.sil_names)
         for field in ['functions', 'methods', 'namespaces', 'predicates',
-                      'classes', 'global_vars']:
+                      'classes', 'global_vars', 'io_operations']:
             lazy_dict = LazyDict(names, prog, field)
             setattr(self, field, lazy_dict)
 
@@ -198,6 +194,8 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
+        if name == 'Place':
+            print("asdasddas")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory

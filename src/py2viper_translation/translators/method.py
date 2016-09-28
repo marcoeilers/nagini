@@ -132,7 +132,7 @@ class MethodTranslator(CommonTranslator):
             condition = self.viper.And(error, has_type, self.no_position(ctx),
                                        self.no_info(ctx))
             assert ctx.current_contract_exception is None
-            ctx.current_contract_exception = ctx.program.classes[exception]
+            ctx.current_contract_exception = exception
             for post, aliases in method.declared_exceptions[exception]:
                 with ctx.additional_aliases(aliases):
                     stmt, expr = self.translate_expr(post, ctx)
