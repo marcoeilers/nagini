@@ -18,6 +18,7 @@ from py2viper_translation.lib.program_nodes import (
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
+    PythonGlobalVar,
     PythonNode,
     PythonProgram,
     PythonProgramView,
@@ -34,7 +35,7 @@ from py2viper_translation.lib.util import (
     is_io_existential,
     UnsupportedException,
 )
-from typing import Dict, Set, Union
+from typing import Dict, List, Set, Union
 
 
 logger = logging.getLogger('py2viper_translation.analyzer')
@@ -82,7 +83,7 @@ class Analyzer(ast.NodeVisitor):
                 cls = container.classes[name]
                 if cls.defined:
                     raise InvalidProgramException(node, 'multiple.definitions')
-            if name in container.global_vars:
+            if name in container.global_vars and hasattr(container.global_vars[name], 'value'):
                 raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
                     name in container.methods or
@@ -521,6 +522,14 @@ class Analyzer(ast.NodeVisitor):
             parent = parent._parent
         return None
 
+    def _get_parents_of_type(self, node: ast.AST, typ: type) -> List[ast.AST]:
+        result = []
+        current = self._get_parent_of_type(node, typ)
+        while current:
+            result.append(current)
+            current = self._get_parent_of_type(current, typ)
+        return result
+
     def visit_Name(self, node: ast.Name) -> None:
         if node.id in LITERALS:
             return
@@ -538,10 +547,13 @@ class Analyzer(ast.NodeVisitor):
                 return
             if node in func_def_parent.decorator_list:
                 return
-        handler_parent = self._get_parent_of_type(node, ast.ExceptHandler)
-        if handler_parent:
-            if handler_parent.type is node:
-                return
+        handler_parents = self._get_parents_of_type(node, ast.ExceptHandler)
+        for handler_parent in handler_parents:
+            if handler_parent:
+                if handler_parent.type is node:
+                    return
+                if handler_parent.name and handler_parent.name == node.id:
+                    return
         # node could be global reference or static member
         # or local variable or function argument.
         if self.current_function is None:
@@ -553,8 +565,12 @@ class Analyzer(ast.NodeVisitor):
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
                     self.define_new(self.program, node.id, node)
-                    var = self.node_factory.create_python_global_var(
-                        node.id, node, cls)
+                    existing_var = self.get_target(node, self.program)
+                    if existing_var:
+                        var = existing_var
+                    else:
+                        var = self.node_factory.create_python_global_var(
+                            node.id, node, cls)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
@@ -578,39 +594,44 @@ class Analyzer(ast.NodeVisitor):
                 if node.id in self.current_class.fields:
                     del self.current_class.fields[node.id]
                 return
-        if node.id not in self.program.global_vars:
-            # node is a local variable, lambda argument, or a static
-            # field.
-            if self.current_function is None:
-                # node is a static field.
-                raise UnsupportedException(node)
+        if not isinstance(self.get_target(node, self.program), PythonGlobalVar):
+            # node is a local variable, lambda argument, or a global variable
+            # that hasn't been encountered yet
+            var = None
+            if node.id in self.current_function.locals:
+                var = self.current_function.locals[node.id]
+            elif node.id in self.current_function.args:
+                pass
+            elif node.id in self.current_function.special_vars:
+                pass
+            elif node.id in self.current_function.io_existential_vars:
+                pass
+            elif (self.current_function.var_arg and
+                    self.current_function.var_arg.name == node.id):
+                pass
+            elif (self.current_function.kw_arg and
+                    self.current_function.kw_arg.name == node.id):
+                pass
+            elif isinstance(self.get_target(node, self.program), PythonProgram):
+                return
+            elif isinstance(self.get_target(node, self.program), PythonClass):
+                return
             else:
-                # node refers to a local variable or lambda argument.
-                var = None
-                if node.id in self.current_function.locals:
-                    var = self.current_function.locals[node.id]
-                elif node.id in self.current_function.args:
-                    pass
-                elif node.id in self.current_function.special_vars:
-                    pass
-                elif node.id in self.current_function.io_existential_vars:
-                    pass
-                elif (self.current_function.var_arg and
-                        self.current_function.var_arg.name == node.id):
-                    pass
-                elif (self.current_function.kw_arg and
-                        self.current_function.kw_arg.name == node.id):
-                    pass
-                elif isinstance(self.get_target(node, self.program), PythonProgram):
-                    return
-                else:
+                if isinstance(node.ctx, ast.Store):
                     var = self.node_factory.create_python_var(node.id,
                                                               node,
                                                               self.typeof(node))
                     alts = self.get_alt_types(node)
                     var.alt_types = alts
                     self.current_function.locals[node.id] = var
-                self.track_access(node, var)
+                else:
+                    # this is a read of a variable we don't know, so it must
+                    # be a global variable.
+                    var = self.node_factory.create_python_global_var(node.id,
+                                                                     node,
+                                                                     self.typeof(node))
+                    self.program.global_vars[node.id] = var
+            self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         self.visit_default(node)

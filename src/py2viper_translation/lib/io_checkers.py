@@ -59,8 +59,8 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         """Check IO operation use and define existential variables."""
         containers = [self._program]
         containers.extend(get_included_programs(self._program))
-        target = _get_target(node, containers, None)
-        if target.__class__.__name__ == 'PythonIOOperation':
+        target = _get_target(node, containers, None) if not isinstance(node.func, ast.Call) else None
+        if target and target.__class__.__name__ == 'PythonIOOperation':
             operation = target
             parameter_count = len(operation.get_parameters())
             results = node.args[parameter_count:]

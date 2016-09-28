@@ -360,7 +360,7 @@ class ExpressionTranslator(CommonTranslator):
         func_name = get_func_name(node.value)
         if isinstance(target, PythonProgram):
             target = self.get_target(node, ctx)
-            if isinstance(target, PythonVar):
+            if isinstance(target, PythonGlobalVar):
                 # global var?
                 pos = self.to_position(node, ctx)
                 info = self.no_info(ctx)

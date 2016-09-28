@@ -131,15 +131,22 @@ def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
     return inner_to_outer
 
 
-def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
+def _is_two_arg_super_call(node: ast.Call, container) -> bool:
     """
     Checks if a super() call with two arguments is valid:
     first arg must be a class, second a reference to self.
     """
-    return (isinstance(node.args[0], ast.Name) and
-        (node.args[0].id in ctx.program.classes) and
-        isinstance(node.args[1], ast.Name) and
-        (node.args[1].id == next(iter(ctx.current_function.args))))
+    # return (isinstance(node.args[0], ast.Name) and
+    #     (node.args[0].id in ctx.program.classes) and
+    #     isinstance(node.args[1], ast.Name) and
+    #     (node.args[1].id == next(iter(ctx.current_function.args))))
+    return (_get_target(node.args[0], get_included_programs(container.get_program()), container).__class__.__name__ == 'PythonClass'
+            and isinstance(node.args[1], ast.Name) and
+            (node.args[1].id == next(iter(container.args))))
+
+
+def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
+    return _is_two_arg_super_call(node, ctx.actual_function)
 
 
 def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
@@ -330,16 +337,8 @@ def get_included_programs(prog: 'PythonProgram',
     return result
 
 
-def _get_target(node: ast.AST, containers: List, container) -> 'PythonProgram':
-    # container = ctx.actual_function if ctx.actual_function else ctx.program
-    # containers = [ctx]
+def _get_target(node: ast.AST, containers: List, container) -> 'PythonNode':
     if isinstance(node, ast.Name):
-        # if isinstance(container, PythonMethod):
-        #     containers.append(container)
-        #     containers.extend(get_included_programs(container.get_program()))
-        # else:
-        #     # assume program
-        #     containers.extend(get_included_programs(container))
         for ctx in containers:
             for field in ['var_aliases', 'args', 'special_args',
                           'special_vars', 'locals', 'classes', 'functions',
@@ -358,7 +357,7 @@ def _get_target(node: ast.AST, containers: List, container) -> 'PythonProgram':
         elif (container and func_name == 'super' and
                       container.__class__.__name__ == 'PythonMethod'):
             if len(node.args) == 2:
-                if not is_two_arg_super_call(node, ctx):
+                if not _is_two_arg_super_call(node, container):
                     raise InvalidProgramException(node,
                                                   'invalid.super.call')
             elif node.args:

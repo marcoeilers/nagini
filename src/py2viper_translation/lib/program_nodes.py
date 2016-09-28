@@ -53,8 +53,6 @@ class PythonScope:
             return name
 
     def get_scope_prefix(self) -> List[str]:
-        if isinstance(self, PythonIOOperation):
-            print("333")
         if self.superscope is None:
             return [self.name]
         else:
@@ -194,8 +192,6 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
-        if name == 'Place':
-            print("asdasddas")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory

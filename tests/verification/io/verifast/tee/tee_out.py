@@ -12,7 +12,6 @@ from py2viper_contracts.io_builtins import (
     Split,
     split_io,
 )
-Import('io_builtins')
 from verifast.stdio_simple import (
     stdout,
     stderr,
@@ -20,7 +19,6 @@ from verifast.stdio_simple import (
     putchar,
     putc,
 )
-Import('../stdio_simple.py')
 
 
 @IOOperation

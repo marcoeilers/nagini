@@ -370,7 +370,7 @@ class StatementTranslator(CommonTranslator):
         end_label = self.viper.Label(label_name,
                                      self.to_position(node, ctx),
                                      self.no_info(ctx))
-        return ctx_stmt + [ctx_assign, enter_call] + body + [end_label]
+        return ctx_stmt + [ctx_assign] + enter_call + body + [end_label]
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = None

@@ -275,7 +275,7 @@ class MethodTranslator(CommonTranslator):
         # create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
-        # posts = type_pres + posts
+        posts = type_pres + posts
         no_pos = self.no_position(ctx)
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref(method.node, ctx),
@@ -447,7 +447,7 @@ class MethodTranslator(CommonTranslator):
                                              [ctx_type, None, None, None],
                                              [exit_res.ref()],
                                              block.with_item.context_expr, ctx)
-            body.append(exit_call)
+            body.extend(exit_call)
         finally_var = block.get_finally_var(self.translator)
         if finally_var.sil_name in ctx.var_aliases:
             finally_var = ctx.var_aliases[finally_var.sil_name]
