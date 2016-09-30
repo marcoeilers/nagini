@@ -125,3 +125,9 @@ class Error:
         """
         return '{0} {1} ({2})'.format(
             self.message, self.reason, self.position_string)
+
+    def string(self, ide_mode: bool) -> str:
+        if ide_mode:
+            return '{0}:{1}:{2}: error: {3} {4}'.format(self.position._position.file().toString(), self.position.line, self.position.column, self.message, self.reason)
+        else:
+            return str(self)

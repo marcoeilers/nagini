@@ -46,6 +46,20 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
+sil_programs = []
+
+
+def load_sil_files(jvm: JVM):
+    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
+                 'func_triple.sil', 'lock.sil']
+    if not config.obligation_config.disable_measures:
+        sil_files.append('measures.sil')
+    current_path = os.path.dirname(inspect.stack()[0][1])
+    resources_path = os.path.join(current_path, 'resources')
+    native_sil = [os.path.join(resources_path, f) for f in sil_files]
+    sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path in native_sil])
+
+
 def translate(path: str, jvm: JVM, sif: bool = False):
     """
     Translates the Python module at the given path to a Viper program
@@ -54,11 +68,6 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     builtins = []
-    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
-                 'func_triple.sil', 'lock.sil']
-    if not config.obligation_config.disable_measures:
-        sil_files.append('measures.sil')
-    native_sil = [os.path.join(resources_path, f) for f in sil_files]
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
 
@@ -99,7 +108,8 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    sil_programs = [parse_sil_file(sil_path, jvm) for sil_path in native_sil]
+    if not sil_programs:
+        load_sil_files(jvm)
     programs = [main_program.global_prog] + list(analyzer.module_programs.values())
     prog = translator.translate_program(programs, sil_programs)
     return prog
@@ -192,9 +202,17 @@ def main() -> None:
         help=('run verification the given number of times to benchmark '
               'performance'),
         default=-1)
+    parser.add_argument(
+        '--ide-mode',
+        action='store_true',
+        help='Output errors in IDE format')
+    parser.add_argument(
+        '--server',
+        action='store_true',
+        help='Start a Nagini server process'
+    )
     args = parser.parse_args()
 
-    python_file = args.python_file
     config.classpath = args.viper_jar_path
     config.boogie_path = args.boogie
     config.z3_path = args.z3
@@ -203,14 +221,36 @@ def main() -> None:
 
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
+    if args.server:
+        load_sil_files(jvm)
+        import zmq
+        zmq_context = zmq.Context()
+        socket = zmq_context.socket(zmq.REP)
+        socket.bind('tcp://127.0.0.1:5555')
+        print("Nagini server started")
+        sys.stdout.flush()
+        while True:
+            file = socket.recv_string()
+            _, reply = translate_and_verify(file, jvm, args)
+            socket.send_string(reply)
+    else:
+        code, msg = translate_and_verify(args.python_file, jvm, args)
+        print(msg)
+        sys.exit(code)
+
+
+def translate_and_verify(python_file, jvm, args):
+    msg = [""]
+    def print_(str):
+        msg[0] = msg[0] + str + "\r"
     try:
         prog = translate(python_file, jvm, args.sif)
         if args.verbose:
-            print('Translation successful.')
+            print_('Translation successful.')
         if args.print_silver:
             if args.verbose:
-                print('Result:')
-            print(prog)
+                print_('Result:')
+            print_(prog)
         if args.write_silver_to_file:
             with open(args.write_silver_to_file, 'w') as fp:
                 fp.write(str(prog))
@@ -226,28 +266,32 @@ def main() -> None:
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
                 assert vresult
-                print("RUN,{},{},{},{},{}".format(
+                print_("RUN,{},{},{},{},{}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
-            print("Verification completed.")
-        print(vresult)
+            print_("Verification completed.")
+        if args.ide_mode:
+            print_("Done.")
+        print_(vresult.string(args.ide_mode))
         if vresult:
-            sys.exit(0)
+            return 0, msg[0]
         else:
-            sys.exit(1)
+            return 1, msg[0]
     except (TypeException, InvalidProgramException) as e:
-        print("Translation failed")
+        if args.ide_mode:
+            print_("Done.")
+        print_("Translation failed")
         if isinstance(e, InvalidProgramException):
-            print('Line ' + str(e.node.lineno) + ': ' + e.code)
+            print(python_file + ':' + str(e.node.lineno) + ': error: ' + e.code)
             if e.message:
-                print(e.message)
-            print(astunparse.unparse(e.node))
+                print_(e.message)
+            print_(astunparse.unparse(e.node))
         if isinstance(e, TypeException):
-            for msg in e.messages:
-                print(msg)
-        sys.exit(1)
+            for msg_ in e.messages:
+                print_(msg_)
+        return 1, msg[0]
     except JavaException as e:
         print(e.stacktrace())
         raise e
