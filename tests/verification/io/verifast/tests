@@ -7,3 +7,4 @@ tee/tee_out.py
 output_anything/output_any_char.py
 matching_brackets/matching_brackets_output.py
 matching_brackets/matching_brackets_checker.py
+buffering_in_library/putchar_with_buffer.py

@@ -48,7 +48,8 @@ def main(t1: Place) -> Place:
         lambda t2: (
             Requires(
                 token(t1, 2) and
-                matching_brackets(t1, t2)
+                matching_brackets(t1, t2) and
+                MustTerminate(2)
             ),
             Ensures(
                 token(t2)

@@ -68,8 +68,16 @@ class ObligationConfig(SectionConfig):
 
     @property
     def disable_termination_check(self):
-        """Disable all termination checks."""
+        """Disable all termination checks.
+
+        Also replaces all ``MustTerminate`` with ``True``.
+        """
         return self._info.getboolean('disable_termination_check', False)
+
+    @property
+    def disable_must_invoke(self):
+        """Replace all ``token`` with ``ctoken``."""
+        return self._info.getboolean('disable_must_invoke', False)
 
 
 class TestConfig(SectionConfig):
@@ -179,8 +187,8 @@ def _get_mypy_path():
         mypy_path = os.path.dirname(os.path.dirname(
             py2viper_contracts.__file__))
     return mypy_path
-    
-    
+
+
 def _get_mypy_dir():
     """ Construct MYPYDIR.
 
