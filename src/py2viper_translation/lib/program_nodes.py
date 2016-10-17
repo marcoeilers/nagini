@@ -422,6 +422,14 @@ class GenericType(PythonType):
         """
         return self.get_class().get_predicate(name)
 
+    def __eq__(self, other) -> bool:
+        if self.cls != other.cls or len(self.type_args) != len(other.type_args):
+            return False
+        for a0, a1 in zip(self.type_args, other.type_args):
+            if a0 != a1:
+                return False
+        return True
+
 
 class MethodType(Enum):
     normal = 0

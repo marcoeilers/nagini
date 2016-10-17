@@ -391,23 +391,37 @@ class TypeDomainFactory:
                                           self.no_info(ctx))
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
+        arg_r = self.viper.LocalVarDecl('r', self.viper.Ref,
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        var_r = self.viper.LocalVar('r', self.viper.Ref,
+                                    self.no_position(ctx), self.no_info(ctx))
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
                                              self.no_info(ctx),
                                              self.type_domain)
+        typeof = self.viper.DomainFuncApp('typeof', [var_r], {},
+                                          self.type_type(), [var_r],
+                                          self.no_position(ctx),
+                                          self.no_info(ctx),
+                                          self.type_domain)
         subtype = self.viper.DomainFuncApp('issubtype',
-                                           [var_sub, none_type], {},
+                                           [typeof, var_sub], {},
                                            self.viper.Bool,
-                                           [var_sub, none_type],
+                                           [typeof, var_sub],
                                            self.no_position(ctx),
                                            self.no_info(ctx), self.type_domain)
-        not_subtype = self.viper.Not(subtype, self.no_position(ctx),
-                                     self.no_info(ctx))
+        not_none = self.viper.NeCmp(var_sub, none_type, self.no_position(ctx),
+                                    self.no_info(ctx))
+        not_null = self.viper.NeCmp(var_r, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+                                    self.no_position(ctx), self.no_info(ctx))
+        implication = self.viper.Implies(self.viper.And(subtype, not_none, self.no_position(ctx), self.no_info(ctx)),
+                                         not_null, self.no_position(ctx), self.no_info(ctx))
         trigger = self.viper.Trigger([subtype], self.no_position(ctx),
                                      self.no_info(ctx))
-        body = self.viper.Forall([arg_sub], [trigger],
-                                 not_subtype, self.no_position(ctx),
+        body = self.viper.Forall([arg_sub, arg_r], [trigger],
+                                 implication, self.no_position(ctx),
                                  self.no_info(ctx))
         return self.viper.DomainAxiom('none_type_subtype', body,
                                       self.no_position(ctx), self.no_info(ctx),

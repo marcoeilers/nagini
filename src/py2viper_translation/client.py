@@ -13,4 +13,4 @@ socket.send_string(args.python_file)
 msg = socket.recv_string()
 for part in msg.splitlines():
     print(part)
-    sys.stdout.flush()
+sys.stdout.flush()
