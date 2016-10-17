@@ -12,6 +12,7 @@ from py2viper_translation.lib.util import (
     construct_lambda_prefix,
     find_loop_for_previous,
     get_func_name,
+    get_parent_of_type,
     InvalidProgramException,
     UnsupportedException,
 )

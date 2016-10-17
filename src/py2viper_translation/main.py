@@ -250,7 +250,7 @@ def translate_and_verify(python_file, jvm, args):
         if args.print_silver:
             if args.verbose:
                 print_('Result:')
-            print_(prog)
+            print(str(prog))
         if args.write_silver_to_file:
             with open(args.write_silver_to_file, 'w') as fp:
                 fp.write(str(prog))

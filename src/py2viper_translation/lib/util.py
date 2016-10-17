@@ -250,6 +250,15 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     return find_loop_for_previous(node._parent, name)
 
 
+def get_parent_of_type(node: ast.AST, typ: type) -> ast.AST:
+    parent = node._parent
+    while not isinstance(parent, ast.Module):
+        if isinstance(parent, typ):
+            return parent
+        parent = parent._parent
+    return None
+
+
 def join_expressions(operator: Callable[[T, T], T],
                      expressions: List[T]) -> T:
     """

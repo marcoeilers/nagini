@@ -33,7 +33,7 @@ class ViperAST:
 
         def getconst(name):
             return getobject(ast, name)
-
+        self.QPs = getobject(ast.utility, "QuantifiedPermissions")
         self.AddOp = getconst("AddOp")
         self.AndOp = getconst("AndOp")
         self.DivOp = getconst("DivOp")
@@ -392,8 +392,12 @@ class ViperAST:
         return self.ast.NullLit(position, info)
 
     def Forall(self, variables, triggers, exp, position, info):
-        return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
+        res = self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
                                exp, position, info)
+        if res.isPure():
+            return res
+        else:
+            return self.QPs.rewriteForall(res)
 
     def Trigger(self, exps, position, info):
         return self.ast.Trigger(self.to_seq(exps), position, info)
