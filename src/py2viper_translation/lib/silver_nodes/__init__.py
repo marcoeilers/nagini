@@ -5,6 +5,7 @@
 
 from py2viper_translation.lib.silver_nodes.base import *
 from py2viper_translation.lib.silver_nodes.bool_expr import *
+from py2viper_translation.lib.silver_nodes.call import *
 from py2viper_translation.lib.silver_nodes.expression import *
 from py2viper_translation.lib.silver_nodes.int_cmp_expr import *
 from py2viper_translation.lib.silver_nodes.int_expr import *

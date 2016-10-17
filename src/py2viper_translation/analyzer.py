@@ -3,6 +3,7 @@ import logging
 import mypy
 import os
 import py2viper_contracts.io_builtins
+import py2viper_contracts.lock
 import py2viper_translation.external.astpp
 import tokenize
 
@@ -111,6 +112,8 @@ class Analyzer(ast.NodeVisitor):
             imported = call.args[0].s
             if imported == 'io_builtins':
                 imp_path = py2viper_contracts.io_builtins.__file__
+            elif imported == 'lock':
+                imp_path = py2viper_contracts.lock.__file__
             else:
                 imp_path = os.path.dirname(abs_path) + os.sep + imported
             self.add_module(imp_path)
