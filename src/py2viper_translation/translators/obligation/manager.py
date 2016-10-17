@@ -46,6 +46,11 @@ class ObligationManager:
         return self._must_invoke_obligation
 
     @property
+    def must_release_obligation(self) -> MustReleaseObligation:
+        """Get ``MustRelease`` obligation."""
+        return self._must_release_obligation
+
+    @property
     def obligations(self) -> List[Obligation]:
         """Get a list of all obligations."""
         return self._obligations

@@ -12,6 +12,7 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/lib/silver_nodes/__init__.py \
 	src/py2viper_translation/lib/silver_nodes/base.py \
 	src/py2viper_translation/lib/silver_nodes/bool_expr.py \
+	src/py2viper_translation/lib/silver_nodes/call.py \
 	src/py2viper_translation/lib/silver_nodes/expression.py \
 	src/py2viper_translation/lib/silver_nodes/int_cmp_expr.py \
 	src/py2viper_translation/lib/silver_nodes/int_expr.py \
@@ -49,7 +50,8 @@ CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/translators/obligation/types/base.py \
 	src/py2viper_translation/translators/obligation/types/must_invoke.py \
 	src/py2viper_translation/translators/obligation/types/must_release.py \
-	src/py2viper_translation/translators/obligation/types/must_terminate.py
+	src/py2viper_translation/translators/obligation/types/must_terminate.py \
+	src/py2viper_translation/translators/obligation/waitlevel.py
 CHECKED_CONTRACT_FILES:=\
 	deps/py2viper-contracts/src/py2viper_contracts/io.py \
 	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
