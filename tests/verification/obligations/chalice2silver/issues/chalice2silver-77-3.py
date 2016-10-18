@@ -4,19 +4,21 @@ This is an example that illustrates Chalice2Silver
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Ensures,
     Implies,
+    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
+Import('lock')
 
 
 def test1(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     l.acquire()
     while False:
         Invariant(MustRelease(l, 10 - 100))
@@ -26,6 +28,7 @@ def test1(l: Lock) -> None:
 
 def test2(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     i = 0
     l.acquire()
     #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
@@ -36,6 +39,7 @@ def test2(l: Lock) -> None:
 
 def test3(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     i = 0
     l.acquire()
     while i < 1:
