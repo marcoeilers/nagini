@@ -127,6 +127,7 @@ class ObligationMethodNodeConstructor:
         """Add obligation stuff to Method."""
         self._add_aditional_parameters()
         self._add_aditional_returns()
+        self._add_aditional_variables()
         self._add_additional_preconditions()
         self._add_additional_postconditions()
         if not self._need_skip_body():
@@ -163,6 +164,11 @@ class ObligationMethodNodeConstructor:
         """Add current wait level ghost return."""
         self._obligation_method.prepend_return(
             self._obligation_info.current_wait_level.decl)
+
+    def _add_aditional_variables(self) -> None:
+        """Add current wait level ghost target."""
+        self._obligation_method.add_local(
+            self._obligation_info.current_wait_level_target)
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""

@@ -226,7 +226,7 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             CURRENT_WAIT_LEVEL_NAME: self._create_perm_var(
                 CURRENT_WAIT_LEVEL_NAME, translator),
             CURRENT_WAIT_LEVEL_TARGET_NAME: self._create_perm_var(
-                CURRENT_WAIT_LEVEL_TARGET_NAME, translator, local=True),
+                CURRENT_WAIT_LEVEL_TARGET_NAME, translator),
         }
         caller_measure_map_var = self._create_measure_var(
             MEASURES_CALLER_NAME, translator)
