@@ -5,17 +5,18 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
-    Invariant,
     Implies,
+    Import,
+    Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
+Import('lock')
 
 
 class A:
@@ -114,6 +115,7 @@ class A:
 
     def nested3(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
+        Requires(WaitLevel() < Level(self.x))
         x = 1
         y = 1
         self.x.acquire()
@@ -128,6 +130,7 @@ class A:
 
     def nested4(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
+        Requires(WaitLevel() < Level(self.x))
         x = 1
         self.x.acquire()
         while x < 5:
@@ -144,6 +147,7 @@ class A:
 
     def nested4_convert_reject(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
+        Requires(WaitLevel() < Level(self.x))
         Ensures(Acc(self.x))
         #:: ExpectedOutput(postcondition.violated:insufficient.permission)
         Ensures(MustRelease(self.x))
@@ -163,6 +167,7 @@ class A:
 
     def nested4_convert_accept(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
+        Requires(WaitLevel() < Level(self.x))
         Ensures(Acc(self.x))
         Ensures(MustRelease(self.x, 1))
         x = 1
