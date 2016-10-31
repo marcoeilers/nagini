@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import *
 
-
 # Helper functions to generate high/low input.
 def input_high() -> int:
     return 42

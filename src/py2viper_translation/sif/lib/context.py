@@ -3,7 +3,7 @@ from typing import Dict
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import PythonVar
 from py2viper_translation.lib.typedefs import Expr
-from py2viper_translation.sif.lib.program_nodes import TL_VAR_NAME
+from py2viper_translation.sif.lib.program_nodes import TL_VAR_NAME, SIFPythonVar
 
 
 class SIFContext(Context):
@@ -27,7 +27,8 @@ class SIFContext(Context):
             # aliases.
             self._old_vars = self.var_aliases.copy()
         if not aliases:
-            aliases = {k: v.var_prime for (k, v) in self.get_all_vars()}
+            aliases = {k:v.var_prime for (k, v) in self.get_all_vars() if
+                       isinstance(v, SIFPythonVar)}
 
         self.var_aliases.update(aliases)
 

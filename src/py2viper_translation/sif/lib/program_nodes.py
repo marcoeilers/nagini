@@ -65,8 +65,9 @@ class SIFPythonMethod(PythonMethod):
         """
         locals = []
         for local in self.locals.values():
-            locals.append(local)
-            locals.append(local.var_prime)
+            if isinstance(local, SIFPythonVar):
+                locals.append(local)
+                locals.append(local.var_prime)
 
         return locals
 

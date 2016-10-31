@@ -1,16 +1,19 @@
 import ast
 
-from py2viper_translation.lib.util import flatten, UnsupportedException
+from py2viper_translation.lib.typedefs import StmtsAndExpr
+from py2viper_translation.lib.util import flatten, UnsupportedException, \
+    get_body_start_index
 from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.translators.abstract import Stmt
+from py2viper_translation.translators.abstract import Expr, Stmt
 from py2viper_translation.translators.statement import StatementTranslator
-from typing import List
+from typing import List, Tuple
 
 
 class SIFStatementTranslator(StatementTranslator):
     """
     Secure Information Flow version of the StatementTranslator.
     """
+
     def translate_stmt(self, node: ast.AST, ctx: SIFContext) -> List[Stmt]:
         return super().translate_stmt(node, ctx)
 
@@ -41,16 +44,8 @@ class SIFStatementTranslator(StatementTranslator):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        # Translate condition twice, once normally and once in the prime ctx.
-        cond_stmt, cond = self.translate_to_bool(node.test, ctx)
-        ctx.set_prime_ctx()
-        cond_stmt_p, cond_p = self.translate_to_bool(node.test, ctx)
-        ctx.set_normal_ctx()
-        # tl := tl || cond != cond_p
-        cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
-        or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
-        tl_assign = self.viper.LocalVarAssign(
-            ctx.actual_function.new_tl_var.ref(), or_expr, pos, info)
+        tl_stmts, if_cond = self._create_condition_timelevel_statements(
+            node.test, ctx)
 
         # Translate the bodies.
         then_body = flatten([self.translate_stmt(stmt, ctx)
@@ -59,9 +54,9 @@ class SIFStatementTranslator(StatementTranslator):
         else_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.orelse])
         else_block = self.translate_block(else_body, pos, info)
-        if_stmt = self.viper.If(cond, then_block, else_block, pos, info)
+        if_stmt = self.viper.If(if_cond, then_block, else_block, pos, info)
 
-        return cond_stmt + cond_stmt_p + [tl_assign, if_stmt]
+        return tl_stmts + [if_stmt]
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: SIFContext) -> List[Stmt]:
@@ -69,7 +64,7 @@ class SIFStatementTranslator(StatementTranslator):
             raise UnsupportedException(node)
         if isinstance(node.targets[0], ast.Subscript):
             raise UnsupportedException(node)
-        
+
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
         ctx.set_prime_ctx()
@@ -77,9 +72,8 @@ class SIFStatementTranslator(StatementTranslator):
         stmts += super().translate_stmt_Assign(node, ctx)
         ctx.set_normal_ctx()
 
-        if ctx.current_tl_var_expr != ctx.current_function.new_tl_var.ref():
-            # RHS was a function call. Need assignment for timeLevel
-            assert isinstance(node.value, ast.Call)
+        # RHS was a function call. Need assignment for timeLevel
+        if isinstance(node.value, ast.Call):
             assign = self.viper.LocalVarAssign(
                 ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
                 self.to_position(node, ctx), self.no_info(ctx))
@@ -87,6 +81,53 @@ class SIFStatementTranslator(StatementTranslator):
             stmts.append(assign)
 
         return stmts
+
+    def translate_stmt_While(self, node: ast.While,
+                             ctx: SIFContext) -> List[Stmt]:
+        self.enter_loop_translation(node, ctx)
+        tl_stmts, while_cond = self._create_condition_timelevel_statements(
+            node.test, ctx)
+        # Translate loop invariants.
+        invariants = []
+        for expr, aliases in ctx.actual_function.loop_invariants[node]:
+            with ctx.additional_aliases(aliases):
+                invariants.append(self.translate_contract(expr, ctx))
+
+        body_index = get_body_start_index(node.body)
+        body = flatten([self.translate_stmt(stmt, ctx) for stmt in
+                        node.body[body_index:]])
+        # Add timelevel statement at the end of the loop.
+        body.extend(tl_stmts)
+        loop_stmts = self.create_while_node(ctx, while_cond, invariants, [],
+                                            body, node)
+        self.leave_loop_translation(ctx)
+        res =  tl_stmts + loop_stmts
+        return res
+
+    def _create_condition_timelevel_statements(self, condition: ast.AST,
+                                               ctx: SIFContext) -> StmtsAndExpr:
+        """Creates the timelevel statement before ifs and whiles.
+
+        Returns:
+            List of statements for the timelevel update and the translated
+            condition.
+        """
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        # Translate condition twice, once normally and once in the prime ctx.
+        cond_stmts, cond = self.translate_to_bool(condition, ctx)
+        ctx.set_prime_ctx()
+        cond_stmts_p, cond_p = self.translate_to_bool(condition, ctx)
+        ctx.set_normal_ctx()
+        # tl := tl || cond != cond_p
+        cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
+        or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
+        tl_assign = self.viper.LocalVarAssign(
+            ctx.actual_function.new_tl_var.ref(), or_expr, pos, info)
+        # After this the current_tl_expr is always reset.
+        ctx.current_tl_var_expr = None
+
+        return cond_stmts + cond_stmts_p + [tl_assign], cond
 
     def _translate_return(self, node: ast.Return,
                           ctx: SIFContext) -> List[Stmt]:
@@ -108,7 +149,3 @@ class SIFStatementTranslator(StatementTranslator):
             res.append(assign_tl)
 
         return res
-
-
-
-
