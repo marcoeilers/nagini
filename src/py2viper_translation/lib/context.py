@@ -24,7 +24,7 @@ class Context:
         self.label_aliases = {}
         self.position = []
         self.info = None
-        self.program = None
+        self.module = None
         self.inlined_calls = []
         self.ignore_family_folds = False
         self.added_handlers = []
@@ -39,8 +39,8 @@ class Context:
         if self.current_function:
             res += list(self.current_function.locals.items())
             res += list(self.current_function.args.items())
-        if self.program:
-            res += list(self.program.global_vars.items())
+        if self.module:
+            res += list(self.module.global_vars.items())
 
         return res
 
@@ -144,3 +144,5 @@ class Context:
         else:
             del self.var_aliases[name]
 
+    def get_contents(self, only_top: bool) -> Dict:
+        return self.var_aliases

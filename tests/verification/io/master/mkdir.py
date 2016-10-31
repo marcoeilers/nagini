@@ -27,11 +27,11 @@ from typing import Tuple
 
 class OSErrorWrapper(Exception):
 
-    def __init__(self, exception: OSError, place: Place) -> None:
+    def __init__(self, exception: Exception, place: Place) -> None:
         Ensures(Acc(self.exception) and self.exception is exception)
         Ensures(Acc(self.place) and self.place is place)
         #super().__init__() TODO
-        self.exception = exception      # type: OSError
+        self.exception = exception      # type: Exception
         self.place = place              # type: Place
 
 
@@ -62,7 +62,7 @@ def mkdir(t1: Place, path: str) -> Place:
             Exsures(OSErrorWrapper,
                 ex == RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
-                Acc(ex.exception) and isinstance(ex.exception, OSError)
+                Acc(ex.exception) and isinstance(ex.exception, Exception)
             ),
         )
     )
@@ -97,7 +97,7 @@ def is_dir(t1: Place, path: str) -> Tuple[bool, Place]:
                 Exsures(OSErrorWrapper,
                     ex == RaisedException() and
                     Acc(ex.place) and ex.place == t2 and token(t2) and
-                    Acc(ex.exception) and isinstance(ex.exception, OSError)
+                    Acc(ex.exception) and isinstance(ex.exception, Exception)
                 ),
             )
     )
@@ -236,7 +236,7 @@ def ensure_dir_exists2(t1: Place, path: str) -> Place:
                 #:: UnexpectedOutput(postcondition.violated:assertion.false, /py2viper/issue/55/)
                 ex == RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
-                Acc(ex.exception) and isinstance(ex.exception, OSError)
+                Acc(ex.exception) and isinstance(ex.exception, Exception)
             ),
         )
     )

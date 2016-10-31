@@ -53,7 +53,6 @@ class MethodTranslator(CommonTranslator):
         result = self.var_type_check(param.sil_name, param.type, no_pos, ctx)
         return result
 
-
     def _translate_pres(self, method: PythonMethod,
                         ctx: Context) -> List[Expr]:
         """
@@ -174,10 +173,8 @@ class MethodTranslator(CommonTranslator):
                         continue
                     if func.method_type == MethodType.class_method:
                         cls_arg = arg.ref()
-                        type_check = self.type_factory.subtype_check(cls_arg,
-                                                                  func.cls,
-                                                                  self.no_position(ctx),
-                                                                  ctx)
+                        type_check = self.type_factory.subtype_check(
+                            cls_arg, func.cls, self.no_position(ctx), ctx)
                         pres.append(type_check)
                         continue
                 type_check = self.get_parameter_typeof(arg, ctx)
@@ -316,7 +313,8 @@ class MethodTranslator(CommonTranslator):
         return [self.viper.Label(end_name, self.no_position(ctx),
                                  self.no_info(ctx))]
 
-    def _create_init_pres(self, method: PythonMethod, ctx: Context) -> List[Expr]:
+    def _create_init_pres(self, method: PythonMethod,
+                          ctx: Context) -> List[Expr]:
         """
         Generates preconditions specific to the '__init__' method.
         """
@@ -341,7 +339,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = method
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.global_prog.classes['Exception'])
+                              ctx.module.global_mod.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()
@@ -441,9 +439,19 @@ class MethodTranslator(CommonTranslator):
             exit_res = ctx.current_function.create_variable('exit_res',
                                                             exit_type,
                                                             self.translator)
-            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            #TODO: call with proper arguments
+            type_class = ctx.module.global_mod.classes['type']
+            exception_class = ctx.module.global_mod.classes['Exception']
+            object_class = ctx.module.global_mod.classes['object']
+            t_var = ctx.actual_function.create_variable('t', type_class,
+                                                        self.translator)
+            e_var = ctx.actual_function.create_variable('e', exception_class,
+                                                        self.translator)
+            tb_var = ctx.actual_function.create_variable('tb', object_class,
+                                                         self.translator)
             exit_call = self.get_method_call(ctx_type, '__exit__',
-                                             [ctx_var.ref(), null, null, null],
+                                             [ctx_var.ref(), t_var.ref(),
+                                              e_var.ref(), tb_var.ref()],
                                              [ctx_type, None, None, None],
                                              [exit_res.ref()],
                                              block.with_item.context_expr, ctx)
@@ -517,7 +525,8 @@ class MethodTranslator(CommonTranslator):
         return_block = self.translate_block(return_block, pos, info)
 
         number_zero = self.viper.IntLit(0, pos, info)
-        greater_zero = self.viper.GtCmp(finally_var.ref(), number_zero, pos, info)
+        greater_zero = self.viper.GtCmp(finally_var.ref(), number_zero, pos,
+                                        info)
         number_one = self.viper.IntLit(1, pos, info)
         greater_one = self.viper.GtCmp(finally_var.ref(), number_one, pos, info)
         if_return = self.viper.If(greater_zero, return_block, goto_post, pos,

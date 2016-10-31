@@ -95,7 +95,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         assert not ctx.current_function
         ctx.current_function = operation
 
-        name = ctx.program.get_fresh_name(
+        name = ctx.module.get_fresh_name(
             operation.sil_name + '__termination_check')
         parameters = [
             parameter.decl

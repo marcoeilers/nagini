@@ -20,8 +20,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonGlobalVar,
     PythonNode,
-    PythonProgram,
-    PythonProgramView,
+    PythonModule,
+    PythonModuleView,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -53,16 +53,17 @@ class Analyzer(ast.NodeVisitor):
         self.scala = jvm.scala
         self.viper = jvm.viper
         self.types = types
-        self.global_prog = PythonProgram(types, node_factory, None, None)
-        self.global_prog.global_prog = self.global_prog
-        self.program = PythonProgram(types, node_factory, '__main__',
-                                     self.global_prog, sil_names=self.global_prog.sil_names)
+        self.global_mod = PythonModule(types, node_factory, None, None)
+        self.global_mod.global_mod = self.global_mod
+        self.module = PythonModule(types, node_factory, '__main__',
+                                   self.global_mod,
+                                   sil_names=self.global_mod.sil_names)
         self.current_class = None
         self.current_function = None
         self.current_scopes = []
         self.contract_only = False
-        self.modules = [os.path.abspath(path)]
-        self.module_programs = {os.path.abspath(path): self.program}
+        self.module_paths = [os.path.abspath(path)]
+        self.modules = {os.path.abspath(path): self.module}
         self.asts = {}
         self.node_factory = node_factory
         self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
@@ -71,14 +72,14 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}                  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
 
-    def define_new(self, container: Union[PythonProgram, PythonClass],
+    def define_new(self, container: Union[PythonModule, PythonClass],
                    name: str, node: ast.AST) -> None:
         """
         Called when a new top level element named ``name`` is created in
         ``container``. Checks there is any existing element with the
         same name, and raises an exception in that case.
         """
-        if isinstance(container, PythonProgram):
+        if isinstance(container, PythonModule):
             if name in container.classes:
                 cls = container.classes[name]
                 if cls.defined:
@@ -149,32 +150,32 @@ class Analyzer(ast.NodeVisitor):
             self.add_module('mod$' + first, into, first)
             self.add_module(abs_path, 'mod$' + first, rest)
             return
-        if abs_path not in self.modules:
-            self.modules.append(abs_path)
+        if abs_path not in self.module_paths:
+            self.module_paths.append(abs_path)
             type_prefix = self.types.get_type_prefix(abs_path)
-            new_prog = PythonProgram(self.program.types, self.node_factory,
-                                     type_prefix, self.program.global_prog,
-                                     self.program.sil_names)
-            self.module_programs[abs_path] = new_prog
+            new_mod = PythonModule(self.module.types, self.node_factory,
+                                    type_prefix, self.module.global_mod,
+                                    self.module.sil_names)
+            self.modules[abs_path] = new_mod
         else:
-            new_prog = self.module_programs[abs_path]
-        into_prog = self.module_programs[into]
+            new_mod = self.modules[abs_path]
+        into_mod = self.modules[into]
         if as_:
             assert not names
-            into_prog.namespaces[as_] = new_prog
+            into_mod.namespaces[as_] = new_mod
         else:
             if names:
-                new_prog = PythonProgramView(new_prog, names)
-            into_prog.from_imports.append(new_prog)
+                new_mod = PythonModuleView(new_mod, names)
+            into_mod.from_imports.append(new_mod)
 
     def process(self, translator: 'Translator') -> None:
         """
         Performs preprocessing on the result of the analysis, which infers some
         things, creates some data structures for the translation etc.
         """
-        self.program.global_prog.process(translator)
-        for program in self.module_programs.values():
-            program.process(translator)
+        self.module.global_mod.process(translator)
+        for module in self.modules.values():
+            module.process(translator)
 
     def add_interface(self, interface: Dict) -> None:
         """
@@ -186,14 +187,14 @@ class Analyzer(ast.NodeVisitor):
         # create global classes first
         for class_name in interface:
             cls = self.get_class(class_name, interface=True,
-                                 program=self.program.global_prog)
+                                 module=self.module.global_mod)
             cls.defined = True
         for class_name in interface:
             cls = self.get_class(class_name)
             if_cls = interface[class_name]
             if 'extends' in if_cls:
                 superclass = self.get_class(if_cls['extends'],
-                                            program=self.program.global_prog)
+                                            module=self.module.global_mod)
                 cls.superclass = superclass
             for method_name in if_cls.get('methods', []):
                 if_method = if_cls['methods'][method_name]
@@ -203,7 +204,7 @@ class Analyzer(ast.NodeVisitor):
                 self._add_interface_method(method_name, if_method, cls, True)
 
     def _add_interface_method(self, method_name, if_method, cls, pure):
-        method = PythonMethod(method_name, None, cls, self.program,
+        method = PythonMethod(method_name, None, cls, self.module,
                               pure, False, self.node_factory, True,
                               if_method)
         ctr = 0
@@ -259,20 +260,18 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def get_target(self, node: ast.AST, container: PythonNode) -> PythonProgram:
+    def get_target(self, node: ast.AST, container: PythonNode) -> PythonModule:
+        # TODO call the one in program nodes
         if isinstance(node, ast.Name):
             containers = [container]
             if isinstance(container, PythonMethod):
-                containers.append(container.get_program())
-            containers.append(containers[-1].global_prog)
+                containers.append(container.get_module())
+            containers.append(containers[-1].global_mod)
             for ctx in containers:
-                for field in ['var_aliases', 'locals', 'classes', 'functions',
-                              'global_vars', 'methods', 'predicates',
-                              'namespaces']:
-                    if hasattr(ctx, field):
-                        field_val = getattr(ctx, field)
-                        if node.id in field_val:
-                            return field_val[node.id]
+                if ctx:
+                    options = ctx.get_contents(True)
+                    if node.id in options:
+                        return options[node.id]
             return None
         elif isinstance(node, ast.Call):
             return self.get_target(node.func, container)
@@ -281,43 +280,43 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(ctx, (PythonVar, PythonMethod)):
                 ctx = ctx.type
             containers = [ctx]
-            while isinstance(containers[-1], PythonClass) and containers[-1].superclass:
+            while (isinstance(containers[-1], PythonClass) and
+                       containers[-1].superclass):
                 containers.append(containers[-1].superclass)
             for ctx in containers:
-                for field in ['classes', 'functions', 'global_vars',
-                              'methods', 'predicates', 'namespaces']:
-                    if hasattr(ctx, field):
-                        field_val = getattr(ctx, field)
-                        if node.attr in field_val:
-                            return field_val[node.attr]
+                if ctx:
+                    options = ctx.get_contents(False)
+                    if node.attr in options:
+                        return options[node.attr]
             return None
         else:
             raise UnsupportedException(node)
 
     def get_class(self, name: str, interface=False,
-                  program=None) -> PythonClass:
-        if not program:
-            program = self.program
-        if name in program.global_prog.classes:
-            cls = program.global_prog.classes[name]
+                  module=None) -> PythonClass:
+        if not module:
+            module = self.module
+        if name in module.global_mod.classes:
+            cls = module.global_mod.classes[name]
             if interface:
                 cls.interface = interface
-        elif name in program.classes:
-            cls = program.classes[name]
+        elif name in module.classes:
+            cls = module.classes[name]
             if interface:
                 cls.interface = interface
         else:
-            cls = self.node_factory.create_python_class(name, program,
-                self.node_factory, interface=interface)
-            program.classes[name] = cls
+            cls = self.node_factory.create_python_class(name, module,
+                                                        self.node_factory,
+                                                        interface=interface)
+            module.classes[name] = cls
         return cls
 
     def get_target_class(self, node: ast.AST) -> PythonClass:
         if isinstance(node, ast.Name):
             return self.get_class(node.id)
         elif isinstance(node, ast.Attribute):
-            ctx = self.get_target(node.value, self.program)
-            return self.get_class(node.attr, program=ctx)
+            ctx = self.get_target(node.value, self.module)
+            return self.get_class(node.attr, module=ctx)
         else:
             raise UnsupportedException(node)
 
@@ -325,7 +324,7 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_class is None
         assert self.current_function is None
         name = node.name
-        self.define_new(self.program, name, node)
+        self.define_new(self.module, name, node)
         cls = self.get_class(name)
         cls.defined = True
         cls.node = node
@@ -350,7 +349,7 @@ class Analyzer(ast.NodeVisitor):
             self.io_operation_analyzer.analyze_io_operation(node)
             return
         if self.current_class is None:
-            scope_container = self.program
+            scope_container = self.module
         else:
             scope_container = self.current_class
         self.define_new(scope_container, name, node)
@@ -380,7 +379,7 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
-        functype = self.program.get_func_type(func.get_scope_prefix())
+        functype = self.module.get_func_type(func.get_scope_prefix())
         if func.pure and not functype:
             raise InvalidProgramException(node, 'function.type.none')
         func.type = self.convert_type(functype)
@@ -500,7 +499,7 @@ class Analyzer(ast.NodeVisitor):
                 self.current_function.postcondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Exsures':
-                exception = self.get_target(node.args[0], self.program)
+                exception = self.get_target(node.args[0], self.module)
                 if exception not in self.current_function.declared_exceptions:
                     self.current_function.declared_exceptions[exception] = []
                 self.current_function.declared_exceptions[exception].append(
@@ -559,13 +558,13 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function is None:
             # node is global in some way.
             if self.current_class is None:
-                if node.id in self.program.classes:
+                if node.id in self.module.classes:
                     return
                 # node is a global variable.
                 if isinstance(node.ctx, ast.Store):
                     cls = self.typeof(node)
-                    self.define_new(self.program, node.id, node)
-                    existing_var = self.get_target(node, self.program)
+                    self.define_new(self.module, node.id, node)
+                    existing_var = self.get_target(node, self.module)
                     if existing_var:
                         var = existing_var
                     else:
@@ -576,8 +575,8 @@ class Analyzer(ast.NodeVisitor):
                             or len(assign.targets) != 1):
                         raise UnsupportedException(assign)
                     var.value = assign.value
-                    self.program.global_vars[node.id] = var
-                var = self.program.global_vars[node.id]
+                    self.module.global_vars[node.id] = var
+                var = self.module.global_vars[node.id]
                 self.track_access(node, var)
             else:
                 # node is a static field.
@@ -594,7 +593,7 @@ class Analyzer(ast.NodeVisitor):
                 if node.id in self.current_class.fields:
                     del self.current_class.fields[node.id]
                 return
-        if not isinstance(self.get_target(node, self.program), PythonGlobalVar):
+        if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
             # node is a local variable, lambda argument, or a global variable
             # that hasn't been encountered yet
             var = None
@@ -612,9 +611,9 @@ class Analyzer(ast.NodeVisitor):
             elif (self.current_function.kw_arg and
                     self.current_function.kw_arg.name == node.id):
                 pass
-            elif isinstance(self.get_target(node, self.program), PythonProgram):
+            elif isinstance(self.get_target(node, self.module), PythonModule):
                 return
-            elif isinstance(self.get_target(node, self.program), PythonClass):
+            elif isinstance(self.get_target(node, self.module), PythonClass):
                 return
             else:
                 if isinstance(node.ctx, ast.Store):
@@ -627,15 +626,17 @@ class Analyzer(ast.NodeVisitor):
                 else:
                     # this is a read of a variable we don't know, so it must
                     # be a global variable.
-                    var = self.node_factory.create_python_global_var(node.id,
-                                                                     node,
-                                                                     self.typeof(node))
-                    self.program.global_vars[node.id] = var
+                    var = self.node_factory.create_python_global_var(
+                        node.id, node, self.typeof(node))
+                    self.module.global_vars[node.id] = var
             self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         self.visit_default(node)
-        if not isinstance(node._parent, ast.Call) and not isinstance(node.value, ast.Subscript) and not isinstance(self.get_target(node.value, self.program), PythonProgram):
+        if (not isinstance(node._parent, ast.Call) and
+                not isinstance(node.value, ast.Subscript) and
+                not isinstance(self.get_target(node.value, self.module),
+                               PythonModule)):
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
@@ -655,15 +656,15 @@ class Analyzer(ast.NodeVisitor):
             prefix = mypy_type._fullname
             if prefix.endswith('.' + mypy_type.name()):
                 prefix = prefix[:-(len(mypy_type.name()) + 1)]
-            program = self.program
-            for module in self.module_programs.values():
+            module = self.module
+            for module in self.modules.values():
                 if module.type_prefix == prefix:
-                    program = module
+                    module = module
                     break
-            result = self.get_class(mypy_type.name(), program=program)
+            result = self.get_class(mypy_type.name(), module=module)
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
-            result = GenericType(self.program.global_prog.classes[TUPLE_TYPE],
+            result = GenericType(self.module.global_mod.classes[TUPLE_TYPE],
                                  args)
         else:
             raise UnsupportedException(mypy_type)
@@ -685,7 +686,7 @@ class Analyzer(ast.NodeVisitor):
             if self.current_function is not None:
                 context.append(self.current_function.name)
             name = node.id if isinstance(node, ast.Name) else node.arg
-            _, alts = self.program.get_type(context, name)
+            _, alts = self.module.get_type(context, name)
             result = {}
             if alts:
                 for line, type in alts.items():
@@ -701,15 +702,15 @@ class Analyzer(ast.NodeVisitor):
         if isinstance(node, ast.Name):
             if node.id in LITERALS:
                 raise UnsupportedException(node)
-            if node.id in self.program.classes:
-                return self.program.classes[node.id]
+            if node.id in self.module.classes:
+                return self.module.classes[node.id]
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
             if self.current_function is not None:
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
-            type, alts = self.program.get_type(context, node.id)
+            type, alts = self.module.get_type(context, node.id)
             key = (node.lineno, node.col_offset)
             if alts and key in alts:
                 return self.convert_type(alts[key])
@@ -717,14 +718,14 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             context = [receiver.name]
-            type, _ = self.program.get_type(context, node.attr)
+            type, _ = self.module.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):
             # special case for cls parameter of classmethods:
             if self.current_function.method_type == MethodType.class_method:
                 args_list = self.current_function.node.args.args
                 if args_list and node is args_list[0]:
-                    cls = self.program.global_prog.classes['type']
+                    cls = self.module.global_mod.classes['type']
                     arg = self.current_class
                     return GenericType(cls, [arg])
             context = []
@@ -732,7 +733,7 @@ class Analyzer(ast.NodeVisitor):
                 context.append(self.current_class.name)
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
-            type, _ = self.program.get_type(context, node.arg)
+            type, _ = self.module.get_type(context, node.arg)
             return self.convert_type(type)
         elif (isinstance(node, ast.Call) and
               isinstance(node.func, ast.Name) and

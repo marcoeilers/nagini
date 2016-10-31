@@ -11,7 +11,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
     PythonMethod,
-    PythonProgram,
+    PythonModule,
     PythonVar
 )
 from py2viper_translation.lib.typedefs import (
@@ -86,15 +86,15 @@ class ProgramTranslator(CommonTranslator):
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.program.global_prog.classes['Exception'])
+                              ctx.module.global_mod.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
         if method.declared_exceptions:
             results.append(error_var.decl)
 
-        mname = ctx.program.get_fresh_name(cls.name + '_' + method.name +
-                                           '_inherit_check')
+        mname = ctx.module.get_fresh_name(cls.name + '_' + method.name +
+                                          '_inherit_check')
         pres, posts = self.extract_contract(method, ERROR_NAME,
                                             False, ctx)
         if method.method_type == MethodType.normal:
@@ -149,7 +149,7 @@ class ProgramTranslator(CommonTranslator):
         params = []
         args = []
 
-        mname = ctx.program.get_fresh_name(method.sil_name + '_override_check')
+        mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
         self_arg = None
@@ -299,14 +299,15 @@ class ProgramTranslator(CommonTranslator):
             if arg.default:
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if stmt:
-                    raise InvalidProgramException(arg.default, 'purity.violated')
+                    raise InvalidProgramException(arg.default,
+                                                  'purity.violated')
                 arg.default_expr = expr
 
-    def translate_program(self, programs: List[PythonProgram],
+    def translate_program(self, modules: List[PythonModule],
                           sil_progs: List,
                           ctx: Context) -> 'silver.ast.Program':
         """
-        Translates a PythonProgram created by the analyzer to a Viper program.
+        Translates the PythonModules created by the analyzer to a Viper program.
         """
         domains = []
         fields = []
@@ -374,21 +375,23 @@ class ProgramTranslator(CommonTranslator):
 
         predicate_families = OrderedDict()
 
-        for program in programs:
-            ctx.program = program
-            for var in program.global_vars:
+        for module in modules:
+            ctx.module = module
+            for var in module.global_vars:
                 functions.append(
-                    self.create_global_var_function(program.global_vars[var], ctx))
+                    self.create_global_var_function(module.global_vars[var],
+                                                    ctx))
 
-            for class_name, cls in program.classes.items():
+            for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES:
                     continue
                 fields += self._translate_fields(cls, ctx)
                 for name, field in cls.static_fields.items():
-                    functions.append(self.create_global_var_function(field, ctx))
+                    functions.append(self.create_global_var_function(field,
+                                                                     ctx))
 
             # translate default args
-            containers = [program] + list(program.classes.values())
+            containers = [module] + list(module.classes.values())
             for container in containers:
                 for function in container.functions.values():
                     self.translate_default_args(function, ctx)
@@ -397,20 +400,20 @@ class ProgramTranslator(CommonTranslator):
                 for pred in container.predicates.values():
                     self.translate_default_args(pred, ctx)
 
-            for function in program.functions.values():
+            for function in module.functions.values():
                 functions.append(self.translate_function(function, ctx))
-            for method in program.methods.values():
+            for method in module.methods.values():
                 methods.append(self.translate_method(method, ctx))
-            for pred in program.predicates.values():
+            for pred in module.predicates.values():
                 predicates.append(self.translate_predicate(pred, ctx))
-            for operation in program.io_operations.values():
+            for operation in module.io_operations.values():
                 predicate, getters, checkers = self.translate_io_operation(
                         operation,
                         ctx)
                 predicates.append(predicate)
                 functions.extend(getters)
                 methods.extend(checkers)
-            for class_name, cls in program.classes.items():
+            for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES:
                     continue
                 old_class = ctx.current_class

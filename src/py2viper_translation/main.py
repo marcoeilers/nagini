@@ -82,25 +82,25 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     else:
         node_factory = ProgramNodeFactory()
     analyzer = Analyzer(jvm, viperast, types, path, node_factory)
-    main_program = analyzer.program
+    main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_interface(json.loads(si))
 
     mod_index = 0
-    while mod_index < len(analyzer.modules):
-        module = analyzer.modules[mod_index]
+    while mod_index < len(analyzer.module_paths):
+        module = analyzer.module_paths[mod_index]
         analyzer.collect_imports(module)
         mod_index += 1
 
-    for module in analyzer.modules:
+    for module in analyzer.module_paths:
         if module.startswith('mod$'):
             continue
         if module != os.path.abspath(path):
             analyzer.contract_only = True
-            analyzer.program = analyzer.module_programs[module]
+            analyzer.module = analyzer.modules[module]
             analyzer.visit_module(module)
         else:
-            analyzer.program = main_program
+            analyzer.module = main_module
             analyzer.contract_only = False
             analyzer.visit_module(module)
     if sif:
@@ -110,8 +110,8 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     analyzer.process(translator)
     if not sil_programs:
         load_sil_files(jvm)
-    programs = [main_program.global_prog] + list(analyzer.module_programs.values())
-    prog = translator.translate_program(programs, sil_programs)
+    modules = [main_module.global_mod] + list(analyzer.modules.values())
+    prog = translator.translate_program(modules, sil_programs)
     return prog
 
 

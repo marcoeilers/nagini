@@ -135,9 +135,9 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         operation_call = cast(ast.Call, operation_call)
         operation_name = cast(ast.Name, operation_call.func).id
 
-        if operation_name not in ctx.program.io_operations:
+        if operation_name not in ctx.module.io_operations:
             raise_invalid_get_ghost_output('argument_not_io_operation', node)
-        operation = ctx.program.io_operations[operation_name]
+        operation = ctx.module.io_operations[operation_name]
 
         result = None
         for result in operation.get_results():

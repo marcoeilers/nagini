@@ -80,7 +80,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_try_stmt(node)
 
     def visit_name_expr(self, node: mypy.nodes.NameExpr):
-        if not node.name in LITERALS:
+        if node.name not in LITERALS:
             name_type = self.type_of(node)
             if not isinstance(name_type, mypy.types.CallableType):
                 self.set_type(self.prefix + [node.name], name_type,
@@ -184,7 +184,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 class TypeInfo:
     """
     Provides type information for all variables and functions in a given
-    Python program.
+    Python module.
     """
 
     def __init__(self):

@@ -26,15 +26,15 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._types = parent.types
         self._node_factory = node_factory
         self._place_class = parent.get_class('Place',
-                                             program=parent.program.global_prog)  # type: nodes.PythonClass
+                                             module=parent.module.global_mod)  # type: nodes.PythonClass
 
         self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
         self._in_property = False
 
     @property
-    def _program(self) -> nodes.PythonProgram:
-        return self._parent.program
+    def _module(self) -> nodes.PythonModule:
+        return self._parent.module
 
     def _raise_invalid_operation(
             self,
@@ -52,24 +52,24 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         """Create IO operation.
 
         Creates non-initialized IO operation from an AST node and adds
-        it to program.
+        it to the module.
         """
         name = node.name
         assert isinstance(name, str)
         operation = self._node_factory.create_python_io_operation(
             name,
             node,
-            self._program,
+            self._module,
             self._node_factory,
         )
-        self._program.io_operations[name] = operation
+        self._module.io_operations[name] = operation
         return operation
 
     def _check_type(self) -> None:
         """Check if operation type is ``bool``."""
         # scope_prefix = self._current_io_operation.get_scope_prefix()
         # func_type_old = self._types.get_func_type(scope_prefix)
-        func_type = self._parent.program.get_func_type([self._current_io_operation.name])
+        func_type = self._parent.module.get_func_type([self._current_io_operation.name])
         if isinstance(func_type, AnyType):
             self._raise_invalid_operation('return_type_not_bool')
         operation_type = self._parent.convert_type(func_type)
@@ -104,7 +104,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             scopes.append(prefix)
         typ, _ = self._parent.types.get_type(scopes, node.arg)
         scopes_2 = scopes + [node.arg]
-        typ_2, _ = self._parent.program.get_type(scopes, node.arg)
+        typ_2, _ = self._parent.module.get_type(scopes, node.arg)
         return self._parent.convert_type(typ_2)
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
