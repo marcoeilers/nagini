@@ -5,6 +5,7 @@ from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
+    _get_target,
     GenericType,
     PythonClass,
     PythonExceptionHandler,
@@ -12,7 +13,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonMethod,
     PythonNode,
-    PythonProgram,
+    PythonModule,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -25,12 +26,9 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
-    _get_target,
     get_func_name,
-    get_included_programs,
     get_surrounding_try_blocks,
     InvalidProgramException,
-    is_two_arg_super_call,
     UnsupportedException
 )
 from py2viper_translation.lib.viper_ast import ViperAST
@@ -105,7 +103,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             target_cls = receiver
             func = target_cls.get_function(func_name)
         else:
-            for container in [ctx.program] + ctx.program.from_imports + [ctx.program.global_prog]:
+            for container in ctx.module.get_included_modules():
                 if func_name in container.functions:
                     func = container.functions[func_name]
                     break
@@ -152,7 +150,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             target_cls = receiver
             func = target_cls.get_method(func_name)
         else:
-            func = ctx.program.methods[func_name]
+            func = ctx.module.methods[func_name]
         if not func:
             raise InvalidProgramException(node, 'unknown.function.called')
         actual_args = []
@@ -188,7 +186,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',
-                ctx.program.global_prog.classes['Exception'], self.translator)
+                ctx.module.global_mod.classes['Exception'], self.translator)
             return new_var.ref()
 
     def var_type_check(self, name: str, type: PythonType,
@@ -262,7 +260,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         arg_types = [None]
         name = '__unbox__'
         call = self.get_function_call(
-            ctx.program.global_prog.classes['__boxed_' + type.name], name, args,
+            ctx.module.global_mod.classes['__boxed_' + type.name], name, args,
             arg_types, node, ctx)
         return call
 
@@ -275,13 +273,31 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result += pow(256, index) * ord(char)
         return result
 
-    def get_target(self, node: ast.AST, ctx: Context) -> PythonProgram:
-        container = ctx.actual_function if ctx.actual_function else ctx.program
+    def is_valid_super_call(self, node: ast.Call, container) -> bool:
+        """
+        Checks if a super() call is valid:
+        It miust either have no arguments, or otherwise the
+        first arg must be a class, the second a reference to self.
+        """
+        if not node.args:
+            return True
+        elif len(node.args) == 2:
+            target = _get_target(node.args[0],
+                                 container.get_module().get_included_modules(),
+                                 container)
+            return (isinstance(target, PythonClass) and
+                    isinstance(node.args[1], ast.Name) and
+                    (node.args[1].id == next(iter(container.args))))
+        else:
+            return False
+
+    def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
+        container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
-            containers.extend(get_included_programs(container.get_program()))
+            containers.extend(container.get_module().get_included_modules())
         else:
-            # assume program
-            containers.extend(get_included_programs(container))
+            # assume module
+            containers.extend(container.get_included_modules())
         return _get_target(node, containers, container)

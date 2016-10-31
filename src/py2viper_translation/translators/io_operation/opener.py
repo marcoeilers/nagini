@@ -8,6 +8,7 @@ from typing import cast, List
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.io_context import IOOpenContext
 from py2viper_translation.lib.program_nodes import (
+    _get_target,
     PythonIOOperation,
     PythonVar,
 )
@@ -16,7 +17,6 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
 )
-from py2viper_translation.lib.util import _get_target, get_included_programs
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.io_operation.common import (
     IOOperationCommonTranslator,
@@ -32,8 +32,8 @@ def _get_opened_operation(
     if (len(node.args) == 1 and
             isinstance(node.args[0], ast.Call) and
             isinstance(node.args[0].func, ast.Name)):
-        containers = [ctx.program]
-        containers.extend(get_included_programs(ctx.program))
+        containers = [ctx.module]
+        containers.extend(ctx.module.get_included_modules())
         target = _get_target(node.args[0], containers, None)
         if isinstance(target, PythonIOOperation):
             return target

@@ -131,24 +131,6 @@ def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
     return inner_to_outer
 
 
-def _is_two_arg_super_call(node: ast.Call, container) -> bool:
-    """
-    Checks if a super() call with two arguments is valid:
-    first arg must be a class, second a reference to self.
-    """
-    # return (isinstance(node.args[0], ast.Name) and
-    #     (node.args[0].id in ctx.program.classes) and
-    #     isinstance(node.args[1], ast.Name) and
-    #     (node.args[1].id == next(iter(ctx.current_function.args))))
-    return (_get_target(node.args[0], get_included_programs(container.get_program()), container).__class__.__name__ == 'PythonClass'
-            and isinstance(node.args[1], ast.Name) and
-            (node.args[1].id == next(iter(container.args))))
-
-
-def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
-    return _is_two_arg_super_call(node, ctx.actual_function)
-
-
 def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
     """
     Returns a list of fields defined in the given class or its superclasses.
@@ -335,78 +317,3 @@ def is_get_ghost_output(node: ast.Assign) -> bool:
     return (isinstance(node.value, ast.Call) and
             isinstance(node.value.func, ast.Name) and
             node.value.func.id == 'GetGhostOutput')
-
-
-def get_included_programs(prog: 'PythonProgram',
-                          include_global: bool = True) -> List['PythonProgram']:
-    result = [prog]
-    for p in prog.from_imports:
-        result.extend(get_included_programs(p, include_global=False))
-    result.append(prog.global_prog)
-    return result
-
-
-def _get_target(node: ast.AST, containers: List, container) -> 'PythonNode':
-    if isinstance(node, ast.Name):
-        for ctx in containers:
-            for field in ['var_aliases', 'args', 'special_args',
-                          'special_vars', 'locals', 'classes', 'functions',
-                          'global_vars', 'methods', 'predicates',
-                          'io_operations', 'namespaces']:
-                if hasattr(ctx, field):
-                    field_val = getattr(ctx, field)
-                    if node.id in field_val:
-                        return field_val[node.id]
-        return None
-    elif isinstance(node, ast.Call):
-        func_name = get_func_name(node)
-        if (container and func_name == 'Result' and
-                    container.__class__.__name__ == 'PythonMethod'):
-            return container.type
-        elif (container and func_name == 'super' and
-                      container.__class__.__name__ == 'PythonMethod'):
-            if len(node.args) == 2:
-                if not _is_two_arg_super_call(node, container):
-                    raise InvalidProgramException(node,
-                                                  'invalid.super.call')
-            elif node.args:
-                raise InvalidProgramException(node,
-                                              'invalid.super.call')
-            return container.cls.superclass
-        return _get_target(node.func, containers, container)
-    elif isinstance(node, ast.Attribute):
-        ctx = _get_target(node.value, containers, container)
-        if (ctx.__class__.__name__ == 'PythonMethod' or
-                    ctx.__class__.__name__ == 'PythonField'):
-            ctx = ctx.type
-        elif 'PythonVarBase' in [b.__name__ for b in ctx.__class__.__bases__]:
-            col = node.col_offset if hasattr(node, 'col_offset') else None
-            key = (node.lineno, col)
-            if key in ctx.alt_types:
-                ctx = ctx.alt_types[key]
-            else:
-                ctx = ctx.type
-        if ctx.__class__.__name__ == 'GenericType' and ctx.name == 'type':
-            ctx = ctx.type_args[0]
-        if ctx.__class__.__name__ == 'GenericType':
-            ctx = ctx.cls
-        containers = []
-        if ctx.__class__.__name__ == 'PythonProgram':
-            containers.extend(get_included_programs(ctx,
-                                                    include_global=False))
-        else:
-            containers.append(ctx)
-        while (containers[-1].__class__.__name__ == 'PythonClass' and
-                   containers[-1].superclass):
-            containers.append(containers[-1].superclass)
-        for ctx in containers:
-            for field in ['classes', 'fields', 'functions', 'global_vars',
-                          'methods', 'predicates', 'io_operations',
-                          'namespaces']:
-                if hasattr(ctx, field):
-                    field_val = getattr(ctx, field)
-                    if node.attr in field_val:
-                        return field_val[node.attr]
-        return None
-    else:
-        return None

@@ -19,7 +19,7 @@ from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
-    get_included_programs,
+    get_func_name,
     InvalidProgramException,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -58,18 +58,18 @@ class PythonScope:
         else:
             return self.superscope.get_scope_prefix() + [self.name]
 
-    def get_program(self) -> 'PythonProgram':
+    def get_module(self) -> 'PythonModule':
         if self.superscope is not None:
-            return self.superscope.get_program()
+            return self.superscope.get_module()
         else:
             return self
 
 
-class PythonProgram(PythonScope):
+class PythonModule(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
-                 global_prog: 'PythonProgram',
+                 global_mod: 'PythonModule',
                  sil_names: List[str] = None) -> None:
         if sil_names is None:
             sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
@@ -81,14 +81,11 @@ class PythonProgram(PythonScope):
         self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
         self.namespaces = OrderedDict()
-        self.global_prog = global_prog
+        self.global_mod = global_mod
         self.type_prefix = type_prefix
         self.from_imports = []
         self.node_factory = node_factory
         self.types = types
-        # for primitive in PRIMITIVES:
-        #     self.classes[primitive] = node_factory.create_python_class(
-        #         primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():
@@ -108,7 +105,7 @@ class PythonProgram(PythonScope):
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
-        for cont in [self] + self.from_imports + [self.global_prog]:
+        for cont in [self] + self.from_imports + [self.global_mod]:
             if name in cont.functions:
                 return cont.functions[name]
             elif name in cont.methods:
@@ -124,44 +121,84 @@ class PythonProgram(PythonScope):
         actual_prefix.extend(prefix)
         return self.types.get_func_type(actual_prefix)
 
+    def get_included_modules(self, include_global: bool = True) \
+            -> List['PythonModule']:
+        result = [self]
+        for p in self.from_imports:
+            result.extend(p.get_included_modules(include_global=False))
+        result.append(self.global_mod)
+        return result
 
-class LazyDict:
-    def __init__(self, names: List[Tuple[str, str]], prog: PythonProgram, field: str):
-        self.prog = prog
-        self.field = field
+    def get_contents(self, only_top: bool) -> Dict:
+        dicts = [self.classes,  self.functions, self.global_vars, self.methods,
+                 self.predicates, self.io_operations, self.namespaces]
+        return CombinedDict([], dicts)
+
+
+class CombinedDict:
+    def __init__(self, names: List[Tuple[str, str]], dicts: List[Dict]):
+        self.dicts = dicts
         self.names = {}
         for name, as_name in names:
             new_name = as_name if as_name else name
             self.names[new_name] = name
 
     def __getitem__(self, item):
-        if item in self.names:
-            key = self.names[item]
-            progs = get_included_programs(self.prog, include_global=False)
-            actuals = [getattr(p, self.field) for p in progs]
-            for actual in actuals:
-                if key in actual:
-                    return actual[key]
+        key = item
+        if self.names:
+            if not key in self.names:
+                raise KeyError(item)
+            key = self.names[key]
+        for d in self.dicts:
+            if key in d:
+                return d[key]
         raise KeyError(item)
 
     def __contains__(self, item):
-        if item in self.names:
-            key = self.names[item]
-            progs = get_included_programs(self.prog, include_global=False)
-            actuals = [getattr(p, self.field) for p in progs]
-            for actual in actuals:
-                if key in actual:
-                    return True
+        key = item
+        if self.names:
+            if not key in self.names:
+                return False
+            key = self.names[key]
+        for d in self.dicts:
+            if key in d:
+                return True
         return False
 
 
-class PythonProgramView(PythonProgram):
-    def __init__(self, prog: PythonProgram, names: List[Tuple[str, str]]):
-        super().__init__(prog.types, prog.node_factory, prog.type_prefix,
-                         prog.global_prog, prog.sil_names)
+class ModuleDictView(CombinedDict):
+    def __init__(self, names: List[Tuple[str, str]], module: PythonModule,
+                 field: str):
+        self.module = module
+        self.field = field
+        self.names = {}
+        for name, as_name in names:
+            new_name = as_name if as_name else name
+            self.names[new_name] = name
+        self._modules = None
+        self._dicts = None
+
+    @property
+    def modules(self):
+        if not self._modules:
+            result = self.module.get_included_modules(include_global=False)
+            self._modules = result
+        return self._modules
+
+    @property
+    def dicts(self):
+        if not self._dicts:
+            self._dicts = [getattr(m, self.field) for m in self.modules]
+        return self._dicts
+
+
+class PythonModuleView(PythonModule):
+    def __init__(self, module: PythonModule, names: List[Tuple[str, str]]):
+        super().__init__(module.types, module.node_factory, module.type_prefix,
+                         module.global_mod, module.sil_names)
         for field in ['functions', 'methods', 'namespaces', 'predicates',
                       'classes', 'global_vars', 'io_operations']:
-            lazy_dict = LazyDict(names, prog, field)
+            lazy_dict = ModuleDictView(names, module, field)
             setattr(self, field, lazy_dict)
 
 
@@ -188,7 +225,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                  node_factory: 'ProgramNodeFactory', node: ast.AST = None,
                  superclass: 'PythonClass' = None, interface=False):
         """
-        :param superscope: The scope, usually program, this belongs to.
+        :param superscope: The scope, usually module, this belongs to.
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
@@ -361,6 +398,12 @@ class PythonClass(PythonType, PythonNode, PythonScope):
             return False
         return self.superclass.issubtype(cls)
 
+    def get_contents(self, only_top: bool) -> Dict:
+        dicts = [self.functions,  self.methods, self.predicates]
+        if not only_top:
+            dicts.append(self.fields)
+        return CombinedDict([], dicts)
+
 
 class GenericType(PythonType):
     """
@@ -372,7 +415,7 @@ class GenericType(PythonType):
     def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
         self.name = cls.name
-        self.program = cls.get_program()
+        self.module = cls.get_module()
         self.cls = cls
         self.type_args = args
         self.exact_length = True
@@ -380,8 +423,8 @@ class GenericType(PythonType):
     def get_class(self) -> PythonClass:
         return self.cls
 
-    def get_program(self) -> 'PythonProgram':
-        return self.program
+    def get_module(self) -> 'PythonModule':
+        return self.module
 
     @property
     def sil_name(self) -> str:
@@ -423,6 +466,8 @@ class GenericType(PythonType):
         return self.get_class().get_predicate(name)
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, GenericType):
+            return False
         if self.cls != other.cls or len(self.type_args) != len(other.type_args):
             return False
         for a0, a1 in zip(self.type_args, other.type_args):
@@ -452,7 +497,7 @@ class PythonMethod(PythonNode, PythonScope):
                  method_type: MethodType = MethodType.normal):
         """
         :param cls: Class this method belongs to, if any.
-        :param superscope: The scope (class or program) this method belongs to
+        :param superscope: The scope (class or module) this method belongs to
         :param pure: True iff ir's a pure function, not an impure method
         :param contract_only: True iff we're not generating the method's
         implementation, just its contract
@@ -512,7 +557,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
             return
-        func_type = self.get_program().types.get_func_type(
+        func_type = self.get_module().types.get_func_type(
             self.get_scope_prefix())
         if self.type is not None:
             self.result = self.node_factory.create_python_var(RESULT_NAME, None,
@@ -598,7 +643,7 @@ class PythonMethod(PythonNode, PythonScope):
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_program().global_vars.get(name)
+            return self.get_module().global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
@@ -634,6 +679,10 @@ class PythonMethod(PythonNode, PythonScope):
             return [self.result]
         else:
             return []
+
+    def get_contents(self, only_top: bool) -> Dict:
+        dicts = [self.args,  self.special_args, self.locals, self.special_vars]
+        return CombinedDict([], dicts)
 
 
 class PythonIOOperation(PythonNode, PythonScope):
@@ -676,18 +725,24 @@ class PythonIOOperation(PythonNode, PythonScope):
             var.process(self.get_fresh_name(var.name), translator)
 
     def process(self, sil_name: str, translator: 'Translator',
-                program: PythonProgram) -> None:
+                module: PythonModule) -> None:
         """
         Creates fresh Silver names for preset, postset, inputs and
         outputs. Also, sets the ``sil_name``.
         """
         if self._body is not None:
+            def find_op(node: ast.AST, containers: List, container):
+                result = _get_target(node, containers, container)
+                if isinstance(result, PythonIOOperation):
+                    return result
+                return None
             body_checker = IOOperationBodyChecker(
                 self._body,
                 self.get_results(),
                 self._io_existentials,
-                program,
-                translator)
+                module,
+                translator,
+                find_op)
             body_checker.check()
         self.sil_name = sil_name
         self._process_var_list(self._preset, translator)
@@ -834,6 +889,10 @@ class PythonIOOperation(PythonNode, PythonScope):
                 return var.create_io_existential_variable_instance()
         return None
 
+    def get_contents(self, only_top: bool) -> Dict:
+        return {}
+
+
 class PythonExceptionHandler(PythonNode):
     """
     Represents an except-block belonging to a try-block.
@@ -898,7 +957,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_program().global_prog.classes[INT_TYPE]
+        int_type = self.method.get_module().global_mod.classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -914,7 +973,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_program().global_prog.classes['Exception']
+        exc_type = self.method.get_module().global_mod.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
@@ -968,9 +1027,9 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         super().process(sil_name, translator)
         self._translator = translator
-        prog = self.type.get_program()
-        self.decl = translator.translate_pythonvar_decl(self, prog)
-        self._ref = translator.translate_pythonvar_ref(self, prog, None, None)
+        module = self.type.get_module()
+        self.decl = translator.translate_pythonvar_decl(self, module)
+        self._ref = translator.translate_pythonvar_ref(self, module, None, None)
 
     def ref(self, node: ast.AST=None,
             ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
@@ -981,8 +1040,8 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         if not node:
             return self._ref
-        prog = self.type.get_program()
-        return self._translator.translate_pythonvar_ref(self, prog, node, ctx)
+        module = self.type.get_module()
+        return self._translator.translate_pythonvar_ref(self, module, node, ctx)
 
 
 class PythonGlobalVar(PythonVarBase):
@@ -1211,3 +1270,54 @@ class ProgramNodeFactory:
                             interface=False):
         return PythonClass(name, superscope, node_factory, node,
                            superclass, interface)
+
+
+def _get_target(node: ast.AST, containers: List, container) -> PythonNode:
+    if isinstance(node, ast.Name):
+        for ctx in containers:
+            if ctx:
+                options = ctx.get_contents(True)
+                if node.id in options:
+                    return options[node.id]
+        return None
+    elif isinstance(node, ast.Call):
+        func_name = get_func_name(node)
+        if (container and func_name == 'Result' and
+                isinstance(container, PythonMethod)):
+            return container.type
+        elif (container and func_name == 'super' and
+                isinstance(container, PythonMethod)):
+            return container.cls.superclass
+        return _get_target(node.func, containers, container)
+    elif isinstance(node, ast.Attribute):
+        ctx = _get_target(node.value, containers, container)
+        if (isinstance(ctx, PythonMethod) or
+                isinstance(ctx, PythonField)):
+            ctx = ctx.type
+        elif isinstance(ctx, PythonVarBase):
+            col = node.col_offset if hasattr(node, 'col_offset') else None
+            key = (node.lineno, col)
+            if key in ctx.alt_types:
+                ctx = ctx.alt_types[key]
+            else:
+                ctx = ctx.type
+        if isinstance(ctx, GenericType) and ctx.name == 'type':
+            ctx = ctx.type_args[0]
+        if isinstance(ctx, GenericType):
+            ctx = ctx.cls
+        containers = []
+        if isinstance(ctx, PythonModule):
+            containers.extend(ctx.get_included_modules(include_global=False))
+        else:
+            containers.append(ctx)
+        while (isinstance(containers[-1], PythonClass) and
+               containers[-1].superclass):
+            containers.append(containers[-1].superclass)
+        for ctx in containers:
+            if ctx:
+                options = ctx.get_contents(False)
+                if node.attr in options:
+                    return options[node.attr]
+        return None
+    else:
+        return None

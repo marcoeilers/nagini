@@ -414,10 +414,15 @@ class TypeDomainFactory:
                                            self.no_info(ctx), self.type_domain)
         not_none = self.viper.NeCmp(var_sub, none_type, self.no_position(ctx),
                                     self.no_info(ctx))
-        not_null = self.viper.NeCmp(var_r, self.viper.NullLit(self.no_position(ctx), self.no_info(ctx)),
+        not_null = self.viper.NeCmp(var_r,
+                                    self.viper.NullLit(self.no_position(ctx),
+                                                       self.no_info(ctx)),
                                     self.no_position(ctx), self.no_info(ctx))
-        implication = self.viper.Implies(self.viper.And(subtype, not_none, self.no_position(ctx), self.no_info(ctx)),
-                                         not_null, self.no_position(ctx), self.no_info(ctx))
+        implication = self.viper.Implies(self.viper.And(subtype, not_none,
+                                                        self.no_position(ctx),
+                                                        self.no_info(ctx)),
+                                         not_null, self.no_position(ctx),
+                                         self.no_info(ctx))
         trigger = self.viper.Trigger([subtype], self.no_position(ctx),
                                      self.no_info(ctx))
         body = self.viper.Forall([arg_sub, arg_r], [trigger],
@@ -460,7 +465,8 @@ class TypeDomainFactory:
                                             self.no_position(ctx),
                                             self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
-                                        self.no_position(ctx), self.no_info(ctx))
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
 
         sub_middle = self.viper.DomainFuncApp('issubtype',
                                               [var_sub, var_middle], {},

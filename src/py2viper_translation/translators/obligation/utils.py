@@ -10,18 +10,17 @@ from py2viper_translation.lib.typedefs import (
     Position,
     Stmt,
 )
-from py2viper_translation.lib.util import get_included_programs
 
 
 def find_method_by_sil_name(ctx: Context, sil_name: str) -> PythonMethod:
     """Find Python method based on its Silver name."""
-    prog = ctx.program
-    progs = get_included_programs(prog)
-    for prog in progs:
-        for method in prog.methods.values():
+    module = ctx.module
+    modules = module.get_included_modules()
+    for module in modules:
+        for method in module.methods.values():
             if method.sil_name == sil_name:
                 return method
-        for cls in prog.classes.values():
+        for cls in module.classes.values():
             for method in cls.methods.values():
                 if method.sil_name == sil_name:
                     return method

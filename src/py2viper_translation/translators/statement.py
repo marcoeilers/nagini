@@ -166,8 +166,8 @@ class StatementTranslator(CommonTranslator):
         invariant.append(previous_list_acc_pred)
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
-        object_class = ctx.program.global_prog.classes[OBJECT_TYPE]
-        list_class = ctx.program.global_prog.classes[LIST_TYPE]
+        object_class = ctx.module.global_mod.classes[OBJECT_TYPE]
+        list_class = ctx.module.global_mod.classes[LIST_TYPE]
         previous_len = self.get_function_call(list_class, '__len__',
                                               [iter_previous_acc],
                                               [object_class], None, ctx)
@@ -222,8 +222,9 @@ class StatementTranslator(CommonTranslator):
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
-                      node: ast.AST, ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
-        iter_class = ctx.program.global_prog.classes['Iterator']
+                      node: ast.AST, ctx: Context) -> Tuple[PythonVar,
+                                                            List[Stmt]]:
+        iter_class = ctx.module.global_mod.classes['Iterator']
         iter_var = ctx.actual_function.create_variable('iter', iter_class,
                                                        self.translator)
         assert not node in ctx.loop_iterators
@@ -240,17 +241,17 @@ class StatementTranslator(CommonTranslator):
                        ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
 
         if target_var.type.name in PRIMITIVES:
-            boxed_target_type = ctx.program.global_prog.classes['__boxed_' +
-                                                                target_var.type.name]
+            boxed_target_type = ctx.module.global_mod.classes['__boxed_' +
+                                                               target_var.type.name]
         else:
             boxed_target_type = target_var.type
         boxed_target_var = ctx.actual_function.create_variable('target',
                                                                boxed_target_type,
                                                                self.translator)
-        exc_class = ctx.program.global_prog.classes['Exception']
+        exc_class = ctx.module.global_mod.classes['Exception']
         err_var = ctx.actual_function.create_variable('iter_err', exc_class,
                                                       self.translator)
-        iter_class = ctx.program.global_prog.classes['Iterator']
+        iter_class = ctx.module.global_mod.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         targets = [boxed_target_var.ref(node.target, ctx), err_var.ref()]
@@ -272,7 +273,7 @@ class StatementTranslator(CommonTranslator):
 
     def _get_iterator_delete(self, iter_var: PythonVar, node: ast.For,
                              ctx: Context) -> List[Stmt]:
-        iter_class = ctx.program.global_prog.classes['Iterator']
+        iter_class = ctx.module.global_mod.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
@@ -343,10 +344,17 @@ class StatementTranslator(CommonTranslator):
                                                          ctx_type,
                                                          self.translator)
         try_block.with_var = with_ctx
-        ctx_assign = self.viper.LocalVarAssign(with_ctx.ref(), ctx_mgr, self.no_position(ctx), self.no_info(ctx))
-        enter_res = ctx.current_function.create_variable('enter_res', enter_res_type, self.translator)
+        ctx_assign = self.viper.LocalVarAssign(with_ctx.ref(), ctx_mgr,
+                                               self.no_position(ctx),
+                                               self.no_info(ctx))
+        enter_res = ctx.current_function.create_variable('enter_res',
+                                                         enter_res_type,
+                                                         self.translator)
         # call enter
-        enter_call = self.get_method_call(ctx_type, '__enter__', [with_ctx.ref()], [ctx_type], [enter_res.ref(node, ctx)], node, ctx)
+        enter_call = self.get_method_call(ctx_type, '__enter__',
+                                          [with_ctx.ref()],
+                                          [ctx_type],
+                                          [enter_res.ref(node, ctx)], node, ctx)
         assign = self.viper.LocalVarAssign(code_var, zero,
                                            self.no_position(ctx),
                                            self.no_info(ctx))
@@ -355,7 +363,8 @@ class StatementTranslator(CommonTranslator):
             as_var = ctx.current_function.get_variable(as_expr.id)
             enter_assign = self.viper.LocalVarAssign(as_var.ref(as_expr, ctx),
                                                      enter_res.ref(),
-                                                     self.to_position(as_expr, ctx),
+                                                     self.to_position(as_expr,
+                                                                      ctx),
                                                      self.no_info(ctx))
             body = [enter_assign, assign]
         else:
