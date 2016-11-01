@@ -129,7 +129,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
         return vresult
     except JavaException as je:
         print(je.stacktrace())
-        traceback.print_exc()
+        traceback.printexc()
 
 
 def _parse_log_level(log_level_string: str) -> int:
@@ -206,11 +206,6 @@ def main() -> None:
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
-    parser.add_argument(
-        '--server',
-        action='store_true',
-        help='Start a Nagini server process'
-    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -221,35 +216,18 @@ def main() -> None:
 
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
-    if args.server:
-        load_sil_files(jvm)
-        import zmq
-        zmq_context = zmq.Context()
-        socket = zmq_context.socket(zmq.REP)
-        socket.bind('tcp://127.0.0.1:5555')
-        print("Nagini server started")
-        sys.stdout.flush()
-        while True:
-            file = socket.recv_string()
-            _, reply = translate_and_verify(file, jvm, args)
-            socket.send_string(reply)
-    else:
-        code, msg = translate_and_verify(args.python_file, jvm, args)
-        print(msg)
-        sys.exit(code)
+    code = translate_and_verify(args.python_file, jvm, args)
+    sys.exit(code)
 
 
 def translate_and_verify(python_file, jvm, args):
-    msg = [""]
-    def print_(str):
-        msg[0] = msg[0] + str + "\r"
     try:
         prog = translate(python_file, jvm, args.sif)
         if args.verbose:
-            print_('Translation successful.')
+            print('Translation successful.')
         if args.print_silver:
             if args.verbose:
-                print_('Result:')
+                print('Result:')
             print(str(prog))
         if args.write_silver_to_file:
             with open(args.write_silver_to_file, 'w') as fp:
@@ -266,32 +244,32 @@ def translate_and_verify(python_file, jvm, args):
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
                 assert vresult
-                print_("RUN,{},{},{},{},{}".format(
+                print("RUN,{},{},{},{},{}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
-            print_("Verification completed.")
+            print("Verification completed.")
         if args.ide_mode:
-            print_("Done.")
-        print_(vresult.string(args.ide_mode))
+            print("Done.")
+        print(vresult.string(args.ide_mode))
         if vresult:
-            return 0, msg[0]
+            return 0
         else:
-            return 1, msg[0]
+            return 1
     except (TypeException, InvalidProgramException) as e:
         if args.ide_mode:
-            print_("Done.")
-        print_("Translation failed")
+            print("Done.")
+        print("Translation failed")
         if isinstance(e, InvalidProgramException):
             print(python_file + ':' + str(e.node.lineno) + ': error: ' + e.code)
             if e.message:
-                print_(e.message)
-            print_(astunparse.unparse(e.node))
+                print(e.message)
+            print(astunparse.unparse(e.node))
         if isinstance(e, TypeException):
-            for msg_ in e.messages:
-                print_(msg_)
-        return 1, msg[0]
+            for msg in e.messages:
+                print(msg)
+        return 1
     except JavaException as e:
         print(e.stacktrace())
         raise e
