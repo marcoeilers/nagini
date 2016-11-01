@@ -1,3 +1,4 @@
+#:: IgnoreFile(/py2viper/issue/57/)
 from threading import Lock
 
 from py2viper_contracts.contracts import (
