@@ -394,6 +394,14 @@ class ContractTranslator(CommonTranslator):
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
+        lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                                         self.no_info(ctx))
+        if triggers:
+            # add lhs of the implication, which the user cannot write directly
+            # in this exact form.
+            # if we always do this, we apparently deactivate the automatically
+            # generated triggers and things are actually worse.
+            triggers = [lhs_trigger] + triggers
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))

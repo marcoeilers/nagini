@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Implies,
-    Import,
     Pure,
     Result,
 )

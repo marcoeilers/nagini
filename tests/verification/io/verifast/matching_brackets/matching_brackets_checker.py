@@ -3,7 +3,6 @@ from py2viper_contracts.contracts import (
     Acc,
     ContractOnly,
     Ensures,
-    Import,
     Requires,
     Result,
 )
