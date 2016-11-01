@@ -9,13 +9,11 @@ from py2viper_contracts.io import *
 from verifast.stdio_simple import (
     putchar,
 )
-Import('../stdio_simple.py')
 
 from verifast.user_sets_contract.specification import (
     example_io,
     Interface,
 )
-Import('specification.py')
 
 
 class Implementation(Interface):

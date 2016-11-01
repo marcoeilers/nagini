@@ -11,18 +11,15 @@ from py2viper_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-Import('io_builtins')
 from verifast.stdio_simple import (
     stdin,
     read_char_io,
     getchar,
 )
-Import('../stdio_simple.py')
 from verifast.tee.tee_out import (
     tee_out_io,
     tee_out,
 )
-Import('tee_out.py')
 
 
 @IOOperation

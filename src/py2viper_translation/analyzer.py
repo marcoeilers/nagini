@@ -229,8 +229,8 @@ class Analyzer(ast.NodeVisitor):
         self.visit(self.asts[module], None)
 
     def visit_Module(self, node: ast.Module) -> None:
-        # Top level elements may only be imports, classes, functions, global
-        # var assignments or Import() calls.
+        # Top level elements may only be imports, classes, functions, or global
+        # var assignments.
         for stmt in node.body:
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
                                  ast.ImportFrom, ast.Assign)):

@@ -10,7 +10,6 @@ from resources.library import (
     write_string_io,
     write_string,
 )
-Import('resources/library.py')
 
 
 def write_implementation_defined1(t1: Place) -> Place:
