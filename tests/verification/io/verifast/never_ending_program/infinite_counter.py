@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Invariant,
     Requires,
     Result,

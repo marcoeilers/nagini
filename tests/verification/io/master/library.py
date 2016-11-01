@@ -3,7 +3,6 @@ from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
     Implies,
-    Import,
     Invariant,
     Pure,
     Requires,

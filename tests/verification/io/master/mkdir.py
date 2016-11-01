@@ -4,7 +4,6 @@ from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
     Exsures,
-    Import,
     Implies,
     Requires,
     Result,
