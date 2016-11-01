@@ -1,31 +1,17 @@
-import io
 import os
 import pytest
 import re
 import tokenize
 
-from os.path import isfile, join
 from py2viper_translation.lib import config, jvmaccess
 from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.typeinfo import TypeException
-from py2viper_translation.lib.util import InvalidProgramException, flatten, flatten_dict
+from py2viper_translation.lib.util import InvalidProgramException, flatten_dict
 from py2viper_translation.main import translate, verify
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
 from typing import Any, Dict, List, Tuple
 
-test_translation_dir = 'tests/translation/'
-test_verification_dir = 'tests/verification/'
-test_sif_dir = 'tests/sif/'
-
 os.environ['MYPYPATH'] = config.mypy_path
-
-verifiers = [ViperVerifier.silicon]
-if config.boogie_path:
-    verifiers.append(ViperVerifier.carbon)
-verifiers = [
-    verifier
-    for verifier in verifiers
-    if verifier.name in config.test_config.verifiers]
 
 assert config.classpath
 jvm = jvmaccess.JVM(config.classpath)
@@ -34,7 +20,7 @@ type_error_pattern = "^(.*):(\\d+): error: (.*)$"
 mypy_error_matcher = re.compile(type_error_pattern)
 
 
-class AnnotatedTests():
+class AnnotatedTests:
     def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
         """
         A test annotation is a comment starting with #::
@@ -171,7 +157,6 @@ class VerificationTests(AnnotatedTests):
             pytest.skip()
         prog = translate(path, jvm, sif)
         assert prog is not None
-        print(prog)
         vresult = verify(prog, path, jvm, verifier)
         self.evaluate_result(vresult, path, test_annotations, jvm, verifier)
 
@@ -186,9 +171,9 @@ class VerificationTests(AnnotatedTests):
         annotations = flatten_dict([self.extract_annotations(ann) for ann
                                     in test_annotations
                                     if ann.string.strip().startswith('#::')],
-                                   {'ExpectedOutput', 'OptionalOutput',
-                                    'Label', 'UnexpectedOutput',
-                                    'MissingOutput'})
+                                    {'ExpectedOutput', 'OptionalOutput',
+                                     'Label', 'UnexpectedOutput',
+                                     'MissingOutput'})
         expected = annotations['ExpectedOutput']
         expected_lo = [(line, id, vias) for ((line, col), (id, vias)) in
                        expected]
@@ -228,43 +213,8 @@ class VerificationTests(AnnotatedTests):
 verification_tester = VerificationTests()
 
 
-def _test_files(test_dir):
-    result = []
-    for root, dir_names, file_names in os.walk(
-            test_dir,
-            topdown=True):
-        if 'tests' in file_names:
-            # tests file lists all tests in this directory, so we read
-            # its contents and do not proceed deeper.
-            with open(join(root, 'tests')) as fp:
-                for file_name in fp:
-                    result.append(join(root, file_name.strip()))
-            dir_names.clear()
-            continue
-        if 'resources' in dir_names:
-            # Skip resources directory.
-            dir_names.remove('resources')
-        for file_name in file_names:
-            if file_name.endswith('.py'):
-                result.append(join(root, file_name))
-    result = [
-        path
-        for path in sorted(result)
-        if path not in config.test_config.ignore_tests]
-    return result
-
-
-def verification_test_files():
-    files = _test_files(test_verification_dir)
-    result = []
-    for file in files:
-        result.extend([(file, verifier) for verifier in verifiers])
-    return result
-
-
-@pytest.mark.parametrize('path,verifier', verification_test_files())
-def test_verification(path, verifier):
-    verification_tester.test_file(path, jvm, verifier, False)
+def test_verification(path, verifier, sif):
+    verification_tester.test_file(path, jvm, verifier, sif)
 
 
 class TranslationTests(AnnotatedTests):
@@ -302,8 +252,7 @@ class TranslationTests(AnnotatedTests):
             (line, id, [])
             for ((line, col), id, backend) in missing]
         try:
-            prog = translate(path, jvm)
-            print(prog)
+            translate(path, jvm, sif)
             assert False
         except InvalidProgramException as e1:
             code = 'invalid.program:' + e1.code
@@ -320,25 +269,5 @@ class TranslationTests(AnnotatedTests):
 translation_tester = TranslationTests()
 
 
-def translation_test_files():
-    return _test_files(test_translation_dir)
-
-
-@pytest.mark.parametrize('path', translation_test_files())
-def test_translation(path):
-    translation_tester.test_file(path, jvm)
-
-
-def sif_test_files():
-    files = _test_files(test_sif_dir)
-    result = []
-    for file in files:
-        result.extend([(file, verifier) for verifier in verifiers])
-    return result
-
-
-@pytest.mark.parametrize('path,verifier', sif_test_files())
-def test_sif(path, verifier):
-    verification_tester.test_file(path, jvm, verifier, True)
-
-
+def test_translation(path, sif):
+    translation_tester.test_file(path, jvm, sif)
