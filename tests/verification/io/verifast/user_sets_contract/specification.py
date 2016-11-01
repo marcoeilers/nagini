@@ -10,7 +10,6 @@ from verifast.stdio_simple import (
     stdout,
     write_char_io,
 )
-Import('../stdio_simple.py')
 
 
 @IOOperation

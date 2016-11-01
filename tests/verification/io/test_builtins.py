@@ -16,7 +16,6 @@ from py2viper_contracts.io_builtins import (
     set_var_io,
     SetVar,
 )
-Import('io_builtins')
 
 
 @IOOperation

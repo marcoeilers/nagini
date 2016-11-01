@@ -19,7 +19,6 @@ from resources.library import (
     write_int_io,
     write_int,
 )
-Import('resources/library.py')
 
 
 class WriterSuper:

@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import *
 import resources.namespace_test_2
-# Import('namespace_test_2.py', 'resources.namespace_test_2')
 
 
 class Sub(resources.namespace_test_2.Super):

@@ -12,7 +12,6 @@ from py2viper_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-Import('io_builtins')
 from py2viper_contracts.obligations import (
     MustTerminate,
 )
@@ -24,7 +23,6 @@ from verifast.stdio_simple import (
     read_char_io,
     getchar,
 )
-Import('../stdio_simple.py')
 from typing import Tuple
 
 

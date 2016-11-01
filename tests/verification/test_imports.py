@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import *
 from resources.test_import_file import test_func, test_method
-# Import('resources/test_import_file.py')
 
 @Pure
 def local_func() -> bool:
