@@ -90,6 +90,12 @@ class TestConfig(SectionConfig):
         else:
             self.verifiers = verifiers_value.strip().split()
 
+        tests_value = self._info.get('tests')
+        if not tests_value:
+            self.tests = ['functional', 'sif', 'io', 'obligations']
+        else:
+            self.tests = tests_value.strip().split()
+
 
 class FileConfig:
     """Configuration stored in the config file."""
