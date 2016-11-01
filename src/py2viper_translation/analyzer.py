@@ -13,12 +13,14 @@ from py2viper_translation.analyzer_io import IOOperationAnalyzer
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import LITERALS, OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
+    _get_target,
     GenericType,
     MethodType,
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
     PythonGlobalVar,
+    PythonIOOperation,
     PythonNode,
     PythonModule,
     PythonModuleView,
@@ -261,36 +263,12 @@ class Analyzer(ast.NodeVisitor):
         visitor(child_node)
 
     def get_target(self, node: ast.AST, container: PythonNode) -> PythonModule:
-        # TODO call the one in program nodes
-        if isinstance(node, ast.Name):
-            containers = [container]
-            if isinstance(container, PythonMethod):
-                containers.append(container.get_module())
-            containers.append(containers[-1].global_mod)
-            for ctx in containers:
-                if ctx:
-                    options = ctx.get_contents(True)
-                    if node.id in options:
-                        return options[node.id]
-            return None
-        elif isinstance(node, ast.Call):
-            return self.get_target(node.func, container)
-        elif isinstance(node, ast.Attribute):
-            ctx = self.get_target(node.value, container)
-            if isinstance(ctx, (PythonVar, PythonMethod)):
-                ctx = ctx.type
-            containers = [ctx]
-            while (isinstance(containers[-1], PythonClass) and
-                       containers[-1].superclass):
-                containers.append(containers[-1].superclass)
-            for ctx in containers:
-                if ctx:
-                    options = ctx.get_contents(False)
-                    if node.attr in options:
-                        return options[node.attr]
-            return None
+        containers = [container]
+        if isinstance(container, (PythonMethod, PythonIOOperation)):
+            containers.extend(container.get_module().get_included_modules())
         else:
-            raise UnsupportedException(node)
+            containers.extend(container.get_included_modules())
+        return _get_target(node, containers, container)
 
     def get_class(self, name: str, interface=False,
                   module=None) -> PythonClass:
