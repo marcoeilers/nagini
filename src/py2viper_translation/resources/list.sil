@@ -107,7 +107,7 @@ method Iterator___del__(self: Ref)
   requires acc(self.__container, 1 / 20)
   ensures acc(self.__container, 1 / 20)
   ensures (issubtype(typeof(self.__container), list())) ==> acc(self.__container.list_acc, 1 / 20)
-  ensures (typeof(self.__container) == dict()) ==> acc(self.__container.dict_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), dict())) ==> acc(self.__container.dict_acc, 1 / 20)
   ensures (issubtype(typeof(self.__container), set())) ==> acc(self.__container.set_acc, 1 / 20)
 {
   inhale false
