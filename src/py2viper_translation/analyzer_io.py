@@ -25,8 +25,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._parent = parent
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.get_class('Place',
-                                             module=parent.module.global_mod)  # type: nodes.PythonClass
+        self._place_class = parent.find_or_create_class('Place',
+            module=parent.module.global_module)
 
         self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
@@ -34,6 +34,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
     @property
     def _module(self) -> nodes.PythonModule:
+        # The module field of the parent Analyzer may change, so we have to
+        # look this up dynamically.
         return self._parent.module
 
     def _raise_invalid_operation(
@@ -67,9 +69,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
 
     def _check_type(self) -> None:
         """Check if operation type is ``bool``."""
-        # scope_prefix = self._current_io_operation.get_scope_prefix()
-        # func_type_old = self._types.get_func_type(scope_prefix)
-        func_type = self._parent.module.get_func_type([self._current_io_operation.name])
+        op_name = self._current_io_operation.name
+        func_type = self._parent.module.get_func_type([op_name])
         if isinstance(func_type, AnyType):
             self._raise_invalid_operation('return_type_not_bool')
         operation_type = self._parent.convert_type(func_type)
@@ -102,10 +103,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             prefix = construct_lambda_prefix(
                 lambda_.lineno, lambda_.col_offset)
             scopes.append(prefix)
-        typ, _ = self._parent.types.get_type(scopes, node.arg)
-        scopes_2 = scopes + [node.arg]
-        typ_2, _ = self._parent.module.get_type(scopes, node.arg)
-        return self._parent.convert_type(typ_2)
+        typ, _ = self._parent.module.get_type(scopes, node.arg)
+        return self._parent.convert_type(typ)
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
         """Check and set preset.
@@ -125,7 +124,6 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self._current_io_operation.set_preset(in_places)
             return []
         if not inputs or self._typeof(inputs[0]) != self._place_class:
-            # t = self._typeof(inputs[0])
             self._raise_invalid_operation('invalid_preset')
         for inp in inputs[1:]:
             if self._typeof(inp) == self._place_class:

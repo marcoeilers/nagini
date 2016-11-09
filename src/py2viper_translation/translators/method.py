@@ -227,9 +227,9 @@ class MethodTranslator(CommonTranslator):
         if func.declared_exceptions:
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')
-        # create preconditions
+        # Create preconditions
         pres = self._translate_pres(func, ctx)
-        # create postconditions
+        # Create postconditions
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
@@ -237,7 +237,7 @@ class MethodTranslator(CommonTranslator):
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
-        # create typeof preconditions
+        # Create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
         if func.type.name not in PRIMITIVES:
             res_type = self.translate_type(func.type, ctx)
@@ -247,7 +247,7 @@ class MethodTranslator(CommonTranslator):
 
         statements = func.node.body
         body_index = get_body_start_index(statements)
-        # translate body
+        # Translate body
         body = self.translate_exprs(statements[body_index:], func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
@@ -263,13 +263,13 @@ class MethodTranslator(CommonTranslator):
         error_var_ref = self.viper.LocalVar(errorvarname, self.viper.Ref,
                                             self.no_position(ctx),
                                             self.no_info(ctx))
-        # create preconditions
+        # Create preconditions
         pres = self._translate_pres(method, ctx)
-        # create postconditions
+        # Create postconditions
         posts = self._translate_posts(method, error_var_ref, ctx)
-        # create exceptional postconditions
+        # Create exceptional postconditions
         posts += self._translate_exceptional_posts(method, error_var_ref, ctx)
-        # create typeof preconditions
+        # Create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
         posts = type_pres + posts
@@ -339,7 +339,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = method
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.module.global_mod.classes['Exception'])
+                              ctx.module.global_module.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()
@@ -354,7 +354,7 @@ class MethodTranslator(CommonTranslator):
         args = self._translate_params(method, ctx)
 
         body = self._create_method_prolog(method, ctx)
-        # translate body
+        # Translate body
         if method.cls and method.method_type == MethodType.normal:
             no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
@@ -377,7 +377,7 @@ class MethodTranslator(CommonTranslator):
                     self.viper.NullLit(self.no_position(ctx),
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
-            # create local variables for parameters
+            # Create local variables for parameters
             for name, arg in method.args.items():
                 arg_var = ctx.current_function.create_variable(name,
                                                                arg.type,
@@ -432,7 +432,7 @@ class MethodTranslator(CommonTranslator):
             for stmt in block.finally_block:
                 body += self.translate_stmt(stmt, ctx)
         else:
-            # with-block
+            # With-block
             ctx_type = self.get_type(block.with_item.context_expr, ctx)
             ctx_var = block.with_var
             exit_type = ctx_type.get_method('__exit__').type
@@ -440,18 +440,23 @@ class MethodTranslator(CommonTranslator):
                                                             exit_type,
                                                             self.translator)
             #TODO: call with proper arguments
-            type_class = ctx.module.global_mod.classes['type']
-            exception_class = ctx.module.global_mod.classes['Exception']
-            object_class = ctx.module.global_mod.classes['object']
-            t_var = ctx.actual_function.create_variable('t', type_class,
-                                                        self.translator)
-            e_var = ctx.actual_function.create_variable('e', exception_class,
-                                                        self.translator)
-            tb_var = ctx.actual_function.create_variable('tb', object_class,
-                                                         self.translator)
+            type_class = ctx.module.global_module.classes['type']
+            exception_class = ctx.module.global_module.classes['Exception']
+            object_class = ctx.module.global_module.classes['object']
+            # The __exit__ method takes three arguments: type, value and
+            # traceback.
+            type_var = ctx.actual_function.create_variable('t', type_class,
+                                                           self.translator)
+            value_var = ctx.actual_function.create_variable('e',
+                                                            exception_class,
+                                                            self.translator)
+            traceback_var = ctx.actual_function.create_variable('tb',
+                                                                object_class,
+                                                                self.translator)
             exit_call = self.get_method_call(ctx_type, '__exit__',
-                                             [ctx_var.ref(), t_var.ref(),
-                                              e_var.ref(), tb_var.ref()],
+                                             [ctx_var.ref(), type_var.ref(),
+                                              value_var.ref(),
+                                              traceback_var.ref()],
                                              [ctx_type, None, None, None],
                                              [exit_res.ref()],
                                              block.with_item.context_expr, ctx)
@@ -466,24 +471,24 @@ class MethodTranslator(CommonTranslator):
         end_label = ctx.get_label_name(END_LABEL)
         goto_end = self.viper.Goto(end_label, pos, info)
         empty_stmt = self.translate_block([], pos, info)
-        # assert tries
+
         except_block = []
         return_block = []
         for current in tries:
             if not return_block and current.finally_block:
-                # propagate return value
+                # Propagate return value
                 var_next = current.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
                 next_assign = self.viper.LocalVarAssign(var_next.ref(),
                                                         finally_var.ref(),
                                                         pos, info)
-                # goto finally block
+                # Goto finally block
                 next_label = ctx.get_label_name(current.finally_name)
                 goto_next = self.viper.Goto(next_label, pos, info)
                 return_block = [next_assign, goto_next]
             for handler in current.handlers:
-                # if handler applies
+                # If handler applies,
                 # goto handler
                 err_var = block.get_error_var(self.translator)
                 if err_var.sil_name in ctx.var_aliases:
@@ -499,14 +504,14 @@ class MethodTranslator(CommonTranslator):
                                            info)
                 except_block.append(if_handler)
             if current.finally_block:
-                # propagate return value
-                # goto finally block
+                # Propagate return value
+                # Goto finally block
                 except_block += return_block
                 break
         if not return_block:
             return_block = [goto_end]
         if ctx.actual_function.declared_exceptions:
-            # assign error to error output var
+            # Assign error to error output var
             error_var = ctx.error_var.ref()
             block_error_var = block.get_error_var(self.translator)
             if block_error_var.sil_name in ctx.var_aliases:

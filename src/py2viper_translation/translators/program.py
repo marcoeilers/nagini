@@ -86,7 +86,7 @@ class ProgramTranslator(CommonTranslator):
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,
-                              ctx.module.global_mod.classes['Exception'])
+                              ctx.module.global_module.classes['Exception'])
         error_var.process(ERROR_NAME, self.translator)
         optional_error_var = error_var if method.declared_exceptions else None
 
@@ -233,7 +233,7 @@ class ProgramTranslator(CommonTranslator):
         if method.declared_exceptions:
             targets.append(error_var_ref)
 
-        # check that arg names match and default args are equal
+        # Check that arg names match and default args are equal
         default_checks = []
         for (name1, arg1), (name2, arg2) in zip(method.args.items(),
                                                 method.overrides.args.items()):
@@ -338,7 +338,7 @@ class ProgramTranslator(CommonTranslator):
                 converted_methods.append(converted_method)
             methods += converted_methods
 
-        # predefined fields
+        # Predefined fields
         fields.append(self.viper.Field('__container', self.viper.Ref,
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
@@ -365,7 +365,7 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
 
-        # predefined obligation stuff
+        # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)
         fields.extend(obl_fields)
@@ -390,7 +390,7 @@ class ProgramTranslator(CommonTranslator):
                     functions.append(self.create_global_var_function(field,
                                                                      ctx))
 
-            # translate default args
+            # Translate default args
             containers = [module] + list(module.classes.values())
             for container in containers:
                 for function in container.functions.values():
@@ -440,12 +440,17 @@ class ProgramTranslator(CommonTranslator):
                               cls.superclass.has_classmethod)) and
                             method.overrides):
                         methods.append(self.create_override_check(method, ctx))
+                for method_name in cls.static_methods:
+                    method = cls.static_methods[method_name]
+                    methods.append(self.translate_method(method, ctx))
+                    if method.overrides:
+                        methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.get_all_methods():
                     method = cls.get_method(method_name)
                     if (method.cls and method.cls != cls and
                             method_name != '__init__' and
                             method.method_type == MethodType.normal):
-                        # inherited
+                        # Inherited
                         methods.append(self.create_inherit_check(method, cls,
                                                                  ctx))
                 for field_name in cls.static_fields:
@@ -463,7 +468,6 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred].append(pred)
                     else:
                         predicate_families[cpred] = [pred]
-                # methods.append(self.create_constructor(cls))
                 ctx.current_class = old_class
 
         for root in predicate_families:

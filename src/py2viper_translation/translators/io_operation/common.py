@@ -41,6 +41,7 @@ class IOOperationCommonTranslator(CommonTranslator):
 
         operation_name = cast(ast.Name, node.func).id
         operation = self.get_target(node, ctx)
+        assert isinstance(operation, PythonIOOperation)
 
         if sil_args is None:
             py_args = node.args[:len(operation.get_parameters())]

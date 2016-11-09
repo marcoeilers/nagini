@@ -10,7 +10,6 @@ from py2viper_contracts.contracts import (
 
 def test1(a: List[int]) -> None:
     Requires(Acc(list_pred(a)))
-    #:: UnexpectedOutput(postcondition.violated:insufficient.permission, /py2viper/issue/59/)
     Ensures(Acc(list_pred(a)))
     for i in a:
         pass
@@ -36,7 +35,6 @@ def test4(a: List[int], b: List[int]) -> None:
     Requires(Acc(list_pred(a)))
     Requires(Acc(list_pred(b)))
     for i in a:
-        #:: UnexpectedOutput(invariant.not.preserved:insufficient.permission, /py2viper/issue/59/)
         Invariant(Acc(list_pred(b)))
         for j in b:
             pass

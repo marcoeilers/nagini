@@ -166,8 +166,8 @@ class StatementTranslator(CommonTranslator):
         invariant.append(previous_list_acc_pred)
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
-        object_class = ctx.module.global_mod.classes[OBJECT_TYPE]
-        list_class = ctx.module.global_mod.classes[LIST_TYPE]
+        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
         previous_len = self.get_function_call(list_class, '__len__',
                                               [iter_previous_acc],
                                               [object_class], None, ctx)
@@ -224,7 +224,7 @@ class StatementTranslator(CommonTranslator):
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
                       node: ast.AST, ctx: Context) -> Tuple[PythonVar,
                                                             List[Stmt]]:
-        iter_class = ctx.module.global_mod.classes['Iterator']
+        iter_class = ctx.module.global_module.classes['Iterator']
         iter_var = ctx.actual_function.create_variable('iter', iter_class,
                                                        self.translator)
         assert not node in ctx.loop_iterators
@@ -241,17 +241,16 @@ class StatementTranslator(CommonTranslator):
                        ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
 
         if target_var.type.name in PRIMITIVES:
-            boxed_target_type = ctx.module.global_mod.classes['__boxed_' +
-                                                               target_var.type.name]
+            class_name = '__boxed_' + target_var.type.name
+            boxed_target_type = ctx.module.global_module.classes[class_name]
         else:
             boxed_target_type = target_var.type
         boxed_target_var = ctx.actual_function.create_variable('target',
-                                                               boxed_target_type,
-                                                               self.translator)
-        exc_class = ctx.module.global_mod.classes['Exception']
+            boxed_target_type, self.translator)
+        exc_class = ctx.module.global_module.classes['Exception']
         err_var = ctx.actual_function.create_variable('iter_err', exc_class,
                                                       self.translator)
-        iter_class = ctx.module.global_mod.classes['Iterator']
+        iter_class = ctx.module.global_module.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         targets = [boxed_target_var.ref(node.target, ctx), err_var.ref()]
@@ -273,7 +272,7 @@ class StatementTranslator(CommonTranslator):
 
     def _get_iterator_delete(self, iter_var: PythonVar, node: ast.For,
                              ctx: Context) -> List[Stmt]:
-        iter_class = ctx.module.global_mod.classes['Iterator']
+        iter_class = ctx.module.global_module.classes['Iterator']
         args = [iter_var.ref()]
         arg_types = [iter_class]
         iter_del = self.get_method_call(iter_class, '__del__', args, arg_types,
@@ -334,11 +333,12 @@ class StatementTranslator(CommonTranslator):
             code_var = ctx.var_aliases[code_var.sil_name]
         code_var = code_var.ref()
         zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
-        # get context mgr
-        ctx_stmt, ctx_mgr = self.translate_expr(try_block.with_item.context_expr, ctx)
+        # Get context mgr
+        ctx_stmt, ctx_mgr = self.translate_expr(try_block.with_item.context_expr,
+                                                ctx)
         ctx_type = self.get_type(try_block.with_item.context_expr, ctx)
         enter_method = ctx_type.get_method('__enter__')
-        # create temp var
+        # Create temp var
         enter_res_type = enter_method.type
         with_ctx = ctx.current_function.create_variable('with_ctx',
                                                          ctx_type,
@@ -350,7 +350,7 @@ class StatementTranslator(CommonTranslator):
         enter_res = ctx.current_function.create_variable('enter_res',
                                                          enter_res_type,
                                                          self.translator)
-        # call enter
+        # Call enter
         enter_call = self.get_method_call(ctx_type, '__enter__',
                                           [with_ctx.ref()],
                                           [ctx_type],
@@ -518,7 +518,7 @@ class StatementTranslator(CommonTranslator):
             if (rhs_type.name != TUPLE_TYPE or
                     len(rhs_type.type_args) != len(node.targets[0].elts)):
                 raise InvalidProgramException(node, 'invalid.assign')
-            # translate rhs
+            # Translate rhs
             for index in range(len(target.elts)):
                 stmt += self.assign_to(target.elts[index], rhs,
                                        index, rhs_type,

@@ -8,7 +8,7 @@ from typing import cast, List
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.io_context import IOOpenContext
 from py2viper_translation.lib.program_nodes import (
-    _get_target,
+    get_target,
     PythonIOOperation,
     PythonVar,
 )
@@ -34,7 +34,7 @@ def _get_opened_operation(
             isinstance(node.args[0].func, ast.Name)):
         containers = [ctx.module]
         containers.extend(ctx.module.get_included_modules())
-        target = _get_target(node.args[0], containers, None)
+        target = get_target(node.args[0], containers, None)
         if isinstance(target, PythonIOOperation):
             return target
     raise_invalid_operation_use('open_non_io_operation', node)
