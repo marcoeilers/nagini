@@ -121,3 +121,13 @@ BOOL_TYPE = 'bool'
 OBJECT_TYPE = 'object'
 
 PRIMITIVES = [INT_TYPE, BOOL_TYPE]
+
+IGNORED_IMPORTS = {'abc',
+                   'builtins',
+                   'py2viper_contracts',
+                   'py2viper_contracts.contracts',
+                   'py2viper_contracts.io',
+                   'py2viper_contracts.obligations',
+                   'threading',
+                   'typing',
+                   }

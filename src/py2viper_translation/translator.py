@@ -85,8 +85,8 @@ class Translator:
         return self.prog_translator.translate_program(modules, sil_progs, ctx)
 
     def translate_pythonvar_decl(self, var: PythonVar,
-                                 module: PythonModule) -> 'silver.ast.LocalVarDecl':
-        # we need a context object here
+            module: PythonModule) -> 'silver.ast.LocalVarDecl':
+        # We need a context object here
         ctx = Context()
         ctx.module = module
         return self.expr_translator.translate_pythonvar_decl(var, ctx)
@@ -94,7 +94,7 @@ class Translator:
     def translate_pythonvar_ref(self, var: PythonVar,
                                 module: PythonModule,
                                 node: ast.AST, ctx: Context) -> Expr:
-        # we need a context object here
+        # We need a context object here
         if not ctx:
             ctx = Context()
             ctx.module = module

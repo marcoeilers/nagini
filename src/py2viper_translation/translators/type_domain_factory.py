@@ -57,8 +57,10 @@ class TypeDomainFactory:
         """
         Creates the type domain function and subtype axiom for this class
         """
-
-        supertype = OBJECT_TYPE if not cls.superclass else cls.superclass.sil_name
+        if not cls.superclass:
+            supertype = OBJECT_TYPE
+        else:
+            supertype = cls.superclass.sil_name
         position = self.to_position(cls.node, ctx)
         info = self.no_info(ctx)
         type_func = self.create_type_function(cls.sil_name, position, info, ctx)
@@ -212,8 +214,8 @@ class TypeDomainFactory:
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
-    def create_subtype_exclusion_axiom(self,
-                                       ctx: Context) -> 'silver.ast.DomainAxiom':
+    def create_subtype_exclusion_axiom(
+            self, ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that states that two types that directly extend
         another type cannot be subtypes of each other:
@@ -377,14 +379,14 @@ class TypeDomainFactory:
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
-    def create_none_type_subtype_axiom(self,
-                                       ctx: Context) -> 'silver.ast.DomainAxiom':
+    def create_none_type_subtype_axiom(
+            self, ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that states that no type is a subtype of NoneType:
 
-        forall sub: PyType ::
-        { issubtype(sub, NoneType()) }
-        !issubtype(sub, NoneType())
+        forall sub: PyType, r: Ref ::
+        { issubtype(typeof(r), sub) }
+        issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
         """
         arg_sub = self.viper.LocalVarDecl('sub', self.type_type(),
                                           self.no_position(ctx),

@@ -83,8 +83,8 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('dict',
-            ctx.module.global_mod.classes[DICT_TYPE], self.translator)
-        dict_class = ctx.module.global_mod.classes[DICT_TYPE]
+            ctx.module.global_module.classes[DICT_TYPE], self.translator)
+        dict_class = ctx.module.global_module.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
@@ -102,7 +102,7 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
-        set_class = ctx.module.global_mod.classes[SET_TYPE]
+        set_class = ctx.module.global_module.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable(SET_TYPE,
             set_class, self.translator)
         constr_call = self.get_method_call(set_class, '__init__', [], [],
@@ -119,7 +119,7 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
-        list_class = ctx.module.global_mod.classes[LIST_TYPE]
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
         targets = [res_var.ref()]
@@ -145,7 +145,7 @@ class ExpressionTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
-        str_type = ctx.module.global_mod.classes[STRING_TYPE]
+        str_type = ctx.module.global_module.classes[STRING_TYPE]
         func_name = '__create__'
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
@@ -160,7 +160,7 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
-        tuple_class = ctx.module.global_mod.classes[TUPLE_TYPE]
+        tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         func_name = '__create' + str(len(node.elts)) + '__'
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
@@ -266,7 +266,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         for try_ in tries:
             if try_.finally_block:
-                # propagate return value
+                # Propagate return value
                 var_next = try_.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
@@ -276,7 +276,7 @@ class ExpressionTranslator(CommonTranslator):
                                                         number_two,
                                                         self.no_position(ctx),
                                                         self.no_info(ctx))
-                # goto finally block
+                # Goto finally block
                 label_name = ctx.get_label_name(try_.finally_name)
                 goto_next = self.viper.Goto(label_name,
                                             self.no_position(ctx),
@@ -296,7 +296,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         stmt, res = self.translate_expr(node, ctx, expression)
         type = self.get_type(node, ctx)
-        if type is ctx.module.global_mod.classes[BOOL_TYPE]:
+        if type is ctx.module.global_module.classes[BOOL_TYPE]:
             return stmt, res
         args = [res]
         arg_type = self.get_type(node, ctx)
@@ -320,8 +320,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             if isinstance(target, PythonClass):
                 return [], self.type_factory.translate_type_literal(target,
-                                                                    node,
-                                                                    ctx)
+                    node, ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:
@@ -362,7 +361,7 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
-                # global var?
+                # Global var?
                 pos = self.to_position(node, ctx)
                 info = self.no_info(ctx)
                 var_type = self.translate_type(target.type, ctx)

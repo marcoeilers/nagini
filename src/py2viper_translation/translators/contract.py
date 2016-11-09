@@ -75,14 +75,14 @@ class ContractTranslator(CommonTranslator):
         """
         Returns the permission for a Acc() contract function.
         """
-        # only one argument means implicit full permission
+        # Only one argument means implicit full permission
         if len(node.args) == 1:
             perm = self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))
         elif len(node.args) == 2:
             perm = self.translate_perm(node.args[1], ctx)
         else:
-            # more than two arguments are invalid
+            # More than two arguments are invalid
             raise InvalidProgramException(node, 'invalid.contract.call')
 
         return perm
@@ -122,14 +122,14 @@ class ContractTranslator(CommonTranslator):
         """
         assert isinstance(node.args[0], ast.Call)
         call = node.args[0]
-        # the predicate inside is a function call in python.
+        # The predicate inside is a function call in python.
         args = []
         arg_stmts = []
         for arg in call.args:
             arg_stmt, arg_expr = self.translate_expr(arg, ctx)
             arg_stmts = arg_stmts + arg_stmt
             args.append(arg_expr)
-        # get the predicate inside the Acc()
+        # Get the predicate inside the Acc()
         if isinstance(call.func, ast.Name):
             if call.func.id in BUILTIN_PREDICATES:
                 return arg_stmts, self.translate_builtin_predicate(call, perm,
@@ -150,7 +150,7 @@ class ContractTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
         pred_name = pred.sil_name
-        # if the predicate is part of a family, find the correct version.
+        # If the predicate is part of a family, find the correct version.
         if pred.cls:
             family_root = pred.cls
             while (family_root.superclass and
@@ -169,7 +169,7 @@ class ContractTranslator(CommonTranslator):
         pred = self.viper.FieldAccessPredicate(fieldacc, perm,
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
-        # add field information
+        # Add field information
         field_type = self.get_type(node.args[0], ctx)
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(fieldacc, field_type,
@@ -229,7 +229,7 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
         if self._is_family_fold(node):
-            # predicate called on receiver, so it belongs to a family
+            # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
                 return [], None
         if pred_stmt:
@@ -272,7 +272,7 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx)
         if self._is_family_fold(node):
-            # predicate called on receiver, so it belongs to a family
+            # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
                 return [], None
         if pred_stmt:
@@ -394,14 +394,19 @@ class ContractTranslator(CommonTranslator):
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
-                                         self.no_info(ctx))
         if triggers:
-            # add lhs of the implication, which the user cannot write directly
+            # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
-            # if we always do this, we apparently deactivate the automatically
+            # If we always do this, we apparently deactivate the automatically
             # generated triggers and things are actually worse.
-            triggers = [lhs_trigger] + triggers
+            try:
+                # Depending on the collection expression, this doesn't always
+                # work (malformed trigger); in that case, we just don't do it.
+                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                                                 self.no_info(ctx))
+                triggers = [lhs_trigger] + triggers
+            except Exception:
+                pass
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))

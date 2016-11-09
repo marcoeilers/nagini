@@ -57,7 +57,8 @@ def load_sil_files(jvm: JVM):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     native_sil = [os.path.join(resources_path, f) for f in sil_files]
-    sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path in native_sil])
+    sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path
+                         in native_sil])
 
 
 def translate(path: str, jvm: JVM, sif: bool = False):
@@ -84,13 +85,32 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     analyzer = Analyzer(jvm, viperast, types, path, node_factory)
     main_module = analyzer.module
     for si in sil_interface:
-        analyzer.add_interface(json.loads(si))
+        analyzer.add_native_silver_builtins(json.loads(si))
 
-    mod_index = 0
-    while mod_index < len(analyzer.module_paths):
-        module = analyzer.module_paths[mod_index]
+    collect_modules(analyzer, path)
+    if sif:
+        translator = SIFTranslator(jvm, path, types, viperast)
+    else:
+        translator = Translator(jvm, path, types, viperast)
+    analyzer.process(translator)
+    if not sil_programs:
+        load_sil_files(jvm)
+    modules = [main_module.global_module] + list(analyzer.modules.values())
+    prog = translator.translate_program(modules, sil_programs)
+    return prog
+
+
+def collect_modules(analyzer: Analyzer, path: str) -> None:
+    """
+    Starting from the main module, finds all imports and sets up all modules
+    for them.
+    """
+    main_module = analyzer.module
+    module_index = 0
+    while module_index < len(analyzer.module_paths):
+        module = analyzer.module_paths[module_index]
         analyzer.collect_imports(module)
-        mod_index += 1
+        module_index += 1
 
     for module in analyzer.module_paths:
         if module.startswith('mod$'):
@@ -103,16 +123,6 @@ def translate(path: str, jvm: JVM, sif: bool = False):
             analyzer.module = main_module
             analyzer.contract_only = False
             analyzer.visit_module(module)
-    if sif:
-        translator = SIFTranslator(jvm, path, types, viperast)
-    else:
-        translator = Translator(jvm, path, types, viperast)
-    analyzer.process(translator)
-    if not sil_programs:
-        load_sil_files(jvm)
-    modules = [main_module.global_mod] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs)
-    return prog
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
@@ -129,7 +139,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
         return vresult
     except JavaException as je:
         print(je.stacktrace())
-        traceback.printexc()
+        traceback.print_exc()
 
 
 def _parse_log_level(log_level_string: str) -> int:
@@ -216,8 +226,7 @@ def main() -> None:
 
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
-    code = translate_and_verify(args.python_file, jvm, args)
-    sys.exit(code)
+    translate_and_verify(args.python_file, jvm, args)
 
 
 def translate_and_verify(python_file, jvm, args):
@@ -250,16 +259,12 @@ def translate_and_verify(python_file, jvm, args):
             vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
             print("Verification completed.")
-        if args.ide_mode:
-            print("Done.")
-        print(vresult.string(args.ide_mode))
+        print(vresult.to_string(args.ide_mode))
         if vresult:
-            return 0
+            sys.exit(0)
         else:
-            return 1
+            sys.exit(1)
     except (TypeException, InvalidProgramException) as e:
-        if args.ide_mode:
-            print("Done.")
         print("Translation failed")
         if isinstance(e, InvalidProgramException):
             print(python_file + ':' + str(e.node.lineno) + ': error: ' + e.code)
@@ -269,7 +274,7 @@ def translate_and_verify(python_file, jvm, args):
         if isinstance(e, TypeException):
             for msg in e.messages:
                 print(msg)
-        return 1
+        sys.exit(2)
     except JavaException as e:
         print(e.stacktrace())
         raise e

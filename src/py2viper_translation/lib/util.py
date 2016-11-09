@@ -59,7 +59,7 @@ class UnsupportedException(Exception):
     def __init__(self, astElement: ast.AST, desc=""):
         ex_str = str(astElement)
         if desc:
-            ex_str += ": " + desc
+            ex_str += ': ' + desc
         super().__init__(ex_str)
 
 
@@ -273,7 +273,7 @@ def pprint(node) -> str:
     if isinstance(node, str):
         return node
     if isinstance(node, ast.FunctionDef):
-        # mainly for debugging, whenever this happens it's almost certainly
+        # Mainly for debugging, whenever this happens it's almost certainly
         # wrong.
         raise ValueError(node)
     res = astunparse.unparse(node)

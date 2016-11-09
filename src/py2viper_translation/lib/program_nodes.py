@@ -16,6 +16,10 @@ from py2viper_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
+from py2viper_translation.lib.program_node_util import (
+    CombinedDict,
+    ModuleDictView,
+)
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
@@ -69,8 +73,16 @@ class PythonModule(PythonScope):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
-                 global_mod: 'PythonModule',
+                 global_module: 'PythonModule',
                  sil_names: List[str] = None) -> None:
+        """
+        Represents a module, i.e. either a directory that only contains other
+        modules or an actual file that may contain classes, methods etc.
+
+        :param type_prefix: The prefix identifying this module in TypeInfo.
+        :param global_module: The module containing globally available elements.
+        :param sil_names: List of all used Silver names, shared between modules.
+        """
         if sil_names is None:
             sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
         super().__init__(sil_names, None)
@@ -81,7 +93,7 @@ class PythonModule(PythonScope):
         self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
         self.namespaces = OrderedDict()
-        self.global_mod = global_mod
+        self.global_module = global_module
         self.type_prefix = type_prefix
         self.from_imports = []
         self.node_factory = node_factory
@@ -105,15 +117,22 @@ class PythonModule(PythonScope):
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
-        for cont in [self] + self.from_imports + [self.global_mod]:
-            if name in cont.functions:
-                return cont.functions[name]
-            elif name in cont.methods:
-                return cont.methods[name]
+        for module in [self] + self.from_imports + [self.global_module]:
+            if name in module.functions:
+                return module.functions[name]
+            elif name in module.methods:
+                return module.methods[name]
 
-    def get_type(self, prefix: List[str], name: str):
+    def get_type(self, prefixes: List[str],
+                 name: str) -> Tuple[str, Dict[Tuple[int, int], str]]:
+        """
+        Returns the main type and the alternative types of the element
+        identified by this name found under this prefix in the current module.
+        E.g., the type of local variable 'a' from method 'm' in class 'C'
+        will be returned for the input (['C', 'm'], 'a').
+        """
         actual_prefix = [self.type_prefix]
-        actual_prefix.extend(prefix)
+        actual_prefix.extend(prefixes)
         return self.types.get_type(actual_prefix, name)
 
     def get_func_type(self, prefix: List[str]):
@@ -121,15 +140,20 @@ class PythonModule(PythonScope):
         actual_prefix.extend(prefix)
         return self.types.get_func_type(actual_prefix)
 
-    def get_included_modules(self, include_global: bool = True) \
-            -> List['PythonModule']:
+    def get_included_modules(
+            self, include_global: bool = True) -> List['PythonModule']:
         result = [self]
         for p in self.from_imports:
             result.extend(p.get_included_modules(include_global=False))
-        result.append(self.global_mod)
+        result.append(self.global_module)
         return result
 
     def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
         dicts = [self.classes,  self.functions, self.global_vars, self.methods,
                  self.predicates, self.io_operations, self.namespaces]
         return CombinedDict([], dicts)
@@ -231,6 +255,8 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         """
         if name in self.methods:
             return self.methods[name]
+        elif name in self.static_methods:
+            return self.static_methods[name]
         elif self.superclass is not None:
             return self.superclass.get_method(name)
         else:
@@ -332,9 +358,16 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         return self.superclass.issubtype(cls)
 
     def get_contents(self, only_top: bool) -> Dict:
-        dicts = [self.functions,  self.methods, self.predicates]
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        dicts = [self.functions,  self.methods, self.static_methods,
+                 self.predicates]
         if not only_top:
             dicts.append(self.fields)
+            dicts.append(self.static_fields)
         return CombinedDict([], dicts)
 
 
@@ -403,8 +436,8 @@ class GenericType(PythonType):
             return False
         if self.cls != other.cls or len(self.type_args) != len(other.type_args):
             return False
-        for a0, a1 in zip(self.type_args, other.type_args):
-            if a0 != a1:
+        for my_arg, other_arg in zip(self.type_args, other.type_args):
+            if my_arg != other_arg:
                 return False
         return True
 
@@ -614,6 +647,11 @@ class PythonMethod(PythonNode, PythonScope):
             return []
 
     def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
 
@@ -665,7 +703,7 @@ class PythonIOOperation(PythonNode, PythonScope):
         """
         if self._body is not None:
             def find_op(node: ast.AST, containers: List, container):
-                result = _get_target(node, containers, container)
+                result = get_target(node, containers, container)
                 if isinstance(result, PythonIOOperation):
                     return result
                 return None
@@ -823,6 +861,11 @@ class PythonIOOperation(PythonNode, PythonScope):
         return None
 
     def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
         return {}
 
 
@@ -890,7 +933,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_module().global_mod.classes[INT_TYPE]
+        int_type = self.method.get_module().global_module.classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -906,7 +949,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_module().global_mod.classes['Exception']
+        exc_type = self.method.get_module().global_module.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
@@ -1151,6 +1194,27 @@ class PythonField(PythonNode):
         return self.name.startswith('__') and not self.name.endswith('__')
 
 
+class PythonModuleView:
+    """
+    A view of a PythonModule that contains only the imported parts of an
+    actual PythonModule, possibly with some renamings.
+    """
+    def __init__(self, module: PythonModule, names: List[Tuple[str, str]]):
+        self.module = PythonModule(module.types, module.node_factory,
+                                   module.type_prefix,
+                                   module.global_module, module.sil_names)
+        for field in ['functions', 'methods', 'static_methods', 'namespaces',
+                      'predicates', 'classes', 'global_vars', 'io_operations']:
+            lazy_dict = ModuleDictView(names, module, field)
+            setattr(self.module, field, lazy_dict)
+
+    def get_contents(self, only_top: bool):
+        return self.module.get_contents(only_top)
+
+    def get_included_modules(self, include_global: bool=True):
+        return self.module.get_included_modules(include_global)
+
+
 class ProgramNodeFactory:
     """
     Factory to create Python ProgramNodes.
@@ -1205,90 +1269,9 @@ class ProgramNodeFactory:
                            superclass, interface)
 
 
-class CombinedDict:
-    """
-    A combined view on the given list of dicts, that adds the possibility to
-    filter and rename some keys. E.g. if names contains ('k1', 'k2') then
-    getting 'k1' will try to retrieve the value for key 'k2' from (one of) the
-    given dicts. Unless 'names' is empty, keys that do not occur in 'names'
-    will be reported as not contained by this view.
-    """
-    def __init__(self, names: List[Tuple[str, str]], dicts: List[Dict]):
-        self.dicts = dicts
-        self.names = {}
-        for name, as_name in names:
-            new_name = as_name if as_name else name
-            self.names[new_name] = name
-
-    def __getitem__(self, item):
-        key = item
-        if self.names:
-            if not key in self.names:
-                raise KeyError(item)
-            key = self.names[key]
-        for d in self.dicts:
-            if key in d:
-                return d[key]
-        raise KeyError(item)
-
-    def __contains__(self, item):
-        key = item
-        if self.names:
-            if not key in self.names:
-                return False
-            key = self.names[key]
-        for d in self.dicts:
-            if key in d:
-                return True
-        return False
-
-
-class ModuleDictView(CombinedDict):
-    """
-    A view of the given aspect (e.g. 'functions') of the given module with the
-    given renamings.
-    """
-    def __init__(self, names: List[Tuple[str, str]], module: PythonModule,
-                 field: str):
-        self.module = module
-        self.field = field
-        self.names = {}
-        for name, as_name in names:
-            new_name = as_name if as_name else name
-            self.names[new_name] = name
-        self._modules = None
-        self._dicts = None
-
-    @property
-    def modules(self):
-        if not self._modules:
-            result = self.module.get_included_modules(include_global=False)
-            self._modules = result
-        return self._modules
-
-    @property
-    def dicts(self):
-        if not self._dicts:
-            self._dicts = [getattr(m, self.field) for m in self.modules]
-        return self._dicts
-
-
-class PythonModuleView(PythonModule):
-    """
-    A view of a PythonModule that contains only the imported parts of an
-    actual PythonModule, possibly with some renamings.
-    """
-    def __init__(self, module: PythonModule, names: List[Tuple[str, str]]):
-        super().__init__(module.types, module.node_factory, module.type_prefix,
-                         module.global_mod, module.sil_names)
-        for field in ['functions', 'methods', 'namespaces', 'predicates',
-                      'classes', 'global_vars', 'io_operations']:
-            lazy_dict = ModuleDictView(names, module, field)
-            setattr(self, field, lazy_dict)
-
-
-def _get_target(node: ast.AST, containers: List[Union[PythonNode, 'Context']],
-                container: PythonNode) -> PythonNode:
+def get_target(node: ast.AST,
+               containers: List[Union[PythonNode, 'Context']],
+               container: PythonNode) -> PythonNode:
     """
     Finds the PythonNode that the given 'node' refers to, e.g. a PythonClass or
     a PythonVar, if the immediate container (e.g. a PythonMethod) of the node
@@ -1296,48 +1279,68 @@ def _get_target(node: ast.AST, containers: List[Union[PythonNode, 'Context']],
     PythonMethods, the Context, PythonModules, etc).
     """
     if isinstance(node, ast.Name):
-        for cont in containers:
-            if cont:
-                options = cont.get_contents(True)
+        # Just look for something with this name in the given containers
+        for lhs in containers:
+            if lhs:
+                # Since this is a direct reference, only top level elements
+                # can be relevant.
+                options = lhs.get_contents(only_top=True)
                 if node.id in options:
                     return options[node.id]
         return None
     elif isinstance(node, ast.Call):
+        # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
         if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
+            # In this case the immediate container must be a method, and we
+            # return its result type
             return container.type
         elif (container and func_name == 'super' and
                 isinstance(container, PythonMethod)):
+            # Return the type of the current method's superclass
             return container.cls.superclass
-        return _get_target(node.func, containers, container)
+        return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
-        cont = _get_target(node.value, containers, container)
-        if (isinstance(cont, PythonMethod) or
-                isinstance(cont, PythonField)):
-            cont = cont.type
-        elif isinstance(cont, PythonVarBase):
+        # Find the type of the LHS, so that we can look through its members.
+        lhs = get_target(node.value, containers, container)
+        if (isinstance(lhs, PythonMethod) or
+                isinstance(lhs, PythonField)):
+            # For methods, get the return type, for fields the field type
+            lhs = lhs.type
+        elif isinstance(lhs, PythonVarBase):
+            # For variables, the type of the variable
             col = node.col_offset if hasattr(node, 'col_offset') else None
             key = (node.lineno, col)
-            if key in cont.alt_types:
-                cont = cont.alt_types[key]
+            if key in lhs.alt_types:
+                lhs = lhs.alt_types[key]
             else:
-                cont = cont.type
-        if isinstance(cont, GenericType) and cont.name == 'type':
-            cont = cont.type_args[0]
-        if isinstance(cont, GenericType):
-            cont = cont.cls
+                lhs = lhs.type
+        if isinstance(lhs, GenericType) and lhs.name == 'type':
+            # For direct references to type objects, we want to lookup things
+            # defined in the class. So instead of type[C], we want to look in
+            # class C directly here.
+            lhs = lhs.type_args[0]
+        if isinstance(lhs, GenericType):
+            # Use the class, since we want to look for members.
+            lhs = lhs.cls
+        # Now collect all containers we have to look through
         containers = []
-        if isinstance(cont, PythonModule):
-            containers.extend(cont.get_included_modules(include_global=False))
+        if isinstance(lhs, PythonModule):
+            # We have to look through all included modules as well, but not
+            # through the global one, since it makes no sense to refer to
+            # global stuff by looking in a different module
+            containers.extend(lhs.get_included_modules(include_global=False))
         else:
-            containers.append(cont)
+            containers.append(lhs)
         while (isinstance(containers[-1], PythonClass) and
-               containers[-1].superclass):
+                containers[-1].superclass):
+            # If we're looking in a class, add all superclasses as well.
             containers.append(containers[-1].superclass)
-        for cont in containers:
-            if cont:
-                options = cont.get_contents(False)
+        for lhs in containers:
+            if lhs:
+                # Look in all contents, including non-top-level
+                options = lhs.get_contents(only_top=False)
                 if node.attr in options:
                     return options[node.attr]
         return None

@@ -145,4 +145,9 @@ class Context:
             del self.var_aliases[name]
 
     def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
         return self.var_aliases

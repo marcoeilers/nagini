@@ -195,7 +195,7 @@ class VerificationTests(AnnotatedTests):
         if vresult:
             assert not expected
         else:
-            # make sure we produce an error string
+            # Make sure we produce an error string
             print(vresult)
             missing_info = [error for error in vresult.errors if
                             not isinstance(error.pos(),
@@ -227,7 +227,7 @@ class TranslationTests(AnnotatedTests):
         return (int(parts[1 + offset]),
                 'type.error:' + reason, [])
 
-    def test_file(self, path: str, jvm):
+    def test_file(self, path: str, jvm, sif):
         test_annotations = self.get_test_annotations(path)
         if any(self._is_ignore_annotation(tk) for tk in test_annotations):
             pytest.skip()

@@ -5,15 +5,15 @@ from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
-    _get_target,
+    get_target,
     GenericType,
     PythonClass,
     PythonExceptionHandler,
     PythonField,
     PythonIOOperation,
     PythonMethod,
-    PythonNode,
     PythonModule,
+    PythonNode,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -115,7 +115,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             formal_args.append(param.decl)
             if (type and type.name in PRIMITIVES and
                     param.type.name not in PRIMITIVES):
-                # have to box
+                # Have to box
                 actual_arg = self.box_primitive(arg, type, None, ctx)
             else:
                 actual_arg = arg
@@ -132,7 +132,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             node_type = None
         if (node_type and node_type in PRIMITIVES and
                 func.type.name not in PRIMITIVES):
-            # have to unbox
+            # Have to unbox
             call = self.unbox_primitive(call, node_type, node, ctx)
         return call
 
@@ -157,7 +157,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         for arg, param, type in zip(args, func.args.values(), arg_types):
             if (type and type.name in PRIMITIVES and
                     param.type.name not in PRIMITIVES):
-                # have to box
+                # Have to box
                 actual_arg = self.box_primitive(arg, type, None, ctx)
             else:
                 actual_arg = arg
@@ -186,7 +186,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',
-                ctx.module.global_mod.classes['Exception'], self.translator)
+                ctx.module.global_module.classes['Exception'], self.translator)
             return new_var.ref()
 
     def var_type_check(self, name: str, type: PythonType,
@@ -260,8 +260,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         arg_types = [None]
         name = '__unbox__'
         call = self.get_function_call(
-            ctx.module.global_mod.classes['__boxed_' + type.name], name, args,
-            arg_types, node, ctx)
+            ctx.module.global_module.classes['__boxed_' + type.name], name,
+            args, arg_types, node, ctx)
         return call
 
     def _get_string_value(self, string: str) -> int:
@@ -276,15 +276,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def is_valid_super_call(self, node: ast.Call, container) -> bool:
         """
         Checks if a super() call is valid:
-        It miust either have no arguments, or otherwise the
+        It must either have no arguments, or otherwise the
         first arg must be a class, the second a reference to self.
         """
         if not node.args:
             return True
         elif len(node.args) == 2:
-            target = _get_target(node.args[0],
-                                 container.get_module().get_included_modules(),
-                                 container)
+            target = get_target(node.args[0],
+                                container.get_module().get_included_modules(),
+                                container)
             return (isinstance(target, PythonClass) and
                     isinstance(node.args[1], ast.Name) and
                     (node.args[1].id == next(iter(container.args))))
@@ -298,6 +298,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             containers.append(container)
             containers.extend(container.get_module().get_included_modules())
         else:
-            # assume module
+            # Assume module
             containers.extend(container.get_included_modules())
-        return _get_target(node, containers, container)
+        return get_target(node, containers, container)

@@ -5,7 +5,7 @@ import sys
 
 from mypy.build import BuildSource
 from py2viper_translation.lib import config
-from py2viper_translation.lib.constants import LITERALS
+from py2viper_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
     InvalidProgramException,
@@ -126,7 +126,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
-                # type change after isinstance
+                # Type change after isinstance
                 if key not in self.alt_types:
                     self.alt_types[key] = {}
                 self.alt_types[key][(line, col)] = type
@@ -176,7 +176,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             raise TypeException([msg])
 
     def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
-        # weird things seem to happen with is-comparisons, so we ignore those.
+        # Weird things seem to happen with is-comparisons, so we ignore those.
         if 'is' not in o.operators and 'is not' not in o.operators:
             super().visit_comparison_expr(o)
 
@@ -213,19 +213,12 @@ class TypeInfo:
             if res.errors:
                 report_errors(res.errors)
             for name, file in res.files.items():
-                if name in {'builtins', 'py2viper_contracts',
-                            'py2viper_contracts.contracts',
-                            'py2viper_contracts.io',
-                            'py2viper_contracts.obligations',
-                            'typing', 'abc',
-                            'threading'}:
+                if name in IGNORED_IMPORTS:
                     continue
                 self.files[name] = file.path
                 visitor = TypeVisitor(res.types, name,
                                       file.ignored_lines)
                 visitor.prefix = [name]
-                # for df in res.files['__main__'].defs:
-                # print(df)
                 file.accept(visitor)
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
