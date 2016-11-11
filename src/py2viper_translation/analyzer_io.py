@@ -32,12 +32,6 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_node = None           # type: ast.FunctionDef
         self._in_property = False
 
-    @property
-    def _module(self) -> nodes.PythonModule:
-        # The module field of the parent Analyzer may change, so we have to
-        # look this up dynamically.
-        return self._parent.module
-
     def _raise_invalid_operation(
             self,
             error_type: str,
@@ -61,10 +55,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         operation = self._node_factory.create_python_io_operation(
             name,
             node,
-            self._module,
+            self._parent.module,
             self._node_factory,
         )
-        self._module.io_operations[name] = operation
+        self._parent.module.io_operations[name] = operation
         return operation
 
     def _check_type(self) -> None:

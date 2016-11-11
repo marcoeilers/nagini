@@ -18,7 +18,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE
 )
 from py2viper_translation.lib.program_nodes import (
-    get_target,
+    get_target as do_get_target,
     GenericType,
     MethodType,
     ProgramNodeFactory,
@@ -27,7 +27,6 @@ from py2viper_translation.lib.program_nodes import (
     PythonGlobalVar,
     PythonIOOperation,
     PythonModule,
-    PythonModuleView,
     PythonNode,
     PythonTryBlock,
     PythonType,
@@ -43,6 +42,7 @@ from py2viper_translation.lib.util import (
     is_io_existential,
     UnsupportedException,
 )
+from py2viper_translation.lib.views import PythonModuleView
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 
@@ -301,7 +301,7 @@ class Analyzer(ast.NodeVisitor):
             containers.extend(container.get_module().get_included_modules())
         else:
             containers.extend(container.get_included_modules())
-        return get_target(node, containers, container)
+        return do_get_target(node, containers, container)
 
     def find_or_create_class(self, name: str, module=None) -> PythonClass:
         """
@@ -562,10 +562,11 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Name(self, node: ast.Name) -> None:
         """
-        This method needs to find all local variables, global variables,
-        lambda arguments and static fields.
+        This method tracks all local variables, global variables,
+        lambda arguments and static fields in the program and creates the
+        corresponding PythonNodes.
         """
-        # Since lots of things in the AST that we don't care about here are
+        # Since lots of things in the AST (that we don't care about here) are
         # also ast.Names, we filter out those cases first.
         if node.id in LITERALS:
             return
@@ -616,8 +617,8 @@ class Analyzer(ast.NodeVisitor):
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
-                        msg = 'only simple assignments and reads allowed for'
-                        msg += ' global variables'
+                        msg = ('only simple assignments and reads allowed for '
+                               'global variables')
                         raise UnsupportedException(assign, msg)
                     var.value = assign.value
                     self.module.global_vars[node.id] = var
@@ -632,8 +633,8 @@ class Analyzer(ast.NodeVisitor):
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):
-                    msg = 'only simple assignments and reads allowed for'
-                    msg += ' static fields'
+                    msg = ('only simple assignments and reads allowed for '
+                           'static fields')
                     raise UnsupportedException(assign, msg)
                 var.value = assign.value
                 self.current_class.static_fields[node.id] = var
@@ -831,8 +832,6 @@ class Analyzer(ast.NodeVisitor):
         """
         With-blocks get translated to try-finally-blocks, so we create a
         PythonTryBlock here.
-        TODO: 'with' cannot be used with IO verification at the moment; see
-        section 6.1.3 of Vytautas' thesis.
         """
         if not self.current_function:
             raise UnsupportedException(node, 'top level with statement')

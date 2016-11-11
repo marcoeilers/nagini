@@ -16,7 +16,7 @@ from py2viper_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
-from py2viper_translation.lib.program_node_util import (
+from py2viper_translation.lib.views import (
     CombinedDict,
     ModuleDictView,
 )
@@ -1192,27 +1192,6 @@ class PythonField(PythonNode):
 
     def is_mangled(self) -> bool:
         return self.name.startswith('__') and not self.name.endswith('__')
-
-
-class PythonModuleView:
-    """
-    A view of a PythonModule that contains only the imported parts of an
-    actual PythonModule, possibly with some renamings.
-    """
-    def __init__(self, module: PythonModule, names: List[Tuple[str, str]]):
-        self.module = PythonModule(module.types, module.node_factory,
-                                   module.type_prefix,
-                                   module.global_module, module.sil_names)
-        for field in ['functions', 'methods', 'static_methods', 'namespaces',
-                      'predicates', 'classes', 'global_vars', 'io_operations']:
-            lazy_dict = ModuleDictView(names, module, field)
-            setattr(self.module, field, lazy_dict)
-
-    def get_contents(self, only_top: bool):
-        return self.module.get_contents(only_top)
-
-    def get_included_modules(self, include_global: bool=True):
-        return self.module.get_included_modules(include_global)
 
 
 class ProgramNodeFactory:
