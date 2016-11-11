@@ -29,6 +29,21 @@ from py2viper_translation.lib.util import (
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 
+class ContainerInterface(metaclass=ABCMeta):
+    """
+    Interface implemented by PythonNodes that can contain other PythonNodes,
+    and by the translation context. Enables others to get the context of
+    this container.
+    """
+    @abc.abstractmethod
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+
+
 class PythonScope:
     """
     Represents a namespace/scope in Python
@@ -69,7 +84,7 @@ class PythonScope:
             return self
 
 
-class PythonModule(PythonScope):
+class PythonModule(PythonScope, ContainerInterface):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
@@ -173,7 +188,7 @@ class PythonType(metaclass=ABCMeta):
     pass
 
 
-class PythonClass(PythonType, PythonNode, PythonScope):
+class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
     Represents a class in the Python program.
     """
@@ -448,7 +463,7 @@ class MethodType(Enum):
     class_method = 2
 
 
-class PythonMethod(PythonNode, PythonScope):
+class PythonMethod(PythonNode, PythonScope, ContainerInterface):
     """
     Represents a Python function which may be pure or impure, belong
     to a class or not
@@ -656,7 +671,7 @@ class PythonMethod(PythonNode, PythonScope):
         return CombinedDict([], dicts)
 
 
-class PythonIOOperation(PythonNode, PythonScope):
+class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
     """
     Represents an IO operation which may be basic or not.
 
@@ -1249,7 +1264,7 @@ class ProgramNodeFactory:
 
 
 def get_target(node: ast.AST,
-               containers: List[Union[PythonNode, 'Context']],
+               containers: List[ContainerInterface],
                container: PythonNode) -> PythonNode:
     """
     Finds the PythonNode that the given 'node' refers to, e.g. a PythonClass or
