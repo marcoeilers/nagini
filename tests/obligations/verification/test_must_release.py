@@ -16,7 +16,7 @@ from py2viper_contracts.obligations import *
 
 #:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
 def acquire_1(l: Lock) -> None:
-    #:: MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)
+    #:: ExpectedOutput(call.precondition:assertion.false)|MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)
     l.acquire()
 
 
@@ -53,7 +53,7 @@ def release_1(l: Lock) -> None:
 
 
 def release_2(l: Lock) -> None:
-    #:: MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)|OptionalOutput(call.precondition:insufficient.permission)
+    #:: ExpectedOutput(call.precondition:assertion.false)|MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)|OptionalOutput(call.precondition:insufficient.permission)
     l.release()
 
 
