@@ -130,7 +130,6 @@ class SIFPureTranslator(PureTranslator):
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref()
             else:
-                # v
                 # Variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
                 # if the condition is false.

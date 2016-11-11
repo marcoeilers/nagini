@@ -5,7 +5,7 @@ from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
-    get_target,
+    get_target as do_get_target,
     GenericType,
     PythonClass,
     PythonExceptionHandler,
@@ -282,9 +282,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if not node.args:
             return True
         elif len(node.args) == 2:
-            target = get_target(node.args[0],
-                                container.get_module().get_included_modules(),
-                                container)
+            target = do_get_target(node.args[0],
+                                   container.get_module().get_included_modules(),
+                                   container)
             return (isinstance(target, PythonClass) and
                     isinstance(node.args[1], ast.Name) and
                     (node.args[1].id == next(iter(container.args))))
@@ -300,4 +300,4 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        return get_target(node, containers, container)
+        return do_get_target(node, containers, container)

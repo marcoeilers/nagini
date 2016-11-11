@@ -1,3 +1,5 @@
+import copy
+
 from typing import Dict, List, Tuple
 
 
@@ -69,3 +71,22 @@ class ModuleDictView:
         if self._dict is None:
             self.initialize()
         return self._dict[item]
+
+
+class PythonModuleView:
+    """
+    A view of a PythonModule that contains only the imported parts of an
+    actual PythonModule, possibly with some renamings.
+    """
+    def __init__(self, module: 'PythonModule', names: List[Tuple[str, str]]):
+        self.module = copy.copy(module)
+        for field in ['functions', 'methods', 'static_methods', 'namespaces',
+                      'predicates', 'classes', 'global_vars', 'io_operations']:
+            lazy_dict = ModuleDictView(names, module, field)
+            setattr(self.module, field, lazy_dict)
+
+    def get_contents(self, only_top: bool):
+        return self.module.get_contents(only_top)
+
+    def get_included_modules(self, include_global: bool=True):
+        return self.module.get_included_modules(include_global)
