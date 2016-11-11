@@ -19,6 +19,7 @@ from py2viper_translation.lib.constants import (
 )
 from py2viper_translation.lib.program_nodes import (
     get_target as do_get_target,
+    ContainerInterface,
     GenericType,
     MethodType,
     ProgramNodeFactory,
@@ -290,7 +291,8 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
-    def get_target(self, node: ast.AST, container: PythonNode) -> PythonNode:
+    def get_target(self, node: ast.AST,
+                   container: ContainerInterface) -> PythonNode:
         """
         Finds the PythonNode that the given 'node' refers to, e.g. a PythonClass
         or a PythonVar, if the immediate container (e.g. a PythonMethod) of the
