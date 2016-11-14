@@ -214,7 +214,7 @@ class CallTranslator(CommonTranslator):
                 # Static field
                 raise UnsupportedException(node, "Static fields not supported")
         if target.type is not None:
-            result_var = result_var = ctx.current_function.create_variable(
+            result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
         if target.declared_exceptions:

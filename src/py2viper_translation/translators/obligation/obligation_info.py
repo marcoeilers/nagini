@@ -9,12 +9,16 @@ from typing import List
 from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
+from py2viper_translation.lib.guard_collectors import (
+    GuardCollectingVisitor,
+)
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
 )
-from py2viper_translation.lib.guard_collectors import (
-    GuardCollectingVisitor,
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
 )
 from py2viper_translation.translators.obligation.manager import (
     ObligationManager,
@@ -28,15 +32,25 @@ from py2viper_translation.translators.obligation.types.base import (
 
 
 CURRENT_THREAD_NAME = '_cthread'
+RESIDUE_LEVEL_METHOD_NAME = '_residue'
+RESIDUE_LEVEL_LOOP_NAME = '_residue'
+CURRENT_WAIT_LEVEL_NAME = '_current_wait_level'
+CURRENT_WAIT_LEVEL_TARGET_NAME = '_cwl'
 MEASURES_CALLER_NAME = '_caller_measures'
 MEASURES_METHOD_NAME = '_method_measures'
-MEASURES_METHOD_CONTENTS_NAME = '_method_measures_contents'
 MEASURES_LOOP_NAME = '_loop_measures'
-ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_original_must_terminate'
-INCREASED_MUST_TERMINATE_AMOUNT_NAME = '_increased_must_terminate'
 LOOP_CHECK_BEFORE_NAME = '_loop_check_before'
 LOOP_TERMINATION_FLAG_NAME = '_loop_termination_flag'
 LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME = '_loop_original_must_terminate'
+
+
+def _create_guard_expression(parts: List[ast.AST]) -> sil.BigAnd:
+    """Transform guarding sequence into the guard expression."""
+    conjunction = sil.BigAnd([
+        sil.PythonBoolExpression(part)
+        for part in parts
+    ])
+    return conjunction
 
 
 @PythonVar.register         # pylint: disable=no-member
@@ -80,11 +94,7 @@ class GuardedObligationInstance:
 
     def create_guard_expression(self) -> sil.BigAnd:
         """Create a conjunction representing a guard."""
-        conjunction = sil.BigAnd([
-            sil.PythonBoolExpression(part)
-            for part in self.guard
-        ])
-        return conjunction
+        return _create_guard_expression(self.guard)
 
 
 class BaseObligationInfo(GuardCollectingVisitor):
@@ -98,6 +108,7 @@ class BaseObligationInfo(GuardCollectingVisitor):
         self._obligation_manager = obligaton_manager
         self._method = method
         self._all_instances = {}
+        self._wait_level_guards = {}
 
     def visit_Call(self, node: ast.Call) -> None:
         for obligation in self._obligation_manager.obligations:
@@ -111,7 +122,10 @@ class BaseObligationInfo(GuardCollectingVisitor):
                 self._all_instances[node] = instance
                 break
         else:
-            super().visit_Call(node)
+            if isinstance(node.func, ast.Name) and node.func.id == 'WaitLevel':
+                self._wait_level_guards[node] = self.current_guard[:]
+            else:
+                super().visit_Call(node)
 
     def get_instance(self, node: ast.Call) -> GuardedObligationInstance:
         """Get ``GuardedObligationInstance`` represented by node."""
@@ -143,6 +157,10 @@ class BaseObligationInfo(GuardCollectingVisitor):
                     instance.obligation_instance.get_measure())
                 disjuncts.append(sil.BigAnd([guard, measure_check]))
         return sil.BigOr(disjuncts)
+
+    def get_wait_level_guard(self, node: ast.Call) -> sil.BigAnd:
+        """Return a guard for the given WaitLevel expression."""
+        return _create_guard_expression(self._wait_level_guards[node])
 
     def _create_var(
             self, name: str, class_name: str,
@@ -200,8 +218,16 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             obligation_id = obligation.identifier()
             self._precondition_instances[obligation_id] = []
             self._postcondition_instances[obligation_id] = []
-        self.current_thread_var = self._create_var(
-            CURRENT_THREAD_NAME, 'Thread', translator.translator)
+        self._variables = {
+            CURRENT_THREAD_NAME: self._create_var(
+                CURRENT_THREAD_NAME, 'Thread', translator.translator),
+            RESIDUE_LEVEL_METHOD_NAME: self._create_perm_var(
+                RESIDUE_LEVEL_METHOD_NAME, translator),
+            CURRENT_WAIT_LEVEL_NAME: self._create_perm_var(
+                CURRENT_WAIT_LEVEL_NAME, translator),
+            CURRENT_WAIT_LEVEL_TARGET_NAME: self._create_perm_var(
+                CURRENT_WAIT_LEVEL_TARGET_NAME, translator),
+        }
         caller_measure_map_var = self._create_measure_var(
             MEASURES_CALLER_NAME, translator)
         self.caller_measure_map = MeasureMap(caller_measure_map_var)
@@ -209,6 +235,33 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             MEASURES_METHOD_NAME, translator)
         self.method_measure_map = MeasureMap(
             method_measure_map_var)
+        self._additional_preconditions = []
+        self._additional_postconditions = []
+
+    @property
+    def current_thread_var(self) -> PythonVar:
+        """Return variable that represents current thread argument."""
+        return self._variables[CURRENT_THREAD_NAME]
+
+    @property
+    def residue_level(self) -> PythonVar:
+        """Return variable that represents the residue level argument."""
+        return self._variables[RESIDUE_LEVEL_METHOD_NAME]
+
+    @property
+    def current_wait_level(self) -> PythonVar:
+        """Return variable that represents current wait level return value."""
+        return self._variables[CURRENT_WAIT_LEVEL_NAME]
+
+    @property
+    def current_wait_level_target(self) -> PythonVar:
+        """Return variable to which the current wait level is assigned.
+
+        .. note::
+            This variable is used only to make the emitted program
+            well-formed.
+        """
+        return self._variables[CURRENT_WAIT_LEVEL_TARGET_NAME]
 
     def traverse_contract(self) -> None:
         """Collect all needed information about obligations."""
@@ -262,6 +315,22 @@ class PythonMethodObligationInfo(BaseObligationInfo):
             all_instances.extend(instances)
         return all_instances
 
+    def add_precondition(self, expr: Expr) -> None:
+        """Add additional precondition at the end."""
+        self._additional_preconditions.append(expr)
+
+    def get_additional_preconditions(self) -> List[Expr]:
+        """Return additional preconditions."""
+        return self._additional_preconditions
+
+    def add_postcondition(self, expr: Expr) -> None:
+        """Add additional postcondition at the end."""
+        self._additional_postconditions.append(expr)
+
+    def get_additional_postconditions(self) -> List[Expr]:
+        """Return additional postconditions."""
+        return self._additional_postconditions
+
 
 class PythonLoopObligationInfo(BaseObligationInfo):
     """Info about the obligation use in a loop."""
@@ -279,17 +348,44 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             MEASURES_LOOP_NAME, translator,
             local=not obligation_config.disable_measures)
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
-        self.loop_check_before_var = self._create_var(
-            LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator,
-            local=True)
-        self.termination_flag_var = self._create_var(
-            LOOP_TERMINATION_FLAG_NAME, 'bool', translator.translator,
-            local=True)
-        self.original_must_terminate_var = self._create_perm_var(
-            LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator,
-            local=True)
+        self._variables = {
+            LOOP_CHECK_BEFORE_NAME: self._create_var(
+                LOOP_CHECK_BEFORE_NAME, 'bool', translator.translator,
+                local=True),
+            LOOP_TERMINATION_FLAG_NAME: self._create_var(
+                LOOP_TERMINATION_FLAG_NAME, 'bool', translator.translator,
+                local=True),
+            LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME: self._create_perm_var(
+                LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator,
+                local=True),
+            RESIDUE_LEVEL_LOOP_NAME: self._create_perm_var(
+                RESIDUE_LEVEL_LOOP_NAME, translator, local=True),
+        }
         self.iteration_err_var = err_var
         """In the for loop translation holds ``__iter__`` result."""
+        self._additional_invariants = []
+        self._prepend_body = []
+        self._after_loop = []
+
+    @property
+    def loop_check_before_var(self) -> PythonVar:
+        """Return variable that indicates exhaling before loop."""
+        return self._variables[LOOP_CHECK_BEFORE_NAME]
+
+    @property
+    def termination_flag_var(self) -> PythonVar:
+        """Return variable that indicates if loop promised to terminate."""
+        return self._variables[LOOP_TERMINATION_FLAG_NAME]
+
+    @property
+    def original_must_terminate_var(self) -> PythonVar:
+        """Return variable that holds original termination amount."""
+        return self._variables[LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME]
+
+    @property
+    def residue_level(self) -> PythonVar:
+        """Return variable that represents the residue level."""
+        return self._variables[RESIDUE_LEVEL_LOOP_NAME]
 
     @property
     def current_thread_var(self) -> PythonVar:
@@ -330,3 +426,27 @@ class PythonLoopObligationInfo(BaseObligationInfo):
             return sil.PythonBoolExpression(self.node.test)
         else:
             return sil.RefVar(self.iteration_err_var) == None  # noqa: E711
+
+    def prepend_body(self, stmt: Stmt) -> None:
+        """Add statement at the beginning of loop body."""
+        self._prepend_body.append(stmt)
+
+    def get_prepend_body(self) -> List[Stmt]:
+        """Return statements to be prepended to the loop body."""
+        return self._prepend_body
+
+    def append_after_loop(self, stmt: Stmt) -> None:
+        """Add statement after the loop."""
+        self._after_loop.append(stmt)
+
+    def get_after_loop(self) -> List[Stmt]:
+        """Get statements to be appended after the loop."""
+        return self._after_loop
+
+    def add_invariant(self, expr: Expr) -> None:
+        """Add the additional invariant at the end."""
+        self._additional_invariants.append(expr)
+
+    def get_additional_invariants(self) -> List[Expr]:
+        """Return additional invariants."""
+        return self._additional_invariants

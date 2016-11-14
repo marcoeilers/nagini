@@ -300,26 +300,7 @@
 "Thread": {
     "extends": "object"
 },
-"Lock": {
-    "methods":{
-        "__init__": {
-            "args": [],
-            "type": null,
-            "MustTerminate": true
-        },
-        "acquire": {
-            "args": ["Lock"],
-            "type": null,
-            "MustTerminate": true
-        },
-        "release": {
-            "args": ["Lock"],
-            "type": null,
-            "MustTerminate": true
-        }
-    },
-    "extends": "object"
+"LevelType": {
 },
 "type": {}
 }
-

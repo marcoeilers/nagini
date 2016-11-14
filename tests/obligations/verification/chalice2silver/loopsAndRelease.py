@@ -5,14 +5,15 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Assert,
+    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
+Import('lock')
 
 
 def rel_now(a: Lock) -> None:
@@ -29,6 +30,7 @@ def rel_later(a: Lock) -> None:
 
 def f(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     a.acquire()
     i = 0
@@ -42,6 +44,7 @@ def f(a: Lock) -> None:
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
 def f_leak(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     a.acquire()
     i = 0
@@ -53,6 +56,7 @@ def f_leak(a: Lock) -> None:
 
 def f_leak2(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     a.acquire()
     i = 0

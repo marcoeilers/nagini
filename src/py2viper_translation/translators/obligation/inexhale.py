@@ -23,7 +23,9 @@ class ObligationInhaleExhale:
             self, bounded: sil.Location,
             unbounded: Optional[sil.Location] = None,
             credit: Optional[sil.Location] = None,
-            skip_exhale: bool = False) -> None:
+            skip_exhale: bool = False,
+            skip_inhale: bool = False,
+            credit_only: bool = False) -> None:
         """Constructor.
 
         :param skip_exhale:
@@ -33,6 +35,8 @@ class ObligationInhaleExhale:
         self._unbounded = unbounded
         self._credit = credit
         self._skip_exhale = skip_exhale
+        self._skip_inhale = skip_inhale
+        self._credit_only = credit_only
 
     @property
     def _unbounded_positive(self) -> sil.BoolExpression:
@@ -59,6 +63,10 @@ class ObligationInhaleExhale:
 
     def _construct_inhale(self, fresh: bool) -> sil.Acc:
         """Construct obligation inhale."""
+        if self._skip_inhale:
+            return sil.TrueLit()
+        if self._credit_only:
+            return self._credit_acc
         if fresh:
             return self._unbounded_acc
         else:
@@ -96,9 +104,11 @@ class ObligationInhaleExhale:
 
         Used for fresh obligations.
         """
-        return sil.InhaleExhale(
-            self._construct_inhale(True),
-            self._construct_unbounded_exhale())
+        if self._credit_only:
+            exhale = self._credit_acc
+        else:
+            exhale = self._construct_unbounded_exhale()
+        return sil.InhaleExhale(self._construct_inhale(True), exhale)
 
     def construct_use_method_bounded(
             self, measure_check: sil.BoolExpression,
@@ -109,6 +119,8 @@ class ObligationInhaleExhale:
         """
         if self._skip_exhale:
             exhale = sil.TrueLit()
+        elif self._credit_only:
+            exhale = self._credit_acc
         else:
             exhale = self._construct_bounded_exhale(
                 measure_check if not is_postconditon else None)
@@ -123,19 +135,22 @@ class ObligationInhaleExhale:
         """
         if self._skip_exhale:
             exhale = sil.TrueLit()
+        elif self._credit_only:
+            exhale = self._credit_acc
+        elif measure_check is None:
+            exhale = self._construct_unbounded_exhale()
         else:
-            if measure_check is None:
-                exhale = self._construct_unbounded_exhale()
-            else:
-                exhale = sil.BoolCondExp(
-                    loop_check_before_var,
-                    self._construct_bounded_exhale(None),
-                    self._construct_bounded_exhale(measure_check))
+            exhale = sil.BoolCondExp(
+                loop_check_before_var,
+                self._construct_bounded_exhale(None),
+                self._construct_bounded_exhale(measure_check))
         inhale = self._construct_inhale(measure_check is None)
         return sil.InhaleExhale(inhale, exhale)
 
     def construct_obligation_bound(self) -> sil.Statement:
         """Construct statement for bounding obligation."""
+        if self._credit_only:
+            return sil.Exhale(sil.TrueLit())
         return sil.If(
             self._unbounded_positive,
             [sil.Exhale(self._unbounded_acc), sil.Inhale(self._bounded_acc)],

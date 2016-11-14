@@ -5,6 +5,7 @@ from py2viper_contracts.contracts import (
     Ensures,
     Requires,
     Result,
+    Assert,
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.io_builtins import (
@@ -58,6 +59,8 @@ def brackets_io(
 class Matcher:
 
     def __init__(self) -> None:
+        Requires(MustTerminate(1))
+        Ensures(Acc(self.c))
         self.c = None   # type: str
 
     def pop_read_ahead(self, t1: Place) -> Tuple[Place, str]:
@@ -123,3 +126,31 @@ class Matcher:
             else:
                 return t_read2, False   # No match because read invalid
                                         # character.
+
+
+def main(t1: Place) -> Place:
+    IOExists8(str, Place, str, bool, Place, Place, bool, bool)(
+        lambda read_ahead, t_read_ahead, read_last, valid, t_brackets_end, t_end,
+               success1, success2: (
+            Requires(
+                token(t1) and
+                read_char_io(t1, stdin, read_ahead, success1, t_read_ahead) and
+                brackets_io(t_read_ahead, read_ahead, read_last, valid, t_brackets_end) and
+                read_last is None and
+                write_char_io(t_brackets_end, stdout, ('1' if valid else '0'), success2, t_end)
+            ),
+            Ensures(
+                token(t_end) and
+                t_end == Result()
+            ),
+        )
+    )
+
+    m = Matcher()
+    m.c, success, t2 = getchar(t1)
+    t3, match = m.brackets(t2)
+    if match:
+        success, t4 = putchar('1', t3)
+    else:
+        success, t4 = putchar('0', t3)
+    return t4
