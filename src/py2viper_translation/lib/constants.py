@@ -1,3 +1,4 @@
+import ast
 
 LITERALS = ['True', 'False', 'None']
 
@@ -131,3 +132,11 @@ IGNORED_IMPORTS = {'abc',
                    'threading',
                    'typing',
                    }
+
+OPERATOR_FUNCTIONS = {
+    ast.Add: '__add__',
+    ast.Sub: '__sub__',
+    ast.Mult: '__mul__',
+    ast.FloorDiv: '__floordiv__',
+    ast.Mod: '__mod__',
+}

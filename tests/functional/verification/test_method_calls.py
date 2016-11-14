@@ -4,7 +4,7 @@ from py2viper_contracts.contracts import *
 class Class1:
     def __init__(self) -> None:
         Ensures(Acc(self.c2) and isinstance(self.c2, Class2))  # type: ignore
-        Ensures(Acc(self.c2.c1) and self.c2.c1 == self)  # type: ignore
+        Ensures(Acc(self.c2.c1) and self.c2.c1 is self)  # type: ignore
         self.c2 = Class2(self)
 
     @Pure
@@ -15,20 +15,20 @@ class Class1:
     def get_c2_impure(self) -> 'Class2':
         Requires(Acc(self.c2))  # type: ignore
         Ensures(Acc(self.c2))  # type: ignore
-        Ensures(self.c2 == Old(self.c2))
-        Ensures(Result() == self.c2)  # type: ignore
+        Ensures(self.c2 is Old(self.c2))
+        Ensures(Result() is self.c2)  # type: ignore
         return self.c2
 
     def set_c2(self, c2: 'Class2') -> None:
         Requires(Acc(self.c2))
         Ensures(Acc(self.c2))
-        Ensures(self.c2 == c2)
+        Ensures(self.c2 is c2)
         self.c2 = c2
 
 
 class Class2:
     def __init__(self, c1: Class1) -> None:
-        Ensures(Acc(self.c1) and self.c1 == c1)  # type: ignore
+        Ensures(Acc(self.c1) and self.c1 is c1)  # type: ignore
         self.c1 = c1
 
     @Pure
@@ -39,14 +39,14 @@ class Class2:
     def get_c1_impure(self) -> Class1:
         Requires(Acc(self.c1))  # type: ignore
         Ensures(Acc(self.c1))  # type: ignore
-        Ensures(self.c1 == Old(self.c1))
-        Ensures(Result() == self.c1)  # type: ignore
+        Ensures(self.c1 is Old(self.c1))
+        Ensures(Result() is self.c1)  # type: ignore
         return self.c1
 
     def set_c1(self, c1: Class1) -> None:
         Requires(Acc(self.c1))
         Ensures(Acc(self.c1))
-        Ensures(self.c1 == c1)
+        Ensures(self.c1 is c1)
         self.c1 = c1
 
 

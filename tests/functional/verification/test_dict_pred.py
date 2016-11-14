@@ -37,6 +37,6 @@ def append_bla_45(l: Dict[int, Tuple[str, int]]) -> None:
     Ensures(Acc(dict_pred(l)))
     Ensures(Implies(Old(3 not in l), len(l) == Old(len(l)) + 1))
     Ensures(Forall(Old(l),
-                   lambda k: (k in l and Implies(k != 3, l[k] == Old(l[k])), [[k in l], [l[k]], [Old(l[k])]])))
-    Ensures(3 in l and l[3] == ('bla', 45))
+                   lambda k: (k in l and Implies(k != 3, l[k] is Old(l[k])), [[k in l], [l[k]], [Old(l[k])]])))
+    Ensures(3 in l and l[3] is ('bla', 45))
     l[3] = ('bla', 45)

@@ -1,7 +1,7 @@
 import ast
 
 from abc import ABCMeta
-from py2viper_translation.lib.constants import PRIMITIVES
+from py2viper_translation.lib.constants import BOOL_TYPE, INT_TYPE, PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
@@ -89,6 +89,30 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
+
+    def is_primitive_operation(self, node: ast.AST, left_type: PythonClass,
+                               right_type: PythonClass) -> bool:
+        """
+        Decides if the binary operation from node, called with arguments of the
+        given types, should be translated as a native Silver operation or
+        as a call to a special function.
+        """
+        if left_type.name in {INT_TYPE, BOOL_TYPE}:
+            if right_type.name not in {INT_TYPE, BOOL_TYPE}:
+                raise InvalidProgramException(node, 'invalid.operation.type')
+            else:
+                return True
+        return False
+
+    def get_primitive_operation(self, node: ast.AST):
+        vals = {
+            ast.Add: self.viper.Add,
+            ast.Sub: self.viper.Sub,
+            ast.Mult: self.viper.Mul,
+            ast.FloorDiv: self.viper.Div,
+            ast.Mod: self.viper.Mod,
+        }
+        return vals[type(node.op)]
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
