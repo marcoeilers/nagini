@@ -25,8 +25,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._parent = parent
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.find_or_create_class('Place',
-            module=parent.module.global_module)
+        self._place_class = parent.find_or_create_class(
+            'Place', module=parent.module.global_module)
 
         self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
