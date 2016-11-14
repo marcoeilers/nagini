@@ -87,7 +87,8 @@ class WaitLevelTranslator(CommonTranslator):
         obligation = self._obligation_manager.must_release_obligation
         fields = obligation.create_fields_untranslated()
         var = ctx.current_function.create_variable(
-            '_r', ctx.program.classes['object'], self.translator, local=False)
+            '_r', ctx.module.global_module.classes['object'],
+            self.translator, local=False)
         for_perm = sil.ForPerm(
             var.sil_name,
             fields,

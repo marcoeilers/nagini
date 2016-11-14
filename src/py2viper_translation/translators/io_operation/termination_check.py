@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import cast, List
+from typing import List
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules, rules
@@ -70,7 +70,6 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
 
         self._current_operation_node = node
 
-        operation_name = cast(ast.Name, node.func).id
         operation = self._io_translator.get_target(node, self._ctx)
         self._current_operation = operation
 

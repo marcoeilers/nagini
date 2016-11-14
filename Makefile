@@ -55,7 +55,8 @@ CHECKED_TRANSLATOR_FILES:=\
 CHECKED_CONTRACT_FILES:=\
 	deps/py2viper-contracts/src/py2viper_contracts/io.py \
 	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
-	deps/py2viper-contracts/src/py2viper_contracts/obligations.py
+	deps/py2viper-contracts/src/py2viper_contracts/obligations.py \
+	deps/py2viper-contracts/src/py2viper_contracts/lock.py
 
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
