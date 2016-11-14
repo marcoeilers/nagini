@@ -353,7 +353,8 @@ class ContractTranslator(CommonTranslator):
                                                self.no_position(ctx),
                                                self.no_info(ctx))]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain], self.no_position(ctx),
+                                        [domain],
+                                        self.to_position(domain_node, ctx),
                                         self.no_info(ctx), seq_ref, formal_args)
         if var.type.name in PRIMITIVES:
             ref_var = self.box_primitive(var.ref(), var.type, None, ctx)

@@ -139,6 +139,14 @@
         "__bool__": {
             "args": ["object"],
             "type": "bool"
+        },
+        "__eq__": {
+            "args": ["object", "object"],
+            "type": "bool"
+        },
+        "__ne__": {
+            "args": ["object", "object"],
+            "type": "bool"
         }
     }
 },
@@ -188,6 +196,10 @@
             "type": "bool"
         },
         "__eq__": {
+            "args": ["str", "object"],
+            "type": "bool"
+        },
+        "__ne__": {
             "args": ["str", "object"],
             "type": "bool"
         },

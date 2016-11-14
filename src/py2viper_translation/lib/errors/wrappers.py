@@ -115,7 +115,9 @@ class Error:
     @property
     def message(self) -> str:
         """Human readable error message."""
-        return ERRORS[self.identifier](self._node)
+        if self._node:
+            return ERRORS[self.identifier](self._node)
+        return self._error.text()
 
     def __str__(self) -> str:
         """Format error.

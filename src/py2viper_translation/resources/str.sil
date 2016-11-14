@@ -21,6 +21,9 @@ function str___eq__(self: Ref, other: Ref): Bool
     ensures (str___val__(self) == str___val__(other)) == result
     ensures result ==> (str___len__(self) == str___len__(other))
 
+function str___ne__(self: Ref, other: Ref): Bool
+    ensures result == !str___eq__(self, other)
+
 function str___add__(self: Ref, other: Ref): Ref
     ensures str___len__(result) == str___len__(self) + str___len__(other)
     ensures typeof(result) == str()

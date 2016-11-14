@@ -111,6 +111,9 @@ class CallTranslator(CommonTranslator):
         node is the call node and arg_stmts are statements related to argument
         evaluation.
         """
+        if ctx.current_function is None:
+            msg = 'Global constructor calls are not supported.'
+            raise UnsupportedException(node, msg)
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
@@ -208,7 +211,7 @@ class CallTranslator(CommonTranslator):
         if ctx.current_function is None:
             if ctx.current_class is None:
                 # Global variable
-                raise UnsupportedException(node, "Global function call "
+                raise UnsupportedException(node, "Global method call "
                                            "not supported.")
             else:
                 # Static field

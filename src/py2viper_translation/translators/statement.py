@@ -5,6 +5,7 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     LIST_TYPE,
     OBJECT_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVES,
     SET_TYPE,
     TUPLE_TYPE,
@@ -42,32 +43,42 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
-        lhs_stmt, lhs = self.translate_expr(node.target, ctx)
-        if lhs_stmt:
+        left_stmt, left = self.translate_expr(node.target, ctx)
+        if left_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        if isinstance(node.op, ast.Add):
-            newval = self.viper.Add(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Sub):
-            newval = self.viper.Sub(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Mult):
-            newval = self.viper.Mul(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        else:
-            raise UnsupportedException(node)
+        stmt, right = self.translate_expr(node.value, ctx)
+        left_type = self.get_type(node.target, ctx)
+        right_type = self.get_type(node.value, ctx)
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if self.is_primitive_operation(node, left_type, right_type):
+            op = self.get_primitive_operation(node)
+            result = op(left, right, position, info)
+        else:
+            func_name = OPERATOR_FUNCTIONS[type(node.op)]
+            called_method = left_type.get_func_or_method(func_name)
+            if called_method.pure:
+                call = self.get_function_call(left_type, func_name,
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                result = call
+            else:
+                result_type = called_method.type
+                res_var = ctx.actual_function.create_variable('op_res',
+                                                              result_type,
+                                                              self.translator)
+                stmt += self.get_method_call(left_type, func_name,
+                                             [left, right],
+                                             [left_type, right_type],
+                                             [res_var.ref(node, ctx)], node,
+                                             ctx)
+                result = res_var.ref(node, ctx)
         if isinstance(node.target, ast.Name):
-            assign = self.viper.LocalVarAssign(lhs, newval, position,
-                                               self.no_info(ctx))
+            assign = self.viper.LocalVarAssign(left, result, position, info)
         elif isinstance(node.target, ast.Attribute):
-            assign = self.viper.FieldAssign(lhs, newval, position,
-                                            self.no_info(ctx))
-        return rhs_stmt + [assign]
+            assign = self.viper.FieldAssign(left, result, position, info)
+        return stmt + [assign]
 
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
