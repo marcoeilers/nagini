@@ -3,23 +3,22 @@ from py2viper_contracts.contracts import (
     Assert,
     Invariant,
     Implies,
-    Import,
     Requires,
     Ensures,
     Result,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 # Creating locks.
-
 
 def create_lock() -> None:
     l = Lock()
     l.acquire()
     l.release()
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(False)
 
 
 #:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
