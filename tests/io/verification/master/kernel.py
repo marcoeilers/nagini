@@ -1,7 +1,6 @@
 from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
-    Import,
     Pure,
     Result,
     Requires,
@@ -13,7 +12,6 @@ from py2viper_contracts.io_builtins import (
     end_io,
     End,
 )
-Import('io_builtins')
 from py2viper_contracts.obligations import (
     MustTerminate,
 )

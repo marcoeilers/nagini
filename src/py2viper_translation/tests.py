@@ -195,7 +195,7 @@ class VerificationTests(AnnotatedTests):
         if vresult:
             assert not expected
         else:
-            # make sure we produce an error string
+            # Make sure we produce an error string
             print(vresult)
             missing_info = [error for error in vresult.errors if
                             not isinstance(error.pos(),

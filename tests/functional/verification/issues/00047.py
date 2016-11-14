@@ -1,4 +1,3 @@
-#:: IgnoreFile(/py2viper/issue/47/)
 from py2viper_contracts.contracts import *
 from py2viper_contracts.io import *
 from typing import Tuple, List
@@ -7,6 +6,7 @@ from typing import Tuple, List
 def test() -> None:
     i = 1
     r = ['x']
+    #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(Forall(r, lambda i: ('y' == i, [])))
 
 
@@ -19,7 +19,7 @@ def read_io(
 
 
 @ContractOnly
-def test(t1: Place, value: int) -> Tuple[str, Place]:
+def test_2(t1: Place, value: int) -> Tuple[str, Place]:
     Requires(value == 3)
     IOExists2(str, Place)(
         lambda value, t2: (

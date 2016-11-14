@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Requires,
     Result,
 )
@@ -13,7 +12,6 @@ from resources.library import (
     write_int_io,
     write_int,
 )
-Import('resources/library.py')
 
 
 # Read only.

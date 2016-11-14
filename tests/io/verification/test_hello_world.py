@@ -1,9 +1,8 @@
-from py2viper_contracts.contracts import Requires, Ensures, Result, Import
+from py2viper_contracts.contracts import Requires, Ensures, Result
 from py2viper_contracts.io import *
 from typing import Tuple, Callable
 
 from resources.library import write_string_io, write_string
-Import('resources/library.py')
 
 
 def hello(t1: Place) -> Place:

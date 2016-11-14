@@ -25,8 +25,8 @@ class Success(VerificationResult):
     def __bool__(self):
         return True
 
-    def __str__(self):
-        return "Verification successful."
+    def to_string(self, ide_mode: bool) -> str:
+        return "Verification successful"
 
 
 class Failure(VerificationResult):
@@ -42,9 +42,9 @@ class Failure(VerificationResult):
     def __bool__(self):
         return False
 
-    def __str__(self):
-        all_errors = [str(error) for error in self.errors]
-        return "Verification failed.\nErrors:\n" + '\n'.join(
+    def to_string(self, ide_mode: bool) -> str:
+        all_errors = [error.string(ide_mode) for error in self.errors]
+        return "Verification failed\nErrors:\n" + '\n'.join(
             all_errors)
 
 

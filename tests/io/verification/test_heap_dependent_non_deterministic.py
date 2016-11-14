@@ -9,7 +9,6 @@ from py2viper_contracts.contracts import (
     Requires,
     Ensures,
     Result,
-    Import,
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.obligations import MustTerminate
@@ -19,7 +18,6 @@ from resources.library import (
     write_int_io,
     write_int,
 )
-Import('resources/library.py')
 
 
 class WriterSuper:

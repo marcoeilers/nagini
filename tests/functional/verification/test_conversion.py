@@ -101,7 +101,7 @@ def test_param_object(a: int, b: object) -> int:
 
 def test_param_object_wrong(a: int, b: object) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Implies(b == None, Result() == 77))
+    Ensures(Implies(b is not None, Result() == 77))
     return 99 if b else 88
 
 
@@ -113,7 +113,7 @@ def test_param_sub(a: int, b: Sub) -> int:
 
 def test_param_sub_wrong(a: int, b: Sub) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Implies(b == None, Result() == 98))
+    Ensures(Implies(b is not None, Result() == 98))
     return 99 if b else 88
 
 

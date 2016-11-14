@@ -15,7 +15,6 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 class A:
@@ -55,7 +54,6 @@ class A:
     def quick_release(self, other: A) -> None:
         Requires(Acc(other.a))
         Requires(Acc(other.b))
-        #:: Label(quick_release__MustRelease)
         Requires(MustRelease(other.a, other.b))
         Requires(other.b >= 2)
 

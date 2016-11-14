@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Invariant,
     Requires,
     Result,
@@ -11,7 +10,6 @@ from verifast.stdio_simple import (
     stdout,
     write_char_io,
 )
-Import('../stdio_simple.py')
 
 
 @IOOperation

@@ -59,7 +59,7 @@ class UnsupportedException(Exception):
     def __init__(self, astElement: ast.AST, desc=""):
         ex_str = str(astElement)
         if desc:
-            ex_str += ": " + desc
+            ex_str += ': ' + desc
         super().__init__(ex_str)
 
 
@@ -129,17 +129,6 @@ def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
     blocks = [b for b in tb if contains_stmt(b.protected_region, stmt)]
     inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
     return inner_to_outer
-
-
-def is_two_arg_super_call(node: ast.Call, ctx) -> bool:
-    """
-    Checks if a super() call with two arguments is valid:
-    first arg must be a class, second a reference to self.
-    """
-    return (isinstance(node.args[0], ast.Name) and
-        (node.args[0].id in ctx.program.classes) and
-        isinstance(node.args[1], ast.Name) and
-        (node.args[1].id == next(iter(ctx.current_function.args))))
 
 
 def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
@@ -243,6 +232,15 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     return find_loop_for_previous(node._parent, name)
 
 
+def get_parent_of_type(node: ast.AST, typ: type) -> ast.AST:
+    parent = node._parent
+    while not isinstance(parent, ast.Module):
+        if isinstance(parent, typ):
+            return parent
+        parent = parent._parent
+    return None
+
+
 def join_expressions(operator: Callable[[T, T], T],
                      expressions: List[T]) -> T:
     """
@@ -275,7 +273,7 @@ def pprint(node) -> str:
     if isinstance(node, str):
         return node
     if isinstance(node, ast.FunctionDef):
-        # mainly for debugging, whenever this happens it's almost certainly
+        # Mainly for debugging, whenever this happens it's almost certainly
         # wrong.
         raise ValueError(node)
     res = astunparse.unparse(node)

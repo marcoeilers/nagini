@@ -10,6 +10,7 @@ from py2viper_translation.lib.errors import Rules, rules
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
 )
+from py2viper_translation.lib.program_nodes import PythonIOOperation
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -51,8 +52,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         return self._checks
 
     def _is_io_operation(self, node: ast.Call) -> bool:
-        return (isinstance(node.func, ast.Name) and
-                node.func.id in self._ctx.program.io_operations)
+        return isinstance(self._io_translator.get_target(node, self._ctx),
+                          PythonIOOperation)
 
     def visit_Call(self, node: ast.Call) -> None:
         if self._is_io_operation(node):
@@ -70,7 +71,7 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         self._current_operation_node = node
 
         operation_name = cast(ast.Name, node.func).id
-        operation = self._ctx.program.io_operations[operation_name]
+        operation = self._io_translator.get_target(node, self._ctx)
         self._current_operation = operation
 
         identifier = "{} ({}:{})".format(

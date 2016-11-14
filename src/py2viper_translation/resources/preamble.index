@@ -301,5 +301,6 @@
     "extends": "object"
 },
 "LevelType": {
-}
+},
+"type": {}
 }

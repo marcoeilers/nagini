@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Invariant,
     Requires,
     Result,
@@ -11,7 +10,6 @@ from py2viper_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-Import('io_builtins')
 
 from typing import Tuple
 
@@ -20,7 +18,6 @@ from verifast.stdio_simple import (
     stdout,
     write_char_io,
 )
-Import('../stdio_simple.py')
 
 
 @IOOperation

@@ -33,33 +33,33 @@ class ViperAST:
 
         def getconst(name):
             return getobject(ast, name)
-
-        self.AddOp = getconst("AddOp")
-        self.AndOp = getconst("AndOp")
-        self.DivOp = getconst("DivOp")
-        self.FracOp = getconst("FracOp")
-        self.GeOp = getconst("GeOp")
-        self.GtOp = getconst("GtOp")
-        self.ImpliesOp = getconst("ImpliesOp")
-        self.IntPermMulOp = getconst("IntPermMulOp")
-        self.LeOp = getconst("LeOp")
-        self.LtOp = getconst("LtOp")
-        self.ModOp = getconst("ModOp")
-        self.MulOp = getconst("MulOp")
-        self.NegOp = getconst("NegOp")
-        self.NotOp = getconst("NotOp")
-        self.OrOp = getconst("OrOp")
-        self.PermAddOp = getconst("PermAddOp")
-        self.PermDivOp = getconst("PermDivOp")
-        self.SubOp = getconst("SubOp")
-        self.NoPosition = getconst("NoPosition")
-        self.NoInfo = getconst("NoInfo")
-        self.Int = getconst("Int")
-        self.Bool = getconst("Bool")
-        self.Ref = getconst("Ref")
-        self.Perm = getconst("Perm")
+        self.QPs = getobject(ast.utility, 'QuantifiedPermissions')
+        self.AddOp = getconst('AddOp')
+        self.AndOp = getconst('AndOp')
+        self.DivOp = getconst('DivOp')
+        self.FracOp = getconst('FracOp')
+        self.GeOp = getconst('GeOp')
+        self.GtOp = getconst('GtOp')
+        self.ImpliesOp = getconst('ImpliesOp')
+        self.IntPermMulOp = getconst('IntPermMulOp')
+        self.LeOp = getconst('LeOp')
+        self.LtOp = getconst('LtOp')
+        self.ModOp = getconst('ModOp')
+        self.MulOp = getconst('MulOp')
+        self.NegOp = getconst('NegOp')
+        self.NotOp = getconst('NotOp')
+        self.OrOp = getconst('OrOp')
+        self.PermAddOp = getconst('PermAddOp')
+        self.PermDivOp = getconst('PermDivOp')
+        self.SubOp = getconst('SubOp')
+        self.NoPosition = getconst('NoPosition')
+        self.NoInfo = getconst('NoInfo')
+        self.Int = getconst('Int')
+        self.Bool = getconst('Bool')
+        self.Ref = getconst('Ref')
+        self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
-        self.none = getobject(scala, "None")
+        self.none = getobject(scala, 'None')
 
     def empty_seq(self):
         return self.scala.collection.mutable.ListBuffer()
@@ -392,8 +392,12 @@ class ViperAST:
         return self.ast.NullLit(position, info)
 
     def Forall(self, variables, triggers, exp, position, info):
-        return self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
+        res = self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
                                exp, position, info)
+        if res.isPure():
+            return res
+        else:
+            return self.QPs.rewriteForall(res)
 
     def Trigger(self, exps, position, info):
         return self.ast.Trigger(self.to_seq(exps), position, info)

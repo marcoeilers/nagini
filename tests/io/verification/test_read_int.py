@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Requires, Ensures, Result, Import
+from py2viper_contracts.contracts import Requires, Ensures, Result
 from py2viper_contracts.io import *
 from typing import Tuple, Callable
 
@@ -8,7 +8,6 @@ from resources.library import (
     write_int_io,
     write_int,
 )
-Import('resources/library.py')
 
 
 # Read only.

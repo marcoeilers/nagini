@@ -4,6 +4,7 @@ import mypy
 
 from abc import ABCMeta
 from collections import OrderedDict
+from enum import Enum
 from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
     END_LABEL,
@@ -15,10 +16,32 @@ from py2viper_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
+from py2viper_translation.lib.views import (
+    CombinedDict,
+    ModuleDictView,
+)
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.typeinfo import TypeInfo
-from py2viper_translation.lib.util import InvalidProgramException
-from typing import Any, Dict, List, Optional, Set, Tuple
+from py2viper_translation.lib.util import (
+    get_func_name,
+    InvalidProgramException,
+)
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+
+class ContainerInterface(metaclass=ABCMeta):
+    """
+    Interface implemented by PythonNodes that can contain other PythonNodes,
+    and by the translation context. Enables others to get the context of
+    this container.
+    """
+    @abc.abstractmethod
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
 
 
 class PythonScope:
@@ -54,27 +77,42 @@ class PythonScope:
         else:
             return self.superscope.get_scope_prefix() + [self.name]
 
-    def get_program(self) -> 'PythonProgram':
+    def get_module(self) -> 'PythonModule':
         if self.superscope is not None:
-            return self.superscope.get_program()
+            return self.superscope.get_module()
         else:
             return self
 
 
-class PythonProgram(PythonScope):
+class PythonModule(PythonScope, ContainerInterface):
     def __init__(self, types: TypeInfo,
-                 node_factory: 'ProgramNodeFactory') -> None:
-        super().__init__(VIPER_KEYWORDS + INTERNAL_NAMES, None)
+                 node_factory: 'ProgramNodeFactory',
+                 type_prefix: str,
+                 global_module: 'PythonModule',
+                 sil_names: List[str] = None) -> None:
+        """
+        Represents a module, i.e. either a directory that only contains other
+        modules or an actual file that may contain classes, methods etc.
+
+        :param type_prefix: The prefix identifying this module in TypeInfo.
+        :param global_module: The module containing globally available elements.
+        :param sil_names: List of all used Silver names, shared between modules.
+        """
+        if sil_names is None:
+            sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
+        super().__init__(sil_names, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.predicates = OrderedDict()
         self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
+        self.namespaces = OrderedDict()
+        self.global_module = global_module
+        self.type_prefix = type_prefix
+        self.from_imports = []
+        self.node_factory = node_factory
         self.types = types
-        for primitive in PRIMITIVES:
-            self.classes[primitive] = node_factory.create_python_class(
-                primitive, self, node_factory)
 
     def process(self, translator: 'Translator') -> None:
         for name, cls in self.classes.items():
@@ -94,10 +132,46 @@ class PythonProgram(PythonScope):
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
-        if name in self.functions:
-            return self.functions[name]
-        else:
-            return self.methods[name]
+        for module in [self] + self.from_imports + [self.global_module]:
+            if name in module.functions:
+                return module.functions[name]
+            elif name in module.methods:
+                return module.methods[name]
+
+    def get_type(self, prefixes: List[str],
+                 name: str) -> Tuple[str, Dict[Tuple[int, int], str]]:
+        """
+        Returns the main type and the alternative types of the element
+        identified by this name found under this prefix in the current module.
+        E.g., the type of local variable 'a' from method 'm' in class 'C'
+        will be returned for the input (['C', 'm'], 'a').
+        """
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefixes)
+        return self.types.get_type(actual_prefix, name)
+
+    def get_func_type(self, prefix: List[str]):
+        actual_prefix = [self.type_prefix]
+        actual_prefix.extend(prefix)
+        return self.types.get_func_type(actual_prefix)
+
+    def get_included_modules(
+            self, include_global: bool = True) -> List['PythonModule']:
+        result = [self]
+        for p in self.from_imports:
+            result.extend(p.get_included_modules(include_global=False))
+        result.append(self.global_module)
+        return result
+
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        dicts = [self.classes,  self.functions, self.global_vars, self.methods,
+                 self.predicates, self.io_operations, self.namespaces]
+        return CombinedDict([], dicts)
 
 
 class PythonNode:
@@ -114,7 +188,7 @@ class PythonType(metaclass=ABCMeta):
     pass
 
 
-class PythonClass(PythonType, PythonNode, PythonScope):
+class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
     Represents a class in the Python program.
     """
@@ -123,7 +197,7 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                  node_factory: 'ProgramNodeFactory', node: ast.AST = None,
                  superclass: 'PythonClass' = None, interface=False):
         """
-        :param superscope: The scope, usually program, this belongs to.
+        :param superscope: The scope, usually module, this belongs to.
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
@@ -133,11 +207,14 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         self.superclass = superclass
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.static_methods = OrderedDict()
         self.predicates = OrderedDict()
         self.fields = OrderedDict()
+        self.static_fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
         self.defined = False
+        self._has_classmethod = False
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -154,6 +231,9 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         """
         if name in self.fields:
             field = self.fields[name]
+            assert field.type == type
+        elif name in self.static_fields:
+            field = self.static_fields[name]
             assert field.type == type
         else:
             field = self.node_factory.create_python_field(name, node,
@@ -172,12 +252,26 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         else:
             return None
 
+    def get_static_field(self, name: str) -> Optional['PythonVar']:
+        """
+        Returns the static field with the given name in this class or a
+        superclass.
+        """
+        if name in self.static_fields:
+            return self.static_fields[name]
+        elif self.superclass is not None:
+            return self.superclass.get_static_field(name)
+        else:
+            return None
+
     def get_method(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the method with the given name in this class or a superclass.
         """
         if name in self.methods:
             return self.methods[name]
+        elif name in self.static_methods:
+            return self.static_methods[name]
         elif self.superclass is not None:
             return self.superclass.get_method(name)
         else:
@@ -223,7 +317,6 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
-
         return fields
 
     def get_all_sil_fields(self) -> List['silver.ast.Field']:
@@ -237,8 +330,15 @@ class PythonClass(PythonType, PythonNode, PythonScope):
                 if field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
-
         return fields
+
+    @property
+    def has_classmethod(self) -> bool:
+        if self._has_classmethod:
+            return True
+        if self.superclass:
+            return self.superclass.has_classmethod
+        return False
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -252,12 +352,18 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         for name, method in self.methods.items():
             method_name = self.name + '_' + name
             method.process(self.get_fresh_name(method_name), translator)
+        for name, method in self.static_methods.items():
+            method_name = self.name + '_' + name
+            method.process(self.get_fresh_name(method_name), translator)
         for name, predicate in self.predicates.items():
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)
         for name, field in self.fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name))
+        for name, field in self.static_fields.items():
+            field_name = self.name + '_' + name
+            field.process(self.get_fresh_name(field_name), translator)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -265,6 +371,19 @@ class PythonClass(PythonType, PythonNode, PythonScope):
         if self.superclass is None:
             return False
         return self.superclass.issubtype(cls)
+
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        dicts = [self.functions,  self.methods, self.static_methods,
+                 self.predicates]
+        if not only_top:
+            dicts.append(self.fields)
+            dicts.append(self.static_fields)
+        return CombinedDict([], dicts)
 
 
 class GenericType(PythonType):
@@ -274,19 +393,19 @@ class GenericType(PythonType):
     behaves like the underlying PythonClass (in this case list).
     """
 
-    def __init__(self, name: str, program: PythonProgram,
+    def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
-        self.name = name
-        self.program = program
-        self.cls = self.program.classes[self.name]
+        self.name = cls.name
+        self.module = cls.get_module()
+        self.cls = cls
         self.type_args = args
         self.exact_length = True
 
     def get_class(self) -> PythonClass:
         return self.cls
 
-    def get_program(self) -> 'PythonProgram':
-        return self.program
+    def get_module(self) -> 'PythonModule':
+        return self.module
 
     @property
     def sil_name(self) -> str:
@@ -327,8 +446,24 @@ class GenericType(PythonType):
         """
         return self.get_class().get_predicate(name)
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, GenericType):
+            return False
+        if self.cls != other.cls or len(self.type_args) != len(other.type_args):
+            return False
+        for my_arg, other_arg in zip(self.type_args, other.type_args):
+            if my_arg != other_arg:
+                return False
+        return True
 
-class PythonMethod(PythonNode, PythonScope):
+
+class MethodType(Enum):
+    normal = 0
+    static_method = 1
+    class_method = 2
+
+
+class PythonMethod(PythonNode, PythonScope, ContainerInterface):
     """
     Represents a Python function which may be pure or impure, belong
     to a class or not
@@ -339,10 +474,11 @@ class PythonMethod(PythonNode, PythonScope):
                  pure: bool, contract_only: bool,
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
-                 interface_dict: Dict[str, Any] = None):
+                 interface_dict: Dict[str, Any] = None,
+                 method_type: MethodType = MethodType.normal):
         """
         :param cls: Class this method belongs to, if any.
-        :param superscope: The scope (class or program) this method belongs to
+        :param superscope: The scope (class or module) this method belongs to
         :param pure: True iff ir's a pure function, not an impure method
         :param contract_only: True iff we're not generating the method's
         implementation, just its contract
@@ -380,6 +516,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.labels = [END_LABEL]
+        self.method_type = method_type
         self.obligation_info = None
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
 
@@ -401,7 +538,7 @@ class PythonMethod(PythonNode, PythonScope):
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
             return
-        func_type = self.get_program().types.get_func_type(
+        func_type = self.get_module().types.get_func_type(
             self.get_scope_prefix())
         if self.type is not None:
             self.result = self.node_factory.create_python_var(RESULT_NAME, None,
@@ -416,7 +553,8 @@ class PythonMethod(PythonNode, PythonScope):
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         for name in self.special_vars:
-            self.special_vars[name].process(self.get_fresh_name(name), translator)
+            self.special_vars[name].process(self.get_fresh_name(name),
+                                            translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
 
@@ -448,6 +586,15 @@ class PythonMethod(PythonNode, PythonScope):
         self._locals[name] = local
 
     @property
+    def special_args(self) -> Dict:
+        result = {}
+        if self.kw_arg:
+            result[self.kw_arg.name] = self.kw_arg
+        if self.var_arg:
+            result[self.var_arg.name] = self.var_arg
+        return result
+
+    @property
     def special_vars(self) -> OrderedDict:
         return self._special_vars
 
@@ -477,7 +624,7 @@ class PythonMethod(PythonNode, PythonScope):
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_program().global_vars.get(name)
+            return self.get_module().global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
@@ -514,8 +661,17 @@ class PythonMethod(PythonNode, PythonScope):
         else:
             return []
 
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        dicts = [self.args,  self.special_args, self.locals, self.special_vars]
+        return CombinedDict([], dicts)
 
-class PythonIOOperation(PythonNode, PythonScope):
+
+class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
     """
     Represents an IO operation which may be basic or not.
 
@@ -555,18 +711,24 @@ class PythonIOOperation(PythonNode, PythonScope):
             var.process(self.get_fresh_name(var.name), translator)
 
     def process(self, sil_name: str, translator: 'Translator',
-                program: PythonProgram) -> None:
+                module: PythonModule) -> None:
         """
         Creates fresh Silver names for preset, postset, inputs and
         outputs. Also, sets the ``sil_name``.
         """
         if self._body is not None:
+            def find_op(node: ast.AST, containers: List, container):
+                result = get_target(node, containers, container)
+                if isinstance(result, PythonIOOperation):
+                    return result
+                return None
             body_checker = IOOperationBodyChecker(
                 self._body,
                 self.get_results(),
                 self._io_existentials,
-                program,
-                translator)
+                module,
+                translator,
+                find_op)
             body_checker.check()
         self.sil_name = sil_name
         self._process_var_list(self._preset, translator)
@@ -713,6 +875,15 @@ class PythonIOOperation(PythonNode, PythonScope):
                 return var.create_io_existential_variable_instance()
         return None
 
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        return {}
+
+
 class PythonExceptionHandler(PythonNode):
     """
     Represents an except-block belonging to a try-block.
@@ -760,6 +931,9 @@ class PythonTryBlock(PythonNode):
         self.node_factory = node_factory
         self.finally_name = None
         self.post_name = None
+        self.with_item = None
+        self.with_var = None
+        self.handler_aliases = {}
         method.labels.append(try_name)
 
     def get_finally_var(self, translator: 'Translator') -> 'PythonVar':
@@ -774,7 +948,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_program().classes[INT_TYPE]
+        int_type = self.method.get_module().global_module.classes[INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -790,7 +964,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_program().classes['Exception']
+        exc_type = self.method.get_module().global_module.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
@@ -844,9 +1018,9 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         super().process(sil_name, translator)
         self._translator = translator
-        prog = self.type.get_program()
-        self.decl = translator.translate_pythonvar_decl(self, prog)
-        self._ref = translator.translate_pythonvar_ref(self, prog, None, None)
+        module = self.type.get_module()
+        self.decl = translator.translate_pythonvar_decl(self, module)
+        self._ref = translator.translate_pythonvar_ref(self, module, None, None)
 
     def ref(self, node: ast.AST=None,
             ctx: 'Context'=None) -> 'silver.ast.LocalVarRef':
@@ -857,8 +1031,8 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         if not node:
             return self._ref
-        prog = self.type.get_program()
-        return self._translator.translate_pythonvar_ref(self, prog, node, ctx)
+        module = self.type.get_module()
+        return self._translator.translate_pythonvar_ref(self, module, node, ctx)
 
 
 class PythonGlobalVar(PythonVarBase):
@@ -1087,3 +1261,82 @@ class ProgramNodeFactory:
                             interface=False):
         return PythonClass(name, superscope, node_factory, node,
                            superclass, interface)
+
+
+def get_target(node: ast.AST,
+               containers: List[ContainerInterface],
+               container: PythonNode) -> PythonNode:
+    """
+    Finds the PythonNode that the given 'node' refers to, e.g. a PythonClass or
+    a PythonVar, if the immediate container (e.g. a PythonMethod) of the node
+    is 'container', by looking in the given 'containers' (can be e.g.
+    PythonMethods, the Context, PythonModules, etc).
+    """
+    if isinstance(node, ast.Name):
+        # Just look for something with this name in the given containers
+        for lhs in containers:
+            if lhs:
+                # Since this is a direct reference, only top level elements
+                # can be relevant.
+                options = lhs.get_contents(only_top=True)
+                if node.id in options:
+                    return options[node.id]
+        return None
+    elif isinstance(node, ast.Call):
+        # For calls, we return the type of the result of the call
+        func_name = get_func_name(node)
+        if (container and func_name == 'Result' and
+                isinstance(container, PythonMethod)):
+            # In this case the immediate container must be a method, and we
+            # return its result type
+            return container.type
+        elif (container and func_name == 'super' and
+                isinstance(container, PythonMethod)):
+            # Return the type of the current method's superclass
+            return container.cls.superclass
+        return get_target(node.func, containers, container)
+    elif isinstance(node, ast.Attribute):
+        # Find the type of the LHS, so that we can look through its members.
+        lhs = get_target(node.value, containers, container)
+        if (isinstance(lhs, PythonMethod) or
+                isinstance(lhs, PythonField)):
+            # For methods, get the return type, for fields the field type
+            lhs = lhs.type
+        elif isinstance(lhs, PythonVarBase):
+            # For variables, the type of the variable
+            col = node.col_offset if hasattr(node, 'col_offset') else None
+            key = (node.lineno, col)
+            if key in lhs.alt_types:
+                lhs = lhs.alt_types[key]
+            else:
+                lhs = lhs.type
+        if isinstance(lhs, GenericType) and lhs.name == 'type':
+            # For direct references to type objects, we want to lookup things
+            # defined in the class. So instead of type[C], we want to look in
+            # class C directly here.
+            lhs = lhs.type_args[0]
+        if isinstance(lhs, GenericType):
+            # Use the class, since we want to look for members.
+            lhs = lhs.cls
+        # Now collect all containers we have to look through
+        containers = []
+        if isinstance(lhs, PythonModule):
+            # We have to look through all included modules as well, but not
+            # through the global one, since it makes no sense to refer to
+            # global stuff by looking in a different module
+            containers.extend(lhs.get_included_modules(include_global=False))
+        else:
+            containers.append(lhs)
+        while (isinstance(containers[-1], PythonClass) and
+                containers[-1].superclass):
+            # If we're looking in a class, add all superclasses as well.
+            containers.append(containers[-1].superclass)
+        for lhs in containers:
+            if lhs:
+                # Look in all contents, including non-top-level
+                options = lhs.get_contents(only_top=False)
+                if node.attr in options:
+                    return options[node.attr]
+        return None
+    else:
+        return None

@@ -1,7 +1,6 @@
 from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
-    Import,
     Requires,
     Result,
 )
@@ -10,7 +9,6 @@ from py2viper_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-Import('io_builtins')
 from py2viper_contracts.obligations import (
     MustTerminate,
 )
@@ -19,7 +17,6 @@ from verifast.stdio_simple import (
     write_char_io,
     putchar,
 )
-Import('../stdio_simple.py')
 
 
 @IOOperation

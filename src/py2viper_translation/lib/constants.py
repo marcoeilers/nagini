@@ -1,7 +1,7 @@
 
 LITERALS = ['True', 'False', 'None']
 
-BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super', 'range']
+BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super', 'range', 'type']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
@@ -121,3 +121,13 @@ BOOL_TYPE = 'bool'
 OBJECT_TYPE = 'object'
 
 PRIMITIVES = [INT_TYPE, BOOL_TYPE]
+
+IGNORED_IMPORTS = {'abc',
+                   'builtins',
+                   'py2viper_contracts',
+                   'py2viper_contracts.contracts',
+                   'py2viper_contracts.io',
+                   'py2viper_contracts.obligations',
+                   'threading',
+                   'typing',
+                   }

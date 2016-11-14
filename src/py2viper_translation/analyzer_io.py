@@ -23,10 +23,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             self, parent: 'py2viper_translation.analyzer.Analyzer',
             node_factory: nodes.ProgramNodeFactory) -> None:
         self._parent = parent
-        self._program = parent.program
         self._types = parent.types
         self._node_factory = node_factory
-        self._place_class = parent.get_class('Place')  # type: nodes.PythonClass
+        self._place_class = parent.find_or_create_class('Place',
+            module=parent.module.global_module)
 
         self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
@@ -48,23 +48,23 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         """Create IO operation.
 
         Creates non-initialized IO operation from an AST node and adds
-        it to program.
+        it to the module.
         """
         name = node.name
         assert isinstance(name, str)
         operation = self._node_factory.create_python_io_operation(
             name,
             node,
-            self._program,
+            self._parent.module,
             self._node_factory,
         )
-        self._program.io_operations[name] = operation
+        self._parent.module.io_operations[name] = operation
         return operation
 
     def _check_type(self) -> None:
         """Check if operation type is ``bool``."""
-        scope_prefix = self._current_io_operation.get_scope_prefix()
-        func_type = self._types.get_func_type(scope_prefix)
+        op_name = self._current_io_operation.name
+        func_type = self._parent.module.get_func_type([op_name])
         if isinstance(func_type, AnyType):
             self._raise_invalid_operation('return_type_not_bool')
         operation_type = self._parent.convert_type(func_type)
@@ -97,7 +97,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             prefix = construct_lambda_prefix(
                 lambda_.lineno, lambda_.col_offset)
             scopes.append(prefix)
-        typ, _ = self._parent.types.get_type(scopes, node.arg)
+        typ, _ = self._parent.module.get_type(scopes, node.arg)
         return self._parent.convert_type(typ)
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:

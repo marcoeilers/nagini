@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.analyzer import PythonProgram, PythonVar
+from py2viper_translation.analyzer import PythonModule, PythonVar
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -76,28 +76,28 @@ class Translator:
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
-    def translate_program(self, program: PythonProgram,
+    def translate_program(self, modules: List[PythonModule],
                           sil_progs: List) -> 'silver.ast.Program':
         ctx = Context()
         ctx.current_class = None
         ctx.current_function = None
-        ctx.program = program
-        return self.prog_translator.translate_program(program, sil_progs, ctx)
+        ctx.module = modules[0]
+        return self.prog_translator.translate_program(modules, sil_progs, ctx)
 
     def translate_pythonvar_decl(self, var: PythonVar,
-            program: PythonProgram) -> 'silver.ast.LocalVarDecl':
-        # we need a context object here
+            module: PythonModule) -> 'silver.ast.LocalVarDecl':
+        # We need a context object here
         ctx = Context()
-        ctx.program = program
+        ctx.module = module
         return self.expr_translator.translate_pythonvar_decl(var, ctx)
 
     def translate_pythonvar_ref(self, var: PythonVar,
-                                program: PythonProgram,
+                                module: PythonModule,
                                 node: ast.AST, ctx: Context) -> Expr:
-        # we need a context object here
+        # We need a context object here
         if not ctx:
             ctx = Context()
-            ctx.program = program
+            ctx.module = module
         return self.expr_translator.translate_pythonvar_ref(var, node, ctx)
 
     def to_position(self, node: ast.AST, ctx: Context) -> 'silver.ast.Position':

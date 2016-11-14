@@ -52,7 +52,7 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         assert ctx.actual_function
 
         name = get_func_name(node)
-        operation = ctx.program.io_operations[name]
+        operation = self.get_target(node, ctx)
         parameters_count = len(operation.get_parameters())
         args = self.translate_args(node.args[:parameters_count], ctx)
         perm = self._construct_full_perm(node, ctx)
@@ -135,9 +135,9 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         operation_call = cast(ast.Call, operation_call)
         operation_name = cast(ast.Name, operation_call.func).id
 
-        if operation_name not in ctx.program.io_operations:
+        if operation_name not in ctx.module.io_operations:
             raise_invalid_get_ghost_output('argument_not_io_operation', node)
-        operation = ctx.program.io_operations[operation_name]
+        operation = ctx.module.io_operations[operation_name]
 
         result = None
         for result in operation.get_results():

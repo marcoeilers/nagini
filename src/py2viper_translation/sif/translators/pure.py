@@ -64,7 +64,7 @@ class SIFPureTranslator(PureTranslator):
         tl_let = TLAssignWrapper(TL_VAR_NAME, conds, node.test, node)
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.program.classes[BOOL_TYPE], self.translator)
+            ctx.module.global_module.classes[BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.name, conds, cond, node)
         then_cond = conds + [cond_var.name]
         else_cond = conds + [NotWrapper(cond_var.name)]
@@ -130,10 +130,10 @@ class SIFPureTranslator(PureTranslator):
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref()
             else:
-                # variable newly defined in conditional branch, so
+                # Variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
                 # if the condition is false.
-                # our encoding requires some value though, even
+                # Our encoding requires some value though, even
                 # though that will never be used, so we take some dummy
                 # value.
                 zero = self.viper.IntLit(0, self.no_position(ctx),
@@ -192,7 +192,7 @@ class SIFPureTranslator(PureTranslator):
                                ctx: SIFContext) -> List[Wrapper]:
         # Add a wrapper for '__tl_0 = __tl'
         tl_var = ctx.current_function.create_variable(TL_VAR_NAME,
-           ctx.program.classes[BOOL_TYPE], self.translator)
+            ctx.module.global_module.classes[BOOL_TYPE], self.translator)
         node = ast.Name(id=ctx.current_function.tl_var.name, ctx=ast.Load())
         tl_wrapper = TLAssignWrapper(tl_var.name, [], node, None, False)
         return [tl_wrapper] + super()._translate_to_wrappers(nodes, ctx)
@@ -253,8 +253,8 @@ class SIFPureTranslator(PureTranslator):
                                           function: SIFPythonMethod,
                                           ctx: SIFContext) -> Expr:
         if wrapper.cond:
-            wrapper.cond = self._translate_condition(wrapper.cond, wrapper.names,
-                                                     ctx)
+            wrapper.cond = self._translate_condition(wrapper.cond,
+                                                     wrapper.names, ctx)
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
         or_expr = self.viper.Or(wrapper.join_wrappers[0].var.ref(),

@@ -1,6 +1,5 @@
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Requires,
     Result,
 )
@@ -14,7 +13,6 @@ from verifast.stdio_simple import (
     write_char_io,
     putchar,
 )
-Import('stdio_simple.py')
 
 
 def main(t1: Place) -> Place:

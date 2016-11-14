@@ -1,7 +1,6 @@
 from py2viper_contracts.contracts import (
     ContractOnly,
     Ensures,
-    Import,
     Requires,
     Result,
 )
@@ -12,13 +11,11 @@ from py2viper_contracts.obligations import (
 from verifast.stdio_simple import (
     putchar,
 )
-Import('../stdio_simple.py')
 
 from verifast.user_sets_contract.specification import (
     example_io,
     Interface,
 )
-Import('specification.py')
 
 
 class Implementation(Interface):
