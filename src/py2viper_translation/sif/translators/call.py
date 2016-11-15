@@ -258,12 +258,14 @@ class SIFCallTranslator(CallTranslator):
         func_name = get_func_name(node)
         if node in self.translated_calls:
             assert len(self.translated_calls[node])
-            return [], self.translated_calls[node].next()
+            call_expr = self.translated_calls[node].next()
+            if call_expr:
+                return [], call_expr
         elif func_name in CONTRACT_FUNCS:
             # Contract functions need no CallResult.
             return self.translate_contractfunc_call(node, ctx)
-        else:
-            self.translated_calls[node] = CallResults()
-            return super().translate_Call(node, ctx)
+
+        self.translated_calls[node] = CallResults()
+        return super().translate_Call(node, ctx)
 
 
