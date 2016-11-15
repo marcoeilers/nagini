@@ -516,6 +516,14 @@ class ExpressionTranslator(CommonTranslator):
                                                     [left, right],
                                                     [left_type, right_type],
                                                     node, ctx)
+            elif compare_func == '__ne__' and left_type.get_function('__eq__'):
+                # The default behavior if __ne__ is not explicitly defined
+                # is to invert the result of __eq__.
+                call = self.get_function_call(left_type, '__eq__',
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                comparison = self.viper.Not(call, position, info)
             else:
                 raise InvalidProgramException(node, 'undefined.comparison')
         return stmts, comparison
