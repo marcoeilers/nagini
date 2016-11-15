@@ -29,17 +29,19 @@ class IOOperationBodyChecker(ast.NodeVisitor):
             self, body: ast.Expr,
             results: List['lib.program_nodes.PythonVar'],
             io_existentials: List['lib.program_nodes.PythonVarCreator'],
-            program: 'lib.program_nodes.PythonProgram',
-            translator: 'Translator') -> None:
+            module: 'lib.program_nodes.PythonModule',
+            translator: 'Translator',
+            op_find) -> None:
         super().__init__()
         self._body = body
         self._results = {var.name for var in results}
         self._existentials = dict(
             (var.name, var) for var in io_existentials)
         self._undefined_existentials = set(self._existentials.keys())
-        self._program = program
+        self._module = module
         self._translator = translator
         self._counter = 0
+        self.op_find = op_find
 
     def check(self) -> None:
         """Check that body is well formed."""
@@ -57,9 +59,13 @@ class IOOperationBodyChecker(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         """Check IO operation use and define existential variables."""
-        if (isinstance(node.func, ast.Name) and
-                node.func.id in self._program.io_operations):
-            operation = self._program.io_operations[node.func.id]
+        containers = [self._module]
+        containers.extend(self._module.get_included_modules())
+        target = None
+        if not isinstance(node.func, ast.Call):
+            target = self.op_find(node, containers, None)
+        if target and target.__class__.__name__ == 'PythonIOOperation':
+            operation = target
             parameter_count = len(operation.get_parameters())
             results = node.args[parameter_count:]
             for i, arg in enumerate(results):

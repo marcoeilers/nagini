@@ -224,9 +224,9 @@ class SIFCallTranslator(CallTranslator):
         arg_stmts, args, _ = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
-        if name in ctx.program.classes:
+        if name in ctx.module.classes:
             # This is a constructor call.
-            target_class = ctx.program.classes[name]
+            target_class = ctx.module.classes[name]
             return self._translate_constructor_call(target_class, node, args,
                                                     arg_stmts, ctx)
         if isinstance(node.func, ast.Attribute):
@@ -239,7 +239,7 @@ class SIFCallTranslator(CallTranslator):
         else:
             # Global function/method called.
             recv_cls = None
-            target = ctx.program.get_func_or_method(name)
+            target = ctx.module.get_func_or_method(name)
 
         assert target, "Predicates not supported yet."
         if target.pure:

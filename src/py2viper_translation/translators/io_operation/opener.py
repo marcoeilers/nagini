@@ -8,6 +8,7 @@ from typing import cast, List
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.io_context import IOOpenContext
 from py2viper_translation.lib.program_nodes import (
+    get_target,
     PythonIOOperation,
     PythonVar,
 )
@@ -31,9 +32,11 @@ def _get_opened_operation(
     if (len(node.args) == 1 and
             isinstance(node.args[0], ast.Call) and
             isinstance(node.args[0].func, ast.Name)):
-        name = node.args[0].func.id
-        if name in ctx.program.io_operations:
-            return ctx.program.io_operations[name]
+        containers = [ctx.module]
+        containers.extend(ctx.module.get_included_modules())
+        target = get_target(node.args[0], containers, None)
+        if isinstance(target, PythonIOOperation):
+            return target
     raise_invalid_operation_use('open_non_io_operation', node)
 
 
@@ -107,7 +110,9 @@ class Opener:
             self._define_input_aliases()
             self._define_output_aliases(sil_args)
             self._define_existential_variables()
+            self._ctx.inlined_calls.append(self._operation)
             body = self._translate_body()
+            self._ctx.inlined_calls.pop()
         statements = self._emit_existential_variable_definitions()
         statements.append(self._emit_body_inhale(body))
         return statements

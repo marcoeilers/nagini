@@ -70,6 +70,8 @@ function set___sil_seq__(self: Ref): Seq[Ref]
     requires acc(self.set_acc, wildcard)
     ensures |result| == |self.set_acc|
     ensures forall c: Ref :: {c in self.set_acc} {c in result} c in self.set_acc <==> c in result
+    ensures forall i: Int :: !(result[i] in result[..i])
+    ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), get_type_arg1(self, 0))
 
 field dict_acc : Set[Ref]
 

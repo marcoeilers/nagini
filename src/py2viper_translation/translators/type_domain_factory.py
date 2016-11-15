@@ -57,8 +57,10 @@ class TypeDomainFactory:
         """
         Creates the type domain function and subtype axiom for this class
         """
-
-        supertype = OBJECT_TYPE if not cls.superclass else cls.superclass.sil_name
+        if not cls.superclass:
+            supertype = OBJECT_TYPE
+        else:
+            supertype = cls.superclass.sil_name
         position = self.to_position(cls.node, ctx)
         info = self.no_info(ctx)
         type_func = self.create_type_function(cls.sil_name, position, info, ctx)
@@ -212,8 +214,8 @@ class TypeDomainFactory:
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
-    def create_subtype_exclusion_axiom(self,
-                                       ctx: Context) -> 'silver.ast.DomainAxiom':
+    def create_subtype_exclusion_axiom(
+            self, ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that states that two types that directly extend
         another type cannot be subtypes of each other:
@@ -377,37 +379,56 @@ class TypeDomainFactory:
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
-    def create_none_type_subtype_axiom(self,
-                                       ctx: Context) -> 'silver.ast.DomainAxiom':
+    def create_none_type_subtype_axiom(
+            self, ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         Creates an axiom that states that no type is a subtype of NoneType:
 
-        forall sub: PyType ::
-        { issubtype(sub, NoneType()) }
-        !issubtype(sub, NoneType())
+        forall sub: PyType, r: Ref ::
+        { issubtype(typeof(r), sub) }
+        issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
         """
         arg_sub = self.viper.LocalVarDecl('sub', self.type_type(),
                                           self.no_position(ctx),
                                           self.no_info(ctx))
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
+        arg_r = self.viper.LocalVarDecl('r', self.viper.Ref,
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        var_r = self.viper.LocalVar('r', self.viper.Ref,
+                                    self.no_position(ctx), self.no_info(ctx))
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
                                              self.no_info(ctx),
                                              self.type_domain)
+        typeof = self.viper.DomainFuncApp('typeof', [var_r], {},
+                                          self.type_type(), [var_r],
+                                          self.no_position(ctx),
+                                          self.no_info(ctx),
+                                          self.type_domain)
         subtype = self.viper.DomainFuncApp('issubtype',
-                                           [var_sub, none_type], {},
+                                           [typeof, var_sub], {},
                                            self.viper.Bool,
-                                           [var_sub, none_type],
+                                           [typeof, var_sub],
                                            self.no_position(ctx),
                                            self.no_info(ctx), self.type_domain)
-        not_subtype = self.viper.Not(subtype, self.no_position(ctx),
-                                     self.no_info(ctx))
+        not_none = self.viper.NeCmp(var_sub, none_type, self.no_position(ctx),
+                                    self.no_info(ctx))
+        not_null = self.viper.NeCmp(var_r,
+                                    self.viper.NullLit(self.no_position(ctx),
+                                                       self.no_info(ctx)),
+                                    self.no_position(ctx), self.no_info(ctx))
+        implication = self.viper.Implies(self.viper.And(subtype, not_none,
+                                                        self.no_position(ctx),
+                                                        self.no_info(ctx)),
+                                         not_null, self.no_position(ctx),
+                                         self.no_info(ctx))
         trigger = self.viper.Trigger([subtype], self.no_position(ctx),
                                      self.no_info(ctx))
-        body = self.viper.Forall([arg_sub], [trigger],
-                                 not_subtype, self.no_position(ctx),
+        body = self.viper.Forall([arg_sub, arg_r], [trigger],
+                                 implication, self.no_position(ctx),
                                  self.no_info(ctx))
         return self.viper.DomainAxiom('none_type_subtype', body,
                                       self.no_position(ctx), self.no_info(ctx),
@@ -446,7 +467,8 @@ class TypeDomainFactory:
                                             self.no_position(ctx),
                                             self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
-                                        self.no_position(ctx), self.no_info(ctx))
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
 
         sub_middle = self.viper.DomainFuncApp('issubtype',
                                               [var_sub, var_middle], {},
@@ -487,9 +509,9 @@ class TypeDomainFactory:
         Creates the reflexivity axiom for the PyType domain:
         forall type: PyType :: { issubtype(type, type) } issubtype(type, type)
         """
-        arg = self.viper.LocalVarDecl('type', self.type_type(),
+        arg = self.viper.LocalVarDecl('type_', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
-        var = self.viper.LocalVar('type', self.type_type(),
+        var = self.viper.LocalVar('type_', self.type_type(),
                                   self.no_position(ctx), self.no_info(ctx))
         reflexive_subtype = self.viper.DomainFuncApp('issubtype', [var, var],
                                                      {}, self.viper.Bool,
@@ -596,6 +618,48 @@ class TypeDomainFactory:
     def extends_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.subtype_func('extends_', ctx)
 
+    def dynamic_type_check(self, lhs: 'Expr',
+                           type: 'Expr', position: 'silver.ast.Position',
+                           ctx: Context):
+        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                             self.type_type(), [lhs],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        result = self.viper.EqCmp(type_func, type, self.no_position(ctx),
+                                  self.no_info(ctx))
+        return result
+
+    def typeof(self, arg: 'Expr', ctx: Context) -> 'Expr':
+        type_func = self.viper.DomainFuncApp('typeof', [arg], {},
+                                             self.type_type(), [arg],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        return type_func
+
+    def subtype_check(self, subtype: 'Expr', type: 'PythonType',
+                      position: 'silver.ast.Position',
+                      ctx: Context) -> Expr:
+        supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
+                                                  self.type_type(), [],
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx),
+                                                  self.type_domain)
+        var_sub = self.viper.LocalVar('sub', self.type_type(),
+                                      self.no_position(ctx), self.no_info(ctx))
+        var_super = self.viper.LocalVar('super', self.type_type(),
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        result = self.viper.DomainFuncApp('issubtype',
+                                          [subtype, supertype_func], {},
+                                          self.viper.Bool,
+                                          [var_sub, var_super],
+                                          position,
+                                          self.no_info(ctx),
+                                          self.type_domain)
+        return result
+
     def type_check(self, lhs: 'Expr', type: 'PythonType',
                    position: 'silver.ast.Position',
                    ctx: Context) -> Expr:
@@ -603,16 +667,16 @@ class TypeDomainFactory:
         Creates an expression checking if the given lhs expression
         is of the given type
         """
-        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
-                                             self.type_type(), [lhs],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
         supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
                                                   self.type_type(), [],
                                                   self.no_position(ctx),
                                                   self.no_info(ctx),
                                                   self.type_domain)
+        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
+                                             self.type_type(), [lhs],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
@@ -626,6 +690,15 @@ class TypeDomainFactory:
                                           self.no_info(ctx),
                                           self.type_domain)
         return result
+
+    def translate_type_literal(self, type: 'PythonClass', node: ast.AST,
+                               ctx: Context) -> Expr:
+        type_func = self.viper.DomainFuncApp(type.sil_name, [], {},
+                                             self.type_type(), [],
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        return type_func
 
     def type_arg_check(self, lhs: Expr, arg: 'PythonType',
                        indices: List['Expr'], ctx: Context) -> 'Expr':

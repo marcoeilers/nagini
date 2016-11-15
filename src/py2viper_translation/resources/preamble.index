@@ -319,5 +319,7 @@
         }
     },
     "extends": "object"
+},
+"type": {}
 }
-}
+

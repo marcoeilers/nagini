@@ -82,7 +82,7 @@ class PureTranslator(CommonTranslator):
         """
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
-            ctx.program.classes[BOOL_TYPE], self.translator)
+            ctx.module.global_module.classes[BOOL_TYPE], self.translator)
         cond_let = AssignWrapper(cond_var.name, conds, cond, node)
         then_cond = conds + [cond_var.name]
         else_cond = conds + [NotWrapper(cond_var.name)]
@@ -157,10 +157,10 @@ class PureTranslator(CommonTranslator):
             if wrapper.name in ctx.var_aliases:
                 old_val = ctx.var_aliases[wrapper.name].ref()
             else:
-                # variable newly defined in conditional branch, so
+                # Variable newly defined in conditional branch, so
                 # there is no old value; the variable is not defined
                 # if the condition is false.
-                # our encoding requires some value though, even
+                # Our encoding requires some value though, even
                 # though that will never be used, so we take some dummy
                 # value.
                 zero = self.viper.IntLit(0, self.no_position(ctx),

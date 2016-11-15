@@ -14,10 +14,12 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
+    PythonGlobalVar,
     PythonIOExistentialVar,
+    PythonModule,
     PythonTryBlock,
     PythonType,
-    PythonVar
+    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -25,6 +27,7 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     join_expressions,
@@ -80,8 +83,8 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
         res_var = ctx.current_function.create_variable('dict',
-            ctx.program.classes[DICT_TYPE], self.translator)
-        dict_class = ctx.program.classes[DICT_TYPE]
+            ctx.module.global_module.classes[DICT_TYPE], self.translator)
+        dict_class = ctx.module.global_module.classes[DICT_TYPE]
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
@@ -99,7 +102,7 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_Set(self, node: ast.Set, ctx: Context) -> StmtsAndExpr:
-        set_class = ctx.program.classes[SET_TYPE]
+        set_class = ctx.module.global_module.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable(SET_TYPE,
             set_class, self.translator)
         constr_call = self.get_method_call(set_class, '__init__', [], [],
@@ -116,7 +119,7 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
-        list_class = ctx.program.classes[LIST_TYPE]
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
         targets = [res_var.ref()]
@@ -142,7 +145,7 @@ class ExpressionTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
-        str_type = ctx.program.classes[STRING_TYPE]
+        str_type = ctx.module.global_module.classes[STRING_TYPE]
         func_name = '__create__'
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
@@ -157,7 +160,7 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
-        tuple_class = ctx.program.classes[TUPLE_TYPE]
+        tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         func_name = '__create' + str(len(node.elts)) + '__'
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
@@ -212,7 +215,8 @@ class ExpressionTranslator(CommonTranslator):
                 error_string = '"method raises no exceptions"'
                 error_pos = self.to_position(call, ctx, error_string)
                 uncaught_option = self.viper.Exhale(
-                    self.viper.FalseLit(error_pos, self.no_info(ctx)), error_pos,
+                    self.viper.FalseLit(error_pos, self.no_info(ctx)),
+                    error_pos,
                     self.no_info(ctx))
 
         for block in relevant_try_blocks:
@@ -262,7 +266,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         for try_ in tries:
             if try_.finally_block:
-                # propagate return value
+                # Propagate return value
                 var_next = try_.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
@@ -272,7 +276,7 @@ class ExpressionTranslator(CommonTranslator):
                                                         number_two,
                                                         self.no_position(ctx),
                                                         self.no_info(ctx))
-                # goto finally block
+                # Goto finally block
                 label_name = ctx.get_label_name(try_.finally_name)
                 goto_next = self.viper.Goto(label_name,
                                             self.no_position(ctx),
@@ -292,7 +296,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         stmt, res = self.translate_expr(node, ctx, expression)
         type = self.get_type(node, ctx)
-        if type is ctx.program.classes[BOOL_TYPE]:
+        if type is ctx.module.global_module.classes[BOOL_TYPE]:
             return stmt, res
         args = [res]
         arg_type = self.get_type(node, ctx)
@@ -305,18 +309,22 @@ class ExpressionTranslator(CommonTranslator):
         return self.translate_expr(node.value, ctx)
 
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
-        if node.id in ctx.program.global_vars:
-            var = ctx.program.global_vars[node.id]
+        target = self.get_target(node, ctx)
+        if isinstance(target, PythonGlobalVar):
+            var = target
             type = self.translate_type(var.type, ctx)
             func_app = self.viper.FuncApp(var.sil_name, [],
                                           self.to_position(node, ctx),
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
+            if isinstance(target, PythonClass):
+                return [], self.type_factory.translate_type_literal(target,
+                    node, ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:
-                var = ctx.current_function.get_variable(node.id)
+                var = ctx.actual_function.get_variable(node.id)
             if (isinstance(var, PythonIOExistentialVar) and
                     not var.is_defined()):
                 raise InvalidProgramException(
@@ -328,10 +336,16 @@ class ExpressionTranslator(CommonTranslator):
         Returns the PythonField for a given ast.Attribute node.
         """
         recv = self.get_type(node.value, ctx)
+        if recv.name == 'type':
+            recv = recv.type_args[0]
         field = recv.get_field(node.attr)
         if not field:
+            if (isinstance(recv, PythonClass) and
+                    recv.get_static_field(node.attr)):
+                var = recv.static_fields[node.attr]
+                return var
             recv = self.get_type(node.value, ctx)
-            raise InvalidProgramException(node, 'field.nonexistant')
+            raise InvalidProgramException(node, 'field.nonexistent')
         while field.inherited is not None:
             field = field.inherited
         if field.is_mangled() and (field.cls is not ctx.current_class and
@@ -342,11 +356,38 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
-        stmt, receiver = self.translate_expr(node.value, ctx)
-        field = self._lookup_field(node, ctx)
-        return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
-                                             self.to_position(node, ctx),
-                                             self.no_info(ctx)))
+        target = self.get_target(node.value, ctx)
+        func_name = get_func_name(node.value)
+        if isinstance(target, PythonModule):
+            target = self.get_target(node, ctx)
+            if isinstance(target, PythonGlobalVar):
+                # Global var?
+                pos = self.to_position(node, ctx)
+                info = self.no_info(ctx)
+                var_type = self.translate_type(target.type, ctx)
+                return [], self.viper.FuncApp(target.sil_name, [], pos, info,
+                                              var_type, [])
+            else:
+                raise UnsupportedException(node)
+        elif isinstance(target, PythonClass) and func_name != 'Result':
+            field = target.static_fields[node.attr]
+            type = self.translate_type(field.type, ctx)
+            func_app = self.viper.FuncApp(field.sil_name, [],
+                                          self.to_position(node, ctx),
+                                          self.no_info(ctx), type, [])
+            return [], func_app
+        else:
+            stmt, receiver = self.translate_expr(node.value, ctx)
+            field = self._lookup_field(node, ctx)
+            if isinstance(field, PythonVar):
+                type = self.translate_type(field.type, ctx)
+                func_app = self.viper.FuncApp(field.sil_name, [],
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx), type, [])
+                return [], func_app
+            return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
+                                                 self.to_position(node, ctx),
+                                                 self.no_info(ctx)))
 
     def translate_UnaryOp(self, node: ast.UnaryOp,
                           ctx: Context) -> StmtsAndExpr:
@@ -413,7 +454,6 @@ class ExpressionTranslator(CommonTranslator):
                                          self.no_info(ctx)))
         else:
             raise UnsupportedException(node)
-
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:

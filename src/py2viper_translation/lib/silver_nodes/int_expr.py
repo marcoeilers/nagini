@@ -73,7 +73,7 @@ class PythonIntExpression(IntExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        int_class = ctx.program.classes['int']
+        int_class = ctx.module.global_module.classes['int']
         assert translator.get_type(self._node, ctx) is int_class
         stmt, expr = translator.translate_expr(
             self._node, ctx, expression=True)
