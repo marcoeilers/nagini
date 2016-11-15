@@ -17,24 +17,54 @@ import glob
 import os
 import sys
 
-from typing import List
-
 
 class SectionConfig:
     """A base class for configuration sections."""
 
-    def __init__(self, config, section_name) -> None:
+    def __init__(self, config, section_name):
         self.config = config
         if section_name not in self.config:
             self.config[section_name] = {}
         self._info = self.config[section_name]
 
 
+class VerificationConfig(SectionConfig):
+    """Verification configuration."""
+    def __init__(self, config):
+        super().__init__(config, 'Verification')
+
+    @property
+    def enable_sif(self):
+        return self._info.getboolean('enable_sif', False)
+
+    @enable_sif.setter
+    def enable_sif(self, enabled):
+        self.config.set('Verification', 'enable_sif', str(enabled))
+
+    @property
+    def enable_obligations(self):
+        return self._info.getboolean('enable_obligations', False)
+
+    @enable_obligations.setter
+    def enable_obligations(self, enabled):
+        self.config.set('Verification', 'enable_obligations', str(enabled))
+
+
+class SIFConfig(SectionConfig):
+    """Secure Information Flow verification configuration."""
+    def __init__(self, config):
+        super().__init__(config, 'SIF')
+
+
 class ObligationConfig(SectionConfig):
     """Obligation translation configuration."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config):
         super().__init__(config, 'Obligations')
+
+    def disable_all(self):
+        self.config.remove_section('Obligations')
+        self.config.add_section('Obligations')
 
     @property
     def disable_measure_check(self):
@@ -75,7 +105,7 @@ class ObligationConfig(SectionConfig):
 class TestConfig(SectionConfig):
     """Testing configuration."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config):
         super().__init__(config, 'Tests')
 
         ignore_tests_value = self._info.get('ignore_tests')
@@ -100,9 +130,11 @@ class TestConfig(SectionConfig):
 class FileConfig:
     """Configuration stored in the config file."""
 
-    def __init__(self, config_file) -> None:
+    def __init__(self, config_file):
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
+        self.verification_config = VerificationConfig(self.config)
+        self.sif_config = SIFConfig(self.config)
         self.obligation_config = ObligationConfig(self.config)
         self.test_config = TestConfig(self.config)
 
@@ -238,6 +270,18 @@ Configuration read from ``py2viper.cfg`` file.
 """
 
 
+verification_config = file_config.verification_config
+"""
+General verification configuration.
+"""
+
+
+sif_config = file_config.sif_config
+"""
+Secure Information Flow verification configuration.
+"""
+
+
 obligation_config = file_config.obligation_config
 """
 Obligation configuration.
@@ -256,5 +300,8 @@ __all__ = (
     'z3_path',
     'mypy_path',
     'mypy_dir',
+    'verification_config',
+    'sif_config',
     'obligation_config',
+    'test_config',
 )

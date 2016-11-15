@@ -62,17 +62,15 @@ def load_sil_files(jvm: JVM):
 
 
 def translate(path: str, jvm: JVM, sif: bool = False):
-    """
-    Translates the Python module at the given path to a Viper program
+    """Translates the Python module at the given path to a Viper program.
     """
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    builtins = []
+        not config.obligation_config.disable_measures):
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         sil_interface = [file.read()]
 
-    modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
     type_correct = types.check(os.path.abspath(path))
@@ -127,9 +125,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
            jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
-    """
-    Verifies the given Viper program
-    """
+    """Verifies the given Viper program."""
     try:
         if backend == ViperVerifier.silicon:
             verifier = Silicon(jvm, path)
@@ -143,8 +139,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
 
 
 def _parse_log_level(log_level_string: str) -> int:
-    """ Parses the log level provided by the user.
-    """
+    """ Parses the log level provided by the user."""
     LOG_LEVELS = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
 
     log_level_string_upper = log_level_string.upper()
@@ -157,9 +152,17 @@ def _parse_log_level(log_level_string: str) -> int:
         raise argparse.ArgumentTypeError(msg)
 
 
-def main() -> None:
-    """ Entry point for the translator.
-    """
+def _set_obligations_config(enabled):
+    """Disables all obligations options, if enabled is False."""
+    # TODO(shitz): There must be a better way to disable obligations than
+    # setting each options to disabled.
+    config.verification_config.enable_obligations = enabled
+    if not enabled:
+        config.obligation_config.disable_all()
+
+
+def _setup_argument_parser() -> argparse.ArgumentParser:
+    """Configures the command line argument parser."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'python_file',
@@ -202,10 +205,14 @@ def main() -> None:
         action='store_true',
         help='Verify secure information flow')
     parser.add_argument(
+        '--obligations',
+        action='store_true',
+        help='Verify obligations')
+    parser.add_argument(
         '--log',
         type=_parse_log_level,
         help='log level',
-        default='WARNING')
+        default='INFO')
     parser.add_argument(
         '--benchmark',
         type=int,
@@ -216,12 +223,17 @@ def main() -> None:
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
-    args = parser.parse_args()
+    """ Entry point for the translator."""
+    args_parser = _setup_argument_parser()
+    args = args_parser.parse_args()
 
+    # Overwrite some settings from commandline parameters.
     config.classpath = args.viper_jar_path
     config.boogie_path = args.boogie
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
+    config.verification_config.enable_sif = args.sif
+    _set_obligations_config(args.obligations)
     logging.basicConfig(level=args.log)
 
     os.environ['MYPYPATH'] = config.mypy_path
