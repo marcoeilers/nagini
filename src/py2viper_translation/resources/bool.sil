@@ -57,6 +57,5 @@ function object___eq__(self: Ref, other: Ref): Bool
     ensures self == other ==> result
     ensures ((self == null) != (other == null)) ==> !result
 
-function object___ne__(self: Ref, other: Ref): Bool
-    ensures self == other ==> !result
-    ensures ((self == null) != (other == null)) ==> result
+function Place___eq__(self: Ref, other: Ref): Bool
+    ensures result == (self == other)
