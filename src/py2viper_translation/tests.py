@@ -52,7 +52,7 @@ class AnnotatedTests:
             '/([a-z0-9]+)/issue/([0-9]+)/'
             '(, ([a-z]+))?'
             '\)')
-        matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,_:;\d ?\'"]+)\)')
+        matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,\(\)_:;\d ?\'"]+)\)')
         result = {'ExpectedOutput': [],
                   'OptionalOutput': [],
                   'UnexpectedOutput': [],

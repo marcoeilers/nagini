@@ -13,6 +13,7 @@ from py2viper_translation.lib.constants import (
     INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
+    UNION_TYPE,
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
@@ -25,6 +26,7 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    UnsupportedException,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -372,6 +374,18 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return False
         return self.superclass.issubtype(cls)
 
+    def get_common_superclass(self, other: 'PythonClass') -> 'PythonClass':
+        if self.issubtype(other):
+            return other
+        if other.issubtype(self):
+            return self
+        if self.superclass:
+            return self.superclass.get_common_superclass(other)
+        elif other.superclass:
+            return self.get_common_superclass(other.superclass)
+        else:
+            return None
+
     def get_contents(self, only_top: bool) -> Dict:
         """
         Returns the elements that can be accessed from this container (to be
@@ -455,6 +469,25 @@ class GenericType(PythonType):
             if my_arg != other_arg:
                 return False
         return True
+
+
+class UnionType(GenericType):
+    def __init__(self, args: List[PythonType]) -> None:
+        self.name = 'Union'
+        cls = args[0]
+        if cls is None:
+            cls = args[1]
+        if isinstance(cls, GenericType):
+            cls = cls.cls
+        for option in args[1:]:
+            if option:
+                if isinstance(option, GenericType):
+                    option = option.cls
+                cls = cls.get_common_superclass(option)
+        self.cls = cls
+        self.module = cls.get_module()
+        self.type_args = args
+        self.exact_length = True
 
 
 class MethodType(Enum):
@@ -1310,6 +1343,17 @@ def get_target(node: ast.AST,
                 lhs = lhs.alt_types[key]
             else:
                 lhs = lhs.type
+        if isinstance(lhs, GenericType) and lhs.name == UNION_TYPE:
+            # We have a union type.
+            if len(lhs.type_args) == 2 and None in lhs.type_args:
+                # This is actually an Optional type; in this case we just pick
+                # the type it is an Optional type of and let the verifier catch
+                # the NPE.
+                lhs = next(t for t in lhs.type_args if t)
+            else:
+                # It's an actual union type; we don't support that at the
+                # moment.
+                raise UnsupportedException(node, 'Member access on union type.')
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in

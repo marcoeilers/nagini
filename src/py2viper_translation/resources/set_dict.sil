@@ -51,6 +51,7 @@ method set___iter__(self: Ref) returns (_res: Ref)
 
 method set_add(self: Ref, item: Ref) returns ()
     requires acc(self.set_acc)
+    requires issubtype(typeof(item), get_type_arg1(self, 0))
     ensures acc(self.set_acc)
     ensures self.set_acc == old(self.set_acc) union Set(item)
     ensures get_type_nargs1(self, 0) == get_type_nargs0(item)
@@ -125,6 +126,7 @@ function dict_get(self: Ref, key: Ref) : Ref
 
 method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     requires acc(self.dict_acc)
+    requires issubtype(typeof(item), get_type_arg1(self, 1))
     ensures acc(self.dict_acc)
     ensures self.dict_acc == old(self.dict_acc) union Set(key)
     ensures dict___getitem__(self, key) == item

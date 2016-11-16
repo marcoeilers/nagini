@@ -31,11 +31,13 @@ class TypeException(Exception):
 
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, type_map, path, ignored_lines):
+    def __init__(self, strict_type_map, non_strict_type_map, path,
+                 ignored_lines):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
-        self.type_map = type_map
+        self.strict_type_map = strict_type_map
+        self.non_strict_type_map = non_strict_type_map
         self.path = path
         self.ignored_lines = ignored_lines
 
@@ -66,7 +68,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if (not self._is_result_call(node.expr) and
                 not isinstance(node.expr, mypy.nodes.IndexExpr) and
                 not isinstance(rectype, mypy.types.CallableType) and
-                not isinstance(rectype, str)):
+                not isinstance(rectype, str) and
+                not isinstance(rectype, mypy.types.UnionType)):
             self.set_type(rectype.type.fullname().split('.') + [node.name],
                           self.type_of(node),
                           node.line, col(node))
@@ -164,8 +167,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if node.callee.name == 'Result':
                 type = self.all_types[tuple(self.prefix)]
                 return type
-        if node in self.type_map:
-            result = self.type_map[node]
+        if node in self.strict_type_map:
+            result = self.strict_type_map[node]
+            return result
+        elif node in self.non_strict_type_map:
+            result = self.non_strict_type_map[node]
             return result
         else:
             msg = self.path + ':' + str(node.get_line()) + ': error: '
@@ -179,6 +185,23 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         # Weird things seem to happen with is-comparisons, so we ignore those.
         if 'is' not in o.operators and 'is not' not in o.operators:
             super().visit_comparison_expr(o)
+
+
+original_parse = mypy.parse.parse
+parsed = {}
+
+
+def new_parse(source, fnam, errors, options):
+    key = (source, fnam)
+    if key in parsed:
+        return parsed[key]
+    else:
+        result = original_parse(source, fnam, errors, options)
+        parsed[key] = result
+        return result
+
+
+setattr(mypy.parse, 'parse', new_parse)
 
 
 class TypeInfo:
@@ -204,20 +227,38 @@ class TypeInfo:
             raise TypeException(errors)
 
         try:
-            res = mypy.build.build(
+            # res = mypy.build.build(
+            #     [BuildSource(filename, None, None)],
+            #     target=mypy.build.TYPE_CHECK,
+            #     bin_dir=config.mypy_dir,
+            #     flags=[mypy.build.FAST_PARSER]
+            #     )
+            options_strict = mypy.options.Options()
+            options_strict.strict_optional = True
+            options_strict.show_none_errors = True
+            mypy.experiments.STRICT_OPTIONAL = True
+            options_strict.fast_parser = True
+            res_strict = mypy.build.build(
                 [BuildSource(filename, None, None)],
-                target=mypy.build.TYPE_CHECK,
-                bin_dir=config.mypy_dir,
-                flags=[mypy.build.FAST_PARSER]
+                options_strict, bin_dir=config.mypy_dir
                 )
-            if res.errors:
-                report_errors(res.errors)
-            for name, file in res.files.items():
+            options_non_strict = mypy.options.Options()
+            options_non_strict.strict_optional = False
+            options_non_strict.show_none_errors = False
+            mypy.experiments.STRICT_OPTIONAL = False
+            options_non_strict.fast_parser = True
+            res_non_strict = mypy.build.build(
+                [BuildSource(filename, None, None)],
+                options_non_strict, bin_dir=config.mypy_dir
+            )
+            if res_non_strict.errors:
+                report_errors(res_non_strict.errors)
+            for name, file in res_strict.files.items():
                 if name in IGNORED_IMPORTS:
                     continue
                 self.files[name] = file.path
-                visitor = TypeVisitor(res.types, name,
-                                      file.ignored_lines)
+                visitor = TypeVisitor(res_strict.types, res_non_strict.types,
+                                      name, file.ignored_lines)
                 visitor.prefix = [name]
                 file.accept(visitor)
                 self.all_types.update(visitor.all_types)
@@ -277,3 +318,9 @@ class TypeInfo:
 
     def is_void_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Void)
+
+    def is_union_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.UnionType)
+
+    def is_none_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.NoneTyp)

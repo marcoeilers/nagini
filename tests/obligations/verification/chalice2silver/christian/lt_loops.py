@@ -16,12 +16,13 @@ from py2viper_contracts.contracts import (
     Requires,
 )
 from py2viper_contracts.obligations import *
+from typing import Optional
 
 
 class A:
 
     def __init__(self) -> None:
-        self.a = None       # type: Lock
+        self.a = None       # type: Optional[Lock]
         self.b = 0          # type: int
 
     def m1(self) -> None:

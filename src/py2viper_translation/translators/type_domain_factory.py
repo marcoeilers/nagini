@@ -34,6 +34,7 @@ class TypeDomainFactory:
             self.create_extends_implies_subtype_axiom(ctx),
             self.create_none_type_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
+            self.create_object_subtype_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx)
@@ -360,22 +361,43 @@ class TypeDomainFactory:
         """
         Creates an axiom that states that the type of null is None:
 
-        typeof(null) == NoneType()
+        forall r: Ref :: {issubtype(typeof(r), NoneType())}
+        issubtype(typeof(r), NoneType()) <==> r == null
         """
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        type_func = self.viper.DomainFuncApp('typeof', [null], {},
-                                             self.type_type(), [null],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
+        arg_r = self.viper.LocalVarDecl('r', self.viper.Ref,
+                                        self.no_position(ctx),
+                                        self.no_info(ctx))
+        var_r = self.viper.LocalVar('r', self.viper.Ref,
+                                    self.no_position(ctx), self.no_info(ctx))
         none_type = self.viper.DomainFuncApp('NoneType', [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
                                              self.no_info(ctx),
                                              self.type_domain)
-        eq = self.viper.EqCmp(type_func, none_type, self.no_position(ctx),
-                              self.no_info(ctx))
-        return self.viper.DomainAxiom('null_nonetype', eq,
+        typeof = self.viper.DomainFuncApp('typeof', [var_r], {},
+                                          self.type_type(), [var_r],
+                                          self.no_position(ctx),
+                                          self.no_info(ctx),
+                                          self.type_domain)
+        subtype = self.viper.DomainFuncApp('issubtype',
+                                           [typeof, none_type], {},
+                                           self.viper.Bool,
+                                           [typeof, none_type],
+                                           self.no_position(ctx),
+                                           self.no_info(ctx), self.type_domain)
+        is_null = self.viper.EqCmp(var_r,
+                                   self.viper.NullLit(self.no_position(ctx),
+                                                      self.no_info(ctx)),
+                                   self.no_position(ctx), self.no_info(ctx))
+        biimplication = self.viper.EqCmp(subtype, is_null,
+                                         self.no_position(ctx),
+                                         self.no_info(ctx))
+        trigger = self.viper.Trigger([subtype], self.no_position(ctx),
+                                     self.no_info(ctx))
+        body = self.viper.Forall([arg_r], [trigger],
+                                 biimplication, self.no_position(ctx),
+                                 self.no_info(ctx))
+        return self.viper.DomainAxiom('null_nonetype', body,
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 
@@ -525,6 +547,38 @@ class TypeDomainFactory:
         body = self.viper.Forall([arg], [trigger], reflexive_subtype,
                                  self.no_position(ctx), self.no_info(ctx))
         return self.viper.DomainAxiom('issubtype_reflexivity', body,
+                                      self.no_position(ctx), self.no_info(ctx),
+                                      self.type_domain)
+
+    def create_object_subtype_axiom(self,
+                                    ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        Creates the axiom saying that all types are subtypes of object:
+        forall type: PyType :: { issubtype(type, object()) }
+        issubtype(type, object())
+        """
+        arg = self.viper.LocalVarDecl('type_', self.type_type(),
+                                      self.no_position(ctx), self.no_info(ctx))
+        var = self.viper.LocalVar('type_', self.type_type(),
+                                  self.no_position(ctx), self.no_info(ctx))
+        object_type = self.viper.DomainFuncApp('object', [], {},
+                                               self.type_type(), [],
+                                               self.no_position(ctx),
+                                               self.no_info(ctx),
+                                               self.type_domain)
+        object_subtype = self.viper.DomainFuncApp('issubtype',
+                                                  [var, object_type],
+                                                  {}, self.viper.Bool,
+                                                  [var, object_type],
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx),
+                                                  self.type_domain)
+        trigger_exp = object_subtype
+        trigger = self.viper.Trigger([trigger_exp], self.no_position(ctx),
+                                     self.no_info(ctx))
+        body = self.viper.Forall([arg], [trigger], object_subtype,
+                                 self.no_position(ctx), self.no_info(ctx))
+        return self.viper.DomainAxiom('issubtype_object', body,
                                       self.no_position(ctx), self.no_info(ctx),
                                       self.type_domain)
 

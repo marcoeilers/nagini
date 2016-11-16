@@ -272,12 +272,18 @@ class MethodTranslator(CommonTranslator):
         # Create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
-        posts = type_pres + posts
         no_pos = self.no_position(ctx)
+        method_pos = self.to_position(method.node, ctx,
+                                      '"return type is correct"')
+        no_info = self.no_info(ctx)
         if method.type and method.type.name not in PRIMITIVES:
             check = self.type_check(ctx.result_var.ref(method.node, ctx),
-                                    method.type, no_pos,
-                                    ctx)
+                                    method.type, method_pos, ctx)
+            if method.declared_exceptions:
+                no_error = self.viper.EqCmp(error_var_ref,
+                                            self.viper.NullLit(no_pos, no_info),
+                                            no_pos, no_info)
+                check = self.viper.Implies(no_error, check, method_pos, no_info)
             posts = [check] + posts
         return pres, posts
 
@@ -453,6 +459,10 @@ class MethodTranslator(CommonTranslator):
             traceback_var = ctx.actual_function.create_variable('tb',
                                                                 object_class,
                                                                 self.translator)
+            value_type = self.type_check(value_var.ref(), exception_class, pos,
+                                         ctx)
+            inhale_types = self.viper.Inhale(value_type, pos, info)
+            body.append(inhale_types)
             exit_call = self.get_method_call(ctx_type, '__exit__',
                                              [ctx_var.ref(), type_var.ref(),
                                               value_var.ref(),

@@ -22,7 +22,7 @@ from verifast.stdio_simple import (
     read_char_io,
     getchar,
 )
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 @IOOperation
@@ -58,7 +58,7 @@ def brackets_io(
 class Matcher:
 
     def __init__(self) -> None:
-        self.c = None   # type: str
+        self.c = None   # type: Optional[str]
 
     def pop_read_ahead(self, t1: Place) -> Tuple[Place, str]:
         IOExists3(str, bool, Place)(
@@ -81,7 +81,7 @@ class Matcher:
         self.c, success, t2 = getchar(t1)
         return (t2, c_copy)
 
-    def peek_read_ahead(self) -> str:
+    def peek_read_ahead(self) -> Optional[str]:
         Requires(Acc(self.c, 1/2))
         Requires(MustTerminate(1))
         Ensures(Acc(self.c, 1/2) and Result() is self.c)
