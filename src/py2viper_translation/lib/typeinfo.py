@@ -1,0 +1,326 @@
+import logging
+import mypy.build
+import py2viper_translation.lib.mypy_parser_patch
+import sys
+
+from mypy.build import BuildSource
+from py2viper_translation.lib import config
+from py2viper_translation.lib.constants import IGNORED_IMPORTS, LITERALS
+from py2viper_translation.lib.util import (
+    construct_lambda_prefix,
+    InvalidProgramException,
+)
+from typing import List, Optional
+
+
+logger = logging.getLogger('py2viper_translation.lib.typeinfo')
+
+
+def col(node) -> Optional[int]:
+    """
+    Returns the column in a mypy mypy AST node, if any.
+    """
+    if hasattr(node, 'column'):
+        return node.column
+    return None
+
+
+class TypeException(Exception):
+    def __init__(self, messages):
+        self.messages = messages
+
+
+class TypeVisitor(mypy.traverser.TraverserVisitor):
+    def __init__(self, strict_type_map, non_strict_type_map, path,
+                 ignored_lines):
+        self.prefix = []
+        self.all_types = {}
+        self.alt_types = {}
+        self.strict_type_map = strict_type_map
+        self.non_strict_type_map = non_strict_type_map
+        self.path = path
+        self.ignored_lines = ignored_lines
+
+    def _is_result_call(self, node: mypy.nodes.Node) -> bool:
+        """Checks if call is either ``Result`` or ``RaisedException``."""
+        if isinstance(node, mypy.nodes.CallExpr):
+            if node.callee.name == 'Result':
+                return True
+            if node.callee.name == 'RaisedException':
+                return True
+        return False
+
+    def visit_import(self, node: mypy.nodes.Import):
+        for fqn, id in node.ids:
+            if not id:
+                id = fqn
+            self.set_type([id], fqn, None, None)
+        super().visit_import(node)
+
+    def visit_import_all(self, node: mypy.nodes.ImportAll):
+        super().visit_import_all(node)
+
+    def visit_import_from(self, node: mypy.nodes.ImportFrom):
+        super().visit_import_from(node)
+
+    def visit_member_expr(self, node: mypy.nodes.MemberExpr):
+        rectype = self.type_of(node.expr)
+        if (not self._is_result_call(node.expr) and
+                not isinstance(node.expr, mypy.nodes.IndexExpr) and
+                not isinstance(rectype, mypy.types.CallableType) and
+                not isinstance(rectype, str) and
+                not isinstance(rectype, mypy.types.UnionType)):
+            self.set_type(rectype.type.fullname().split('.') + [node.name],
+                          self.type_of(node),
+                          node.line, col(node))
+        super().visit_member_expr(node)
+
+    def visit_try_stmt(self, node: mypy.nodes.TryStmt):
+        for var in node.vars:
+            if var is not None:
+                self.set_type(self.prefix + [var.name], self.type_of(var),
+                              var.line, col(var))
+        super().visit_try_stmt(node)
+
+    def visit_name_expr(self, node: mypy.nodes.NameExpr):
+        if node.name not in LITERALS:
+            name_type = self.type_of(node)
+            if not isinstance(name_type, mypy.types.CallableType):
+                self.set_type(self.prefix + [node.name], name_type,
+                              node.line, col(node))
+
+    def visit_func_def(self, node: mypy.nodes.FuncDef):
+        oldprefix = self.prefix
+        self.prefix = self.prefix + [node.name()]
+        functype = self.type_of(node)
+        self.set_type(self.prefix, functype, node.line, col(node))
+        for arg in node.arguments:
+            self.set_type(self.prefix + [arg.variable.name()],
+                          arg.variable.type, arg.line, col(arg))
+        super().visit_func_def(node)
+        self.prefix = oldprefix
+
+    def visit_func_expr(self, node: mypy.nodes.FuncExpr):
+        oldprefix = self.prefix
+        prefix_string = construct_lambda_prefix(node.line, col(node))
+        self.prefix = self.prefix + [prefix_string]
+        for arg in node.arguments:
+            self.set_type(self.prefix + [arg.variable.name()],
+                          arg.variable.type, arg.line, col(arg))
+        node.body.accept(self)
+        self.prefix = oldprefix
+
+    def visit_class_def(self, node: mypy.nodes.ClassDef):
+        oldprefix = self.prefix
+        self.prefix = self.prefix + [node.name]
+        super().visit_class_def(node)
+        self.prefix = oldprefix
+
+    def set_type(self, fqn, type, line, col):
+        if isinstance(type, mypy.types.CallableType):
+            type = type.ret_type
+        if not type or isinstance(type, mypy.types.AnyType):
+            if line in self.ignored_lines:
+                return
+            else:
+                error = ' error: Encountered Any type. Type annotation missing?'
+                msg = ':'.join([self.path, str(line), error])
+                raise TypeException([msg])
+        key = tuple(fqn)
+        if key in self.all_types:
+            if not self.type_equals(self.all_types[key], type):
+                # Type change after isinstance
+                if key not in self.alt_types:
+                    self.alt_types[key] = {}
+                self.alt_types[key][(line, col)] = type
+                return
+        self.all_types[key] = type
+
+    def type_equals(self, t1, t2):
+        if str(t1) == str(t2):
+            return True
+        if (isinstance(t1, mypy.types.FunctionLike) and
+                isinstance(t2, mypy.types.FunctionLike)):
+            if self.type_equals(t1.ret_type, t2.ret_type):
+                all_eq = True
+                for arg1, arg2 in zip(t1.arg_types, t2.arg_types):
+                    all_eq = all_eq and self.type_equals(arg1, arg2)
+                return all_eq
+        return t1 == t2
+
+    def visit_call_expr(self, node: mypy.nodes.CallExpr):
+        for a in node.args:
+            a.accept(self)
+        node.callee.accept(self)
+
+    def type_of(self, node):
+        if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
+            return node.fullname
+        if isinstance(node, mypy.nodes.FuncDef):
+            if node.type:
+                return node.type
+        if isinstance(node, mypy.nodes.NameExpr):
+            key = (node.name,)
+            if key in self.all_types:
+                return self.all_types[key]
+        elif isinstance(node, mypy.nodes.CallExpr):
+            if node.callee.name == 'Result':
+                type = self.all_types[tuple(self.prefix)]
+                return type
+        if node in self.strict_type_map:
+            result = self.strict_type_map[node]
+            return result
+        elif node in self.non_strict_type_map:
+            result = self.non_strict_type_map[node]
+            return result
+        else:
+            msg = self.path + ':' + str(node.get_line()) + ': error: '
+            if isinstance(node, mypy.nodes.FuncDef):
+                msg += 'Encountered Any type. Type annotation missing?'
+            else:
+                msg += 'dead.code'
+            raise TypeException([msg])
+
+    def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
+        # Weird things seem to happen with is-comparisons, so we ignore those.
+        if 'is' not in o.operators and 'is not' not in o.operators:
+            super().visit_comparison_expr(o)
+
+
+original_parse = mypy.parse.parse
+parsed = {}
+
+
+def new_parse(source, fnam, errors, options):
+    key = (source, fnam)
+    if key in parsed:
+        return parsed[key]
+    else:
+        result = original_parse(source, fnam, errors, options)
+        parsed[key] = result
+        return result
+
+
+setattr(mypy.parse, 'parse', new_parse)
+
+
+class TypeInfo:
+    """
+    Provides type information for all variables and functions in a given
+    Python module.
+    """
+
+    def __init__(self):
+        self.all_types = {}
+        self.alt_types = {}
+        self.files = {}
+
+    def check(self, filename: str) -> bool:
+        """
+        Typechecks the given file and collects all type information needed for
+        the translation to Viper
+        """
+
+        def report_errors(errors: List[str]) -> None:
+            for error in errors:
+                logger.info(error)
+            raise TypeException(errors)
+
+        try:
+            # res = mypy.build.build(
+            #     [BuildSource(filename, None, None)],
+            #     target=mypy.build.TYPE_CHECK,
+            #     bin_dir=config.mypy_dir,
+            #     flags=[mypy.build.FAST_PARSER]
+            #     )
+            options_strict = mypy.options.Options()
+            options_strict.strict_optional = True
+            options_strict.show_none_errors = True
+            mypy.experiments.STRICT_OPTIONAL = True
+            options_strict.fast_parser = True
+            res_strict = mypy.build.build(
+                [BuildSource(filename, None, None)],
+                options_strict, bin_dir=config.mypy_dir
+                )
+            options_non_strict = mypy.options.Options()
+            options_non_strict.strict_optional = False
+            options_non_strict.show_none_errors = False
+            mypy.experiments.STRICT_OPTIONAL = False
+            options_non_strict.fast_parser = True
+            res_non_strict = mypy.build.build(
+                [BuildSource(filename, None, None)],
+                options_non_strict, bin_dir=config.mypy_dir
+            )
+            if res_non_strict.errors:
+                report_errors(res_non_strict.errors)
+            for name, file in res_strict.files.items():
+                if name in IGNORED_IMPORTS:
+                    continue
+                self.files[name] = file.path
+                visitor = TypeVisitor(res_strict.types, res_non_strict.types,
+                                      name, file.ignored_lines)
+                visitor.prefix = [name]
+                file.accept(visitor)
+                self.all_types.update(visitor.all_types)
+                self.alt_types.update(visitor.alt_types)
+            return True
+        except mypy.errors.CompileError as e:
+            report_errors(e.messages)
+
+    def get_type_prefix(self, name: str) -> str:
+        if name.endswith('.py'):
+            name = name[:-3]
+        name = name.replace('/', '.')
+        name = name.replace('\\', '.')
+        for key in self.all_types:
+            if name.endswith(key[0]):
+                return key[0]
+
+    def get_type(self, prefix: List[str], name: str):
+        """
+        Looks up the inferred or annotated type for the given name in the given
+        prefix
+        """
+        key = tuple(prefix + [name])
+        result = self.all_types.get(key)
+        alts = self.alt_types.get(key)
+        if result is None:
+            if not prefix:
+                return None, None
+            else:
+                return self.get_type(prefix[:len(prefix) - 1], name)
+        else:
+            return result, alts
+
+    def get_func_type(self, prefix: List[str]):
+        """
+        Looks up the type of the function which creates the given context
+        """
+        result = self.all_types.get(tuple(prefix))
+        if result is None:
+            if len(prefix) == 0:
+                return None
+            else:
+                return self.get_func_type(prefix[:len(prefix) - 1])
+        else:
+            if isinstance(result, mypy.types.FunctionLike):
+                result = result.ret_type
+            return result
+
+    def is_normal_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.nodes.TypeInfo)
+
+    def is_instance_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Instance)
+
+    def is_tuple_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.TupleType)
+
+    def is_void_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.Void)
+
+    def is_union_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.UnionType)
+
+    def is_none_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.NoneTyp)

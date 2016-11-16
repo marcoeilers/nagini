@@ -1,0 +1,347 @@
+{
+"list": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "append": {
+            "args": ["list", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__setitem__": {
+            "args": ["list", "int", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["list"],
+            "type": "Iterator",
+            "MustTerminate": true
+        }
+    },
+    "functions": {
+        "__getitem__": {
+            "args": ["list", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["list", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["list"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["list"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"set":{
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "add": {
+            "args": ["set", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "clear": {
+            "args": ["set"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["set"],
+            "type": "Iterator",
+            "MustTerminate": true
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "object"],
+            "type": "bool"
+        },
+        "__bool__": {
+            "args": ["set"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["set"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"dict": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "keys": {
+            "args": ["dict"],
+            "type": "set",
+            "MustTerminate": true
+        },
+        "__setitem__": {
+            "args": ["dict", "object", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__iter__": {
+            "args": ["dict"],
+            "type": "Iterator",
+            "MustTerminate": true
+        },
+        "values": {
+            "args": ["dict"],
+            "type": "set",
+            "MustTerminate": true
+        }
+    },
+    "functions": {
+        "__contains__": {
+            "args": ["dict", "object"],
+            "type": "bool"
+        },
+        "__getitem__": {
+            "args": ["dict", "object"],
+            "type": "object"
+        },
+        "get": {
+            "args": ["dict", "object"],
+            "type": "object",
+            "generic_type": 1
+        },
+        "__bool__": {
+            "args": ["dict"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["dict"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"object": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        },
+        "__eq__": {
+            "args": ["object", "object"],
+            "type": "bool"
+        }
+    }
+},
+"int": {
+    "functions": {
+        "__bool__": {
+            "args": ["int"],
+            "type": "bool"
+        },
+        "__box__": {
+            "args": ["int"],
+            "type": "__boxed_int"
+        }
+    }
+},
+"bool": {
+    "functions": {
+        "__bool__": {
+            "args": ["bool"],
+            "type": "bool"
+        },
+        "__box__": {
+            "args": ["bool"],
+            "type": "__boxed_bool"
+        }
+    }
+},
+"NoneType": {
+    "functions": {
+        "__bool__": {
+            "args": ["object"],
+            "type": "bool"
+        }
+    }
+},
+"Exception": {
+    "extends": "object"
+},
+"str": {
+    "functions": {
+        "__len__": {
+            "args": ["str"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["str"],
+            "type": "bool"
+        },
+        "__eq__": {
+            "args": ["str", "object"],
+            "type": "bool"
+        },
+        "__add__": {
+            "args": ["str", "str"],
+            "type": "str"
+        },
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "str"
+        }
+    },
+    "extends": "object"
+},
+"tuple": {
+    "functions": {
+        "__create0__": {
+            "args": [],
+            "type": "tuple"
+        },
+        "__create1__": {
+            "args": ["object", "type"],
+            "type": "tuple"
+        },
+        "__create2__": {
+            "args": ["object", "object", "type", "type"],
+            "type": "tuple"
+        },
+        "__create3__": {
+            "args": ["object", "object", "object", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__create4__": {
+            "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__create5__": {
+            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__create6__": {
+            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__getitem__": {
+            "args": ["tuple", "int"],
+            "type": "object"
+        },
+        "__len__": {
+            "args": ["tuple"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"__boxed_int": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_int"],
+            "type": "int"
+        }
+    },
+    "extends": "object"
+},
+"__boxed_bool": {
+    "functions": {
+        "__unbox__": {
+            "args": ["__boxed_bool"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+},
+"range": {
+    "functions": {
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "range"
+        },
+        "__getitem__": {
+            "args": ["range", "int"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["range", "object"],
+            "type": "bool"
+        },
+        "__len__": {
+            "args": ["range"],
+            "type": "int"
+        },
+        "__bool__": {
+            "args": ["range"],
+            "type": "bool"
+        },
+        "__sil_set__": {
+            "args": ["range"],
+            "type": "object"
+        }
+    },
+    "extends": "object"
+},
+"Iterator": {
+    "methods":{
+        "__next__": {
+            "args": ["Iterator"],
+            "type": "object",
+            "MustTerminate": true
+        },
+        "__del__": {
+            "args": ["Iterator"],
+            "type": null,
+            "MustTerminate": true
+        }
+    },
+    "extends": "object"
+},
+"Thread": {
+    "extends": "object"
+},
+"Lock": {
+    "methods":{
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true
+        },
+        "acquire": {
+            "args": ["Lock"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "release": {
+            "args": ["Lock"],
+            "type": null,
+            "MustTerminate": true
+        }
+    },
+    "extends": "object"
+},
+"type": {},
+"Union": {},
+"Place": {
+    "functions": {
+        "__eq__": {
+            "args": ["Place", "object"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+}
+}
+
