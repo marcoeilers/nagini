@@ -1,7 +1,12 @@
 import ast
 
 from abc import ABCMeta
-from py2viper_translation.lib.constants import BOOL_TYPE, INT_TYPE, PRIMITIVES
+from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
+    INT_TYPE,
+    OPERATOR_FUNCTIONS,
+    PRIMITIVES,
+)
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
@@ -44,6 +49,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     Abstract class which all specialized translators extend. Provides some
     functionality which is needed by many or all specialized translators.
     """
+
+    def __init__(self, config: 'TranslatorConfig', jvm: JVM, source_file: str,
+                 type_info: 'TypeInfo', viper_ast: ViperAST) -> None:
+        super().__init__(config, jvm, source_file, type_info, viper_ast)
+        self.primitive_operations = {
+            ast.Add: self.viper.Add,
+            ast.Sub: self.viper.Sub,
+            ast.Mult: self.viper.Mul,
+            ast.FloorDiv: self.viper.Div,
+            ast.Mod: self.viper.Mod,
+        }
 
     def translate_generic(self, node: ast.AST, ctx: Context) -> None:
         """
@@ -90,6 +106,42 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
 
+    def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
+                           right_type: PythonType, node: ast.AST,
+                           ctx: Context) -> StmtsAndExpr:
+        """
+        Translates the invocation of the binary operator of 'node' on the
+        given two arguments, either to a primitive Silver operation or to a
+        function or method call.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        stmt = []
+        if self.is_primitive_operation(node, left_type, right_type):
+            op = self.get_primitive_operation(node)
+            result = op(left, right, position, info)
+        else:
+            func_name = OPERATOR_FUNCTIONS[type(node.op)]
+            called_method = left_type.get_func_or_method(func_name)
+            if called_method.pure:
+                call = self.get_function_call(left_type, func_name,
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                result = call
+            else:
+                result_type = called_method.type
+                res_var = ctx.actual_function.create_variable('op_res',
+                                                              result_type,
+                                                              self.translator)
+                stmt += self.get_method_call(left_type, func_name,
+                                             [left, right],
+                                             [left_type, right_type],
+                                             [res_var.ref(node, ctx)], node,
+                                             ctx)
+                result = res_var.ref(node, ctx)
+        return stmt, result
+
     def is_primitive_operation(self, node: ast.AST, left_type: PythonClass,
                                right_type: PythonClass) -> bool:
         """
@@ -104,15 +156,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 return True
         return False
 
-    def get_primitive_operation(self, node: ast.AST):
-        vals = {
-            ast.Add: self.viper.Add,
-            ast.Sub: self.viper.Sub,
-            ast.Mult: self.viper.Mul,
-            ast.FloorDiv: self.viper.Div,
-            ast.Mod: self.viper.Mod,
-        }
-        return vals[type(node.op)]
+    def get_primitive_operation(self, node: ast.BinOp):
+        """
+        Returns the constructor for the Silver node representing the given
+        operation. If, for example, 'node' is an addition, this will return
+        self.viper.Add.
+        """
+        return self.primitive_operations[type(node.op)]
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],

@@ -211,11 +211,11 @@ class CallTranslator(CommonTranslator):
         if ctx.current_function is None:
             if ctx.current_class is None:
                 # Global variable
-                raise UnsupportedException(node, "Global method call "
-                                           "not supported.")
+                raise UnsupportedException(node, 'Global method call '
+                                           'not supported.')
             else:
                 # Static field
-                raise UnsupportedException(node, "Static fields not supported")
+                raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
             result_var = result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
