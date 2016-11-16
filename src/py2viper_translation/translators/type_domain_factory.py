@@ -756,7 +756,6 @@ class TypeDomainFactory:
 
     def type_arg_check(self, lhs: Expr, arg: 'PythonType',
                        indices: List['Expr'], ctx: Context) -> 'Expr':
-
         name = 'get_type_arg' + str(len(indices))
         args = [lhs] + indices
         type_arg_func = self.viper.DomainFuncApp(name, args, {},
