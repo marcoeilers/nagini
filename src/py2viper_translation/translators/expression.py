@@ -6,7 +6,6 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     INT_TYPE,
     LIST_TYPE,
-    OPERATOR_FUNCTIONS,
     PRIMITIVES,
     SET_TYPE,
     STRING_TYPE,
@@ -429,31 +428,9 @@ class ExpressionTranslator(CommonTranslator):
         stmt = left_stmt + right_stmt
         left_type = self.get_type(node.left, ctx)
         right_type = self.get_type(node.right, ctx)
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        if self.is_primitive_operation(node, left_type, right_type):
-            op = self.get_primitive_operation(node)
-            return stmt, op(left, right, position, info)
-        else:
-            func_name = OPERATOR_FUNCTIONS[type(node.op)]
-            called_method = left_type.get_func_or_method(func_name)
-            if called_method.pure:
-                call = self.get_function_call(left_type, func_name,
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                return stmt, call
-            else:
-                result_type = called_method.type
-                res_var = ctx.actual_function.create_variable('op_res',
-                                                              result_type,
-                                                              self.translator)
-                stmt += self.get_method_call(left_type, func_name,
-                                             [left, right],
-                                             [left_type, right_type],
-                                             [res_var.ref(node, ctx)], node,
-                                             ctx)
-                return stmt, res_var.ref(node, ctx)
+        op_stmt, result = self.translate_operator(left, right, left_type,
+                                                  right_type, node, ctx)
+        return stmt + op_stmt, result
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
