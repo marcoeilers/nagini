@@ -418,11 +418,8 @@ class CallTranslator(CommonTranslator):
             vals.append(arg_val)
             val_types.append(self.get_type(arg, ctx))
         func_name = '__create' + str(len(args)) + '__'
-        boxed_types = [(ctx.module.global_module.classes['__boxed_' + t.name]
-                        if t.name in PRIMITIVES else t)
-                       for t in val_types]
-        vals = vals + [self.type_factory.translate_type_literal(t, node, ctx)
-                       for t in boxed_types]
+        vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
+                       for (t, v) in zip(val_types, vals)]
         type_class = ctx.module.global_module.classes['type']
         val_types += [type_class] * len(val_types)
         call = self.get_function_call(tuple_class, func_name, vals, val_types,

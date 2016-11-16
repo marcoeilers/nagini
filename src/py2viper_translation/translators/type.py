@@ -295,74 +295,37 @@ class TypeTranslator(CommonTranslator):
             return False
         return self._is_subtype(t1.superclass, t2)
 
-    def set_type_args(self, lhs: Expr, type: GenericType,
-                      prefix: List[Expr], ctx: Context) -> Expr:
-        """
-        Creates an expression specifying the type of lhs and its type arguments.
-        """
-        args = type.type_args
-        result = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-
-        for i, arg in enumerate(args):
-            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
-            indices = prefix + [lit]
-            if arg.name in PRIMITIVES:
-                arg = ctx.module.global_module.classes['__boxed_' + arg.name]
-            check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
-            result = self.viper.And(result, check, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-            if isinstance(arg, GenericType):
-                arg_args = self.set_type_args(lhs, arg, indices, ctx)
-                result = self.viper.And(result, arg_args, self.no_position(ctx),
-                                        self.no_info(ctx))
-        return result
-
-    def set_type_nargs(self, lhs: Expr, type: GenericType,
-                       prefix: List[Expr], ctx: Context) -> Expr:
-        """
-        Creates an expression specifying the number of type args the type
-        of lhs has at each level of nesting.
-        """
-        args = type.type_args
-        if type.exact_length:
-            nargs = len(type.type_args)
-            result = self.type_factory.type_nargs_check(lhs, nargs,
-                                                        prefix, ctx)
-        else:
-            result = self.viper.TrueLit(self.no_position(ctx),
-                                        self.no_info(ctx))
-
-        for i, arg in enumerate(args):
-            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
-            indices = prefix + [lit]
-
-            if isinstance(arg, GenericType):
-                arg_nargs = self.set_type_nargs(lhs, arg, indices, ctx)
-                result = self.viper.And(result, arg_nargs,
-                                        self.no_position(ctx),
-                                        self.no_info(ctx))
-        return result
-
     def set_type_nargs_and_args(self, lhs: Expr, type: GenericType,
                                 prefix: List[Expr], ctx: Context,
                                 inhale_exhale: bool) -> Expr:
+        true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         if type.name == UNION_TYPE:
             result = self.viper.FalseLit(self.no_position(ctx),
                                          self.no_info(ctx))
             for option in type.type_args:
+                if option is None:
+                    option = ctx.module.global_module.classes['NoneType']
+                elif option.name in PRIMITIVES:
+                    option = ctx.module.global_module.classes['__boxed_' +
+                                                              option.name]
+                check = self.type_factory.type_arg_check(lhs, option, prefix,
+                                                         ctx)
+                if inhale_exhale:
+                    check = self.viper.InhaleExhaleExp(check, true,
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
                 if isinstance(option, GenericType):
                     option_args = self.set_type_nargs_and_args(lhs, option,
                                                                prefix, ctx,
                                                                inhale_exhale)
-                else:
-                    option_args = self.viper.TrueLit(self.no_position(ctx),
-                                                     self.no_info(ctx))
-                result = self.viper.Or(result, option_args,
-                                       self.no_position(ctx), self.no_info(ctx))
+                    check = self.viper.And(check, option_args,
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+                result = self.viper.Or(result, check,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx))
             return result
         args = type.type_args
-        true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         if type.exact_length:
             nargs = len(type.type_args)
             result = self.type_factory.type_nargs_check(lhs, nargs,
@@ -376,7 +339,10 @@ class TypeTranslator(CommonTranslator):
 
             if arg.name in PRIMITIVES:
                 arg = ctx.module.global_module.classes['__boxed_' + arg.name]
-            check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+            if arg.name == UNION_TYPE:
+                check = true
+            else:
+                check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
             if inhale_exhale:
                 check = self.viper.InhaleExhaleExp(check, true,
                                                    self.no_position(ctx),
