@@ -117,18 +117,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         stmt = []
-        if self.is_primitive_operation(node, left_type, right_type):
-            op = self.get_primitive_operation(node)
+        if self._is_primitive_operation(node, left_type, right_type):
+            op = self._get_primitive_operation(node)
             result = op(left, right, position, info)
         else:
             func_name = OPERATOR_FUNCTIONS[type(node.op)]
             called_method = left_type.get_func_or_method(func_name)
             if called_method.pure:
-                call = self.get_function_call(left_type, func_name,
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                result = call
+                result = self.get_function_call(left_type, func_name,
+                                                [left, right],
+                                                [left_type, right_type],
+                                                node, ctx)
             else:
                 result_type = called_method.type
                 res_var = ctx.actual_function.create_variable('op_res',
@@ -142,8 +141,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 result = res_var.ref(node, ctx)
         return stmt, result
 
-    def is_primitive_operation(self, node: ast.AST, left_type: PythonClass,
-                               right_type: PythonClass) -> bool:
+    def _is_primitive_operation(self, node: ast.AST, left_type: PythonClass,
+                                right_type: PythonClass) -> bool:
         """
         Decides if the binary operation from node, called with arguments of the
         given types, should be translated as a native Silver operation or
@@ -156,7 +155,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 return True
         return False
 
-    def get_primitive_operation(self, node: ast.BinOp):
+    def _get_primitive_operation(self, node: ast.BinOp):
         """
         Returns the constructor for the Silver node representing the given
         operation. If, for example, 'node' is an addition, this will return

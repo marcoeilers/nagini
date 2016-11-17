@@ -482,7 +482,7 @@ class ExpressionTranslator(CommonTranslator):
             raise UnsupportedException(node.ops[0])
         if left_type.name in {INT_TYPE, BOOL_TYPE}:
             if right_type.name not in {INT_TYPE, BOOL_TYPE}:
-                # This comparison can will either raise an error or always
+                # This comparison will either raise an error or always
                 # yield the same result (if we check for equality), so we
                 # don't support it.
                 raise InvalidProgramException(node, 'invalid.comparison.type')
