@@ -428,32 +428,9 @@ class ExpressionTranslator(CommonTranslator):
         stmt = left_stmt + right_stmt
         left_type = self.get_type(node.left, ctx)
         right_type = self.get_type(node.right, ctx)
-        if left_type.name != INT_TYPE:
-            call = self.get_function_call(left_type, '__add__', [left, right],
-                                          [left_type, right_type], node, ctx)
-            return stmt, call
-        if isinstance(node.op, ast.Add):
-            return (stmt, self.viper.Add(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        elif isinstance(node.op, ast.Sub):
-            return (stmt, self.viper.Sub(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        elif isinstance(node.op, ast.Mult):
-            return (stmt, self.viper.Mul(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        elif isinstance(node.op, ast.FloorDiv):
-            return (stmt, self.viper.Div(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        elif isinstance(node.op, ast.Mod):
-            return (stmt, self.viper.Mod(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx)))
-        else:
-            raise UnsupportedException(node)
+        op_stmt, result = self.translate_operator(left, right, left_type,
+                                                  right_type, node, ctx)
+        return stmt + op_stmt, result
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
@@ -468,59 +445,65 @@ class ExpressionTranslator(CommonTranslator):
         right_stmt, right = self.translate_expr(node.comparators[0], ctx)
         right_type = self.get_type(node.comparators[0], ctx)
         stmts = left_stmt + right_stmt
-        if isinstance(node.ops[0], (ast.Eq, ast.NotEq)):
-            # TODO: this is a workaround for the moment, but doesn't work in
-            # general. If the static left type is e.g. object, but the runtime
-            # type is e.g. str, we will use reference equality instead of
-            # calling __eq__.
-            is_not = isinstance(node.ops[0], ast.NotEq)
-            if left_type.get_function('__eq__'):
-                call = self.get_function_call(left_type, '__eq__',
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                if is_not:
-                    call = self.viper.Not(call, self.to_position(node, ctx),
-                                          self.no_info(ctx))
-                return stmts, call
-            constr = self.viper.NeCmp if is_not else self.viper.EqCmp
-            return (stmts, constr(left, right, self.to_position(node, ctx),
-                                  self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.Is):
-            return (stmts, self.viper.EqCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.Gt):
-            return (stmts, self.viper.GtCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.GtE):
-            return (stmts, self.viper.GeCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.Lt):
-            return (stmts, self.viper.LtCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
-        elif isinstance(node.ops[0], ast.LtE):
-            return (stmts, self.viper.LeCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(node.ops[0], ast.Is):
+            return (stmts, self.viper.EqCmp(left, right, position, info))
         elif isinstance(node.ops[0], ast.IsNot):
-            return (stmts, self.viper.NeCmp(left, right,
-                                            self.to_position(node, ctx),
-                                            self.no_info(ctx)))
+            return (stmts, self.viper.NeCmp(left, right, position, info))
         elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
             args = [right, left]
             arg_types = [right_type, left_type]
             app = self.get_function_call(right_type, '__contains__',
                                          args, arg_types, node, ctx)
             if isinstance(node.ops[0], ast.NotIn):
-                app = self.viper.Not(app, self.to_position(node, ctx),
-                                     self.no_info(ctx))
+                app = self.viper.Not(app, position, info)
             return stmts, app
+        if isinstance(node.ops[0], ast.Eq):
+            int_compare = self.viper.EqCmp
+            compare_func = '__eq__'
+        elif isinstance(node.ops[0], ast.NotEq):
+            int_compare = self.viper.NeCmp
+            compare_func = '__ne__'
+        elif isinstance(node.ops[0], ast.Gt):
+            int_compare = self.viper.GtCmp
+            compare_func = '__gt__'
+        elif isinstance(node.ops[0], ast.GtE):
+            int_compare = self.viper.GeCmp
+            compare_func = '__ge__'
+        elif isinstance(node.ops[0], ast.Lt):
+            int_compare = self.viper.LtCmp
+            compare_func = '__lt__'
+        elif isinstance(node.ops[0], ast.LtE):
+            int_compare = self.viper.LeCmp
+            compare_func = '__le__'
         else:
             raise UnsupportedException(node.ops[0])
+        if left_type.name in {INT_TYPE, BOOL_TYPE}:
+            if right_type.name not in {INT_TYPE, BOOL_TYPE}:
+                # This comparison will either raise an error or always
+                # yield the same result (if we check for equality), so we
+                # don't support it.
+                raise InvalidProgramException(node, 'invalid.comparison.type')
+            comparison = int_compare(left, right, position, info)
+        else:
+            if left_type.get_function(compare_func):
+                comparison = self.get_function_call(left_type, compare_func,
+                                                    [left, right],
+                                                    [left_type, right_type],
+                                                    node, ctx)
+            elif compare_func == '__ne__' and left_type.get_function('__eq__'):
+                # The default behavior if __ne__ is not explicitly defined
+                # is to invert the result of __eq__.
+                call = self.get_function_call(left_type, '__eq__',
+                                              [left, right],
+                                              [left_type, right_type],
+                                              node, ctx)
+                comparison = self.viper.Not(call, position, info)
+            else:
+                raise InvalidProgramException(node, 'undefined.comparison')
+        return stmts, comparison
 
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:
