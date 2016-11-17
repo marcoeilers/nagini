@@ -112,8 +112,8 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         if ctx.current_function is None:
-            msg = 'Global constructor calls are not supported.'
-            raise UnsupportedException(node, msg)
+            raise UnsupportedException(node, 'Global constructor calls are not '
+                                             'supported.')
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
