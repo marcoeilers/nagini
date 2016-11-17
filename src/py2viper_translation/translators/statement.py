@@ -42,32 +42,22 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
-        lhs_stmt, lhs = self.translate_expr(node.target, ctx)
-        if lhs_stmt:
+        left_stmt, left = self.translate_expr(node.target, ctx)
+        if left_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        if isinstance(node.op, ast.Add):
-            newval = self.viper.Add(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Sub):
-            newval = self.viper.Sub(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Mult):
-            newval = self.viper.Mul(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        else:
-            raise UnsupportedException(node)
+        stmt, right = self.translate_expr(node.value, ctx)
+        left_type = self.get_type(node.target, ctx)
+        right_type = self.get_type(node.value, ctx)
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        op_stmt, result = self.translate_operator(left, right, left_type,
+                                                  right_type, node, ctx)
+        stmt += op_stmt
         if isinstance(node.target, ast.Name):
-            assign = self.viper.LocalVarAssign(lhs, newval, position,
-                                               self.no_info(ctx))
+            assign = self.viper.LocalVarAssign(left, result, position, info)
         elif isinstance(node.target, ast.Attribute):
-            assign = self.viper.FieldAssign(lhs, newval, position,
-                                            self.no_info(ctx))
-        return rhs_stmt + [assign]
+            assign = self.viper.FieldAssign(left, result, position, info)
+        return stmt + [assign]
 
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []

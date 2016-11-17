@@ -139,6 +139,10 @@
         "__bool__": {
             "args": ["object"],
             "type": "bool"
+        },
+        "__eq__": {
+            "args": ["object", "object"],
+            "type": "bool"
         }
     }
 },
@@ -320,6 +324,15 @@
     },
     "extends": "object"
 },
-"type": {}
+"type": {},
+"Place": {
+    "functions": {
+        "__eq__": {
+            "args": ["Place", "object"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+}
 }
 

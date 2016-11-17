@@ -115,7 +115,11 @@ class Error:
     @property
     def message(self) -> str:
         """Human readable error message."""
-        return ERRORS[self.identifier](self._node)
+        if self._node:
+            return ERRORS[self.identifier](self._node)
+        # If we don't have a node, fall back to the original Silver message,
+        # it's better than nothing.
+        return self._error.text()
 
     def __str__(self) -> str:
         """Format error.

@@ -8,6 +8,7 @@ from py2viper_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
@@ -118,9 +119,8 @@ class TypeTranslator(CommonTranslator):
             return ctx.module.global_module.classes[INT_TYPE]
         elif isinstance(node, ast.Tuple):
             args = [self.get_type(arg, ctx) for arg in node.elts]
-            type = GenericType(ctx.module.global_module.classes[TUPLE_TYPE],
+            return GenericType(ctx.module.global_module.classes[TUPLE_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Subscript):
             value_type = self.get_type(node.value, ctx)
             if value_type.name == TUPLE_TYPE:
@@ -154,9 +154,8 @@ class TypeTranslator(CommonTranslator):
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.module.global_module.classes[OBJECT_TYPE]]
-            type = GenericType(ctx.module.global_module.classes[LIST_TYPE],
+            return GenericType(ctx.module.global_module.classes[LIST_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Set):
             if node.elts:
                 el_types = [self.get_type(el, ctx) for el in node.elts]
@@ -168,9 +167,8 @@ class TypeTranslator(CommonTranslator):
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.module.global_module.classes[OBJECT_TYPE]]
-            type = GenericType(ctx.module.global_module.classes[SET_TYPE],
+            return GenericType(ctx.module.global_module.classes[SET_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Dict):
             if node.keys:
                 key_types = [self.get_type(key, ctx) for key in node.keys]
@@ -185,15 +183,20 @@ class TypeTranslator(CommonTranslator):
             else:
                 object_class = ctx.module.global_module.classes[OBJECT_TYPE]
                 args = [object_class, object_class]
-            type = GenericType(ctx.module.global_module.classes[DICT_TYPE],
+            return GenericType(ctx.module.global_module.classes[DICT_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.IfExp):
             body_type = self.get_type(node.body, ctx)
             else_type = self.get_type(node.orelse, ctx)
             return self.pairwise_supertype(body_type, else_type)
         elif isinstance(node, ast.BinOp):
-            return self.get_type(node.left, ctx)
+            left_type = self.get_type(node.left, ctx)
+            right_type = self.get_type(node.right, ctx)
+            if self._is_primitive_operation(node, left_type, right_type):
+                return left_type
+            else:
+                operator_func = OPERATOR_FUNCTIONS[type(node.op)]
+                return left_type.get_func_or_method(operator_func).type
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return ctx.module.global_module.classes[BOOL_TYPE]
