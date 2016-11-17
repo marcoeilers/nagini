@@ -293,7 +293,8 @@ class CallTranslator(CommonTranslator):
                 rec_target = self.get_target(node.func.value, ctx)
                 if isinstance(rec_target, PythonModule):
                     return False
-                elif isinstance(rec_target, PythonClass):
+                elif (isinstance(rec_target, PythonClass) and
+                          not isinstance(node.func.value, ast.Call)):
                     return False
                 else:
                     return True
@@ -573,7 +574,7 @@ class CallTranslator(CommonTranslator):
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
             if (isinstance(receiver_target, PythonClass) and
-                    get_func_name(node.func.value) != 'Result'):
+                    not isinstance(node.func.value, ast.Call)):
                 if target.method_type == MethodType.static_method:
                     # Static method
                     receiver_class = None
