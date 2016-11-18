@@ -93,6 +93,9 @@ class SIFStatementTranslator(StatementTranslator):
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
 
+        # Reset timelevel expression.
+        ctx.current_tl_var_expr = None
+
         body_index = get_body_start_index(node.body)
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in
                         node.body[body_index:]])
@@ -101,7 +104,7 @@ class SIFStatementTranslator(StatementTranslator):
         loop_stmts = self.create_while_node(ctx, while_cond, invariants, [],
                                             body, node)
         self.leave_loop_translation(ctx)
-        res =  tl_stmts + loop_stmts
+        res = tl_stmts + loop_stmts
         return res
 
     def _create_condition_timelevel_statements(self, condition: ast.AST,
