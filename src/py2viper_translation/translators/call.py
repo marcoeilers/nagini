@@ -111,6 +111,9 @@ class CallTranslator(CommonTranslator):
         node is the call node and arg_stmts are statements related to argument
         evaluation.
         """
+        if ctx.current_function is None:
+            raise UnsupportedException(node, 'Global constructor calls are not '
+                                             'supported.')
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
@@ -208,11 +211,11 @@ class CallTranslator(CommonTranslator):
         if ctx.current_function is None:
             if ctx.current_class is None:
                 # Global variable
-                raise UnsupportedException(node, "Global function call "
-                                           "not supported.")
+                raise UnsupportedException(node, 'Global method call '
+                                           'not supported.')
             else:
                 # Static field
-                raise UnsupportedException(node, "Static fields not supported")
+                raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
             result_var = result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
@@ -304,7 +307,8 @@ class CallTranslator(CommonTranslator):
                 rec_target = self.get_target(node.func.value, ctx)
                 if isinstance(rec_target, PythonModule):
                     return False
-                elif isinstance(rec_target, PythonClass):
+                elif (isinstance(rec_target, PythonClass) and
+                          not isinstance(node.func.value, ast.Call)):
                     return False
                 else:
                     return True
@@ -585,7 +589,8 @@ class CallTranslator(CommonTranslator):
             receiver_target = self.get_target(node.func.value, ctx)
             print(receiver_target.name)
             if (isinstance(receiver_target, PythonClass) and
-                    get_func_name(node.func.value) != 'Result'):
+                    (not isinstance(node.func.value, ast.Call) or
+                     get_func_name(node.func.value) == 'super')):
                 if target.method_type == MethodType.static_method:
                     # Static method
                     receiver_class = None

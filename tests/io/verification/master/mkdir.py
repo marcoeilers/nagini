@@ -59,7 +59,7 @@ def mkdir(t1: Place, path: str) -> Place:
                 ex is None
             ),
             Exsures(OSErrorWrapper,
-                ex == RaisedException() and
+                ex is RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, Exception)
             ),
@@ -94,7 +94,7 @@ def is_dir(t1: Place, path: str) -> Tuple[bool, Place]:
                     success == Result()[0]
                 ),
                 Exsures(OSErrorWrapper,
-                    ex == RaisedException() and
+                    ex is RaisedException() and
                     Acc(ex.place) and ex.place == t2 and token(t2) and
                     Acc(ex.exception) and isinstance(ex.exception, Exception)
                 ),
@@ -233,7 +233,7 @@ def ensure_dir_exists2(t1: Place, path: str) -> Place:
             ),
             Exsures(OSErrorWrapper,
                 #:: UnexpectedOutput(postcondition.violated:assertion.false, /py2viper/issue/55/)
-                ex == RaisedException() and
+                ex is RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, Exception)
             ),

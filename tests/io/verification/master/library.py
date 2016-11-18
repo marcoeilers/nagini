@@ -49,7 +49,7 @@ def create_server_socket(t1: Place) -> Tuple[Socket, Place]:
                 token(t2) and
                 Result()[1] == t2 and
                 socket != None and
-                Result()[0] == socket
+                Result()[0] is socket
             ),
         )
     )
@@ -78,7 +78,7 @@ def accept(t1: Place, server_socket: Socket) -> Tuple[Socket, Place]:
                 token(t2) and
                 Result()[1] == t2 and
                 client_socket != None and
-                client_socket == Result()[0]
+                client_socket is Result()[0]
             ),
         )
     )
