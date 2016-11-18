@@ -1,21 +1,10 @@
 from py2viper_contracts.contracts import *
 
+from sif_utils import input_high, input_low, sif_print
+
 
 # Helper functions to generate high/low input.
 # TODO(shitz): Move to common utils file when imports are properly supported.
-def input_high() -> int:
-    return 42
-
-
-def input_low() -> int:
-    Requires(Low())
-    Ensures(Low(Result()))
-    return 42
-
-
-def sif_print(x: int) -> None:
-    Requires(Low(x))
-    pass
 
 
 def test(x: int) -> bool:
@@ -70,12 +59,9 @@ def while4() -> int:
     Ensures(Result() == 10)
     i = 15
     sum = 0
-    Assert(Low(m1(i)))
-    #:: ExpectedOutput(invalid.program:purity.violated)
     while m1(i):
         Invariant(sum == 15 - i)
-        Invariant(Low(m1(i)))
+        Invariant(Low(i))
         sum = sum + 1
         i = i - 1
-        Assert(Low(i))
     return sum
