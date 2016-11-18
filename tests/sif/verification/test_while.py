@@ -1,10 +1,5 @@
 from py2viper_contracts.contracts import *
-
 from sif_utils import input_high, input_low, sif_print
-
-
-# Helper functions to generate high/low input.
-# TODO(shitz): Move to common utils file when imports are properly supported.
 
 
 def test(x: int) -> bool:
@@ -19,9 +14,10 @@ def while1() -> int:
     sum = 0
     while i != 0:
         Invariant(Low(i))
+        Invariant(Low(sum))
         sum = sum + 1
         i = i - 1
-
+    sif_print(sum)
     return sum
 
 
@@ -54,7 +50,7 @@ def m1(a: int) -> bool:
 
 
 def while4() -> int:
-    """Purity violated."""
+    """While with pure guard."""
     Requires(Low())
     Ensures(Result() == 10)
     i = 15
@@ -62,6 +58,8 @@ def while4() -> int:
     while m1(i):
         Invariant(sum == 15 - i)
         Invariant(Low(i))
+        Invariant(Low(sum))
         sum = sum + 1
         i = i - 1
+    sif_print(sum)
     return sum

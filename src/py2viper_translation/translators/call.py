@@ -395,6 +395,16 @@ class CallTranslator(CommonTranslator):
 
         return arg_stmts, args, arg_types
 
+    def _translate_receiver(self, node: ast.Call, target: PythonMethod,
+            ctx: Context) -> Tuple[List[Stmt], List[Expr], List[PythonType]]:
+        rec_stmts, receiver = self.translate_expr(node.func.value, ctx)
+        receiver_type = self.get_type(node.func.value, ctx)
+        if (target.method_type == MethodType.class_method and
+                receiver_type.name != 'type'):
+            receiver = self.type_factory.typeof(receiver, ctx)
+
+        return rec_stmts, [receiver], [receiver_type]
+
     def wrap_var_args(self, args: List[ast.AST], node: ast.AST,
                       ctx: Context) -> StmtsAndExpr:
         """
@@ -578,16 +588,11 @@ class CallTranslator(CommonTranslator):
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
         if isinstance(target, PythonClass):
-            # This is a constructor call
-            # constr_class = target
-            # if isinstance(constr_class, PythonMethod):
-            #     constr_class = constr_class.cls
             return self._translate_constructor_call(target, node, args,
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
-            print(receiver_target.name)
             if (isinstance(receiver_target, PythonClass) and
                     (not isinstance(node.func.value, ast.Call) or
                      get_func_name(node.func.value) == 'super')):
@@ -625,17 +630,14 @@ class CallTranslator(CommonTranslator):
                                             ctx)
             else:
                 # Method called on an object
-                rec_stmt, receiver = self.translate_expr(node.func.value, ctx)
-                receiver_type = self.get_type(node.func.value, ctx)
-                if (target.method_type == MethodType.class_method and
-                        receiver_type.name != 'type'):
-                    receiver = self.type_factory.typeof(receiver, ctx)
+                recv_stmts, recv_exprs, recv_types = self._translate_receiver(
+                    node, target, ctx)
                 is_predicate = target.predicate
                 receiver_class = target.cls
                 if target.method_type != MethodType.static_method:
-                    arg_stmts = rec_stmt + arg_stmts
-                    args = [receiver] + args
-                    arg_types = [receiver_type] + arg_types
+                    arg_stmts = recv_stmts + arg_stmts
+                    args = recv_exprs + args
+                    arg_types = recv_types + arg_types
         else:
             # Global function/method called
             receiver_class = None

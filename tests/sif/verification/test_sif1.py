@@ -1,19 +1,5 @@
 from py2viper_contracts.contracts import *
-
-# Helper functions to generate high/low input.
-def input_high() -> int:
-    return 42
-
-
-def input_low() -> int:
-    Requires(Low())
-    Ensures(Low(Result()))
-    return 42
-
-
-def sif_print(x: int) -> None:
-    Requires(Low(x))
-    pass
+from sif_utils import input_high, input_low, sif_print
 
 
 @NotPreservingTL

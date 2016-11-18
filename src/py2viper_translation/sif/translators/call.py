@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
+from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import PythonClass, PythonType
 from py2viper_translation.lib.typeinfo import TypeInfo
@@ -120,10 +120,6 @@ class SIFCallTranslator(CallTranslator):
         info = self.no_info(ctx)
         call_results = self.translated_calls[node]
 
-        # Create formal args.
-        # formal_args = []
-        # for arg in target.get_args():
-        #     formal_args.append(arg.decl)
         type_ = self.translate_type(target.type, ctx)
         func_app = self.viper.FuncApp(target.sil_name, args, position,
                                       info, type_, formal_args)
@@ -206,16 +202,17 @@ class SIFCallTranslator(CallTranslator):
         arg_stmts += arg_stmt
         args.append(arg_expr)
         arg_types.append(arg_type)
-        return arg_stmt, args, arg_types
+        return arg_stmts, args, arg_types
 
-    def _translate_receiver(self, node: ast.Call,
-                            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
+    def _translate_receiver(self, node: ast.Call, target: SIFPythonMethod,
+            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr], List[PythonType]]:
         info = self.no_info(ctx)
         recv_stmts, recv = self.translate_expr(node.func.value, ctx)
         ctx.set_prime_ctx()
         recv_stmts_p, recv_p = self.translate_expr(node.func.value, ctx)
         assert not recv_stmts_p
         ctx.set_normal_ctx()
+        recv_type = self.get_type(node.func.value, ctx)
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
         type_expr = self.type_factory.type_comp(recv, recv_p, ctx)
@@ -227,38 +224,7 @@ class SIFCallTranslator(CallTranslator):
                                            rhs,
                                            self.no_position(ctx),
                                            info)
-        return recv_stmts + [assign], [recv, recv_p]
-
-    # def translate_normal_call(self, node: ast.Call,
-    #                           ctx: SIFContext) -> StmtsAndExpr:
-    #     arg_stmts, args, _ = self._translate_args(node, ctx)
-    #     name = get_func_name(node)
-    #     position = self.to_position(node, ctx)
-    #     target = self._get_call_target(node, ctx)
-    #     if isinstance(target, PythonClass):
-    #         # This is a constructor call
-    #         target_class = ctx.module.classes[name]
-    #         return self._translate_constructor_call(target_class, node, args,
-    #                                                 arg_stmts, ctx)
-    #     if isinstance(node.func, ast.Attribute):
-    #         # Method called on an object.
-    #         recv_cls = self.get_type(node.func.value, ctx)
-    #         target = recv_cls.get_func_or_method(node.func.attr)
-    #         recv_stmts, recvs = self._translate_receiver(node, ctx)
-    #         arg_stmts += recv_stmts
-    #         args = recvs + args
-    #     else:
-    #         # Global function/method called.
-    #         recv_cls = None
-    #         target = ctx.module.get_func_or_method(name)
-    #
-    #     assert target, "Predicates not supported yet."
-    #     if target.pure:
-    #         return self.translate_function_call(target, args, arg_stmts,
-    #                                             position, node, ctx)
-    #
-    #     return self.translate_method_call(target, args, arg_stmts,
-    #                                       position, node, ctx)
+        return recv_stmts + [assign], [recv, recv_p], [recv_type, recv_type]
 
     def translate_Call(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
         """
@@ -278,5 +244,3 @@ class SIFCallTranslator(CallTranslator):
 
         self.translated_calls[node] = CallResults()
         return super().translate_Call(node, ctx)
-
-

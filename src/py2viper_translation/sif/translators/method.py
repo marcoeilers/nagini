@@ -45,9 +45,6 @@ class SIFMethodTranslator(MethodTranslator):
                         ctx: SIFContext):
         ctx.in_pres = True
         pres = super()._translate_pres(method, ctx)
-        # ctx.set_prime_ctx()
-        # pres += super()._translate_pres(method, ctx)
-        # ctx.set_normal_ctx()
         ctx.in_pres = False
         return pres
 
@@ -61,15 +58,6 @@ class SIFMethodTranslator(MethodTranslator):
             posts.append(self._create_tl_post(method, ctx))
         ctx.in_posts = False
         return posts
-
-    def _create_method_prolog(self, method: SIFPythonMethod,
-                              ctx: SIFContext) -> List[Stmt]:
-        # new_tl := tl
-        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
-                                            method.tl_var.ref(),
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-        return [tl_stmt]
 
     def _create_init_pres(self, method: SIFPythonMethod,
                           ctx: SIFContext) -> List[Expr]:
@@ -102,6 +90,19 @@ class SIFMethodTranslator(MethodTranslator):
                                  self.no_position(ctx), self.no_info(ctx))
 
         return [not_null, not_null_prime, equal] + accs + accs_prime
+
+    def _create_local_vars(self, method: SIFPythonMethod,
+                           ctx: SIFContext) -> List[Stmt]:
+        """Creates LocalVarAssigns for the TL parameter."""
+        # __new_tl := __tl
+        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
+                                            method.tl_var.ref(),
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
+        # Reset current TL expression.
+        ctx.current_tl_var_expr = None
+
+        return [tl_stmt]
 
     def translate_function(self, func: SIFPythonMethod,
                            ctx: SIFContext) -> 'silver.ast.Function':
