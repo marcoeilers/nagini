@@ -141,7 +141,7 @@ class Context:
         if name in self.old_aliases and self.old_aliases[name]:
             old = self.old_aliases[name].pop()
             self.var_aliases[name] = old
-        else:
+        elif name in self.var_aliases:
             del self.var_aliases[name]
 
     def get_contents(self, only_top: bool) -> Dict:

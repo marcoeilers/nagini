@@ -297,13 +297,6 @@ class MethodTranslator(CommonTranslator):
             accs.append(pred)
         return accs
 
-    def _create_method_prolog(self, method: PythonMethod,
-                              ctx: Context) -> List[Stmt]:
-        """
-        Hook to generate the method prolog.
-        """
-        return []
-
     def _create_method_epilog(self, method: PythonMethod,
                               ctx: Context) -> List[Stmt]:
         """
@@ -329,6 +322,21 @@ class MethodTranslator(CommonTranslator):
 
         return [not_null] + accs
 
+    def _create_local_vars(self, method: PythonMethod,
+                           ctx: Context) -> List[Stmt]:
+        """Creates LocalVarAssigns for each parameter."""
+        assign_stmts = []
+        for name, arg in method.args.items():
+            arg_var = ctx.current_function.create_variable(name, arg.type,
+                                                           self.translator)
+            arg_assign = self.viper.LocalVarAssign(arg_var.ref(), arg.ref(),
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+            assign_stmts.append(arg_assign)
+            ctx.set_alias(name, arg_var, arg)
+
+        return assign_stmts
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -352,9 +360,8 @@ class MethodTranslator(CommonTranslator):
             results.append(error_var_decl)
 
         args = self._translate_params(method, ctx)
-
-        body = self._create_method_prolog(method, ctx)
         # Translate body
+        body = []
         if method.cls and method.method_type == MethodType.normal:
             no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
@@ -378,20 +385,12 @@ class MethodTranslator(CommonTranslator):
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
             # Create local variables for parameters
-            for name, arg in method.args.items():
-                arg_var = ctx.current_function.create_variable(name,
-                                                               arg.type,
-                                                               self.translator)
-                arg_assign = self.viper.LocalVarAssign(arg_var.ref(), arg.ref(),
-                                                       self.no_position(ctx),
-                                                       self.no_info(ctx))
-                body.append(arg_assign)
-                ctx.set_alias(name, arg_var, arg)
+            body.extend(self._create_local_vars(method, ctx))
             body += flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in
                  method.node.body[body_index:]])
-            for name in method.args:
-                ctx.remove_alias(name)
+            for arg in method.get_args():
+                ctx.remove_alias(arg.name)
             end_label = ctx.get_label_name(END_LABEL)
             body.append(self.viper.Goto(end_label, self.no_position(ctx),
                                         self.no_info(ctx)))

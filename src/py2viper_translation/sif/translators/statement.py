@@ -1,8 +1,12 @@
 import ast
 
 from py2viper_translation.lib.typedefs import StmtsAndExpr
-from py2viper_translation.lib.util import flatten, UnsupportedException, \
-    get_body_start_index
+from py2viper_translation.lib.util import (
+    flatten,
+    get_body_start_index,
+    InvalidProgramException,
+    UnsupportedException,
+)
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.translators.abstract import Expr, Stmt
 from py2viper_translation.translators.statement import StatementTranslator
@@ -72,14 +76,6 @@ class SIFStatementTranslator(StatementTranslator):
         stmts += super().translate_stmt_Assign(node, ctx)
         ctx.set_normal_ctx()
 
-        # RHS was a function call. Need assignment for timeLevel
-        if isinstance(node.value, ast.Call):
-            assign = self.viper.LocalVarAssign(
-                ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
-                self.to_position(node, ctx), self.no_info(ctx))
-            ctx.current_tl_var_expr = None
-            stmts.append(assign)
-
         return stmts
 
     def translate_stmt_While(self, node: ast.While,
@@ -129,6 +125,9 @@ class SIFStatementTranslator(StatementTranslator):
             ctx.actual_function.new_tl_var.ref(), or_expr, pos, info)
         # After this the current_tl_expr is always reset.
         ctx.current_tl_var_expr = None
+
+        if cond_stmts or cond_stmts_p:
+            raise InvalidProgramException(condition, 'purity.violated')
 
         return cond_stmts + cond_stmts_p + [tl_assign], cond
 

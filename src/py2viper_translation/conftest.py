@@ -91,7 +91,7 @@ def _test_files(test_dir: str) -> List[str]:
             # Skip resources directory.
             dir_names.remove('resources')
         for file_name in file_names:
-            if file_name.endswith('.py'):
+            if file_name.startswith('test_') and file_name.endswith('.py'):
                 result.append(os.path.join(root, file_name))
     result = [path for path in sorted(result)
               if path not in config.test_config.ignore_tests]
