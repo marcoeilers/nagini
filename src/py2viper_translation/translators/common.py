@@ -88,8 +88,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         return self.viper.to_position(node, ctx.position, error_string, rules)
 
-    def no_position(self, ctx: Context) -> 'silver.ast.Position':
-        return self.to_position(None, ctx)
+    def no_position(self, ctx: Context, error_string: str=None,
+            rules: Rules=None) -> 'silver.ast.Position':
+        return self.to_position(None, ctx, error_string, rules)
 
     def to_info(self, comments: List[str], ctx: Context) -> 'silver.ast.Info':
         """

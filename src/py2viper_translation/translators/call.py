@@ -232,6 +232,20 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + call,
                 result_var.ref() if result_var else None)
 
+    def translate_function_call(self, target: PythonMethod, args: List[Expr],
+                                formal_args: List[Expr], arg_stmts: List[Stmt],
+                                position: 'silver.ast.Position', node: ast.AST,
+                                ctx: Context) -> StmtsAndExpr:
+        """Translates a call to a pure method."""
+        type = self.translate_type(target.type, ctx)
+        call = self.viper.FuncApp(target.sil_name, args, position,
+                                  self.no_info(ctx), type, formal_args)
+        call_type = self.get_type(node, ctx)
+        if (call_type and call_type.name in PRIMITIVES and
+                target.type.name not in PRIMITIVES):
+            call = self.unbox_primitive(call, call_type, node, ctx)
+        return arg_stmts, call
+
     def _get_call_target(self, node: ast.Call,
                          ctx: Context) -> Union[PythonClass, PythonMethod]:
         """
@@ -565,14 +579,15 @@ class CallTranslator(CommonTranslator):
             raise UnsupportedException(node, msg + '.')
         if isinstance(target, PythonClass):
             # This is a constructor call
-            constr_class = target
-            if isinstance(constr_class, PythonMethod):
-                constr_class = constr_class.cls
-            return self._translate_constructor_call(constr_class, node, args,
+            # constr_class = target
+            # if isinstance(constr_class, PythonMethod):
+            #     constr_class = constr_class.cls
+            return self._translate_constructor_call(target, node, args,
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
+            print(receiver_target.name)
             if (isinstance(receiver_target, PythonClass) and
                     (not isinstance(node.func.value, ast.Call) or
                      get_func_name(node.func.value) == 'super')):
@@ -626,7 +641,7 @@ class CallTranslator(CommonTranslator):
             receiver_class = None
             is_predicate = target.predicate
         actual_args = []
-        target_params = list(target.args.values())
+        target_params = target.get_args()
         if target.var_arg:
             target_params.append(target.var_arg)
         if target.kw_arg:
@@ -639,8 +654,8 @@ class CallTranslator(CommonTranslator):
                 actual_arg = arg
             actual_args.append(actual_arg)
         args = actual_args
-        for arg in target.args:
-            formal_args.append(target.args[arg].decl)
+        for arg in target.get_args():
+            formal_args.append(arg.decl)
         target_name = target.sil_name
         if is_predicate:
             if receiver_class:
@@ -653,14 +668,8 @@ class CallTranslator(CommonTranslator):
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
-            type = self.translate_type(target.type, ctx)
-            call = self.viper.FuncApp(target_name, args, position,
-                                      self.no_info(ctx), type, formal_args)
-            call_type = self.get_type(node, ctx)
-            if (call_type and call_type.name in PRIMITIVES and
-                    target.type.name not in PRIMITIVES):
-                call = self.unbox_primitive(call, call_type, node, ctx)
-            return (arg_stmts, call)
+            return self.translate_function_call(target, args, formal_args,
+                                                arg_stmts, position, node, ctx)
         else:
             return self.translate_method_call(target, args, arg_stmts,
                                               position, node, ctx)

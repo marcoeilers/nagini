@@ -113,7 +113,7 @@ class SIFCallTranslator(CallTranslator):
         raise UnsupportedException(node, "Built-ins not supported.")
 
     def translate_function_call(self, target: SIFPythonMethod, args: List[Expr],
-                                arg_stmts: List[Stmt],
+                                formal_args: List[Expr], arg_stmts: List[Stmt],
                                 position: 'silver.ast.Position', node: ast.AST,
                                 ctx: SIFContext) -> StmtsAndExpr:
         assert not ctx.use_prime
@@ -121,9 +121,9 @@ class SIFCallTranslator(CallTranslator):
         call_results = self.translated_calls[node]
 
         # Create formal args.
-        formal_args = []
-        for arg in target.get_args():
-            formal_args.append(arg.decl)
+        # formal_args = []
+        # for arg in target.get_args():
+        #     formal_args.append(arg.decl)
         type_ = self.translate_type(target.type, ctx)
         func_app = self.viper.FuncApp(target.sil_name, args, position,
                                       info, type_, formal_args)
@@ -183,20 +183,30 @@ class SIFCallTranslator(CallTranslator):
                                                   List[PythonType]]:
         args = []
         arg_stmts = []
+        arg_types = []
         for arg in node.args:
-            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
-            arg_stmts += arg_stmt
-            args.append(arg_expr)
+            arg_stmts, args, arg_types = self._translate_one_arg(arg, args,
+                arg_stmts, arg_types, ctx)
             ctx.set_prime_ctx()
-            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+            arg_stmts, args, arg_types = self._translate_one_arg(arg, args,
+                arg_stmts, arg_types, ctx)
             ctx.set_normal_ctx()
-            arg_stmts += arg_stmt
-            args.append(arg_expr)
         # Add timeLevel.
         assert ctx.current_function
         args.append(ctx.current_tl_var_expr)
+        arg_types.append(ctx.module.global_module.classes['bool'])
 
-        return arg_stmts, args, []
+        return arg_stmts, args, arg_types
+
+    def _translate_one_arg(self, arg: Expr, args: List[Expr],
+            arg_stmts: List[Stmt], arg_types: List[PythonType],
+            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr], List[PythonType]]:
+        arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+        arg_type = self.get_type(arg, ctx)
+        arg_stmts += arg_stmt
+        args.append(arg_expr)
+        arg_types.append(arg_type)
+        return arg_stmt, args, arg_types
 
     def _translate_receiver(self, node: ast.Call,
                             ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
@@ -219,35 +229,36 @@ class SIFCallTranslator(CallTranslator):
                                            info)
         return recv_stmts + [assign], [recv, recv_p]
 
-    def translate_normal_call(self, node: ast.Call,
-                              ctx: SIFContext) -> StmtsAndExpr:
-        arg_stmts, args, _ = self._translate_args(node, ctx)
-        name = get_func_name(node)
-        position = self.to_position(node, ctx)
-        if name in ctx.module.classes:
-            # This is a constructor call.
-            target_class = ctx.module.classes[name]
-            return self._translate_constructor_call(target_class, node, args,
-                                                    arg_stmts, ctx)
-        if isinstance(node.func, ast.Attribute):
-            # Method called on an object.
-            recv_cls = self.get_type(node.func.value, ctx)
-            target = recv_cls.get_func_or_method(node.func.attr)
-            recv_stmts, recvs = self._translate_receiver(node, ctx)
-            arg_stmts += recv_stmts
-            args = recvs + args
-        else:
-            # Global function/method called.
-            recv_cls = None
-            target = ctx.module.get_func_or_method(name)
-
-        assert target, "Predicates not supported yet."
-        if target.pure:
-            return self.translate_function_call(target, args, arg_stmts,
-                                                position, node, ctx)
-
-        return self.translate_method_call(target, args, arg_stmts,
-                                          position, node, ctx)
+    # def translate_normal_call(self, node: ast.Call,
+    #                           ctx: SIFContext) -> StmtsAndExpr:
+    #     arg_stmts, args, _ = self._translate_args(node, ctx)
+    #     name = get_func_name(node)
+    #     position = self.to_position(node, ctx)
+    #     target = self._get_call_target(node, ctx)
+    #     if isinstance(target, PythonClass):
+    #         # This is a constructor call
+    #         target_class = ctx.module.classes[name]
+    #         return self._translate_constructor_call(target_class, node, args,
+    #                                                 arg_stmts, ctx)
+    #     if isinstance(node.func, ast.Attribute):
+    #         # Method called on an object.
+    #         recv_cls = self.get_type(node.func.value, ctx)
+    #         target = recv_cls.get_func_or_method(node.func.attr)
+    #         recv_stmts, recvs = self._translate_receiver(node, ctx)
+    #         arg_stmts += recv_stmts
+    #         args = recvs + args
+    #     else:
+    #         # Global function/method called.
+    #         recv_cls = None
+    #         target = ctx.module.get_func_or_method(name)
+    #
+    #     assert target, "Predicates not supported yet."
+    #     if target.pure:
+    #         return self.translate_function_call(target, args, arg_stmts,
+    #                                             position, node, ctx)
+    #
+    #     return self.translate_method_call(target, args, arg_stmts,
+    #                                       position, node, ctx)
 
     def translate_Call(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
         """
@@ -258,12 +269,14 @@ class SIFCallTranslator(CallTranslator):
         func_name = get_func_name(node)
         if node in self.translated_calls:
             assert len(self.translated_calls[node])
-            return [], self.translated_calls[node].next()
+            call_expr = self.translated_calls[node].next()
+            if call_expr:
+                return [], call_expr
         elif func_name in CONTRACT_FUNCS:
             # Contract functions need no CallResult.
             return self.translate_contractfunc_call(node, ctx)
-        else:
-            self.translated_calls[node] = CallResults()
-            return super().translate_Call(node, ctx)
+
+        self.translated_calls[node] = CallResults()
+        return super().translate_Call(node, ctx)
 
 
