@@ -108,6 +108,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.to_info([], ctx)
 
     def normalize_type(self, typ: PythonType, ctx: Context) -> PythonType:
+        """
+        Normalizes a type, i.e., converts it to the wrapper type if it's
+        a primitive, returns the actual NoneType if it's None, otherwise just
+        returns the type.
+        """
         if typ is None:
             return ctx.module.global_module.classes['NoneType']
         if typ.name in PRIMITIVES:
@@ -116,6 +121,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
                            ctx: Context) -> Expr:
+        """
+        Creates an expression of type PyType that represents the type of 'arg',
+        to be handed to the constructor function for tuples. This is different
+        than what's used elsewhere. For, e.g., Optional[NoneType, A, C], this
+        will return
+        arg == null ? NoneType : issubtype(typeof(arg), A) ? A : C
+        """
         position = self.no_position(ctx)
         info = self.no_info(ctx)
         if arg_type.name == UNION_TYPE:
