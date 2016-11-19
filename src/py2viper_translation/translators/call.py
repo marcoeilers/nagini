@@ -106,6 +106,10 @@ class CallTranslator(CommonTranslator):
 
     def inhale_field_type(self, f: PythonField, receiver: Expr,
                           ctx: Context) -> Stmt:
+        """
+        Creates an inhale statement that inhales type information for the
+        given field.
+        """
         position = self.no_position(ctx)
         info = self.no_info(ctx)
         field_acc = self.viper.FieldAccess(receiver, f.sil_field, position,
@@ -174,6 +178,7 @@ class CallTranslator(CommonTranslator):
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
         stmt = constr_call
+        # Inhale the type of the newly created set
         coll_type = self.get_type(node, ctx)
         if (node._parent and isinstance(node._parent, ast.Assign) and
                 len(node._parent.targets) == 1):
@@ -419,6 +424,8 @@ class CallTranslator(CommonTranslator):
             vals.append(arg_val)
             val_types.append(self.get_type(arg, ctx))
         func_name = '__create' + str(len(args)) + '__'
+        # __createX__ must be called with the types of the arguments as
+        # additional arguments.
         vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
                        for (t, v) in zip(val_types, vals)]
         type_class = ctx.module.global_module.classes['type']

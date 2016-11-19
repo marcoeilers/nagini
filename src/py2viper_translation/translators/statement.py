@@ -16,6 +16,7 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    AssignCollector,
     contains_stmt,
     flatten,
     get_body_start_index,
@@ -29,21 +30,6 @@ from py2viper_translation.lib.util import (
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
 from typing import List, Optional, Tuple
-
-
-class AssignCollector(ast.NodeVisitor):
-    def __init__(self):
-        self.assigned_vars = {}
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        for target in node.targets:
-            if isinstance(target, ast.Tuple):
-                actual_targets = target.elts
-            else:
-                actual_targets = [target]
-            for actual in actual_targets:
-                if isinstance(actual, ast.Name):
-                    self.assigned_vars[actual.id] = actual
 
 
 class StatementTranslator(CommonTranslator):
@@ -285,6 +271,31 @@ class StatementTranslator(CommonTranslator):
                                         [], node, ctx)
         return iter_del
 
+    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
+                                   ctx: Context) -> List[Expr]:
+        """
+        Creates a list of assertions containing type information for all local
+        variables written to within the given partial ASTs which already
+        existed before.
+        To be used to remember type information about arguments/local variables
+        which are assigned to in loops and therefore havoced.
+        """
+        result = []
+        collector = AssignCollector()
+        for stmt in nodes:
+            collector.visit(stmt)
+        for name in collector.assigned_vars:
+            if name in ctx.var_aliases:
+                var = ctx.var_aliases[name]
+            else:
+                var = ctx.actual_function.get_variable(name)
+            if (name in ctx.actual_function.args or
+                    (var.writes and not contains_stmt(nodes, var.writes[0]))):
+                if var.type.name not in PRIMITIVES:
+                    result.append(self.type_check(var.ref(), var.type,
+                                                  self.no_position(ctx), ctx))
+        return result
+
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
@@ -301,22 +312,9 @@ class StatementTranslator(CommonTranslator):
                                                     err_var, iterable,
                                                     iterable_type, node, ctx)
         bodyindex = get_body_start_index(node.body)
+        invariant.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
+                                                         ctx))
 
-        collector = AssignCollector()
-        for stmt in node.body[bodyindex:]:
-            collector.visit(stmt)
-        for name in collector.assigned_vars:
-            if name in ctx.var_aliases:
-                var = ctx.var_aliases[name]
-            else:
-                var = ctx.actual_function.get_variable(name)
-            if (name in ctx.actual_function.args or
-                    (var.writes and not contains_stmt(node.body[bodyindex:],
-                                                      var.writes[0]))):
-                if var.type.name not in PRIMITIVES:
-                    invariant.append(self.type_check(var.ref(), var.type,
-                                                     self.no_position(ctx),
-                                                     ctx))
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
@@ -562,21 +560,8 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
         bodyindex = get_body_start_index(node.body)
-        collector = AssignCollector()
-        for stmt in node.body[bodyindex:]:
-            collector.visit(stmt)
-        for name in collector.assigned_vars:
-            if name in ctx.var_aliases:
-                var = ctx.var_aliases[name]
-            else:
-                var = ctx.actual_function.get_variable(name)
-            if (name in ctx.actual_function.args or
-                    (var.writes and not contains_stmt(node.body[bodyindex:],
-                                                      var.writes[0]))):
-                if var.type.name not in PRIMITIVES:
-                    invariants.append(self.type_check(var.ref(), var.type,
-                                                      self.no_position(ctx),
-                                                      ctx))
+        invariants.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
+                                                          ctx))
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         loop = self.create_while_node(

@@ -13,7 +13,6 @@ from py2viper_translation.lib.constants import (
     INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
-    UNION_TYPE,
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
@@ -375,6 +374,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         return self.superclass.issubtype(cls)
 
     def get_common_superclass(self, other: 'PythonClass') -> 'PythonClass':
+        """
+        Returns the common superclass of both classes, or None if they don't
+        have any.
+        """
         if self.issubtype(other):
             return other
         if other.issubtype(self):
@@ -472,9 +475,19 @@ class GenericType(PythonType):
 
 
 class UnionType(GenericType):
+    """
+    A special case of a generic type for union types. Behaves like any generic
+    type named 'Union' with the given type arguments in most scenarios, but
+    if you look up methods/functions/..., it will give you those offered by
+    the common superclass of all its arguments (which should always exist and
+    be 'object' if there is no other connection).
+    In the special case of an optional type, it will just give you all the
+    members of the non-None option.
+    """
     def __init__(self, args: List[PythonType]) -> None:
         self.name = 'Union'
         cls = args[0]
+        # Optional type is represented by one arg being None, filter this out.
         if cls is None:
             cls = args[1]
         if isinstance(cls, GenericType):
@@ -1343,7 +1356,7 @@ def get_target(node: ast.AST,
                 lhs = lhs.alt_types[key]
             else:
                 lhs = lhs.type
-        if isinstance(lhs, GenericType) and lhs.name == UNION_TYPE:
+        if isinstance(lhs, UnionType):
             # We have a union type.
             if len(lhs.type_args) == 2 and None in lhs.type_args:
                 # This is actually an Optional type; in this case we just pick

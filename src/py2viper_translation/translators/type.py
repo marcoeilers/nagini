@@ -298,16 +298,24 @@ class TypeTranslator(CommonTranslator):
     def set_type_nargs_and_args(self, lhs: Expr, type: GenericType,
                                 prefix: List[Expr], ctx: Context,
                                 inhale_exhale: bool) -> Expr:
+        """
+        Creates an assertion containing the type argument information contained
+        in 'type' about 'lhs', but not its actual, top level type. If, e.g.,
+        'type' is Dict[str, C], this will generate an assertion saying that
+        the type of 'lhs' has two type arguments, the first is str and the
+        second is C.
+        If 'inhale_exhale' is True, then this information (minus number of type
+        arguments) will only be inhaled, not checked.
+        """
         true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         if type.name == UNION_TYPE:
+            # Special case for union types: We don't want Union to show up
+            # in the type info in Silver, instead, we just say that the type
+            # arg is either option1, or option2 etc.
             result = self.viper.FalseLit(self.no_position(ctx),
                                          self.no_info(ctx))
             for option in type.type_args:
-                if option is None:
-                    option = ctx.module.global_module.classes['NoneType']
-                elif option.name in PRIMITIVES:
-                    option = ctx.module.global_module.classes['__boxed_' +
-                                                              option.name]
+                option = self.normalize_type(option, ctx)
                 check = self.type_factory.type_arg_check(lhs, option, prefix,
                                                          ctx)
                 if inhale_exhale:
@@ -325,6 +333,7 @@ class TypeTranslator(CommonTranslator):
                                        self.no_position(ctx),
                                        self.no_info(ctx))
             return result
+        # Number of type arguments.
         args = type.type_args
         if type.exact_length:
             nargs = len(type.type_args)
@@ -334,6 +343,7 @@ class TypeTranslator(CommonTranslator):
             result = true
 
         for i, arg in enumerate(args):
+            # Include the actual type argument information.
             lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
             indices = prefix + [lit]
 
@@ -351,6 +361,7 @@ class TypeTranslator(CommonTranslator):
                                     self.no_info(ctx))
 
             if isinstance(arg, GenericType):
+                # Recurse to include the type arguments of the type argument.
                 arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices, ctx,
                                                          inhale_exhale)
                 result = self.viper.And(result, arg_nargs,
@@ -375,6 +386,8 @@ class TypeTranslator(CommonTranslator):
         elif type.name == 'type':
             return self.viper.TrueLit(position, self.no_info(ctx))
         elif type.name == UNION_TYPE:
+            # Union type should not directly show up on Silver level, instead
+            # say the type is either option1 or option2 etc.
             result = self.viper.FalseLit(position, self.no_info(ctx))
             for option in type.type_args:
                 option_result = self.type_check(lhs, option, position, ctx,
@@ -384,13 +397,8 @@ class TypeTranslator(CommonTranslator):
             return result
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
-            # if inhale_exhale:
-            #     true = self.viper.TrueLit(position,
-            #                               self.no_info(ctx))
-            #     result = self.viper.InhaleExhaleExp(result, true,
-            #                                         position,
-            #                                         self.no_info(ctx))
             if isinstance(type, GenericType):
+                # Add information about type arguments.
                 args = self.set_type_nargs_and_args(lhs, type, [], ctx,
                                                     inhale_exhale)
                 result = self.viper.And(result, args, self.no_position(ctx),
