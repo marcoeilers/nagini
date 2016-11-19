@@ -130,9 +130,6 @@ class PureTranslator(CommonTranslator):
         position = self.to_position(wrapper.node, ctx)
         val = self._translate_wrapper_expr(wrapper, ctx)
         if wrapper.cond:
-            #if not previous:
-            # raise InvalidProgramException(function.node,
-            #                              'function.return.missing')
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
             if previous:
