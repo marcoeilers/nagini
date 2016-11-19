@@ -5,7 +5,6 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     LIST_TYPE,
     OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
     PRIMITIVES,
     SET_TYPE,
     TUPLE_TYPE,
@@ -67,29 +66,9 @@ class StatementTranslator(CommonTranslator):
         right_type = self.get_type(node.value, ctx)
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if self.is_primitive_operation(node, left_type, right_type):
-            op = self.get_primitive_operation(node)
-            result = op(left, right, position, info)
-        else:
-            func_name = OPERATOR_FUNCTIONS[type(node.op)]
-            called_method = left_type.get_func_or_method(func_name)
-            if called_method.pure:
-                call = self.get_function_call(left_type, func_name,
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                result = call
-            else:
-                result_type = called_method.type
-                res_var = ctx.actual_function.create_variable('op_res',
-                                                              result_type,
-                                                              self.translator)
-                stmt += self.get_method_call(left_type, func_name,
-                                             [left, right],
-                                             [left_type, right_type],
-                                             [res_var.ref(node, ctx)], node,
-                                             ctx)
-                result = res_var.ref(node, ctx)
+        op_stmt, result = self.translate_operator(left, right, left_type,
+                                                  right_type, node, ctx)
+        stmt += op_stmt
         if isinstance(node.target, ast.Name):
             assign = self.viper.LocalVarAssign(left, result, position, info)
         elif isinstance(node.target, ast.Attribute):

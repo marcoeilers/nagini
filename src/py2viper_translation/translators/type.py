@@ -193,7 +193,7 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.BinOp):
             left_type = self.get_type(node.left, ctx)
             right_type = self.get_type(node.right, ctx)
-            if self.is_primitive_operation(node, left_type, right_type):
+            if self._is_primitive_operation(node, left_type, right_type):
                 return left_type
             else:
                 operator_func = OPERATOR_FUNCTIONS[type(node.op)]
