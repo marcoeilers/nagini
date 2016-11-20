@@ -19,6 +19,9 @@ class SIFStatementTranslator(StatementTranslator):
     """
 
     def translate_stmt(self, node: ast.AST, ctx: SIFContext) -> List[Stmt]:
+        # New statement means we always updated the __new_tl var before, thus
+        # we use that and reset the current TL var expression.
+        ctx.current_tl_var_expr = None
         return super().translate_stmt(node, ctx)
 
     def translate_stmt_If(self, node: ast.If, ctx: SIFContext) -> List[Stmt]:
@@ -87,10 +90,9 @@ class SIFStatementTranslator(StatementTranslator):
         invariants = []
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
-                invariants.append(self.translate_contract(expr, ctx))
-
-        # Reset timelevel expression.
-        ctx.current_tl_var_expr = None
+                ctx.current_tl_var_expr = None
+                invariant = self.translate_contract(expr, ctx)
+                invariants.append(invariant)
 
         body_index = get_body_start_index(node.body)
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in
@@ -123,8 +125,6 @@ class SIFStatementTranslator(StatementTranslator):
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
         tl_assign = self.viper.LocalVarAssign(
             ctx.actual_function.new_tl_var.ref(), or_expr, pos, info)
-        # After this the current_tl_expr is always reset.
-        ctx.current_tl_var_expr = None
 
         if cond_stmts or cond_stmts_p:
             raise InvalidProgramException(condition, 'purity.violated')
