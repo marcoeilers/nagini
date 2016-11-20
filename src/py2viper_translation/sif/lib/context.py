@@ -3,7 +3,7 @@ from typing import Dict
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import PythonVar
 from py2viper_translation.lib.typedefs import Expr
-from py2viper_translation.sif.lib.program_nodes import TL_VAR_NAME, SIFPythonVar
+from py2viper_translation.sif.lib.program_nodes import SIFPythonVar, TL_VAR_NAME
 
 
 class SIFContext(Context):
