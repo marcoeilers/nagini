@@ -81,12 +81,3 @@ class SIFContractTranslator(ContractTranslator):
             return [], self.viper.And(not_tl, expr_cmp, pos, info)
         else:
             return [], not_tl
-
-    # def translate_assert(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
-    #     old_tl_expr = ctx.current_tl_var_expr
-    #     if old_tl_expr == ctx.actual_function.new_tl_var.ref():
-    #         old_tl_expr = None
-    #     stmts, expr = super().translate_assert(node, ctx)
-    #     assert not expr
-    #     ctx.current_tl_var_expr = old_tl_expr
-    #     return stmts, None
