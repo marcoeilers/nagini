@@ -58,8 +58,25 @@ def while4() -> int:
     while m1(i):
         Invariant(sum == 15 - i)
         Invariant(Low(i))
+        Invariant(Low(m1(i)))
         Invariant(Low(sum))
         sum = sum + 1
         i = i - 1
     sif_print(sum)
     return sum
+
+
+@NotPreservingTL
+def while5() -> None:
+    """Nested while."""
+    Requires(Low())
+    h = input_high()
+    l = input_low()
+    i = 0
+    while l != 0:
+        while h != 0:
+            i = i + 1
+            h = h -1
+        l = l - 1
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    sif_print(i)
