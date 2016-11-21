@@ -375,8 +375,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
 
     def get_common_superclass(self, other: 'PythonClass') -> 'PythonClass':
         """
-        Returns the common superclass of both classes, or None if they don't
-        have any.
+        Returns the common superclass of both classes. Raises an error if they
+        don't have any, which should never happen.
         """
         if self.issubtype(other):
             return other
@@ -387,7 +387,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         elif other.superclass:
             return self.get_common_superclass(other.superclass)
         else:
-            return None
+            assert False, 'Internal error: Classes without common superclass.'
 
     def get_contents(self, only_top: bool) -> Dict:
         """
@@ -487,20 +487,29 @@ class UnionType(GenericType):
     def __init__(self, args: List[PythonType]) -> None:
         self.name = 'Union'
         cls = args[0]
-        # Optional type is represented by one arg being None, filter this out.
-        if cls is None:
-            cls = args[1]
         if isinstance(cls, GenericType):
             cls = cls.cls
-        for option in args[1:]:
-            if option:
-                if isinstance(option, GenericType):
-                    option = option.cls
-                cls = cls.get_common_superclass(option)
+        for type_option in args[1:]:
+            if type_option:
+                if isinstance(type_option, GenericType):
+                    type_option = type_option.cls
+                cls = cls.get_common_superclass(type_option)
         self.cls = cls
         self.module = cls.get_module()
         self.type_args = args
         self.exact_length = True
+
+
+class OptionalType(UnionType):
+    """
+    A special case of a union type for optional types, i.e., unions of some type
+    and NoneType. Will behave like a normal union type. If you look up methods
+    etc., it will behave like its type argument (e.g., Optional[C] would behave
+    like C).
+    """
+    def __init__(self, typ: PythonType) -> None:
+        super().__init__([typ])
+        self.type_args = [None, typ]
 
 
 class MethodType(Enum):
@@ -1356,17 +1365,12 @@ def get_target(node: ast.AST,
                 lhs = lhs.alt_types[key]
             else:
                 lhs = lhs.type
+        if isinstance(lhs, OptionalType):
+            lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # We have a union type.
-            if len(lhs.type_args) == 2 and None in lhs.type_args:
-                # This is actually an Optional type; in this case we just pick
-                # the type it is an Optional type of and let the verifier catch
-                # the NPE.
-                lhs = next(t for t in lhs.type_args if t)
-            else:
-                # It's an actual union type; we don't support that at the
-                # moment.
-                raise UnsupportedException(node, 'Member access on union type.')
+            # It's a regular union type; we don't support that at the
+            # moment.
+            raise UnsupportedException(node, 'Member access on union type.')
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in

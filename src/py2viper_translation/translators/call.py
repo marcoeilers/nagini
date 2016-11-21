@@ -133,9 +133,9 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
         fields = target_class.get_all_sil_fields()
-        field_type_inhales = [self.inhale_field_type(f, res_var.ref(), ctx)
-                              for f in target_class.get_all_fields()
-                              if f.type.name not in PRIMITIVES]
+        field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
+                              for field in target_class.get_all_fields()
+                              if field.type.name not in PRIMITIVES]
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
         pos = self.to_position(node, ctx)
@@ -178,14 +178,14 @@ class CallTranslator(CommonTranslator):
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
         stmt = constr_call
-        # Inhale the type of the newly created set
-        coll_type = self.get_type(node, ctx)
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
         if (node._parent and isinstance(node._parent, ast.Assign) and
                 len(node._parent.targets) == 1):
-            coll_type = self.get_type(node._parent.targets[0], ctx)
+            set_type = self.get_type(node._parent.targets[0], ctx)
         position = self.to_position(node, ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      coll_type, position, ctx),
+                                                      set_type, position, ctx),
                                       position, self.no_info(ctx)))
         return stmt, res_var.ref()
 

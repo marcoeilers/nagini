@@ -89,10 +89,11 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
         stmt = constr_call
-        coll_type = self.get_type(node, ctx)
+        # Inhale the type of the newly created dict (including type arguments)
+        dict_type = self.get_type(node, ctx)
         position = self.to_position(node, ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      coll_type, position, ctx),
+                                                      dict_type, position, ctx),
                                       position, self.no_info(ctx)))
         for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key, ctx)
@@ -113,10 +114,11 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(set_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
-        coll_type = self.get_type(node, ctx)
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
         position = self.to_position(node, ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      coll_type, position, ctx),
+                                                      set_type, position, ctx),
                                       position, self.no_info(ctx)))
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
@@ -137,10 +139,11 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
-        coll_type = self.get_type(node, ctx)
+        # Inhale the type of the newly created list (including type arguments)
+        list_type = self.get_type(node, ctx)
         position = self.to_position(node, ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      coll_type, position, ctx),
+                                                      list_type, position, ctx),
                                       position, self.no_info(ctx)))
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
