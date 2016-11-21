@@ -6,13 +6,10 @@ from sif_utils import input_high, input_low, sif_print
 def fig1a() -> None:
     Requires(Low())
     x = input_high()
-    # The if statement below makes carbon throw two precondition violated
-    # exceptions, since both !tl and y == y_p are false. Silicon only produces
-    # one exception. Our test framework cannot handle this yet.
-    # if x < 1234:
-    #     x = 0
+    if x < 1234:
+        x = 0
     y = x
-    #:: ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false) | OptionalOutput(call.precondition:assertion.false)
     sif_print(y)
 
 
