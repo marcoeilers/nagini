@@ -510,7 +510,7 @@ class OptionalType(UnionType):
     def __init__(self, typ: PythonType) -> None:
         super().__init__([typ])
         self.type_args = [None, typ]
-        self.optional_type = type
+        self.optional_type = typ
 
 
 class MethodType(Enum):
