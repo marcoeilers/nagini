@@ -218,19 +218,20 @@ class TypeInfo:
                 options_strict, bin_dir=config.mypy_dir
                 )
 
-            # Run mypy a second time with strict optional checking disabled,
-            # s.t. we don't get overapproximated none-related errors.
-            options_non_strict = mypy.options.Options()
-            options_non_strict.strict_optional = False
-            options_non_strict.show_none_errors = False
-            mypy.experiments.STRICT_OPTIONAL = False
-            options_non_strict.fast_parser = True
-            res_non_strict = mypy.build.build(
-                [BuildSource(filename, None, None)],
-                options_non_strict, bin_dir=config.mypy_dir
-            )
-            if res_non_strict.errors:
-                report_errors(res_non_strict.errors)
+            if res_strict.errors:
+                # Run mypy a second time with strict optional checking disabled,
+                # s.t. we don't get overapproximated none-related errors.
+                options_non_strict = mypy.options.Options()
+                options_non_strict.strict_optional = False
+                options_non_strict.show_none_errors = False
+                mypy.experiments.STRICT_OPTIONAL = False
+                options_non_strict.fast_parser = True
+                res_non_strict = mypy.build.build(
+                    [BuildSource(filename, None, None)],
+                    options_non_strict, bin_dir=config.mypy_dir
+                )
+                if res_non_strict.errors:
+                    report_errors(res_non_strict.errors)
             for name, file in res_strict.files.items():
                 if name in IGNORED_IMPORTS:
                     continue
