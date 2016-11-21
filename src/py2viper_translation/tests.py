@@ -154,7 +154,7 @@ class VerificationTests(AnnotatedTests):
     def test_file(self, path: str, jvm, verifier, sif):
         test_annotations = self.get_test_annotations(path)
         if any(self._is_ignore_annotation(tk) for tk in test_annotations):
-            pytest.skip()
+            pytest.skip('Ignored')
         prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
@@ -208,6 +208,8 @@ class VerificationTests(AnnotatedTests):
             self.compare_actual_expected(
                 actual_lo, expected_lo, optional_lo, labels_dict,
                 unexpected_lo, missing_lo)
+            if unexpected or missing:
+                pytest.skip('Unexpected or missing output')
 
 
 verification_tester = VerificationTests()
@@ -264,6 +266,8 @@ class TranslationTests(AnnotatedTests):
 
         self.compare_actual_expected(
             actual, expected_lo, optional_lo, {}, unexpected_lo, missing_lo)
+        if unexpected or missing:
+            pytest.skip('Unexpected or missing output')
 
 
 translation_tester = TranslationTests()
