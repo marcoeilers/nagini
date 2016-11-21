@@ -31,8 +31,7 @@ class TypeException(Exception):
 
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, type_map, path,
-                 ignored_lines):
+    def __init__(self, type_map, path, ignored_lines):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
@@ -194,6 +193,23 @@ class TypeInfo:
         self.alt_types = {}
         self.files = {}
 
+
+    def _create_options(self, strict_optional: bool):
+        """
+        Creates an Options object for mypy and activates strict optional typing
+        based on the given argument.
+        As long as mypy actually ignores these options, this will also set
+        the STRICT_OPTIONAL flag in the experimental module to the given value.
+        """
+        result = mypy.options.Options()
+        result.strict_optional = strict_optional
+        result.show_none_errors = strict_optional
+        # This is an experimental feature atm and you actually have to
+        # enable it like this
+        mypy.experiments.STRICT_OPTIONAL = strict_optional
+        result.fast_parser = True
+        return result
+
     def check(self, filename: str) -> bool:
         """
         Typechecks the given file and collects all type information needed for
@@ -206,13 +222,7 @@ class TypeInfo:
             raise TypeException(errors)
 
         try:
-            options_strict = mypy.options.Options()
-            options_strict.strict_optional = True
-            options_strict.show_none_errors = True
-            # This is an experimental feature atm and you actually have to
-            # enable it like this
-            mypy.experiments.STRICT_OPTIONAL = True
-            options_strict.fast_parser = True
+            options_strict = self._create_options(True)
             res_strict = mypy.build.build(
                 [BuildSource(filename, None, None)],
                 options_strict, bin_dir=config.mypy_dir
@@ -221,11 +231,7 @@ class TypeInfo:
             if res_strict.errors:
                 # Run mypy a second time with strict optional checking disabled,
                 # s.t. we don't get overapproximated none-related errors.
-                options_non_strict = mypy.options.Options()
-                options_non_strict.strict_optional = False
-                options_non_strict.show_none_errors = False
-                mypy.experiments.STRICT_OPTIONAL = False
-                options_non_strict.fast_parser = True
+                options_non_strict = self._create_options(False)
                 res_non_strict = mypy.build.build(
                     [BuildSource(filename, None, None)],
                     options_non_strict, bin_dir=config.mypy_dir

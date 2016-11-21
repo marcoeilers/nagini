@@ -23,6 +23,7 @@ from py2viper_translation.lib.program_nodes import (
     ContainerInterface,
     GenericType,
     MethodType,
+    OptionalType,
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
@@ -748,7 +749,17 @@ class Analyzer(ast.NodeVisitor):
             result = None
         elif self.types.is_union_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
-            result = UnionType(args)
+            optional = False
+            if None in args:
+                # It's an optional type, remember this and wrap it later
+                optional = True
+                args.remove(None)
+            if len(args) > 1:
+                result = UnionType(args)
+            else:
+                result = args[0]
+            if optional:
+                result = OptionalType(result)
         else:
             raise UnsupportedException(mypy_type)
         return result
