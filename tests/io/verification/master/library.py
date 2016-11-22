@@ -20,7 +20,7 @@ from py2viper_contracts.io_builtins import (
 from py2viper_contracts.obligations import (
     MustTerminate,
 )
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 class Socket:
@@ -100,7 +100,8 @@ def read_all_io(
 
 
 @ContractOnly
-def read_all(t1: Place, socket: Socket, timeout: int) -> Tuple[str, Place]:
+def read_all(t1: Place, socket: Socket,
+             timeout: int) -> Tuple[Optional[str], Place]:
     IOExists2(str, Place)(
         lambda data, t2: (
             Requires(

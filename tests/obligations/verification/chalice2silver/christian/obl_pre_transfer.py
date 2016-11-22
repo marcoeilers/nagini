@@ -16,12 +16,13 @@ from py2viper_contracts.contracts import (
     Requires,
 )
 from py2viper_contracts.obligations import *
+from typing import Optional
 
 
 class A:
 
     def __init__(self) -> None:
-        self.x = None   # type: Lock
+        self.x = None   # type: Optional[Lock]
         self.y = 0
 
     def unbounded_transfer(self) -> None:
