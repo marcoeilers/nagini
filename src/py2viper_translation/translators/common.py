@@ -6,6 +6,7 @@ from py2viper_translation.lib.constants import (
     INT_TYPE,
     OPERATOR_FUNCTIONS,
     PRIMITIVES,
+    UNION_TYPE,
 )
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
@@ -106,6 +107,46 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def no_info(self, ctx: Context) -> 'silver.ast.Info':
         return self.to_info([], ctx)
+
+    def normalize_type(self, typ: PythonType, ctx: Context) -> PythonType:
+        """
+        Normalizes a type, i.e., converts it to the wrapper type if it's
+        a primitive, returns the actual NoneType if it's None, otherwise just
+        returns the type.
+        """
+        if typ is None:
+            return ctx.module.global_module.classes['NoneType']
+        if typ.name in PRIMITIVES:
+            return ctx.module.global_module.classes['__boxed_' + typ.name]
+        return typ
+
+    def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
+                           ctx: Context) -> Expr:
+        """
+        Creates an expression of type PyType that represents the type of 'arg',
+        to be handed to the constructor function for tuples. This is different
+        than what's used elsewhere. For, e.g., Optional[NoneType, A, C], this
+        will return
+        arg == null ? NoneType : issubtype(typeof(arg), A) ? A : C
+        """
+        position = self.no_position(ctx)
+        info = self.no_info(ctx)
+        if arg_type.name == UNION_TYPE:
+            first_arg = self.normalize_type(arg_type.type_args[0], ctx)
+            result = self.type_factory.translate_type_literal(first_arg, node,
+                                                              ctx)
+            for option in arg_type.type_args[1:]:
+                option = self.normalize_type(option, ctx)
+                check = self.type_check(arg, option, position, ctx, False)
+                type_lit = self.type_factory.translate_type_literal(option,
+                                                                    node, ctx)
+                result = self.viper.CondExp(check, type_lit, result, position,
+                                            info)
+            return result
+        arg_type = self.normalize_type(arg_type, ctx)
+        type_lit = self.type_factory.translate_type_literal(arg_type,
+                                                            node, ctx)
+        return type_lit
 
     def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
                            right_type: PythonType, node: ast.AST,

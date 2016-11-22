@@ -174,14 +174,6 @@ class ContractTranslator(CommonTranslator):
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(fieldacc, field_type,
                                         self.no_position(ctx), ctx)
-            not_null = self.viper.NeCmp(fieldacc,
-                                        self.viper.NullLit(self.no_position(ctx),
-                                                           self.no_info(ctx)),
-                                        self.to_position(node, ctx),
-                                        self.no_info(ctx))
-            implication = self.viper.Implies(not_null, type_info,
-                                             self.to_position(node, ctx),
-                                             self.no_info(ctx))
             pred = self.viper.And(pred, type_info,
                                   self.to_position(node, ctx),
                                   self.no_info(ctx))

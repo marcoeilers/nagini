@@ -257,7 +257,6 @@ def nested_try_finally(out: Container) -> None:
                 raise MyException()
             finally:
                 out.value = 30
-            Assert(False)
         except MyException as e:
             out.value = out.value + 3
         except Exception:
@@ -285,7 +284,6 @@ def nested_try_finally_2(out: Container) -> None:
                 raise MyException()
             finally:
                 out.value = 30
-            Assert(False)
         except MyException as e:
             out.value = out.value + 3
         except Exception:
@@ -450,8 +448,8 @@ class ExceptionClass:
             raise MyOtherException()
 
 
+#:: ExpectedOutput(postcondition.violated:assertion.false)
 def class_client() -> ExceptionClass:
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() is not None)
     try:
         res = ExceptionClass(False)

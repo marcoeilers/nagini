@@ -22,6 +22,7 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.program_nodes import (
     MethodType,
     PythonClass,
+    PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
@@ -104,6 +105,19 @@ class CallTranslator(CommonTranslator):
         return self.type_factory.concrete_type_check(obj_var, type, position,
                                                      ctx)
 
+    def inhale_field_type(self, f: PythonField, receiver: Expr,
+                          ctx: Context) -> Stmt:
+        """
+        Creates an inhale statement that inhales type information for the
+        given field.
+        """
+        position = self.no_position(ctx)
+        info = self.no_info(ctx)
+        field_acc = self.viper.FieldAccess(receiver, f.sil_field, position,
+                                           info)
+        check = self.type_check(field_acc, f.type, position, ctx)
+        return self.viper.Inhale(check, position, info)
+
     def _translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -120,6 +134,9 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
         fields = target_class.get_all_sil_fields()
+        field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
+                              for field in target_class.get_all_fields()
+                              if field.type.name not in PRIMITIVES]
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
         pos = self.to_position(node, ctx)
@@ -132,7 +149,7 @@ class CallTranslator(CommonTranslator):
         type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
-        stmts = [new, type_inhale]
+        stmts = [new, type_inhale] + field_type_inhales
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls
@@ -161,7 +178,17 @@ class CallTranslator(CommonTranslator):
         targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        return constr_call, res_var.ref()
+        stmt = constr_call
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
+        if (node._parent and isinstance(node._parent, ast.Assign) and
+                len(node._parent.targets) == 1):
+            set_type = self.get_type(node._parent.targets[0], ctx)
+        position = self.to_position(node, ctx)
+        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
+                                                      set_type, position, ctx),
+                                      position, self.no_info(ctx)))
+        return stmt, res_var.ref()
 
     def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
@@ -389,7 +416,8 @@ class CallTranslator(CommonTranslator):
             arg_stmts += var_stmt
 
         if target.kw_arg:
-            kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node, ctx)
+            kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node,
+                                                      target.kw_arg.type, ctx)
             args.append(kw_arg_dict)
             arg_types.append(target.kw_arg.type)
             arg_stmts += kw_stmt
@@ -421,12 +449,18 @@ class CallTranslator(CommonTranslator):
             vals.append(arg_val)
             val_types.append(self.get_type(arg, ctx))
         func_name = '__create' + str(len(args)) + '__'
+        # __createX__ must be called with the types of the arguments as
+        # additional arguments.
+        vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
+                       for (t, v) in zip(val_types, vals)]
+        type_class = ctx.module.global_module.classes['type']
+        val_types += [type_class] * len(val_types)
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call
 
-    def _wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Dict,
-                      ctx: Context) -> StmtsAndExpr:
+    def _wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Call,
+                      kw_type: PythonType, ctx: Context) -> StmtsAndExpr:
         """
         Wraps the given arguments into a dict to be passed to an **kwargs param.
         """
@@ -436,7 +470,11 @@ class CallTranslator(CommonTranslator):
         arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
-        stmt = constr_call
+        position = self.to_position(node, ctx)
+        type_inhale = self.viper.Inhale(self.type_check(res_var.ref(), kw_type,
+                                                        position, ctx),
+                                        position, self.no_info(ctx))
+        stmt = constr_call + [type_inhale]
         str_type = ctx.module.global_module.classes[STRING_TYPE]
         for key, val in args.items():
             # Key string literal

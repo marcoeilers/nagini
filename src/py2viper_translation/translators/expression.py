@@ -89,6 +89,12 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
         stmt = constr_call
+        # Inhale the type of the newly created dict (including type arguments)
+        dict_type = self.get_type(node, ctx)
+        position = self.to_position(node, ctx)
+        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
+                                                      dict_type, position, ctx),
+                                      position, self.no_info(ctx)))
         for key, val in zip(node.keys, node.values):
             key_stmt, key_val = self.translate_expr(key, ctx)
             key_type = self.get_type(key, ctx)
@@ -108,6 +114,12 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(set_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
+        position = self.to_position(node, ctx)
+        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
+                                                      set_type, position, ctx),
+                                      position, self.no_info(ctx)))
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
             el_type = self.get_type(el, ctx)
@@ -127,6 +139,12 @@ class ExpressionTranslator(CommonTranslator):
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
+        # Inhale the type of the newly created list (including type arguments)
+        list_type = self.get_type(node, ctx)
+        position = self.to_position(node, ctx)
+        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
+                                                      list_type, position, ctx),
+                                      position, self.no_info(ctx)))
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
             el_type = self.get_type(element, ctx)
@@ -161,7 +179,11 @@ class ExpressionTranslator(CommonTranslator):
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
+        type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(node.elts)) + '__'
+        vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
+                       for (t, v) in zip(val_types, vals)]
+        val_types += [type_class] * len(val_types)
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call

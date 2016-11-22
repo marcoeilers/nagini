@@ -1,4 +1,5 @@
 from py2viper_contracts.contracts import *
+from typing import Optional
 
 class Super:
     pass
@@ -78,7 +79,7 @@ def test_while_wrong(a: int) -> int:
 def test_none_super(a: int) -> int:
     Ensures(Implies(a == 44, Result() == 88))
     Ensures(Implies(a != 44, Result() == 99))
-    c = Super()
+    c = Super()  # type: Optional[Super]
     if a == 44:
         c = None
     return 99 if c else 88
@@ -87,31 +88,31 @@ def test_none_super(a: int) -> int:
 def test_none_super_wrong(a: int) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(a == 44, Result() == 77))
-    c = Super()
+    c = Super()  # type: Optional[Super]
     if a == 44:
         c = None
     return 99 if c else 88
 
 
-def test_param_object(a: int, b: object) -> int:
+def test_param_object(a: int, b: Optional[object]) -> int:
     Ensures(Implies(b == None, Result() == 88))
     Ensures(Implies(b != None, Result() == 99))
     return 99 if b else 88
 
 
-def test_param_object_wrong(a: int, b: object) -> int:
+def test_param_object_wrong(a: int, b: Optional[object]) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(b is not None, Result() == 77))
     return 99 if b else 88
 
 
-def test_param_sub(a: int, b: Sub) -> int:
+def test_param_sub(a: int, b: Optional[Sub]) -> int:
     Ensures(Implies(b == None, Result() == 88))
     Ensures(Implies(b != None, Result() == 99))
     return 99 if b else 88
 
 
-def test_param_sub_wrong(a: int, b: Sub) -> int:
+def test_param_sub_wrong(a: int, b: Optional[Sub]) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(b is not None, Result() == 98))
     return 99 if b else 88
