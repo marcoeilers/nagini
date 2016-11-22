@@ -131,6 +131,8 @@ class SIFMethodTranslator(MethodTranslator):
     def _create_local_vars_for_params(self, method: SIFPythonMethod,
                                       ctx: SIFContext) -> List[Stmt]:
         """Creates LocalVarAssigns for the TL parameter."""
+        # TODO(shitz): Should at some point also introduce local vars for params
+        # but this needs some more work with ctx.var_aliases.
         # __new_tl := __tl
         tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
                                             method.tl_var.ref(),
