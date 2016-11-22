@@ -10,19 +10,18 @@ from py2viper_contracts.contracts import (
     Assert,
     Ensures,
     Implies,
-    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
+from typing import Optional
 
 
 class A:
 
     def __init__(self) -> None:
-        self.a = None       # type: Lock
+        self.a = None       # type: Optional[Lock]
         self.b = 0          # type: int
 
     def m1(self) -> None:

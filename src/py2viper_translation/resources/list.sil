@@ -58,6 +58,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires acc(self.list_acc)
     requires key >= 0
     requires key < list___len__(self)
+    requires issubtype(typeof(item), get_type_arg1(self, 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[key := item]
 {
@@ -66,6 +67,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
 
 method list_append(self: Ref, item: Ref) returns ()
     requires acc(self.list_acc)
+    requires issubtype(typeof(item), get_type_arg1(self, 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {

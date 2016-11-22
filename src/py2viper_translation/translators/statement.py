@@ -16,6 +16,8 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.lib.util import (
+    AssignCollector,
+    contains_stmt,
     flatten,
     get_body_start_index,
     get_func_name,
@@ -42,32 +44,22 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
-        lhs_stmt, lhs = self.translate_expr(node.target, ctx)
-        if lhs_stmt:
+        left_stmt, left = self.translate_expr(node.target, ctx)
+        if left_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        if isinstance(node.op, ast.Add):
-            newval = self.viper.Add(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Sub):
-            newval = self.viper.Sub(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        elif isinstance(node.op, ast.Mult):
-            newval = self.viper.Mul(lhs, rhs,
-                                    self.to_position(node, ctx),
-                                    self.no_info(ctx))
-        else:
-            raise UnsupportedException(node)
+        stmt, right = self.translate_expr(node.value, ctx)
+        left_type = self.get_type(node.target, ctx)
+        right_type = self.get_type(node.value, ctx)
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        op_stmt, result = self.translate_operator(left, right, left_type,
+                                                  right_type, node, ctx)
+        stmt += op_stmt
         if isinstance(node.target, ast.Name):
-            assign = self.viper.LocalVarAssign(lhs, newval, position,
-                                               self.no_info(ctx))
+            assign = self.viper.LocalVarAssign(left, result, position, info)
         elif isinstance(node.target, ast.Attribute):
-            assign = self.viper.FieldAssign(lhs, newval, position,
-                                            self.no_info(ctx))
-        return rhs_stmt + [assign]
+            assign = self.viper.FieldAssign(left, result, position, info)
+        return stmt + [assign]
 
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
@@ -279,6 +271,31 @@ class StatementTranslator(CommonTranslator):
                                         [], node, ctx)
         return iter_del
 
+    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
+                                   ctx: Context) -> List[Expr]:
+        """
+        Creates a list of assertions containing type information for all local
+        variables written to within the given partial ASTs which already
+        existed before.
+        To be used to remember type information about arguments/local variables
+        which are assigned to in loops and therefore havoced.
+        """
+        result = []
+        collector = AssignCollector()
+        for stmt in nodes:
+            collector.visit(stmt)
+        for name in collector.assigned_vars:
+            if name in ctx.var_aliases:
+                var = ctx.var_aliases[name]
+            else:
+                var = ctx.actual_function.get_variable(name)
+            if (name in ctx.actual_function.args or
+                    (var.writes and not contains_stmt(nodes, var.writes[0]))):
+                if var.type.name not in PRIMITIVES:
+                    result.append(self.type_check(var.ref(), var.type,
+                                                  self.no_position(ctx), ctx))
+        return result
+
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
@@ -294,10 +311,14 @@ class StatementTranslator(CommonTranslator):
         invariant = self._create_for_loop_invariant(iter_var, target_var,
                                                     err_var, iterable,
                                                     iterable_type, node, ctx)
+        bodyindex = get_body_start_index(node.body)
+        invariant.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
+                                                         ctx))
+
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
-        bodyindex = get_body_start_index(node.body)
+
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         body.extend(next_call)
@@ -539,6 +560,8 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
         bodyindex = get_body_start_index(node.body)
+        invariants.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
+                                                          ctx))
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         loop = self.create_while_node(

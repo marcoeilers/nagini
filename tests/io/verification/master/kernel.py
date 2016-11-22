@@ -43,7 +43,7 @@ def open(t1: Place, file_name: str) -> Tuple[File, Place]:
             Ensures(
                 token(t2) and
                 t2 == Result()[1] and
-                fp == Result()[0]
+                fp is Result()[0]
             ),
         )
     )

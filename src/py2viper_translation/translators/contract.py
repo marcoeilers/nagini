@@ -174,14 +174,6 @@ class ContractTranslator(CommonTranslator):
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(fieldacc, field_type,
                                         self.no_position(ctx), ctx)
-            not_null = self.viper.NeCmp(fieldacc,
-                                        self.viper.NullLit(self.no_position(ctx),
-                                                           self.no_info(ctx)),
-                                        self.to_position(node, ctx),
-                                        self.no_info(ctx))
-            implication = self.viper.Implies(not_null, type_info,
-                                             self.to_position(node, ctx),
-                                             self.no_info(ctx))
             pred = self.viper.And(pred, type_info,
                                   self.to_position(node, ctx),
                                   self.no_info(ctx))
@@ -353,7 +345,8 @@ class ContractTranslator(CommonTranslator):
                                                self.no_position(ctx),
                                                self.no_info(ctx))]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain], self.no_position(ctx),
+                                        [domain],
+                                        self.to_position(domain_node, ctx),
                                         self.no_info(ctx), seq_ref, formal_args)
         if var.type.name in PRIMITIVES:
             ref_var = self.box_primitive(var.ref(), var.type, None, ctx)

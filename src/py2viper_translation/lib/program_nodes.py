@@ -25,6 +25,7 @@ from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
+    UnsupportedException,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -372,6 +373,22 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return False
         return self.superclass.issubtype(cls)
 
+    def get_common_superclass(self, other: 'PythonClass') -> 'PythonClass':
+        """
+        Returns the common superclass of both classes. Raises an error if they
+        don't have any, which should never happen.
+        """
+        if self.issubtype(other):
+            return other
+        if other.issubtype(self):
+            return self
+        if self.superclass:
+            return self.superclass.get_common_superclass(other)
+        elif other.superclass:
+            return self.get_common_superclass(other.superclass)
+        else:
+            assert False, 'Internal error: Classes without common superclass.'
+
     def get_contents(self, only_top: bool) -> Dict:
         """
         Returns the elements that can be accessed from this container (to be
@@ -455,6 +472,45 @@ class GenericType(PythonType):
             if my_arg != other_arg:
                 return False
         return True
+
+
+class UnionType(GenericType):
+    """
+    A special case of a generic type for union types. Behaves like any generic
+    type named 'Union' with the given type arguments in most scenarios, but
+    if you look up methods/functions/..., it will give you those offered by
+    the common superclass of all its arguments (which should always exist and
+    be 'object' if there is no other connection).
+    In the special case of an optional type, it will just give you all the
+    members of the non-None option.
+    """
+    def __init__(self, args: List[PythonType]) -> None:
+        self.name = 'Union'
+        cls = args[0]
+        if isinstance(cls, GenericType):
+            cls = cls.cls
+        for type_option in args[1:]:
+            if type_option:
+                if isinstance(type_option, GenericType):
+                    type_option = type_option.cls
+                cls = cls.get_common_superclass(type_option)
+        self.cls = cls
+        self.module = cls.get_module()
+        self.type_args = args
+        self.exact_length = True
+
+
+class OptionalType(UnionType):
+    """
+    A special case of a union type for optional types, i.e., unions of some type
+    and NoneType. Will behave like a normal union type. If you look up methods
+    etc., it will behave like its type argument (e.g., Optional[C] would behave
+    like C).
+    """
+    def __init__(self, typ: PythonType) -> None:
+        super().__init__([typ])
+        self.type_args = [None, typ]
+        self.optional_type = typ
 
 
 class MethodType(Enum):
@@ -1310,6 +1366,12 @@ def get_target(node: ast.AST,
                 lhs = lhs.alt_types[key]
             else:
                 lhs = lhs.type
+        if isinstance(lhs, OptionalType):
+            lhs = lhs.optional_type
+        if isinstance(lhs, UnionType):
+            # It's a regular union type; we don't support that at the
+            # moment.
+            raise UnsupportedException(node, 'Member access on union type.')
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in

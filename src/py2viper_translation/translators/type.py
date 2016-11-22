@@ -8,11 +8,13 @@ from py2viper_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
+    UNION_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
     GenericType,
@@ -118,9 +120,8 @@ class TypeTranslator(CommonTranslator):
             return ctx.module.global_module.classes[INT_TYPE]
         elif isinstance(node, ast.Tuple):
             args = [self.get_type(arg, ctx) for arg in node.elts]
-            type = GenericType(ctx.module.global_module.classes[TUPLE_TYPE],
+            return GenericType(ctx.module.global_module.classes[TUPLE_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Subscript):
             value_type = self.get_type(node.value, ctx)
             if value_type.name == TUPLE_TYPE:
@@ -154,9 +155,8 @@ class TypeTranslator(CommonTranslator):
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.module.global_module.classes[OBJECT_TYPE]]
-            type = GenericType(ctx.module.global_module.classes[LIST_TYPE],
+            return GenericType(ctx.module.global_module.classes[LIST_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Set):
             if node.elts:
                 el_types = [self.get_type(el, ctx) for el in node.elts]
@@ -168,9 +168,8 @@ class TypeTranslator(CommonTranslator):
                 args = self.get_type(node._parent.targets[0], ctx).type_args
             else:
                 args = [ctx.module.global_module.classes[OBJECT_TYPE]]
-            type = GenericType(ctx.module.global_module.classes[SET_TYPE],
+            return GenericType(ctx.module.global_module.classes[SET_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.Dict):
             if node.keys:
                 key_types = [self.get_type(key, ctx) for key in node.keys]
@@ -185,15 +184,20 @@ class TypeTranslator(CommonTranslator):
             else:
                 object_class = ctx.module.global_module.classes[OBJECT_TYPE]
                 args = [object_class, object_class]
-            type = GenericType(ctx.module.global_module.classes[DICT_TYPE],
+            return GenericType(ctx.module.global_module.classes[DICT_TYPE],
                                args)
-            return type
         elif isinstance(node, ast.IfExp):
             body_type = self.get_type(node.body, ctx)
             else_type = self.get_type(node.orelse, ctx)
             return self.pairwise_supertype(body_type, else_type)
         elif isinstance(node, ast.BinOp):
-            return self.get_type(node.left, ctx)
+            left_type = self.get_type(node.left, ctx)
+            right_type = self.get_type(node.right, ctx)
+            if self._is_primitive_operation(node, left_type, right_type):
+                return left_type
+            else:
+                operator_func = OPERATOR_FUNCTIONS[type(node.op)]
+                return left_type.get_func_or_method(operator_func).type
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return ctx.module.global_module.classes[BOOL_TYPE]
@@ -291,50 +295,75 @@ class TypeTranslator(CommonTranslator):
             return False
         return self._is_subtype(t1.superclass, t2)
 
-    def set_type_args(self, lhs: Expr, type: GenericType,
-                      prefix: List[Expr], ctx: Context) -> Expr:
+    def set_type_nargs_and_args(self, lhs: Expr, type: GenericType,
+                                prefix: List[Expr], ctx: Context,
+                                inhale_exhale: bool) -> Expr:
         """
-        Creates an expression specifying the type of lhs and its type arguments.
+        Creates an assertion containing the type argument information contained
+        in 'type' about 'lhs', but not its actual, top level type. If, e.g.,
+        'type' is Dict[str, C], this will generate an assertion saying that
+        the type of 'lhs' has two type arguments, the first is str and the
+        second is C.
+        If 'inhale_exhale' is True, then this information (minus number of type
+        arguments) will only be inhaled, not checked.
         """
-        args = type.type_args
-        result = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-
-        for i, arg in enumerate(args):
-            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
-            indices = prefix + [lit]
-            if arg.name in PRIMITIVES:
-                arg = ctx.module.global_module.classes['__boxed_' + arg.name]
-            check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
-            result = self.viper.And(result, check, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-            if isinstance(arg, GenericType):
-                arg_args = self.set_type_args(lhs, arg, indices, ctx)
-                result = self.viper.And(result, arg_args, self.no_position(ctx),
-                                        self.no_info(ctx))
-        return result
-
-    def set_type_nargs(self, lhs: Expr, type: GenericType,
-                       prefix: List[Expr], ctx: Context) -> Expr:
-        """
-        Creates an expression specifying the number of type args the type
-        of lhs has at each level of nesting.
-        """
+        true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        if type.name == UNION_TYPE:
+            # Special case for union types: We don't want Union to show up
+            # in the type info in Silver, instead, we just say that the type
+            # arg is either option1, or option2 etc.
+            result = self.viper.FalseLit(self.no_position(ctx),
+                                         self.no_info(ctx))
+            for option in type.type_args:
+                option = self.normalize_type(option, ctx)
+                check = self.type_factory.type_arg_check(lhs, option, prefix,
+                                                         ctx)
+                if inhale_exhale:
+                    check = self.viper.InhaleExhaleExp(check, true,
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
+                if isinstance(option, GenericType):
+                    option_args = self.set_type_nargs_and_args(lhs, option,
+                                                               prefix, ctx,
+                                                               inhale_exhale)
+                    check = self.viper.And(check, option_args,
+                                           self.no_position(ctx),
+                                           self.no_info(ctx))
+                result = self.viper.Or(result, check,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx))
+            return result
+        # Number of type arguments.
         args = type.type_args
         if type.exact_length:
             nargs = len(type.type_args)
             result = self.type_factory.type_nargs_check(lhs, nargs,
                                                         prefix, ctx)
         else:
-            result = self.viper.TrueLit(self.no_position(ctx),
-                                        self.no_info(ctx))
+            result = true
 
         for i, arg in enumerate(args):
+            # Include the actual type argument information.
             lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
             indices = prefix + [lit]
 
+            if arg.name in PRIMITIVES:
+                arg = ctx.module.global_module.classes['__boxed_' + arg.name]
+            if arg.name == UNION_TYPE:
+                check = true
+            else:
+                check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+            if inhale_exhale:
+                check = self.viper.InhaleExhaleExp(check, true,
+                                                   self.no_position(ctx),
+                                                   self.no_info(ctx))
+            result = self.viper.And(result, check, self.no_position(ctx),
+                                    self.no_info(ctx))
+
             if isinstance(arg, GenericType):
-                arg_nargs = self.set_type_nargs(lhs, arg, indices, ctx)
+                # Recurse to include the type arguments of the type argument.
+                arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices, ctx,
+                                                         inhale_exhale)
                 result = self.viper.And(result, arg_nargs,
                                         self.no_position(ctx),
                                         self.no_info(ctx))
@@ -348,120 +377,30 @@ class TypeTranslator(CommonTranslator):
         for simple types, or include information about type arguments for
         generic types, or things like the lengths for tuples.
         """
-        if type.name in PRIMITIVES:
-            boxed = ctx.module.classes['__boxed_' + type.name]
-            result = self.type_factory.type_check(lhs, boxed, position, ctx)
+        if type is None:
+            none_type = ctx.module.global_module.classes['NoneType']
+            return self.type_factory.type_check(lhs, none_type, position, ctx)
+        elif type.name in PRIMITIVES:
+            boxed = ctx.module.global_module.classes['__boxed_' + type.name]
+            return self.type_factory.type_check(lhs, boxed, position, ctx)
         elif type.name == 'type':
-            result = self.viper.TrueLit(position, self.no_info(ctx))
+            return self.viper.TrueLit(position, self.no_info(ctx))
+        elif type.name == UNION_TYPE:
+            # Union type should not directly show up on Silver level, instead
+            # say the type is either type option 1 or type option 2 etc.
+            result = self.viper.FalseLit(position, self.no_info(ctx))
+            for type_option in type.type_args:
+                option_result = self.type_check(lhs, type_option, position, ctx,
+                                                inhale_exhale)
+                result = self.viper.Or(result, option_result, position,
+                                       self.no_info(ctx))
+            return result
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
-
-        if isinstance(type, GenericType):
-            args = self.set_type_args(lhs, type, [], ctx)
-            result = self.viper.And(result, args, self.no_position(ctx),
-                                    self.no_info(ctx))
-        if inhale_exhale:
-            true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
-            result = self.viper.InhaleExhaleExp(result, true,
-                                                self.no_position(ctx),
-                                                self.no_info(ctx))
-        if isinstance(type, GenericType):
-            nargs = self.set_type_nargs(lhs, type, [], ctx)
-            result = self.viper.And(result, nargs, self.no_position(ctx),
-                                    self.no_info(ctx))
-        return result
-
-    def _type_check_set(self, lhs: Expr, type: PythonType, basic_check: Expr,
-                        ctx: Context, perms: bool=False) -> Expr:
-        return basic_check
-
-    def _type_check_list(self, lhs: Expr, type: PythonType, basic_check: Expr,
-                         ctx: Context, perms: bool=False) -> Expr:
-        return basic_check
-
-    def _type_check_dict(self, lhs: Expr, type: PythonType, basic_check: Expr,
-                         ctx: Context, perms: bool=False) -> Expr:
-        result = basic_check
-        if perms:
-            # Access to field dict_acc : Set[Ref]
-            field_type = self.viper.SetType(self.viper.Ref)
-            field = self.viper.Field('dict_acc', field_type,
-                                     self.no_position(ctx),
-                                     self.no_info(ctx))
-            field_acc = self.viper.FieldAccess(lhs, field,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))
-            acc_pred = self.viper.FieldAccessPredicate(field_acc,
-                self.viper.FullPerm(self.no_position(ctx),
-                                    self.no_info(ctx)),
-                self.no_position(ctx), self.no_info(ctx))
-            result = result = self.viper.And(result, acc_pred,
-                                             self.no_position(ctx),
-                                             self.no_info(ctx))
-        return result
-
-    def _type_check_tuple(self, lhs: Expr, type: PythonType, basic_check: Expr,
-                          ctx: Context, perms: bool=False) -> Expr:
-        result = basic_check
-        if type.exact_length:
-            # Set length
-            length = self.viper.IntLit(len(type.type_args),
-                                       self.no_position(ctx),
-                                       self.no_info(ctx))
-            len_call = self.get_function_call(type, '__len__', [lhs],
-                                              [None], None, ctx)
-            eq = self.viper.EqCmp(len_call, length, self.no_position(ctx),
-                                  self.no_info(ctx))
-            result = self.viper.And(result, eq, self.no_position(ctx),
-                                    self.no_info(ctx))
-            # Types of contents
-            for index in range(len(type.type_args)):
-                # typeof getitem <= type
-                item = type.type_args[index]
-                index_lit = self.viper.IntLit(index, self.no_position(ctx),
-                                              self.no_info(ctx))
-                args = [lhs, index_lit]
-                arg_types = [None, None]
-                item_call = self.get_function_call(type, '__getitem__',
-                                                   args,
-                                                   arg_types, None, ctx)
-                type_check = self.type_check(item_call, item, ctx)
-                result = result = self.viper.And(result, type_check,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx))
-        else:
-            # Exact length is unknown;
-            # forall contents, assume type
-            int_type = ctx.module.classes[INT_TYPE]
-            index_var = ctx.current_function.create_variable('index',
-                int_type, self.translator, local=False)
-            var_decl = index_var.decl
-            zero = self.viper.IntLit(0, self.no_position(ctx),
-                                     self.no_info(ctx))
-            index_positive = self.viper.GeCmp(index_var.ref(), zero,
-                                              self.no_position(ctx),
-                                              self.no_info(ctx))
-            length = self.get_function_call(type, '__len__', [lhs],
-                                            [None], None, ctx)
-            index_less_length = self.viper.LtCmp(index_var.ref(), length,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx))
-            impl_lhs = self.viper.And(index_positive, index_less_length,
-                                      self.no_position(ctx),
-                                      self.no_info(ctx))
-            args = [lhs, index_var.ref()]
-            arg_types = [None, None]
-            item_call = self.get_function_call(type, '__getitem__',
-                                               args,
-                                               arg_types, None, ctx)
-            type_check = self.type_check(item_call, type.type_args[0], ctx)
-            implication = self.viper.Implies(impl_lhs, type_check,
-                                             self.no_position(ctx),
-                                             self.no_info(ctx))
-            forall = self.viper.Forall([var_decl], [], implication,
-                                       self.no_position(ctx),
-                                       self.no_info(ctx))
-            result = result = self.viper.And(result, forall,
-                                             self.no_position(ctx),
-                                             self.no_info(ctx))
-        return result
+            if isinstance(type, GenericType):
+                # Add information about type arguments.
+                args = self.set_type_nargs_and_args(lhs, type, [], ctx,
+                                                    inhale_exhale)
+                result = self.viper.And(result, args, self.no_position(ctx),
+                                        self.no_info(ctx))
+            return result

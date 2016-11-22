@@ -1,3 +1,4 @@
+import ast
 
 LITERALS = ['True', 'False', 'None']
 
@@ -108,6 +109,8 @@ RANGE_TYPE = 'range'
 
 TUPLE_TYPE = 'tuple'
 
+UNION_TYPE = 'Union'
+
 DICT_TYPE = 'dict'
 
 SET_TYPE = 'set'
@@ -122,12 +125,23 @@ OBJECT_TYPE = 'object'
 
 PRIMITIVES = [INT_TYPE, BOOL_TYPE]
 
-IGNORED_IMPORTS = {'abc',
+IGNORED_IMPORTS = {'_importlib_modulespec',
+                   'abc',
                    'builtins',
                    'py2viper_contracts',
                    'py2viper_contracts.contracts',
                    'py2viper_contracts.io',
                    'py2viper_contracts.obligations',
+                   'sys',
                    'threading',
+                   'types',
                    'typing',
                    }
+
+OPERATOR_FUNCTIONS = {
+    ast.Add: '__add__',
+    ast.Sub: '__sub__',
+    ast.Mult: '__mul__',
+    ast.FloorDiv: '__floordiv__',
+    ast.Mod: '__mod__',
+}
