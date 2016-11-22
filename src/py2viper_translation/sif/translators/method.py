@@ -128,8 +128,8 @@ class SIFMethodTranslator(MethodTranslator):
 
         return [not_null, not_null_prime, equal] + accs + accs_prime
 
-    def _create_local_vars(self, method: SIFPythonMethod,
-                           ctx: SIFContext) -> List[Stmt]:
+    def _create_local_vars_for_params(self, method: SIFPythonMethod,
+                                      ctx: SIFContext) -> List[Stmt]:
         """Creates LocalVarAssigns for the TL parameter."""
         # __new_tl := __tl
         tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),

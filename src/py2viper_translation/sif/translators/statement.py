@@ -51,7 +51,7 @@ class SIFStatementTranslator(StatementTranslator):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        tl_stmts, if_cond = self._create_condition_timelevel_statements(
+        tl_stmts, if_cond = self._create_condition_and_timelevel_statements(
             node.test, ctx)
 
         # Translate the bodies.
@@ -84,7 +84,7 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_While(self, node: ast.While,
                              ctx: SIFContext) -> List[Stmt]:
         self.enter_loop_translation(node, ctx)
-        tl_stmts, while_cond = self._create_condition_timelevel_statements(
+        tl_stmts, while_cond = self._create_condition_and_timelevel_statements(
             node.test, ctx)
         # Translate loop invariants.
         invariants = []
@@ -105,15 +105,16 @@ class SIFStatementTranslator(StatementTranslator):
         res = tl_stmts + loop_stmts
         return res
 
-    def _create_condition_timelevel_statements(self, condition: ast.AST,
-                                               ctx: SIFContext) -> StmtsAndExpr:
-        """Creates the timelevel statement before ifs and whiles.
+    def _create_condition_and_timelevel_statements(self, condition: ast.AST,
+            ctx: SIFContext) -> StmtsAndExpr:
+        """
+        Creates the timelevel statement before ifs and whiles.
 
         Returns:
             List of statements for the timelevel update and the translated
             condition.
         """
-        pos = self.no_position(ctx)
+        pos = self.to_position(condition, ctx)
         info = self.no_info(ctx)
         # Translate condition twice, once normally and once in the prime ctx.
         cond_stmts, cond = self.translate_to_bool(condition, ctx)

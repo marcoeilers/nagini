@@ -322,8 +322,8 @@ class MethodTranslator(CommonTranslator):
 
         return [not_null] + accs
 
-    def _create_local_vars(self, method: PythonMethod,
-                           ctx: Context) -> List[Stmt]:
+    def _create_local_vars_for_params(self, method: PythonMethod,
+                                      ctx: Context) -> List[Stmt]:
         """Creates LocalVarAssigns for each parameter."""
         assign_stmts = []
         for name, arg in method.args.items():
@@ -385,7 +385,7 @@ class MethodTranslator(CommonTranslator):
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
             # Create local variables for parameters
-            body.extend(self._create_local_vars(method, ctx))
+            body.extend(self._create_local_vars_for_params(method, ctx))
             body += flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in
                  method.node.body[body_index:]])
