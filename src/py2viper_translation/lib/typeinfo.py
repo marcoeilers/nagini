@@ -66,7 +66,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if (not self._is_result_call(node.expr) and
                 not isinstance(node.expr, mypy.nodes.IndexExpr) and
                 not isinstance(rectype, mypy.types.CallableType) and
-                not isinstance(rectype, str)):
+                not isinstance(rectype, str) and
+                not isinstance(rectype, mypy.types.UnionType)):
             self.set_type(rectype.type.fullname().split('.') + [node.name],
                           self.type_of(node),
                           node.line, col(node))
@@ -192,6 +193,23 @@ class TypeInfo:
         self.alt_types = {}
         self.files = {}
 
+
+    def _create_options(self, strict_optional: bool):
+        """
+        Creates an Options object for mypy and activates strict optional typing
+        based on the given argument.
+        As long as mypy actually ignores these options, this will also set
+        the STRICT_OPTIONAL flag in the experimental module to the given value.
+        """
+        result = mypy.options.Options()
+        result.strict_optional = strict_optional
+        result.show_none_errors = strict_optional
+        # This is an experimental feature atm and you actually have to
+        # enable it like this
+        mypy.experiments.STRICT_OPTIONAL = strict_optional
+        result.fast_parser = True
+        return result
+
     def check(self, filename: str) -> bool:
         """
         Typechecks the given file and collects all type information needed for
@@ -204,19 +222,27 @@ class TypeInfo:
             raise TypeException(errors)
 
         try:
-            res = mypy.build.build(
+            options_strict = self._create_options(True)
+            res_strict = mypy.build.build(
                 [BuildSource(filename, None, None)],
-                target=mypy.build.TYPE_CHECK,
-                bin_dir=config.mypy_dir,
-                flags=[mypy.build.FAST_PARSER]
+                options_strict, bin_dir=config.mypy_dir
                 )
-            if res.errors:
-                report_errors(res.errors)
-            for name, file in res.files.items():
+
+            if res_strict.errors:
+                # Run mypy a second time with strict optional checking disabled,
+                # s.t. we don't get overapproximated none-related errors.
+                options_non_strict = self._create_options(False)
+                res_non_strict = mypy.build.build(
+                    [BuildSource(filename, None, None)],
+                    options_non_strict, bin_dir=config.mypy_dir
+                )
+                if res_non_strict.errors:
+                    report_errors(res_non_strict.errors)
+            for name, file in res_strict.files.items():
                 if name in IGNORED_IMPORTS:
                     continue
                 self.files[name] = file.path
-                visitor = TypeVisitor(res.types, name,
+                visitor = TypeVisitor(res_strict.types, name,
                                       file.ignored_lines)
                 visitor.prefix = [name]
                 file.accept(visitor)
@@ -277,3 +303,9 @@ class TypeInfo:
 
     def is_void_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.Void)
+
+    def is_union_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.UnionType)
+
+    def is_none_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.NoneTyp)

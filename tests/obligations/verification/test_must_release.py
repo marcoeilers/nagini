@@ -2,22 +2,21 @@ from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Implies,
-    Import,
     Invariant,
     Requires,
     Ensures,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
+from typing import Optional
 
 
 # Check acquiring a lock.
 
 
 #:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
-def acquire_1(l: Lock) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)|MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)
+def acquire_1(l: Optional[Lock]) -> None:
+    #:: ExpectedOutput(call.precondition:assertion.false)
     l.acquire()
 
 

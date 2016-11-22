@@ -1,4 +1,3 @@
-#:: IgnoreFile(/py2viper/issue/54/)
 
 
 def foo() -> int:

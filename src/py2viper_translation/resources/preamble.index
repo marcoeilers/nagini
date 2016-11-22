@@ -139,6 +139,10 @@
         "__bool__": {
             "args": ["object"],
             "type": "bool"
+        },
+        "__eq__": {
+            "args": ["object", "object"],
+            "type": "bool"
         }
     }
 },
@@ -209,19 +213,27 @@
             "type": "tuple"
         },
         "__create1__": {
-            "args": ["object"],
+            "args": ["object", "type"],
             "type": "tuple"
         },
         "__create2__": {
-            "args": ["object", "object"],
+            "args": ["object", "object", "type", "type"],
             "type": "tuple"
         },
         "__create3__": {
-            "args": ["object", "object", "object"],
+            "args": ["object", "object", "object", "type", "type", "type"],
             "type": "tuple"
         },
         "__create4__": {
-            "args": ["object", "object", "object", "object"],
+            "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__create5__": {
+            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
+            "type": "tuple"
+        },
+        "__create6__": {
+            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
             "type": "tuple"
         },
         "__getitem__": {
@@ -302,5 +314,15 @@
 },
 "LevelType": {
 },
-"type": {}
+"type": {},
+"Union": {},
+"Place": {
+    "functions": {
+        "__eq__": {
+            "args": ["Place", "object"],
+            "type": "bool"
+        }
+    },
+    "extends": "object"
+}
 }

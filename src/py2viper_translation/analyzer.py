@@ -16,13 +16,15 @@ from py2viper_translation.lib.constants import (
     IGNORED_IMPORTS,
     LITERALS,
     OBJECT_TYPE,
-    TUPLE_TYPE
+    TUPLE_TYPE,
+    UNION_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
     get_target as do_get_target,
     ContainerInterface,
     GenericType,
     MethodType,
+    OptionalType,
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
@@ -34,6 +36,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
     PythonMethod,
+    UnionType,
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
@@ -235,9 +238,14 @@ class Analyzer(ast.NodeVisitor):
                 if_method = if_cls['functions'][method_name]
                 self._add_native_silver_method(method_name, if_method, cls,
                                                True)
+            for pred_name in if_cls.get('predicates', []):
+                if_pred = if_cls['predicates'][pred_name]
+                self._add_native_silver_method(pred_name, if_pred, cls,
+                                               True, True)
 
     def _add_native_silver_method(self, method_name: str, if_method: str,
-                                  cls: PythonClass, pure: bool) -> None:
+                                  cls: PythonClass, pure: bool,
+                                  predicate: bool = False) -> None:
         method = PythonMethod(method_name, None, cls, self.module,
                               pure, False, self.node_factory, True,
                               if_method)
@@ -252,7 +260,9 @@ class Analyzer(ast.NodeVisitor):
             method.type = self.find_or_create_class(if_method['type'])
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
-        if pure:
+        if predicate:
+            cls.predicates[method_name] = method
+        elif pure:
             cls.functions[method_name] = method
         else:
             cls.methods[method_name] = method
@@ -738,6 +748,21 @@ class Analyzer(ast.NodeVisitor):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
+        elif self.types.is_none_type(mypy_type):
+            result = None
+        elif self.types.is_union_type(mypy_type):
+            args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
+            optional = False
+            if None in args:
+                # It's an optional type, remember this and wrap it later
+                optional = True
+                args.remove(None)
+            if len(args) > 1:
+                result = UnionType(args)
+            else:
+                result = args[0]
+            if optional:
+                result = OptionalType(result)
         else:
             raise UnsupportedException(mypy_type)
         return result
@@ -874,12 +899,17 @@ class Analyzer(ast.NodeVisitor):
         self.current_function.labels.append(post_name)
         self.current_function.try_blocks.append(try_block)
         for handler in node.handlers:
+            if handler.type:
+                handler_type = self.find_or_create_target_class(handler.type)
+            else:
+                # Handler has no explicit type, therefore catches any kind
+                # of exception.
+                handler_type = self.module.global_module.classes['Exception']
             handler_name = self.current_function.get_fresh_name(
-                'handler' + self._get_basic_name(handler.type))
-            type = self.find_or_create_target_class(handler.type)
-            py_handler = PythonExceptionHandler(handler, type, try_block,
-                                                handler_name, handler.body,
-                                                handler.name)
+                'handler' + handler_type.name)
+            py_handler = PythonExceptionHandler(handler, handler_type,
+                                                try_block, handler_name,
+                                                handler.body, handler.name)
             self.current_function.labels.append(handler_name)
             try_block.handlers.append(py_handler)
         if node.orelse:

@@ -37,6 +37,6 @@ def append_bla_45(l: List[Tuple[str, int]]) -> None:
     Ensures(Acc(list_pred(l)))
     Ensures(len(l) == Old(len(l)) + 1)
     Ensures(Forall(range(0, Old(len(l))),
-                   lambda i: (l[i] == Old(l[i]), [[l[i]], [Old(l[i])]])))
-    Ensures(l[len(l) - 1] == ('bla', 45))
+                   lambda i: (l[i] is Old(l[i]), [[l[i]], [Old(l[i])]])))
+    Ensures(l[len(l) - 1] is ('bla', 45))
     l.append(('bla', 45))

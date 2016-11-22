@@ -16,16 +16,6 @@ T = TypeVar('T')
 V = TypeVar('V')
 
 
-def unzip(pairs: List[Tuple[T, V]]) -> Tuple[List[T], List[V]]:
-    """
-    Unzips a list of pairs into two lists
-    """
-    vars_and_body = [list(t) for t in zip(*pairs)]
-    vars = vars_and_body[0]
-    body = vars_and_body[1]
-    return vars, body
-
-
 def flatten(lists: List[List[T]]) -> List[T]:
     """
     Flattens a list of lists into a flat list
@@ -72,6 +62,24 @@ class InvalidProgramException(Exception):
         self.node = node
         self.code = code
         self.message = message
+
+
+class AssignCollector(ast.NodeVisitor):
+    """
+    Collects all assignment targets within a given (partial) AST.
+    """
+    def __init__(self):
+        self.assigned_vars = {}
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            if isinstance(target, ast.Tuple):
+                actual_targets = target.elts
+            else:
+                actual_targets = [target]
+            for actual in actual_targets:
+                if isinstance(actual, ast.Name):
+                    self.assigned_vars[actual.id] = actual
 
 
 def get_func_name(stmt: ast.AST) -> Optional[str]:
@@ -129,21 +137,6 @@ def get_surrounding_try_blocks(try_blocks: List['PythonTryBlock'],
     blocks = [b for b in tb if contains_stmt(b.protected_region, stmt)]
     inner_to_outer = sorted(blocks,key=lambda b: rank(b, blocks))
     return inner_to_outer
-
-
-def get_all_fields(cls: 'PythonClass') -> List['silver.ast.Field']:
-    """
-    Returns a list of fields defined in the given class or its superclasses.
-    """
-    accs = []
-    fields = []
-    while cls is not None:
-        for fieldname in cls.fields:
-            field = cls.fields[fieldname]
-            if field.inherited is None:
-                fields.append(field.sil_field)
-        cls = cls.superclass
-    return fields
 
 
 def is_invariant(stmt: ast.AST) -> bool:
