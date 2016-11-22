@@ -46,8 +46,8 @@ from typing import Dict, List, Tuple, Union
 
 class CallTranslator(CommonTranslator):
 
-    def translate_isinstance(self, node: ast.Call,
-                             ctx: Context) -> StmtsAndExpr:
+    def _translate_isinstance(self, node: ast.Call,
+                              ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
         assert isinstance(target, (PythonClass, PythonVar))
@@ -60,14 +60,15 @@ class CallTranslator(CommonTranslator):
                                                          ctx)
         return stmt, check
 
-    def translate_type_func(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_type_func(self, node: ast.Call,
+                             ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
         result = self.type_factory.typeof(obj, ctx)
         return stmt, result
 
-    def translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
         args = [target]
@@ -76,7 +77,7 @@ class CallTranslator(CommonTranslator):
                                       node, ctx)
         return stmt, call
 
-    def translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
             if self.is_valid_super_call(node, ctx):
                 return self.translate_expr(node.args[1], ctx)
@@ -91,8 +92,8 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
-    def var_concrete_type_check(self, name: str, type: PythonClass, position,
-                                ctx: Context) -> 'silver.ast.DomainFuncApp':
+    def _var_concrete_type_check(self, name: str, type: PythonClass, position,
+                                 ctx: Context) -> 'silver.ast.DomainFuncApp':
         """
         Creates an expression checking if the var with the given name
         is of exactly the given type.
@@ -122,10 +123,10 @@ class CallTranslator(CommonTranslator):
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
         pos = self.to_position(node, ctx)
-        result_has_type = self.var_concrete_type_check(res_var.name,
-                                                       target_class,
-                                                       pos,
-                                                       ctx)
+        result_has_type = self._var_concrete_type_check(res_var.name,
+                                                        target_class,
+                                                        pos,
+                                                        ctx)
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,
@@ -150,7 +151,7 @@ class CallTranslator(CommonTranslator):
                 stmts = stmts + catchers
         return arg_stmts + stmts, res_var.ref()
 
-    def translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if node.args:
             raise UnsupportedException(node)
         args = []
@@ -162,7 +163,7 @@ class CallTranslator(CommonTranslator):
                                            [], targets, node, ctx)
         return constr_call, res_var.ref()
 
-    def translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
             msg = 'range() is currently only supported with two args.'
             raise UnsupportedException(node, msg)
@@ -178,31 +179,31 @@ class CallTranslator(CommonTranslator):
                                       arg_types, node, ctx)
         return start_stmt + end_stmt, call
 
-    def translate_builtin_func(self, node: ast.Call,
-                               ctx: Context) -> StmtsAndExpr:
+    def _translate_builtin_func(self, node: ast.Call,
+                                ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to a builtin function like len() or isinstance()
         """
         func_name = get_func_name(node)
         if func_name == 'isinstance':
-            return self.translate_isinstance(node, ctx)
+            return self._translate_isinstance(node, ctx)
         elif func_name == 'super':
-            return self.translate_super(node, ctx)
+            return self._translate_super(node, ctx)
         elif func_name == 'len':
-            return self.translate_len(node, ctx)
+            return self._translate_len(node, ctx)
         elif func_name == 'set':
-            return self.translate_set(node, ctx)
+            return self._translate_set(node, ctx)
         elif func_name == 'range':
-            return self.translate_range(node, ctx)
+            return self._translate_range(node, ctx)
         elif func_name == 'type':
-            return self.translate_type_func(node, ctx)
+            return self._translate_type_func(node, ctx)
         else:
             raise UnsupportedException(node)
 
-    def translate_method_call(self, target: PythonMethod, args: List[Expr],
-                              arg_stmts: List[Stmt],
-                              position: 'silver.ast.Position', node: ast.AST,
-                              ctx: Context) -> StmtsAndExpr:
+    def _translate_method_call(self, target: PythonMethod, args: List[Expr],
+                               arg_stmts: List[Stmt],
+                               position: 'silver.ast.Position', node: ast.AST,
+                               ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to an impure method.
         """
@@ -232,10 +233,10 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + call,
                 result_var.ref() if result_var else None)
 
-    def translate_function_call(self, target: PythonMethod, args: List[Expr],
-                                formal_args: List[Expr], arg_stmts: List[Stmt],
-                                position: 'silver.ast.Position', node: ast.AST,
-                                ctx: Context) -> StmtsAndExpr:
+    def _translate_function_call(self, target: PythonMethod, args: List[Expr],
+                                 formal_args: List[Expr], arg_stmts: List[Stmt],
+                                 position: 'silver.ast.Position', node: ast.AST,
+                                 ctx: Context) -> StmtsAndExpr:
         """Translates a call to a pure method."""
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
@@ -382,13 +383,13 @@ class CallTranslator(CommonTranslator):
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
-            var_stmt, var_arg_list = self.wrap_var_args(var_args, node, ctx)
+            var_stmt, var_arg_list = self._wrap_var_args(var_args, node, ctx)
             args.append(var_arg_list)
             arg_types.append(target.var_arg.type)
             arg_stmts += var_stmt
 
         if target.kw_arg:
-            kw_stmt, kw_arg_dict = self.wrap_kw_args(kw_args, node, ctx)
+            kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node, ctx)
             args.append(kw_arg_dict)
             arg_types.append(target.kw_arg.type)
             arg_stmts += kw_stmt
@@ -405,8 +406,8 @@ class CallTranslator(CommonTranslator):
 
         return rec_stmts, [receiver], [receiver_type]
 
-    def wrap_var_args(self, args: List[ast.AST], node: ast.AST,
-                      ctx: Context) -> StmtsAndExpr:
+    def _wrap_var_args(self, args: List[ast.AST], node: ast.AST,
+                       ctx: Context) -> StmtsAndExpr:
         """
         Wraps the given arguments into a tuple to be passed to an *args param.
         """
@@ -424,8 +425,8 @@ class CallTranslator(CommonTranslator):
                                       node, ctx)
         return stmts, call
 
-    def wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Dict,
-                     ctx: Context) -> StmtsAndExpr:
+    def _wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Dict,
+                      ctx: Context) -> StmtsAndExpr:
         """
         Wraps the given arguments into a dict to be passed to an **kwargs param.
         """
@@ -511,8 +512,8 @@ class CallTranslator(CommonTranslator):
         ctx.label_aliases = old_label_aliases
         return stmts, end_label
 
-    def inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
-                    inline_reason: str, ctx: Context) -> StmtsAndExpr:
+    def _inline_call(self, method: PythonMethod, node: ast.Call, is_super: bool,
+                     inline_reason: str, ctx: Context) -> StmtsAndExpr:
         """
         Inlines a statically bound call to the given method. If is_super is set,
         adds self to the arguments, since this will not be part of the args
@@ -569,8 +570,8 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def translate_normal_call(self, node: ast.Call,
-                              ctx: Context) -> StmtsAndExpr:
+    def _translate_normal_call(self, node: ast.Call,
+                               ctx: Context) -> StmtsAndExpr:
         """
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
@@ -617,7 +618,7 @@ class CallTranslator(CommonTranslator):
                                                         ctx.actual_function):
                             raise InvalidProgramException(node.func.value,
                                                           'invalid.super.call')
-                    return self.inline_call(target, node, is_super,
+                    return self._inline_call(target, node, is_super,
                                             'static call', ctx)
             elif isinstance(receiver_target, PythonModule):
                 # Normal, receiverless call to imported function
@@ -626,8 +627,8 @@ class CallTranslator(CommonTranslator):
             elif (isinstance(node.func.value, ast.Call) and
                         get_func_name(node.func.value) == 'super'):
                     # Super call
-                    return self.inline_call(target, node, True, 'static call',
-                                            ctx)
+                    return self._inline_call(target, node, True, 'static call',
+                                             ctx)
             else:
                 # Method called on an object
                 recv_stmts, recv_exprs, recv_types = self._translate_receiver(
@@ -670,11 +671,11 @@ class CallTranslator(CommonTranslator):
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
-            return self.translate_function_call(target, args, formal_args,
-                                                arg_stmts, position, node, ctx)
+            return self._translate_function_call(target, args, formal_args,
+                                                 arg_stmts, position, node, ctx)
         else:
-            return self.translate_method_call(target, args, arg_stmts,
-                                              position, node, ctx)
+            return self._translate_method_call(target, args, arg_stmts,
+                                               position, node, ctx)
 
     def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -692,13 +693,13 @@ class CallTranslator(CommonTranslator):
         elif get_func_name(node) in OBLIGATION_CONTRACT_FUNCS:
             return self.translate_obligation_contractfunc_call(node, ctx)
         elif get_func_name(node) in BUILTINS:
-            return self.translate_builtin_func(node, ctx)
+            return self._translate_builtin_func(node, ctx)
         elif self._is_cls_call(node, ctx):
-            return self.translate_cls_call(node, ctx)
+            return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
         else:
-            return self.translate_normal_call(node, ctx)
+            return self._translate_normal_call(node, ctx)
 
     def _is_cls_call(self, node: ast.Call, ctx: Context) -> bool:
         """
@@ -713,7 +714,7 @@ class CallTranslator(CommonTranslator):
                     return True
         return False
 
-    def translate_cls_call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_cls_call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the cls parameter in a class method.
         """

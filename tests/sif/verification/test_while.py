@@ -1,5 +1,5 @@
 from py2viper_contracts.contracts import *
-from sif_utils import input_high, input_low, sif_print
+from resources.sif_utils import input_high, input_low, sif_print
 
 
 def test(x: int) -> bool:

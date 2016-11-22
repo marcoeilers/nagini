@@ -1,6 +1,7 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_FUNCS
+from py2viper_translation.lib.constants import BOOL_TYPE
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import PythonClass, PythonType
 from py2viper_translation.lib.typeinfo import TypeInfo
@@ -78,10 +79,10 @@ class SIFCallTranslator(CallTranslator):
         new_stmt = self.viper.NewStmt(res_var.ref(), fields,
                                       self.no_position(ctx),
                                       info)
-        result_has_type = self.var_concrete_type_check(res_var.name,
-                                                       target_class,
-                                                       self.no_position(ctx),
-                                                       ctx)
+        result_has_type = self._var_concrete_type_check(res_var.name,
+                                                        target_class,
+                                                        self.no_position(ctx),
+                                                        ctx)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),
@@ -108,14 +109,14 @@ class SIFCallTranslator(CallTranslator):
 
         return arg_stmts + stmts, call_results.next()
 
-    def translate_builtin_func(self, node: ast.Call,
-                               ctx: SIFContext) -> StmtsAndExpr:
+    def _translate_builtin_func(self, node: ast.Call,
+                                ctx: SIFContext) -> StmtsAndExpr:
         raise UnsupportedException(node, "Built-ins not supported.")
 
-    def translate_function_call(self, target: SIFPythonMethod, args: List[Expr],
-                                formal_args: List[Expr], arg_stmts: List[Stmt],
-                                position: 'silver.ast.Position', node: ast.AST,
-                                ctx: SIFContext) -> StmtsAndExpr:
+    def _translate_function_call(self, target: SIFPythonMethod, args: List[Expr],
+                                 formal_args: List[Expr], arg_stmts: List[Stmt],
+                                 position: 'silver.ast.Position', node: ast.AST,
+                                 ctx: SIFContext) -> StmtsAndExpr:
         assert not ctx.use_prime
         info = self.no_info(ctx)
         call_results = self.translated_calls[node]
@@ -139,10 +140,10 @@ class SIFCallTranslator(CallTranslator):
 
         return arg_stmts, call_results.next()
 
-    def translate_method_call(self, target: SIFPythonMethod, args: List[Expr],
-                              arg_stmts: List[Stmt],
-                              position: 'silver.ast.Position', node: ast.AST,
-                              ctx: SIFContext) -> StmtsAndExpr:
+    def _translate_method_call(self, target: SIFPythonMethod, args: List[Expr],
+                               arg_stmts: List[Stmt],
+                               position: 'silver.ast.Position', node: ast.AST,
+                               ctx: SIFContext) -> StmtsAndExpr:
         call_results = self.translated_calls[node]
         targets = []
 
@@ -190,7 +191,7 @@ class SIFCallTranslator(CallTranslator):
         # Add timeLevel.
         assert ctx.current_function
         args.append(ctx.current_tl_var_expr)
-        arg_types.append(ctx.module.global_module.classes['bool'])
+        arg_types.append(ctx.module.global_module.classes[BOOL_TYPE])
 
         return arg_stmts, args, arg_types
 
