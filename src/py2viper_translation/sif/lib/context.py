@@ -80,25 +80,3 @@ class SIFContext(Context):
     @current_tl_var_expr.setter
     def current_tl_var_expr(self, expr: Expr):
         self._curr_tl_var_expr = expr
-
-
-class set_prime_ctx:
-    """
-    Context manager class to allow a programmer to easily translate a code
-    fragment in the 'prime' context, while making sure that the translator
-    returns to the normal context after the with-block. Example:
-
-    <in normal ctx>
-    with set_prime_ctx(ctx):
-        <translate in prime ctx>
-    <in normal ctx>
-    """
-    def __init__(self, ctx: SIFContext, aliases: Dict[str, PythonVar] = None):
-        self._ctx = ctx
-        self._aliases = aliases
-
-    def __enter__(self):
-        self._ctx.set_prime_ctx(self._aliases)
-
-    def __exit__(self, *exc):
-        self._ctx.set_normal_ctx()
