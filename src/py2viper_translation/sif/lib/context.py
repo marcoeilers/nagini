@@ -1,9 +1,9 @@
-from typing import Dict
-
+from contextlib import contextmanager
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import PythonVar
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.sif.lib.program_nodes import SIFPythonVar, TL_VAR_NAME
+from typing import Dict
 
 
 class SIFContext(Context):
@@ -15,11 +15,30 @@ class SIFContext(Context):
         self.in_pres = False
         self.in_posts = False
 
+    @contextmanager
+    def prime_ctx(self, aliases: Dict[str, PythonVar] = None) -> None:
+        """
+        Context manager to allow a programmer to easily translate a code
+        fragment in the 'prime' context, while making sure that the translator
+        returns to the normal context after the with-block.
+
+        Example::
+            <in normal ctx>
+            with set_prime_ctx(ctx):
+                <translate in prime ctx>
+            <in normal ctx>
+        """
+        self._set_prime_ctx(aliases)
+        try:
+            yield
+        finally:
+            self._set_normal_ctx()
+
     @property
     def use_prime(self) -> bool:
         return self._use_prime
 
-    def set_prime_ctx(self, aliases: Dict[str, PythonVar] = None):
+    def _set_prime_ctx(self, aliases: Dict[str, PythonVar] = None):
         assert not self._use_prime
         self._use_prime = True
         if self.var_aliases:
@@ -32,7 +51,7 @@ class SIFContext(Context):
 
         self.var_aliases.update(aliases)
 
-    def set_normal_ctx(self):
+    def _set_normal_ctx(self):
         assert self._use_prime
         self._use_prime = False
         # Restore from backed up aliases.

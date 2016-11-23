@@ -7,7 +7,7 @@ from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.sif.lib.context import set_prime_ctx, SIFContext
+from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.translators.abstract import Stmt
 from py2viper_translation.translators.statement import StatementTranslator
 from typing import List
@@ -75,7 +75,7 @@ class SIFStatementTranslator(StatementTranslator):
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
         # Translate assignment for prime variables.
-        with set_prime_ctx(ctx):
+        with ctx.prime_ctx():
             stmts += super().translate_stmt_Assign(node, ctx)
 
         return stmts
@@ -117,7 +117,7 @@ class SIFStatementTranslator(StatementTranslator):
         info = self.no_info(ctx)
         # Translate condition twice, once normally and once in the prime ctx.
         cond_stmts, cond = self.translate_to_bool(condition, ctx)
-        with set_prime_ctx(ctx):
+        with ctx.prime_ctx():
             cond_stmts_p, cond_p = self.translate_to_bool(condition, ctx)
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
@@ -135,7 +135,7 @@ class SIFStatementTranslator(StatementTranslator):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
-        with set_prime_ctx(ctx):
+        with ctx.prime_ctx():
             rhs_stmt_p, rhs_p = self.translate_expr(node.value, ctx)
         assign = self.viper.LocalVarAssign(
             ctx.current_function.result.ref(node, ctx), rhs, pos, info)

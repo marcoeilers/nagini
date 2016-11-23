@@ -10,7 +10,7 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.sif.lib.context import set_prime_ctx, SIFContext
+from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
@@ -184,7 +184,7 @@ class SIFCallTranslator(CallTranslator):
         for arg in node.args:
             arg_stmts, args, arg_types = self._translate_one_arg(arg, args,
                 arg_stmts, arg_types, ctx)
-            with set_prime_ctx(ctx):
+            with ctx.prime_ctx():
                 arg_stmts, args, arg_types = self._translate_one_arg(arg, args,
                     arg_stmts, arg_types, ctx)
         # Add timeLevel.
@@ -208,7 +208,7 @@ class SIFCallTranslator(CallTranslator):
             ctx: SIFContext) -> Tuple[List[Stmt], List[Expr], List[PythonType]]:
         info = self.no_info(ctx)
         recv_stmts, recv = self.translate_expr(node.func.value, ctx)
-        with set_prime_ctx(ctx):
+        with ctx.prime_ctx():
             recv_stmts_p, recv_p = self.translate_expr(node.func.value, ctx)
             assert not recv_stmts_p
         recv_type = self.get_type(node.func.value, ctx)
