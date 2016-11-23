@@ -24,7 +24,7 @@ class SIFContext(Context):
 
         Example::
             <in normal ctx>
-            with set_prime_ctx(ctx):
+            with ctx.prime_ctx():
                 <translate in prime ctx>
             <in normal ctx>
         """
