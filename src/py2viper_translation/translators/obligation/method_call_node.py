@@ -28,6 +28,9 @@ class ObligationMethodCall:
 
     def __init__(
             self, name: str, args: List[Expr], targets: List[Expr]) -> None:
+        assert name
+        assert all(args)
+        assert all(targets)
         self.name = name
         self.original_args = args[:]
         self.args = args
@@ -35,10 +38,12 @@ class ObligationMethodCall:
 
     def prepend_arg(self, arg: Expr) -> None:
         """Prepend ``args`` to the argument list."""
+        assert arg
         self.args.insert(0, arg)
 
     def prepend_target(self, target: Expr) -> None:
         """Prepend ``target`` to the target list."""
+        assert target
         self.targets.insert(0, target)
 
 
