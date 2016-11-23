@@ -303,42 +303,12 @@ class ProgramTranslator(CommonTranslator):
                                                   'purity.violated')
                 arg.default_expr = expr
 
-    def translate_program(self, modules: List[PythonModule],
-                          sil_progs: List,
-                          ctx: Context) -> 'silver.ast.Program':
+    def _create_predefined_fields(self,
+                                  ctx: Context) -> List['silver.ast.Field']:
         """
-        Translates the PythonModules created by the analyzer to a Viper program.
+        TODO
         """
-        domains = []
         fields = []
-        functions = []
-        predicates = []
-        methods = []
-
-        for sil_prog in sil_progs:
-            domains += [d for d in self.viper.to_list(sil_prog.domains())
-                        if d.name() != 'PyType']
-            functions += self.viper.to_list(sil_prog.functions())
-            predicates += self.viper.to_list(sil_prog.predicates())
-
-            converted_methods = []
-            for method in self.viper.to_list(sil_prog.methods()):
-                converted_method = self.create_method_node(
-                    ctx=ctx,
-                    name=method.name(),
-                    args=self.viper.to_list(method.formalArgs()),
-                    returns=self.viper.to_list(method.formalReturns()),
-                    pres=self.viper.to_list(method.pres()),
-                    posts=self.viper.to_list(method.posts()),
-                    locals=self.viper.to_list(method.locals()),
-                    body=method.body(),
-                    position=method.pos(),
-                    info=method.info(),
-                    )
-                converted_methods.append(converted_method)
-            methods += converted_methods
-
-        # Predefined fields
         fields.append(self.viper.Field('__container', self.viper.Ref,
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
@@ -364,6 +334,54 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+        return fields
+
+    def _convert_silver_elements(self, sil_progs: List['silver.ast.Program'],
+                                 ctx: Context) -> Tuple[
+                                                   List['silver.ast.Domain'],
+                                                   List['silver.ast.Predicate'],
+                                                   List['silver.ast.Function'],
+                                                   List['silver.ast.Method']]:
+        """
+        TODO
+        """
+        domains = []
+        functions = []
+        predicates = []
+        methods = []
+        for sil_prog in sil_progs:
+            domains += [d for d in self.viper.to_list(sil_prog.domains())
+                        if d.name() != 'PyType']
+            functions += self.viper.to_list(sil_prog.functions())
+            predicates += self.viper.to_list(sil_prog.predicates())
+
+            converted_methods = []
+            for method in self.viper.to_list(sil_prog.methods()):
+                converted_method = self.create_method_node(
+                    ctx=ctx,
+                    name=method.name(),
+                    args=self.viper.to_list(method.formalArgs()),
+                    returns=self.viper.to_list(method.formalReturns()),
+                    pres=self.viper.to_list(method.pres()),
+                    posts=self.viper.to_list(method.posts()),
+                    locals=self.viper.to_list(method.locals()),
+                    body=method.body(),
+                    position=method.pos(),
+                    info=method.info(),
+                )
+                converted_methods.append(converted_method)
+            methods += converted_methods
+        return domains, predicates, functions, methods
+
+    def translate_program(self, modules: List[PythonModule],
+                          sil_progs: List,
+                          ctx: Context) -> 'silver.ast.Program':
+        """
+        Translates the PythonModules created by the analyzer to a Viper program.
+        """
+        fields = self._create_predefined_fields(ctx)
+        converted_sil_progs = self._convert_silver_elements(sil_progs, ctx)
+        domains, predicates, functions, methods = converted_sil_progs
 
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
@@ -375,6 +393,8 @@ class ProgramTranslator(CommonTranslator):
 
         predicate_families = OrderedDict()
 
+        # First iteration over all modules: translate global variables, static
+        # fields, and default arguments.
         for module in modules:
             ctx.module = module
             for var in module.global_vars:
@@ -399,6 +419,10 @@ class ProgramTranslator(CommonTranslator):
                     self.translate_default_args(method, ctx)
                 for pred in container.predicates.values():
                     self.translate_default_args(pred, ctx)
+
+        # Second iteration over all modules: Translate everything else.
+        for module in modules:
+            ctx.module = module
 
             for function in module.functions.values():
                 functions.append(self.translate_function(function, ctx))
