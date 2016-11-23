@@ -7,7 +7,7 @@ from py2viper_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
 )
-from py2viper_translation.sif.lib.context import set_prime_ctx, SIFContext
+from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import (
     SIFPythonMethod,
     TL_VAR_NAME,
@@ -217,7 +217,7 @@ class SIFPureTranslator(PureTranslator):
         val = self._translate_wrapper_expr(wrapper, ctx)
         aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
         aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-        with set_prime_ctx(ctx, aliases):
+        with ctx.prime_ctx(aliases):
             val_p = self._translate_wrapper_expr(wrapper, ctx)
         # Create FuncTriple as return value.
         args = [val, val_p, ctx.current_tl_var_expr]
@@ -235,7 +235,7 @@ class SIFPureTranslator(PureTranslator):
             cond = self._translate_wrapper_expr(wrapper, ctx)
             aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
             aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-            with set_prime_ctx(ctx, aliases):
+            with ctx.prime_ctx(aliases):
                 cond_p = self._translate_wrapper_expr(wrapper, ctx)
             ne = self.viper.NeCmp(cond, cond_p, position, info)
             rhs = self.viper.Or(tl_var, ne, position, info)
@@ -294,7 +294,7 @@ class SIFPureTranslator(PureTranslator):
                 wrapper_p.names = aliases
                 wrapper.expr = self._translate_assign_wrapper_expr(wrapper,
                     function, ctx)
-                with set_prime_ctx(ctx, aliases):
+                with ctx.prime_ctx(aliases):
                     wrapper_p.expr = self._translate_assign_wrapper_expr(
                         wrapper_p, function, ctx)
                 new_wrappers.append(wrapper)
