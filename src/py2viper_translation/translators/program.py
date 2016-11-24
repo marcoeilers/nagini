@@ -15,7 +15,13 @@ from py2viper_translation.lib.program_nodes import (
     PythonVar
 )
 from py2viper_translation.lib.typedefs import (
+    Domain,
     Expr,
+    Field,
+    Function,
+    Method,
+    Predicate,
+    Program,
     Stmt,
     StmtsAndExpr,
 )
@@ -304,7 +310,7 @@ class ProgramTranslator(CommonTranslator):
                 arg.default_expr = expr
 
     def _create_predefined_fields(self,
-                                  ctx: Context) -> List['silver.ast.Field']:
+                                  ctx: Context) -> List[Field]:
         """
         Creates and returns fields needed for encoding various language
         features, e.g. collections, measures and iterators.
@@ -337,12 +343,11 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_info(ctx)))
         return fields
 
-    def _convert_silver_elements(self, sil_progs: List['silver.ast.Program'],
-                                 ctx: Context) -> Tuple[
-                                                   List['silver.ast.Domain'],
-                                                   List['silver.ast.Predicate'],
-                                                   List['silver.ast.Function'],
-                                                   List['silver.ast.Method']]:
+    def _convert_silver_elements(self, sil_progs: List[Program],
+                                 ctx: Context) -> Tuple[List[Domain],
+                                                        List[Predicate],
+                                                        List[Function],
+                                                        List[Method]]:
         """
         Extracts domains, functions, predicates and methods from the given list
         of Silver programs, applies the necessary conversions (e.g. related to
@@ -358,7 +363,6 @@ class ProgramTranslator(CommonTranslator):
             functions += self.viper.to_list(sil_prog.functions())
             predicates += self.viper.to_list(sil_prog.predicates())
 
-            converted_methods = []
             for method in self.viper.to_list(sil_prog.methods()):
                 converted_method = self.create_method_node(
                     ctx=ctx,
@@ -372,8 +376,7 @@ class ProgramTranslator(CommonTranslator):
                     position=method.pos(),
                     info=method.info(),
                 )
-                converted_methods.append(converted_method)
-            methods += converted_methods
+                methods.append(converted_method)
         return domains, predicates, functions, methods
 
     def translate_program(self, modules: List[PythonModule],
