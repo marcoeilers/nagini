@@ -15,13 +15,14 @@ from py2viper_contracts.contracts import (
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
+from typing import Optional
 
 
 class A:
 
     def __init__(self) -> None:
         Ensures(Acc(self.a) and Acc(self.b))
-        self.a = None   # type: Lock
+        self.a = None   # type: Optional[Lock]
         self.b = 0      # type: int
 
     def d3(self) -> None:
