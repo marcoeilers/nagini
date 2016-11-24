@@ -5,17 +5,16 @@ test suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
-    Invariant,
     Implies,
+    Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 from typing import Optional
 
 

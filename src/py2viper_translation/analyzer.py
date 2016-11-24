@@ -3,6 +3,7 @@ import logging
 import mypy
 import os
 import py2viper_contracts.io_builtins
+import py2viper_contracts.lock
 import py2viper_translation.external.astpp
 import tokenize
 
@@ -147,6 +148,8 @@ class Analyzer(ast.NodeVisitor):
                     continue
                 if module_name == 'py2viper_contracts.io_builtins':
                     path = py2viper_contracts.io_builtins.__file__
+                elif module_name == 'py2viper_contracts.lock':
+                    path = py2viper_contracts.lock.__file__
                 else:
                     assert module_name in self.types.files
                     path = self.types.files[module_name]

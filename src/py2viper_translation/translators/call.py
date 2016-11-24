@@ -126,6 +126,7 @@ class CallTranslator(CommonTranslator):
         node is the call node and arg_stmts are statements related to argument
         evaluation.
         """
+        assert all(args)
         if ctx.current_function is None:
             raise UnsupportedException(node, 'Global constructor calls are not '
                                              'supported.')
@@ -149,6 +150,7 @@ class CallTranslator(CommonTranslator):
         type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
+        assert all(args)
         stmts = [new, type_inhale] + field_type_inhales
         target = target_class.get_method('__init__')
         if target:
@@ -158,6 +160,8 @@ class CallTranslator(CommonTranslator):
                 error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
             method_name = target_class.get_method('__init__').sil_name
+            assert all(args)
+            assert all(targets)
             init = self.create_method_call_node(
                 ctx, method_name, args, targets, self.to_position(node, ctx),
                 self.no_info(ctx), target_method=target, target_node=node)
@@ -245,7 +249,7 @@ class CallTranslator(CommonTranslator):
                 # Static field
                 raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
-            result_var = result_var = ctx.current_function.create_variable(
+            result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
         if target.declared_exceptions:
@@ -373,6 +377,8 @@ class CallTranslator(CommonTranslator):
             arg_stmts += arg_stmt
             args.append(arg_expr)
             arg_types.append(arg_type)
+        assert all(args)
+        assert all(arg_types)
 
         if not target:
             return arg_stmts, args, arg_types
@@ -407,13 +413,16 @@ class CallTranslator(CommonTranslator):
             if arg is False:
                 # Not set yet, need default
                 args[index] = target.args[key].default_expr
+                assert args[index], '{} arg={}'.format(target.name, key)
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
+        assert all(args), args
 
         if target.var_arg:
             var_stmt, var_arg_list = self._wrap_var_args(var_args, node, ctx)
             args.append(var_arg_list)
             arg_types.append(target.var_arg.type)
             arg_stmts += var_stmt
+        assert all(args)
 
         if target.kw_arg:
             kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node,
@@ -421,6 +430,7 @@ class CallTranslator(CommonTranslator):
             args.append(kw_arg_dict)
             arg_types.append(target.kw_arg.type)
             arg_stmts += kw_stmt
+        assert all(args)
 
         return arg_stmts, args, arg_types
 
@@ -616,6 +626,8 @@ class CallTranslator(CommonTranslator):
         """
         formal_args = []
         arg_stmts, args, arg_types = self._translate_args(node, ctx)
+        assert all(args)
+        assert all(arg_types)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         target = self._get_call_target(node, ctx)

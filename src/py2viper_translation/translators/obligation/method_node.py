@@ -49,8 +49,12 @@ class ObligationMethod:
         self.body = body
 
     def prepend_arg(self, arg: VarDecl) -> None:
-        """Prepend ``args`` to the argument list."""
+        """Prepend ``arg`` to the argument list."""
         self.args.insert(0, arg)
+
+    def prepend_return(self, arg: VarDecl) -> None:
+        """Prepend ``arg`` to the return list."""
+        self.returns.insert(0, arg)
 
     def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
@@ -64,9 +68,21 @@ class ObligationMethod:
         """Append ``precondition`` to precondition list."""
         self.pres.append(precondition)
 
+    def append_preconditions(self, preconditions: List[Expr]) -> None:
+        """Append ``preconditions`` to precondition list."""
+        self.pres.extend(preconditions)
+
     def append_postcondition(self, postcondition: Expr) -> None:
         """Append ``postcondition`` to postcondition list."""
         self.posts.append(postcondition)
+
+    def append_postconditions(self, postconditions: List[Expr]) -> None:
+        """Append ``postconditions`` to postcondition list."""
+        self.posts.extend(postconditions)
+
+    def prepend_postcondition(self, postcondition: Expr) -> None:
+        """Prepend ``postcondition`` to postcondition list."""
+        self.posts.insert(0, postcondition)
 
     def add_local(self, var: PythonVar) -> None:
         """Add local variable to variables list."""
@@ -110,11 +126,16 @@ class ObligationMethodNodeConstructor:
     def add_obligations(self) -> None:
         """Add obligation stuff to Method."""
         self._add_aditional_parameters()
+        self._add_aditional_returns()
+        self._add_aditional_variables()
         self._add_additional_preconditions()
+        self._add_additional_postconditions()
         if not self._need_skip_body():
             self._set_up_measures()
             self._bound_obligations()
             self._add_body_leak_check()
+            self._obligation_method.append_postconditions(
+                self._obligation_info.get_additional_postconditions())
         self._add_caller_leak_check()
 
     def _is_body_native_silver(self) -> bool:
@@ -130,12 +151,24 @@ class ObligationMethodNodeConstructor:
                  not self._overriding_check))
 
     def _add_aditional_parameters(self) -> None:
-        """Add current thread and caller measures parameters."""
+        """Add current thread, caller measures, and residue parameters."""
+        self._obligation_method.prepend_arg(
+            self._obligation_info.residue_level.decl)
         if not obligation_config.disable_measures:
             self._obligation_method.prepend_arg(
                 self._obligation_info.caller_measure_map.get_var().decl)
         self._obligation_method.prepend_arg(
             self._obligation_info.current_thread_var.decl)
+
+    def _add_aditional_returns(self) -> None:
+        """Add current wait level ghost return."""
+        self._obligation_method.prepend_return(
+            self._obligation_info.current_wait_level.decl)
+
+    def _add_aditional_variables(self) -> None:
+        """Add current wait level ghost target."""
+        self._obligation_method.add_local(
+            self._obligation_info.current_wait_level_target)
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
@@ -161,6 +194,18 @@ class ObligationMethodNodeConstructor:
             cthread_var.sil_name, cthread_var.type, self._position,
             self._ctx))
         self._obligation_method.prepend_precondition(translated)
+        self._obligation_method.append_preconditions(
+            self._obligation_info.get_additional_preconditions())
+
+    def _add_additional_postconditions(self) -> None:
+        """Initialize current wait level for the caller."""
+        postcondition = self._translator.initialize_current_wait_level(
+            sil.PermVar(self._obligation_info.current_wait_level),
+            sil.PermVar(self._obligation_info.residue_level),
+            self._ctx)
+        translated = postcondition.translate(
+            self._translator, self._ctx, self._position, self._info)
+        self._obligation_method.prepend_postcondition(translated)
 
     def _set_up_measures(self) -> None:
         """Create and initialize method's measure map."""

@@ -3,9 +3,19 @@
 
 from typing import List, Tuple
 
+from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
+    PythonVar,
+)
+from py2viper_translation.lib.typedefs import (
+    Function,
+    Info,
+    Method,
+    Position,
+    Predicate,
+    VarDecl,
 )
 from py2viper_translation.translators.io_operation.common import (
     IOOperationCommonTranslator,
@@ -23,10 +33,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
 
     def translate_io_operation(
             self, operation: PythonIOOperation,
-            ctx: Context) -> Tuple[
-                'viper_ast.Predicate',
-                List['viper_ast.Function'],
-                List['viper_ast.Method']]:
+            ctx: Context) -> Tuple[Predicate, List[Function], List[Method]]:
         """Translate IO operation to Silver.
 
         This means:
@@ -50,13 +57,10 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         predicate = self.viper.Predicate(operation.sil_name, args, None,
                                          position, info)
 
-        getters = []
-        for result in operation.get_results():
-            name = construct_getter_name(operation, result)
-            typ = self.translate_type(result.type, ctx)
-            getter = self.viper.Function(name, args, typ, [], [], None,
-                                         position, info)
-            getters.append(getter)
+        getters = [
+            self._construct_getter(
+                operation, result, args, position, info, ctx)
+            for result in operation.get_results()]
 
         if not operation.is_basic():
             self._translate_defining_getters(operation, ctx)
@@ -69,6 +73,23 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
             getters,
             checks,
         )
+
+    def _construct_getter(
+            self, operation: PythonIOOperation, operation_result: PythonVar,
+            args: List[VarDecl], position: Position,
+            info: Info, ctx: Context) -> Function:
+        name = construct_getter_name(operation, operation_result)
+        typ = self.translate_type(operation_result.type, ctx)
+        if operation_result.type.name not in PRIMITIVES:
+            getter_result = self.viper.Result(typ, position, info)
+            result_type_expr = self.type_check(
+                getter_result, operation_result.type, position, ctx)
+            posts = [result_type_expr]
+        else:
+            posts = []
+        getter = self.viper.Function(
+            name, args, typ, [], posts, None, position, info)
+        return getter
 
     def _translate_defining_getters(
             self, main_operation: PythonIOOperation,
@@ -90,7 +111,7 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
 
     def _create_termination_check(
             self, operation: PythonIOOperation,
-            ctx: Context) -> 'viper_ast.Method':
+            ctx: Context) -> Method:
         """Create a termination check."""
         assert not ctx.current_function
         ctx.current_function = operation

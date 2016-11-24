@@ -51,7 +51,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
             ctx: Context) -> sil.InhaleExhale:
         return obligation_instance.get_use_method(ctx)
 
-    def create_method_node(     # pylint: disable=too-many-arguments
+    def create_method_node(     # pylint: disable=too-many-arguments,too-many-locals
             self, ctx: Context, name: str,
             original_args: List[VarDecl], returns: List[VarDecl],
             pres: List[Expr], posts: List[Expr],
@@ -69,14 +69,21 @@ class MethodObligationTranslator(CommonObligationTranslator):
                 name, original_args, returns, pres, posts, local_vars, body,
                 position, info)
 
+        assert (ctx.current_function is None or
+                ctx.current_function == method)
+        old_method = ctx.current_function
+        ctx.current_function = method
+
         obligation_method = ObligationMethod(
             name, original_args, returns, pres, posts, local_vars, body)
         constructor = ObligationMethodNodeConstructor(
             obligation_method, method, self, ctx, self._obligation_manager,
             position, info, overriding_check)
         constructor.add_obligations()
+        node = constructor.construct_node()
 
-        return constructor.construct_node()
+        ctx.current_function = old_method
+        return node
 
     def create_method_call_node(
             self, ctx: Context, methodname: str, original_args: List[Expr],
