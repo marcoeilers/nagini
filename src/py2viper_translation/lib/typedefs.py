@@ -9,9 +9,13 @@ StmtsAndExpr = Tuple[List[Stmt], Expr]
 
 VarDecl = 'silver.ast.LocalVarDecl'
 
+Domain = 'silver.ast.Domain'
+
 DomainFuncApp = 'silver.ast.DomainFuncApp'
 
 Predicate = 'silver.ast.Predicate'
+
+Program = 'silver.ast.Program'
 
 Field = 'silver.ast.Field'
 
