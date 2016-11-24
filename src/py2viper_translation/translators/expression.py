@@ -460,6 +460,8 @@ class ExpressionTranslator(CommonTranslator):
             self.define_io_existential(node, ctx)
             return ([], self.viper.TrueLit(self.to_position(node, ctx),
                                            self.no_info(ctx)))
+        if self.is_wait_level_comparison(node, ctx):
+            return self.translate_wait_level_comparison(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

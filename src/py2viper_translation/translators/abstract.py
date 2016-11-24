@@ -1,6 +1,7 @@
 import ast
 
 from abc import ABCMeta
+from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.constants import PRIMITIVES
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
@@ -212,6 +213,35 @@ class AbstractTranslator(metaclass=ABCMeta):
             ctx: Context) -> Tuple[List[Predicate], List[Field]]:
         translator = self.config.obligation_translator
         return translator.get_obligation_preamble(ctx)
+
+    def is_wait_level_comparison(self, node: ast.Compare,
+                                 ctx: Context) -> bool:
+        translator = self.config.obligation_translator
+        return translator.is_wait_level_comparison(node, ctx)
+
+    def translate_wait_level_comparison(self, node: ast.Compare,
+                                        ctx: Context) -> StmtsAndExpr:
+        translator = self.config.obligation_translator
+        return translator.translate_wait_level_comparison(node, ctx)
+
+    def create_level_call(self, expr: sil.RefExpression) -> sil.PermExpression:
+        translator = self.config.obligation_translator
+        return translator.create_level_call(expr)
+
+    def create_level_below(
+            self, expr: sil.PermExpression,
+            residue_level_var: sil.PermExpression,
+            ctx: Context) -> sil.BoolExpression:
+        translator = self.config.obligation_translator
+        return translator.create_level_below(expr, residue_level_var, ctx)
+
+    def initialize_current_wait_level(
+            self, current_wait_level: sil.PermExpression,
+            residue_level_var: sil.PermExpression,
+            ctx: Context) -> sil.BoolExpression:
+        translator = self.config.obligation_translator
+        return translator.initialize_current_wait_level(
+            current_wait_level, residue_level_var, ctx)
 
     def create_method_node(
             self, ctx: Context, name: str,

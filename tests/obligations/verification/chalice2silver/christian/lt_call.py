@@ -5,24 +5,23 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
+    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
-from typing import Optional
+from py2viper_contracts.lock import Lock
 
 
 class A:
 
     def __init__(self) -> None:
         Ensures(Acc(self.a) and Acc(self.b))
-        self.a = None   # type: Optional[Lock]
+        self.a = None   # type: Lock
         self.b = 0      # type: int
 
     def d3(self) -> None:
@@ -56,6 +55,8 @@ class A:
         Requires(Acc(other.a))
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
+        Requires(other.b >= 2)
+
         other.a.release()
 
     def timed_release_unbounded(self) -> None:
@@ -86,7 +87,7 @@ class A:
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
 
-        #:: ExpectedOutput(call.precondition:insufficient.permission)
+        #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(call.precondition:insufficient.permission)
         self.quick_release(other)
 
     def timed_release_bounded_statdec(self, other: A) -> None:

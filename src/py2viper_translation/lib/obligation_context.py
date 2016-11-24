@@ -1,6 +1,9 @@
 """Classes for storing obligation translation state."""
 
 
+from typing import Optional
+
+
 class ObligationContext:
     """Current state that is related to obligation translation."""
 
@@ -19,6 +22,17 @@ class ObligationContext:
         """
         assert self._loop_stack
         return self._loop_stack[-1]
+
+    def get_surrounding_loop_info(self) -> Optional[object]:
+        """Get info of the loop surrounding the inner most loop.
+
+        Method type is set to ``object`` to indicate that the result
+        should be opaque to all code except obligation implementation.
+        """
+        if len(self._loop_stack) >= 2:
+            return self._loop_stack[-2]
+        else:
+            return None
 
     def push_loop_info(self, info: object) -> None:
         """Push loop information to loop stack.

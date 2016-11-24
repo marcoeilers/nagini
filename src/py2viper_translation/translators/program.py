@@ -301,6 +301,7 @@ class ProgramTranslator(CommonTranslator):
                 if stmt:
                     raise InvalidProgramException(arg.default,
                                                   'purity.violated')
+                assert expr
                 arg.default_expr = expr
 
     def translate_program(self, modules: List[PythonModule],

@@ -1,9 +1,10 @@
-from threading import Lock
-
 from py2viper_contracts.contracts import (
+    Import,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
+Import('lock')
 
 
 class Super:

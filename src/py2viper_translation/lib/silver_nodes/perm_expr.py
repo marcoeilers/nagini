@@ -4,6 +4,7 @@
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
+from py2viper_translation.lib.silver_nodes.call import CallMixin
 from py2viper_translation.lib.silver_nodes.expression import Expression
 from py2viper_translation.lib.silver_nodes.perm_cmp_expr import (
     PermGtCmp,
@@ -11,6 +12,7 @@ from py2viper_translation.lib.silver_nodes.perm_cmp_expr import (
     PermLtCmp,
     PermLeCmp,
 )
+from py2viper_translation.lib.silver_nodes.types import PERM
 from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
@@ -35,6 +37,25 @@ class PermExpression(Expression):   # pylint: disable=abstract-method
 
     def __le__(self, other: 'PermExpression') -> 'BoolExpression':
         return PermLeCmp(self, other)
+
+
+class RawPermExpression(PermExpression):
+    """A perm typed Silver expression."""
+
+    def __init__(self, expression: Expr) -> None:
+        self._expression = expression
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        assert self._expression.typ() == translator.viper.Perm
+        return self._expression
+
+
+class PermCall(PermExpression, CallMixin):
+    """A call to a perm function."""
+
+    def __init__(self, function: str, args: 'List[CallArg]') -> None:
+        super().__init__(function, args, PERM)
 
 
 class PermSub(PermExpression):
