@@ -306,7 +306,8 @@ class ProgramTranslator(CommonTranslator):
     def _create_predefined_fields(self,
                                   ctx: Context) -> List['silver.ast.Field']:
         """
-        TODO
+        Creates and returns fields needed for encoding various language
+        features, e.g. collections, measures and iterators.
         """
         fields = []
         fields.append(self.viper.Field('__container', self.viper.Ref,
@@ -343,7 +344,9 @@ class ProgramTranslator(CommonTranslator):
                                                    List['silver.ast.Function'],
                                                    List['silver.ast.Method']]:
         """
-        TODO
+        Extracts domains, functions, predicates and methods from the given list
+        of Silver programs, applies the necessary conversions (e.g. related to
+        obligations) to them, and returns them in separate lists.
         """
         domains = []
         functions = []
