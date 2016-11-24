@@ -1,3 +1,4 @@
+from py2viper_translation.lib.program_nodes import MethodType
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -44,10 +45,25 @@ class SIFMethodTranslator(MethodTranslator):
     def _translate_pres(self, method: SIFPythonMethod,
                         ctx: SIFContext):
         ctx.in_pres = True
-        pres = super()._translate_pres(method, ctx)
-        # ctx.set_prime_ctx()
-        # pres += super()._translate_pres(method, ctx)
-        # ctx.set_normal_ctx()
+        pres = []
+        for pre, aliases in method.precondition:
+            with ctx.additional_aliases(aliases):
+                ctx.current_tl_var_expr = None
+                stmt, expr = self.translate_expr(pre, ctx)
+            if stmt:
+                raise InvalidProgramException(pre, 'purity.violated')
+            pres.append(expr)
+
+        if method.cls and method.method_type is MethodType.normal:
+            error_string = '"call receiver is not None"'
+            pos = self.to_position(method.node, ctx, error_string)
+            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
+                                        self.viper.NullLit(
+                                            self.no_position(ctx),
+                                            self.no_info(ctx)),
+                                        pos,
+                                        self.no_info(ctx))
+            pres = [not_null] + pres
         ctx.in_pres = False
         return pres
 
@@ -55,21 +71,30 @@ class SIFMethodTranslator(MethodTranslator):
                          err_var: 'viper.ast.LocalVar',
                          ctx: SIFContext):
         ctx.in_posts = True
-        posts = super()._translate_posts(method, err_var, ctx)
+        ctx.obligation_context.is_translating_posts = True
+        posts = []
+        no_error = self.viper.EqCmp(err_var,
+                                    self.viper.NullLit(self.no_position(ctx),
+                                                       self.no_info(ctx)),
+                                    self.no_position(ctx), self.no_info(ctx))
+        for post, aliases in method.postcondition:
+            with ctx.additional_aliases(aliases):
+                ctx.current_tl_var_expr = None
+                stmt, expr = self.translate_expr(post, ctx)
+            if stmt:
+                raise InvalidProgramException(post, 'purity.violated')
+            if method.declared_exceptions:
+                expr = self.viper.Implies(no_error, expr,
+                                          self.to_position(post, ctx),
+                                          self.no_info(ctx))
+            posts.append(expr)
+
+        ctx.obligation_context.is_translating_posts = False
         # !tl ==> !new_tl
         if method.preserves_tl:
             posts.append(self._create_tl_post(method, ctx))
         ctx.in_posts = False
         return posts
-
-    def _create_method_prolog(self, method: SIFPythonMethod,
-                              ctx: SIFContext) -> List[Stmt]:
-        # new_tl := tl
-        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
-                                            method.tl_var.ref(),
-                                            self.no_position(ctx),
-                                            self.no_info(ctx))
-        return [tl_stmt]
 
     def _create_init_pres(self, method: SIFPythonMethod,
                           ctx: SIFContext) -> List[Expr]:
@@ -102,6 +127,19 @@ class SIFMethodTranslator(MethodTranslator):
                                  self.no_position(ctx), self.no_info(ctx))
 
         return [not_null, not_null_prime, equal] + accs + accs_prime
+
+    def _create_local_vars_for_params(self, method: SIFPythonMethod,
+                                      ctx: SIFContext) -> List[Stmt]:
+        """Creates LocalVarAssigns for the TL parameter."""
+        # TODO(shitz): Should at some point also introduce local vars for params
+        # but this needs some more work with ctx.var_aliases.
+        # __new_tl := __tl
+        tl_stmt = self.viper.LocalVarAssign(method.new_tl_var.ref(),
+                                            method.tl_var.ref(),
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
+
+        return [tl_stmt]
 
     def translate_function(self, func: SIFPythonMethod,
                            ctx: SIFContext) -> 'silver.ast.Function':

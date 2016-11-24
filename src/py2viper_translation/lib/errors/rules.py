@@ -58,7 +58,6 @@ OBLIGATION_LOOP_MEASURE_NON_POSITIVE = {
         ('not.wellformed', 'loop_condition.not_framed_for_obligation_use'),
 }
 
-
 __all__ = (
     'Rules',
     'TERMINATION_CHECK_MEASURE_NON_POSITIVE',

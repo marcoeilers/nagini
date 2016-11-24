@@ -49,9 +49,8 @@ class SIFContractTranslator(ContractTranslator):
         Translates a Acc(field). Needs to generate Acc(field_p) as well.
         """
         stmt, acc = super().translate_acc_field(node, perm, ctx)
-        ctx.set_prime_ctx()
-        stmt_p, acc_p = super().translate_acc_field(node, perm, ctx)
-        ctx.set_normal_ctx()
+        with ctx.prime_ctx():
+            stmt_p, acc_p = super().translate_acc_field(node, perm, ctx)
         # Acc(field) && Acc(field_p)
         and_accs = self.viper.And(acc, acc_p, self.to_position(node, ctx),
                                   self.no_info(ctx))
@@ -71,9 +70,9 @@ class SIFContractTranslator(ContractTranslator):
         not_tl = self.viper.Not(ctx.current_tl_var_expr, pos, info)
         if node.args:
             stmts, expr = self.translate_expr(node.args[0], ctx)
-            ctx.set_prime_ctx()
-            stmts_p, expr_p = self.translate_expr(node.args[0], ctx)
-            ctx.set_normal_ctx()
+            with ctx.prime_ctx():
+                stmts_p, expr_p = self.translate_expr(node.args[0], ctx)
+
             if stmts or stmts_p:
                 raise InvalidProgramException(node, 'purity.violated')
 

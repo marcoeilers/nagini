@@ -217,9 +217,8 @@ class SIFPureTranslator(PureTranslator):
         val = self._translate_wrapper_expr(wrapper, ctx)
         aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
         aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-        ctx.set_prime_ctx(aliases=aliases)
-        val_p = self._translate_wrapper_expr(wrapper, ctx)
-        ctx.set_normal_ctx()
+        with ctx.prime_ctx(aliases):
+            val_p = self._translate_wrapper_expr(wrapper, ctx)
         # Create FuncTriple as return value.
         args = [val, val_p, ctx.current_tl_var_expr]
         return self.config.func_triple_factory.get_call(FTDF.CREATE,
@@ -236,9 +235,8 @@ class SIFPureTranslator(PureTranslator):
             cond = self._translate_wrapper_expr(wrapper, ctx)
             aliases = {k: v.var_prime for (k, v) in wrapper.names.items()}
             aliases.update({k: v.var_prime for (k, v) in function.args.items()})
-            ctx.set_prime_ctx(aliases=aliases)
-            cond_p = self._translate_wrapper_expr(wrapper, ctx)
-            ctx.set_normal_ctx()
+            with ctx.prime_ctx(aliases):
+                cond_p = self._translate_wrapper_expr(wrapper, ctx)
             ne = self.viper.NeCmp(cond, cond_p, position, info)
             rhs = self.viper.Or(tl_var, ne, position, info)
         else:
@@ -296,10 +294,9 @@ class SIFPureTranslator(PureTranslator):
                 wrapper_p.names = aliases
                 wrapper.expr = self._translate_assign_wrapper_expr(wrapper,
                     function, ctx)
-                ctx.set_prime_ctx(aliases=aliases)
-                wrapper_p.expr = self._translate_assign_wrapper_expr(wrapper_p,
-                    function, ctx)
-                ctx.set_normal_ctx()
+                with ctx.prime_ctx(aliases):
+                    wrapper_p.expr = self._translate_assign_wrapper_expr(
+                        wrapper_p, function, ctx)
                 new_wrappers.append(wrapper)
                 new_wrappers.append(wrapper_p)
             else:
