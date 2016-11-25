@@ -51,7 +51,7 @@ REF = RefType()
 
 
 class PermType(Type):
-    """A permission type."""
+    """The Viper permission type."""
 
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         return translator.viper.Perm

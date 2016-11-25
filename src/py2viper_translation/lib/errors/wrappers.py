@@ -18,6 +18,11 @@ class Position:
             self.node_id = None
 
     @property
+    def file_name(self) -> str:
+        """Return ``file``."""
+        return self._position.file().toString()
+
+    @property
     def line(self) -> int:
         """Return ``start.line``."""
         return self._position.line()
@@ -134,7 +139,7 @@ class Error:
         """Format error for IDE."""
         if ide_mode:
             return '{0}:{1}:{2}: error: {3} {4}'.format(
-                self.position._position.file().toString(),  # pylint: disable=protected-access
+                self.position.file_name,
                 self.position.line, self.position.column, self.message,
                 self.reason)
         else:
