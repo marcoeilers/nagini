@@ -52,7 +52,13 @@ class RawPermExpression(PermExpression):
 
 
 class PermCall(PermExpression, CallMixin):
-    """A call to a perm function."""
+    """A call to a perm function.
+
+    For example ``foo()`` where ``foo`` is defined as:
+
+    .. code:: silver
+        function foo(): Perm
+    """
 
     def __init__(self, function: str, args: 'List[CallArg]') -> None:
         super().__init__(function, args, PERM)

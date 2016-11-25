@@ -37,7 +37,11 @@ class CallArg:
 
 
 class CallMixin(Expression):
-    """A call mix-in to be mixed with call type expression."""
+    """Generic function call mix-in.
+
+    This mix-in should be mixed with an expression type to get a call to
+    a function of that type.
+    """
 
     def __init__(self, function: str, args: List[CallArg],
                  typ: 'Type') -> None:

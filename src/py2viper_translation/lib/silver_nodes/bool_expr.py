@@ -134,10 +134,16 @@ class InhaleExhale(BoolExpression):
 
 
 class BoolCall(BoolExpression, CallMixin):
-    """A call to a boolean function."""
+    """A call to a boolean function.
+
+    For example ``foo()`` where ``foo`` is defined as:
+
+    .. code:: silver
+        function foo(): Bool
+    """
 
     def __init__(self, function: str, args: List['CallArg']) -> None:
-        super().__init__(function, args, BOOL)
+        super().__init__(function, args, BOOL)  # Call CallMixin constructor.
 
 
 class BigAnd(BoolExpression):
