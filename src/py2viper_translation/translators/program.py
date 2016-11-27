@@ -63,11 +63,14 @@ class ProgramTranslator(CommonTranslator):
         position = self.to_position(var.node, ctx)
         posts = []
         result = self.viper.Result(type, position, self.no_info(ctx))
-        stmt, value = self.translate_expr(var.value, ctx)
-        if stmt:
-            raise InvalidProgramException('purity.violated', var.node)
-        posts.append(
-            self.viper.EqCmp(result, value, position, self.no_info(ctx)))
+        if var.type.name not in PRIMITIVES:
+            posts.append(self.type_check(result, var.type, position, ctx))
+        if hasattr(var, 'value'):
+            stmt, value = self.translate_expr(var.value, ctx)
+            if stmt:
+                raise InvalidProgramException('purity.violated', var.node)
+            posts.append(self.viper.EqCmp(result, value, position,
+                                          self.no_info(ctx)))
         return self.viper.Function(var.sil_name, [], type, [], posts, None,
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))

@@ -67,7 +67,7 @@ class ExpressionTranslator(CommonTranslator):
 
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        result =  visitor(node, ctx)
+        result = visitor(node, ctx)
 
         self._is_expression = old_is_expression
 

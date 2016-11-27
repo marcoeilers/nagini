@@ -13,6 +13,7 @@ from py2viper_translation.lib.constants import (
     INTERNAL_NAMES,
     PRIMITIVES,
     RESULT_NAME,
+    STRING_TYPE,
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
@@ -116,6 +117,11 @@ class PythonModule(PythonScope, ContainerInterface):
         self.types = types
 
     def process(self, translator: 'Translator') -> None:
+        if self.type_prefix:
+            # If this is not the global module
+            file_var = PythonGlobalVar('__file__', None,
+                                       self.global_module.classes[STRING_TYPE])
+            self.global_vars['__file__'] = file_var
         for name, cls in self.classes.items():
             cls.process(self.get_fresh_name(name), translator)
         for name, function in self.functions.items():

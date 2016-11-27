@@ -49,11 +49,12 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         return False
 
     def visit_import(self, node: mypy.nodes.Import):
-        for fqn, id in node.ids:
-            if not id:
-                id = fqn
-            self.set_type([id], fqn, None, None)
-        super().visit_import(node)
+        pass
+        # for fqn, id in node.ids:
+        #     if not id:
+        #         id = fqn
+        #     self.set_type([id], fqn, None, None)
+        # super().visit_import(node)
 
     def visit_import_all(self, node: mypy.nodes.ImportAll):
         super().visit_import_all(node)
@@ -124,6 +125,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 error = ' error: Encountered Any type. Type annotation missing?'
                 msg = ':'.join([self.path, str(line), error])
                 raise TypeException([msg])
+        if (isinstance(type, mypy.types.Instance) and
+                    type.type.fullname() == 'builtins.float'):
+            error = ' error: Encountered float type.'
+            msg = ':'.join([self.path, str(line), error])
+            raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
@@ -255,6 +261,8 @@ class TypeInfo:
     def get_type_prefix(self, name: str) -> str:
         if name.endswith('.py'):
             name = name[:-3]
+        elif name.endswith('.pyi'):
+            name = name[:-4]
         name = name.replace('/', '.')
         name = name.replace('\\', '.')
         for key in self.all_types:
