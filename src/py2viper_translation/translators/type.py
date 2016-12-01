@@ -275,8 +275,6 @@ class TypeTranslator(CommonTranslator):
         if len(types) == 1:
             return types[0]
         current = types[0]
-        if current is None:
-            print("aa")
         for new in types[1:]:
             current = self.pairwise_supertype(current, new)
         return current

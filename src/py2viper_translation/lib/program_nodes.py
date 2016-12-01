@@ -118,7 +118,7 @@ class PythonModule(PythonScope, ContainerInterface):
 
     def process(self, translator: 'Translator') -> None:
         if self.type_prefix:
-            # If this is not the global module
+            # If this is not the global module, add a __file__ variable
             file_var = PythonGlobalVar('__file__', None,
                                        self.global_module.classes[STRING_TYPE])
             self.global_vars['__file__'] = file_var
