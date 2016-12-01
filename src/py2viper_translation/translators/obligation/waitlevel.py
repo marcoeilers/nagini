@@ -23,7 +23,7 @@ from py2viper_translation.translators.obligation.manager import (
 
 
 class WaitLevelTranslator(CommonTranslator):
-    """Base class for obligation translators."""
+    """Class for translating wait-levels."""
 
     def __init__(self, config: TranslatorConfig, jvm: JVM, source_file: str,
                  type_info: TypeInfo, viper_ast: ViperAST,
@@ -33,7 +33,13 @@ class WaitLevelTranslator(CommonTranslator):
 
     def is_wait_level_comparison(self, node: ast.Compare,
                                  ctx: Context) -> bool:
-        """Check if we are comparing with ``WaitLevel``."""
+        """Check if we are comparing with ``WaitLevel``.
+
+        Allowed forms are:
+
+        1.  ``WaitLevel() < Level(l)``
+        2.  ``Level(l1) < Level(l2)``
+        """
         return (len(node.ops) == 1 and
                 isinstance(node.ops[0], ast.Lt) and
                 len(node.comparators) == 1 and

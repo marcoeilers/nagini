@@ -30,6 +30,8 @@ class ObligationContext:
         should be opaque to all code except obligation implementation.
         """
         if len(self._loop_stack) >= 2:
+            # Surrounding loop exists only if there are at least two
+            # loops in the loop stack.
             return self._loop_stack[-2]
         else:
             return None

@@ -8,13 +8,11 @@ suite.
 from py2viper_contracts.contracts import (
     Assert,
     Ensures,
-    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 def reAcq(a: Lock) -> None:

@@ -6,13 +6,11 @@ This is an example that illustrates Chalice2Silver
 
 from py2viper_contracts.contracts import (
     Ensures,
-    Import,
     Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 def foo(l: Lock) -> None:

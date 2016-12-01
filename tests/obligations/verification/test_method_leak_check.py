@@ -1,11 +1,9 @@
 from py2viper_contracts.contracts import (
-    Import,
     Requires,
 )
 from py2viper_contracts.io import *
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 def MustInvoke_callee_1(t1: Place) -> None:

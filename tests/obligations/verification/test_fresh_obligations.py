@@ -2,14 +2,12 @@ from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Implies,
-    Import,
     Invariant,
     Requires,
     Ensures,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 # Positive examples.

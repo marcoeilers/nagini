@@ -9,7 +9,6 @@ from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
-    Import,
     Invariant,
     Requires,
 )
