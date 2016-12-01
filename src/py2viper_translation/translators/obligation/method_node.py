@@ -64,17 +64,9 @@ class ObligationMethod:
         """Prepend ``preconditions`` to precondition list."""
         self.pres[0:0] = preconditions
 
-    def append_precondition(self, precondition: Expr) -> None:
-        """Append ``precondition`` to precondition list."""
-        self.pres.append(precondition)
-
     def append_preconditions(self, preconditions: List[Expr]) -> None:
         """Append ``preconditions`` to precondition list."""
         self.pres.extend(preconditions)
-
-    def append_postcondition(self, postcondition: Expr) -> None:
-        """Append ``postcondition`` to postcondition list."""
-        self.posts.append(postcondition)
 
     def append_postconditions(self, postconditions: List[Expr]) -> None:
         """Append ``postconditions`` to postcondition list."""
@@ -245,7 +237,7 @@ class ObligationMethodNodeConstructor:
         info = self._translator.to_info(["Body leak check."], self._ctx)
         postcondition = check.translate(
             self._translator, self._ctx, position, info)
-        self._obligation_method.append_postcondition(postcondition)
+        self._obligation_method.append_postconditions([postcondition])
 
     def _add_caller_leak_check(self) -> None:
         """Add a leak check.
@@ -294,7 +286,7 @@ class ObligationMethodNodeConstructor:
         info = self._translator.to_info(["Caller side leak check"], self._ctx)
         precondition = check.translate(
             self._translator, self._ctx, position, info)
-        self._obligation_method.append_precondition(precondition)
+        self._obligation_method.append_preconditions([precondition])
 
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:

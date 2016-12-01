@@ -4,7 +4,6 @@ from py2viper_contracts.contracts import (
     Requires,
     Ensures,
     Predicate,
-    Import,
     Result,
     Unfold,
     Fold,
@@ -14,7 +13,6 @@ from py2viper_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-Import('io_builtins')
 from py2viper_contracts.obligations import (
     MustTerminate,
 )

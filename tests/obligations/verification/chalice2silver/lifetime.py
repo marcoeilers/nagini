@@ -7,12 +7,10 @@ test suite.
 
 from py2viper_contracts.contracts import (
     Assert,
-    Import,
     Requires,
 )
 from py2viper_contracts.obligations import *
 from py2viper_contracts.lock import Lock
-Import('lock')
 
 
 def do_release(l: Lock) -> None:

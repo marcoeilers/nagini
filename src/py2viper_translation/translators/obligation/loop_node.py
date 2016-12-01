@@ -43,10 +43,6 @@ class ObligationLoop:
         """Prepend ``invariant`` to the invariants list."""
         self.invariants.insert(0, invariant)
 
-    def append_invariant(self, invariant: Expr) -> None:
-        """Append ``invariant`` to the invariants list."""
-        self.invariants.append(invariant)
-
     def append_invariants(self, invariants: List[Expr]) -> None:
         """Append ``invariants`` to the invariants list."""
         self.invariants.extend(invariants)
@@ -148,9 +144,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             info = self._to_info('Leak check for context.')
             position = self._to_position(
                 conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
-            self._obligation_loop.append_invariant(
+            self._obligation_loop.append_invariants([
                 before_loop_leak_check.translate(
-                    self._translator, self._ctx, position, info))
+                    self._translator, self._ctx, position, info)])
 
         if not obligation_config.disable_loop_body_leak_check:
             body_leak_check = sil.InhaleExhale(
@@ -159,9 +155,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             info = self._to_info('Leak check for loop body.')
             position = self._to_position(
                 conversion_rules=rules.OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL)
-            self._obligation_loop.append_invariant(
+            self._obligation_loop.append_invariants([
                 body_leak_check.translate(
-                    self._translator, self._ctx, position, info))
+                    self._translator, self._ctx, position, info)])
 
     def _set_up_measures(self) -> None:
         """Create and initialize loop's measure map."""
