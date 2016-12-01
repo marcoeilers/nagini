@@ -275,6 +275,8 @@ class TypeTranslator(CommonTranslator):
         if len(types) == 1:
             return types[0]
         current = types[0]
+        if current is None:
+            print("aa")
         for new in types[1:]:
             current = self.pairwise_supertype(current, new)
         return current
@@ -284,8 +286,10 @@ class TypeTranslator(CommonTranslator):
             return t2
         if self._is_subtype(t2, t1):
             return t1
-        if not t1.superclass:
+        if (not t1.superclass and not t2.superclass):
             return None
+        if not t1.superclass:
+            return self.pairwise_supertype(t2.superclass, t1)
         return self.pairwise_supertype(t2, t1.superclass)
 
     def _is_subtype(self, t1: PythonType, t2: PythonType) -> bool:

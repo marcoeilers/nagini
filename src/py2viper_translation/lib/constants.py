@@ -2,7 +2,14 @@ import ast
 
 LITERALS = ['True', 'False', 'None']
 
-BUILTINS = ['isinstance', 'bool', 'len', 'set', 'super', 'range', 'type']
+BUILTINS = ['cast',
+            'isinstance',
+            'bool',
+            'len',
+            'set',
+            'super',
+            'range',
+            'type']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 

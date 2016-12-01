@@ -153,14 +153,29 @@ class PythonModule(PythonScope, ContainerInterface):
         E.g., the type of local variable 'a' from method 'm' in class 'C'
         will be returned for the input (['C', 'm'], 'a').
         """
-        actual_prefix = [self.type_prefix]
+        actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
-        return self.types.get_type(actual_prefix, name)
+        local_result = self.types.get_type(actual_prefix, name)
+        local_type, local_alts = local_result
+        if local_type is not None:
+            return local_type, local_alts
+        for module in self.from_imports:
+            module_result = module.get_type(prefixes, name)
+            if module_result is not None:
+                return module_result
+        return None
 
     def get_func_type(self, prefix: List[str]):
-        actual_prefix = [self.type_prefix]
+        actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefix)
-        return self.types.get_func_type(actual_prefix)
+        local_result = self.types.get_func_type(actual_prefix)
+        if local_result is not None:
+            return local_result
+        for module in self.from_imports:
+            module_result = module.get_func_type(prefix)
+            if module_result is not None:
+                return module_result
+        return None
 
     def get_included_modules(
             self, include_global: bool = True) -> List['PythonModule']:
@@ -1356,6 +1371,8 @@ def get_target(node: ast.AST,
                 isinstance(container, PythonMethod)):
             # Return the type of the current method's superclass
             return container.cls.superclass
+        elif func_name == 'cast':
+            return get_target(node.args[0], containers, container)
         return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
