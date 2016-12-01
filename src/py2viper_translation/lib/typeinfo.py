@@ -49,20 +49,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return True
         return False
 
-    def visit_import(self, node: mypy.nodes.Import):
-        pass
-        # for fqn, id in node.ids:
-        #     if not id:
-        #         id = fqn
-        #     self.set_type([id], fqn, None, None)
-        # super().visit_import(node)
-
-    def visit_import_all(self, node: mypy.nodes.ImportAll):
-        super().visit_import_all(node)
-
-    def visit_import_from(self, node: mypy.nodes.ImportFrom):
-        super().visit_import_from(node)
-
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
         rectype = self.type_of(node.expr)
         if (not self._is_result_call(node.expr) and
