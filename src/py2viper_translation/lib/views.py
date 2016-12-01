@@ -90,3 +90,9 @@ class PythonModuleView:
 
     def get_included_modules(self, include_global: bool=True):
         return self.module.get_included_modules(include_global)
+
+    def get_type(self, prefixes, name):
+        return self.module.get_type(prefixes, name)
+
+    def get_func_type(self, prefix):
+        return self.module.get_func_type(prefix)

@@ -59,3 +59,8 @@ function object___eq__(self: Ref, other: Ref): Bool
 
 function Place___eq__(self: Ref, other: Ref): Bool
     ensures result == (self == other)
+
+function object___cast__(typ: PyType, object: Ref): Ref
+    requires issubtype(typeof(object), typ)
+    ensures result == object
+    ensures issubtype(typeof(object), typ)

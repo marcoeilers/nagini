@@ -143,6 +143,10 @@
         "__eq__": {
             "args": ["object", "object"],
             "type": "bool"
+        },
+        "__cast__": {
+            "args": ["type", "object"],
+            "type": "object"
         }
     }
 },
