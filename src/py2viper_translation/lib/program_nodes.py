@@ -149,14 +149,14 @@ class PythonModule(PythonScope, ContainerInterface):
                  name: str) -> Tuple[str, Dict[Tuple[int, int], str]]:
         """
         Returns the main type and the alternative types of the element
-        identified by this name found under this prefix in the current module.
+        identified by this name found under this prefix in the current module
+        (or imported ones).
         E.g., the type of local variable 'a' from method 'm' in class 'C'
         will be returned for the input (['C', 'm'], 'a').
         """
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
-        local_result = self.types.get_type(actual_prefix, name)
-        local_type, local_alts = local_result
+        local_type, local_alts = self.types.get_type(actual_prefix, name)
         if local_type is not None:
             return local_type, local_alts
         for module in self.from_imports:
@@ -165,9 +165,15 @@ class PythonModule(PythonScope, ContainerInterface):
                 return module_result
         return None
 
-    def get_func_type(self, prefix: List[str]):
+    def get_func_type(self, path: List[str]):
+        """
+        Returns the type of the function identified by the given path in the
+        current module (including imported other modules). It is assumed that
+        the path points to a function, and the returned type will be the return
+        type of that function, i.e., generally not a function type.
+        """
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
-        actual_prefix.extend(prefix)
+        actual_prefix.extend(path)
         local_result = self.types.get_func_type(actual_prefix)
         if local_result is not None:
             return local_result
