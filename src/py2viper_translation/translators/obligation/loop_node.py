@@ -39,13 +39,13 @@ class ObligationLoop:
         self.local_vars = local_vars
         self.body = body
 
-    def prepend_invariants(self, invariants: List[Expr]) -> None:
-        """Prepend ``invariants`` to the invariants list."""
-        self.invariants[0:0] = invariants
+    def prepend_invariant(self, invariant: Expr) -> None:
+        """Prepend ``invariant`` to the invariants list."""
+        self.invariants.insert(0, invariant)
 
-    def append_invariant(self, invariant: Expr) -> None:
-        """Append ``invariant`` to the invariants list."""
-        self.invariants.append(invariant)
+    def append_invariants(self, invariants: List[Expr]) -> None:
+        """Append ``invariants`` to the invariants list."""
+        self.invariants.extend(invariants)
 
     def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
@@ -77,6 +77,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def construct_loop(self) -> None:
         """Construct statements to perform a loop."""
+        self._add_current_wait_level()
+        self._add_additional_invariants()
         self._add_leak_check()
         self._set_up_measures()
         self._bound_obligations()
@@ -86,9 +88,32 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         self._set_loop_check_before()
         self._set_loop_check_after_body()
         self._check_loop_preserves_termination()
+        self._prepend_loop_body()
         self._add_loop()
+        self._add_additional_statements_after_loop()
         self._reset_must_terminate(
             self._loop_obligation_info.original_must_terminate_var)
+
+    def _add_current_wait_level(self) -> None:
+        """Inhale assumptions about current wait-level variable."""
+        context_info = self._ctx.obligation_context.get_surrounding_loop_info()
+        if context_info:
+            context_residue_level = context_info.residue_level
+        else:
+            method_info = self._ctx.current_function.obligation_info
+            context_residue_level = method_info.residue_level
+        invariant = self._translator.initialize_current_wait_level(
+            sil.PermVar(self._loop_obligation_info.residue_level),
+            sil.PermVar(context_residue_level),
+            self._ctx)
+        translated = invariant.translate(
+            self._translator, self._ctx, self._position, self._info)
+        self._obligation_loop.prepend_invariant(translated)
+
+    def _add_additional_invariants(self) -> None:
+        """Add additional invariants from the obligation info."""
+        self._obligation_loop.append_invariants(
+            self._loop_obligation_info.get_additional_invariants())
 
     def _add_leak_check(self) -> None:
         """Add leak checks to invariant."""
@@ -119,9 +144,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             info = self._to_info('Leak check for context.')
             position = self._to_position(
                 conversion_rules=rules.OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL)
-            self._obligation_loop.append_invariant(
+            self._obligation_loop.append_invariants([
                 before_loop_leak_check.translate(
-                    self._translator, self._ctx, position, info))
+                    self._translator, self._ctx, position, info)])
 
         if not obligation_config.disable_loop_body_leak_check:
             body_leak_check = sil.InhaleExhale(
@@ -130,9 +155,9 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             info = self._to_info('Leak check for loop body.')
             position = self._to_position(
                 conversion_rules=rules.OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL)
-            self._obligation_loop.append_invariant(
+            self._obligation_loop.append_invariants([
                 body_leak_check.translate(
-                    self._translator, self._ctx, position, info))
+                    self._translator, self._ctx, position, info)])
 
     def _set_up_measures(self) -> None:
         """Create and initialize loop's measure map."""
@@ -199,6 +224,11 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._translator, self._ctx, position, info)
         self._obligation_loop.append_body(statement)
 
+    def _prepend_loop_body(self) -> None:
+        """Add additional statements before loop from the obligation info."""
+        self._obligation_loop.prepend_body(
+            self._loop_obligation_info.get_prepend_body())
+
     def _add_loop(self) -> None:
         """Add the actual loop node."""
         body_block = self._translator.translate_block(
@@ -208,6 +238,11 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
             self._obligation_loop.local_vars, body_block,
             self._position, self._info)
         self._statements.append(loop)
+
+    def _add_additional_statements_after_loop(self) -> None:
+        """Add additional statements after loop from the obligation info."""
+        self._statements.extend(
+            self._loop_obligation_info.get_after_loop())
 
     @property
     def _loop_obligation_info(self) -> PythonLoopObligationInfo:

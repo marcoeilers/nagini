@@ -181,11 +181,16 @@ import ast
 from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import silver_nodes as sil
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
 )
+from py2viper_translation.lib.typedefs import (
+    Predicate,
+)
+from py2viper_translation.translators.common import CommonTranslator
 from py2viper_translation.translators.obligation.inexhale import (
     InexhaleObligationInstanceMixin,
     ObligationInhaleExhale,
@@ -219,7 +224,8 @@ class MustTerminateObligationInstance(
     def _get_inexhale(self, ctx: Context) -> ObligationInhaleExhale:
         return ObligationInhaleExhale(
             _create_predicate_access(self._target),
-            skip_exhale=True)
+            skip_exhale=True,
+            skip_inhale=obligation_config.disable_termination_check)
 
     def get_obligation_bound(self, ctx: Context) -> sil.Statement:
         assert False    # MustTerminate is never fresh.
@@ -281,3 +287,10 @@ class MustTerminateObligation(Obligation):
 
     def create_leak_check(self, var_name: str) -> List[sil.BoolExpression]:
         return [self._create_predicate_for_perm(_PREDICATE_NAME, var_name)]
+
+    def create_predicates(
+            self, translator: CommonTranslator) -> List[Predicate]:
+        if obligation_config.disable_termination_check:
+            return []
+        else:
+            return super().create_predicates(translator)

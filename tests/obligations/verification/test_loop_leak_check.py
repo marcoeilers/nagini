@@ -1,15 +1,11 @@
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Requires,
-    Invariant,
     Implies,
+    Invariant,
 )
 from py2viper_contracts.io import *
-from py2viper_contracts.obligations import (
-    MustRelease,
-    MustTerminate,
-)
+from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 
 
 def MustInvoke_context_1(t1: Place) -> None:

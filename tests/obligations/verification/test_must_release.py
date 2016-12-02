@@ -1,18 +1,18 @@
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
-    Invariant,
     Implies,
+    Invariant,
     Requires,
     Ensures,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 from typing import Optional
 
 
 # Check acquiring a lock.
+
 
 #:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
 def acquire_1(l: Optional[Lock]) -> None:
@@ -23,23 +23,27 @@ def acquire_1(l: Optional[Lock]) -> None:
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
 def acquire_2(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     l.acquire()
 
 
 def acquire_3(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     l.acquire()
     l.release()
 
 
 def acquire_4(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
     l.acquire()
 
 
 def acquire_5(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l, 10))
     l.acquire()
 
@@ -74,6 +78,7 @@ def terminating_1() -> None:
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
 def terminating_2(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     Requires(MustTerminate(2))
     l.acquire()
 

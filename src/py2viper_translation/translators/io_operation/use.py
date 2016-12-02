@@ -51,7 +51,6 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         """
         assert ctx.actual_function
 
-        name = get_func_name(node)
         operation = self.get_target(node, ctx)
         parameters_count = len(operation.get_parameters())
         args = self.translate_args(node.args[:parameters_count], ctx)

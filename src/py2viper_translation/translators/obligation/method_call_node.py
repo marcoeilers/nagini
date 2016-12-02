@@ -28,6 +28,9 @@ class ObligationMethodCall:
 
     def __init__(
             self, name: str, args: List[Expr], targets: List[Expr]) -> None:
+        assert name
+        assert all(args)
+        assert all(targets)
         self.name = name
         self.original_args = args[:]
         self.args = args
@@ -35,7 +38,13 @@ class ObligationMethodCall:
 
     def prepend_arg(self, arg: Expr) -> None:
         """Prepend ``args`` to the argument list."""
+        assert arg
         self.args.insert(0, arg)
+
+    def prepend_target(self, target: Expr) -> None:
+        """Prepend ``target`` to the target list."""
+        assert target
+        self.targets.insert(0, target)
 
 
 class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
@@ -66,11 +75,19 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def construct_call(self) -> None:
         """Construct statements to perform a call."""
-        self._add_aditional_arguments()
+        self._add_additional_arguments()
+        self._add_additional_targets()
         self._add_call()
 
-    def _add_aditional_arguments(self) -> None:
+    def _add_additional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
+        if self._ctx.obligation_context.is_translating_loop():
+            loop_info = self._ctx.obligation_context.current_loop_info
+            residue_level = loop_info.residue_level
+        else:
+            residue_level = self._obligation_info.residue_level
+        self._obligation_method_call.prepend_arg(
+            residue_level.ref(self._target_node, self._ctx))
         if not obligation_config.disable_measures:
             self._obligation_method_call.prepend_arg(
                 self._obligation_info.method_measure_map.get_var().ref(
@@ -78,6 +95,11 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
         self._obligation_method_call.prepend_arg(
             self._obligation_info.current_thread_var.ref(
                 self._target_node, self._ctx))
+
+    def _add_additional_targets(self) -> None:
+        """Add current wait level dummy target."""
+        self._obligation_method_call.prepend_target(
+            self._obligation_info.current_wait_level_target.ref())
 
     def _add_call(self) -> None:
         """Add the actual call node."""

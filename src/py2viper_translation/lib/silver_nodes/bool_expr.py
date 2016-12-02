@@ -8,7 +8,9 @@ from typing import List
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
+from py2viper_translation.lib.silver_nodes.call import CallMixin
 from py2viper_translation.lib.silver_nodes.expression import Expression
+from py2viper_translation.lib.silver_nodes.types import BOOL
 from py2viper_translation.lib.typedefs import (
     Expr,
     Info,
@@ -131,49 +133,17 @@ class InhaleExhale(BoolExpression):
             inhale, exhale, position, info)
 
 
-class CallArg:
-    """A call argument."""
+class BoolCall(BoolExpression, CallMixin):
+    """A call to a boolean function.
 
-    def __init__(
-            self, parameter_name: str, parameter_type: 'Type',
-            argument: Expression) -> None:
-        self._parameter_name = parameter_name
-        self._parameter_type = parameter_type
-        self._argument = argument
+    For example ``foo()`` where ``foo`` is defined as:
 
-    def construct_definition(
-            self, translator: 'Translator', position: Position,
-            info: Info) -> Expr:
-        """Construct formal argument definition."""
-        typ = self._parameter_type.translate(translator)
-        return translator.viper.LocalVarDecl(
-            self._parameter_name, typ, position, info)
+    .. code:: silver
+        function foo(): Bool
+    """
 
-    def translate_argument(
-            self, translator: 'AbstractTranslator', ctx: 'Context',
-            position: Position, info: Info) -> Expr:
-        """Translate the argument passed to the function."""
-        return self._argument.translate(translator, ctx, position, info)
-
-
-class BoolCall(BoolExpression):
-    """A call to a boolean function."""
-
-    def __init__(self, function: str, args: List[CallArg]) -> None:
-        self._function = function
-        self._args = args
-
-    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
-                  position: Position, info: Info) -> Expr:
-        formal_args = [
-            arg.construct_definition(translator, position, info)
-            for arg in self._args]
-        args = [
-            arg.translate_argument(translator, ctx, position, info)
-            for arg in self._args]
-        return translator.viper.FuncApp(
-            self._function, args, position, info, translator.viper.Bool,
-            formal_args)
+    def __init__(self, function: str, args: List['CallArg']) -> None:
+        super().__init__(function, args, BOOL)  # Call CallMixin constructor.
 
 
 class BigAnd(BoolExpression):

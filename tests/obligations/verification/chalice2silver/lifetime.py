@@ -5,13 +5,12 @@ test suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Assert,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 
 
 def do_release(l: Lock) -> None:

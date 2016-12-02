@@ -14,6 +14,7 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.typedefs import (
     Predicate,
+    Field,
 )
 from py2viper_translation.translators.common import CommonTranslator
 
@@ -126,15 +127,19 @@ class Obligation(abc.ABC):
             for predicate in predicates]
         return translated_predicates
 
-    def create_fields(
-            self, translator: CommonTranslator) -> List[Predicate]:
+    def create_fields_untranslated(self) -> List[sil.Field]:
         """Create fields that are used to represent this obligation."""
-        position = translator.viper.NoPosition
-        info = translator.viper.NoInfo
         fields = [
             sil.Field(name, sil.INT)
             for name in self._field_names]
+        return fields
+
+    def create_fields(
+            self, translator: CommonTranslator) -> List[Field]:
+        """Create Silver fields that are used to represent this obligation."""
+        position = translator.viper.NoPosition
+        info = translator.viper.NoInfo
         translated_fields = [
             field.translate(translator, None, position, info)
-            for field in fields]
+            for field in self.create_fields_untranslated()]
         return translated_fields
