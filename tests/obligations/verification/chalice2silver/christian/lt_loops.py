@@ -5,17 +5,16 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
-    Invariant,
     Implies,
+    Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 from typing import Optional
 
 
@@ -121,7 +120,20 @@ class A:
 
     def m10(self) -> None:
         Requires(Acc(self.a) and MustRelease(self.a, 2))
+        Requires(WaitLevel() < Level(self.a))
         while True:
             Invariant(Acc(self.a) and MustRelease(self.a, 1))
+            Invariant(WaitLevel() < Level(self.a))
             self.a.release()
             self.a.acquire()
+
+    def m11(self) -> None:
+        Requires(Acc(self.a) and MustRelease(self.a, 2))
+        Requires(WaitLevel() < Level(self.a))
+        while True:
+            Invariant(Acc(self.a) and MustRelease(self.a, 1))
+            Invariant(WaitLevel() < Level(self.a))
+            self.a.release()
+            self.a.acquire()
+            #:: ExpectedOutput(assert.failed:assertion.false)
+            Assert(False)

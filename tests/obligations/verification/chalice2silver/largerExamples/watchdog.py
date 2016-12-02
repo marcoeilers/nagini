@@ -5,17 +5,16 @@ test suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
-    Invariant,
     Implies,
+    Invariant,
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 
 
 class WatchDog:
@@ -29,12 +28,14 @@ class WatchDog:
     def watch(self, d: Lock) -> None:
         Requires(d is not None)
         Requires(Acc(self.running))
+        Requires(WaitLevel() < Level(d))
         self.running = True     # TODO: self.running should be in Lock
                                 # invariant.
         d.acquire()
         while (self.running):
             Invariant(Acc(self.running))
             Invariant(MustRelease(d, 1))
+            Invariant(WaitLevel() < Level(d))
             # TODO: Check some property here.
             d.release()
             self.delay(5)

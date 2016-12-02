@@ -6,6 +6,7 @@ import ast
 from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import silver_nodes as sil
+from py2viper_translation.lib.config import obligation_config
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonMethod,
@@ -41,7 +42,8 @@ class MustInvokeObligationInstance(
         return ObligationInhaleExhale(
             sil.PredicateAccess(_BOUNDED_PREDICATE_NAME, self.get_target()),
             sil.PredicateAccess(_UNBOUNDED_PREDICATE_NAME, self.get_target()),
-            sil.PredicateAccess(_CREDIT_PREDICATE_NAME, self.get_target()))
+            sil.PredicateAccess(_CREDIT_PREDICATE_NAME, self.get_target()),
+            credit_only=obligation_config.disable_must_invoke)
 
     def is_fresh(self) -> bool:
         return self._measure is None
@@ -58,10 +60,13 @@ class MustInvokeObligation(Obligation):
     """Class representing ``MustInvoke`` obligation."""
 
     def __init__(self) -> None:
-        super().__init__([
-            _BOUNDED_PREDICATE_NAME,
-            _UNBOUNDED_PREDICATE_NAME,
-            _CREDIT_PREDICATE_NAME], [])
+        if obligation_config.disable_must_invoke:
+            super().__init__([_CREDIT_PREDICATE_NAME], [])
+        else:
+            super().__init__([
+                _BOUNDED_PREDICATE_NAME,
+                _UNBOUNDED_PREDICATE_NAME,
+                _CREDIT_PREDICATE_NAME], [])
 
     def identifier(self) -> str:
         return _OBLIGATION_NAME

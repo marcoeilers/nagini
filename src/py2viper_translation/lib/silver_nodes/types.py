@@ -50,6 +50,16 @@ class RefType(Type):
 REF = RefType()
 
 
+class PermType(Type):
+    """The Viper permission type."""
+
+    def translate(self, translator: 'AbstractTranslator') -> Expr:
+        return translator.viper.Perm
+
+
+PERM = PermType()
+
+
 class SeqType(Type):
     """A sequence type."""
 

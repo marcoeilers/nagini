@@ -5,8 +5,6 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
@@ -15,6 +13,7 @@ from py2viper_contracts.contracts import (
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 from typing import Optional
 
 
@@ -56,6 +55,8 @@ class A:
         Requires(Acc(other.a))
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
+        Requires(other.b >= 2)
+
         other.a.release()
 
     def timed_release_unbounded(self) -> None:
@@ -86,7 +87,7 @@ class A:
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
 
-        #:: ExpectedOutput(call.precondition:insufficient.permission)
+        #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(call.precondition:insufficient.permission)
         self.quick_release(other)
 
     def timed_release_bounded_statdec(self, other: A) -> None:

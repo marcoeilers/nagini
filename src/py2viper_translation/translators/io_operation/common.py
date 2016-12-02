@@ -3,7 +3,7 @@
 
 import ast
 
-from typing import cast, List, Optional
+from typing import List, Optional
 
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
@@ -39,7 +39,6 @@ class IOOperationCommonTranslator(CommonTranslator):
         position = self.no_position(ctx)
         info = self.no_info(ctx)
 
-        operation_name = cast(ast.Name, node.func).id
         operation = self.get_target(node, ctx)
         assert isinstance(operation, PythonIOOperation)
 

@@ -5,8 +5,6 @@ suite.
 """
 
 
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Assert,
     Ensures,
@@ -14,10 +12,12 @@ from py2viper_contracts.contracts import (
     Requires,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 
 
 def reAcq(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
     Requires(MustRelease(a, 2))
     Ensures(MustRelease(a, 2))
     a.release()
@@ -32,6 +32,7 @@ def reAcq2(a: Lock) -> None:
 
 def reAcq3(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
     Requires(MustRelease(a, 2))
     Ensures(MustRelease(a))
     a.release()
@@ -47,18 +48,21 @@ def reAcq4(a: Lock) -> None:
 
 def acq(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
     Ensures(MustRelease(a, 5))
     a.acquire()
 
 
 def continuous1(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     acq(a)
 
     while True:
         #:: ExpectedOutput(invariant.not.preserved:insufficient.permission)
         Invariant(MustRelease(a, 3))
+        Invariant(WaitLevel() < Level(a))
         a.release()
         a.acquire()
         reAcq(a)
@@ -66,12 +70,14 @@ def continuous1(a: Lock) -> None:
 
 def continuous2(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     acq(a)
 
     while True:
         #:: ExpectedOutput(invariant.not.preserved:insufficient.permission)
         Invariant(MustRelease(a, 3))
+        Invariant(WaitLevel() < Level(a))
         a.release()
         a.acquire()
         reAcq2(a)
@@ -79,11 +85,13 @@ def continuous2(a: Lock) -> None:
 
 def continuous3(a: Lock) -> None:
     Requires(a is not None)
+    Requires(WaitLevel() < Level(a))
 
     acq(a)
 
     while True:
         Invariant(MustRelease(a, 3))
+        Invariant(WaitLevel() < Level(a))
         a.release()
         a.acquire()
         reAcq3(a)

@@ -139,6 +139,7 @@ class CallTranslator(CommonTranslator):
         node is the call node and arg_stmts are statements related to argument
         evaluation.
         """
+        assert all(args), "Some args are None: {}".format(args)
         if ctx.current_function is None:
             raise UnsupportedException(node, 'Global constructor calls are not '
                                              'supported.')
@@ -260,7 +261,7 @@ class CallTranslator(CommonTranslator):
                 # Static field
                 raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
-            result_var = result_var = ctx.current_function.create_variable(
+            result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
         if target.declared_exceptions:
@@ -422,6 +423,7 @@ class CallTranslator(CommonTranslator):
             if arg is False:
                 # Not set yet, need default
                 args[index] = target.args[key].default_expr
+                assert args[index], '{} arg={}'.format(target.name, key)
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
@@ -436,6 +438,7 @@ class CallTranslator(CommonTranslator):
             args.append(kw_arg_dict)
             arg_types.append(target.kw_arg.type)
             arg_stmts += kw_stmt
+        assert all(args), "Args translated into None: {}.".format(args)
 
         return arg_stmts, args, arg_types
 

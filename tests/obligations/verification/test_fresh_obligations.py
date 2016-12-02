@@ -1,14 +1,13 @@
-from threading import Lock
-
 from py2viper_contracts.contracts import (
     Acc,
     Assert,
-    Invariant,
     Implies,
+    Invariant,
     Requires,
     Ensures,
 )
 from py2viper_contracts.obligations import *
+from py2viper_contracts.lock import Lock
 
 
 # Positive examples.
@@ -16,10 +15,12 @@ from py2viper_contracts.obligations import *
 
 def await_1(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     l.acquire()
     i = 5
     while i > 0:
         Invariant(MustRelease(l))
+        Invariant(WaitLevel() < Level(l))
         l.release()
         l.acquire()
         i -= 1
@@ -28,11 +29,13 @@ def await_1(l: Lock) -> None:
 
 def await_2(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
     l.acquire()
     i = 5
     while i > 0:
         Invariant(MustRelease(l))
+        Invariant(WaitLevel() < Level(l))
         l.release()
         l.acquire()
         i -= 1
@@ -43,11 +46,13 @@ def await_2(l: Lock) -> None:
 
 def await_3(l: Lock) -> None:
     Requires(MustRelease(l))
+    Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
     i = 5
     while i > 0:
         #:: ExpectedOutput(invariant.not.established:insufficient.permission)
         Invariant(MustRelease(l))
+        Invariant(WaitLevel() < Level(l))
         l.release()
         l.acquire()
         i -= 1
@@ -55,6 +60,7 @@ def await_3(l: Lock) -> None:
 
 def await_4(l: Lock) -> None:
     Requires(l is not None)
+    Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
     l.acquire()
     i = 5
@@ -111,7 +117,7 @@ class B:
 
     #:: Label(B_release)
     def release(self, l: Lock) -> None:
-        Requires(MustRelease(l, 1))
+        Requires(MustRelease(l, 2))
         l.release()
 
 
