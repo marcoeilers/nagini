@@ -255,11 +255,31 @@ class PythonMethodObligationInfo(BaseObligationInfo):
 
     @property
     def current_wait_level_target(self) -> PythonVar:
-        """Return variable to which the current wait level is assigned.
+        """Return target variable to which the current wait level is assigned.
 
         .. note::
-            This variable is used only to make the emitted program
-            well-formed.
+            In the wait level use in method calls encoding, we need to
+            have the fresh variable that denotes the current thread's
+            wait level after the precondition was exhaled, but before
+            the postcondition is inhaled. We use an additional ghost
+            return variable ``CURRENT_WAIT_LEVEL_NAME`` for this:
+
+            .. code-block:: silver
+
+                method foo(...) returns (..., _current_wait_level: Perm)
+
+            However, when this method ``foo`` is called, we need a
+            variable to which we can assign this return value.
+            Therefore, we introduce a local variable
+            ``CURRENT_WAIT_LEVEL_TARGET_NAME`` in each method for this
+            purpose:
+
+            .. code-block:: silver
+
+                ..., _cwl := foo(...)
+
+            Note that this variable ``CURRENT_WAIT_LEVEL_TARGET_NAME``
+            is otherwise not used.
         """
         return self._variables[CURRENT_WAIT_LEVEL_TARGET_NAME]
 
