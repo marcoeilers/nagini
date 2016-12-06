@@ -14,9 +14,9 @@ from typing import Optional
 # Check acquiring a lock.
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def acquire_1(l: Optional[Lock]) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false)|UnexpectedOutput(carbon)(call.precondition:assertion.false, 168)
     l.acquire()
 
 
@@ -57,7 +57,7 @@ def release_1(l: Lock) -> None:
 
 
 def release_2(l: Lock) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)|MissingOutput(call.precondition:assertion.false, /py2viper/issue/57/)|OptionalOutput(call.precondition:insufficient.permission)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
     l.release()
 
 
@@ -187,9 +187,9 @@ def test_loop_condition_framing_1() -> None:
     l = Lock()
     l.acquire()
     i = 5
-    #:: UnexpectedOutput(while.failed:insufficient.permission, /carbon/issue/70/)
+    #:: UnexpectedOutput(carbon)(while.failed:insufficient.permission, 70)
     while a.steps < 5:
-        #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)|MissingOutput(not.wellformed:loop_condition.not_framed_for_obligation_use, /carbon/issue/70/)
+        #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)|MissingOutput(carbon)(not.wellformed:loop_condition.not_framed_for_obligation_use, 70)
         Invariant(MustRelease(l, i))
         Invariant(Acc(a.steps))
         Invariant(i == 5 - a.steps)

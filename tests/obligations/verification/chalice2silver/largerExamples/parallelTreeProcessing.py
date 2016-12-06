@@ -56,7 +56,6 @@ class Tree:
     def work(self, call_height: int) -> None:
         Requires(self.valid())
         Requires(call_height >= 0)
-        #:: UnexpectedOutput(not.wellformed:insufficient.permission, /carbon/issue/150/)
         Requires(Unfolding(self.valid(), self.height == call_height))
         Requires(MustTerminate(call_height + 1))
         Ensures(self.valid())

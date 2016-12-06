@@ -1,4 +1,4 @@
-#:: IgnoreFile(/py2viper/issue/44/)
+#:: IgnoreFile(44)
 from typing import Optional
 
 

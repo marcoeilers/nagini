@@ -9,7 +9,7 @@ def fig1a() -> None:
     if x < 1234:
         x = 0
     y = x
-    #:: ExpectedOutput(call.precondition:assertion.false) | OptionalOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false) | ExpectedOutput(carbon)(call.precondition:assertion.false)
     sif_print(y)
 
 

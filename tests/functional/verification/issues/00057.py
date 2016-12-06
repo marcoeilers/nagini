@@ -32,5 +32,5 @@ def callee(b: B, c: C) -> None:
 
 
 def test() -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false)
     callee(None, None)
