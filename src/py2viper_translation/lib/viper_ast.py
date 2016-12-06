@@ -207,7 +207,7 @@ class ViperAST:
         return self.ast.NewStmt(lhs, self.to_seq(fields), position, info)
 
     def Label(self, name, position, info):
-        return self.ast.Label(name, position, info)
+        return self.ast.Label(name, self.to_seq([]), position, info)
 
     def Goto(self, name, position, info):
         return self.ast.Goto(name, position, info)
