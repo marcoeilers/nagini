@@ -69,6 +69,19 @@ class CallTranslator(CommonTranslator):
         result = self.type_factory.typeof(obj, ctx)
         return stmt, result
 
+    def _translate_cast_func(self, node: ast.Call,
+                             ctx: Context) -> StmtsAndExpr:
+        stmt, object_arg = self.translate_expr(node.args[1], ctx)
+        cast_type = self.get_type(node, ctx)
+        type_arg = self.type_factory.translate_type_literal(cast_type,
+                                                            node.args[0], ctx)
+        pos = self.to_position(node, ctx)
+        object_class = ctx.module.global_module.classes['object']
+        result = self.get_function_call(object_class, '__cast__',
+                                        [type_arg, object_arg], [None, None],
+                                        node, ctx)
+        return stmt, result
+
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -225,6 +238,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_range(node, ctx)
         elif func_name == 'type':
             return self._translate_type_func(node, ctx)
+        elif func_name == 'cast':
+            return self._translate_cast_func(node, ctx)
         else:
             raise UnsupportedException(node)
 
@@ -725,15 +740,16 @@ class CallTranslator(CommonTranslator):
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
         """
-        if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
+        func_name = get_func_name(node)
+        if func_name in CONTRACT_WRAPPER_FUNCS:
             raise InvalidProgramException(node, 'invalid.contract.position')
-        elif get_func_name(node) in CONTRACT_FUNCS:
+        elif func_name in CONTRACT_FUNCS:
             return self.translate_contractfunc_call(node, ctx)
-        elif get_func_name(node) in IO_CONTRACT_FUNCS:
+        elif func_name in IO_CONTRACT_FUNCS:
             return self.translate_io_contractfunc_call(node, ctx)
-        elif get_func_name(node) in OBLIGATION_CONTRACT_FUNCS:
+        elif func_name in OBLIGATION_CONTRACT_FUNCS:
             return self.translate_obligation_contractfunc_call(node, ctx)
-        elif get_func_name(node) in BUILTINS:
+        elif func_name in BUILTINS:
             return self._translate_builtin_func(node, ctx)
         elif self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)

@@ -248,7 +248,12 @@ class MethodTranslator(CommonTranslator):
         statements = func.node.body
         body_index = get_body_start_index(statements)
         # Translate body
-        body = self.translate_exprs(statements[body_index:], func, ctx)
+        actual_body = statements[body_index:]
+        if (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+            isinstance(actual_body[0].value, ast.Ellipsis)):
+            body = None
+        else:
+            body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
         return self.viper.Function(name, args, type, pres, posts, body,

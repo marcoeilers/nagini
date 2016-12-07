@@ -1,5 +1,6 @@
 import logging
 import mypy.build
+import os
 import py2viper_translation.lib.mypy_parser_patch
 import sys
 
@@ -47,19 +48,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if node.callee.name == 'RaisedException':
                 return True
         return False
-
-    def visit_import(self, node: mypy.nodes.Import):
-        for fqn, id in node.ids:
-            if not id:
-                id = fqn
-            self.set_type([id], fqn, None, None)
-        super().visit_import(node)
-
-    def visit_import_all(self, node: mypy.nodes.ImportAll):
-        super().visit_import_all(node)
-
-    def visit_import_from(self, node: mypy.nodes.ImportFrom):
-        super().visit_import_from(node)
 
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
         rectype = self.type_of(node.expr)
@@ -124,6 +112,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 error = ' error: Encountered Any type. Type annotation missing?'
                 msg = ':'.join([self.path, str(line), error])
                 raise TypeException([msg])
+        if (isinstance(type, mypy.types.Instance) and
+                    type.type.fullname() == 'builtins.float'):
+            error = ' error: Encountered float type.'
+            msg = ':'.join([self.path, str(line), error])
+            raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
@@ -147,6 +140,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         return t1 == t2
 
     def visit_call_expr(self, node: mypy.nodes.CallExpr):
+        if (isinstance(node.callee, mypy.nodes.NameExpr) and
+                    node.callee.fullname == 'typing.cast'):
+            return
         for a in node.args:
             a.accept(self)
         node.callee.accept(self)
@@ -244,7 +240,7 @@ class TypeInfo:
                 self.files[name] = file.path
                 visitor = TypeVisitor(res_strict.types, name,
                                       file.ignored_lines)
-                visitor.prefix = [name]
+                visitor.prefix = name.split('.')
                 file.accept(visitor)
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
@@ -253,13 +249,12 @@ class TypeInfo:
             report_errors(e.messages)
 
     def get_type_prefix(self, name: str) -> str:
-        if name.endswith('.py'):
-            name = name[:-3]
-        name = name.replace('/', '.')
-        name = name.replace('\\', '.')
-        for key in self.all_types:
-            if name.endswith(key[0]):
-                return key[0]
+        name = os.path.abspath(name)
+        for prefix, path in self.files.items():
+            path = os.path.abspath(path)
+            if path == name:
+                return prefix
+        return None
 
     def get_type(self, prefix: List[str], name: str):
         """
