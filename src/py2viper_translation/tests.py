@@ -79,7 +79,15 @@ def _consume_list(key: str, dictionary: Dict[str, Any]) -> Any:
 
 
 class Error(abc.ABC):
-    """Base class for reported errors."""
+    """Base class for reported errors.
+
+    Subclasses of this class are wrappers that unify interfaces of three
+    error types currently produced by Nagini:
+
+    1.  Type errors produced by Mypy.
+    2.  Invalid program errors produced by translators.
+    3.  Verification errors produced by back-end verifiers.
+    """
 
     @property
     @abc.abstractmethod
@@ -332,7 +340,16 @@ class MissingOutputAnnotation(
         super().__init__(token, group_dict)
 
     def match(self, expected: ExpectedOutputAnnotation) -> bool:
-        """Check if this annotation matches give ExpectedOutput."""
+        """Check if this annotation matches the given ``ExpectedOutput``.
+
+        ``MissingOutput`` annotation indicates that the output mentioned
+        in a certain ``ExpectedOutput`` annotation is not going to be
+        produced due to some issue. In other words, a ``MissingOutput``
+        annotation silences a matching ``ExpectedOutput`` annotation.
+        Intuitively, a ``MissingOutput`` annotation matches an
+        ``ExpectedOutput`` annotation if they are on the same line and
+        have the same arguments.
+        """
         return (self.line == expected.line and
                 self._id == expected.full_id and
                 self.get_vias() == expected.get_vias() and
