@@ -1,4 +1,4 @@
-#:: IgnoreFile(/py2viper/issue/42/)
+#:: IgnoreFile(42)
 
 
 class TextIO:

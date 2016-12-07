@@ -1,4 +1,4 @@
-#:: IgnoreFile(/py2viper/issue/25/)
+#:: IgnoreFile(25)
 from py2viper_contracts.contracts import *
 
 class C:

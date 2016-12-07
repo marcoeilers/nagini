@@ -217,7 +217,6 @@ def ensure_dir_exists_io2(
 
 # TODO: When issue #55 is fixed and this one passes, encode failing
 # variations.
-#:: OptionalOutput(postcondition.violated:assertion.false)
 def ensure_dir_exists2(t1: Place, path: str) -> Place:
     IOExists2(Place, OSErrorWrapper)(
         lambda t2, ex: (
@@ -228,11 +227,10 @@ def ensure_dir_exists2(t1: Place, path: str) -> Place:
                 MustTerminate(2)
             ),
             Ensures(
-                #:: OptionalOutput(postcondition.violated:assertion.false)
                 token(t2) and t2 == Result() and ex is None
             ),
             Exsures(OSErrorWrapper,
-                #:: UnexpectedOutput(postcondition.violated:assertion.false, /py2viper/issue/55/)
+                #:: UnexpectedOutput(postcondition.violated:assertion.false, 55) | UnexpectedOutput(carbon)(postcondition.violated:assertion.false, 168)
                 ex is RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, Exception)

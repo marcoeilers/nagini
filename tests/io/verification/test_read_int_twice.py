@@ -258,7 +258,7 @@ def read_write_int_twice4(t1: Place) -> Place:
 
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     t4 = write_int(t3, number2)
-    #:: OptionalOutput(call.precondition:insufficient.permission)
+    #:: ExpectedOutput(carbon)(call.precondition:insufficient.permission)
     t5 = write_int(t4, number1)
 
     return t5

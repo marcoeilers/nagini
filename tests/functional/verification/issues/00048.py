@@ -1,4 +1,4 @@
-#:: IgnoreFile(/py2viper/issue/48/)
+#:: IgnoreFile(48)
 from py2viper_contracts.contracts import *
 
 

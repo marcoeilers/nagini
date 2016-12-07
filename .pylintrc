@@ -174,7 +174,7 @@ expected-line-ending-format=LF
 spelling-dict=en_GB
 
 # List of comma separated words that should not be checked.
-spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–,str,existentials,var,acc,SIF,wildcard,docstring,tcond,arg,prepended,IDE,foo
+spelling-ignore-words=mypy,noqa,AST,IO,ast,bool,args,kwargs,preset,postset,TODO,FIXME,todo,ungrouped,def,int,formedness,pragma,ctoken,wellformed,subtyping,–,str,existentials,var,acc,SIF,wildcard,docstring,tcond,arg,prepended,IDE,foo,pytest,vias,backend,…
 
 # A path to a file that contains private dictionary; one word per line.
 spelling-private-dict-file=
@@ -215,7 +215,7 @@ logging-modules=logging
 bad-functions=filter,map
 
 # Good variable names which should always be accepted, separated by a comma
-good-names=i,j,k,ex,Run,_
+good-names=i,j,k,ex,Run,_,fp
 
 # Bad variable names which should always be refused, separated by a comma
 bad-names=foo,bar,baz,toto,tutu,tata
