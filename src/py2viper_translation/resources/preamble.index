@@ -12,7 +12,7 @@
             "MustTerminate": true
         },
         "__setitem__": {
-            "args": ["list", "int", "object"],
+            "args": ["list", "__prim__int", "object"],
             "type": null,
             "MustTerminate": true
         },
@@ -24,7 +24,7 @@
     },
     "functions": {
         "__getitem__": {
-            "args": ["list", "int"],
+            "args": ["list", "__prim__int"],
             "type": "object"
         },
         "__contains__": {
@@ -153,26 +153,68 @@
 "int": {
     "functions": {
         "__bool__": {
-            "args": ["int"],
+            "args": ["__prim__int"],
             "type": "bool"
         },
-        "__box__": {
+        "__unbox__": {
             "args": ["int"],
-            "type": "__boxed_int"
+            "type": "int"
+        },
+        "__eq__": {
+            "args": ["int", "object"],
+            "type": "bool"
+        },
+        "__add__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "int"
+        },
+        "__sub__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "int"
+        },
+        "__mul__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "int"
+        },
+        "__floordiv__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "int"
+        },
+        "__ge__": {
+            "args": ["int", "int"],
+            "type": "bool"
+        },
+        "__gt__": {
+            "args": ["int", "int"],
+            "type": "bool"
+        },
+        "__lt__": {
+            "args": ["int", "int"],
+            "type": "bool"
+        },
+        "__le__": {
+            "args": ["int", "int"],
+            "type": "bool"
         }
-    }
+    },
+    "extends": "object"
 },
 "bool": {
     "functions": {
+        "__unbox__": {
+            "args": ["bool"],
+            "type": "__prim__bool"
+        },
         "__bool__": {
             "args": ["bool"],
             "type": "bool"
         },
-        "__box__": {
-            "args": ["bool"],
-            "type": "__boxed_bool"
+        "__eq__": {
+            "args": ["bool", "object"],
+            "type": "bool"
         }
-    }
+    },
+    "extends": "int"
 },
 "NoneType": {
     "functions": {
@@ -251,23 +293,22 @@
     },
     "extends": "object"
 },
-"__boxed_int": {
+"__prim__int": {
     "functions": {
-        "__unbox__": {
-            "args": ["__boxed_int"],
+        "__box__": {
+            "args": ["__prim__int"],
             "type": "int"
         }
     },
     "extends": "object"
 },
-"__boxed_bool": {
+"__prim__bool": {
     "functions": {
-        "__unbox__": {
-            "args": ["__boxed_bool"],
+        "__box__": {
+            "args": ["__prim__bool"],
             "type": "bool"
         }
-    },
-    "extends": "object"
+    }
 },
 "range": {
     "functions": {

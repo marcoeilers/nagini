@@ -45,8 +45,10 @@ class ExpressionTranslator(CommonTranslator):
 
         # TODO: Update all code to use this flag.
         self._is_expression = False
+        self._target_type = None
 
     def translate_expr(self, node: ast.AST, ctx: Context,
+                       target_type = None,
                        expression: bool = False) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression
@@ -67,18 +69,34 @@ class ExpressionTranslator(CommonTranslator):
 
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        result = visitor(node, ctx)
+        if not target_type:
+            target_type = self.viper.Ref
+        old_target = self._target_type
+        self._target_type = target_type
+        stmt, result = visitor(node, ctx)
+
+        if target_type != result.typ():
+            if target_type == self.viper.Ref:
+                result = self.to_ref(result, ctx)
+            elif target_type == self.viper.Bool:
+                result = self.to_bool(result, ctx, node)
+            elif target_type == self.viper.Int:
+                result = self.to_int(result, ctx)
 
         self._is_expression = old_is_expression
-
-        return result
+        self._target_type = old_target
+        return stmt, result
 
     def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
-        return ([], self.viper.IntLit(node.n, self.to_position(node, ctx),
-                                      self.no_info(ctx)))
+        lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
+                                self.no_info(ctx))
+        int_class = ctx.module.global_module.classes['__prim__' + INT_TYPE]
+        boxed_lit = self.get_function_call(int_class, '__box__', [lit],
+                                           [None], node, ctx)
+        return ([], boxed_lit)
 
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
@@ -192,9 +210,11 @@ class ExpressionTranslator(CommonTranslator):
                             ctx: Context) -> StmtsAndExpr:
         if not isinstance(node.slice, ast.Index):
             raise UnsupportedException(node)
-        target_stmt, target = self.translate_expr(node.value, ctx)
+        target_stmt, target = self.translate_expr(node.value, ctx,
+                                                  target_type=self.viper.Ref)
         target_type = self.get_type(node.value, ctx)
-        index_stmt, index = self.translate_expr(node.slice.value, ctx)
+        index_stmt, index = self.translate_expr(node.slice.value, ctx,
+                                                target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
@@ -318,14 +338,18 @@ class ExpressionTranslator(CommonTranslator):
         """
         stmt, res = self.translate_expr(node, ctx, expression)
         type = self.get_type(node, ctx)
-        if type is ctx.module.global_module.classes[BOOL_TYPE]:
-            return stmt, res
-        args = [res]
-        arg_type = self.get_type(node, ctx)
-        arg_types = [arg_type]
-        call = self.get_function_call(arg_type, '__bool__', args, arg_types,
-                                      node, ctx)
-        return stmt, call
+        bool_class = ctx.module.global_module.classes[BOOL_TYPE]
+        if type is not bool_class:
+            # return stmt, res
+            args = [res]
+            arg_type = self.get_type(node, ctx)
+            arg_types = [arg_type]
+            res = self.get_function_call(arg_type, '__bool__', args, arg_types,
+                                         node, ctx)
+        if res.typ() != self.viper.Bool:
+            res = self.get_function_call(bool_class, '__unbox__', [res], [None],
+                                         node, ctx)
+        return stmt, res
 
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
@@ -399,7 +423,8 @@ class ExpressionTranslator(CommonTranslator):
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
-            stmt, receiver = self.translate_expr(node.value, ctx)
+            stmt, receiver = self.translate_expr(node.value, ctx,
+                                                 target_type=self.viper.Ref)
             field = self._lookup_field(node, ctx)
             if isinstance(field, PythonVar):
                 type = self.translate_type(field.type, ctx)
@@ -414,10 +439,12 @@ class ExpressionTranslator(CommonTranslator):
     def translate_UnaryOp(self, node: ast.UnaryOp,
                           ctx: Context) -> StmtsAndExpr:
         if isinstance(node.op, ast.Not):
-            stmt, expr = self.translate_to_bool(node.operand, ctx)
+            stmt, expr = self.translate_expr(node.operand, ctx,
+                                             target_type=self.viper.Bool)
             return (stmt, self.viper.Not(expr, self.to_position(node, ctx),
                                          self.no_info(ctx)))
-        stmt, expr = self.translate_expr(node.operand, ctx)
+        stmt, expr = self.translate_expr(node.operand, ctx,
+                                         target_type=self.viper.Int)
         if isinstance(node.op, ast.USub):
             return (stmt, self.viper.Minus(expr, self.to_position(node, ctx),
                                            self.no_info(ctx)))
@@ -426,9 +453,12 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
-        cond_stmt, cond = self.translate_to_bool(node.test, ctx)
-        then_stmt, then = self.translate_expr(node.body, ctx)
-        else_stmt, else_ = self.translate_expr(node.orelse, ctx)
+        cond_stmt, cond = self.translate_expr(node.test, ctx,
+                                              target_type=self.viper.Bool)
+        then_stmt, then = self.translate_expr(node.body, ctx,
+                                              target_type=self._target_type)
+        else_stmt, else_ = self.translate_expr(node.orelse, ctx,
+                                               target_type=self._target_type)
         if then_stmt or else_stmt:
             then_block = self.translate_block(then_stmt, position,
                                               self.no_info(ctx))
@@ -504,7 +534,7 @@ class ExpressionTranslator(CommonTranslator):
             compare_func = '__le__'
         else:
             raise UnsupportedException(node.ops[0])
-        if left_type.name in {INT_TYPE, BOOL_TYPE}:
+        if False and left_type.name in {INT_TYPE, BOOL_TYPE}:
             if right_type.name not in {INT_TYPE, BOOL_TYPE}:
                 # This comparison will either raise an error or always
                 # yield the same result (if we check for equality), so we
@@ -524,7 +554,8 @@ class ExpressionTranslator(CommonTranslator):
                                               [left, right],
                                               [left_type, right_type],
                                               node, ctx)
-                comparison = self.viper.Not(call, position, info)
+                comparison = self.viper.Not(self.to_bool(call, ctx, node.left),
+                                            position, info)
             else:
                 raise InvalidProgramException(node, 'undefined.comparison')
         return stmts, comparison
@@ -554,7 +585,7 @@ class ExpressionTranslator(CommonTranslator):
         expression_parts = []
         for value in node.values:
             statements_part, expression_part = self.translate_expr(
-                value, ctx)
+                value, ctx, target_type=self.viper.Bool)
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)

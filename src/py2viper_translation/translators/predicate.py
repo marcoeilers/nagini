@@ -68,6 +68,7 @@ class PredicateTranslator(CommonTranslator):
             stmt, current = self.translate_expr(
                     instance.node.body[0],
                     ctx,
+                    target_type=self.viper.Bool,
                     expression=True)
             if stmt:
                 raise InvalidProgramException(instance.node,
