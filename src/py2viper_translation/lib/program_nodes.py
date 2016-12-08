@@ -403,7 +403,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                         requires.add(target.sil_name)
                     else:
                         requires.add(r)
-                translator.prog_translator.required_names[m.sil_name] = requires
+                translator.set_required_names(m.sil_name,  requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -614,6 +614,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.method_type = method_type
         self.obligation_info = None
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
+        self.requires = []
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

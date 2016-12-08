@@ -31,10 +31,14 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-from typing import List, Tuple
+from typing import List, Set, Tuple
 
 
 class ProgramTranslator(CommonTranslator):
+    def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,
+                 type_info: 'TypeInfo', viper_ast: 'ViperAST') -> None:
+        super().__init__(config, jvm, source_file, type_info, viper_ast)
+        self.required_names = {}
 
     def translate_field(self, field: PythonField,
                         ctx: Context) -> 'silver.ast.Field':
@@ -347,8 +351,13 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_info(ctx)))
         return fields
 
-    def _get_all_used_names(self):
-        used_names = set()
+    def _get_all_used_names(self, initial: Set[str]) -> None:
+        """
+        Calculates the names of all methods and functions used by the program,
+        based on the names reported to be used by the viper_ast module, adding
+        those to the given set.
+        """
+        used_names = initial
         to_add = list(self.viper.used_names)
         index = 0
         while index < len(to_add):
@@ -358,7 +367,6 @@ class ProgramTranslator(CommonTranslator):
                 if current in self.required_names:
                     to_add.extend(self.required_names[current])
             index = index + 1
-        return used_names
 
     def _convert_silver_elements(self, sil_progs: List[Program],
                                  ctx: Context) -> Tuple[List[Domain],
@@ -375,7 +383,12 @@ class ProgramTranslator(CommonTranslator):
         predicates = []
         methods = []
 
-        used_names = self._get_all_used_names()
+        used_names = set()
+        self._get_all_used_names(used_names)
+
+        # Reset used names set, we only need the additional ones used by the
+        # upcoming method transformation.
+        self.viper.used_names = set()
         for sil_prog in sil_progs:
             for method in self.viper.to_list(sil_prog.methods()):
                 if method.name() in used_names:
@@ -393,7 +406,8 @@ class ProgramTranslator(CommonTranslator):
                     )
                     methods.append(converted_method)
 
-        used_names = self._get_all_used_names()
+        # Add names used by method transformation.
+        self._get_all_used_names(used_names)
 
         for sil_prog in sil_progs:
             domains += [d for d in self.viper.to_list(sil_prog.domains())
