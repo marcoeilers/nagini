@@ -34,7 +34,7 @@ class ContractTranslator(CommonTranslator):
 
     def translate_contract_Call(self, node: ast.Call, ctx: Context) -> Expr:
         if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
-            stmt, res = self.translate_expr(node.args[0], ctx)
+            stmt, res = self.translate_expr(node.args[0], ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(node, 'purity.violated')
             return res
@@ -184,7 +184,7 @@ class ContractTranslator(CommonTranslator):
         Translates a call to Assert().
         """
         assert len(node.args) == 1
-        stmt, expr = self.translate_expr(node.args[0], ctx)
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool)
         assertion = self.viper.Assert(expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return stmt + [assertion], None
@@ -195,8 +195,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        cond_stmt, cond = self.translate_expr(node.args[0], ctx)
-        then_stmt, then = self.translate_expr(node.args[1], ctx)
+        cond_stmt, cond = self.translate_to_bool(node.args[0], ctx)
+        then_stmt, then = self.translate_to_bool(node.args[1], ctx)
         implication = self.viper.Implies(cond, then,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -219,7 +219,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -262,7 +263,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -279,10 +281,12 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        expr_stmt, expr = self.translate_expr(node.args[1], ctx)
+        expr_stmt, expr = self.translate_expr(node.args[1], ctx,
+                                              self._target_type)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold
@@ -374,7 +378,8 @@ class ContractTranslator(CommonTranslator):
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
+        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                             self.viper.Bool)
 
         triggers = self._translate_triggers(lambda_.body, node, ctx)
 

@@ -337,7 +337,7 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assert(self, node: ast.Assert,
                               ctx: Context) -> List[Stmt]:
-        stmt, expr = self.translate_expr(node.test, ctx)
+        stmt, expr = self.translate_expr(node.test, ctx, self.viper.Bool)
         assertion = self.viper.Assert(expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return stmt + [assertion]

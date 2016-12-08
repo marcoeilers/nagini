@@ -60,8 +60,8 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if 'builtins.' + cls.name in self.builtins:
-            return self.builtins['builtins.' + cls.name]
+        if cls.name.startswith('__prim__') and 'builtins.' + cls.name[8:] in self.builtins:
+            return self.builtins['builtins.' + cls.name[8:]]
         elif cls.name == 'type':
             return self.type_factory.type_type()
         else:

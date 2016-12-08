@@ -49,7 +49,8 @@ class SIFMethodTranslator(MethodTranslator):
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
                 ctx.current_tl_var_expr = None
-                stmt, expr = self.translate_expr(pre, ctx)
+                stmt, expr = self.translate_expr(pre, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -80,7 +81,8 @@ class SIFMethodTranslator(MethodTranslator):
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
                 ctx.current_tl_var_expr = None
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -167,7 +169,8 @@ class SIFMethodTranslator(MethodTranslator):
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)

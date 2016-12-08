@@ -61,7 +61,7 @@ class MethodTranslator(CommonTranslator):
         pres = []
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(pre, ctx)
+                stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -93,7 +93,7 @@ class MethodTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -134,7 +134,7 @@ class MethodTranslator(CommonTranslator):
             ctx.current_contract_exception = exception
             for post, aliases in method.declared_exceptions[exception]:
                 with ctx.additional_aliases(aliases):
-                    stmt, expr = self.translate_expr(post, ctx)
+                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
                 if stmt:
                     raise InvalidProgramException(post, 'purity.violated')
                 expr = self.viper.Implies(condition, expr,
@@ -233,7 +233,7 @@ class MethodTranslator(CommonTranslator):
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)

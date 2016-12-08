@@ -80,6 +80,60 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
+    def to_ref(self, e: Expr, ctx: Context) -> Expr:
+        result = e
+        if e.typ() == self.viper.Int:
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'int___unbox__'):
+                result = e.args().get(0)
+            else:
+                prim_int = ctx.module.global_module.classes['__prim__int']
+                result = self.get_function_call(prim_int, '__box__',
+                                                [result], [None], node, ctx)
+        elif e.typ() == self.viper.Bool:
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'bool___unbox__'):
+                result = e.args().get(0)
+            else:
+                prim_bool = ctx.module.global_module.classes['__prim__bool']
+                result = self.get_function_call(prim_bool, '__box__',
+                                                [result], [None], None, ctx)
+        return result
+
+    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
+        if e.typ() == self.viper.Bool:
+            return e
+        assert e.typ() == self.viper.Ref
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                e.funcname() == '__prim__bool___box__'):
+            return e.args().get(0)
+        result = e
+        call_bool = True
+        if node:
+            node_type = self.get_type(node, ctx)
+            if node_type.name == 'bool':
+                call_bool = False
+        if call_bool:
+            result = self.get_function_call(node_type, '__bool__',
+                                            [result], [None], node, ctx)
+        bool_type = ctx.module.global_module.classes['bool']
+        result = self.get_function_call(bool_type, '__unbox__',
+                                        [result], [None], node, ctx)
+        return result
+
+    def to_int(self, e: Expr, ctx: Context) -> Expr:
+        if e.typ() == self.viper.Int:
+            return e
+        assert e.typ() == self.viper.Ref
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == '__prim__int___box__'):
+            return e.args().get(0)
+        result = e
+        int_type = ctx.module.global_module.classes['int']
+        result = self.get_function_call(int_type, '__unbox__',
+                                        [result], [None], None, ctx)
+        return result
+
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
             rules: Rules=None) -> 'silver.ast.Position':
@@ -190,6 +244,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         given types, should be translated as a native Silver operation or
         as a call to a special function.
         """
+        return False
         if left_type.name in {INT_TYPE, BOOL_TYPE}:
             if right_type.name not in {INT_TYPE, BOOL_TYPE}:
                 raise InvalidProgramException(node, 'invalid.operation.type')
@@ -241,14 +296,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         call = self.viper.FuncApp(sil_name, actual_args,
                                   self.to_position(node, ctx),
                                   self.no_info(ctx), type, formal_args)
-        if node and not isinstance(node, ast.Assign):
-            node_type = self.get_type(node, ctx)
-        else:
-            node_type = None
-        if (node_type and node_type in PRIMITIVES and
-                func.type.name not in PRIMITIVES):
-            # Have to unbox
-            call = self.unbox_primitive(call, node_type, node, ctx)
+        # if node and not isinstance(node, ast.Assign):
+        #     node_type = self.get_type(node, ctx)
+        # else:
+        #     node_type = None
+        # if (node_type and node_type in PRIMITIVES and
+        #         func.type.name not in PRIMITIVES):
+        #     # Have to unbox
+        #     call = self.unbox_primitive(call, node_type, node, ctx)
         return call
 
     def get_method_call(self, receiver: PythonType,

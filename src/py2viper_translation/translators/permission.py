@@ -31,8 +31,10 @@ class PermTranslator(CommonTranslator):
 
     def translate_perm_BinOp(self, node: ast.BinOp, ctx: Context) -> Expr:
         if isinstance(node.op, ast.Div):
-            left_stmt, left = self.translate_expr(node.left, ctx)
-            right_stmt, right = self.translate_expr(node.right, ctx)
+            left_stmt, left = self.translate_expr(node.left, ctx,
+                                                  self.viper.Int)
+            right_stmt, right = self.translate_expr(node.right, ctx,
+                                                    self.viper.Int)
             if left_stmt or right_stmt:
                 raise InvalidProgramException(node, 'purity.violated')
             return self.viper.FractionalPerm(left, right,
