@@ -206,6 +206,7 @@ class Analyzer(ast.NodeVisitor):
         Performs preprocessing on the result of the analysis, which infers some
         things, creates some data structures for the translation etc.
         """
+        translator.prog_translator.required_names = {}
         self.module.global_module.process(translator)
         for module in self.modules.values():
             module.process(translator)
@@ -260,6 +261,10 @@ class Analyzer(ast.NodeVisitor):
             method.type = self.find_or_create_class(if_method['type'])
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
+        if if_method.get('requires'):
+            method.requires = if_method['requires']
+        else:
+            method.requires = []
         if predicate:
             cls.predicates[method_name] = method
         elif pure:
