@@ -351,11 +351,11 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_info(ctx)))
         return fields
 
-    def _get_all_used_names(self, initial: Set[str]) -> None:
+    def _add_all_used_names(self, initial: Set[str]) -> None:
         """
         Calculates the names of all methods and functions used by the program,
-        based on the names reported to be used by the viper_ast module, adding
-        those to the given set.
+        based on the names reported to be used by the viper_ast module, and adds
+        them to the given set.
         """
         used_names = initial
         to_add = list(self.viper.used_names)
@@ -384,7 +384,7 @@ class ProgramTranslator(CommonTranslator):
         methods = []
 
         used_names = set()
-        self._get_all_used_names(used_names)
+        self._add_all_used_names(used_names)
 
         # Reset used names set, we only need the additional ones used by the
         # upcoming method transformation.
@@ -407,7 +407,7 @@ class ProgramTranslator(CommonTranslator):
                     methods.append(converted_method)
 
         # Add names used by method transformation.
-        self._get_all_used_names(used_names)
+        self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
             domains += [d for d in self.viper.to_list(sil_prog.domains())
