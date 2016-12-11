@@ -395,15 +395,15 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if self.interface:
             all_methods = list(self.functions.values())
             all_methods.extend(self.methods.values())
-            for m in all_methods:
+            for method in all_methods:
                 requires = set()
-                for r in m.requires:
-                    target = self.get_func_or_method(r)
+                for requirement in method.requires:
+                    target = self.get_func_or_method(requirement)
                     if target:
                         requires.add(target.sil_name)
                     else:
-                        requires.add(r)
-                translator.set_required_names(m.sil_name,  requires)
+                        requires.add(requirement)
+                translator.set_required_names(method.sil_name, requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
