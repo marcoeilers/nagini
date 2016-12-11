@@ -408,14 +408,19 @@ class ProgramTranslator(CommonTranslator):
 
         # Some obligation-related functions may only be used by the code added
         # by the method conversion we just performed, so we have to add
-        # the names which have been used in the meantime.
+        # the names which have been used in the meantime. This works assuming
+        # that the converted code does not introduce additional method
+        # requirements (which should never be the case).
         self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
-            domains += [d for d in self.viper.to_list(sil_prog.domains())
-                        if d.name() != 'PyType']
-            functions += [f for f in self.viper.to_list(sil_prog.functions())
-                          if f.name() in used_names]
+            domains += [domain
+                        for domain in self.viper.to_list(sil_prog.domains())
+                        if domain.name() != 'PyType']
+            functions += [
+                function
+                for function in self.viper.to_list(sil_prog.functions())
+                if function.name() in used_names]
             predicates += self.viper.to_list(sil_prog.predicates())
 
         return domains, predicates, functions, methods
