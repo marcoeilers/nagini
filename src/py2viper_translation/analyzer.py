@@ -260,6 +260,8 @@ class Analyzer(ast.NodeVisitor):
             method.type = self.find_or_create_class(if_method['type'])
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
+        if if_method.get('requires'):
+            method.requires = if_method['requires']
         if predicate:
             cls.predicates[method_name] = method
         elif pure:
