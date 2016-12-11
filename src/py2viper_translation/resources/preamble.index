@@ -14,7 +14,8 @@
         "__setitem__": {
             "args": ["list", "int", "object"],
             "type": null,
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__len__"]
         },
         "__iter__": {
             "args": ["list"],
@@ -25,7 +26,8 @@
     "functions": {
         "__getitem__": {
             "args": ["list", "int"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__len__"]
         },
         "__contains__": {
             "args": ["list", "object"],
@@ -62,7 +64,8 @@
         "__iter__": {
             "args": ["set"],
             "type": "Iterator",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__sil__seq__"]
         }
     },
     "functions": {
@@ -77,6 +80,10 @@
         "__len__": {
             "args": ["set"],
             "type": "int"
+        },
+        "__sil__seq__": {
+            "args": ["set"],
+            "type": null
         }
     },
     "extends": "object"
@@ -96,17 +103,20 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null,
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__getitem__", "__contains__"]
         },
         "__iter__": {
             "args": ["dict"],
             "type": "Iterator",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__sil__seq__"]
         },
         "values": {
             "args": ["dict"],
             "type": "set",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__contains__", "__getitem__"]
         }
     },
     "functions": {
@@ -116,7 +126,8 @@
         },
         "__getitem__": {
             "args": ["dict", "object"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__contains__"]
         },
         "get": {
             "args": ["dict", "object"],
@@ -130,6 +141,10 @@
         "__len__": {
             "args": ["dict"],
             "type": "int"
+        },
+        "__sil__seq__": {
+            "args": ["dict"],
+            "type": null
         }
     },
     "extends": "object"
@@ -158,7 +173,8 @@
         },
         "__box__": {
             "args": ["int"],
-            "type": "__boxed_int"
+            "type": "__boxed_int",
+            "requires": ["__boxed_int___unbox__"]
         }
     }
 },
@@ -170,7 +186,8 @@
         },
         "__box__": {
             "args": ["bool"],
-            "type": "__boxed_bool"
+            "type": "__boxed_bool",
+            "requires": ["__boxed_bool___unbox__"]
         }
     }
 },
@@ -193,7 +210,8 @@
         },
         "__bool__": {
             "args": ["str"],
-            "type": "bool"
+            "type": "bool",
+            "requires": ["__len__"]
         },
         "__eq__": {
             "args": ["str", "object"],
@@ -201,11 +219,17 @@
         },
         "__add__": {
             "args": ["str", "str"],
-            "type": "str"
+            "type": "str",
+            "requires": ["__len__"]
         },
         "__create__": {
             "args": ["int", "int"],
-            "type": "str"
+            "type": "str",
+            "requires": ["__len__", "__val__"]
+        },
+        "__val__": {
+            "args": ["str"],
+            "type": "int"
         }
     },
     "extends": "object"
@@ -214,38 +238,51 @@
     "functions": {
         "__create0__": {
             "args": [],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__"]
         },
         "__create1__": {
             "args": ["object", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create2__": {
             "args": ["object", "object", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create3__": {
             "args": ["object", "object", "object", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create4__": {
             "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create5__": {
             "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create6__": {
             "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__getitem__": {
             "args": ["tuple", "int"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__len__"]
         },
         "__len__": {
             "args": ["tuple"],
+            "type": "int",
+            "requires": ["__len__unknown"]
+        },
+        "__len__unknown": {
+            "args": ["str"],
             "type": "int"
         }
     },
@@ -255,7 +292,8 @@
     "functions": {
         "__unbox__": {
             "args": ["__boxed_int"],
-            "type": "int"
+            "type": "int",
+            "requires": ["int___box__"]
         }
     },
     "extends": "object"
@@ -264,7 +302,8 @@
     "functions": {
         "__unbox__": {
             "args": ["__boxed_bool"],
-            "type": "bool"
+            "type": "bool",
+            "requires": ["bool___box__"]
         }
     },
     "extends": "object"
@@ -273,11 +312,13 @@
     "functions": {
         "__create__": {
             "args": ["int", "int"],
-            "type": "range"
+            "type": "range",
+            "requires": ["__len__", "__contains__", "__getitem__", "int___box__"]
         },
         "__getitem__": {
             "args": ["range", "int"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__len__"]
         },
         "__contains__": {
             "args": ["range", "object"],
@@ -291,9 +332,10 @@
             "args": ["range"],
             "type": "bool"
         },
-        "__sil_set__": {
+        "__sil_seq__": {
             "args": ["range"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__contains__", "__len__"]
         }
     },
     "extends": "object"

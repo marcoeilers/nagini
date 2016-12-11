@@ -30,6 +30,7 @@ class ViperAST:
         self.scala = scala
         self.jvm = jvm
         self.nodes = {}
+        self.used_names = set()
 
         def getconst(name):
             return getobject(ast, name)
@@ -199,8 +200,9 @@ class ViperAST:
     def TypeVar(self, name):
         return self.ast.TypeVar(name)
 
-    def MethodCall(self, methodname, args, targets, position, info):
-        return self.ast.MethodCall(methodname, self.to_seq(args),
+    def MethodCall(self, method_name, args, targets, position, info):
+        self.used_names.add(method_name)
+        return self.ast.MethodCall(method_name, self.to_seq(args),
                                    self.to_seq(targets), position, info)
 
     def NewStmt(self, lhs, fields, position, info):
@@ -322,6 +324,7 @@ class ViperAST:
         return self.ast.Implies(left, right, position, info)
 
     def FuncApp(self, name, args, position, info, type, formalargs):
+        self.used_names.add(name)
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.to_seq(formalargs))
 
