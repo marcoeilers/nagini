@@ -406,7 +406,9 @@ class ProgramTranslator(CommonTranslator):
                     )
                     methods.append(converted_method)
 
-        # Add names used by method transformation.
+        # Some obligation-related functions may only be used by the code added
+        # by the method conversion we just performed, so we have to add
+        # the names which have been used in the meantime.
         self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
