@@ -316,6 +316,7 @@ class TypeTranslator(CommonTranslator):
         If 'inhale_exhale' is True, then this information (minus number of type
         arguments) will only be inhaled, not checked.
         """
+        inhale_exhale = False
         true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         if type.name == UNION_TYPE:
             # Special case for union types: We don't want Union to show up
@@ -386,6 +387,7 @@ class TypeTranslator(CommonTranslator):
         for simple types, or include information about type arguments for
         generic types, or things like the lengths for tuples.
         """
+        inhale_exhale = False
         if type is None:
             none_type = ctx.module.global_module.classes['NoneType']
             return self.type_factory.type_check(lhs, none_type, position, ctx)

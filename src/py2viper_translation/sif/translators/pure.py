@@ -185,7 +185,7 @@ class SIFPureTranslator(PureTranslator):
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)
         else:
-            return self.viper.Let(wrapper.var.decl, wrapper.expr,
+            return self.viper.Let(wrapper.var.decl, self.to_bool(wrapper.expr, ctx),
                                   previous, position, info)
 
     def _translate_to_wrappers(self, nodes: List[ast.AST],

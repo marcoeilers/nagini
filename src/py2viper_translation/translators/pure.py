@@ -148,7 +148,7 @@ class PureTranslator(CommonTranslator):
                                   ctx: Context) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
-        val = self._translate_wrapper_expr(wrapper, ctx)
+        val = self.to_ref(self._translate_wrapper_expr(wrapper, ctx), ctx)
         if not previous:
             raise InvalidProgramException(function.node,
                                           'function.return.missing')
@@ -175,7 +175,7 @@ class PureTranslator(CommonTranslator):
                     self.viper.Bool: false,
                     self.viper.Ref: null
                 }
-                old_val = dummies[wrapper.var.decl.typ()]
+                old_val = self.to_ref(dummies[wrapper.var.decl.typ()], ctx)
             new_val = self.viper.CondExp(cond, val, old_val, position,
                                          info)
             return self.viper.Let(wrapper.var.decl, new_val,
@@ -191,7 +191,9 @@ class PureTranslator(CommonTranslator):
         if isinstance(wrapper.expr, BinOpWrapper):
             assert isinstance(wrapper, AssignWrapper)
             stmt, val = self.translate_expr(wrapper.expr.rhs, ctx)
+            val = self.to_int(val, ctx)
             var = ctx.var_aliases[wrapper.name].ref()
+            var = self.to_int(var, ctx)
             if isinstance(wrapper.expr.op, ast.Add):
                 val = self.viper.Add(var, val, position, info)
             elif isinstance(wrapper.expr.op, ast.Sub):
@@ -280,7 +282,7 @@ class PureTranslator(CommonTranslator):
         previous = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         for cond in conds:
             if isinstance(cond, NotWrapper):
-                current = ctx.var_aliases.get(cond.cond).ref()
+                current = self.to_bool(ctx.var_aliases.get(cond.cond).ref(), ctx)
                 current = self.viper.Not(current, self.no_position(ctx),
                                          self.no_info(ctx))
             else:

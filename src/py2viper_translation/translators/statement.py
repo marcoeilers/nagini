@@ -502,7 +502,8 @@ class StatementTranslator(CommonTranslator):
                 raise UnsupportedException(node)
             target_cls = self.get_type(lhs.value, ctx)
             lhs_stmt, target = self.translate_expr(lhs.value, ctx)
-            ind_stmt, index = self.translate_expr(lhs.slice.value, ctx)
+            ind_stmt, index = self.translate_expr(lhs.slice.value, ctx,
+                                                  target_type=self.viper.Int)
             index_type = self.get_type(lhs.slice.value, ctx)
 
             args = [target, index, rhs]

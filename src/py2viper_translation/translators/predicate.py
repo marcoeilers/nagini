@@ -21,9 +21,15 @@ class PredicateTranslator(CommonTranslator):
         assert ctx.current_function is None
         ctx.current_function = pred
         args = []
-        for arg in pred.args:
-            args.append(pred.args[arg].decl)
-        body = self.translate_exprs(pred.node.body, pred, ctx)
+        arg_types = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        for name, arg in pred.args.items():
+            args.append(arg.decl)
+            arg_type = self.type_check(arg.ref(), arg.type, self.no_position(ctx), ctx)
+            arg_types = self.viper.And(arg_types, arg_type,
+                                       self.no_position(ctx), self.no_info(ctx))
+        body = self.to_bool(self.translate_exprs(pred.node.body, pred, ctx), ctx)
+        body = self.viper.And(arg_types, body, self.no_position(ctx),
+                              self.no_info(ctx))
         ctx.current_function = None
         return self.viper.Predicate(pred.sil_name, args, body,
                                     self.to_position(pred.node, ctx),
@@ -45,8 +51,13 @@ class PredicateTranslator(CommonTranslator):
         name = root.sil_name
         args = []
         self_var_ref = root.args[next(iter(root.args))].ref()
-        for arg in root.args:
-            args.append(root.args[arg].decl)
+        arg_types = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        for arg in root.args.values():
+            args.append(arg.decl)
+            arg_type = self.type_check(arg.ref(), arg.type,
+                                       self.no_position(ctx), ctx)
+            arg_types = self.viper.And(arg_types, arg_type,
+                                       self.no_position(ctx), self.no_info(ctx))
         body = None
         assert not ctx.var_aliases
         for instance in sorted:
@@ -86,6 +97,8 @@ class PredicateTranslator(CommonTranslator):
             else:
                 body = implication
         ctx.var_aliases = {}
+        body = self.viper.And(arg_types, body, self.no_position(ctx),
+                              self.no_info(ctx))
         return self.viper.Predicate(name, args, body,
                                     self.to_position(root.node, ctx),
                                     self.no_info(ctx))
