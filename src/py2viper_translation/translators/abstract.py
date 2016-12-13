@@ -84,10 +84,10 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.expr_translator.translate_expr(
             node, ctx, target_type, expression)
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context,
-                          expression: bool = False) -> StmtsAndExpr:
-        return self.config.expr_translator.translate_to_bool(
-            node, ctx, expression)
+    # def translate_to_bool(self, node: ast.AST, ctx: Context,
+    #                       expression: bool = False) -> StmtsAndExpr:
+    #     return self.config.expr_translator.translate_to_bool(
+    #         node, ctx, expression)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)

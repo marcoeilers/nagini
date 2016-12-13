@@ -195,8 +195,10 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        cond_stmt, cond = self.translate_to_bool(node.args[0], ctx)
-        then_stmt, then = self.translate_to_bool(node.args[1], ctx)
+        cond_stmt, cond = self.translate_expr(node.args[0], ctx,
+                                              target_type=self.viper.Bool)
+        then_stmt, then = self.translate_expr(node.args[1], ctx,
+                                              target_type=self.viper.Bool)
         implication = self.viper.Implies(cond, then,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -405,6 +407,11 @@ class ContractTranslator(CommonTranslator):
                 triggers = [lhs_trigger] + triggers
             except Exception:
                 pass
+        var_type_check = self.type_check(var.ref(), var.type,
+                                         self.no_position(ctx), ctx, False)
+        implication = self.viper.Implies(var_type_check, implication,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))

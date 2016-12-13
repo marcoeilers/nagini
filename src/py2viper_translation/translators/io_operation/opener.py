@@ -165,7 +165,9 @@ class Opener:
         forbidden inside IO operations.
         """
         statements, body_expression = self._translator.translate_expr(
-            self._operation.get_body(), self._ctx, expression=True)
+            self._operation.get_body(), self._ctx,
+            target_type=self._translator.viper.Bool,
+            expression=True)
         assert not statements
         return body_expression
 

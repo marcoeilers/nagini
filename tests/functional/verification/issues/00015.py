@@ -15,6 +15,7 @@ class B(C):
         return 2
 
 
+#:: ExpectedOutput(postcondition.violated:assertion.false)
 def test(c: C) -> int:
     Requires(c is not None)
     if (isinstance(c, A) and c.a() == 1) or (isinstance(c, B) and c.b() == 2):

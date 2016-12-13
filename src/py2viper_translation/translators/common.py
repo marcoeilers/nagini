@@ -85,15 +85,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if e.typ() == self.viper.Int:
             if (isinstance(e, self.viper.ast.FuncApp) and
                     e.funcname() == 'int___unbox__'):
-                result = e.args().get(0)
+                result = e.args().head()
             else:
                 prim_int = ctx.module.global_module.classes['__prim__int']
                 result = self.get_function_call(prim_int, '__box__',
-                                                [result], [None], node, ctx)
+                                                [result], [None], None, ctx)
         elif e.typ() == self.viper.Bool:
             if (isinstance(e, self.viper.ast.FuncApp) and
                     e.funcname() == 'bool___unbox__'):
-                result = e.args().get(0)
+                result = e.args().head()
             else:
                 prim_bool = ctx.module.global_module.classes['__prim__bool']
                 result = self.get_function_call(prim_bool, '__box__',
@@ -103,31 +103,34 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
         if e.typ() == self.viper.Bool:
             return e
-        assert e.typ() == self.viper.Ref
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
         if (isinstance(e, self.viper.ast.FuncApp) and
                 e.funcname() == '__prim__bool___box__'):
-            return e.args().get(0)
+            return e.args().head()
         result = e
         call_bool = True
         if node:
             node_type = self.get_type(node, ctx)
             if node_type.name == 'bool':
                 call_bool = False
-        if call_bool:
-            result = self.get_function_call(node_type, '__bool__',
+            if call_bool:
+                result = self.get_function_call(node_type, '__bool__',
+                                                [result], [None], node, ctx)
+        if result.typ() != self.viper.Bool:
+            bool_type = ctx.module.global_module.classes['bool']
+            result = self.get_function_call(bool_type, '__unbox__',
                                             [result], [None], node, ctx)
-        bool_type = ctx.module.global_module.classes['bool']
-        result = self.get_function_call(bool_type, '__unbox__',
-                                        [result], [None], node, ctx)
         return result
 
     def to_int(self, e: Expr, ctx: Context) -> Expr:
         if e.typ() == self.viper.Int:
             return e
-        assert e.typ() == self.viper.Ref
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
         if (isinstance(e, self.viper.ast.FuncApp) and
                     e.funcname() == '__prim__int___box__'):
-            return e.args().get(0)
+            return e.args().head()
         result = e
         int_type = ctx.module.global_module.classes['int']
         result = self.get_function_call(int_type, '__unbox__',
@@ -283,12 +286,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
             formal_args.append(param.decl)
-            if (type and type.name in PRIMITIVES and
-                    param.type.name not in PRIMITIVES):
-                # Have to box
-                actual_arg = self.box_primitive(arg, type, None, ctx)
+            if param.type.name == '__prim__bool':
+                actual_arg = self.to_bool(arg, ctx)
+            elif param.type.name == '__prim__int':
+                actual_arg = self.to_int(arg, ctx)
             else:
-                actual_arg = arg
+                actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name

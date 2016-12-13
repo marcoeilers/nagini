@@ -586,6 +586,8 @@ class ExpressionTranslator(CommonTranslator):
         for value in node.values:
             statements_part, expression_part = self.translate_expr(
                 value, ctx, target_type=self.viper.Bool)
+            if expression_part.typ() != self.viper.Bool:
+                print("34")
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)

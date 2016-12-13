@@ -1031,7 +1031,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_module().global_module.classes[INT_TYPE]
+        int_type = self.method.get_module().global_module.classes['__prim__' + INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)

@@ -29,15 +29,15 @@
         },
         "__contains__": {
             "args": ["list", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__len__": {
             "args": ["list"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__bool__": {
             "args": ["list"],
-            "type": "bool"
+            "type": "__prim__bool"
         }
     },
     "extends": "object"
@@ -68,15 +68,15 @@
     "functions": {
         "__contains__": {
             "args": ["dict", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__bool__": {
             "args": ["set"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__len__": {
             "args": ["set"],
-            "type": "int"
+            "type": "__prim__int"
         }
     },
     "extends": "object"
@@ -112,7 +112,7 @@
     "functions": {
         "__contains__": {
             "args": ["dict", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__getitem__": {
             "args": ["dict", "object"],
@@ -125,11 +125,11 @@
         },
         "__bool__": {
             "args": ["dict"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__len__": {
             "args": ["dict"],
-            "type": "int"
+            "type": "__prim__int"
         }
     },
     "extends": "object"
@@ -138,11 +138,11 @@
     "functions": {
         "__bool__": {
             "args": ["object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__eq__": {
             "args": ["object", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__cast__": {
             "args": ["type", "object"],
@@ -154,47 +154,51 @@
     "functions": {
         "__bool__": {
             "args": ["__prim__int"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__unbox__": {
             "args": ["int"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__eq__": {
             "args": ["int", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__sub__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__mul__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__floordiv__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "int"
+            "type": "__prim__int"
+        },
+        "__mod__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
         },
         "__ge__": {
-            "args": ["int", "int"],
-            "type": "bool"
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__bool"
         },
         "__gt__": {
-            "args": ["int", "int"],
-            "type": "bool"
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__bool"
         },
         "__lt__": {
-            "args": ["int", "int"],
-            "type": "bool"
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__bool"
         },
         "__le__": {
-            "args": ["int", "int"],
-            "type": "bool"
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__bool"
         }
     },
     "extends": "object"
@@ -207,11 +211,11 @@
         },
         "__bool__": {
             "args": ["bool"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__eq__": {
             "args": ["bool", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         }
     },
     "extends": "int"
@@ -220,7 +224,7 @@
     "functions": {
         "__bool__": {
             "args": ["object"],
-            "type": "bool"
+            "type": "__prim__bool"
         }
     }
 },
@@ -231,22 +235,22 @@
     "functions": {
         "__len__": {
             "args": ["str"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__bool__": {
             "args": ["str"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__eq__": {
             "args": ["str", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__add__": {
             "args": ["str", "str"],
             "type": "str"
         },
         "__create__": {
-            "args": ["int", "int"],
+            "args": ["__prim__int", "__prim__int"],
             "type": "str"
         }
     },
@@ -283,12 +287,12 @@
             "type": "tuple"
         },
         "__getitem__": {
-            "args": ["tuple", "int"],
+            "args": ["tuple", "__prim__int"],
             "type": "object"
         },
         "__len__": {
             "args": ["tuple"],
-            "type": "int"
+            "type": "__prim__int"
         }
     },
     "extends": "object"
@@ -299,8 +303,7 @@
             "args": ["__prim__int"],
             "type": "int"
         }
-    },
-    "extends": "object"
+    }
 },
 "__prim__bool": {
     "functions": {
@@ -313,24 +316,24 @@
 "range": {
     "functions": {
         "__create__": {
-            "args": ["int", "int"],
+            "args": ["__prim__int", "__prim__int"],
             "type": "range"
         },
         "__getitem__": {
-            "args": ["range", "int"],
+            "args": ["range", "__prim__int"],
             "type": "object"
         },
         "__contains__": {
             "args": ["range", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__len__": {
             "args": ["range"],
-            "type": "int"
+            "type": "__prim__int"
         },
         "__bool__": {
             "args": ["range"],
-            "type": "bool"
+            "type": "__prim__bool"
         },
         "__sil_set__": {
             "args": ["range"],
@@ -365,7 +368,7 @@
     "functions": {
         "__eq__": {
             "args": ["Place", "object"],
-            "type": "bool"
+            "type": "__prim__bool"
         }
     },
     "extends": "object"
