@@ -287,8 +287,7 @@ class ContractTranslator(CommonTranslator):
                                               self.viper.Bool)
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        expr_stmt, expr = self.translate_expr(node.args[1], ctx,
-                                              self._target_type)
+        expr_stmt, expr = self.translate_expr(node.args[1], ctx)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold

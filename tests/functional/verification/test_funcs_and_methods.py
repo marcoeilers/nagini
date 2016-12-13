@@ -29,6 +29,7 @@ def func3(x: int, y: int, z: bool) -> bool:
 def func2(arg: int) -> int:
     Ensures(Result() == 48 - 6)
     arg2 = arg
+    local_var12 = True
     while arg2 > 0:
         Invariant(True)
         local_var12 = False
