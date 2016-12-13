@@ -60,7 +60,8 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name.startswith('__prim__') and 'builtins.' + cls.name[8:] in self.builtins:
+        if cls.name.startswith('__prim__'):
+            assert 'builtins.' + cls.name[8:] in self.builtins
             return self.builtins['builtins.' + cls.name[8:]]
         elif cls.name == 'type':
             return self.type_factory.type_type()
@@ -68,6 +69,12 @@ class TypeTranslator(CommonTranslator):
             return self.viper.Ref
 
     def get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
+        result = self._do_get_type(node, ctx)
+        if result.name.startswith('__prim__'):
+            result = ctx.module.global_module.classes[result.name[8:]]
+        return result
+
+    def _do_get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
         """
         Returns the type of the expression represented by node as a PythonClass
         """

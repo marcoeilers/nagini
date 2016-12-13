@@ -1,4 +1,3 @@
-#:: IgnoreFile(/py2viper/issue/44/)
 from typing import Optional
 
 

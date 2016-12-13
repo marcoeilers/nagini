@@ -124,10 +124,12 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         ]
 
         statement, termination_condition = self.translate_expr(
-            operation.get_terminates(), ctx, expression=True)
+            operation.get_terminates(), ctx, target_type=self.viper.Bool,
+            expression=True)
         assert not statement
         statement, termination_measure = self.translate_expr(
-            operation.get_termination_measure(), ctx, expression=True)
+            operation.get_termination_measure(), ctx,
+            target_type=self.viper.Int, expression=True)
         assert not statement
 
         generator = TerminationCheckGenerator(

@@ -55,6 +55,7 @@ class StatementTranslator(CommonTranslator):
         op_stmt, result = self.translate_operator(left, right, left_type,
                                                   right_type, node, ctx)
         stmt += op_stmt
+        result = self.to_ref(result, ctx)
         if isinstance(node.target, ast.Name):
             assign = self.viper.LocalVarAssign(left, result, position, info)
         elif isinstance(node.target, ast.Attribute):
@@ -467,7 +468,8 @@ class StatementTranslator(CommonTranslator):
             raise UnsupportedException(node)
 
     def translate_stmt_If(self, node: ast.If, ctx: Context) -> List[Stmt]:
-        cond_stmt, cond = self.translate_to_bool(node.test, ctx)
+        cond_stmt, cond = self.translate_expr(node.test, ctx,
+                                              target_type=self.viper.Bool)
         then_body = flatten([self.translate_stmt(stmt, ctx)
                              for stmt in node.body])
         then_block = self.translate_block(then_body,
@@ -551,7 +553,8 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
         self.enter_loop_translation(node, ctx)
-        cond_stmt, cond = self.translate_to_bool(node.test, ctx)
+        cond_stmt, cond = self.translate_expr(node.test, ctx,
+                                              target_type=self.viper.Bool)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         invariants = []
@@ -560,8 +563,8 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
         bodyindex = get_body_start_index(node.body)
-        invariants.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
-                                                          ctx))
+        var_types = self._get_havoced_var_type_info(node.body[bodyindex:], ctx)
+        invariants = var_types + invariants
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
         loop = self.create_while_node(

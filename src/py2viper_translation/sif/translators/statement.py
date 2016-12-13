@@ -116,9 +116,11 @@ class SIFStatementTranslator(StatementTranslator):
         pos = self.to_position(condition, ctx)
         info = self.no_info(ctx)
         # Translate condition twice, once normally and once in the prime ctx.
-        cond_stmts, cond = self.translate_to_bool(condition, ctx)
+        cond_stmts, cond = self.translate_expr(condition, ctx,
+                                               target_type=self.viper.Bool)
         with ctx.prime_ctx():
-            cond_stmts_p, cond_p = self.translate_to_bool(condition, ctx)
+            cond_stmts_p, cond_p = self.translate_expr(condition, ctx,
+                                                       target_type=self.viper.Bool)
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)

@@ -133,7 +133,8 @@ class PureTranslator(CommonTranslator):
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)
             if previous:
-                return self.viper.CondExp(cond, val, previous, position, info)
+                return self.viper.CondExp(self.to_bool(cond, ctx), val,
+                                          previous, position, info)
             else:
                 return val
         else:
@@ -284,6 +285,8 @@ class PureTranslator(CommonTranslator):
                                          self.no_info(ctx))
             else:
                 current = ctx.var_aliases.get(cond).ref()
-            previous = self.viper.And(previous, current, self.no_position(ctx),
+            previous = self.viper.And(self.to_bool(previous, ctx),
+                                      self.to_bool(current, ctx),
+                                      self.no_position(ctx),
                                       self.no_info(ctx))
         return previous
