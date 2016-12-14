@@ -15,7 +15,10 @@ from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
-from py2viper_translation.lib.util import InvalidProgramException
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+)
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.program_nodes import SIFProgramNodeFactory
 from py2viper_translation.sif_translator import SIFTranslator
@@ -275,6 +278,8 @@ def translate_and_verify(python_file, jvm, args):
             for msg in e.messages:
                 print(msg)
         sys.exit(2)
+    except UnsupportedException as e:
+        sys.exit(3)
     except JavaException as e:
         print(e.stacktrace())
         raise e

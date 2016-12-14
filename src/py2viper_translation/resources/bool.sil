@@ -25,8 +25,8 @@ function __prim__int___box__(prim: Int): Ref
 
 function int___unbox__(box: Ref): Int
     requires issubtype(typeof(box), int())
-    ensures typeof(box) == int() ==> __prim__int___box__(result) == box
-    ensures typeof(box) == bool() ==> __prim__bool___box__(result != 0) == box
+    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
 
 function __prim__bool___box__(prim: Bool): Ref
     ensures typeof(result) == bool()
@@ -98,25 +98,30 @@ function int___mod__(self: Int, other: Int): Int
     self % other
 }
 
-function range___create__(start: Int, len: Int): Ref
-    requires len >= 0
-    ensures range___len__(result) == len
+function range___create__(start: Int, stop: Int): Ref
+    requires stop > start
+    ensures range___val__(result) == [start..stop)
+    //ensures range___len__(result) == len
     ensures typeof(result) == range()
-    ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == __prim__int___box__(start + i)))
-    ensures forall i: Int :: {range___contains__(result, __prim__int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, __prim__int___box__(i))))
+    //ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == __prim__int___box__(start + i)))
+    //ensures forall i: Int :: {range___contains__(result, __prim__int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, __prim__int___box__(i))))
+
+function range___val__(self: Ref): Seq[Int]
 
 function range___len__(self: Ref): Int
-    ensures result >= 0
+    ensures result == |range___val__(self)|
 
-function range___getitem__(self: Ref, index: Int): Ref
-    requires index >= 0
-    requires index < range___len__(self)
+function range___getitem__(self: Ref, index: Int): Int
+    requires index in range___val__(self)
+    ensures result == range___val__(self)[index]
 
-function range___contains__(self: Ref, item: Ref): Bool
+function range___contains__(self: Ref, item: Int): Bool
+    ensures result == (item in range___val__(self))
 
 function range___sil_seq__(self: Ref) : Seq[Ref]
     ensures |result| == range___len__(self)
-    ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
+    ensures forall i: Int :: ((i>= 0 && i < |range___val__(self)|) ==> result[i] == __prim__int___box__(range___val__(self)[i]))
+    //ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
 
 function object___eq__(self: Ref, other: Ref): Bool
     ensures self == other ==> result

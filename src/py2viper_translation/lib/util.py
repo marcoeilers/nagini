@@ -47,6 +47,7 @@ class UnsupportedException(Exception):
     """
 
     def __init__(self, astElement: ast.AST, desc=""):
+        self.node = astElement
         ex_str = str(astElement)
         if desc:
             ex_str += ': ' + desc

@@ -321,10 +321,10 @@
         },
         "__getitem__": {
             "args": ["range", "__prim__int"],
-            "type": "object"
+            "type": "__prim__int"
         },
         "__contains__": {
-            "args": ["range", "object"],
+            "args": ["range", "__prim__int"],
             "type": "__prim__bool"
         },
         "__len__": {
@@ -335,7 +335,7 @@
             "args": ["range"],
             "type": "__prim__bool"
         },
-        "__sil_set__": {
+        "__sil_seq__": {
             "args": ["range"],
             "type": "object"
         }
