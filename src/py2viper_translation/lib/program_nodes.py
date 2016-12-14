@@ -1429,5 +1429,28 @@ def get_target(node: ast.AST,
                 if node.attr in options:
                     return options[node.attr]
         return None
+    elif isinstance(node, ast.Str):
+        module = [c for c in containers if isinstance(c, PythonModule)][0]
+        return module.global_module.classes['str']
+    elif isinstance(node, ast.Subscript):
+        if isinstance(node.value, ast.Name):
+            module = [c for c in containers if isinstance(c, PythonModule)][0]
+            type_class = None
+            if node.value.id == 'Dict':
+                type_class = module.global_module.classes['dict']
+            if node.value.id == 'Set':
+                type_class = module.global_module.classes['set']
+            if node.value.id == 'List':
+                type_class = module.global_module.classes['list']
+            if node.value.id == 'Tuple':
+                type_class = module.global_module.classes['tuple']
+            if type_class:
+                args = []
+                if isinstance(node.slice.value, ast.Tuple):
+                    args = [get_target(arg, containers, container)
+                            for arg in node.slice.value.elts]
+                else:
+                    assert False
+                return GenericType(type_class, args)
     else:
         return None

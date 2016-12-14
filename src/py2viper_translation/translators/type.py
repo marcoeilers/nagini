@@ -261,7 +261,11 @@ class TypeTranslator(CommonTranslator):
                     if node.func.id == 'isinstance':
                         return ctx.module.global_module.classes[BOOL_TYPE]
                     elif node.func.id == BOOL_TYPE:
-                        return ctx.module.global_module.classes[BOOL_TYPE]hg co
+                        return ctx.module.global_module.classes[BOOL_TYPE]
+                    elif node.func.id == 'cast':
+                        return self.get_target(node.args[0], ctx) # self.get_type(node.args[0], ctx)
+                    else:
+                        raise UnsupportedException(node)
                 if node.func.id in ctx.module.classes:
                     return ctx.module.global_module.classes[node.func.id]
                 elif ctx.module.get_func_or_method(node.func.id) is not None:

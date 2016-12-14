@@ -252,6 +252,20 @@
         "__create__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "str"
+        },
+        "join": {
+            "args": ["str", "list"],
+            "type": "str"
+        },
+        "__mod__": {
+            "args": ["str", "tuple"],
+            "type": "str"
+        }
+    },
+    "methods": {
+        "split": {
+            "args": ["str"],
+            "type": "list"
         }
     },
     "extends": "object"
