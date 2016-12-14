@@ -261,7 +261,7 @@ class TypeTranslator(CommonTranslator):
                     if node.func.id == 'isinstance':
                         return ctx.module.global_module.classes[BOOL_TYPE]
                     elif node.func.id == BOOL_TYPE:
-                        return ctx.module.global_module.classes[BOOL_TYPE]
+                        return ctx.module.global_module.classes[BOOL_TYPE]hg co
                 if node.func.id in ctx.module.classes:
                     return ctx.module.global_module.classes[node.func.id]
                 elif ctx.module.get_func_or_method(node.func.id) is not None:
@@ -345,38 +345,63 @@ class TypeTranslator(CommonTranslator):
             return result
         # Number of type arguments.
         args = type.type_args
+        result = true
         if type.exact_length:
             nargs = len(type.type_args)
             result = self.type_factory.type_nargs_check(lhs, nargs,
                                                         prefix, ctx)
+            for i, arg in enumerate(args):
+                # Include the actual type argument information.
+                lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
+                indices = prefix + [lit]
+
+                if arg.name in PRIMITIVES:
+                    arg = ctx.module.global_module.classes['__boxed_' + arg.name]
+                if arg.name == UNION_TYPE:
+                    check = true
+                else:
+                    check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
+                if inhale_exhale:
+                    check = self.viper.InhaleExhaleExp(check, true,
+                                                       self.no_position(ctx),
+                                                       self.no_info(ctx))
+                result = self.viper.And(result, check, self.no_position(ctx),
+                                        self.no_info(ctx))
+
+                if isinstance(arg, GenericType):
+                    # Recurse to include the type arguments of the type argument.
+                    arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices, ctx,
+                                                             inhale_exhale)
+                    result = self.viper.And(result, arg_nargs,
+                                            self.no_position(ctx),
+                                            self.no_info(ctx))
         else:
-            result = true
-
-        for i, arg in enumerate(args):
-            # Include the actual type argument information.
-            lit = self.viper.IntLit(i, self.no_position(ctx), self.no_info(ctx))
-            indices = prefix + [lit]
-
-            if arg.name in PRIMITIVES:
-                arg = ctx.module.global_module.classes['__boxed_' + arg.name]
-            if arg.name == UNION_TYPE:
-                check = true
-            else:
-                check = self.type_factory.type_arg_check(lhs, arg, indices, ctx)
-            if inhale_exhale:
-                check = self.viper.InhaleExhaleExp(check, true,
-                                                   self.no_position(ctx),
-                                                   self.no_info(ctx))
-            result = self.viper.And(result, check, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-            if isinstance(arg, GenericType):
-                # Recurse to include the type arguments of the type argument.
-                arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices, ctx,
-                                                         inhale_exhale)
-                result = self.viper.And(result, arg_nargs,
+            assert len(args) == 1
+            int_class = ctx.module.global_module.classes['__prim__int']
+            index_var = ctx.actual_function.create_variable('i', int_class,
+                                                            self.translator,
+                                                            False)
+            zero = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
+            ge_zero = self.viper.GeCmp(index_var.ref(), zero,
+                                       self.no_position(ctx), self.no_info(ctx))
+            nargs = self.type_factory.type_nargs(lhs, prefix, ctx)
+            lt_nargs = self.viper.LtCmp(index_var.ref(), nargs,
                                         self.no_position(ctx),
                                         self.no_info(ctx))
+            index_in_bounds = self.viper.And(ge_zero, lt_nargs,
+                                             self.no_position(ctx),
+                                             self.no_info(ctx))
+            indices = prefix + [index_var.ref()]
+            variables = [index_var.decl]
+            check = self.type_factory.type_arg_check(lhs, args[0], indices, ctx)
+            body = self.viper.Implies(index_in_bounds, check,
+                                      self.no_position(ctx), self.no_info(ctx))
+            triggers = [self.viper.Trigger([self.type_factory.type_arg(lhs, indices, ctx)], self.no_position(ctx), self.no_info(ctx))]
+            all_args = self.viper.Forall(variables, triggers, body,
+                                         self.no_position(ctx),
+                                         self.no_info(ctx))
+            result = self.viper.And(result, all_args, self.no_position(ctx),
+                                    self.no_info(ctx))
         return result
 
     def type_check(self, lhs: Expr, type: PythonType,

@@ -328,12 +328,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             raise InvalidProgramException(node, 'unknown.function.called')
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
-            if (type and type.name in PRIMITIVES and
-                    param.type.name not in PRIMITIVES):
-                # Have to box
-                actual_arg = self.box_primitive(arg, type, None, ctx)
+            if param.type.name == '__prim__bool':
+                actual_arg = self.to_bool(arg, ctx)
+            elif param.type.name == '__prim__int':
+                actual_arg = self.to_int(arg, ctx)
             else:
-                actual_arg = arg
+                actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
         sil_name = func.sil_name
         call = self.create_method_call_node(
@@ -473,4 +473,5 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        return do_get_target(node, containers, container)
+        result = do_get_target(node, containers, container)
+        return result

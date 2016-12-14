@@ -2,6 +2,9 @@ domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
     unique function str(): PyType
+    unique function list(): PyType
+    function get_type_arg1(obj: Ref, index: Int): PyType
+    function get_type_nargs0(r: Ref): Int
 }
 
 function str___len__(self: Ref): Int
