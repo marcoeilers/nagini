@@ -7,6 +7,8 @@ domain PyType {
     function get_type_nargs0(r: Ref): Int
 }
 
+field list_acc : Seq[Ref]
+
 function str___len__(self: Ref): Int
 	ensures result >= 0
 
@@ -37,3 +39,4 @@ method str_split(self: Ref) returns (res: Ref)
     ensures issubtype(typeof(res), list())
     ensures get_type_nargs0(res) == 1
     ensures get_type_arg1(res, 0) == str()
+    ensures acc(res.list_acc)

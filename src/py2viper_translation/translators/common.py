@@ -295,7 +295,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             actual_args.append(actual_arg)
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name
-
         call = self.viper.FuncApp(sil_name, actual_args,
                                   self.to_position(node, ctx),
                                   self.no_info(ctx), type, formal_args)
