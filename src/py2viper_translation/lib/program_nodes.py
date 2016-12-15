@@ -5,15 +5,26 @@ import mypy
 from abc import ABCMeta
 from collections import OrderedDict
 from enum import Enum
+from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
+    BUILTINS,
+    DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
     INT_TYPE,
     INTERNAL_NAMES,
+    LIST_TYPE,
+    OBJECT_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVES,
+    RANGE_TYPE,
     RESULT_NAME,
+    SET_TYPE,
     STRING_TYPE,
+    TUPLE_TYPE,
+    UNION_TYPE,
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
@@ -489,6 +500,9 @@ class GenericType(PythonType):
         Returns the predicate with the given name in this class or a superclass.
         """
         return self.get_class().get_predicate(name)
+
+    def issubtype(self, other: PythonType) -> bool:
+        return self.cls.issubtype(other)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, GenericType):
@@ -1382,7 +1396,7 @@ def get_target(node: ast.AST,
         return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
-        lhs = get_target(node.value, containers, container)
+        lhs = get_type(node.value, containers, container)
         if (isinstance(lhs, PythonMethod) or
                 isinstance(lhs, PythonField)):
             # For methods, get the return type, for fields the field type
@@ -1429,9 +1443,6 @@ def get_target(node: ast.AST,
                 if node.attr in options:
                     return options[node.attr]
         return None
-    elif isinstance(node, ast.Str):
-        module = [c for c in containers if isinstance(c, PythonModule)][0]
-        return module.global_module.classes['str']
     elif isinstance(node, ast.Subscript):
         if isinstance(node.value, ast.Name):
             module = [c for c in containers if isinstance(c, PythonModule)][0]
@@ -1454,3 +1465,255 @@ def get_target(node: ast.AST,
                 return GenericType(type_class, args)
     else:
         return None
+
+
+def get_type(node: ast.AST, containers: List[ContainerInterface],
+             container: PythonNode) -> PythonClass:
+    result = _do_get_type(node, containers, container)
+    if isinstance(result, PythonType) and result.name.startswith('__prim__'):
+        module = container.get_module()
+        result = module.global_module.classes[result.name[8:]]
+    return result
+
+# needs current module, current function. so basically needs container. plus containers for get_target call.
+def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
+                 container: PythonNode) -> PythonClass:
+    """
+    Returns the type of the expression represented by node as a PythonClass
+    """
+    if isinstance(container, (PythonIOOperation, PythonMethod)):
+        module = container.get_module()
+        current_function = container
+    else:
+        module = container
+        current_function = None
+    ctxs = [c for c in containers if hasattr(c, 'var_aliases')]
+    ctx = ctxs[0] if ctxs else None
+    target = get_target(node, containers, container)
+    if target:
+        if isinstance(target, PythonVarBase):
+            col = node.col_offset if hasattr(node, 'col_offset') else None
+            key = (node.lineno, col)
+            if key in target.alt_types:
+                return target.alt_types[key]
+            else:
+                return target.type
+        if isinstance(target, PythonMethod):
+            if isinstance(node.func, ast.Attribute):
+                rec_target = get_target(node.func.value, containers, container)
+                if not isinstance(rec_target, PythonModule):
+                    rectype = get_type(node.func.value, containers, container)
+                    if target.generic_type != -1:
+                        return rectype.type_args[target.generic_type]
+            return target.type
+        if isinstance(target, PythonField):
+            return target.type
+        if target:
+            return target
+
+    if isinstance(node, ast.Attribute):
+        receiver = get_type(node.value, containers, container)
+        if receiver:
+            if receiver.name == 'type':
+                receiver = receiver.type_args[0]
+            rec_field = receiver.get_field(node.attr)
+            if not rec_field:
+                return receiver.get_static_field(node.attr)
+            return rec_field.type
+    elif isinstance(node, ast.Name):
+        if node.id in module.global_vars:
+            return module.global_vars[node.id].type
+        else:
+            # Var aliases should never change the type of a variable, but
+            # we might still get alt_type information from them that we
+            # don't get from the normal variable in case where there *is*
+            # no normal variable, lambda arguments.
+            if current_function:
+                var = current_function.get_variable(node.id)
+                if not var and ctx and node.id in ctx.var_aliases:
+                    var = ctx.var_aliases[node.id]
+                col = node.col_offset if hasattr(node, 'col_offset') else None
+                key = (node.lineno, col)
+                if key in var.alt_types:
+                    return var.alt_types[key]
+                else:
+                    return var.type
+    elif isinstance(node, ast.Num):
+        return module.global_module.classes[INT_TYPE]
+    elif isinstance(node, ast.Tuple):
+        args = [get_type(arg, containers, container) for arg in node.elts]
+        return GenericType(module.global_module.classes[TUPLE_TYPE],
+                           args)
+    elif isinstance(node, ast.Subscript):
+        value_type = get_type(node.value, containers, container)
+        if value_type.name == TUPLE_TYPE:
+            if len(value_type.type_args) == 1:
+                return value_type.type_args[0]
+            return value_type.type_args[node.slice.value.n]
+        elif value_type.name == LIST_TYPE:
+            return value_type.type_args[0]
+        elif value_type.name == SET_TYPE:
+            return value_type.type_args[0]
+        elif value_type.name == DICT_TYPE:
+            return value_type.type_args[1]
+        elif value_type.name == RANGE_TYPE:
+            return module.global_module.classes[INT_TYPE]
+        else:
+            raise UnsupportedException(node)
+    elif isinstance(node, ast.Str):
+        return module.global_module.classes[STRING_TYPE]
+    elif isinstance(node, ast.Compare):
+        return module.global_module.classes[BOOL_TYPE]
+    elif isinstance(node, ast.BoolOp):
+        return module.global_module.classes[BOOL_TYPE]
+    elif isinstance(node, ast.List):
+        if node.elts:
+            el_types = [get_type(el, containers, container) for el in node.elts]
+            args = [common_supertype(el_types)]
+        elif node._parent and isinstance(node._parent, ast.Assign):
+            # Empty constructor is assigned to variable;
+            # we get the type of the empty list from the type of the
+            # variable it's assigned to.
+            args = get_type(node._parent.targets[0], containers, container).type_args
+        else:
+            args = [module.global_module.classes[OBJECT_TYPE]]
+        return GenericType(module.global_module.classes[LIST_TYPE],
+                           args)
+    elif isinstance(node, ast.Set):
+        if node.elts:
+            el_types = [get_type(el, containers, container) for el in node.elts]
+            args = [common_supertype(el_types)]
+        elif node._parent and isinstance(node._parent, ast.Assign):
+            # Empty constructor is assigned to variable;
+            # we get the type of the empty set from the type of the
+            # variable it's assigned to.
+            args = get_type(node._parent.targets[0], containers, container).type_args
+        else:
+            args = [module.global_module.classes[OBJECT_TYPE]]
+        return GenericType(module.global_module.classes[SET_TYPE],
+                           args)
+    elif isinstance(node, ast.Dict):
+        if node.keys:
+            key_types = [get_type(key, containers, container) for key in node.keys]
+            val_types = [get_type(val, containers, container) for val in node.values]
+            args = [common_supertype(key_types),
+                    common_supertype(val_types)]
+        elif node._parent and isinstance(node._parent, ast.Assign):
+            # Empty constructor is assigned to variable;
+            # we get the type of the empty dict from the type of the
+            # variable it's assigned to.
+            args = get_type(node._parent.targets[0], containers, container).type_args
+        else:
+            object_class = module.global_module.classes[OBJECT_TYPE]
+            args = [object_class, object_class]
+        return GenericType(module.global_module.classes[DICT_TYPE],
+                           args)
+    elif isinstance(node, ast.IfExp):
+        body_type = get_type(node.body, containers, container)
+        else_type = get_type(node.orelse, containers, container)
+        return pairwise_supertype(body_type, else_type)
+    elif isinstance(node, ast.BinOp):
+        left_type = get_type(node.left, containers, container)
+        right_type = get_type(node.right, containers, container)
+        operator_func = OPERATOR_FUNCTIONS[type(node.op)]
+        return left_type.get_func_or_method(operator_func).type
+    elif isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.Not):
+            return module.global_module.classes[BOOL_TYPE]
+        elif isinstance(node.op, ast.USub):
+            return module.global_module.classes[INT_TYPE]
+        else:
+            raise UnsupportedException(node)
+    elif isinstance(node, ast.NameConstant):
+        if (node.value is True) or (node.value is False):
+            return module.global_module.classes[BOOL_TYPE]
+        elif node.value is None:
+            return module.global_module.classes[OBJECT_TYPE]
+        else:
+            raise UnsupportedException(node)
+    elif isinstance(node, ast.Call):
+        if get_func_name(node) == 'super':
+            if len(node.args) == 2:
+                # if not self.is_valid_super_call(node, ctx):
+                #     raise InvalidProgramException(node,
+                #                                   'invalid.super.call')
+                return module.classes[node.args[0].id].superclass
+            elif not node.args:
+                return current_class.superclass
+            else:
+                raise InvalidProgramException(node, 'invalid.super.call')
+        if get_func_name(node) == 'len':
+            return module.global_module.classes[INT_TYPE]
+        if isinstance(node.func, ast.Name):
+            if node.func.id in CONTRACT_FUNCS:
+                if node.func.id == 'Result':
+                    return current_function.type
+                elif node.func.id == 'RaisedException':
+                    assert ctx
+                    assert ctx.current_contract_exception is not None
+                    return ctx.current_contract_exception
+                elif node.func.id == 'Acc':
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == 'Old':
+                    return get_type(node.args[0], containers, container)
+                elif node.func.id == 'Implies':
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == 'Forall':
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == 'Exists':
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == 'Unfolding':
+                    return get_type(node.args[1], containers, container)
+                elif node.func.id == 'Previous':
+                    arg_type = get_type(node.args[0], containers, container)
+                    list_class = module.global_module.classes[LIST_TYPE]
+                    return GenericType(list_class, [arg_type])
+                else:
+                    raise UnsupportedException(node)
+            elif node.func.id in BUILTINS:
+                if node.func.id == 'isinstance':
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == BOOL_TYPE:
+                    return module.global_module.classes[BOOL_TYPE]
+                elif node.func.id == 'cast':
+                    return get_target(node.args[0],
+                                      containers, container)
+                else:
+                    raise UnsupportedException(node)
+            if node.func.id in module.classes:
+                return module.global_module.classes[node.func.id]
+            elif module.get_func_or_method(node.func.id) is not None:
+                target = module.get_func_or_method(node.func.id)
+                return target.type
+        elif isinstance(node.func, ast.Attribute):
+            rectype = get_type(node.func.value, containers, container)
+            if isinstance(rectype, PythonType):
+                target = rectype.get_func_or_method(node.func.attr)
+                if target.generic_type != -1:
+                    return rectype.type_args[target.generic_type]
+                else:
+                    return target.type
+    else:
+        raise UnsupportedException(node)
+
+
+def common_supertype(types: List[PythonType]) -> PythonType:
+    assert types
+    if len(types) == 1:
+        return types[0]
+    current = types[0]
+    for new in types[1:]:
+        current = pairwise_supertype(current, new)
+    return current
+
+
+def pairwise_supertype(t1: PythonType, t2: PythonType) -> PythonType:
+    if t1.issubtype(t2):
+        return t2
+    if t2.issubtype(t1):
+        return t1
+    if (not t1.superclass and not t2.superclass):
+        return None
+    if not t1.superclass:
+        return pairwise_supertype(t2.superclass, t1)
+    return pairwise_supertype(t2, t1.superclass)
