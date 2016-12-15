@@ -89,7 +89,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 prim_int = ctx.module.global_module.classes['__prim__int']
                 result = self.get_function_call(prim_int, '__box__',
-                                                [result], [None], None, ctx)
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
         elif e.typ() == self.viper.Bool:
             if (isinstance(e, self.viper.ast.FuncApp) and
                     e.funcname() == 'bool___unbox__'):
@@ -97,7 +98,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 prim_bool = ctx.module.global_module.classes['__prim__bool']
                 result = self.get_function_call(prim_bool, '__box__',
-                                                [result], [None], None, ctx)
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
         return result
 
     def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
@@ -116,11 +118,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 call_bool = False
             if call_bool:
                 result = self.get_function_call(node_type, '__bool__',
-                                                [result], [None], node, ctx)
+                                                [result], [None], node, ctx,
+                                                position=e.pos())
         if result.typ() != self.viper.Bool:
             bool_type = ctx.module.global_module.classes['bool']
             result = self.get_function_call(bool_type, '__unbox__',
-                                            [result], [None], node, ctx)
+                                            [result], [None], node, ctx,
+                                            position=e.pos())
         return result
 
     def to_int(self, e: Expr, ctx: Context) -> Expr:
@@ -134,7 +138,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         result = e
         int_type = ctx.module.global_module.classes['int']
         result = self.get_function_call(int_type, '__unbox__',
-                                        [result], [None], None, ctx)
+                                        [result], [None], None, ctx,
+                                        position=e.pos())
         return result
 
     def to_position(
@@ -266,7 +271,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
-                          ctx: Context) -> 'silver.ast.FuncApp':
+                          ctx: Context,
+                          position = None) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments. Boxes arguments if necessary, and
@@ -296,8 +302,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name
 
+        actual_position = position if position else self.to_position(node, ctx)
         call = self.viper.FuncApp(sil_name, actual_args,
-                                  self.to_position(node, ctx),
+                                  actual_position,
                                   self.no_info(ctx), type, formal_args)
         # if node and not isinstance(node, ast.Assign):
         #     node_type = self.get_type(node, ctx)
