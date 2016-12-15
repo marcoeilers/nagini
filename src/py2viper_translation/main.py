@@ -278,8 +278,6 @@ def translate_and_verify(python_file, jvm, args):
             for msg in e.messages:
                 print(msg)
         sys.exit(2)
-    except UnsupportedException as e:
-        sys.exit(3)
     except JavaException as e:
         print(e.stacktrace())
         raise e

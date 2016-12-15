@@ -334,7 +334,7 @@ class StatementTranslator(CommonTranslator):
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
-        return iter_assign + next_call + [target_assign] + loop + iter_del
+        return iterable_stmt + iter_assign + next_call + [target_assign] + loop + iter_del
 
     def translate_stmt_Assert(self, node: ast.Assert,
                               ctx: Context) -> List[Stmt]:
@@ -464,6 +464,8 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
             return self.translate_stmt(node.value, ctx)
+        elif isinstance(node.value, ast.Str):
+            return []
         else:
             raise UnsupportedException(node)
 
