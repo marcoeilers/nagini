@@ -325,6 +325,7 @@ class ContractTranslator(CommonTranslator):
                     if part_stmt:
                         raise InvalidProgramException(inner,
                                                       'purity.violated')
+                    part = self.unwrap(part)
                     trigger.append(part)
                 trigger = self.viper.Trigger(trigger, self.no_position(ctx),
                                              self.no_info(ctx))
@@ -390,6 +391,7 @@ class ContractTranslator(CommonTranslator):
 
         dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
                                                               ctx)
+        lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))

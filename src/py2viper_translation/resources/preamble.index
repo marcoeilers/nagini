@@ -24,7 +24,7 @@
     },
     "functions": {
         "__getitem__": {
-            "args": ["list", "__prim__int"],
+            "args": ["list", "int"],
             "type": "object"
         },
         "__contains__": {
@@ -320,11 +320,11 @@
             "type": "range"
         },
         "__getitem__": {
-            "args": ["range", "__prim__int"],
+            "args": ["range", "int"],
             "type": "__prim__int"
         },
         "__contains__": {
-            "args": ["range", "__prim__int"],
+            "args": ["range", "int"],
             "type": "__prim__bool"
         },
         "__len__": {
