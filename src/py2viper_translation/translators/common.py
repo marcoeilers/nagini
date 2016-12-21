@@ -142,6 +142,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                         position=e.pos())
         return result
 
+    def unwrap(self, e: Expr) -> Expr:
+        if isinstance(e, self.viper.ast.FuncApp):
+            if (e.funcname().endswith('__box__') or
+                    e.funcname().endswith('__unbox__')):
+                return e.args().head()
+        return e
+
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
             rules: Rules=None) -> 'silver.ast.Position':

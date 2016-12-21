@@ -20,6 +20,7 @@ domain PyType {
     unique function list(): PyType
     unique function set(): PyType
     unique function dict(): PyType
+    unique function int(): PyType
 }
 
 method list___init__() returns (res: Ref)
@@ -45,14 +46,20 @@ function list___len__(self: Ref) : Int
  |self.list_acc|
 }
 
-function list___getitem__(self: Ref, key: Int): Ref
+function int___unbox__(self: Ref): Int
+
+function list___getitem__(self: Ref, key: Ref): Ref
+    requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
-    requires key >= 0
-    requires key < list___len__(self)
-    ensures result == self.list_acc[key]
+    requires int___unbox__(key) >= 0
+    requires int___unbox__(key) < list___len__(self)
+    ensures result == self.list_acc[int___unbox__(key)]
+    ensures issubtype(typeof(result), get_type_arg1(self, 0))
     ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
     (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
-    (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2))
+    (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2)) &&
+    (forall i1: Int :: {get_type_arg1(result, i1)} get_type_arg1(result, i1) == get_type_arg2(self, 0, i1)) &&
+    (forall i1: Int, i2 : Int :: {get_type_arg2(result, i1, i2)} get_type_arg2(result, i1, i2) == get_type_arg3(self, 0, i1, i2))
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires acc(self.list_acc)
