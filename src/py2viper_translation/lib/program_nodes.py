@@ -134,7 +134,9 @@ class PythonModule(PythonScope, ContainerInterface):
                                        self.global_module.classes[STRING_TYPE])
             self.global_vars['__file__'] = file_var
         for name, cls in self.classes.items():
-            cls.process(self.get_fresh_name(name), translator)
+            if name == cls.name:
+                # if this is not a type alias
+                cls.process(self.get_fresh_name(name), translator)
         for name, function in self.functions.items():
             function.process(self.get_fresh_name(name), translator)
         for name, method in self.methods.items():
@@ -1460,6 +1462,8 @@ def get_target(node: ast.AST,
                 if isinstance(node.slice.value, ast.Tuple):
                     args = [get_target(arg, containers, container)
                             for arg in node.slice.value.elts]
+                elif isinstance(node.slice.value, ast.Name):
+                    args = [get_target(node.slice.value, containers, container)]
                 else:
                     assert False
                 return GenericType(type_class, args)

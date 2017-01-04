@@ -385,13 +385,20 @@ class MethodTranslator(CommonTranslator):
         args = self._translate_params(method, ctx)
         # Translate body
         body = []
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            no_pos = self.no_position(ctx)
             type_check = self.type_factory.concrete_type_check(
                 next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
             inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
                                             self.no_info(ctx))
             body.append(inhale_type)
+        if method.type:
+            assign_none = self.viper.LocalVarAssign(method.result.ref(),
+                                                    self.viper.NullLit(no_pos,
+                                                                       no_info),
+                                                    no_pos, no_info)
+            body.append(assign_none)
         if method.contract_only:
             false = self.viper.FalseLit(self.no_position(ctx),
                                         self.no_info(ctx))

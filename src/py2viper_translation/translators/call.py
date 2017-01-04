@@ -20,6 +20,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
+    GenericType,
     MethodType,
     PythonClass,
     PythonField,
@@ -51,10 +52,10 @@ class CallTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
-        assert isinstance(target, (PythonClass, PythonVar))
+        assert isinstance(target, (PythonClass, PythonVar, GenericType))
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
-        if isinstance(target, PythonClass):
+        if isinstance(target, (PythonClass, GenericType)):
             check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
         else:
             check = self.type_factory.dynamic_type_check(obj, target.ref(), pos,

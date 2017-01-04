@@ -777,6 +777,22 @@ class TypeDomainFactory:
                               self.no_info(ctx))
         return eq
 
+    def type_arg_check_subtype(self, lhs: Expr, arg: 'PythonType',
+                               indices: List['Expr'], ctx: Context) -> 'Expr':
+        type_arg_func = self.type_arg(lhs, indices, ctx)
+        type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
+                                             self.type_type(), [],
+                                             self.no_position(ctx),
+                                             self.no_info(ctx),
+                                             self.type_domain)
+        subtype = self.viper.DomainFuncApp('issubtype',
+                                           [type_arg_func, type_func], {},
+                                           self.viper.Bool,
+                                           [type_arg_func, type_func],
+                                           self.no_position(ctx),
+                                           self.no_info(ctx), self.type_domain)
+        return subtype
+
     def type_nargs(self, lhs: Expr, indices: List[Expr], ctx: Context) -> Expr:
         name = 'get_type_nargs' + str(len(indices))
         args = [lhs] + indices
