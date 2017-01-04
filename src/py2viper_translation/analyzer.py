@@ -450,6 +450,17 @@ class Analyzer(ast.NodeVisitor):
     def visit_For(self, node: ast.While) -> None:
         self.visit_loop(node)
 
+    def visit_Assign(self, node: ast.Assign) -> None:
+        alias = False
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            lhs_name = (self.module.type_prefix, node.targets[0].id)
+            if lhs_name in self.types.type_aliases:
+                aliased_type = self.convert_type(self.types.type_aliases[lhs_name])
+                self.module.classes[node.targets[0].id] = aliased_type
+                alias = True
+        if not alias:
+            self.visit_default(node)
+
     def visit_arguments(self, node: ast.arguments) -> None:
         assert self.current_function is not None
         for arg in node.args:

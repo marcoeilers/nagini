@@ -178,7 +178,13 @@ class TypeTranslator(CommonTranslator):
                                              self.no_info(ctx))
             indices = prefix + [index_var.ref()]
             variables = [index_var.decl]
-            check = self.type_factory.type_arg_check(lhs, args[0], indices, ctx)
+            # if covariant:
+            if type.name == 'tuple':
+                check = self.type_factory.type_arg_check_subtype(lhs, args[0],
+                                                                 indices, ctx)
+            else:
+                check = self.type_factory.type_arg_check(lhs, args[0], indices,
+                                                         ctx)
             body = self.viper.Implies(index_in_bounds, check,
                                       self.no_position(ctx), self.no_info(ctx))
             triggers = [self.viper.Trigger([self.type_factory.type_arg(lhs, indices, ctx)], self.no_position(ctx), self.no_info(ctx))]

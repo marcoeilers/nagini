@@ -69,9 +69,12 @@ class ProgramTranslator(CommonTranslator):
             stmt, value = self.translate_expr(var.value, ctx)
             if stmt:
                 raise InvalidProgramException('purity.violated', var.node)
-            posts.append(self.viper.EqCmp(result, value, position,
-                                          self.no_info(ctx)))
-        return self.viper.Function(var.sil_name, [], type, [], posts, None,
+            body = value
+            # posts.append(self.viper.EqCmp(result, value, position,
+            #                               self.no_info(ctx)))
+        else:
+            body = None
+        return self.viper.Function(var.sil_name, [], type, [], posts, body,
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
@@ -364,7 +367,8 @@ class ProgramTranslator(CommonTranslator):
         for sil_prog in sil_progs:
             domains += [d for d in self.viper.to_list(sil_prog.domains())
                         if d.name() != 'PyType']
-            functions += self.viper.to_list(sil_prog.functions())
+            functions += [f for f in self.viper.to_list(sil_prog.functions())
+                          if all([f.name() != f2.name() for f2 in functions])]
             predicates += self.viper.to_list(sil_prog.predicates())
 
             for method in self.viper.to_list(sil_prog.methods()):
@@ -411,17 +415,17 @@ class ProgramTranslator(CommonTranslator):
                 functions.append(
                     self.create_global_var_function(module.global_vars[var],
                                                     ctx))
-
+            containers = [module]
             for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES:
+                if class_name in PRIMITIVES or class_name != cls.name:
                     continue
+                containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
                 for name, field in cls.static_fields.items():
                     functions.append(self.create_global_var_function(field,
                                                                      ctx))
 
             # Translate default args
-            containers = [module] + list(module.classes.values())
             for container in containers:
                 for function in container.functions.values():
                     self.translate_default_args(function, ctx)
@@ -448,7 +452,7 @@ class ProgramTranslator(CommonTranslator):
                 functions.extend(getters)
                 methods.extend(checkers)
             for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES:
+                if class_name in PRIMITIVES or class_name != cls.name:
                     continue
                 old_class = ctx.current_class
                 ctx.current_class = cls
