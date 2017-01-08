@@ -272,15 +272,8 @@ class StatementTranslator(CommonTranslator):
                                         [], node, ctx)
         return iter_del
 
-    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
-                                   ctx: Context) -> List[Expr]:
-        """
-        Creates a list of assertions containing type information for all local
-        variables written to within the given partial ASTs which already
-        existed before.
-        To be used to remember type information about arguments/local variables
-        which are assigned to in loops and therefore havoced.
-        """
+    def _get_havoced_vars(self, nodes: List[ast.AST],
+                          ctx: Context) -> List[PythonVar]:
         result = []
         collector = AssignCollector()
         for stmt in nodes:
@@ -293,8 +286,23 @@ class StatementTranslator(CommonTranslator):
             if (name in ctx.actual_function.args or
                     (var.writes and not contains_stmt(nodes, var.writes[0]))):
                 if var.type.name not in PRIMITIVES:
-                    result.append(self.type_check(var.ref(), var.type,
-                                                  self.no_position(ctx), ctx))
+                    result.append(var)
+        return result
+
+    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
+                                   ctx: Context) -> List[Expr]:
+        """
+        Creates a list of assertions containing type information for all local
+        variables written to within the given partial ASTs which already
+        existed before.
+        To be used to remember type information about arguments/local variables
+        which are assigned to in loops and therefore havoced.
+        """
+        result = []
+        vars = self._get_havoced_vars(nodes, ctx)
+        for var in vars:
+            result.append(self.type_check(var.ref(), var.type,
+                                          self.no_position(ctx), ctx))
         return result
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:

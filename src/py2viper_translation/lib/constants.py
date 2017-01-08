@@ -130,7 +130,7 @@ BOOL_TYPE = 'bool'
 
 OBJECT_TYPE = 'object'
 
-PRIMITIVES = [] # [INT_TYPE, BOOL_TYPE]
+PRIMITIVES = ['__prim__int', '__prim__bool'] # [INT_TYPE, BOOL_TYPE]
 
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',

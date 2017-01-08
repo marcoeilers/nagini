@@ -100,7 +100,13 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 lambda_.lineno, lambda_.col_offset)
             scopes.append(prefix)
         typ, _ = self._parent.module.get_type(scopes, node.arg)
-        return self._parent.convert_type(typ)
+        result = self._parent.convert_type(typ)
+        if result.name in {'int', 'bool'}:
+            # to avoid problems with boxed versions not being reference-equal,
+            # always use unboxed versions
+            prim_name = '__prim__' + result.name
+            result = self._parent.module.global_module.classes[prim_name]
+        return result
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:
         """Check and set preset.

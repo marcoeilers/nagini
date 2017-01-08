@@ -63,7 +63,7 @@ class Matcher:
         Ensures(Acc(self.c))
         self.c = None   # type: Optional[str]
 
-    def pop_read_ahead(self, t1: Place) -> Tuple[Place, str]:
+    def pop_read_ahead(self, t1: Place) -> Tuple[Place, Optional[str]]:
         IOExists3(str, bool, Place)(
             lambda new_char, success, t2: (
                 Requires(

@@ -70,8 +70,8 @@ class ProgramTranslator(CommonTranslator):
             if stmt:
                 raise InvalidProgramException('purity.violated', var.node)
             body = value
-            # posts.append(self.viper.EqCmp(result, value, position,
-            #                               self.no_info(ctx)))
+            posts.append(self.viper.EqCmp(result, value, position,
+                                          self.no_info(ctx)))
         else:
             body = None
         return self.viper.Function(var.sil_name, [], type, [], posts, body,

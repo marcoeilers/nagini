@@ -52,8 +52,8 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         assert ctx.actual_function
 
         operation = self.get_target(node, ctx)
-        parameters_count = len(operation.get_parameters())
-        args = self.translate_args(node.args[:parameters_count], ctx)
+        parameters = operation.get_parameters()
+        args = self.translate_args(node.args[:len(parameters)], parameters, ctx)
         perm = self._construct_full_perm(node, ctx)
 
         # Translate predicate.
