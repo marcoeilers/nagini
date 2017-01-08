@@ -93,7 +93,7 @@ def test_measure_io3_non_basic(
     Terminates(True)
     #:: ExpectedOutput(termination_check.failed:termination_measure.non_positive)
     TerminationMeasure(value)
-    #:: OptionalOutput(termination_check.failed:measure.non_decreasing)
+    #:: ExpectedOutput(carbon)(termination_check.failed:measure.non_decreasing)
     return no_op_io(t_pre, t_post)
 
 # Gap.

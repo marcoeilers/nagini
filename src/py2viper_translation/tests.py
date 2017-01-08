@@ -1,277 +1,614 @@
+"""Nagini tests based on pytest framework.
+
+Nagini tests are based on ideas taken from ``Silver``. Each test is a
+Python source file with annotations that specify the expected behaviour.
+The goal of the test suite is to catch changes in the behaviour,
+therefore, annotations must be always up-to-date. Annotations are
+written in Python comments that start with ``::``. Multiple annotations
+on the same line are separated by ``|``.
+
+Supported annotation types are:
+
+1.  ``ExpectedOutput<(backend)>(<error_id>, <via1>, <via2>,…)`` –
+    indicates that the following line should produce the specified
+    error.
+2.  ``UnexpectedOutput<(backend)>(<error_id>, <issue>, <via1>, <via2>,…)``
+    – indicates that the following line should not produce the
+    specified error, but it currently does. The problem is currently
+    tracked in ``backend`` (if missing, then Nagini) issue tracker's
+    issue ``issue``.
+3.  ``MissingOutput<(backend)>(<error_id>, <issue>, <via1>, <via2>,…)`` –
+    indicates that the error mentioned in the matching
+    ``ExpectedOutput`` annotation is not produced due to issue
+    ``issue``.
+4.  ``Label(via)`` – mark location to be used in other annotations.
+5.  ``IgnoreFile(<issue>)`` – mark that file cannot be tested due to
+    critical issue such as a crash, which is tracked in ``issue``.
+"""
+
+
+import abc
 import os
-import pytest
 import re
 import tokenize
+
+import pytest
+
+from typing import Any, Dict, List, Optional
 
 from py2viper_translation.lib import config, jvmaccess
 from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.typeinfo import TypeException
-from py2viper_translation.lib.util import InvalidProgramException, flatten_dict
+from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.main import translate, verify
 from py2viper_translation.verifier import VerificationResult, ViperVerifier
-from typing import Any, Dict, List, Tuple
 
 os.environ['MYPYPATH'] = config.mypy_path
 
 assert config.classpath
-jvm = jvmaccess.JVM(config.classpath)
+_JVM = jvmaccess.JVM(config.classpath)
 
-type_error_pattern = "^(.*):(\\d+): error: (.*)$"
-mypy_error_matcher = re.compile(type_error_pattern)
+_TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
+_MYPY_ERROR_MATCHER = re.compile(_TYPE_ERROR_PATTERN)
+
+_BACKEND_SILICON = 'silicon'
+_BACKEND_CARBON = 'carbon'
+_BACKEND_ANY = 'ANY'
 
 
-class AnnotatedTests:
-    def _is_annotation(self, tk: tokenize.TokenInfo) -> bool:
-        """
-        A test annotation is a comment starting with #::
-        """
-        return (tk.type is tokenize.COMMENT and
-                tk.string.strip().startswith('#:: ') and
-                tk.string.strip().endswith(')'))
+def _consume(key: str, dictionary: Dict[str, Any], check: bool = False) -> Any:
+    """Destructive read from the dictionary.
 
-    def _is_ignore_annotation(self, tk: tokenize.TokenInfo) -> bool:
-        return (tk.type is tokenize.COMMENT and
-                tk.string.strip().startswith('#:: IgnoreFile'))
+    If ``check`` is ``True``, check that read value does not evaluate to
+    ``false``.
+    """
+    value = dictionary[key]
+    del dictionary[key]
+    if check:
+        assert value, "{} in {} is False".format(key, dictionary)
+    return value
 
-    def get_test_annotations(self, path: str) -> List:
-        """
-        Retrieves test annotations from the given Python source file
-        """
-        with open(path, 'rb') as fp:
-            test_annotations = [
-                token
-                for token in tokenize.tokenize(fp.readline)
-                if self._is_annotation(token)]
-        return test_annotations
 
-    def extract_annotations(self, token) -> Dict[str, List[Any]]:
-        issue_matcher = re.compile(
-            '([a-zA-Z]+)'
-            '\('
-            '([a-zA-z\._:;\d ?\'"]+), '
-            '/([a-z0-9]+)/issue/([0-9]+)/'
-            '(, ([a-z]+))?'
-            '\)')
-        matcher = re.compile('([a-zA-Z]+)\(([a-zA-z\.,\(\)_:;\d ?\'"]+)\)')
-        result = {'ExpectedOutput': [],
-                  'OptionalOutput': [],
-                  'UnexpectedOutput': [],
-                  'MissingOutput': [],
-                  'Label': []}
-        content = token.string.strip()[3:].strip()
-        stripped_list = [part.strip() for part in content.split('|')]
-        for part in stripped_list:
-            issue_match = issue_matcher.match(part)
-            match = matcher.match(part)
-            if issue_match:
-                type, content, tracker, backend = issue_match.group(1, 2, 3, 6)
-                if not backend:
-                    backend = tracker
-                if type == 'UnexpectedOutput':
-                    result['UnexpectedOutput'].append(
-                        self.token_to_unexpected(content, backend, token))
-                elif type == 'MissingOutput':
-                    result['MissingOutput'].append(
-                        self.token_to_unexpected(content, backend, token))
-                else:
-                    raise ValueError(type)
-            elif match:
-                type, content = match.group(1, 2)
-                if type == 'ExpectedOutput':
-                    result['ExpectedOutput'].append(
-                        self.token_to_expected(content, token))
-                elif type == 'OptionalOutput':
-                    result['OptionalOutput'].append(
-                        self.token_to_expected(content, token))
-                elif type == 'Label':
-                    result['Label'].append(
-                        self.token_to_label(content, token))
-                else:
-                    raise ValueError(type)
-            else:
-                raise ValueError(part)
-        return result
+def _consume_list(key: str, dictionary: Dict[str, Any]) -> Any:
+    """Destructive read of comma separated list from the dictionary."""
+    value = _consume(key, dictionary)
+    if value:
+        return [part for part in value.split(', ') if part]
+    else:
+        return []
 
-    def token_to_unexpected(self, content, backend, token):
-        return (token.start, content, backend)
 
-    def token_to_expected(self, content, token):
-        if content.startswith('type.error:'):
-            # Type errors need special treatment because they contain
-            # error text, not ids.
-            return (token.start, (content, ()))
-        split = content.split(',')
-        id = split[0]
-        vias = split[1:]
-        return (token.start, (id, vias))
+class Error(abc.ABC):
+    """Base class for reported errors.
 
-    def token_to_label(self, content, token):
-        return (content, token.start[0])
+    Subclasses of this class are wrappers that unify interfaces of three
+    error types currently produced by Nagini:
 
-    def get_vias(self, error) -> str:
-        reason_pos = error.reason.position
+    1.  Type errors produced by Mypy.
+    2.  Invalid program errors produced by translators.
+    3.  Verification errors produced by back-end verifiers.
+    """
+
+    @property
+    @abc.abstractmethod
+    def full_id(self) -> str:
+        """Return full error id."""
+
+    @property
+    @abc.abstractmethod
+    def line(self) -> int:
+        """Return line number."""
+
+    @abc.abstractmethod
+    def get_vias(self) -> List[int]:
+        """Return a list of vias."""
+
+
+class VerificationError(Error):
+    """Verification error reported by verifier."""
+
+    def __init__(self, actual_error: 'Error') -> None:
+        self._error = actual_error
+
+    def __repr__(self) -> str:
+        return 'VerificationError({}, line={}, vias={})'.format(
+            self.full_id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        return self._error.full_id
+
+    @property
+    def line(self) -> int:
+        return self._error.position.line
+
+    def get_vias(self) -> List[int]:
+        reason_pos = self._error.reason.position
         if reason_pos.node_id:
             vias = error_manager.get_vias(reason_pos.node_id)
             if vias:
                 return [via[1].line() for via in vias]
-        error_pos = error.position
+        error_pos = self._error.position
         if error_pos.node_id:
             vias = error_manager.get_vias(error_pos.node_id)
             return [via[1].line() for via in vias]
         return []
 
-    def failure_to_actual(self, error: 'silver.verifier.AbstractError') \
-            -> Tuple[int, int, str, List[int]]:
-        return ((error.pos().line(), error.pos().column()), error.full_id,
-                self.get_vias(error))
 
-    def compare_actual_expected(
-            self, actual, expected, optional, labels, unexpected, missing):
-        actual_unexpected = []
-        missing_expected = []
-        expected = [(l, i, [labels[i] for i in v]) for (l, i, v) in expected]
-        for ae in actual:
-            (line, id, vias) = ae
-            vias_decrement = [via - 1 for via in vias]
-            key = (line - 1, id, vias_decrement)
-            if (not key in expected and
-                    not key in optional and
-                    not key in unexpected):
-                actual_unexpected.append(ae)
-            if key in missing:
-                actual_unexpected.append(ae)
-        for ee in expected + unexpected:
-            (line, id, vias) = ee
-            vias_increment = [via + 1 for via in vias]
-            if (not (line + 1, id, vias_increment) in actual and
-                    not (line, id, vias_increment) in missing):
-                missing_expected.append(ee)
-        assert not actual_unexpected
-        assert not missing_expected
+class InvalidProgramError(Error):
+    """Invalid program error reported by translator."""
+
+    def __init__(self, exception: InvalidProgramException) -> None:
+        self._exception = exception
+
+    def __repr__(self) -> str:
+        return 'InvalidProgramError({}, line={}, vias={})'.format(
+            self.full_id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        return 'invalid.program:' + self._exception.code
+
+    @property
+    def line(self) -> int:
+        return self._exception.node.lineno
+
+    def get_vias(self) -> List[int]:
+        return []
 
 
-class VerificationTests(AnnotatedTests):
-    def test_file(self, path: str, jvm, verifier, sif):
-        test_annotations = self.get_test_annotations(path)
-        if any(self._is_ignore_annotation(tk) for tk in test_annotations):
+class TypeCheckError(Error):
+    """Type error reported by Mypy."""
+
+    def __init__(self, msg: str) -> None:
+        self._msg = msg
+        match = _MYPY_ERROR_MATCHER.match(msg)
+        self._groups = match.groupdict()
+
+    def __repr__(self) -> str:
+        return 'TypeCheckError({}, line={}, vias={})'.format(
+            self.full_id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        return 'type.error:' + self._groups['msg']
+
+    @property
+    def line(self) -> int:
+        return int(self._groups['line'])
+
+    def get_vias(self) -> List[int]:
+        return []
+
+
+class Annotation:
+    """Base class for all test annotations."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        self._token = token
+        for key, value in group_dict.items():
+            if key == 'type':
+                continue
+            if value:
+                setter_name = '_set_' + key
+                # Here we check that provided annotation does not have
+                # too much stuff.
+                assert hasattr(self, setter_name), (
+                    "Unsupported {} for {}".format(value, self))
+                getattr(self, setter_name)(value)
+
+    @property
+    def line(self) -> int:
+        """Get line number of this annotation."""
+        return self._token.start[0] + 1
+
+    @property
+    @abc.abstractmethod
+    def backend(self) -> str:
+        """Back-end which this annotation is targeting."""
+
+
+class BackendSpecificAnnotationMixIn:
+    """Annotation that depends on the back-end.
+
+    The subclass is expected to define a field ``_backend``.
+    """
+
+    @property
+    def backend(self) -> str:
+        """Back-end which this annotation is targeting."""
+        return self._backend or _BACKEND_ANY
+
+
+class ErrorMatchingAnnotationMixIn:
+    """An annotation that can match an error.
+
+    The subclass is expected to define fields ``_id`` and ``_labels``.
+    """
+
+    def match(self, error: Error) -> bool:
+        """Check is error matches this annotation."""
+        return (self._id == error.full_id and
+                self.line == error.line and
+                self.get_vias() == error.get_vias())
+
+
+class UsingLabelsAnnotationMixIn:
+    """An annotation that can refer to labels.
+
+    The subclass is expected to define the field ``_labels``.
+    """
+
+    def resolve_labels(
+            self, labels_dict: Dict[str, 'LabelAnnotation']) -> None:
+        """Resolve label names to label objects."""
+        for i, label in enumerate(self._labels):
+            self._labels[i] = labels_dict[label]
+
+    def get_vias(self) -> List[int]:
+        """Return vias extracted from label positions."""
+        return [label.line for label in self._labels]
+
+
+class ExpectedOutputAnnotation(
+        BackendSpecificAnnotationMixIn,
+        ErrorMatchingAnnotationMixIn,
+        UsingLabelsAnnotationMixIn,
+        Annotation):
+    """ExpectedOutput annotation."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        """ExpectedOutput constructor.
+
+        Supported info:
+
+        +   id – mandatory.
+        +   backend – optional.
+        +   labels – optional.
+        """
+        self._id = _consume('id', group_dict, True)
+        self._backend = _consume('backend', group_dict)
+        self._labels = _consume_list('labels', group_dict)
+        super().__init__(token, group_dict)
+
+    def __repr__(self) -> str:
+        return 'ExpectedOutput({}, line={}, vias={})'.format(
+            self._id, self.line, self.get_vias())
+
+    @property
+    def full_id(self) -> str:
+        """Return full error id."""
+        return self._id
+
+
+class UnexpectedOutputAnnotation(
+        BackendSpecificAnnotationMixIn,
+        ErrorMatchingAnnotationMixIn,
+        UsingLabelsAnnotationMixIn,
+        Annotation):
+    """UnexpectedOutput annotation."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        """UnexpectedOutput constructor.
+
+        Supported info:
+
+        +   id – mandatory.
+        +   backend – optional, ``None`` means ``py2viper``.
+        +   issue_id – mandatory.
+        +   labels – optional.
+        """
+        self._id = _consume('id', group_dict, True)
+        self._backend = _consume('backend', group_dict)
+        self._issue_id = _consume('issue_id', group_dict, True)
+        self._labels = _consume_list('labels', group_dict)
+        super().__init__(token, group_dict)
+
+    def __repr__(self) -> str:
+        return 'UnexpectedOutput({}, line={}, vias={})'.format(
+            self._id, self.line, self.get_vias())
+
+
+class MissingOutputAnnotation(
+        BackendSpecificAnnotationMixIn,
+        UsingLabelsAnnotationMixIn,
+        Annotation):
+    """MissingOutput annotation."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        """MissingOutput constructor.
+
+        Supported info:
+
+        +   id – mandatory.
+        +   backend – optional, ``None`` means ``py2viper``.
+        +   issue_id – mandatory.
+        +   labels – optional.
+        """
+        self._id = _consume('id', group_dict, True)
+        self._backend = _consume('backend', group_dict)
+        self._issue_id = _consume('issue_id', group_dict, True)
+        self._labels = _consume_list('labels', group_dict)
+        super().__init__(token, group_dict)
+
+    def match(self, expected: ExpectedOutputAnnotation) -> bool:
+        """Check if this annotation matches the given ``ExpectedOutput``.
+
+        ``MissingOutput`` annotation indicates that the output mentioned
+        in a certain ``ExpectedOutput`` annotation is not going to be
+        produced due to some issue. In other words, a ``MissingOutput``
+        annotation silences a matching ``ExpectedOutput`` annotation.
+        Intuitively, a ``MissingOutput`` annotation matches an
+        ``ExpectedOutput`` annotation if they are on the same line and
+        have the same arguments.
+        """
+        return (self.line == expected.line and
+                self._id == expected.full_id and
+                self.get_vias() == expected.get_vias() and
+                (self.backend == expected.backend or
+                 self.backend == _BACKEND_ANY or
+                 expected.backend == _BACKEND_ANY))
+
+
+class LabelAnnotation(Annotation):
+    """Label annotation."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        """Label constructor.
+
+        Supported info:
+
+        +   id – mandatory.
+        """
+        self._id = _consume('id', group_dict, True)
+        super().__init__(token, group_dict)
+
+    @property
+    def name(self) -> str:
+        """Return the labels name."""
+        return self._id
+
+    @property
+    def backend(self) -> str:
+        """Back-end which this annotation is targeting."""
+        return _BACKEND_ANY
+
+
+class IgnoreFileAnnotation(
+        BackendSpecificAnnotationMixIn,
+        Annotation):
+    """IgnoreFile annotation."""
+
+    def __init__(
+            self, token: tokenize.TokenInfo,
+            group_dict: Dict[str, Optional[str]]) -> None:
+        """IgnoreFile constructor.
+
+        Supported info:
+
+        +   id – mandatory, used as issue_id.
+        +   backend – optional, ``None`` means ``py2viper``.
+        """
+        self._issue_id = _consume('id', group_dict, True)
+        assert self._issue_id.isnumeric(), "Issue id must be a number."
+        self._backend = _consume('backend', group_dict)
+        super().__init__(token, group_dict)
+
+
+class AnnotationManager:
+    """A class for managing annotations in the specific test file."""
+
+    def __init__(self, backend: str) -> None:
+        self._matcher = re.compile(
+            # Annotation type such as ExpectedOutput.
+            r'(?P<type>[a-zA-Z]+)'
+            # To which back-end the annotation is dedicated. None means
+            # both.
+            r'(\((?P<backend>[a-z]+)\))?'
+            r'\('
+            # Error message, or label id. Matches everything except
+            # comma.
+            r'(?P<id>[a-zA-Z\.\(\)_:;\d ?\'"]+)'
+            # Issue id in the issue tracker.
+            r'(, (?P<issue_id>\d+))?'
+            # Labels. Note that label must start with a letter.
+            r'(?P<labels>(, [a-zA-Z][a-zA-Z\d_]+)+)?'
+            r'\)'
+        )
+        self._annotations = {
+            'ExpectedOutput': [],
+            'UnexpectedOutput': [],
+            'MissingOutput': [],
+            'Label': [],
+            'IgnoreFile': [],
+        }
+        self._backend = backend
+
+    def _create_annotation(
+            self, annotation_string: str, token: tokenize.TokenInfo) -> None:
+        """Create annotation object from the ``annotation_string``."""
+        match = self._matcher.match(annotation_string)
+        assert match, "Failed to match: {}".format(annotation_string)
+        group_dict = match.groupdict()
+        annotation_type = group_dict['type']
+        if annotation_type == 'ExpectedOutput':
+            annotation = ExpectedOutputAnnotation(token, group_dict)
+        elif annotation_type == 'UnexpectedOutput':
+            annotation = UnexpectedOutputAnnotation(token, group_dict)
+        elif annotation_type == 'MissingOutput':
+            annotation = MissingOutputAnnotation(token, group_dict)
+        elif annotation_type == 'Label':
+            annotation = LabelAnnotation(token, group_dict)
+        elif annotation_type == 'IgnoreFile':
+            annotation = IgnoreFileAnnotation(token, group_dict)
+        else:
+            assert False, "Unknown annotation type: {}".format(annotation_type)
+        assert annotation_type in self._annotations
+        if annotation.backend in (self._backend, _BACKEND_ANY):
+            self._annotations[annotation_type].append(annotation)
+
+    def _get_expected_output(self) -> List[ExpectedOutputAnnotation]:
+        """Return a final list of expected output annotations."""
+        expected_annotations = self._annotations['ExpectedOutput']
+        missing_annotations = set(self._annotations['MissingOutput'])
+        # Filter out annotations that should be missing.
+        annotations = []
+        for expected in expected_annotations:
+            for missing in missing_annotations:
+                if missing.match(expected):
+                    missing_annotations.remove(missing)
+                    break
+            else:
+                annotations.append(expected)
+        assert not missing_annotations
+        # Append unexpected annotations.
+        annotations.extend(self._annotations['UnexpectedOutput'])
+        return annotations
+
+    def resolve_references(self) -> None:
+        """Resolve references to labels."""
+        labels_dict = dict(
+            (label.name, label)
+            for label in self._annotations['Label'])
+        for annotation_type in ['ExpectedOutput', 'UnexpectedOutput',
+                                'MissingOutput']:
+            for annotation in self._annotations[annotation_type]:
+                annotation.resolve_labels(labels_dict)
+
+    def check_errors(self, actual_errors: List[Error]) -> None:
+        """Check if actual errors match annotations."""
+        annotations = set(self._get_expected_output())
+        unexpected_errors = []
+        for error in actual_errors:
+            for annotation in annotations:
+                if annotation.match(error):
+                    annotations.remove(annotation)
+                    break
+            else:
+                unexpected_errors.append(error)
+        assert not annotations
+        assert not unexpected_errors
+
+    def has_unexpected_missing(self) -> bool:
+        """Check if there are unexpected or missing output annotations."""
+        return (self._annotations['UnexpectedOutput'] or
+                self._annotations['MissingOutput'])
+
+    def extract_annotations(self, token: tokenize.TokenInfo) -> None:
+        """Extract annotations mentioned in the token."""
+        content = token.string.strip()[3:]
+        stripped_list = [part.strip() for part in content.split('|')]
+        for part in stripped_list:
+            self._create_annotation(part, token)
+
+    def ignore_file(self) -> bool:
+        """Check if file should be ignored."""
+        return bool(self._annotations['IgnoreFile'])
+
+
+class AnnotatedTest:
+    """A class representing an annotated test.
+
+    An annotated test is a Python source file with annotations that
+    indicate expected verification errors.
+    """
+
+    def _is_annotation(self, token: tokenize.TokenInfo) -> bool:
+        """Check if token is a test annotation.
+
+        A test annotation is a comment starting with ``#::``.
+        """
+        return (token.type is tokenize.COMMENT and
+                token.string.strip().startswith('#:: ') and
+                token.string.strip().endswith(')'))
+
+    def get_annotation_manager(
+            self, path: str, backend: str) -> AnnotationManager:
+        """Create ``AnnotationManager`` for given Python source file."""
+        manager = AnnotationManager(backend)
+        with open(path, 'rb') as fp:
+            for token in tokenize.tokenize(fp.readline):
+                if self._is_annotation(token):
+                    manager.extract_annotations(token)
+        manager.resolve_references()
+        return manager
+
+
+class VerificationTest(AnnotatedTest):
+    """Test for testing verification of successfully translated programs."""
+
+    def test_file(
+            self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
+            sif: bool):
+        """Test specific Python file."""
+        annotation_manager = self.get_annotation_manager(path, verifier.name)
+        if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
-        self.evaluate_result(vresult, path, test_annotations, jvm, verifier)
+        self._evaluate_result(vresult, annotation_manager, jvm)
 
-    def evaluate_result(self, vresult: VerificationResult, file_path: str,
-                        test_annotations: List, jvm: jvmaccess.JVM,
-                        verifier: ViperVerifier):
-        """
-        Evaluates the verification result w.r.t. the test annotations in
-        the file
-        """
-
-        annotations = flatten_dict([self.extract_annotations(ann) for ann
-                                    in test_annotations
-                                    if ann.string.strip().startswith('#::')],
-                                    {'ExpectedOutput', 'OptionalOutput',
-                                     'Label', 'UnexpectedOutput',
-                                     'MissingOutput'})
-        expected = annotations['ExpectedOutput']
-        expected_lo = [(line, id, vias) for ((line, col), (id, vias)) in
-                       expected]
-        optional = annotations['OptionalOutput']
-        optional_lo = [(line, id, vias) for ((line, col), (id, vias)) in
-                       optional]
-        labels = annotations['Label']
-        labels_dict = {key: value for (key, value) in labels}
-        unexpected = annotations['UnexpectedOutput']
-        unexpected_lo = [
-            (line, id, [])
-            for ((line, col), id, backend) in unexpected
-            if backend in ('py2viper', verifier.name)]
-        missing = annotations['MissingOutput']
-        missing_lo = [
-            (line, id, [])
-            for ((line, col), id, backend) in missing
-            if backend in ('py2viper', verifier.name)]
+    def _evaluate_result(
+            self, vresult: VerificationResult,
+            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM):
+        """Evaluate verification result with regard to test annotations."""
         if vresult:
-            assert not expected
+            actual_errors = []
         else:
-            # Make sure we produce an error string
-            print(vresult)
-            missing_info = [error for error in vresult.errors if
-                            not isinstance(error.pos(),
-                                           jvm.viper.silver.ast.HasLineColumn)]
-            actual = [self.failure_to_actual(error) for error in vresult.errors
-                      if not error in missing_info]
-            actual_lo = [(line, id, via) for ((line, col), id, via) in
-                         actual]
-            assert not missing_info
-            self.compare_actual_expected(
-                actual_lo, expected_lo, optional_lo, labels_dict,
-                unexpected_lo, missing_lo)
-            if unexpected or missing:
-                pytest.skip('Unexpected or missing output')
-
-
-verification_tester = VerificationTests()
-
-
-def test_verification(path, verifier, sif):
-    verification_tester.test_file(path, jvm, verifier, sif)
-
-
-class TranslationTests(AnnotatedTests):
-    def extract_mypy_error(self, message):
-        parts = mypy_error_matcher.match(message).groups()
-        offset = 3 if parts[0] is None else 0
-        reason = parts[2 + offset].strip()
-        if '(' in reason:
-            reason = reason.split('(')[0].strip()
-        return (int(parts[1 + offset]),
-                'type.error:' + reason, [])
-
-    def test_file(self, path: str, jvm, sif):
-        test_annotations = self.get_test_annotations(path)
-        if any(self._is_ignore_annotation(tk) for tk in test_annotations):
-            pytest.skip()
-        annotations = flatten_dict([self.extract_annotations(ann) for ann
-                                    in test_annotations
-                                    if ann.string.strip().startswith('#::')],
-                                   {'ExpectedOutput', 'OptionalOutput',
-                                    'Label', 'UnexpectedOutput',
-                                    'MissingOutput'})
-        expected = annotations['ExpectedOutput']
-        expected_lo = [(line, id, vias) for ((line, col), (id, vias)) in
-                       expected]
-        optional = annotations['OptionalOutput']
-        optional_lo = [(line, id, vias) for ((line, col), (id, vias)) in
-                       optional]
-        unexpected = annotations['UnexpectedOutput']
-        unexpected_lo = [
-            (line, id, [])
-            for ((line, col), id, backend) in unexpected]
-        missing = annotations['MissingOutput']
-        missing_lo = [
-            (line, id, [])
-            for ((line, col), id, backend) in missing]
-        try:
-            translate(path, jvm, sif)
-            assert False
-        except InvalidProgramException as e1:
-            code = 'invalid.program:' + e1.code
-            line = e1.node.lineno
-            actual = [(line, code, [])]
-        except TypeException as e2:
-            actual = [self.extract_mypy_error(msg) for msg in e2.messages if
-                      mypy_error_matcher.match(msg)]
-
-        self.compare_actual_expected(
-            actual, expected_lo, optional_lo, {}, unexpected_lo, missing_lo)
-        if unexpected or missing:
+            assert all(
+                isinstance(error.pos(), jvm.viper.silver.ast.HasLineColumn)
+                for error in vresult.errors)
+            actual_errors = [
+                VerificationError(error) for error in vresult.errors]
+        annotation_manager.check_errors(actual_errors)
+        if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')
 
 
-translation_tester = TranslationTests()
+_VERIFICATION_TESTER = VerificationTest()
+
+
+def test_verification(path, verifier, sif):
+    """Execute provided verification test."""
+    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif)
+
+
+class TranslationTest(AnnotatedTest):
+    """Test for testing translation errors."""
+
+    def test_file(self, path: str, jvm: jvmaccess.JVM, sif: bool):
+        """Test specific Python file."""
+        annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
+        if annotation_manager.ignore_file():
+            pytest.skip('Ignored')
+        try:
+            translate(path, jvm, sif)
+            assert False
+        except InvalidProgramException as exp1:
+            actual_errors = [InvalidProgramError(exp1)]
+        except TypeException as exp2:
+            actual_errors = [
+                TypeCheckError(msg) for msg in exp2.messages
+                if _MYPY_ERROR_MATCHER.match(msg)]
+        annotation_manager.check_errors(actual_errors)
+        if annotation_manager.has_unexpected_missing():
+            pytest.skip('Unexpected or missing output')
+
+
+_TRANSLATION_TESTER = TranslationTest()
 
 
 def test_translation(path, sif):
-    translation_tester.test_file(path, jvm, sif)
+    """Execute provided translation test."""
+    _TRANSLATION_TESTER.test_file(path, _JVM, sif)

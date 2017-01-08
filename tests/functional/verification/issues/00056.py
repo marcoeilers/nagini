@@ -32,7 +32,6 @@ class A2:
     def __init__(self) -> None:
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(Acc(self.b))
-        #:: OptionalOutput(postcondition.violated:assertion.false)
         Ensures(Acc(self.c))
         self.b = None   # type: B
         self.c = None   # type: C

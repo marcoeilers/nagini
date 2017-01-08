@@ -21,7 +21,7 @@ def create_lock() -> None:
     Assert(False)
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def create_lock_unknown_order_1() -> None:
     l1 = Lock()
     l2 = Lock()
@@ -30,7 +30,7 @@ def create_lock_unknown_order_1() -> None:
     l2.acquire()
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def create_lock_unknown_order_2() -> None:
     l1 = Lock()
     l2 = Lock()
@@ -80,7 +80,7 @@ def create_lock_below_3() -> None:
     l2 = Lock(below=l1)
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def create_lock_between_1() -> None:
     l1 = Lock()
     l3 = Lock(below=l1)
@@ -118,7 +118,7 @@ def release(l: Lock) -> None:
     l.release()
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def acquire(l: Lock) -> None:
     Requires(l is not None)
     #:: ExpectedOutput(call.precondition:assertion.false)
@@ -150,7 +150,7 @@ def acquire_release_multiple_caller_1() -> None:
     l.release()
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def acquire_release_multiple_caller_2(l: Lock) -> None:
     Requires(l is not None)
     #:: ExpectedOutput(call.precondition:assertion.false)

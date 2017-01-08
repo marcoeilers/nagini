@@ -14,7 +14,8 @@
         "__setitem__": {
             "args": ["list", "__prim__int", "object"],
             "type": null,
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__len__"]
         },
         "__iter__": {
             "args": ["list"],
@@ -25,7 +26,8 @@
     "functions": {
         "__getitem__": {
             "args": ["list", "int"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__len__"]
         },
         "__contains__": {
             "args": ["list", "object"],
@@ -62,7 +64,8 @@
         "__iter__": {
             "args": ["set"],
             "type": "Iterator",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__sil__seq__"]
         }
     },
     "functions": {
@@ -77,6 +80,10 @@
         "__len__": {
             "args": ["set"],
             "type": "__prim__int"
+        },
+        "__sil__seq__": {
+            "args": ["set"],
+            "type": null
         }
     },
     "extends": "object"
@@ -96,17 +103,20 @@
         "__setitem__": {
             "args": ["dict", "object", "object"],
             "type": null,
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__getitem__", "__contains__"]
         },
         "__iter__": {
             "args": ["dict"],
             "type": "Iterator",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__sil__seq__"]
         },
         "values": {
             "args": ["dict"],
             "type": "set",
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["__contains__", "__getitem__"]
         }
     },
     "functions": {
@@ -116,7 +126,8 @@
         },
         "__getitem__": {
             "args": ["dict", "object"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__contains__"]
         },
         "get": {
             "args": ["dict", "object"],
@@ -130,6 +141,10 @@
         "__len__": {
             "args": ["dict"],
             "type": "__prim__int"
+        },
+        "__sil__seq__": {
+            "args": ["dict"],
+            "type": null
         }
     },
     "extends": "object"
@@ -158,11 +173,13 @@
         },
         "__unbox__": {
             "args": ["int"],
-            "type": "__prim__int"
+            "type": "__prim__int",
+            "requires": ["__prim__int___box__"]
         },
         "__eq__": {
             "args": ["int", "object"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
@@ -170,7 +187,8 @@
         },
         "__sub__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__int"
+            "type": "__prim__int",
+            "requires": ["__unbox__"]
         },
         "__mul__": {
             "args": ["__prim__int", "__prim__int"],
@@ -215,7 +233,8 @@
         },
         "__eq__": {
             "args": ["bool", "object"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
         }
     },
     "extends": "int"
@@ -239,7 +258,8 @@
         },
         "__bool__": {
             "args": ["str"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["__len__"]
         },
         "__eq__": {
             "args": ["str", "object"],
@@ -250,8 +270,13 @@
             "type": "str"
         },
         "__create__": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "str"
+            "args": ["int", "int"],
+            "type": "str",
+            "requires": ["__len__", "__val__"]
+        },
+        "__val__": {
+            "args": ["str"],
+            "type": "int"
         }
     },
     "extends": "object"
@@ -260,31 +285,38 @@
     "functions": {
         "__create0__": {
             "args": [],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__"]
         },
         "__create1__": {
             "args": ["object", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create2__": {
             "args": ["object", "object", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create3__": {
             "args": ["object", "object", "object", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create4__": {
             "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create5__": {
             "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__create6__": {
             "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
-            "type": "tuple"
+            "type": "tuple",
+            "requires": ["__len__", "__getitem__"]
         },
         "__getitem__": {
             "args": ["tuple", "__prim__int"],
@@ -301,7 +333,8 @@
     "functions": {
         "__box__": {
             "args": ["__prim__int"],
-            "type": "int"
+            "type": "int",
+            "requires": ["int___unbox__"]
         }
     }
 },
@@ -309,7 +342,8 @@
     "functions": {
         "__box__": {
             "args": ["__prim__bool"],
-            "type": "bool"
+            "type": "bool",
+            "requires": ["bool___unbox__"]
         }
     }
 },
@@ -317,11 +351,13 @@
     "functions": {
         "__create__": {
             "args": ["__prim__int", "__prim__int"],
-            "type": "range"
+            "type": "range",
+            "requires": ["__len__", "__contains__", "__getitem__", "int___box__"]
         },
         "__getitem__": {
             "args": ["range", "int"],
-            "type": "__prim__int"
+            "type": "__prim__int",
+            "requires": ["__len__"]
         },
         "__contains__": {
             "args": ["range", "int"],
@@ -337,7 +373,8 @@
         },
         "__sil_seq__": {
             "args": ["range"],
-            "type": "object"
+            "type": "object",
+            "requires": ["__contains__", "__len__"]
         }
     },
     "extends": "object"

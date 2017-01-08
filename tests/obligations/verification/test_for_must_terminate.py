@@ -83,8 +83,6 @@ def test_terminate_promise_4(a: List[int], b: List[int]) -> None:
     Requires(Acc(list_pred(b)))
     for i in a:
         Invariant(MustTerminate(len(a) - len(Previous(i))))
-        # TODO: This is actually an instance of bug #59.
-        #:: OptionalOutput(invariant.not.preserved:insufficient.permission)
         Invariant(Acc(list_pred(b)))
         #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
         for j in b:
