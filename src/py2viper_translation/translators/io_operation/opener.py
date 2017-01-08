@@ -94,7 +94,8 @@ class Opener:
 
     def _translate_arguments(self) -> List[Expr]:
         return self._translator.translate_args(
-            self._operation_call.args, self._ctx)
+            self._operation_call.args, self._operation.get_parameters(),
+            self._ctx)
 
     def _translate_exhale(self, sil_args: List[Expr]) -> Stmt:
         """Translate exhale of IO operation."""

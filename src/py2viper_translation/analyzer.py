@@ -484,8 +484,12 @@ class Analyzer(ast.NodeVisitor):
         assert not self._aliases
         for arg in node.args.args:
             if self._is_io_existential:
+                arg_type = self.typeof(arg)
+                if arg_type.name in {'int', 'bool'}:
+                    name = '__prim__' + arg_type.name
+                    arg_type = self.module.global_module.classes[name]
                 var = self.node_factory.create_python_io_existential_var(
-                    arg.arg, arg, self.typeof(arg))
+                    arg.arg, arg, arg_type)
                 self._aliases[arg.arg] = var
             else:
                 var = self.node_factory.create_python_var(
