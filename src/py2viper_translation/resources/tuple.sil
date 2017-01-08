@@ -96,7 +96,7 @@ function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
 
 function tuple___len__(self: Ref): Int
 {
-	(get_type_nargs0(self) != -1) ? get_type_nargs0(self) : tuple___len__unknown(self)
+	get_type_nargs0(self)
 }
 
 function tuple___len__unknown(self: Ref): Int
@@ -104,5 +104,5 @@ function tuple___len__unknown(self: Ref): Int
 function tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
     requires key < tuple___len__(self)
-    ensures get_type_nargs0(self) != -1 ==> issubtype(typeof(result), get_type_arg1(self, key))
-    ensures get_type_nargs0(self) == -1 ==> issubtype(typeof(result), get_type_arg1(self, 0))
+    ensures issubtype(typeof(result), get_type_arg1(self, key))
+    //ensures get_type_nargs0(self) == -1 ==> issubtype(typeof(result), get_type_arg1(self, 0))

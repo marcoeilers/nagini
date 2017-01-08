@@ -754,13 +754,20 @@ class TypeDomainFactory:
                                              self.type_domain)
         return type_func
 
-    def type_arg_check(self, lhs: Expr, arg: 'PythonType',
-                       indices: List['Expr'], ctx: Context) -> 'Expr':
+    def type_arg(self, lhs: Expr, indices: List['Expr'],
+                 ctx: Context) -> 'Expr':
         name = 'get_type_arg' + str(len(indices))
         args = [lhs] + indices
         type_arg_func = self.viper.DomainFuncApp(name, args, {},
-            self.type_type(), args, self.no_position(ctx),
-            self.no_info(ctx), self.type_domain)
+                                                 self.type_type(), args,
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx),
+                                                 self.type_domain)
+        return type_arg_func
+
+    def type_arg_check(self, lhs: Expr, arg: 'PythonType',
+                       indices: List['Expr'], ctx: Context) -> 'Expr':
+        type_arg_func = self.type_arg(lhs, indices, ctx)
         type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
                                              self.type_type(), [],
                                              self.no_position(ctx),
@@ -770,8 +777,7 @@ class TypeDomainFactory:
                               self.no_info(ctx))
         return eq
 
-    def type_nargs_check(self, lhs: Expr, nargs: int,
-                         indices: List['Expr'], ctx: Context) -> 'Expr':
+    def type_nargs(self, lhs: Expr, indices: List[Expr], ctx: Context) -> Expr:
         name = 'get_type_nargs' + str(len(indices))
         args = [lhs] + indices
         pos = self.no_position(ctx)
@@ -783,6 +789,11 @@ class TypeDomainFactory:
                                                  pos,
                                                  info,
                                                  self.type_domain)
+        return type_arg_func
+
+    def type_nargs_check(self, lhs: Expr, nargs: int,
+                         indices: List['Expr'], ctx: Context) -> 'Expr':
+        type_arg_func = self.type_nargs(lhs, indices, ctx)
         nargs_lit = self.viper.IntLit(nargs, self.no_position(ctx),
                                       self.no_info(ctx))
         eq = self.viper.EqCmp(type_arg_func, nargs_lit, self.no_position(ctx),

@@ -47,6 +47,7 @@ class UnsupportedException(Exception):
     """
 
     def __init__(self, astElement: ast.AST, desc=""):
+        self.node = astElement
         ex_str = str(astElement)
         if desc:
             ex_str += ': ' + desc
@@ -73,13 +74,19 @@ class AssignCollector(ast.NodeVisitor):
 
     def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
-            if isinstance(target, ast.Tuple):
-                actual_targets = target.elts
-            else:
-                actual_targets = [target]
-            for actual in actual_targets:
-                if isinstance(actual, ast.Name):
-                    self.assigned_vars[actual.id] = actual
+            self._track_assign(target)
+
+    def _track_assign(self, target: ast.AST) -> None:
+        if isinstance(target, ast.Tuple):
+            actual_targets = target.elts
+        else:
+            actual_targets = [target]
+        for actual in actual_targets:
+            if isinstance(actual, ast.Name):
+                self.assigned_vars[actual.id] = actual
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self._track_assign(node.target)
 
 
 def get_func_name(stmt: ast.AST) -> Optional[str]:

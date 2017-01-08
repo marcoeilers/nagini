@@ -13,45 +13,120 @@ function int___bool__(self: Int) : Bool
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
-    unique function __boxed_int(): PyType
-    unique function __boxed_bool(): PyType
+    unique function int(): PyType
+    unique function bool(): PyType
     unique function range(): PyType
 }
 
-function int___box__(int: Int): Ref
-    ensures __boxed_int___unbox__(result) == int
-    ensures forall other: Int :: {int___box__(other)} ((int___box__(other) == result) <==> (other == int))
-    ensures typeof(result) == __boxed_int()
+function __prim__int___box__(prim: Int): Ref
+    ensures typeof(result) == int()
+    ensures int___unbox__(result) == prim
+    ensures forall other: Int :: {__prim__int___box__(other)} ((__prim__int___box__(other) == result) <==> (other == prim))
 
-function __boxed_int___unbox__(box: Ref): Int
-    ensures int___box__(result) == box
+function int___unbox__(box: Ref): Int
+    requires issubtype(typeof(box), int())
+    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
 
-function bool___box__(bool: Bool): Ref
-    ensures __boxed_bool___unbox__(result) == bool
-    ensures typeof(result) == __boxed_bool()
+function __prim__bool___box__(prim: Bool): Ref
+    ensures typeof(result) == bool()
+    ensures bool___unbox__(result) == prim
+    ensures int___unbox__(result) == (prim ? 1 : 0)
 
-function __boxed_bool___unbox__(box: Ref): Bool
-    ensures bool___box__(result) == box
+function bool___unbox__(box: Ref): Bool
+    requires issubtype(typeof(box), bool())
+    ensures __prim__bool___box__(result) == box
 
-function range___create__(start: Int, len: Int): Ref
-    requires len >= 0
-    ensures range___len__(result) == len
+function int___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+{
+    int___unbox__(self) == int___unbox__(other)
+}
+
+function bool___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), bool())
+    requires issubtype(typeof(other), bool())
+{
+    bool___unbox__(self) == bool___unbox__(other)
+}
+
+function int___ge__(self: Int, other: Int): Bool
+{
+    self >= other
+}
+
+function int___gt__(self: Int, other: Int): Bool
+{
+    self > other
+}
+
+function int___le__(self: Int, other: Int): Bool
+{
+    self <= other
+}
+
+function int___lt__(self: Int, other: Int): Bool
+{
+    self < other
+}
+
+function int___add__(self: Int, other: Int): Int
+{
+    self + other
+}
+
+function int___sub__(self: Int, other: Int): Int
+{
+    self - other
+}
+
+function int___mul__(self: Int, other: Int): Int
+{
+    self * other
+}
+
+function int___floordiv__(self: Int, other: Int): Int
+    requires other != 0
+{
+    self \ other
+}
+
+function int___mod__(self: Int, other: Int): Int
+    requires other != 0
+{
+    self % other
+}
+
+function range___create__(start: Int, stop: Int): Ref
+    requires stop > start
+    ensures range___val__(result) == [start..stop)
+    //ensures range___len__(result) == len
     ensures typeof(result) == range()
-    ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == int___box__(start + i)))
-    ensures forall i: Int :: {range___contains__(result, int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, int___box__(i))))
+    //ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == __prim__int___box__(start + i)))
+    //ensures forall i: Int :: {range___contains__(result, __prim__int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, __prim__int___box__(i))))
+
+function range___val__(self: Ref): Seq[Int]
 
 function range___len__(self: Ref): Int
-    ensures result >= 0
+    ensures result == |range___val__(self)|
 
-function range___getitem__(self: Ref, index: Int): Ref
-    requires index >= 0
-    requires index < range___len__(self)
+function range___getitem__(self: Ref, index: Ref): Int
+    requires issubtype(typeof(index), int())
+    requires int___unbox__(index) in range___val__(self)
+    ensures result == range___val__(self)[int___unbox__(index)]
 
 function range___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(item), int())
+    ensures result == (item in range___sil_seq__(self))
 
 function range___sil_seq__(self: Ref) : Seq[Ref]
     ensures |result| == range___len__(self)
-    ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
+    ensures forall i: Int :: ((i>= 0 && i < |range___val__(self)|) ==> result[i] == __prim__int___box__(range___val__(self)[i]))
+    ensures forall i: Ref :: {i in result} i in result <==> (issubtype(typeof(i), int()) && int___unbox__(i) in range___val__(self))
+
+    //ensures forall i: Int :: ((i>= 0 && i < |range___val__(self)|) ==> __prim__int___box__(range___val__(self)[i]) in result)
+    //ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
 
 function object___eq__(self: Ref, other: Ref): Bool
     ensures self == other ==> result
@@ -60,7 +135,7 @@ function object___eq__(self: Ref, other: Ref): Bool
 function Place___eq__(self: Ref, other: Ref): Bool
     ensures result == (self == other)
 
-function object___cast__(typ: PyType, object: Ref): Ref
-    requires issubtype(typeof(object), typ)
-    ensures result == object
-    ensures issubtype(typeof(object), typ)
+function object___cast__(typ: PyType, obj: Ref): Ref
+    requires issubtype(typeof(obj), typ)
+    ensures result == obj
+    ensures issubtype(typeof(obj), typ)

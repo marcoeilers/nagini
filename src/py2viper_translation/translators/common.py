@@ -80,6 +80,75 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
 
+    def to_ref(self, e: Expr, ctx: Context) -> Expr:
+        result = e
+        if e.typ() == self.viper.Int:
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'int___unbox__'):
+                result = e.args().head()
+            else:
+                prim_int = ctx.module.global_module.classes['__prim__int']
+                result = self.get_function_call(prim_int, '__box__',
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
+        elif e.typ() == self.viper.Bool:
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'bool___unbox__'):
+                result = e.args().head()
+            else:
+                prim_bool = ctx.module.global_module.classes['__prim__bool']
+                result = self.get_function_call(prim_bool, '__box__',
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
+        return result
+
+    def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
+        if e.typ() == self.viper.Bool:
+            return e
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                e.funcname() == '__prim__bool___box__'):
+            return e.args().head()
+        result = e
+        call_bool = True
+        if node:
+            node_type = self.get_type(node, ctx)
+            if node_type.name == 'bool':
+                call_bool = False
+            if call_bool:
+                result = self.get_function_call(node_type, '__bool__',
+                                                [result], [None], node, ctx,
+                                                position=e.pos())
+        if result.typ() != self.viper.Bool:
+            bool_type = ctx.module.global_module.classes['bool']
+            result = self.get_function_call(bool_type, '__unbox__',
+                                            [result], [None], node, ctx,
+                                            position=e.pos())
+        return result
+
+    def to_int(self, e: Expr, ctx: Context) -> Expr:
+        if e.typ() == self.viper.Int:
+            return e
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == '__prim__int___box__'):
+            return e.args().head()
+        result = e
+        int_type = ctx.module.global_module.classes['int']
+        result = self.get_function_call(int_type, '__unbox__',
+                                        [result], [None], None, ctx,
+                                        position=e.pos())
+        return result
+
+    def unwrap(self, e: Expr) -> Expr:
+        if isinstance(e, self.viper.ast.FuncApp):
+            if (e.funcname().endswith('__box__') or
+                    e.funcname().endswith('__unbox__')):
+                return e.args().head()
+        return e
+
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
             rules: Rules=None) -> 'silver.ast.Position':
@@ -190,6 +259,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         given types, should be translated as a native Silver operation or
         as a call to a special function.
         """
+        return False
         if left_type.name in {INT_TYPE, BOOL_TYPE}:
             if right_type.name not in {INT_TYPE, BOOL_TYPE}:
                 raise InvalidProgramException(node, 'invalid.operation.type')
@@ -208,7 +278,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
-                          ctx: Context) -> 'silver.ast.FuncApp':
+                          ctx: Context,
+                          position = None) -> 'silver.ast.FuncApp':
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments. Boxes arguments if necessary, and
@@ -228,27 +299,28 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
             formal_args.append(param.decl)
-            if (type and type.name in PRIMITIVES and
-                    param.type.name not in PRIMITIVES):
-                # Have to box
-                actual_arg = self.box_primitive(arg, type, None, ctx)
+            if param.type.name == '__prim__bool':
+                actual_arg = self.to_bool(arg, ctx)
+            elif param.type.name == '__prim__int':
+                actual_arg = self.to_int(arg, ctx)
             else:
-                actual_arg = arg
+                actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
         type = self.translate_type(func.type, ctx)
         sil_name = func.sil_name
 
+        actual_position = position if position else self.to_position(node, ctx)
         call = self.viper.FuncApp(sil_name, actual_args,
-                                  self.to_position(node, ctx),
+                                  actual_position,
                                   self.no_info(ctx), type, formal_args)
-        if node and not isinstance(node, ast.Assign):
-            node_type = self.get_type(node, ctx)
-        else:
-            node_type = None
-        if (node_type and node_type in PRIMITIVES and
-                func.type.name not in PRIMITIVES):
-            # Have to unbox
-            call = self.unbox_primitive(call, node_type, node, ctx)
+        # if node and not isinstance(node, ast.Assign):
+        #     node_type = self.get_type(node, ctx)
+        # else:
+        #     node_type = None
+        # if (node_type and node_type in PRIMITIVES and
+        #         func.type.name not in PRIMITIVES):
+        #     # Have to unbox
+        #     call = self.unbox_primitive(call, node_type, node, ctx)
         return call
 
     def get_method_call(self, receiver: PythonType,
@@ -270,12 +342,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             raise InvalidProgramException(node, 'unknown.function.called')
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
-            if (type and type.name in PRIMITIVES and
-                    param.type.name not in PRIMITIVES):
-                # Have to box
-                actual_arg = self.box_primitive(arg, type, None, ctx)
+            if param.type.name == '__prim__bool':
+                actual_arg = self.to_bool(arg, ctx)
+            elif param.type.name == '__prim__int':
+                actual_arg = self.to_int(arg, ctx)
             else:
-                actual_arg = arg
+                actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)
         sil_name = func.sil_name
         call = self.create_method_call_node(
@@ -415,4 +487,5 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        return do_get_target(node, containers, container)
+        result = do_get_target(node, containers, container)
+        return result

@@ -73,9 +73,12 @@ class ProgramTranslator(CommonTranslator):
             stmt, value = self.translate_expr(var.value, ctx)
             if stmt:
                 raise InvalidProgramException('purity.violated', var.node)
+            body = value
             posts.append(self.viper.EqCmp(result, value, position,
                                           self.no_info(ctx)))
-        return self.viper.Function(var.sil_name, [], type, [], posts, None,
+        else:
+            body = None
+        return self.viper.Function(var.sil_name, [], type, [], posts, body,
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
@@ -423,6 +426,20 @@ class ProgramTranslator(CommonTranslator):
                 if function.name() in used_names]
             predicates += self.viper.to_list(sil_prog.predicates())
 
+            for method in self.viper.to_list(sil_prog.methods()):
+                converted_method = self.create_method_node(
+                    ctx=ctx,
+                    name=method.name(),
+                    args=self.viper.to_list(method.formalArgs()),
+                    returns=self.viper.to_list(method.formalReturns()),
+                    pres=self.viper.to_list(method.pres()),
+                    posts=self.viper.to_list(method.posts()),
+                    locals=self.viper.to_list(method.locals()),
+                    body=method.body(),
+                    position=method.pos(),
+                    info=method.info(),
+                )
+                methods.append(converted_method)
         return domains, predicates, functions, methods
 
     def translate_program(self, modules: List[PythonModule],

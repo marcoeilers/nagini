@@ -209,12 +209,10 @@ class CallTranslator(CommonTranslator):
             msg = 'range() is currently only supported with two args.'
             raise UnsupportedException(node, msg)
         range_class = ctx.module.global_module.classes[RANGE_TYPE]
-        start_stmt, start = self.translate_expr(node.args[0], ctx)
-        end_stmt, end = self.translate_expr(node.args[1], ctx)
-
-        length = self.viper.Sub(end, start, self.to_position(node.args[1], ctx),
-                                self.no_info(ctx))
-        args = [start, length]
+        start_stmt, start = self.translate_expr(node.args[0], ctx,
+                                                self.viper.Int)
+        end_stmt, end = self.translate_expr(node.args[1], ctx, self.viper.Int)
+        args = [start, end]
         arg_types = [None, None]
         call = self.get_function_call(range_class, '__create__', args,
                                       arg_types, node, ctx)

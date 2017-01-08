@@ -148,7 +148,8 @@ class SIFPureTranslator(PureTranslator):
                     self.viper.Ref: null
                 }
                 old_val = dummies[wrapper.var.decl.typ()]
-            new_val = self.viper.CondExp(wrapper.cond, wrapper.expr,
+            new_val = self.viper.CondExp(wrapper.cond,
+                                         self.to_ref(wrapper.expr, ctx),
                                          old_val, position, info)
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)
@@ -180,12 +181,13 @@ class SIFPureTranslator(PureTranslator):
         position = self.to_position(wrapper.node, ctx)
         if wrapper.cond:
             old_val = ctx.var_aliases[wrapper.name].ref()
-            new_val = self.viper.CondExp(wrapper.cond, wrapper.expr,
+            new_val = self.viper.CondExp(wrapper.cond,
+                                         self.to_bool(wrapper.expr, ctx),
                                          old_val, position, info)
             return self.viper.Let(wrapper.var.decl, new_val,
                                   previous, position, info)
         else:
-            return self.viper.Let(wrapper.var.decl, wrapper.expr,
+            return self.viper.Let(wrapper.var.decl, self.to_bool(wrapper.expr, ctx),
                                   previous, position, info)
 
     def _translate_to_wrappers(self, nodes: List[ast.AST],

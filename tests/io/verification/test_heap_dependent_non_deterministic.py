@@ -38,6 +38,7 @@ class WriterSuper:
                 token(t1, 2) and
                 ((
                     Acc(self.int_field1, 1/2) and
+                    #:: ExpectedOutput(carbon)(application.precondition:assertion.false)
                     write_int_io(t1, self.int_field1, t2)
                 ) if b else (
                     Acc(self.int_field2, 1/2) and

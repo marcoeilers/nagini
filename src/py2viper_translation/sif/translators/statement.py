@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.lib.typedefs import StmtsAndExpr
+from py2viper_translation.lib.typedefs import Expr, StmtsAndExpr
 from py2viper_translation.lib.util import (
     flatten,
     get_body_start_index,
@@ -94,6 +94,8 @@ class SIFStatementTranslator(StatementTranslator):
                 invariants.append(invariant)
 
         body_index = get_body_start_index(node.body)
+        var_types = self._get_havoced_var_type_info(node.body[body_index:], ctx)
+        invariants = var_types + invariants
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in
                         node.body[body_index:]])
         # Add timelevel statement at the end of the loop.
@@ -103,6 +105,24 @@ class SIFStatementTranslator(StatementTranslator):
         self.leave_loop_translation(ctx)
         res = tl_stmts + loop_stmts
         return res
+
+    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
+                                   ctx: SIFContext) -> List[Expr]:
+        """
+        Creates a list of assertions containing type information for all local
+        variables written to within the given partial ASTs which already
+        existed before.
+        To be used to remember type information about arguments/local variables
+        which are assigned to in loops and therefore havoced.
+        """
+        result = []
+        vars = self._get_havoced_vars(nodes, ctx)
+        for var in vars:
+            result.append(self.type_check(var.ref(), var.type,
+                                          self.no_position(ctx), ctx))
+            result.append(self.type_check(var.var_prime.ref(), var.type,
+                                          self.no_position(ctx), ctx))
+        return result
 
     def _create_condition_and_timelevel_statements(self, condition: ast.AST,
             ctx: SIFContext) -> StmtsAndExpr:
@@ -116,9 +136,11 @@ class SIFStatementTranslator(StatementTranslator):
         pos = self.to_position(condition, ctx)
         info = self.no_info(ctx)
         # Translate condition twice, once normally and once in the prime ctx.
-        cond_stmts, cond = self.translate_to_bool(condition, ctx)
+        cond_stmts, cond = self.translate_expr(condition, ctx,
+                                               target_type=self.viper.Bool)
         with ctx.prime_ctx():
-            cond_stmts_p, cond_p = self.translate_to_bool(condition, ctx)
+            cond_stmts_p, cond_p = self.translate_expr(condition, ctx,
+                                                       target_type=self.viper.Bool)
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
@@ -145,7 +167,8 @@ class SIFStatementTranslator(StatementTranslator):
         if isinstance(node.value, ast.Call):
             _, tl_expr = self.translate_expr(node.value, ctx)
             assign_tl = self.viper.LocalVarAssign(
-                ctx.current_function.new_tl_var.ref(), tl_expr, pos, info)
+                ctx.current_function.new_tl_var.ref(),
+                self.to_bool(tl_expr, ctx), pos, info)
             res.append(assign_tl)
 
         return res

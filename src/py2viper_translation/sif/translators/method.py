@@ -1,4 +1,4 @@
-from py2viper_translation.lib.program_nodes import MethodType
+from py2viper_translation.lib.program_nodes import GenericType, MethodType
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -49,7 +49,8 @@ class SIFMethodTranslator(MethodTranslator):
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
                 ctx.current_tl_var_expr = None
-                stmt, expr = self.translate_expr(pre, ctx)
+                stmt, expr = self.translate_expr(pre, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -80,7 +81,8 @@ class SIFMethodTranslator(MethodTranslator):
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
                 ctx.current_tl_var_expr = None
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -167,7 +169,8 @@ class SIFMethodTranslator(MethodTranslator):
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx,
+                                                 target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -178,6 +181,28 @@ class SIFMethodTranslator(MethodTranslator):
         # create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
         # TODO(shitz): Add result type post-condition.
+        result = self.viper.Result(self.config.func_triple_factory.get_type(func.type, ctx),
+                                   self.no_position(ctx), self.no_info(ctx))
+        res_fst = self.config.func_triple_factory.get_call(FTDF.GET, [result],
+                                                           func.type,
+                                                           self.no_position(ctx),
+                                                           self.no_info(ctx),
+                                                           ctx)
+        res_snd = self.config.func_triple_factory.get_call(FTDF.GET_PRIME,
+                                                           [result],
+                                                           func.type,
+                                                           self.no_position(
+                                                               ctx),
+                                                           self.no_info(ctx),
+                                                           ctx)
+        return_type_posts = []
+        return_type_posts.append(self.type_check(res_fst, func.type,
+                                                 self.no_position(ctx),
+                                                 ctx))
+        return_type_posts.append(self.type_check(res_snd, func.type,
+                                                 self.no_position(ctx),
+                                                 ctx))
+        posts = return_type_posts + posts
         statements = func.node.body
         body_index = get_body_start_index(statements)
         # translate body
@@ -192,3 +217,14 @@ class SIFMethodTranslator(MethodTranslator):
         # Reset ctx to remove any artifacts from previously translated units.
         ctx.reset()
         return super().translate_method(method, ctx)
+
+    def _create_result_type_post(self, method: SIFPythonMethod, error_var_ref,
+                                 ctx: SIFContext):
+        if not method.type:
+            return []
+        res = self._create_single_result_post(method, error_var_ref,
+                                              ctx.result_var.ref(method.node,
+                                                                 ctx), ctx)
+        res_p = self._create_single_result_post(method, error_var_ref,
+            ctx.result_var.var_prime.ref(method.node, ctx), ctx)
+        return res + res_p

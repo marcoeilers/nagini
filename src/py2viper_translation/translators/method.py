@@ -61,7 +61,7 @@ class MethodTranslator(CommonTranslator):
         pres = []
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(pre, ctx)
+                stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(pre, 'purity.violated')
             pres.append(expr)
@@ -93,7 +93,7 @@ class MethodTranslator(CommonTranslator):
                                     self.no_position(ctx), self.no_info(ctx))
         for post, aliases in method.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             if method.declared_exceptions:
@@ -134,7 +134,7 @@ class MethodTranslator(CommonTranslator):
             ctx.current_contract_exception = exception
             for post, aliases in method.declared_exceptions[exception]:
                 with ctx.additional_aliases(aliases):
-                    stmt, expr = self.translate_expr(post, ctx)
+                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
                 if stmt:
                     raise InvalidProgramException(post, 'purity.violated')
                 expr = self.viper.Implies(condition, expr,
@@ -164,11 +164,11 @@ class MethodTranslator(CommonTranslator):
         """
         Creates 'typeof' preconditions for function arguments.
         """
-        args = func.args
+        args = func.get_args()
         pres = []
-        for arg in args.values():
-            if not (arg.type.name in PRIMITIVES):
-                if arg == next(iter(args.values())):
+        for arg in args:
+            if not (arg.type.name.startswith('__prim__')):
+                if arg == args[0]:
                     if is_constructor:
                         continue
                     if func.method_type == MethodType.class_method:
@@ -233,7 +233,7 @@ class MethodTranslator(CommonTranslator):
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
-                stmt, expr = self.translate_expr(post, ctx)
+                stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -277,20 +277,32 @@ class MethodTranslator(CommonTranslator):
         # Create typeof preconditions
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
+
+        posts = self._create_result_type_post(method, error_var_ref, ctx) + posts
+        return pres, posts
+
+    def _create_result_type_post(self, method: PythonMethod, error_var_ref, ctx: Context):
+        if method.type and method.type.name not in PRIMITIVES:
+            result = self._create_single_result_post(method, error_var_ref, ctx.result_var.ref(method.node, ctx), ctx)
+            return result
+        else:
+            return []
+
+    def _create_single_result_post(self, method: PythonMethod, error_var_ref, result_var, ctx: Context):
         no_pos = self.no_position(ctx)
         method_pos = self.to_position(method.node, ctx,
                                       '"return type is correct"')
         no_info = self.no_info(ctx)
-        if method.type and method.type.name not in PRIMITIVES:
-            check = self.type_check(ctx.result_var.ref(method.node, ctx),
-                                    method.type, method_pos, ctx)
-            if method.declared_exceptions:
-                no_error = self.viper.EqCmp(error_var_ref,
-                                            self.viper.NullLit(no_pos, no_info),
-                                            no_pos, no_info)
-                check = self.viper.Implies(no_error, check, method_pos, no_info)
-            posts = [check] + posts
-        return pres, posts
+
+        check = self.type_check(result_var,
+                                method.type, method_pos, ctx)
+        if method.declared_exceptions:
+            no_error = self.viper.EqCmp(error_var_ref,
+                                        self.viper.NullLit(no_pos, no_info),
+                                        no_pos, no_info)
+            check = self.viper.Implies(no_error, check, method_pos, no_info)
+        result = [check]
+        return result
 
     def get_all_field_accs(self, fields: List['silver.ast.Field'],
             self_var: 'silver.ast.LocalVar', position: 'silver.ast.Position',

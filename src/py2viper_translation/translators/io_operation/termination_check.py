@@ -95,7 +95,7 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
         """Generate a Silver expression that guards current AST node."""
         guard_sil_parts = []
         for part in self.current_guard:
-            sil_part = self._translate_expr(part)
+            sil_part = self._translate_expr(part, target_type=self._viper.Bool)
             guard_sil_parts.append(sil_part)
         and_operator = (
             lambda left, right:
@@ -143,7 +143,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
     def _check_termination_condition(self) -> None:
         """Check that child termination condition is implied."""
         termination_condition = self._translate_expr(
-            self._current_operation.get_terminates())
+            self._current_operation.get_terminates(),
+            target_type=self._viper.Bool)
         position = self._position(
             rules.TERMINATION_CHECK_CHILD_TERMINATION_NOT_IMPLIED)
         self._add_check(termination_condition,
@@ -153,7 +154,8 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
     def _check_termination_measure(self) -> None:
         """Check that child measure is strictly smaller."""
         termination_measure = self._translate_expr(
-            self._current_operation.get_termination_measure())
+            self._current_operation.get_termination_measure(),
+            target_type=self._viper.Int)
         position = self._position(
             rules.TERMINATION_CHECK_MEASURE_NON_DECREASING)
         larger = self._viper.GtCmp(
@@ -162,9 +164,9 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
             position, self._no_info())
         self._add_check(larger, "Termination measure of {}.", position)
 
-    def _translate_expr(self, node: ast.AST) -> Expr:
+    def _translate_expr(self, node: ast.AST, target_type=None) -> Expr:
         statement, expression = self._io_translator.translate_expr(
-            node, self._ctx, expression=True)
+            node, self._ctx, target_type=target_type, expression=True)
         assert not statement
         return expression
 

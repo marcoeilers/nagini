@@ -124,10 +124,12 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         ]
 
         statement, termination_condition = self.translate_expr(
-            operation.get_terminates(), ctx, expression=True)
+            operation.get_terminates(), ctx, target_type=self.viper.Bool,
+            expression=True)
         assert not statement
         statement, termination_measure = self.translate_expr(
-            operation.get_termination_measure(), ctx, expression=True)
+            operation.get_termination_measure(), ctx,
+            target_type=self.viper.Int, expression=True)
         assert not statement
 
         generator = TerminationCheckGenerator(
@@ -142,10 +144,35 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         position = self.to_position(operation.get_termination_measure(), ctx)
 
         body = self.translate_block(checks, position, info)
-
+        pres = self._create_typeof_pres(operation.get_parameters(), ctx)
         ctx.current_function = None
         result = self.viper.Method(
-            name=name, args=parameters, returns=[], pres=[], posts=[],
+            name=name, args=parameters, returns=[], pres=pres, posts=[],
             locals=[], body=body, position=self.no_position(ctx), info=info)
 
+        return result
+
+    def _create_typeof_pres(self, args,
+                            ctx: Context):
+        """
+        Creates 'typeof' preconditions for function arguments.
+        """
+        pres = []
+        for arg in args:
+            type_check = self.get_parameter_typeof(arg, ctx)
+            pres.append(type_check)
+        return pres
+
+    def get_parameter_typeof(self, param,
+                             ctx: Context):
+        """
+        Creates an expression checking if the given parameter has its type,
+        to be assumed in preconditions and/or postconditions. If possible,
+        the expression is wrapped in an InhaleExhaleExpression s.t. it is
+        just assumed, not checked. Generally this seems to be possible with
+        types, but not with type arg numbers, because the latter encodes length
+        for tuples.
+        """
+        no_pos = self.no_position(ctx)
+        result = self.var_type_check(param.sil_name, param.type, no_pos, ctx)
         return result

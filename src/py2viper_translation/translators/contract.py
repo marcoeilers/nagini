@@ -34,7 +34,7 @@ class ContractTranslator(CommonTranslator):
 
     def translate_contract_Call(self, node: ast.Call, ctx: Context) -> Expr:
         if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
-            stmt, res = self.translate_expr(node.args[0], ctx)
+            stmt, res = self.translate_expr(node.args[0], ctx, self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(node, 'purity.violated')
             return res
@@ -184,7 +184,7 @@ class ContractTranslator(CommonTranslator):
         Translates a call to Assert().
         """
         assert len(node.args) == 1
-        stmt, expr = self.translate_expr(node.args[0], ctx)
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool)
         assertion = self.viper.Assert(expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return stmt + [assertion], None
@@ -195,8 +195,10 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        cond_stmt, cond = self.translate_expr(node.args[0], ctx)
-        then_stmt, then = self.translate_expr(node.args[1], ctx)
+        cond_stmt, cond = self.translate_expr(node.args[0], ctx,
+                                              target_type=self.viper.Bool)
+        then_stmt, then = self.translate_expr(node.args[1], ctx,
+                                              target_type=self.viper.Bool)
         implication = self.viper.Implies(cond, then,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -219,7 +221,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -262,7 +265,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -279,7 +283,8 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
-        pred_stmt, pred = self.translate_expr(node.args[0], ctx)
+        pred_stmt, pred = self.translate_expr(node.args[0], ctx,
+                                              self.viper.Bool)
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         expr_stmt, expr = self.translate_expr(node.args[1], ctx)
@@ -320,6 +325,7 @@ class ContractTranslator(CommonTranslator):
                     if part_stmt:
                         raise InvalidProgramException(inner,
                                                       'purity.violated')
+                    part = self.unwrap(part)
                     trigger.append(part)
                 trigger = self.viper.Trigger(trigger, self.no_position(ctx),
                                              self.no_info(ctx))
@@ -374,7 +380,8 @@ class ContractTranslator(CommonTranslator):
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx)
+        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                             self.viper.Bool)
 
         triggers = self._translate_triggers(lambda_.body, node, ctx)
 
@@ -384,6 +391,7 @@ class ContractTranslator(CommonTranslator):
 
         dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
                                                               ctx)
+        lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -400,6 +408,11 @@ class ContractTranslator(CommonTranslator):
                 triggers = [lhs_trigger] + triggers
             except Exception:
                 pass
+        var_type_check = self.type_check(var.ref(), var.type,
+                                         self.no_position(ctx), ctx, False)
+        implication = self.viper.Implies(var_type_check, implication,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
         forall = self.viper.Forall(variables, triggers, implication,
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))

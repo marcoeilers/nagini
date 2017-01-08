@@ -1044,7 +1044,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_module().global_module.classes[INT_TYPE]
+        int_type = self.method.get_module().global_module.classes['__prim__' + INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -1147,6 +1147,8 @@ class PythonIOExistentialVar(PythonVarBase):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
+        if type.name == 'int':
+            print("1212")
         self._ref = None
         self._old_ref = None
 
@@ -1194,6 +1196,8 @@ class PythonVarCreator:
                  type: PythonClass) -> None:
         self._name = name
         self._node = node
+        if type.name == 'int':
+            print("1212")
         self._type = type
 
         # Information needed to construct defining getter.

@@ -99,8 +99,8 @@ class PythonBoolExpression(BoolExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        stmt, expr = translator.translate_to_bool(
-            self._node, ctx, expression=True)
+        stmt, expr = translator.translate_expr(
+            self._node, ctx, target_type=translator.viper.Bool, expression=True)
         assert not stmt
         return expr
 
@@ -113,7 +113,7 @@ class BoolVar(BoolExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        bool_class = ctx.module.global_module.classes['bool']
+        bool_class = ctx.module.global_module.classes['__prim__bool']
         assert self._var.type is bool_class
         return self._var.ref()
 

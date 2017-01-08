@@ -94,7 +94,8 @@ class Opener:
 
     def _translate_arguments(self) -> List[Expr]:
         return self._translator.translate_args(
-            self._operation_call.args, self._ctx)
+            self._operation_call.args, self._operation.get_parameters(),
+            self._ctx)
 
     def _translate_exhale(self, sil_args: List[Expr]) -> Stmt:
         """Translate exhale of IO operation."""
@@ -165,7 +166,9 @@ class Opener:
         forbidden inside IO operations.
         """
         statements, body_expression = self._translator.translate_expr(
-            self._operation.get_body(), self._ctx, expression=True)
+            self._operation.get_body(), self._ctx,
+            target_type=self._translator.viper.Bool,
+            expression=True)
         assert not statements
         return body_expression
 

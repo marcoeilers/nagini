@@ -23,11 +23,13 @@ class IOOperationCommonTranslator(CommonTranslator):
 
     def translate_args(
             self, args: List[ast.expr],
+            params,
             ctx: Context) -> List[Expr]:
         """Translate IO operation arguments to silver."""
         arg_exprs = []
-        for arg in args:
-            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+        for arg, param in zip(args, params):
+            typ = self.translate_type(param.type, ctx)
+            arg_stmt, arg_expr = self.translate_expr(arg, ctx, target_type=typ)
             assert not arg_stmt
             arg_exprs.append(arg_expr)
         return arg_exprs
@@ -43,8 +45,9 @@ class IOOperationCommonTranslator(CommonTranslator):
         assert isinstance(operation, PythonIOOperation)
 
         if sil_args is None:
-            py_args = node.args[:len(operation.get_parameters())]
-            sil_args = self.translate_args(py_args, ctx)
+            parameters = operation.get_parameters()
+            py_args = node.args[:len(parameters)]
+            sil_args = self.translate_args(py_args, parameters, ctx)
 
         getter_name = construct_getter_name(operation, result)
         typ = self.translate_type(result.type, ctx)
@@ -52,6 +55,7 @@ class IOOperationCommonTranslator(CommonTranslator):
             arg.decl
             for arg in operation.get_parameters()
         ]
+
         getter = self.viper.FuncApp(
             getter_name, sil_args, position, info, typ, formal_args)
         return getter
@@ -64,7 +68,7 @@ class IOOperationCommonTranslator(CommonTranslator):
 
         parameters = operation.get_parameters()
         py_args = node.args[:len(parameters)]
-        sil_args = self.translate_args(py_args, ctx)
+        sil_args = self.translate_args(py_args, parameters, ctx)
         for parameter, py_arg, sil_arg in zip(parameters, py_args, sil_args):
             var_type = self.get_type(py_arg, ctx)
             var = PythonIOExistentialVar(parameter.name, py_arg, var_type)

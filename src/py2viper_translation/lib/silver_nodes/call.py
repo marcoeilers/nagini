@@ -1,6 +1,5 @@
 """Function call Silver expression."""
 
-
 from typing import List
 
 from py2viper_translation.lib.silver_nodes.expression import Expression
@@ -33,7 +32,10 @@ class CallArg:
             self, translator: 'AbstractTranslator', ctx: 'Context',
             position: Position, info: Info) -> Expr:
         """Translate the argument passed to the function."""
-        return self._argument.translate(translator, ctx, position, info)
+        result = self._argument.translate(translator, ctx, position, info)
+        if self._parameter_type.__class__.__name__ == 'IntType':
+            result = translator.to_int(result, ctx)
+        return result
 
 
 class CallMixin(Expression):
