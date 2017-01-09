@@ -421,25 +421,12 @@ class ProgramTranslator(CommonTranslator):
                         for domain in self.viper.to_list(sil_prog.domains())
                         if domain.name() != 'PyType']
             functions += [
-                function
-                for function in self.viper.to_list(sil_prog.functions())
-                if function.name() in used_names]
+                f
+                for f in self.viper.to_list(sil_prog.functions())
+                if (f.name() in used_names and
+                    all([f.name() != f2.name() for f2 in functions]))]
             predicates += self.viper.to_list(sil_prog.predicates())
 
-            for method in self.viper.to_list(sil_prog.methods()):
-                converted_method = self.create_method_node(
-                    ctx=ctx,
-                    name=method.name(),
-                    args=self.viper.to_list(method.formalArgs()),
-                    returns=self.viper.to_list(method.formalReturns()),
-                    pres=self.viper.to_list(method.pres()),
-                    posts=self.viper.to_list(method.posts()),
-                    locals=self.viper.to_list(method.locals()),
-                    body=method.body(),
-                    position=method.pos(),
-                    info=method.info(),
-                )
-                methods.append(converted_method)
         return domains, predicates, functions, methods
 
     def translate_program(self, modules: List[PythonModule],
