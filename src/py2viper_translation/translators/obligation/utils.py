@@ -17,13 +17,17 @@ def find_method_by_sil_name(ctx: Context, sil_name: str) -> PythonMethod:
     module = ctx.module
     modules = module.get_included_modules()
     for module in modules:
-        for method in module.methods.values():
-            if method.sil_name == sil_name:
-                return method
-        for cls in module.classes.values():
-            for method in cls.methods.values():
+        methods = module.methods
+        if isinstance(methods, dict):
+            for method in methods.values():
                 if method.sil_name == sil_name:
                     return method
+        classes = module.classes
+        if isinstance(classes, dict):
+            for cls in classes.values():
+                for method in cls.methods.values():
+                    if method.sil_name == sil_name:
+                        return method
     return None
 
 
