@@ -516,6 +516,11 @@ class GenericType(PythonType):
         return self.get_class().get_predicate(name)
 
     def issubtype(self, other: PythonType) -> bool:
+        if isinstance(other, GenericType):
+            if self.cls.issubtype(other.cls):
+                if self.type_args == other.type_args:
+                    return True
+            return False
         return self.cls.issubtype(other)
 
     def __eq__(self, other) -> bool:
