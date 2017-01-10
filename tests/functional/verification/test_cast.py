@@ -14,7 +14,7 @@ class D:
 def m(l: List[object]) -> None:
     Requires(Acc(list_pred(l)))
     Requires(len(l) > 1)
-    #:: ExpectedOutput(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:assertion.false)|UnexpectedOutput(carbon)(call.precondition:assertion.false, 173)
     cast(C, l[0]).f()
 
 
