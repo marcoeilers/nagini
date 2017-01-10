@@ -26,7 +26,7 @@ def while2() -> None:
     Requires(Low())
     x = input_high()
     while x != 0:
-        #:: OptionalOutput(invariant.not.preserved:assertion.false) | ExpectedOutput(invariant.not.established:assertion.false)
+        #:: ExpectedOutput(carbon)(invariant.not.preserved:assertion.false) | ExpectedOutput(invariant.not.established:assertion.false)
         Invariant(Low())
         x = x - 1
     sif_print(1)
@@ -78,5 +78,5 @@ def while5() -> None:
             i = i + 1
             h = h -1
         l = l - 1
-    #:: OptionalOutput(call.predcondition:assertion.false) | ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(carbon)(call.precondition:assertion.false) | ExpectedOutput(call.precondition:assertion.false)
     sif_print(i)

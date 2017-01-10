@@ -42,7 +42,7 @@ def MustRelease_context_2(lock: Lock) -> None:
         i += 1
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def MustInvoke_body_1(t1: Place) -> None:
     Requires(token(t1, 1))
     i = 0
@@ -52,7 +52,7 @@ def MustInvoke_body_1(t1: Place) -> None:
         i += 1
 
 
-#:: OptionalOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def MustRelease_body_1(lock: Lock) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
@@ -65,7 +65,7 @@ def MustRelease_body_1(lock: Lock) -> None:
 def MustInvoke_body_2(t1: Place) -> None:
     Requires(token(t1, 1))
     i = 0
-    #:: OptionalOutput(leak_check.failed:loop_body.leaks_obligations)
+    #:: ExpectedOutput(carbon)(leak_check.failed:loop_body.leaks_obligations)
     while i < 5:
         #:: ExpectedOutput(invariant.not.preserved:insufficient.permission)
         Invariant(Implies(i < 5, token(t1, 1)))
@@ -75,7 +75,7 @@ def MustInvoke_body_2(t1: Place) -> None:
 def MustRelease_body_2(lock: Lock) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
-    #:: OptionalOutput(leak_check.failed:loop_body.leaks_obligations)
+    #:: ExpectedOutput(carbon)(leak_check.failed:loop_body.leaks_obligations)
     while i < 5:
         #:: ExpectedOutput(invariant.not.preserved:insufficient.permission)
         Invariant(Implies(i < 5, MustRelease(lock, 1)))

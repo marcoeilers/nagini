@@ -405,6 +405,18 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         for name, field in self.static_fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name), translator)
+        if self.interface:
+            all_methods = list(self.functions.values())
+            all_methods.extend(self.methods.values())
+            for method in all_methods:
+                requires = set()
+                for requirement in method.requires:
+                    target = self.get_func_or_method(requirement)
+                    if target:
+                        requires.add(target.sil_name)
+                    else:
+                        requires.add(requirement)
+                translator.set_required_names(method.sil_name, requires)
 
     def issubtype(self, cls: 'PythonClass') -> bool:
         if cls is self:
@@ -618,6 +630,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.method_type = method_type
         self.obligation_info = None
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
+        self.requires = []
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1150,6 +1163,8 @@ class PythonIOExistentialVar(PythonVarBase):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
+        if type.name == 'int':
+            print("1212")
         self._ref = None
         self._old_ref = None
 
@@ -1197,6 +1212,8 @@ class PythonVarCreator:
                  type: PythonClass) -> None:
         self._name = name
         self._node = node
+        if type.name == 'int':
+            print("1212")
         self._type = type
 
         # Information needed to construct defining getter.

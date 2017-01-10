@@ -207,10 +207,7 @@ class TypeTranslator(CommonTranslator):
         if type is None:
             none_type = ctx.module.global_module.classes['NoneType']
             return self.type_factory.type_check(lhs, none_type, position, ctx)
-        elif type.name in PRIMITIVES:
-            boxed = ctx.module.global_module.classes['__boxed_' + type.name]
-            return self.type_factory.type_check(lhs, boxed, position, ctx)
-        elif type.name == 'type':
+        elif type.name in PRIMITIVES or type.name == 'type':
             return self.viper.TrueLit(position, self.no_info(ctx))
         elif type.name == UNION_TYPE:
             # Union type should not directly show up on Silver level, instead

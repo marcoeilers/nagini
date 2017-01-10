@@ -9,6 +9,12 @@ def func1(b: int) -> int:
     a = 16
     return b + a
 
+@Pure
+def func1_correct(b: int) -> int:
+    Requires(b == 15)
+    Ensures(Result() == 32)
+    return 32
+
 def method1(b: int) -> int:
     Requires(b == 15)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
@@ -35,7 +41,7 @@ def func2(arg: int) -> int:
         local_var12 = False
         arg2 -= 5
     if local_var12 and local_var12:
-        local_var = func1(15)
+        local_var = func1_correct(15)
         return local_var + 10
     else:
         return 42

@@ -1,5 +1,6 @@
 CHECKED_TRANSLATOR_FILES:=\
 	src/py2viper_translation/analyzer_io.py \
+	src/py2viper_translation/tests.py \
 	src/py2viper_translation/lib/io_context.py \
 	src/py2viper_translation/lib/io_checkers.py \
 	src/py2viper_translation/lib/guard_collectors.py \

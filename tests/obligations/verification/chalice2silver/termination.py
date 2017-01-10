@@ -23,7 +23,6 @@ def some_time() -> None:
 
 def i_time(i: int) -> None:
     Requires(i > 0)
-    #:: Label(i_time__MustTerminate)
     Requires(MustTerminate(i))
 
 
@@ -108,7 +107,7 @@ def loop3() -> None:
     n = 10
     while i < n:
         Invariant(MustTerminate(n-i+1))
-        #:: ExpectedOutput(call.precondition:assertion.false)|OptionalOutput(leak_check.failed:caller.has_unsatisfied_obligations)
+        #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(leak_check.failed:caller.has_unsatisfied_obligations)
         i_time(i)
         i = i + 1
 
