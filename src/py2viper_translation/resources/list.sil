@@ -94,6 +94,7 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+  ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
 {
   inhale false
 }
@@ -107,6 +108,7 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   ensures old(|self.list_acc| > self.__iter_index) ==> (_res == old(self.list_acc[self.__iter_index])) && ((_res in self.list_acc) && (_err == null))
   ensures acc(self.__previous, 1 / 40) && ((self.__previous == old(self.__previous)) && (acc(self.__previous.list_acc, write) && (old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index])))))
   ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null) && (self.__previous.list_acc == self.list_acc)
+  ensures _err == null ==> issubtype(typeof(_res), get_type_arg1(self, 0))
 {
   inhale false
 }

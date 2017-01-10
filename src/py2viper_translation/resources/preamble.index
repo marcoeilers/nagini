@@ -278,6 +278,20 @@
         "__val__": {
             "args": ["str"],
             "type": "int"
+        },
+        "join": {
+            "args": ["str", "list"],
+            "type": "str"
+        },
+        "__mod__": {
+            "args": ["str", "tuple"],
+            "type": "str"
+        }
+    },
+    "methods": {
+        "split": {
+            "args": ["str"],
+            "type": "list"
         }
     },
     "extends": "object"
