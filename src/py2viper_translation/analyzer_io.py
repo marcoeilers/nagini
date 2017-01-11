@@ -8,7 +8,11 @@ from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from typing import cast, List
 
 from py2viper_translation.lib import program_nodes as nodes
-from py2viper_translation.lib.constants import BOOL_TYPE
+from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
+    BOXED_PRIMITIVES,
+    PRIMITIVE_PREFIX,
+)
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
     InvalidProgramException,
@@ -101,10 +105,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             scopes.append(prefix)
         typ, _ = self._parent.module.get_type(scopes, node.arg)
         result = self._parent.convert_type(typ)
-        if result.name in {'int', 'bool'}:
+        if result.name in BOXED_PRIMITIVES:
             # to avoid problems with boxed versions not being reference-equal,
             # always use unboxed versions
-            prim_name = '__prim__' + result.name
+            prim_name = PRIMITIVE_PREFIX + result.name
             result = self._parent.module.global_module.classes[prim_name]
         return result
 

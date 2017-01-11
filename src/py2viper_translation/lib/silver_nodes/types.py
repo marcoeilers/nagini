@@ -19,12 +19,21 @@ class Type:
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         """Translate type to its Silver representation."""
 
+    def adjust_type(self, translator: 'AbstractTranslator', e: Expr,
+                    ctx: 'Context') -> Expr:
+        """Convert the expression e to this Silver type if possible."""
+        return e
+
 
 class BoolType(Type):
     """A boolean type."""
 
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         return translator.viper.Bool
+
+    def adjust_type(self, translator: 'AbstractTranslator', e: Expr,
+                    ctx: 'Context') -> Expr:
+        return translator.to_bool(e, ctx)
 
 
 BOOL = BoolType()
@@ -36,6 +45,9 @@ class IntType(Type):
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         return translator.viper.Int
 
+    def adjust_type(self, translator: 'AbstractTranslator', e: Expr,
+                    ctx: 'Context') -> Expr:
+        return translator.to_int(e, ctx)
 
 INT = IntType()
 
@@ -45,6 +57,10 @@ class RefType(Type):
 
     def translate(self, translator: 'AbstractTranslator') -> Expr:
         return translator.viper.Ref
+
+    def adjust_type(self, translator: 'AbstractTranslator', e: Expr,
+                    ctx: 'Context') -> Expr:
+        return translator.to_ref(e, ctx)
 
 
 REF = RefType()

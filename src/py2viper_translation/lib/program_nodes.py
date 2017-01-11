@@ -18,7 +18,7 @@ from py2viper_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
-    PRIMITIVES,
+    PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -1065,7 +1065,8 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        int_type = self.method.get_module().global_module.classes['__prim__' + INT_TYPE]
+        global_module = self.method.get_module().global_module
+        int_type = global_module.classes[PRIMITIVE_INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
@@ -1168,8 +1169,6 @@ class PythonIOExistentialVar(PythonVarBase):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
-        if type.name == 'int':
-            print("1212")
         self._ref = None
         self._old_ref = None
 
@@ -1217,8 +1216,6 @@ class PythonVarCreator:
                  type: PythonClass) -> None:
         self._name = name
         self._node = node
-        if type.name == 'int':
-            print("1212")
         self._type = type
 
         # Information needed to construct defining getter.
@@ -1472,13 +1469,13 @@ def get_target(node: ast.AST,
             module = [c for c in containers if isinstance(c, PythonModule)][0]
             type_class = None
             if node.value.id == 'Dict':
-                type_class = module.global_module.classes['dict']
+                type_class = module.global_module.classes[DICT_TYPE]
             if node.value.id == 'Set':
-                type_class = module.global_module.classes['set']
+                type_class = module.global_module.classes[SET_TYPE]
             if node.value.id == 'List':
-                type_class = module.global_module.classes['list']
+                type_class = module.global_module.classes[LIST_TYPE]
             if node.value.id == 'Tuple':
-                type_class = module.global_module.classes['tuple']
+                type_class = module.global_module.classes[TUPLE_TYPE]
             if type_class:
                 args = []
                 if isinstance(node.slice.value, ast.Tuple):

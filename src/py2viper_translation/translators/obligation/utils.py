@@ -13,21 +13,17 @@ from py2viper_translation.lib.typedefs import (
 
 
 def find_method_by_sil_name(ctx: Context, sil_name: str) -> PythonMethod:
-    """Find Python method based on its Silver name."""
-    module = ctx.module
-    modules = module.get_included_modules()
-    for module in modules:
-        methods = module.methods
-        if isinstance(methods, dict):
-            for method in methods.values():
-                if method.sil_name == sil_name:
-                    return method
-        classes = module.classes
-        if isinstance(classes, dict):
-            for cls in classes.values():
-                for method in cls.methods.values():
-                    if method.sil_name == sil_name:
-                        return method
+    """Find Python method from the global module based on its Silver name."""
+    module = ctx.module.global_module
+    methods = module.methods
+    for method in methods.values():
+        if method.sil_name == sil_name:
+            return method
+    classes = module.classes
+    for cls in classes.values():
+        for method in cls.methods.values():
+            if method.sil_name == sil_name:
+                return method
     return None
 
 
