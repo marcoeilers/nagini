@@ -180,9 +180,10 @@ class SIFMethodTranslator(MethodTranslator):
         ctx.in_posts = False
         # create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
-        # TODO(shitz): Add result type post-condition.
-        result = self.viper.Result(self.config.func_triple_factory.get_type(func.type, ctx),
-                                   self.no_position(ctx), self.no_info(ctx))
+        # Add result type post-condition.
+        result_type = self.config.func_triple_factory.get_type(func.type, ctx)
+        result = self.viper.Result(result_type, self.no_position(ctx),
+                                   self.no_info(ctx))
         res_fst = self.config.func_triple_factory.get_call(FTDF.GET, [result],
                                                            func.type,
                                                            self.no_position(ctx),

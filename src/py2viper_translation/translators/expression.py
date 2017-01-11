@@ -6,7 +6,6 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     INT_TYPE,
     LIST_TYPE,
-    PRIMITIVES,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -222,8 +221,6 @@ class ExpressionTranslator(CommonTranslator):
                                       arg_types, node, ctx)
         result = call
         result_type = self.get_type(node, ctx)
-        if result_type.name in PRIMITIVES:
-            result = self.unbox_primitive(result, result_type, node, ctx)
         return target_stmt + index_stmt, result
 
     def create_exception_catchers(self, var: PythonVar,
@@ -340,7 +337,6 @@ class ExpressionTranslator(CommonTranslator):
         type = self.get_type(node, ctx)
         bool_class = ctx.module.global_module.classes[BOOL_TYPE]
         if type is not bool_class:
-            # return stmt, res
             args = [res]
             arg_type = self.get_type(node, ctx)
             arg_types = [arg_type]
@@ -534,30 +530,22 @@ class ExpressionTranslator(CommonTranslator):
             compare_func = '__le__'
         else:
             raise UnsupportedException(node.ops[0])
-        if False and left_type.name in {INT_TYPE, BOOL_TYPE}:
-            if right_type.name not in {INT_TYPE, BOOL_TYPE}:
-                # This comparison will either raise an error or always
-                # yield the same result (if we check for equality), so we
-                # don't support it.
-                raise InvalidProgramException(node, 'invalid.comparison.type')
-            comparison = int_compare(left, right, position, info)
+        if left_type.get_function(compare_func):
+            comparison = self.get_function_call(left_type, compare_func,
+                                                [left, right],
+                                                [left_type, right_type],
+                                                node, ctx)
+        elif compare_func == '__ne__' and left_type.get_function('__eq__'):
+            # The default behavior if __ne__ is not explicitly defined
+            # is to invert the result of __eq__.
+            call = self.get_function_call(left_type, '__eq__',
+                                          [left, right],
+                                          [left_type, right_type],
+                                          node, ctx)
+            comparison = self.viper.Not(self.to_bool(call, ctx, node.left),
+                                        position, info)
         else:
-            if left_type.get_function(compare_func):
-                comparison = self.get_function_call(left_type, compare_func,
-                                                    [left, right],
-                                                    [left_type, right_type],
-                                                    node, ctx)
-            elif compare_func == '__ne__' and left_type.get_function('__eq__'):
-                # The default behavior if __ne__ is not explicitly defined
-                # is to invert the result of __eq__.
-                call = self.get_function_call(left_type, '__eq__',
-                                              [left, right],
-                                              [left_type, right_type],
-                                              node, ctx)
-                comparison = self.viper.Not(self.to_bool(call, ctx, node.left),
-                                            position, info)
-            else:
-                raise InvalidProgramException(node, 'undefined.comparison')
+            raise InvalidProgramException(node, 'undefined.comparison')
         return stmts, comparison
 
     def translate_NameConstant(self, node: ast.NameConstant,

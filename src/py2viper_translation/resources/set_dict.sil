@@ -127,7 +127,6 @@ method dict_keys(self: Ref) returns (res: Ref)
 function dict___getitem__(self: Ref, key: Ref) : Ref
     requires acc(self.dict_acc, wildcard)
     requires dict___contains__(self, key)
-    //ensures get_type_nargs0(result) == get_type_nargs1(self, 1)
     ensures issubtype(typeof(result), get_type_arg1(self, 1))
     ensures (get_type_nargs0(result) == get_type_nargs1(self, 1)) &&
     (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 1, i1)) &&

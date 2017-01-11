@@ -354,10 +354,7 @@ class ContractTranslator(CommonTranslator):
                                         [domain],
                                         self.to_position(domain_node, ctx),
                                         self.no_info(ctx), seq_ref, formal_args)
-        if var.type.name in PRIMITIVES:
-            ref_var = self.box_primitive(var.ref(), var.type, None, ctx)
-        else:
-            ref_var = var.ref()
+        ref_var = self.to_ref(var.ref(), ctx)
         result = self.viper.SeqContains(ref_var, domain_set,
                                         self.to_position(domain_node, ctx),
                                         self.no_info(ctx))

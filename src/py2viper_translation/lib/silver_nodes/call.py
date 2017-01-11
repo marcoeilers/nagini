@@ -33,8 +33,7 @@ class CallArg:
             position: Position, info: Info) -> Expr:
         """Translate the argument passed to the function."""
         result = self._argument.translate(translator, ctx, position, info)
-        if self._parameter_type.__class__.__name__ == 'IntType':
-            result = translator.to_int(result, ctx)
+        result = self._parameter_type.adjust_type(translator, result, ctx)
         return result
 
 

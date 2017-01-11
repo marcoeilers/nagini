@@ -5,6 +5,10 @@ import ast
 
 from typing import List, Optional
 
+from py2viper_translation.lib.constants import (
+    BOXED_PRIMITIVES,
+    PRIMITIVE_PREFIX,
+)
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.program_nodes import (
     PythonIOOperation,
@@ -71,6 +75,9 @@ class IOOperationCommonTranslator(CommonTranslator):
         sil_args = self.translate_args(py_args, parameters, ctx)
         for parameter, py_arg, sil_arg in zip(parameters, py_args, sil_args):
             var_type = self.get_type(py_arg, ctx)
+            if var_type.name in BOXED_PRIMITIVES:
+                prim_name = PRIMITIVE_PREFIX + var_type.name
+                var_type = ctx.module.global_module.classes[prim_name]
             var = PythonIOExistentialVar(parameter.name, py_arg, var_type)
             var.set_ref(sil_arg, None)
             ctx.set_alias(parameter.name, var)
