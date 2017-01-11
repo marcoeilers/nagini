@@ -101,10 +101,7 @@ function int___mod__(self: Int, other: Int): Int
 function range___create__(start: Int, stop: Int): Ref
     requires stop > start
     ensures range___val__(result) == [start..stop)
-    //ensures range___len__(result) == len
     ensures typeof(result) == range()
-    //ensures forall i: Int :: {range___getitem__(result, i)} ((i >= 0 && i < range___len__(result)) ==> (range___getitem__(result, i) == __prim__int___box__(start + i)))
-    //ensures forall i: Int :: {range___contains__(result, __prim__int___box__(i))} ((i >= start && i < start + len) <==> (range___contains__(result, __prim__int___box__(i))))
 
 function range___val__(self: Ref): Seq[Int]
 
@@ -124,9 +121,6 @@ function range___sil_seq__(self: Ref) : Seq[Ref]
     ensures |result| == range___len__(self)
     ensures forall i: Int :: ((i>= 0 && i < |range___val__(self)|) ==> result[i] == __prim__int___box__(range___val__(self)[i]))
     ensures forall i: Ref :: {i in result} i in result <==> (issubtype(typeof(i), int()) && int___unbox__(i) in range___val__(self))
-
-    //ensures forall i: Int :: ((i>= 0 && i < |range___val__(self)|) ==> __prim__int___box__(range___val__(self)[i]) in result)
-    //ensures forall v: Ref :: {range___contains__(self, v)} {v in result} ((v in result) <==> (range___contains__(self, v)))
 
 function object___eq__(self: Ref, other: Ref): Bool
     ensures self == other ==> result

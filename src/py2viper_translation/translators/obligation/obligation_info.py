@@ -8,6 +8,7 @@ from typing import List
 
 from py2viper_translation.lib import silver_nodes as sil
 from py2viper_translation.lib.config import obligation_config
+from py2viper_translation.lib.constants import PRIMITIVE_BOOL_TYPE
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.guard_collectors import (
     GuardCollectingVisitor,
@@ -370,11 +371,11 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         self.loop_measure_map = MeasureMap(loop_measure_map_var)
         self._variables = {
             LOOP_CHECK_BEFORE_NAME: self._create_var(
-                LOOP_CHECK_BEFORE_NAME, '__prim__bool', translator.translator,
-                local=True),
+                LOOP_CHECK_BEFORE_NAME, PRIMITIVE_BOOL_TYPE,
+                translator.translator, local=True),
             LOOP_TERMINATION_FLAG_NAME: self._create_var(
-                LOOP_TERMINATION_FLAG_NAME, '__prim__bool', translator.translator,
-                local=True),
+                LOOP_TERMINATION_FLAG_NAME, PRIMITIVE_BOOL_TYPE,
+                translator.translator, local=True),
             LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME: self._create_perm_var(
                 LOOP_ORIGINAL_MUST_TERMINATE_AMOUNT_NAME, translator,
                 local=True),

@@ -159,8 +159,9 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         """
         pres = []
         for arg in args:
-            type_check = self.get_parameter_typeof(arg, ctx)
-            pres.append(type_check)
+            if not arg.type.name in PRIMITIVES:
+                type_check = self.get_parameter_typeof(arg, ctx)
+                pres.append(type_check)
         return pres
 
     def get_parameter_typeof(self, param,

@@ -105,4 +105,3 @@ function tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
     requires key < tuple___len__(self)
     ensures issubtype(typeof(result), get_type_arg1(self, key))
-    //ensures get_type_nargs0(self) == -1 ==> issubtype(typeof(result), get_type_arg1(self, 0))

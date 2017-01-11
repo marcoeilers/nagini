@@ -283,9 +283,6 @@ class CallTranslator(CommonTranslator):
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
         call_type = self.get_type(node, ctx)
-        if (call_type and call_type.name in PRIMITIVES and
-                target.type.name not in PRIMITIVES):
-            call = self.unbox_primitive(call, call_type, node, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -704,12 +701,7 @@ class CallTranslator(CommonTranslator):
         if target.kw_arg:
             target_params.append(target.kw_arg)
         for arg, param, type in zip(args, target_params, arg_types):
-            if (type and type.name in PRIMITIVES and
-                    param.type.name not in PRIMITIVES):
-                actual_arg = self.box_primitive(arg, type, None, ctx)
-            else:
-                actual_arg = arg
-            actual_args.append(actual_arg)
+            actual_args.append(arg)
         args = actual_args
         for arg in target.get_args():
             formal_args.append(arg.decl)

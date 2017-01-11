@@ -24,10 +24,12 @@ class PredicateTranslator(CommonTranslator):
         arg_types = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
         for name, arg in pred.args.items():
             args.append(arg.decl)
-            arg_type = self.type_check(arg.ref(), arg.type, self.no_position(ctx), ctx)
+            arg_type = self.type_check(arg.ref(), arg.type,
+                                       self.no_position(ctx), ctx)
             arg_types = self.viper.And(arg_types, arg_type,
                                        self.no_position(ctx), self.no_info(ctx))
-        body = self.to_bool(self.translate_exprs(pred.node.body, pred, ctx), ctx)
+        body = self.to_bool(self.translate_exprs(pred.node.body, pred, ctx),
+                            ctx)
         body = self.viper.And(arg_types, body, self.no_position(ctx),
                               self.no_info(ctx))
         ctx.current_function = None

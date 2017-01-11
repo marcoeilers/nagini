@@ -128,9 +128,17 @@ INT_TYPE = 'int'
 
 BOOL_TYPE = 'bool'
 
+PRIMITIVE_INT_TYPE = '__prim__int'
+
+PRIMITIVE_BOOL_TYPE = '__prim__bool'
+
 OBJECT_TYPE = 'object'
 
-PRIMITIVES = ['__prim__int', '__prim__bool'] # [INT_TYPE, BOOL_TYPE]
+PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE}
+
+BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
+
+PRIMITIVE_PREFIX = '__prim__'
 
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',

@@ -5,6 +5,7 @@ import ast
 
 from typing import List
 
+from py2viper_translation.lib.constants import PRIMITIVE_BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
@@ -113,7 +114,7 @@ class BoolVar(BoolExpression):
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
-        bool_class = ctx.module.global_module.classes['__prim__bool']
+        bool_class = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
         assert self._var.type is bool_class
         return self._var.ref()
 

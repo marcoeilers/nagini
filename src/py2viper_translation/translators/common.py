@@ -5,7 +5,8 @@ from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     INT_TYPE,
     OPERATOR_FUNCTIONS,
-    PRIMITIVES,
+    PRIMITIVE_BOOL_TYPE,
+    PRIMITIVE_INT_TYPE,
     UNION_TYPE,
 )
 from py2viper_translation.lib.context import Context
@@ -81,13 +82,18 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.viper.Seqn(body, position, info)
 
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
+        """
+        Converts the given expression to an expression of the Silver type Ref
+        if it isn't already, either by boxing a primitive or undoing a
+        previous unboxing operation.
+        """
         result = e
         if e.typ() == self.viper.Int:
             if (isinstance(e, self.viper.ast.FuncApp) and
                     e.funcname() == 'int___unbox__'):
                 result = e.args().head()
             else:
-                prim_int = ctx.module.global_module.classes['__prim__int']
+                prim_int = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
                 result = self.get_function_call(prim_int, '__box__',
                                                 [result], [None], None, ctx,
                                                 position=e.pos())
@@ -96,13 +102,18 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     e.funcname() == 'bool___unbox__'):
                 result = e.args().head()
             else:
-                prim_bool = ctx.module.global_module.classes['__prim__bool']
+                prim_bool = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
                 result = self.get_function_call(prim_bool, '__box__',
                                                 [result], [None], None, ctx,
                                                 position=e.pos())
         return result
 
     def to_bool(self, e: Expr, ctx: Context, node: ast.AST = None) -> Expr:
+        """
+        Converts the given expression to an expression of the Silver type Bool
+        if it isn't already, either by calling __bool__ on an object and
+        possibly unboxing the result, or by undoing a previous boxing operation.
+        """
         if e.typ() == self.viper.Bool:
             return e
         if e.typ() != self.viper.Ref:
@@ -128,6 +139,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return result
 
     def to_int(self, e: Expr, ctx: Context) -> Expr:
+        """
+        Converts the given expression to an expression of the Silver type Int
+        if it isn't already, either by unboxing a reference or undoing a
+        previous boxing operation.
+        """
         if e.typ() == self.viper.Int:
             return e
         if e.typ() != self.viper.Ref:
@@ -136,7 +152,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     e.funcname() == '__prim__int___box__'):
             return e.args().head()
         result = e
-        int_type = ctx.module.global_module.classes['int']
+        int_type = ctx.module.global_module.classes[INT_TYPE]
         result = self.get_function_call(int_type, '__unbox__',
                                         [result], [None], None, ctx,
                                         position=e.pos())
@@ -179,14 +195,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def normalize_type(self, typ: PythonType, ctx: Context) -> PythonType:
         """
-        Normalizes a type, i.e., converts it to the wrapper type if it's
-        a primitive, returns the actual NoneType if it's None, otherwise just
-        returns the type.
+        Normalizes a type, i.e., returns the actual NoneType if it's None,
+        otherwise just returns the type.
         """
         if typ is None:
             return ctx.module.global_module.classes['NoneType']
-        if typ.name in PRIMITIVES:
-            return ctx.module.global_module.classes['__boxed_' + typ.name]
         return typ
 
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
@@ -313,14 +326,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         call = self.viper.FuncApp(sil_name, actual_args,
                                   actual_position,
                                   self.no_info(ctx), type, formal_args)
-        # if node and not isinstance(node, ast.Assign):
-        #     node_type = self.get_type(node, ctx)
-        # else:
-        #     node_type = None
-        # if (node_type and node_type in PRIMITIVES and
-        #         func.type.name not in PRIMITIVES):
-        #     # Have to unbox
-        #     call = self.unbox_primitive(call, node_type, node, ctx)
         return call
 
     def get_method_call(self, receiver: PythonType,
@@ -342,7 +347,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             raise InvalidProgramException(node, 'unknown.function.called')
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
-            if param.type.name == '__prim__bool':
+            if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
             elif param.type.name == '__prim__int':
                 actual_arg = self.to_int(arg, ctx)
@@ -425,31 +430,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         ctx.var_aliases = old_var_valiases
         ctx.label_aliases = old_lbl_aliases
         return stmts
-
-    def box_primitive(self, primitive: Expr, type: PythonType, node: ast.AST,
-                      ctx: Context) -> StmtsAndExpr:
-        """
-        Wraps the primitive of type type into a Ref object.
-        """
-        args = [primitive]
-        arg_types = [None]
-        name = '__box__'
-        call = self.get_function_call(type, name, args, arg_types, node, ctx)
-        return call
-
-    def unbox_primitive(self, box: Expr, type: PythonType, node: ast.AST,
-                        ctx: Context) -> Expr:
-        """
-        Assuming box is a wrapper-Ref containing a primitive of type type,
-        returns the boxed primitive.
-        """
-        args = [box]
-        arg_types = [None]
-        name = '__unbox__'
-        call = self.get_function_call(
-            ctx.module.global_module.classes['__boxed_' + type.name], name,
-            args, arg_types, node, ctx)
-        return call
 
     def _get_string_value(self, string: str) -> int:
         """

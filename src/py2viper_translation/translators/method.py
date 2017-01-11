@@ -278,17 +278,21 @@ class MethodTranslator(CommonTranslator):
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
 
-        posts = self._create_result_type_post(method, error_var_ref, ctx) + posts
+        result_post = self._create_result_type_post(method, error_var_ref, ctx)
+        posts = result_post + posts
         return pres, posts
 
-    def _create_result_type_post(self, method: PythonMethod, error_var_ref, ctx: Context):
+    def _create_result_type_post(self, method: PythonMethod, error_var_ref,
+                                 ctx: Context) -> List[Expr]:
         if method.type and method.type.name not in PRIMITIVES:
-            result = self._create_single_result_post(method, error_var_ref, ctx.result_var.ref(method.node, ctx), ctx)
+            result = self._create_single_result_post(method, error_var_ref,
+                ctx.result_var.ref(method.node, ctx), ctx)
             return result
         else:
             return []
 
-    def _create_single_result_post(self, method: PythonMethod, error_var_ref, result_var, ctx: Context):
+    def _create_single_result_post(self, method: PythonMethod, error_var_ref,
+                                   result_var, ctx: Context) -> List[Expr]:
         no_pos = self.no_position(ctx)
         method_pos = self.to_position(method.node, ctx,
                                       '"return type is correct"')
