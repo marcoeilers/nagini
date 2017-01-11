@@ -39,6 +39,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.type_map = type_map
         self.path = path
         self.ignored_lines = ignored_lines
+        self.aliases = {}
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
@@ -68,8 +69,17 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                               var.line, col(var))
         super().visit_try_stmt(node)
 
+    def visit_assignment_stmt(self, node: mypy.nodes.AssignmentStmt):
+        if (isinstance(node.rvalue, mypy.nodes.IndexExpr) and
+                isinstance(node.rvalue.analyzed, mypy.nodes.TypeAliasExpr)):
+            key = tuple(self.prefix + [node.lvalues[0].name])
+            self.aliases[key] = node.rvalue.analyzed.type
+        else:
+            super().visit_assignment_stmt(node)
+
     def visit_name_expr(self, node: mypy.nodes.NameExpr):
-        if node.name not in LITERALS:
+        if (node.name not in LITERALS and
+                tuple([self.prefix[0]] + [node.name]) not in self.aliases):
             name_type = self.type_of(node)
             if not isinstance(name_type, mypy.types.CallableType):
                 self.set_type(self.prefix + [node.name], name_type,
@@ -188,6 +198,7 @@ class TypeInfo:
         self.all_types = {}
         self.alt_types = {}
         self.files = {}
+        self.type_aliases = {}
 
 
     def _create_options(self, strict_optional: bool):
@@ -244,6 +255,7 @@ class TypeInfo:
                 file.accept(visitor)
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
+                self.type_aliases.update(visitor.aliases)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)

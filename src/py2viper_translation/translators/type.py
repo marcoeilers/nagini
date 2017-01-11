@@ -19,7 +19,9 @@ from py2viper_translation.lib.constants import (
 )
 from py2viper_translation.lib.program_nodes import (
     GenericType,
+    get_type as do_get_type,
     PythonClass,
+    PythonIOOperation,
     PythonMethod,
     PythonModule,
     PythonNode,
@@ -69,17 +71,28 @@ class TypeTranslator(CommonTranslator):
         else:
             return self.viper.Ref
 
-    def get_type(self, node: ast.AST, ctx: Context) -> PythonType:
+    def get_type(self, node: ast.AST, ctx: Context) -> PythonModule:
         """
         Returns the type of the expression represented by node as a PythonType.
         """
-        result = self._do_get_type(node, ctx)
+        container = ctx.actual_function if ctx.actual_function else ctx.module
+        containers = [ctx]
+        if isinstance(container, (PythonMethod, PythonIOOperation)):
+            containers.append(container)
+            containers.extend(container.get_module().get_included_modules())
+        else:
+            # Assume module
+            containers.extend(container.get_included_modules())
+        result = do_get_type(node, containers, container)
         if result.name.startswith(PRIMITIVE_PREFIX):
             # Convert to none-primitive type
             result = ctx.module.global_module.classes[result.name[8:]]
         return result
 
-    def _do_get_type(self, node: ast.AST, ctx: Context) -> PythonType:
+    def _do_get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
+        """
+        Returns the type of the expression represented by node as a PythonClass
+        """
         target = self.get_target(node, ctx)
         if target:
             if isinstance(target, PythonVarBase):
@@ -403,7 +416,14 @@ class TypeTranslator(CommonTranslator):
                                              self.no_info(ctx))
             indices = prefix + [index_var.ref()]
             variables = [index_var.decl]
-            check = self.type_factory.type_arg_check(lhs, args[0], indices, ctx)
+            # if the type parameter is covariant, but since we cannot currently 
+            # express that, we only check for the special case of tuples:
+            if type.name == TUPLE_TYPE:
+                check = self.type_factory.type_arg_check_subtype(lhs, args[0],
+                                                                 indices, ctx)
+            else:
+                check = self.type_factory.type_arg_check(lhs, args[0], indices,
+                                                         ctx)
             body = self.viper.Implies(index_in_bounds, check,
                                       self.no_position(ctx), self.no_info(ctx))
             triggers = [self.viper.Trigger([self.type_factory.type_arg(lhs,
