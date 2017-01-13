@@ -11,6 +11,7 @@ from py2viper_translation.lib.constants import (
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
+    PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
     STRING_TYPE,
@@ -61,9 +62,9 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name.startswith('__prim__'):
-            assert 'builtins.' + cls.name[8:] in self.builtins
-            return self.builtins['builtins.' + cls.name[8:]]
+        if cls.name in PRIMITIVES:
+            cls = cls.try_box()
+            return self.builtins['builtins.' + cls.name]
         elif cls.name == 'type':
             return self.type_factory.type_type()
         else:
@@ -73,10 +74,7 @@ class TypeTranslator(CommonTranslator):
         """
         Returns the type of the expression represented by node as a PythonType.
         """
-        result = self._do_get_type(node, ctx)
-        if result.name.startswith(PRIMITIVE_PREFIX):
-            # Convert to none-primitive type
-            result = ctx.module.global_module.classes[result.name[8:]]
+        result = self._do_get_type(node, ctx).try_box()
         return result
 
     def _do_get_type(self, node: ast.AST, ctx: Context) -> PythonType:
@@ -202,11 +200,8 @@ class TypeTranslator(CommonTranslator):
         elif isinstance(node, ast.BinOp):
             left_type = self.get_type(node.left, ctx)
             right_type = self.get_type(node.right, ctx)
-            if self._is_primitive_operation(node, left_type, right_type):
-                return left_type
-            else:
-                operator_func = OPERATOR_FUNCTIONS[type(node.op)]
-                return left_type.get_func_or_method(operator_func).type
+            operator_func = OPERATOR_FUNCTIONS[type(node.op)]
+            return left_type.get_func_or_method(operator_func).type
         elif isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return ctx.module.global_module.classes[BOOL_TYPE]

@@ -28,6 +28,8 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
     Expr,
+    FuncApp,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -241,44 +243,25 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         stmt = []
-        if self._is_primitive_operation(node, left_type, right_type):
-            op = self._get_primitive_operation(node)
-            result = op(left, right, position, info)
+        func_name = OPERATOR_FUNCTIONS[type(node.op)]
+        called_method = left_type.get_func_or_method(func_name)
+        if called_method.pure:
+            result = self.get_function_call(left_type, func_name,
+                                            [left, right],
+                                            [left_type, right_type],
+                                            node, ctx)
         else:
-            func_name = OPERATOR_FUNCTIONS[type(node.op)]
-            called_method = left_type.get_func_or_method(func_name)
-            if called_method.pure:
-                result = self.get_function_call(left_type, func_name,
-                                                [left, right],
-                                                [left_type, right_type],
-                                                node, ctx)
-            else:
-                result_type = called_method.type
-                res_var = ctx.actual_function.create_variable('op_res',
-                                                              result_type,
-                                                              self.translator)
-                stmt += self.get_method_call(left_type, func_name,
-                                             [left, right],
-                                             [left_type, right_type],
-                                             [res_var.ref(node, ctx)], node,
-                                             ctx)
-                result = res_var.ref(node, ctx)
+            result_type = called_method.type
+            res_var = ctx.actual_function.create_variable('op_res',
+                                                          result_type,
+                                                          self.translator)
+            stmt += self.get_method_call(left_type, func_name,
+                                         [left, right],
+                                         [left_type, right_type],
+                                         [res_var.ref(node, ctx)], node,
+                                         ctx)
+            result = res_var.ref(node, ctx)
         return stmt, result
-
-    def _is_primitive_operation(self, node: ast.AST, left_type: PythonClass,
-                                right_type: PythonClass) -> bool:
-        """
-        Decides if the binary operation from node, called with arguments of the
-        given types, should be translated as a native Silver operation or
-        as a call to a special function.
-        """
-        return False
-        if left_type.name in {INT_TYPE, BOOL_TYPE}:
-            if right_type.name not in {INT_TYPE, BOOL_TYPE}:
-                raise InvalidProgramException(node, 'invalid.operation.type')
-            else:
-                return True
-        return False
 
     def _get_primitive_operation(self, node: ast.BinOp):
         """
@@ -292,7 +275,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
                           ctx: Context,
-                          position = None) -> 'silver.ast.FuncApp':
+                          position: Position = None) -> FuncApp:
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments. Boxes arguments if necessary, and

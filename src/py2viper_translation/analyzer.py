@@ -485,11 +485,11 @@ class Analyzer(ast.NodeVisitor):
         self.current_scopes.append(name)
         assert not self._aliases
         for arg in node.args.args:
+            # For IO operation arguments, we want parameters to be primitive
+            # b/c primitive equality is simpler than boxed reference equality,
+            # and for simplicity we use the same policy for output params too.
             if self._is_io_existential:
-                arg_type = self.typeof(arg)
-                if arg_type.name in {'int', 'bool'}:
-                    name = '__prim__' + arg_type.name
-                    arg_type = self.module.global_module.classes[name]
+                arg_type = self.typeof(arg).try_unbox()
                 var = self.node_factory.create_python_io_existential_var(
                     arg.arg, arg, arg_type)
                 self._aliases[arg.arg] = var

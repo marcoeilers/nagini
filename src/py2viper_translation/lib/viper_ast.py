@@ -183,8 +183,6 @@ class ViperAST:
 
     def DomainFuncApp(self, funcname, args, typevarmap, typepassed, argspassed,
                       position, info, domain_name):
-        if funcname == '__prim__int':
-            print("11")
         def typepassedapply(slf):
             return typepassed
 
