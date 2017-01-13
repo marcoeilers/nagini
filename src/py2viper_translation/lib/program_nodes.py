@@ -7,10 +7,13 @@ from collections import OrderedDict
 from enum import Enum
 from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
+    BOXED_PRIMITIVES,
     END_LABEL,
     ERROR_NAME,
     INTERNAL_NAMES,
     PRIMITIVE_INT_TYPE,
+    PRIMITIVE_PREFIX,
+    PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
     VIPER_KEYWORDS,
@@ -212,7 +215,6 @@ class PythonType(metaclass=ABCMeta):
     """
     Abstract superclass of all kinds python types.
     """
-    pass
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
@@ -440,6 +442,26 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             dicts.append(self.static_fields)
         return CombinedDict([], dicts)
 
+    def try_box(self) -> 'PythonClass':
+        """
+        If this class represents a primitive type, returns the boxed version,
+        otherwise just return the type itself.
+        """
+        if self.name in PRIMITIVES:
+            boxed_name = self.name[len(PRIMITIVE_PREFIX):]
+            return self.get_module().classes[boxed_name]
+        return self
+
+    def try_unbox(self) -> 'PythonClass':
+        """
+        If this class represents a boxed version of a primitive type, returns
+        the primitive version, otherwise just returns the type itself.
+        """
+        if self.name in BOXED_PRIMITIVES:
+            unboxed_name = PRIMITIVE_PREFIX + self.name
+            return self.get_module().classes[unboxed_name]
+        return self
+
 
 class GenericType(PythonType):
     """
@@ -510,6 +532,22 @@ class GenericType(PythonType):
             if my_arg != other_arg:
                 return False
         return True
+
+    def try_box(self) -> 'GenericType':
+        """
+        If this class represents a primitive type, returns the boxed version,
+        otherwise just return the type itself.
+        """
+        # Generic types are never primitive, so just return self.
+        return self
+
+    def try_unbox(self) -> 'GenericType':
+        """
+        If this class represents a boxed version of a primitive type, returns
+        the primitive version, otherwise just returns the type itself.
+        """
+        # Generic types are never primitive, so just return self.
+        return self
 
 
 class UnionType(GenericType):
