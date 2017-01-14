@@ -166,9 +166,9 @@ class MethodTranslator(CommonTranslator):
         """
         args = func.get_args()
         pres = []
-        for arg in args:
-            if not (arg.type.name.startswith('__prim__')):
-                if arg == args[0]:
+        for i, arg in enumerate(args):
+            if not (arg.type.name in PRIMITIVES):
+                if i == 0:
                     if is_constructor:
                         continue
                     if func.method_type == MethodType.class_method:

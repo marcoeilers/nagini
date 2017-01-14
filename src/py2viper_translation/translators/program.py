@@ -420,11 +420,12 @@ class ProgramTranslator(CommonTranslator):
             domains += [domain
                         for domain in self.viper.to_list(sil_prog.domains())
                         if domain.name() != 'PyType']
+            function_names = [function.name() for function in functions]
             functions += [
-                f
-                for f in self.viper.to_list(sil_prog.functions())
-                if (f.name() in used_names and
-                    all([f.name() != f2.name() for f2 in functions]))]
+                function
+                for function in self.viper.to_list(sil_prog.functions())
+                if (function.name() in used_names and
+                    function.name() not in function_names)]
             predicates += self.viper.to_list(sil_prog.predicates())
 
         return domains, predicates, functions, methods

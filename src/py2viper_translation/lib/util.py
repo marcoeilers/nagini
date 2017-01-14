@@ -46,9 +46,9 @@ class UnsupportedException(Exception):
     currently supported
     """
 
-    def __init__(self, astElement: ast.AST, desc=""):
-        self.node = astElement
-        ex_str = str(astElement)
+    def __init__(self, ast_element: ast.AST, desc=""):
+        self.node = ast_element
+        ex_str = str(ast_element)
         if desc:
             ex_str += ': ' + desc
         super().__init__(ex_str)

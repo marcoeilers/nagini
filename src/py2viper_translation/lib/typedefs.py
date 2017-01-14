@@ -23,6 +23,8 @@ Function = 'silver.ast.Function'
 
 Method = 'silver.ast.Method'
 
+FuncApp = 'silver.ast.FuncApp'
+
 TypeVar = 'silver.ast.TypeVar'
 
 Type = 'silver.ast.Type'

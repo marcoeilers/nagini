@@ -1,6 +1,6 @@
 import ast
 
-from py2viper_translation.lib.constants import BOOL_TYPE
+from py2viper_translation.lib.constants import PRIMITIVE_BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
@@ -29,7 +29,8 @@ class SIFPythonMethod(PythonMethod):
                  interface: bool = False):
         super().__init__(name, node, cls, superscope, pure, contract_only,
                          node_factory, interface)
-        bool_type = superscope.get_module().global_module.classes['__prim__' + BOOL_TYPE]
+        bool_type = superscope.get_module().global_module.classes[
+            PRIMITIVE_BOOL_TYPE]
         self.tl_var = PythonVar(TL_VAR_NAME, None, bool_type)
         self.new_tl_var = PythonVar(NEW_TL_VAR_NAME, None, bool_type)
         self._set_preserves_tl()

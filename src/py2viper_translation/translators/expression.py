@@ -4,8 +4,8 @@ from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     DICT_TYPE,
     END_LABEL,
-    INT_TYPE,
     LIST_TYPE,
+    PRIMITIVE_INT_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -50,8 +50,11 @@ class ExpressionTranslator(CommonTranslator):
                        target_type = None,
                        expression: bool = False) -> StmtsAndExpr:
         """
-        Generic visitor function for translating an expression
+        Generic visitor function for translating an expression.
 
+        :param target_type:
+            The Silver type this expression should be translated to, defaults
+            to Ref if no arguments is provided.
         :param expression:
             Indicates if ``node`` must be translated into Silver
             expression.
@@ -92,7 +95,7 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
         lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
                                 self.no_info(ctx))
-        int_class = ctx.module.global_module.classes['__prim__' + INT_TYPE]
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
         boxed_lit = self.get_function_call(int_class, '__box__', [lit],
                                            [None], node, ctx)
         return ([], boxed_lit)
@@ -574,8 +577,6 @@ class ExpressionTranslator(CommonTranslator):
         for value in node.values:
             statements_part, expression_part = self.translate_expr(
                 value, ctx, target_type=self.viper.Bool)
-            if expression_part.typ() != self.viper.Bool:
-                print("34")
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)
