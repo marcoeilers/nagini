@@ -5,17 +5,29 @@ import mypy
 from abc import ABCMeta
 from collections import OrderedDict
 from enum import Enum
+from py2viper_contracts.contracts import CONTRACT_FUNCS
 from py2viper_contracts.io import BUILTIN_IO_OPERATIONS
 from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
     BOXED_PRIMITIVES,
+    BUILTINS,
+    DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
+    INT_TYPE,
     INTERNAL_NAMES,
+    LIST_TYPE,
+    OBJECT_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVES,
+    RANGE_TYPE,
     RESULT_NAME,
+    SET_TYPE,
     STRING_TYPE,
+    TUPLE_TYPE,
+    UNION_TYPE,
     VIPER_KEYWORDS,
 )
 from py2viper_translation.lib.io_checkers import IOOperationBodyChecker
@@ -125,7 +137,9 @@ class PythonModule(PythonScope, ContainerInterface):
                                        self.global_module.classes[STRING_TYPE])
             self.global_vars['__file__'] = file_var
         for name, cls in self.classes.items():
-            cls.process(self.get_fresh_name(name), translator)
+            if name == cls.name:
+                # if this is not a type alias
+                cls.process(self.get_fresh_name(name), translator)
         for name, function in self.functions.items():
             function.process(self.get_fresh_name(name), translator)
         for name, method in self.methods.items():
@@ -215,6 +229,7 @@ class PythonType(metaclass=ABCMeta):
     """
     Abstract superclass of all kinds python types.
     """
+    pass
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
@@ -522,6 +537,14 @@ class GenericType(PythonType):
         Returns the predicate with the given name in this class or a superclass.
         """
         return self.get_class().get_predicate(name)
+
+    def issubtype(self, other: PythonType) -> bool:
+        if isinstance(other, GenericType):
+            if self.cls.issubtype(other.cls):
+                if self.type_args == other.type_args:
+                    return True
+            return False
+        return self.cls.issubtype(other)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, GenericType):
@@ -1433,7 +1456,7 @@ def get_target(node: ast.AST,
         return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
-        lhs = get_target(node.value, containers, container)
+        lhs = get_type(node.value, containers, container)
         if (isinstance(lhs, PythonMethod) or
                 isinstance(lhs, PythonField)):
             # For methods, get the return type, for fields the field type
@@ -1480,5 +1503,27 @@ def get_target(node: ast.AST,
                 if node.attr in options:
                     return options[node.attr]
         return None
+    elif isinstance(node, ast.Subscript):
+        if isinstance(node.value, ast.Name):
+            module = [c for c in containers if isinstance(c, PythonModule)][0]
+            type_class = None
+            if node.value.id == 'Dict':
+                type_class = module.global_module.classes[DICT_TYPE]
+            if node.value.id == 'Set':
+                type_class = module.global_module.classes[SET_TYPE]
+            if node.value.id == 'List':
+                type_class = module.global_module.classes[LIST_TYPE]
+            if node.value.id == 'Tuple':
+                type_class = module.global_module.classes[TUPLE_TYPE]
+            if type_class:
+                args = []
+                if isinstance(node.slice.value, ast.Tuple):
+                    args = [get_target(arg, containers, container)
+                            for arg in node.slice.value.elts]
+                elif isinstance(node.slice.value, ast.Name):
+                    args = [get_target(node.slice.value, containers, container)]
+                else:
+                    assert False
+                return GenericType(type_class, args)
     else:
         return None

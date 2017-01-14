@@ -288,9 +288,20 @@ class ContractTranslator(CommonTranslator):
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         expr_stmt, expr = self.translate_expr(node.args[1], ctx)
+        expr = self.unwrap(expr)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold
+
+    def _translate_instanceof(self, node: ast.Call,
+                              ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 2
+        stmt, obj = self.translate_expr(node.args[0], ctx)
+        target = self.get_type(node.args[1], ctx)
+        assert isinstance(target, PythonClass)
+        pos = self.to_position(node, ctx)
+        check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
+        return stmt, check
 
     def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -449,5 +460,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_forall(node, ctx)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
+        elif func_name == 'Instanceof':
+            return self.translate_instanceof(node, ctx)
         else:
             raise UnsupportedException(node)

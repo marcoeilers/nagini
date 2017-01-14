@@ -460,17 +460,17 @@ class ProgramTranslator(CommonTranslator):
                 functions.append(
                     self.create_global_var_function(module.global_vars[var],
                                                     ctx))
-
+            containers = [module]
             for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES:
+                if class_name in PRIMITIVES or class_name != cls.name:
                     continue
+                containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
                 for name, field in cls.static_fields.items():
                     functions.append(self.create_global_var_function(field,
                                                                      ctx))
 
             # Translate default args
-            containers = [module] + list(module.classes.values())
             for container in containers:
                 for function in container.functions.values():
                     self.translate_default_args(function, ctx)
@@ -497,7 +497,7 @@ class ProgramTranslator(CommonTranslator):
                 functions.extend(getters)
                 methods.extend(checkers)
             for class_name, cls in module.classes.items():
-                if class_name in PRIMITIVES:
+                if class_name in PRIMITIVES or class_name != cls.name:
                     continue
                 old_class = ctx.current_class
                 ctx.current_class = cls
