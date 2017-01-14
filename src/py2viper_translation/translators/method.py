@@ -398,6 +398,7 @@ class MethodTranslator(CommonTranslator):
                                             self.no_info(ctx))
             body.append(inhale_type)
         if method.type:
+            # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),
                                                     self.viper.NullLit(no_pos,
                                                                        no_info),

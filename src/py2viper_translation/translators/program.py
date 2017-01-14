@@ -463,6 +463,7 @@ class ProgramTranslator(CommonTranslator):
             containers = [module]
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
+                    # Skip primitives or entries for type variables.
                     continue
                 containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
@@ -498,6 +499,7 @@ class ProgramTranslator(CommonTranslator):
                 methods.extend(checkers)
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
+                    # Skip primitives and type variable entries.
                     continue
                 old_class = ctx.current_class
                 ctx.current_class = cls
