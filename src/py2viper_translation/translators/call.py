@@ -52,10 +52,10 @@ class CallTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
-        assert isinstance(target, (PythonClass, PythonVar, GenericType))
+        assert isinstance(target, (PythonType, PythonVar))
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
-        if isinstance(target, (PythonClass, GenericType)):
+        if isinstance(target, PythonType):
             check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
         else:
             check = self.type_factory.dynamic_type_check(obj, target.ref(), pos,
@@ -383,6 +383,8 @@ class CallTranslator(CommonTranslator):
 
         for arg in node.args:
             if isinstance(arg, ast.Starred):
+                # If it's a starred expression, unpack all values separately
+                # into unpacked_args.
                 arg_stmt, arg_expr = self.translate_expr(arg.value, ctx)
                 arg_type = self.get_type(arg.value, ctx)
                 arg_stmts += arg_stmt
@@ -390,7 +392,9 @@ class CallTranslator(CommonTranslator):
                 if (isinstance(arg_type, GenericType) and
                             arg_type.name == TUPLE_TYPE):
                     if not arg_type.exact_length:
-                        raise UnsupportedException(arg)
+                        raise UnsupportedException(arg, 'Starred expression '
+                                                        'with statically '
+                                                        'unknown length.')
                     nargs = len(arg_type.type_args)
                     for i, type_arg in enumerate(arg_type.type_args):
                         index = self.viper.IntLit(i, self.no_position(ctx),
@@ -401,7 +405,8 @@ class CallTranslator(CommonTranslator):
                         unpacked_args.append(item)
                         unpacked_arg_types.append(type_arg)
                 else:
-                    raise UnsupportedException(arg)
+                    raise UnsupportedException(arg, 'Starred expression which '
+                                                    'is not a tuple.')
             else:
                 arg_stmt, arg_expr = self.translate_expr(arg, ctx)
                 arg_type = self.get_type(arg, ctx)

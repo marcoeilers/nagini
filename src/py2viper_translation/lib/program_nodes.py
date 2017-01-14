@@ -1504,6 +1504,7 @@ def get_target(node: ast.AST,
                     return options[node.attr]
         return None
     elif isinstance(node, ast.Subscript):
+        # This might be a type literal like List[int]
         if isinstance(node.value, ast.Name):
             module = [c for c in containers if isinstance(c, PythonModule)][0]
             type_class = None
@@ -1530,19 +1531,24 @@ def get_target(node: ast.AST,
 
 
 def get_type(node: ast.AST, containers: List[ContainerInterface],
-             container: PythonNode) -> PythonClass:
+             container: PythonNode) -> Optional[PythonType]:
+    """
+    If 'node' is an expression, returns its type, assuming that the immediate
+    container (e.g. a PythonMethod) of the node is 'container', by looking in
+    the given 'containers' (can be e.g. PythonMethods, the Context,
+    PythonModules, etc). For primitive values, returns the boxed version.
+    Returns None if the type is void.
+    """
     result = _do_get_type(node, containers, container)
-    if isinstance(result, PythonType) and result.name.startswith('__prim__'):
-        module = container.get_module()
-        result = module.global_module.classes[result.name[8:]]
+    if isinstance(result, PythonType):
+        result = result.try_box()
     return result
 
 
-# needs current module, current function. so basically needs container. plus containers for get_target call.
 def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
-                 container: PythonNode) -> PythonClass:
+                 container: PythonNode) -> Optional[PythonType]:
     """
-    Returns the type of the expression represented by node as a PythonClass
+    Does the actual work for get_type without boxing the type.
     """
     if isinstance(container, (PythonIOOperation, PythonMethod)):
         module = container.get_module()
@@ -1766,6 +1772,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
 
 
 def common_supertype(types: List[PythonType]) -> PythonType:
+    """
+    Returns the common supertype of all types in the list. The list may not
+    be empty.
+    """
     assert types
     if len(types) == 1:
         return types[0]
@@ -1776,6 +1786,9 @@ def common_supertype(types: List[PythonType]) -> PythonType:
 
 
 def pairwise_supertype(t1: PythonType, t2: PythonType) -> PythonType:
+    """
+    Returns the common supertype of 't1' and 't2', if any.
+    """
     if t1.issubtype(t2):
         return t2
     if t2.issubtype(t1):

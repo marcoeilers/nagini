@@ -327,13 +327,7 @@ class StatementTranslator(CommonTranslator):
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
         result = iterable_stmt + iter_assign + next_call + loop + iter_del
-        if ctx.actual_function.type:
-            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-            result_none = self.viper.LocalVarAssign(
-                ctx.actual_function.result.ref(),
-                null, self.no_position(ctx),
-                self.no_info(ctx))
-            result.append(result_none)
+        result += self._set_result_none(ctx)
         return result
 
     def translate_stmt_Assert(self, node: ast.Assert,
@@ -465,6 +459,7 @@ class StatementTranslator(CommonTranslator):
         if isinstance(node.value, ast.Call):
             return self.translate_stmt(node.value, ctx)
         elif isinstance(node.value, ast.Str):
+            # Docstring, just skip.
             return []
         else:
             raise UnsupportedException(node)
@@ -571,14 +566,23 @@ class StatementTranslator(CommonTranslator):
         loop = self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
+        loop += self._set_result_none(ctx)
+        return loop
+
+    def _set_result_none(self, ctx: Context) -> List[Stmt]:
+        """
+        Sets the return variable of the current function to null (the default
+        return variable), to be used after loops which may havoc the result
+        variable (if there is a return within the loop body).
+        """
         if ctx.actual_function.type:
             null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
             result_none = self.viper.LocalVarAssign(
                 ctx.actual_function.result.ref(),
                 null, self.no_position(ctx),
                 self.no_info(ctx))
-            loop.append(result_none)
-        return loop
+            return [result_none]
+        return []
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
         if not node.value:
