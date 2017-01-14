@@ -378,23 +378,51 @@ class CallTranslator(CommonTranslator):
         arg_types = []
         arg_stmts = []
 
-        normal_args = node.args[:target.nargs] if target else node.args
+        unpacked_args = []
+        unpacked_arg_types = []
 
-        for arg in normal_args:
-            arg_stmt, arg_expr = self.translate_expr(arg, ctx)
-            arg_type = self.get_type(arg, ctx)
-            arg_stmts += arg_stmt
-            args.append(arg_expr)
-            arg_types.append(arg_type)
+        for arg in node.args:
+            if isinstance(arg, ast.Starred):
+                arg_stmt, arg_expr = self.translate_expr(arg.value, ctx)
+                arg_type = self.get_type(arg.value, ctx)
+                arg_stmts += arg_stmt
+
+                if (isinstance(arg_type, GenericType) and
+                            arg_type.name == TUPLE_TYPE):
+                    if not arg_type.exact_length:
+                        raise UnsupportedException(arg)
+                    nargs = len(arg_type.type_args)
+                    for i, type_arg in enumerate(arg_type.type_args):
+                        index = self.viper.IntLit(i, self.no_position(ctx),
+                                                  self.no_info(ctx))
+                        item = self.get_function_call(arg_type, '__getitem__',
+                                                      [arg_expr, index],
+                                                      [None, None], arg, ctx)
+                        unpacked_args.append(item)
+                        unpacked_arg_types.append(type_arg)
+                else:
+                    raise UnsupportedException(arg)
+            else:
+                arg_stmt, arg_expr = self.translate_expr(arg, ctx)
+                arg_type = self.get_type(arg, ctx)
+                arg_stmts += arg_stmt
+                unpacked_args.append(arg_expr)
+                unpacked_arg_types.append(arg_type)
 
         if not target:
-            return arg_stmts, args, arg_types
+            return arg_stmts, unpacked_args, unpacked_arg_types
 
-        var_args = node.args[target.nargs:]
-
+        implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
+        nargs = target.nargs
         keys = list(target.args.keys())
-        if self._has_implicit_receiver_arg(node, ctx):
+        if implicit_receiver:
+            nargs -= 1
             keys = keys[1:]
+        args = unpacked_args[:nargs]
+        arg_types = unpacked_arg_types[:nargs]
+
+        var_args = unpacked_args[nargs:]
+        var_arg_types = unpacked_arg_types[nargs:]
 
         no_missing = len(keys) - len(args)
         args += [False] * no_missing
@@ -424,7 +452,9 @@ class CallTranslator(CommonTranslator):
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
-            var_stmt, var_arg_list = self._wrap_var_args(var_args, node, ctx)
+            var_stmt, var_arg_list = self._wrap_var_args(var_args,
+                                                         var_arg_types, node,
+                                                         ctx)
             args.append(var_arg_list)
             arg_types.append(target.var_arg.type)
             arg_stmts += var_stmt
@@ -449,27 +479,20 @@ class CallTranslator(CommonTranslator):
 
         return rec_stmts, [receiver], [receiver_type]
 
-    def _wrap_var_args(self, args: List[ast.AST], node: ast.AST,
-                       ctx: Context) -> StmtsAndExpr:
+    def _wrap_var_args(self, args: List[Expr], types: List[PythonType],
+                       node: ast.AST, ctx: Context) -> StmtsAndExpr:
         """
         Wraps the given arguments into a tuple to be passed to an *args param.
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         stmts = []
-        vals = []
-        val_types = []
-        for arg in args:
-            arg_stmt, arg_val = self.translate_expr(arg, ctx)
-            stmts += arg_stmt
-            vals.append(arg_val)
-            val_types.append(self.get_type(arg, ctx))
         func_name = '__create' + str(len(args)) + '__'
         # __createX__ must be called with the types of the arguments as
         # additional arguments.
-        vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
-                       for (t, v) in zip(val_types, vals)]
+        vals = args + [self.get_tuple_type_arg(v, t, node, ctx)
+                       for (t, v) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
-        val_types += [type_class] * len(val_types)
+        val_types = types + [type_class] * len(types)
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call
