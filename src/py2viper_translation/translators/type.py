@@ -33,6 +33,7 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typedefs import (
     Expr,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -89,8 +90,8 @@ class TypeTranslator(CommonTranslator):
         return result
 
     def set_type_nargs_and_args(self, lhs: Expr, type: GenericType,
-                                prefix: List[Expr], ctx: Context,
-                                inhale_exhale: bool) -> Expr:
+                                prefix: List[Expr], position: Position,
+                                ctx: Context, inhale_exhale: bool) -> Expr:
         """
         Creates an assertion containing the type argument information contained
         in 'type' about 'lhs', but not its actual, top level type. If, e.g.,
@@ -118,17 +119,16 @@ class TypeTranslator(CommonTranslator):
                                                          ctx)
                 if inhale_exhale:
                     check = self.viper.InhaleExhaleExp(check, true,
-                                                       self.no_position(ctx),
+                                                       position,
                                                        self.no_info(ctx))
                 if isinstance(option, GenericType):
                     option_args = self.set_type_nargs_and_args(lhs, option,
-                                                               prefix, ctx,
+                                                               prefix, position,
+                                                               ctx,
                                                                inhale_exhale)
                     check = self.viper.And(check, option_args,
-                                           self.no_position(ctx),
-                                           self.no_info(ctx))
-                result = self.viper.Or(result, check,
-                                       self.no_position(ctx),
+                                           position, self.no_info(ctx))
+                result = self.viper.Or(result, check, position,
                                        self.no_info(ctx))
             return result
         # Number of type arguments.
@@ -150,18 +150,17 @@ class TypeTranslator(CommonTranslator):
                     check = self.type_factory.type_arg_check(lhs, arg, indices,
                                                              ctx)
                 if inhale_exhale:
-                    check = self.viper.InhaleExhaleExp(check, true,
-                                                       self.no_position(ctx),
+                    check = self.viper.InhaleExhaleExp(check, true, position,
                                                        self.no_info(ctx))
-                result = self.viper.And(result, check, self.no_position(ctx),
+                result = self.viper.And(result, check, position,
                                         self.no_info(ctx))
 
                 if isinstance(arg, GenericType):
                     # Recurse to include the type arguments of the type argument
                     arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices,
-                                                             ctx, inhale_exhale)
-                    result = self.viper.And(result, arg_nargs,
-                                            self.no_position(ctx),
+                                                             position, ctx,
+                                                             inhale_exhale)
+                    result = self.viper.And(result, arg_nargs, position,
                                             self.no_info(ctx))
         else:
             # We want a tuple of unknown length, with all elements being
@@ -193,17 +192,16 @@ class TypeTranslator(CommonTranslator):
             else:
                 check = self.type_factory.type_arg_check(lhs, args[0], indices,
                                                          ctx)
-            body = self.viper.Implies(index_in_bounds, check,
-                                      self.no_position(ctx), self.no_info(ctx))
+            body = self.viper.Implies(index_in_bounds, check, position,
+                                      self.no_info(ctx))
             triggers = [self.viper.Trigger([self.type_factory.type_arg(lhs,
                                                                        indices,
                                                                        ctx)],
                                            self.no_position(ctx),
                                            self.no_info(ctx))]
             all_args = self.viper.Forall(variables, triggers, body,
-                                         self.no_position(ctx),
-                                         self.no_info(ctx))
-            result = self.viper.And(result, all_args, self.no_position(ctx),
+                                         position, self.no_info(ctx))
+            result = self.viper.And(result, all_args, position,
                                     self.no_info(ctx))
         return result
 
@@ -235,8 +233,8 @@ class TypeTranslator(CommonTranslator):
             result = self.type_factory.type_check(lhs, type, position, ctx)
             if isinstance(type, GenericType):
                 # Add information about type arguments.
-                args = self.set_type_nargs_and_args(lhs, type, [], ctx,
-                                                    inhale_exhale)
-                result = self.viper.And(result, args, self.no_position(ctx),
+                args = self.set_type_nargs_and_args(lhs, type, [], position,
+                                                    ctx, inhale_exhale)
+                result = self.viper.And(result, args, position,
                                         self.no_info(ctx))
             return result

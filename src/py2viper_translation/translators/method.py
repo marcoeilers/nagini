@@ -303,7 +303,7 @@ class MethodTranslator(CommonTranslator):
         if method.declared_exceptions:
             no_error = self.viper.EqCmp(error_var_ref,
                                         self.viper.NullLit(no_pos, no_info),
-                                        no_pos, no_info)
+                                        method_pos, no_info)
             check = self.viper.Implies(no_error, check, method_pos, no_info)
         result = [check]
         return result
