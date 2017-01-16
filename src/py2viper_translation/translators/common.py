@@ -12,7 +12,6 @@ from py2viper_translation.lib.constants import (
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.errors import Rules
 from py2viper_translation.lib.program_nodes import (
-    get_target as do_get_target,
     GenericType,
     PythonClass,
     PythonExceptionHandler,
@@ -26,6 +25,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonVar,
 )
 from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typedefs import (
     Expr,
     FuncApp,

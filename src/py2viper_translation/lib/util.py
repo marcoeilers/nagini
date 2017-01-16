@@ -108,6 +108,10 @@ def get_func_name(stmt: ast.AST) -> Optional[str]:
         raise UnsupportedException(stmt)
 
 
+def get_column(node: ast.AST) -> Optional[int]:
+    return node.col_offset if hasattr(node, 'col_offset') else None
+
+
 def contains_stmt(container: Any, contained: ast.AST) -> bool:
     """
     Checks if 'contained' is a part of the partial AST

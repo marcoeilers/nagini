@@ -30,8 +30,7 @@ class IOOperationBodyChecker(ast.NodeVisitor):
             results: List['lib.program_nodes.PythonVar'],
             io_existentials: List['lib.program_nodes.PythonVarCreator'],
             module: 'lib.program_nodes.PythonModule',
-            translator: 'Translator',
-            op_find) -> None:
+            translator: 'Translator') -> None:
         super().__init__()
         self._body = body
         self._results = {var.name for var in results}
@@ -41,7 +40,6 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         self._module = module
         self._translator = translator
         self._counter = 0
-        self.op_find = op_find
 
     def check(self) -> None:
         """Check that body is well formed."""
@@ -63,7 +61,7 @@ class IOOperationBodyChecker(ast.NodeVisitor):
         containers.extend(self._module.get_included_modules())
         target = None
         if not isinstance(node.func, ast.Call):
-            target = self.op_find(node, containers, None)
+            target = self._translator.get_target(node, containers, None)
         if target and target.__class__.__name__ == 'PythonIOOperation':
             operation = target
             parameter_count = len(operation.get_parameters())

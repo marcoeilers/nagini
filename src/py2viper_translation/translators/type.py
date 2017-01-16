@@ -20,7 +20,6 @@ from py2viper_translation.lib.constants import (
 )
 from py2viper_translation.lib.program_nodes import (
     GenericType,
-    get_type as do_get_type,
     PythonClass,
     PythonIOOperation,
     PythonMethod,
@@ -31,6 +30,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonVarBase,
 )
 from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.resolver import get_type as do_get_type
 from py2viper_translation.lib.typedefs import (
     Expr,
     Position,

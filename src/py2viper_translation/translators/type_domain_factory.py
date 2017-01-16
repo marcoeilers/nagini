@@ -768,8 +768,8 @@ class TypeDomainFactory:
     def type_arg_check(self, lhs: Expr, arg: 'PythonType',
                        indices: List['Expr'], ctx: Context) -> 'Expr':
         """
-        Checks if the type argument of 'lhs' with the given indices is equal to
-        the given type.
+        Checks if the type argument of ``lhs`` with the given indices is equal
+        to the given type.
         """
         type_arg_func = self.type_arg(lhs, indices, ctx)
         type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
@@ -784,8 +784,8 @@ class TypeDomainFactory:
     def type_arg_check_subtype(self, lhs: Expr, arg: 'PythonType',
                                indices: List['Expr'], ctx: Context) -> 'Expr':
         """
-        Checks if the type argument of 'lhs' with the given indices is a subtype
-        of the given type.
+        Checks if the type argument of ``lhs`` with the given indices is a
+        subtype of the given type.
         """
         type_arg_func = self.type_arg(lhs, indices, ctx)
         type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},

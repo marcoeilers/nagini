@@ -3,8 +3,11 @@ import ast
 from py2viper_translation.analyzer import PythonModule, PythonVar
 from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.program_nodes import (
+    ContainerInterface,
     PythonMethod,
+    PythonNode,
 )
+from py2viper_translation.lib.resolver import get_target
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import (
@@ -31,7 +34,7 @@ from py2viper_translation.translators.type import TypeTranslator
 from py2viper_translation.translators.type_domain_factory import (
     TypeDomainFactory,
 )
-from typing import List, Set
+from typing import List, Optional, Set
 
 
 class Translator:
@@ -130,3 +133,8 @@ class Translator:
         translator.
         """
         return self.obligation_translator.create_obligation_info(method)
+
+    def get_target(self, node: ast.AST,
+                   containers: List[ContainerInterface],
+                   container: PythonNode) -> PythonNode:
+        return get_target(node, containers, container)

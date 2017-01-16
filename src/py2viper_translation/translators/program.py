@@ -12,7 +12,8 @@ from py2viper_translation.lib.program_nodes import (
     PythonField,
     PythonMethod,
     PythonModule,
-    PythonVar
+    PythonType,
+    PythonVar,
 )
 from py2viper_translation.lib.typedefs import (
     Domain,

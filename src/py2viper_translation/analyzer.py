@@ -20,7 +20,6 @@ from py2viper_translation.lib.constants import (
     UNION_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
-    get_target as do_get_target,
     ContainerInterface,
     GenericType,
     MethodType,
@@ -38,6 +37,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonMethod,
     UnionType,
 )
+from  py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
@@ -455,25 +455,27 @@ class Analyzer(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign) -> None:
         alias = False
         # Check if this is a type alias
-        if not self.current_function:
-            if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-                lhs_name = (self.module.type_prefix, node.targets[0].id)
-                # If it's a type alias marked by mypy
-                if lhs_name in self.types.type_aliases:
-                    type_name = self.types.type_aliases[lhs_name]
-                    aliased_type = self.convert_type(type_name)
-                    self.module.classes[node.targets[0].id] = aliased_type
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            lhs_name = (self.module.type_prefix, node.targets[0].id)
+            # If it's a type alias marked by mypy
+            if lhs_name in self.types.type_aliases:
+                type_name = self.types.type_aliases[lhs_name]
+                aliased_type = self.convert_type(type_name)
+                self.module.classes[node.targets[0].id] = aliased_type
+                alias = True
+            # Could still be a type alias if RHS refers to class
+            elif not isinstance(node.value, ast.Call):
+                target = self.get_target(node.value, self.module)
+                if isinstance(target, PythonType):
+                    self.module.classes[node.targets[0].id] = target
                     alias = True
-                # Could still be a type alias if RHS refers to class
-                else:
-                    target = self.get_target(node.value, self.module)
-                    if isinstance(target, PythonType):
-                        self.module.classes[node.targets[0].id] = target
-                        alias = True
 
         # Nothing else to do for type aliases, for all other cases proceed as
         # usual.
-        if not alias:
+        if alias:
+            if self.current_function or self.current_class:
+                raise InvalidProgramException(node, 'local.type.alias')
+        else:
             self.visit_default(node)
 
     def visit_arguments(self, node: ast.arguments) -> None:
