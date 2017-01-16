@@ -471,7 +471,6 @@ class CallTranslator(CommonTranslator):
             arg_types.append(target.kw_arg.type)
             arg_stmts += kw_stmt
         assert all(args), "Args translated into None: {}.".format(args)
-
         return arg_stmts, args, arg_types
 
     def _translate_receiver(self, node: ast.Call, target: PythonMethod,
@@ -494,8 +493,8 @@ class CallTranslator(CommonTranslator):
         func_name = '__create' + str(len(args)) + '__'
         # __createX__ must be called with the types of the arguments as
         # additional arguments.
-        vals = args + [self.get_tuple_type_arg(v, t, node, ctx)
-                       for (t, v) in zip(types, args)]
+        vals = args + [self.get_tuple_type_arg(arg, typ, node, ctx)
+                       for (typ, arg) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
         val_types = types + [type_class] * len(types)
         call = self.get_function_call(tuple_class, func_name, vals, val_types,

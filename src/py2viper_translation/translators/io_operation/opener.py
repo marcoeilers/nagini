@@ -8,10 +8,10 @@ from typing import cast, List
 from py2viper_translation.lib.context import Context
 from py2viper_translation.lib.io_context import IOOpenContext
 from py2viper_translation.lib.program_nodes import (
-    get_target,
     PythonIOOperation,
     PythonVar,
 )
+from py2viper_translation.lib.resolver import get_target
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,

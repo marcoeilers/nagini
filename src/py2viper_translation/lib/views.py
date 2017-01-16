@@ -41,6 +41,24 @@ class CombinedDict:
         return False
 
 
+class IOOperationContentDict:
+    """
+    Represents the contents of an IOOperation, which does not use dicts
+    internally and therefore does not work with CombinedDicts.
+    """
+
+    def __init__(self, io_op: 'PythonIOOperation') -> None:
+        self.io_op = io_op
+
+    def __contains__(self, item):
+        result = self.io_op.get_variable(item)
+        return result is not None
+
+    def __getitem__(self, item):
+        result = self.io_op.get_variable(item)
+        return result
+
+
 class ModuleDictView:
     """
     A view of the given aspect (e.g. 'functions') of the given module with the

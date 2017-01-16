@@ -77,24 +77,25 @@ class StatementTranslator(CommonTranslator):
         static block of code that's always the same except for possible boxing
         and unboxing, and looks like this:
 
-        invariant acc(a.list_acc, 1 / 20)
-        invariant acc(iter.list_acc, 1 / 20)
-        invariant iter.list_acc == list___sil_seq__(a)
-        invariant acc(iter.__iter_index, write)
-        invariant acc(iter.__previous, 1 / 20)
-        invariant acc(iter.__previous.list_acc, write)
-        invariant iter.__iter_index - 1 == list___len__(iter.__previous)
-        invariant (iter_err == null) ==> (iter.__iter_index >= 0) &&
-                  (iter.__iter_index <= |iter.list_acc|)
-        invariant (iter_err == null) ==> (c ==
-                                          iter.list_acc[iter.__iter_index - 1])
-        invariant (iter_err == null) ==> (c in iter.list_acc)
-        invariant (iter_err == null) ==>(iter.__previous.list_acc ==
-                                         iter.list_acc[..iter.__iter_index - 1])
-        invariant (iter_err == null) ==> get_type_arg1(iter) == T()
-        invariant (iter_err == null) ==> issubtype(typeof(c), T())
-        invariant (iter_err != null) ==> (iter.__previous.list_acc ==
-                                          iter.list_acc)
+        .. code-block:: silver
+            invariant acc(a.list_acc, 1 / 20)
+            invariant acc(iter.list_acc, 1 / 20)
+            invariant iter.list_acc == list___sil_seq__(a)
+            invariant acc(iter.__iter_index, write)
+            invariant acc(iter.__previous, 1 / 20)
+            invariant acc(iter.__previous.list_acc, write)
+            invariant iter.__iter_index - 1 == list___len__(iter.__previous)
+            invariant (iter_err == null) ==> (iter.__iter_index >= 0) &&
+                      (iter.__iter_index <= |iter.list_acc|)
+            invariant (iter_err == null) ==> (c ==
+                                              iter.list_acc[iter.__iter_index-1])
+            invariant (iter_err == null) ==> (c in iter.list_acc)
+            invariant (iter_err == null) ==>(iter.__previous.list_acc ==
+                                             iter.list_acc[..iter.__iter_index-1])
+            invariant (iter_err == null) ==> get_type_arg1(iter) == T()
+            invariant (iter_err == null) ==> issubtype(typeof(c), T())
+            invariant (iter_err != null) ==> (iter.__previous.list_acc ==
+                                              iter.list_acc)
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
