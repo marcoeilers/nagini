@@ -44,7 +44,7 @@ from typing import List, Optional
 
 def get_target(node: ast.AST,
                containers: List[ContainerInterface],
-               container: PythonNode) -> PythonNode:
+               container: PythonNode) -> Optional[PythonNode]:
     """
     Finds the PythonNode that the given ``node`` refers to, e.g. a PythonClass
     or a PythonVar, if the immediate container (e.g. a PythonMethod) of the node
@@ -52,15 +52,7 @@ def get_target(node: ast.AST,
     PythonMethods, the Context, PythonModules, etc).
     """
     if isinstance(node, ast.Name):
-        # Just look for something with this name in the given containers
-        for lhs in containers:
-            if lhs:
-                # Since this is a direct reference, only top level elements
-                # can be relevant.
-                options = lhs.get_contents(only_top=True)
-                if node.id in options:
-                    return options[node.id]
-        return None
+        return _find_entry(node.id, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
@@ -106,13 +98,7 @@ def get_target(node: ast.AST,
                    containers[-1].superclass):
             # If we're looking in a class, add all superclasses as well.
             containers.append(containers[-1].superclass)
-        for lhs in containers:
-            if lhs:
-                # Look in all contents, including non-top-level
-                options = lhs.get_contents(only_top=False)
-                if node.attr in options:
-                    return options[node.attr]
-        return None
+        return _find_entry(node.attr, False, containers)
     elif isinstance(node, ast.Subscript):
         # This might be a type literal like List[int]
         if isinstance(node.value, ast.Name):
@@ -139,6 +125,19 @@ def get_target(node: ast.AST,
                 return GenericType(type_class, args)
     else:
         return None
+
+
+def _find_entry(target_name: str, only_top: bool,
+                containers: List[ContainerInterface]) -> Optional[PythonNode]:
+    """
+    Returns the PythonNode identified by the given name in the given containers.
+    """
+    for lhs in containers:
+        if lhs:
+            options = lhs.get_contents(only_top=only_top)
+            if target_name in options:
+                return options[target_name]
+    return None
 
 
 def get_type(node: ast.AST, containers: List[ContainerInterface],
