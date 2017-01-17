@@ -35,6 +35,6 @@ To run doctests::
 Build Status
 ============
 
-.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=py2viper-translation&style=plastic
+.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=nagini&style=plastic
    :alt: Build Status
-   :target: https://pmbuilds.inf.ethz.ch/job/py2viper-translation
+   :target: https://pmbuilds.inf.ethz.ch/job/nagini
