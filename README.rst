@@ -55,7 +55,7 @@ Running on Windows
         set SILICONJAR=ViperToolsWin\backends\silicon.jar
         set CARBONJAR=ViperToolsWin\backends\carbon.jar
         set Z3_EXE=ViperToolsWin\z3\bin\z3.exe
-        set Z3_EXE=ViperToolsWin\boogie\Binaries\Boogie.exe
+        set BOOGIE_EXE=ViperToolsWin\boogie\Binaries\Boogie.exe
 
 6.  To run the tests, do the following::
 
