@@ -42,16 +42,15 @@ from library import (
 
 @IOOperation
 def listener_loop_io(
-        t_pre: Place,
         server_socket: Socket) -> bool:
     Terminates(False)
-    return IOExists6(Place, Place, Place, Place, Socket, str)(
-        lambda t2, t3, t4, t5, client_socket, data: (
-            accept_io(t_pre, server_socket, client_socket, t2) and
-            read_all_io(t2, client_socket, 1, data, t3) and
-            output_io(t3, client_socket, data, t4) and
-            close_io(t4, client_socket, t5) and
-            listener_loop_io(t5, server_socket)
+    return IOExists2(Socket, str)(
+        lambda client_socket, data: (
+            accept_io(server_socket, client_socket) >>
+            read_all_io(client_socket, 1, data) >>
+            output_io(client_socket, data) >>
+            close_io(client_socket) >>
+            listener_loop_io(server_socket)
         )
     )
 
@@ -60,19 +59,19 @@ def listener_loop_io(
 def listener_io(
         t_pre: Place) -> bool:
     Terminates(False)
-    return IOExists2(Place, Socket)(
-        lambda t2, server_socket: (
-            create_server_socket_io(t_pre, server_socket, t2) and
-            listener_loop_io(t2, server_socket)
+    return IOExists1(Socket)(
+        lambda server_socket: (
+            t_pre >> create_server_socket_io(server_socket) >>
+            listener_loop_io(server_socket)
         )
     )
 
 
 def run(t1: Place) -> None:
-    Requires(token(t1, 2) and listener_io(t1))
+    Requires(token(t1, 2) and t1 >> listener_io())
     Ensures(False)
 
-    Open(listener_io(t1))
+    Open(t1 >> listener_io())
 
     server_socket, t_loop = create_server_socket(t1)
 
