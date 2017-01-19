@@ -51,10 +51,10 @@ Running on Windows
 
 5.  In CMD, do the following (adjust the paths if you have extracted ViperToolsWin somewhere else)::
 
-        set SILICONJAR=ViperToolsWin\backends\silicon.jar
-        set CARBONJAR=ViperToolsWin\backends\carbon.jar
-        set Z3_EXE=ViperToolsWin\z3\bin\z3.exe
-        set BOOGIE_EXE=ViperToolsWin\boogie\Binaries\Boogie.exe
+        set SILICONJAR=backends\silicon.jar
+        set CARBONJAR=backends\carbon.jar
+        set Z3_EXE=z3\bin\z3.exe
+        set BOOGIE_EXE=boogie\Binaries\Boogie.exe
 
 6.  To run the tests, do the following::
 
