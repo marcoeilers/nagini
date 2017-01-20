@@ -1,0 +1,19 @@
+from py2viper_contracts.contracts import Result
+from py2viper_contracts.io import *
+
+
+@IOOperation
+def test_io(
+        t_pre: Place,
+        result: int = Result(),
+        ) -> bool:
+    Terminates(True)
+
+
+@IOOperation
+def test_io2(
+        t_pre: Place,
+        ) -> bool:
+    Terminates(True)
+    #:: ExpectedOutput(invalid.program:invalid.io_operation.body.not_variable_in_result_position)
+    return test_io(t_pre, 2)
