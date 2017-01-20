@@ -54,7 +54,7 @@ sil_programs = []
 
 def load_sil_files(jvm: JVM):
     sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
-                 'func_triple.sil', 'lock.sil']
+                 'seq.sil', 'func_triple.sil', 'lock.sil']
     if not config.obligation_config.disable_measures:
         sil_files.append('measures.sil')
     current_path = os.path.dirname(inspect.stack()[0][1])

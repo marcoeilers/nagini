@@ -16,6 +16,7 @@ from py2viper_translation.lib.constants import (
     PRIMITIVES,
     RANGE_TYPE,
     RESULT_NAME,
+    SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -181,7 +182,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonField):
             return target.type
         if target:
-            return target
+            if isinstance(target, PythonType) and target.name != SEQ_TYPE:
+                return target
     if isinstance(node, (ast.Attribute, ast.Name)):
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
@@ -280,6 +282,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
+    if func_name == 'Sequence':
+        return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
+                                            containers, container)
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
             if node.func.id == 'Result':
@@ -297,6 +302,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return get_type(node.args[0], containers, container)
             elif node.func.id == 'Unfolding':
                 return get_type(node.args[1], containers, container)
+            elif node.func.id == 'to_seq':
+                arg_type = get_type(node.args[0], containers, container)
+                seq_class = module.global_module.classes[SEQ_TYPE]
+                return GenericType(seq_class, [arg_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
@@ -342,6 +351,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[1]
     elif value_type.name == RANGE_TYPE:
         return module.global_module.classes[INT_TYPE]
+    elif value_type.name == SEQ_TYPE:
+        return value_type.type_args[0]
     else:
         raise UnsupportedException(node)
 

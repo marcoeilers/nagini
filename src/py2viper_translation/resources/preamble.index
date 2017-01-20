@@ -40,6 +40,10 @@
         "__bool__": {
             "args": ["list"],
             "type": "__prim__bool"
+        },
+        "__sil_seq__": {
+            "args": ["list"],
+            "type": "__prim__Sequence"
         }
     },
     "extends": "object"
@@ -83,7 +87,7 @@
         },
         "__sil_seq__": {
             "args": ["set"],
-            "type": null
+            "type": "__prim__Sequence"
         }
     },
     "extends": "object"
@@ -110,7 +114,7 @@
             "args": ["dict"],
             "type": "Iterator",
             "MustTerminate": true,
-            "requires": ["__sil__seq__"]
+            "requires": ["__sil_seq__"]
         },
         "values": {
             "args": ["dict"],
@@ -142,9 +146,9 @@
             "args": ["dict"],
             "type": "__prim__int"
         },
-        "__sil__seq__": {
+        "__sil_seq__": {
             "args": ["dict"],
-            "type": null
+            "type": "__prim__Sequence"
         }
     },
     "extends": "object"
@@ -363,14 +367,83 @@
         }
     }
 },
+"__prim__Sequence": {},
+"Sequence": {
+    "functions": {
+        "__create__": {
+            "args": ["__prim__Sequence", "type"],
+            "type": "Sequence",
+            "requires": ["__unbox__"]
+        },
+        "__unbox__": {
+            "args": ["Sequence"],
+            "type": "__prim__Sequence",
+            "requires": []
+        },
+        "__contains__": {
+            "args": ["Sequence", "object"],
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
+        },
+        "__getitem__": {
+            "args": ["Sequence", "int"],
+            "type": "object",
+            "requires": ["__unbox__", "__len__", "int___unbox__"]
+        },
+        "__sil_seq__": {
+            "args": ["Sequence"],
+            "type": "__prim__Sequence",
+            "requires": ["__unbox__"]
+        },
+        "__len__": {
+            "args": ["Sequence"],
+            "type": "__prim__int",
+            "requires": ["__unbox__"]
+        },
+        "take": {
+            "args": ["Sequence", "__prim__int"],
+            "type": "Sequence",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "drop": {
+            "args": ["Sequence", "__prim__int"],
+            "type": "Sequence",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "update": {
+            "args": ["Sequence", "__prim__int", "object"],
+            "type": "Sequence",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "__add__": {
+            "args": ["Sequence", "Sequence"],
+            "type": "Sequence",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "__eq__": {
+            "args": ["Sequence", "Sequence"],
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
+        }
+    },
+    "extends": "object"
+},
 "range": {
     "functions": {
         "__create__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "range",
-            "requires": ["__val__"]
+            "requires": ["__val__", "__start__", "__stop__"]
         },
         "__val__": {
+            "args": ["range"],
+            "type": "object"
+        },
+        "__start__": {
+            "args": ["range"],
+            "type": "object"
+        },
+        "__stop__": {
             "args": ["range"],
             "type": "object"
         },
@@ -395,8 +468,15 @@
         },
         "__sil_seq__": {
             "args": ["range"],
-            "type": "object",
-            "requires": ["__val__", "__len__", "__prim__int___box__", "int___unbox__"]
+            "type": "__prim__Sequence",
+            "requires": ["__val__", "__len__", "__prim__int___box__", "int___unbox__", "__start__", "__stop__"]
+        }
+    },
+    "methods": {
+        "__iter__": {
+            "args": ["range"],
+            "type": "Iterator",
+            "MustTerminate": true
         }
     },
     "extends": "object"

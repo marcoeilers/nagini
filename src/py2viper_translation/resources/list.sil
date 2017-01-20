@@ -95,6 +95,7 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
+  ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
 {
   inhale false
 }
@@ -104,11 +105,20 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   requires acc(self.__iter_index, write)
   requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
   ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
-  ensures acc(self.__iter_index, write) && (self.__iter_index == old(self.__iter_index) + 1)
-  ensures old(|self.list_acc| > self.__iter_index) ==> (_res == old(self.list_acc[self.__iter_index])) && ((_res in self.list_acc) && (_err == null))
-  ensures acc(self.__previous, 1 / 40) && ((self.__previous == old(self.__previous)) && (acc(self.__previous.list_acc, write) && (old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index])))))
-  ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null) && (self.__previous.list_acc == self.list_acc)
-  ensures _err == null ==> issubtype(typeof(_res), get_type_arg1(self, 0))
+  ensures acc(self.__iter_index, write)
+  ensures old(self.__iter_index == |self.list_acc|) <==> _err != null
+  ensures acc(self.__previous, 1 / 40) && (self.__previous == old(self.__previous)) && acc(self.__previous.list_acc, write)
+  ensures _err == null ==> (self.__iter_index == old(self.__iter_index) + 1)
+  ensures _err == null ==> self.__previous.list_acc == self.list_acc[..self.__iter_index - 1]
+  ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
+  ensures _err != null ==> self.__previous.list_acc == self.list_acc
+  ensures _err != null ==> self.__iter_index == |self.list_acc|
+  //ensures old(|self.list_acc| > self.__iter_index) <==> (_err == null)
+  //ensures old(|self.list_acc| > 0) ==> (_res == old(self.list_acc[self.__iter_index])) && (_res in self.list_acc)
+  //ensures acc(self.__previous, 1 / 40) && (self.__previous == old(self.__previous)) && acc(self.__previous.list_acc, write)
+  //ensures old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index]))
+  //ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null) && (self.__previous.list_acc == self.list_acc)
+  ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), get_type_arg1(self, 0))
 {
   inhale false
 }

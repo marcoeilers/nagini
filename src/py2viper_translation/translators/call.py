@@ -730,7 +730,8 @@ class CallTranslator(CommonTranslator):
         if target.kw_arg:
             target_params.append(target.kw_arg)
         for arg, param, type in zip(args, target_params, arg_types):
-            actual_args.append(arg)
+            target_type = self.translate_type(param.type, ctx)
+            actual_args.append(self.convert_to_type(arg, target_type, ctx))
         args = actual_args
         for arg in target.get_args():
             formal_args.append(arg.decl)

@@ -2,8 +2,10 @@ import ast
 
 from py2viper_translation.lib.constants import (
     BOOL_TYPE,
+    BOXED_PRIMITIVES,
     DICT_TYPE,
     END_LABEL,
+    INT_TYPE,
     LIST_TYPE,
     PRIMITIVE_INT_TYPE,
     SET_TYPE,
@@ -45,6 +47,16 @@ class ExpressionTranslator(CommonTranslator):
         # TODO: Update all code to use this flag.
         self._is_expression = False
         self._target_type = None
+        self.primitive_compare = {
+            ast.Is: self.viper.EqCmp,
+            ast.Eq: self.viper.EqCmp,
+            ast.NotEq: self.viper.NeCmp,
+            ast.IsNot: self.viper.NeCmp,
+            ast.Lt: self.viper.LtCmp,
+            ast.LtE: self.viper.LeCmp,
+            ast.Gt: self.viper.GtCmp,
+            ast.GtE: self.viper.GeCmp,
+        }
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type = None,
@@ -78,12 +90,7 @@ class ExpressionTranslator(CommonTranslator):
         stmt, result = visitor(node, ctx)
 
         if target_type != result.typ():
-            if target_type == self.viper.Ref:
-                result = self.to_ref(result, ctx)
-            elif target_type == self.viper.Bool:
-                result = self.to_bool(result, ctx, node)
-            elif target_type == self.viper.Int:
-                result = self.to_int(result, ctx)
+            result = self.convert_to_type(result, target_type, ctx, node)
 
         self._is_expression = old_is_expression
         self._target_type = old_target
@@ -483,6 +490,9 @@ class ExpressionTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
 
+    def _get_primitive_compare(self, node: ast.BinOp):
+        return self.primitive_compare[type(node.ops[0])]
+
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
         if self.is_io_existential_defining_equality(node, ctx):
@@ -500,6 +510,14 @@ class ExpressionTranslator(CommonTranslator):
         stmts = left_stmt + right_stmt
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
+
+        left_type_boxed = left_type.try_box()
+        right_type_boxed = right_type.try_box()
+        if right_type_boxed.name in BOXED_PRIMITIVES and right_type_boxed.name == left_type_boxed.name:
+            op = self._get_primitive_compare(node)
+            wrap = self.to_int if left_type_boxed.name == INT_TYPE else self.to_bool
+            result = op(wrap(left, ctx), wrap(right, ctx), position, info)
+            return stmts, result
 
         if isinstance(node.ops[0], ast.Is):
             return (stmts, self.viper.EqCmp(left, right, position, info))

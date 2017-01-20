@@ -17,6 +17,7 @@ domain PyType {
     function get_type_nargs5(r: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): Int
     unique function set(): PyType
     unique function dict(): PyType
+    unique function list(): PyType
 }
 
 method set___init__() returns (res: Ref)
@@ -55,6 +56,7 @@ method set___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
+  ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
 {
   inhale false
 }
@@ -109,6 +111,7 @@ method dict___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures get_type_arg1(_res, 0) == get_type_arg1(self, 1)
+  ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
 {
   inhale false
 }

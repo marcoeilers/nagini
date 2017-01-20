@@ -1,7 +1,11 @@
 import ast
 
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
-from py2viper_translation.lib.constants import BUILTIN_PREDICATES, PRIMITIVES
+from py2viper_translation.lib.constants import (
+    BUILTIN_PREDICATES,
+    PRIMITIVES,
+    SEQ_TYPE,
+)
 from py2viper_translation.lib.program_nodes import PythonModule, PythonVar
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -364,6 +368,45 @@ class ContractTranslator(CommonTranslator):
                                     self.no_info(ctx))
         return dom_stmt, result
 
+    def translate_to_sequence(self, node: ast.Call,
+                              ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        seq_call = self.get_function_call(coll_type, '__sil_seq__', [arg],
+                                          [None], node, ctx)
+        seq_class = ctx.module.global_module.classes[SEQ_TYPE]
+        type_lit = self.type_factory.translate_type_literal(
+            coll_type.type_args[0], node, ctx)
+        result = self.get_function_call(seq_class, '__create__',
+                                        [seq_call, type_lit], [None, None],
+                                        node, ctx)
+        return stmt, result
+
+    def translate_sequence(self, node: ast.Call,
+                           ctx: Context) -> StmtsAndExpr:
+        seq_type = self.get_type(node, ctx)
+        viper_type = self.translate_type(seq_type.type_args[0], ctx)
+        val_stmts = []
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type=viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSeq(vals, self.to_position(node,
+                                                                   ctx),
+                                            self.no_info(ctx))
+        else:
+            result = self.viper.EmptySeq(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        type_lit = self.type_factory.translate_type_literal(seq_type.type_args[0], node, ctx)
+        result = self.get_function_call(seq_type.cls, '__create__',
+                                        [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+
     def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         domain_node = node.args[0]
 
@@ -450,5 +493,9 @@ class ContractTranslator(CommonTranslator):
             return self.translate_forall(node, ctx)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
+        elif func_name == 'Sequence':
+            return self.translate_sequence(node, ctx)
+        elif func_name == 'to_seq':
+            return self.translate_to_sequence(node, ctx)
         else:
             raise UnsupportedException(node)

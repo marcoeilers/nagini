@@ -3,6 +3,7 @@ import ast
 from abc import ABCMeta
 from py2viper_translation.lib.constants import (
     BOOL_TYPE,
+    BOXED_PRIMITIVES,
     INT_TYPE,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_BOOL_TYPE,
@@ -82,6 +83,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         for stmt in stmtlist:
             body.append(stmt)
         return self.viper.Seqn(body, position, info)
+
+    def convert_to_type(self, e: Expr, target_type, ctx: Context,
+                        node: ast.AST = None) -> Expr:
+        result = e
+        if target_type == self.viper.Ref:
+            result = self.to_ref(e, ctx)
+        elif target_type == self.viper.Bool:
+            result = self.to_bool(e, ctx, node)
+        elif target_type == self.viper.Int:
+            result = self.to_int(e, ctx)
+        return result
 
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
         """
@@ -232,6 +244,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                             node, ctx)
         return type_lit
 
+    def _get_primitive_operation(self, node: ast.BinOp):
+        """
+        Returns the constructor for the Silver node representing the given
+        operation. If, for example, 'node' is an addition, this will return
+        self.viper.Add.
+        """
+        return self.primitive_operations[type(node.op)]
+
     def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
                            right_type: PythonType, node: ast.AST,
                            ctx: Context) -> StmtsAndExpr:
@@ -244,6 +264,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         info = self.no_info(ctx)
         stmt = []
         func_name = OPERATOR_FUNCTIONS[type(node.op)]
+        left_type_boxed = left_type.try_box()
+        right_type_boxed = right_type.try_box()
+        if right_type_boxed.name in BOXED_PRIMITIVES and right_type_boxed.name == left_type_boxed.name:
+            op = self._get_primitive_operation(node)
+            wrap = self.to_int if left_type_boxed.name == INT_TYPE else self.to_bool
+            result = op(wrap(left, ctx), wrap(right, ctx), position, info)
+            return stmt, result
         called_method = left_type.get_func_or_method(func_name)
         if called_method.pure:
             result = self.get_function_call(left_type, func_name,
