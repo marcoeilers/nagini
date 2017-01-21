@@ -53,7 +53,7 @@ sil_programs = []
 
 
 def load_sil_files(jvm: JVM):
-    sil_files = ['bool.sil', 'set_dict.sil', 'list.sil', 'str.sil', 'tuple.sil',
+    sil_files = ['bool.sil', 'list.sil', 'set_dict.sil', 'str.sil', 'tuple.sil',
                  'seq.sil', 'func_triple.sil', 'lock.sil']
     if not config.obligation_config.disable_measures:
         sil_files.append('measures.sil')

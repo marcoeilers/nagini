@@ -182,7 +182,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonField):
             return target.type
         if target:
-            if isinstance(target, PythonType) and target.name != SEQ_TYPE:
+            if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
                 return target
     if isinstance(node, (ast.Attribute, ast.Name)):
         # All these cases should be handled by get_target, so if we get here,

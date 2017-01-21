@@ -20,6 +20,9 @@ domain PyType {
     unique function list(): PyType
 }
 
+// from list.sil
+//function type_arg_eq(self: Ref, other: Ref, ind1: Int, ind2: Int): Bool
+
 method set___init__() returns (res: Ref)
     ensures acc(res.set_acc)
     ensures res.set_acc == Set[Ref]()
@@ -57,6 +60,8 @@ method set___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
   ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
+  ensures get_type_nargs1(_res.__previous, 0) == get_type_nargs1(self, 0) &&
+    (forall i1: Int :: {get_type_arg2(_res.__previous, 0, i1)} get_type_arg2(_res.__previous, 0, i1) == get_type_arg2(self, 0, i1))
 {
   inhale false
 }
@@ -110,8 +115,10 @@ method dict___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
-  ensures get_type_arg1(_res, 0) == get_type_arg1(self, 1)
+  ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
   ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
+  ensures get_type_nargs1(_res.__previous, 0) == get_type_nargs1(self, 0) &&
+    (forall i1: Int :: {get_type_arg2(_res.__previous, 0, i1)} get_type_arg2(_res.__previous, 0, i1) == get_type_arg2(self, 0, i1))
 {
   inhale false
 }

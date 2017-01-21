@@ -750,6 +750,7 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript) and
                 not isinstance(self.get_target(node.value, self.module),
                                PythonModule)):
+            test = self.get_target(node.value, self.module)
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
