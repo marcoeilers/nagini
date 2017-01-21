@@ -7,7 +7,7 @@ def w(normal: int, *args: int, other: bool, **kwargs: bool) -> int:
     Requires(args[1] == 17)
     Requires(other == True)
     Requires(len(kwargs) == 1)
-    Requires(kwargs.get('kw') is False)
+    Requires('kw' in kwargs and kwargs['kw'] is False)
     Ensures(Result() == args[0])
     return args[0]
 

@@ -48,6 +48,22 @@ function list___len__(self: Ref) : Int
 
 function int___unbox__(self: Ref): Int
 
+/*
+function type_args_plus_1(self: Ref, other: Ref, ind: Int): Bool
+{
+    (get_type_nargs0(other) == get_type_nargs1(self, ind)) &&
+    (forall i1: Int :: {get_type_nargs1(other, i1)} get_type_nargs1(other, i1) == get_type_nargs2(self, ind, i1)) &&
+    (forall i1: Int, i2: Int :: {get_type_nargs2(other, i1, i2)} get_type_nargs2(other, i1, i2) == get_type_nargs3(self, ind, i1, i2)) &&
+    (forall i1: Int :: {get_type_arg1(other, i1)} get_type_arg1(other, i1) == get_type_arg2(self, ind, i1)) &&
+    (forall i1: Int, i2 : Int :: {get_type_arg2(other, i1, i2)} get_type_arg2(other, i1, i2) == get_type_arg3(self, ind, i1, i2))
+}
+
+function type_arg_eq(self: Ref, other: Ref, ind1: Int, ind2: Int): Bool
+{
+    get_type_nargs1(other, ind2) == get_type_nargs1(self, ind1) &&
+    (forall i1: Int :: {get_type_arg2(other, ind2, i1)} get_type_arg2(other, ind2, i1) == get_type_arg2(self, ind1, i1))
+}*/
+
 function list___getitem__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
@@ -55,6 +71,7 @@ function list___getitem__(self: Ref, key: Ref): Ref
     requires int___unbox__(key) < list___len__(self)
     ensures result == self.list_acc[int___unbox__(key)]
     ensures issubtype(typeof(result), get_type_arg1(self, 0))
+    //ensures type_args_plus_1(self, result, 0)
     ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
     (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
     (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2)) &&
@@ -96,6 +113,8 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
   ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
+  ensures get_type_nargs1(_res.__previous, 0) == get_type_nargs1(self, 0) &&
+    (forall i1: Int :: {get_type_arg2(_res.__previous, 0, i1)} get_type_arg2(_res.__previous, 0, i1) == get_type_arg2(self, 0, i1))
 {
   inhale false
 }

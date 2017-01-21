@@ -82,7 +82,9 @@ class SIFStatementTranslator(StatementTranslator):
 
     def translate_stmt_While(self, node: ast.While,
                              ctx: SIFContext) -> List[Stmt]:
-        self.enter_loop_translation(node, ctx)
+        post_label = ctx.actual_function.get_fresh_name('post_loop')
+        end_label = ctx.actual_function.get_fresh_name('loop_end')
+        self.enter_loop_translation(node, post_label, end_label, ctx)
         tl_stmts, while_cond = self._create_condition_and_timelevel_statements(
             node.test, ctx)
         # Translate loop invariants.
