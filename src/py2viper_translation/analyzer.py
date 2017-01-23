@@ -444,6 +444,9 @@ class Analyzer(ast.NodeVisitor):
                 self.visit(child.value.args[0], node)
             else:
                 self.visit(child, node)
+        if node.orelse:
+            for stmt in node.orelse:
+                self.visit(stmt, node)
         self.current_loop_invariant = old_loop_invariant
 
     def visit_While(self, node: ast.While) -> None:

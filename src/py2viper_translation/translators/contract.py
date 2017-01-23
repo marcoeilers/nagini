@@ -3,7 +3,9 @@ import ast
 from py2viper_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from py2viper_translation.lib.constants import (
     BUILTIN_PREDICATES,
+    INT_TYPE,
     PRIMITIVES,
+    RANGE_TYPE,
     SEQ_TYPE,
 )
 from py2viper_translation.lib.program_nodes import PythonModule, PythonVar
@@ -375,8 +377,12 @@ class ContractTranslator(CommonTranslator):
         seq_call = self.get_function_call(coll_type, '__sil_seq__', [arg],
                                           [None], node, ctx)
         seq_class = ctx.module.global_module.classes[SEQ_TYPE]
-        type_lit = self.type_factory.translate_type_literal(
-            coll_type.type_args[0], node, ctx)
+        if coll_type.name == RANGE_TYPE:
+            type_arg = ctx.module.global_module.classes[INT_TYPE]
+        else:
+            type_arg = coll_type.type_args[0]
+        type_lit = self.type_factory.translate_type_literal( type_arg, node,
+                                                             ctx)
         result = self.get_function_call(seq_class, '__create__',
                                         [seq_call, type_lit], [None, None],
                                         node, ctx)
