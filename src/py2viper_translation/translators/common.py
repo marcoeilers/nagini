@@ -86,6 +86,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def convert_to_type(self, e: Expr, target_type, ctx: Context,
                         node: ast.AST = None) -> Expr:
+        """
+        Converts expression ``e`` to the Viper type ``target_type`` if said
+        type is Ref, Bool or Int.
+        """
         result = e
         if target_type == self.viper.Ref:
             result = self.to_ref(e, ctx)
@@ -266,9 +270,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         func_name = OPERATOR_FUNCTIONS[type(node.op)]
         left_type_boxed = left_type.try_box()
         right_type_boxed = right_type.try_box()
-        if right_type_boxed.name in BOXED_PRIMITIVES and right_type_boxed.name == left_type_boxed.name:
+        # If both sides are of the same, primitive type, use the builtin Viper
+        # operator instead of the function
+        if (right_type_boxed.name in BOXED_PRIMITIVES and
+                right_type_boxed.name == left_type_boxed.name):
             op = self._get_primitive_operation(node)
-            wrap = self.to_int if left_type_boxed.name == INT_TYPE else self.to_bool
+            if left_type_boxed.name == INT_TYPE:
+                wrap = self.to_int
+            else:
+                wrap = self.to_bool
             result = op(wrap(left, ctx), wrap(right, ctx), position, info)
             return stmt, result
         called_method = left_type.get_func_or_method(func_name)

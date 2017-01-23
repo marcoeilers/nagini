@@ -20,9 +20,6 @@ domain PyType {
     unique function list(): PyType
 }
 
-// from list.sil
-//function type_arg_eq(self: Ref, other: Ref, ind1: Int, ind2: Int): Bool
-
 method set___init__() returns (res: Ref)
     ensures acc(res.set_acc)
     ensures res.set_acc == Set[Ref]()

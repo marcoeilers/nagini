@@ -9,6 +9,7 @@ domain PyType {
     function get_type_nargs0(obj: Ref): Int
 }
 
+// Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
 
 function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
@@ -19,7 +20,6 @@ function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
 
 function Sequence___unbox__(box: Ref): Seq[Ref]
     requires issubtype(typeof(box), Sequence())
-    //ensures __prim__Sequence___create__(result, get_type_arg1(result, 0)) == box
 
 function Sequence___contains__(self: Ref, item: Ref): Bool
     requires issubtype(typeof(self), Sequence())

@@ -11,7 +11,11 @@ from py2viper_translation.lib.constants import (
     SET_TYPE,
     TUPLE_TYPE,
 )
-from py2viper_translation.lib.program_nodes import GenericType, PythonType, PythonVar
+from py2viper_translation.lib.program_nodes import (
+    GenericType,
+    PythonType,
+    PythonVar,
+)
 from py2viper_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -39,6 +43,7 @@ class StatementTranslator(CommonTranslator):
     def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,
                  type_info: 'TypeInfo', viper_ast: 'ViperAST') -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
+        # Keep track of the end and after labels of loops we are currently in.
         self.loops = []
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
@@ -91,18 +96,23 @@ class StatementTranslator(CommonTranslator):
             invariant acc(iter.__iter_index, write)
             invariant acc(iter.__previous, 1 / 20)
             invariant acc(iter.__previous.list_acc, write)
-            invariant iter.__iter_index - 1 == list___len__(iter.__previous)
-            invariant (iter_err == null) ==> (iter.__iter_index >= 0) &&
-                      (iter.__iter_index <= |iter.list_acc|)
-            invariant (iter_err == null) ==> (c ==
-                                              iter.list_acc[iter.__iter_index-1])
-            invariant (iter_err == null) ==> (c in iter.list_acc)
-            invariant (iter_err == null) ==>(iter.__previous.list_acc ==
-                                             iter.list_acc[..iter.__iter_index-1])
-            invariant (iter_err == null) ==> get_type_arg1(iter) == T()
-            invariant (iter_err == null) ==> issubtype(typeof(c), T())
-            invariant (iter_err != null) ==> (iter.__previous.list_acc ==
-                                              iter.list_acc)
+            invariant issubtype(typeof(iter.__previous), list()) && ...
+            invariant iter_err == null ==>
+                      iter.__iter_index - 1 == list___len__(iter.__previous)
+            invariant iter_err != null ==>
+                      iter.__iter_index == list___len__(iter.__previous)
+            invariant iter.__iter_index >= 0 &&
+                      iter.__iter_index <= |iter.list_acc|
+            invariant |iter.list_acc| > 0 ==>
+                      c == iter.list_acc[iter.__iter_index - 1]
+            invariant |iter.list_acc| > 0 ==> (c in iter.list_acc)
+            invariant iter_err == null ==>
+                          iter.__previous.list_acc ==
+                          iter.list_acc[..iter.__iter_index - 1]
+            invariant |iter.list_acc| > 0 ==>
+                      issubtype(typeof(c), list()) && ...
+            invariant iter_err != null ==>
+                      iter.__previous.list_acc == iter.list_acc
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -172,7 +182,8 @@ class StatementTranslator(CommonTranslator):
         list_class = ctx.module.global_module.classes[LIST_TYPE]
 
         previous_type = GenericType(list_class, [target_var.type])
-        invariant.append(self.type_check(iter_previous_acc, previous_type, pos, ctx))
+        invariant.append(self.type_check(iter_previous_acc, previous_type, pos,
+                                         ctx))
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
         object_class = ctx.module.global_module.classes[OBJECT_TYPE]
@@ -180,24 +191,29 @@ class StatementTranslator(CommonTranslator):
         previous_len = self.get_function_call(list_class, '__len__',
                                               [iter_previous_acc],
                                               [object_class], None, ctx)
-        no_error_previous_len_eq = self.viper.EqCmp(index_minus_one, previous_len, pos,
-                                                    info)
-        error_previous_len_eq = self.viper.EqCmp(iter_index_acc, previous_len, pos, info)
+        no_error_previous_len_eq = self.viper.EqCmp(index_minus_one,
+                                                    previous_len, pos, info)
+        error_previous_len_eq = self.viper.EqCmp(iter_index_acc, previous_len,
+                                                 pos, info)
 
         null = self.viper.NullLit(pos, info)
 
         no_error = self.viper.EqCmp(err_var.ref(), null, pos, info)
         some_error = self.viper.NeCmp(err_var.ref(), null, pos, info)
 
-        invariant.append(self.viper.Implies(no_error, no_error_previous_len_eq, pos, info))
-        invariant.append(self.viper.Implies(some_error, error_previous_len_eq, pos, info))
+        invariant.append(self.viper.Implies(no_error, no_error_previous_len_eq,
+                                            pos, info))
+        invariant.append(self.viper.Implies(some_error, error_previous_len_eq,
+                                            pos, info))
 
         index_nonneg = self.viper.GeCmp(iter_index_acc, zero, pos, info)
         iter_list_len = self.viper.SeqLength(iter_acc, pos, info)
 
         non_empty_iterator = self.viper.GtCmp(iter_list_len, zero, pos, info)
 
-        no_error_implies_non_empty = self.viper.Implies(no_error, non_empty_iterator, pos, info)
+        no_error_implies_non_empty = self.viper.Implies(no_error,
+                                                        non_empty_iterator, pos,
+                                                        info)
         invariant.append(no_error_implies_non_empty)
 
         index_le_len = self.viper.LeCmp(iter_index_acc, iter_list_len, pos,
@@ -219,10 +235,11 @@ class StatementTranslator(CommonTranslator):
                                                  iter_current_index, pos, info)
         current_element_contained = self.viper.SeqContains(boxed_target,
                                                            iter_acc, pos, info)
-        invariant.append(self.viper.Implies(non_empty_iterator, current_element_index,
-                                            pos, info))
-        invariant.append(self.viper.Implies(non_empty_iterator, current_element_contained,
-                                            pos, info))
+        invariant.append(self.viper.Implies(non_empty_iterator,
+                                            current_element_index, pos, info))
+        invariant.append(self.viper.Implies(non_empty_iterator,
+                                            current_element_contained, pos,
+                                            info))
 
         previous_elements = self.viper.SeqTake(iter_acc, index_minus_one, pos,
                                                info)
@@ -283,8 +300,8 @@ class StatementTranslator(CommonTranslator):
     def _get_havoced_vars(self, nodes: List[ast.AST],
                           ctx: Context) -> List[PythonVar]:
         """
-        Finds all local variables written to within the given partial ASTs which already
-        existed before.
+        Finds all local variables written to within the given partial ASTs which
+        already existed before.
         """
         result = []
         collector = AssignCollector()

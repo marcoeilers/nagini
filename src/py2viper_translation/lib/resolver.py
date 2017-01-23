@@ -182,6 +182,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonField):
             return target.type
         if target:
+            # If this is a Sequence(...) call, target will be the Sequence class
+            # but won't have generic type information. So we don't return here
+            # and let the code below take care of the call.
             if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
                 return target
     if isinstance(node, (ast.Attribute, ast.Name)):
