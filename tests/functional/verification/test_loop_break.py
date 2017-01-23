@@ -42,15 +42,18 @@ def find_divisor_else(product: int) -> int:
 def find_divisor_for(product: int) -> int:
     Requires(product > 2)
     Ensures(Result() >= 2 and Result() <= product)
-    Ensures(Forall(range(2, Result()), lambda x: (product % x != 0, [])))
+    Ensures(Forall(to_seq(range(2, Result())), lambda x: (product % x != 0, [])))
     Ensures(Implies(Result() != product, product % Result() == 0))
     for i in range(2, product):
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(Previous(i), lambda x: (product % x != 0, [])))
+        Invariant(Forall(to_seq(Previous(i)), lambda x: (product % x != 0, [])))
         if product % i == 0:
+            Assert(to_seq(Previous(i)) == to_seq(range(2, i)))
+            Assert(Forall(to_seq(range(2, i)), lambda x: (product % x != 0, [])))
             break
     else:
         i = product
+        Assert(Forall(range(2, i), lambda x: (product % x != 0, [])))
     return i
 
 
@@ -61,6 +64,7 @@ def find_divisor_for_2(product: int) -> int:
     for i in range(2, product):
         Invariant(i >= 2 and i <= product)
         Invariant(Forall(Previous(i), lambda x: (product % x != 0, [])))
+        Invariant(Forall(to_seq(Previous(i)), lambda x: (product % x != 0, [])))
         if product % i == 0:
             break
     else:

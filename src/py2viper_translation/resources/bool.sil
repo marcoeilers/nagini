@@ -135,6 +135,7 @@ function range___sil_seq__(self: Ref): Seq[Ref]
   ensures |result| == range___len__(self)
   ensures (forall i: Int :: i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (issubtype(typeof(i), int()) && (int___unbox__(i) in range___val__(self))))
+  ensures (forall i: Int, j: Int :: result[i] == result[j] <==> i == j)
   //ensures forall end: Int :: {range___sil_seq__(range___create__(range___start__(self), end))} (end < range___stop__(self) && end >= range___start__(self)) ==> result == range___sil_seq__(range___create__(range___start__(self), end))[..range___stop__(self)]
 
 
