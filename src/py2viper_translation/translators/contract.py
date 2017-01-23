@@ -374,6 +374,8 @@ class ContractTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
         stmt, arg = self.translate_expr(node.args[0], ctx)
+        # Use the sequence conversion also used for iterating over the
+        # iterable (which gives no information about order).
         seq_call = self.get_function_call(coll_type, '__sil_seq__', [arg],
                                           [None], node, ctx)
         seq_class = ctx.module.global_module.classes[SEQ_TYPE]
@@ -381,8 +383,8 @@ class ContractTranslator(CommonTranslator):
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
             type_arg = coll_type.type_args[0]
-        type_lit = self.type_factory.translate_type_literal( type_arg, node,
-                                                             ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, node,
+                                                            ctx)
         result = self.get_function_call(seq_class, '__create__',
                                         [seq_call, type_lit], [None, None],
                                         node, ctx)
@@ -407,7 +409,8 @@ class ContractTranslator(CommonTranslator):
             result = self.viper.EmptySeq(viper_type,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
-        type_lit = self.type_factory.translate_type_literal(seq_type.type_args[0], node, ctx)
+        type_arg = seq_type.type_args[0]
+        type_lit = self.type_factory.translate_type_literal(type_arg, node, ctx)
         result = self.get_function_call(seq_type.cls, '__create__',
                                         [result, type_lit], [None, None], node,
                                         ctx)

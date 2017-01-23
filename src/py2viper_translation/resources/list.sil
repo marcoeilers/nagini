@@ -47,9 +47,14 @@ function list___len__(self: Ref) : Int
  |self.list_acc|
 }
 
+// Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
 
 /*
+// TODO: It would make sense to have functions like this for assertions we need
+// for lots of different functions/methods (list___getitem__, Iterator___next__,
+// list___iter__, ...), but it seems that Silicon doesn't always expand the
+// function and becomes incomplete if we do that.
 function type_args_plus_1(self: Ref, other: Ref, ind: Int): Bool
 {
     (get_type_nargs0(other) == get_type_nargs1(self, ind)) &&
@@ -72,7 +77,6 @@ function list___getitem__(self: Ref, key: Ref): Ref
     requires int___unbox__(key) < list___len__(self)
     ensures result == self.list_acc[int___unbox__(key)]
     ensures issubtype(typeof(result), get_type_arg1(self, 0))
-    //ensures type_args_plus_1(self, result, 0)
     ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
     (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
     (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2)) &&
@@ -121,11 +125,9 @@ method list___iter__(self: Ref) returns (_res: Ref)
 }
 
 method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
-  //requires acc(self.__container, 1/100)
   requires acc(self.list_acc, 1 / 40)
   requires acc(self.__iter_index, write)
   requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
-  //ensures acc(self.__container, 1/100)
   ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
   ensures acc(self.__iter_index, write)
   ensures old(self.__iter_index == |self.list_acc|) <==> _err != null
@@ -135,18 +137,10 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
   ensures _err != null ==> self.__previous.list_acc == self.list_acc
   ensures _err != null ==> self.__iter_index == |self.list_acc|
-  //ensures old(|self.list_acc| > self.__iter_index) <==> (_err == null)
-  //ensures old(|self.list_acc| > 0) ==> (_res == old(self.list_acc[self.__iter_index])) && (_res in self.list_acc)
-  //ensures acc(self.__previous, 1 / 40) && (self.__previous == old(self.__previous)) && acc(self.__previous.list_acc, write)
-  //ensures old(|self.list_acc| > self.__iter_index) ==> (self.__previous.list_acc == old(self.list_acc[..self.__iter_index]))
-  //ensures old(|self.list_acc| <= self.__iter_index) ==> (_err != null) && (self.__previous.list_acc == self.list_acc)
   ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), get_type_arg1(self, 0))
   ensures |self.list_acc| > 0 ==> (get_type_nargs0(_res) == get_type_nargs1(self, 0)) &&
     (forall i1: Int :: {get_type_nargs1(_res, i1)} get_type_nargs1(_res, i1) == get_type_nargs2(self, 0, i1)) &&
-    (forall i1: Int :: {get_type_arg1(_res, i1)} get_type_arg1(_res, i1) == get_type_arg2(self, 0, i1)) //&&
-    //(forall i1: Int, i2 : Int :: {get_type_arg2(other, i1, i2)} get_type_arg2(other, i1, i2) == get_type_arg3(self, ind, i1, i2))
-  //ensures issubtype(typeof(self.__container), range()) ==> (forall i: Int, j: Int :: self.__previous.list_acc[i] == self.__previous.list_acc[j] <==> i == j)
-  //ensures issubtype(typeof(self.__container), set()) ==> (forall i: Int, j: Int :: self.__previous.list_acc[i] == self.__previous.list_acc[j] <==> i == j)
+    (forall i1: Int :: {get_type_arg1(_res, i1)} get_type_arg1(_res, i1) == get_type_arg2(self, 0, i1))
 {
   inhale false
 }

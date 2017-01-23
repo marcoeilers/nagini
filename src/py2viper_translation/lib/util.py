@@ -276,10 +276,10 @@ def pprint(node) -> str:
         raise ValueError(node)
     if isinstance(node, str):
         return node
-    #if isinstance(node, ast.FunctionDef):
+    if isinstance(node, ast.FunctionDef):
         # Mainly for debugging, whenever this happens it's almost certainly
         # wrong.
-        #raise ValueError(node)
+        raise ValueError(node)
     res = astunparse.unparse(node)
     res = res.replace('\n', '')
     return res

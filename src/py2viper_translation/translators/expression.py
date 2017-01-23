@@ -513,9 +513,15 @@ class ExpressionTranslator(CommonTranslator):
 
         left_type_boxed = left_type.try_box()
         right_type_boxed = right_type.try_box()
-        if right_type_boxed.name in BOXED_PRIMITIVES and right_type_boxed.name == left_type_boxed.name:
+        # If both sides are of the same, primitive type, use the builtin Viper
+        # operator instead of the function
+        if (right_type_boxed.name in BOXED_PRIMITIVES and
+                right_type_boxed.name == left_type_boxed.name):
             op = self._get_primitive_compare(node)
-            wrap = self.to_int if left_type_boxed.name == INT_TYPE else self.to_bool
+            if left_type_boxed.name == INT_TYPE:
+                wrap = self.to_int
+            else:
+                wrap = self.to_bool
             result = op(wrap(left, ctx), wrap(right, ctx), position, info)
             return stmts, result
 

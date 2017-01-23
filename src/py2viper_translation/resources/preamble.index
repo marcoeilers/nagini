@@ -20,7 +20,6 @@
         "__iter__": {
             "args": ["list"],
             "type": "Iterator",
-            "requires": ["type_arg_eq"],
             "MustTerminate": true
         }
     },
@@ -28,7 +27,7 @@
         "__getitem__": {
             "args": ["list", "int"],
             "type": "object",
-            "requires": ["__len__", "type_args_plus_1"]
+            "requires": ["__len__"]
         },
         "__contains__": {
             "args": ["list", "object"],
@@ -70,7 +69,7 @@
             "args": ["set"],
             "type": "Iterator",
             "MustTerminate": true,
-            "requires": ["__sil_seq__", "type_arg_eq"]
+            "requires": ["__sil_seq__"]
         }
     },
     "functions": {
@@ -115,7 +114,7 @@
             "args": ["dict"],
             "type": "Iterator",
             "MustTerminate": true,
-            "requires": ["__sil_seq__", "type_arg_eq"]
+            "requires": ["__sil_seq__"]
         },
         "values": {
             "args": ["dict"],
