@@ -374,8 +374,8 @@ class ContractTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
         stmt, arg = self.translate_expr(node.args[0], ctx)
-        # Use the sequence conversion also used for iterating over the
-        # iterable (which gives no information about order).
+        # Use the same sequence conversion as for iterating over the
+        # iterable (which gives no information about order for unordered types).
         seq_call = self.get_function_call(coll_type, '__sil_seq__', [arg],
                                           [None], node, ctx)
         seq_class = ctx.module.global_module.classes[SEQ_TYPE]
@@ -504,7 +504,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_previous(node, ctx)
         elif func_name == 'Sequence':
             return self.translate_sequence(node, ctx)
-        elif func_name == 'to_seq':
+        elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
         else:
             raise UnsupportedException(node)

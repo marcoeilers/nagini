@@ -305,7 +305,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return get_type(node.args[0], containers, container)
             elif node.func.id == 'Unfolding':
                 return get_type(node.args[1], containers, container)
-            elif node.func.id == 'to_seq':
+            elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
                 return GenericType(seq_class, [arg_type])
