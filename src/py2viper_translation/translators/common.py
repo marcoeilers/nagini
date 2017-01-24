@@ -5,7 +5,6 @@ from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     BOXED_PRIMITIVES,
     INT_TYPE,
-    OPERATOR_FUNCTIONS,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     UNION_TYPE,
