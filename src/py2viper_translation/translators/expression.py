@@ -24,6 +24,7 @@ from py2viper_translation.lib.program_nodes import (
 )
 from py2viper_translation.lib.typedefs import (
     Expr,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -47,7 +48,12 @@ class ExpressionTranslator(CommonTranslator):
         # TODO: Update all code to use this flag.
         self._is_expression = False
         self._target_type = None
-        self.primitive_compare = {
+        self._primitive_operations = {
+            ast.Add: self.viper.Add,
+            ast.Sub: self.viper.Sub,
+            ast.Mult: self.viper.Mul,
+            ast.FloorDiv: self.viper.Div,
+            ast.Mod: self.viper.Mod,
             ast.Is: self.viper.EqCmp,
             ast.Eq: self.viper.EqCmp,
             ast.NotEq: self.viper.NeCmp,
@@ -490,8 +496,67 @@ class ExpressionTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
 
-    def _get_primitive_compare(self, node: ast.BinOp):
-        return self.primitive_compare[type(node.ops[0])]
+    def _is_primitive_operation(self, left_type: PythonType,
+                                right_type: PythonType) -> bool:
+        """
+        Determines if a binary operation with the given operand types can be
+        translated as a native silver binary operation. True iff both types
+        are identical and primitives.
+        """
+        left_type_boxed = left_type.try_box()
+        right_type_boxed = right_type.try_box()
+        return (right_type_boxed.name in BOXED_PRIMITIVES and
+                right_type_boxed.name == left_type_boxed.name)
+
+    def _translate_primitive_operation(self, left: Expr, right: Expr,
+                                       op_type: PythonType, op: ast.operator,
+                                       pos: Position, ctx: Context) -> Expr:
+        """
+        Translates the binary operation consisting of the given operator and
+        the given operands to a primitive Viper BinOp.
+        """
+        op = self._primitive_operations[type(op)]
+        if op_type.try_box().name == INT_TYPE:
+            wrap = self.to_int
+        else:
+            wrap = self.to_bool
+        result = op(wrap(left, ctx), wrap(right, ctx), pos, self.no_info(ctx))
+        return result
+
+    def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
+                           right_type: PythonType, node: ast.AST,
+                           ctx: Context) -> StmtsAndExpr:
+        """
+        Translates the invocation of the binary operator of 'node' on the
+        given two arguments, either to a primitive Silver operation or to a
+        function or method call.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        stmt = []
+        if self._is_primitive_operation(left_type, right_type):
+            result = self._translate_primitive_operation(left, right, left_type,
+                                                         node.op, position, ctx)
+            return stmt, result
+        func_name = OPERATOR_FUNCTIONS[type(node.op)]
+        called_method = left_type.get_func_or_method(func_name)
+        if called_method.pure:
+            result = self.get_function_call(left_type, func_name,
+                                            [left, right],
+                                            [left_type, right_type],
+                                            node, ctx)
+        else:
+            result_type = called_method.type
+            res_var = ctx.actual_function.create_variable('op_res',
+                                                          result_type,
+                                                          self.translator)
+            stmt += self.get_method_call(left_type, func_name,
+                                         [left, right],
+                                         [left_type, right_type],
+                                         [res_var.ref(node, ctx)], node,
+                                         ctx)
+            result = res_var.ref(node, ctx)
+        return stmt, result
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
@@ -511,18 +576,10 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        left_type_boxed = left_type.try_box()
-        right_type_boxed = right_type.try_box()
-        # If both sides are of the same, primitive type, use the builtin Viper
-        # operator instead of the function
-        if (right_type_boxed.name in BOXED_PRIMITIVES and
-                right_type_boxed.name == left_type_boxed.name):
-            op = self._get_primitive_compare(node)
-            if left_type_boxed.name == INT_TYPE:
-                wrap = self.to_int
-            else:
-                wrap = self.to_bool
-            result = op(wrap(left, ctx), wrap(right, ctx), position, info)
+        if self._is_primitive_operation(left_type, right_type):
+            result = self._translate_primitive_operation(left, right, left_type,
+                                                         node.ops[0], position,
+                                                         ctx)
             return stmts, result
 
         if isinstance(node.ops[0], ast.Is):

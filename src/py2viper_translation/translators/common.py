@@ -55,17 +55,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     functionality which is needed by many or all specialized translators.
     """
 
-    def __init__(self, config: 'TranslatorConfig', jvm: JVM, source_file: str,
-                 type_info: 'TypeInfo', viper_ast: ViperAST) -> None:
-        super().__init__(config, jvm, source_file, type_info, viper_ast)
-        self.primitive_operations = {
-            ast.Add: self.viper.Add,
-            ast.Sub: self.viper.Sub,
-            ast.Mult: self.viper.Mul,
-            ast.FloorDiv: self.viper.Div,
-            ast.Mod: self.viper.Mod,
-        }
-
     def translate_generic(self, node: ast.AST, ctx: Context) -> None:
         """
         Visitor that is used if no other visitor is implemented.
@@ -247,66 +236,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         type_lit = self.type_factory.translate_type_literal(arg_type,
                                                             node, ctx)
         return type_lit
-
-    def _get_primitive_operation(self, node: ast.BinOp):
-        """
-        Returns the constructor for the Silver node representing the given
-        operation. If, for example, 'node' is an addition, this will return
-        self.viper.Add.
-        """
-        return self.primitive_operations[type(node.op)]
-
-    def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
-                           right_type: PythonType, node: ast.AST,
-                           ctx: Context) -> StmtsAndExpr:
-        """
-        Translates the invocation of the binary operator of 'node' on the
-        given two arguments, either to a primitive Silver operation or to a
-        function or method call.
-        """
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        stmt = []
-        func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        left_type_boxed = left_type.try_box()
-        right_type_boxed = right_type.try_box()
-        # If both sides are of the same, primitive type, use the builtin Viper
-        # operator instead of the function
-        if (right_type_boxed.name in BOXED_PRIMITIVES and
-                right_type_boxed.name == left_type_boxed.name):
-            op = self._get_primitive_operation(node)
-            if left_type_boxed.name == INT_TYPE:
-                wrap = self.to_int
-            else:
-                wrap = self.to_bool
-            result = op(wrap(left, ctx), wrap(right, ctx), position, info)
-            return stmt, result
-        called_method = left_type.get_func_or_method(func_name)
-        if called_method.pure:
-            result = self.get_function_call(left_type, func_name,
-                                            [left, right],
-                                            [left_type, right_type],
-                                            node, ctx)
-        else:
-            result_type = called_method.type
-            res_var = ctx.actual_function.create_variable('op_res',
-                                                          result_type,
-                                                          self.translator)
-            stmt += self.get_method_call(left_type, func_name,
-                                         [left, right],
-                                         [left_type, right_type],
-                                         [res_var.ref(node, ctx)], node,
-                                         ctx)
-            result = res_var.ref(node, ctx)
-        return stmt, result
-
-    def _get_primitive_operation(self, node: ast.BinOp):
-        """
-        Returns the constructor for the Silver node representing the given
-        operation. If, for example, 'node' is an addition, this will return
-        self.viper.Add.
-        """
-        return self.primitive_operations[type(node.op)]
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],

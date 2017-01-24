@@ -137,6 +137,12 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                                       preds,
                                                                       ctx)
 
+    def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
+                           right_type: PythonType, node: ast.AST,
+                           ctx: Context) -> StmtsAndExpr:
+        return self.config.expr_translator.translate_operator(
+            left, right, left_type, right_type, node, ctx)
+
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],
                                   call: ast.Call, ctx: Context) -> List[Stmt]:
