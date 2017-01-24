@@ -7,6 +7,7 @@ from py2viper_translation.lib.constants import (
     END_LABEL,
     INT_TYPE,
     LIST_TYPE,
+    OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     SET_TYPE,
     STRING_TYPE,

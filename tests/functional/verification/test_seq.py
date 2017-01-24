@@ -31,25 +31,25 @@ def test_seq() -> None:
     assert False
 
 
-def test_list_to_seq() -> None:
+def test_list_ToSeq() -> None:
     a = [1,2,3]
-    assert to_seq(a) == Sequence(1,2,3)
+    assert ToSeq(a) == Sequence(1,2,3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
 
-def test_dict_to_seq() -> None:
+def test_dict_ToSeq() -> None:
     a = {1: 45, 2: 34}
-    b = to_seq(a)
+    b = ToSeq(a)
     assert 1 in b
     assert 2 in b
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert 3 in b
 
 
-def test_set_to_seq() -> None:
+def test_set_ToSeq() -> None:
     a = {1, 3, 5}
-    b = to_seq(a)
+    b = ToSeq(a)
     assert 1 in b
     assert 5 in b
     #:: ExpectedOutput(assert.failed:assertion.false)
