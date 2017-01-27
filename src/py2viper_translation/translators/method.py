@@ -392,8 +392,8 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            type_check = self.type_factory.concrete_type_check(
-                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
+            type_check = self.type_check(next(iter(method.args.values())).ref(),
+                                         method.cls, no_pos, ctx, concrete=True)
             inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
                                             self.no_info(ctx))
             body.append(inhale_type)

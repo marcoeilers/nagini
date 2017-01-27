@@ -477,3 +477,44 @@ def join_paths_2(c: Container) -> Container:
     except MyException:
         pass
     return c
+
+
+def from_catch() -> None:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(False)
+    try:
+        raise MyException() from MyOtherException()
+    except MyException:
+        pass
+    except MyOtherException:
+        assert False
+
+
+def setup(c: Container) -> MyException:
+    Requires(Acc(c.value))
+    Ensures(Acc(c.value) and c.value == 17)
+    c.value = 17
+    return MyException()
+
+
+def require(c: Container) -> MyException:
+    Requires(Acc(c.value) and c.value == 17)
+    Ensures(Acc(c.value))
+    return MyException()
+
+
+def from_order() -> None:
+    c = Container()
+    try:
+        raise setup(c) from require(c)
+    except MyException:
+        pass
+
+
+def from_order_2() -> None:
+    c = Container()
+    try:
+        #:: ExpectedOutput(call.precondition:assertion.false)
+        raise require(c) from setup(c)
+    except MyException:
+        pass

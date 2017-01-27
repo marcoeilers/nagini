@@ -27,6 +27,7 @@ domain PyType {
 
 function __prim__int___box__(prim: Int): Ref
     ensures typeof(result) == int()
+    ensures get_type_nargs0(result) == 0
     ensures int___unbox__(result) == prim
     ensures forall other: Int :: {__prim__int___box__(other)} ((__prim__int___box__(other) == result) <==> (other == prim))
 
@@ -37,6 +38,7 @@ function int___unbox__(box: Ref): Int
 
 function __prim__bool___box__(prim: Bool): Ref
     ensures typeof(result) == bool()
+    ensures get_type_nargs0(result) == 0
     ensures bool___unbox__(result) == prim
     ensures int___unbox__(result) == (prim ? 1 : 0)
 

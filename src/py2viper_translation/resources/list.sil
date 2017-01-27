@@ -96,7 +96,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
 
 method list_append(self: Ref, item: Ref) returns ()
     requires acc(self.list_acc)
-    requires issubtype(typeof(item), get_type_arg1(self, 0))
+    requires issubtype(typeof(item), get_type_arg1(self, 0)) && get_type_nargs0(item) == get_type_nargs1(self, 0) && (forall i1: Int :: {get_type_arg1(item, i1)} i1 >= 0 && i1 < get_type_nargs0(item) ==> get_type_arg1(item, i1) == get_type_arg2(self, 0, i1))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {

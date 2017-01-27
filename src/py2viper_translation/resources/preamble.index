@@ -300,6 +300,60 @@
     },
     "extends": "object"
 },
+"bytes": {
+    "functions": {
+        "__len__": {
+            "args": ["bytes"],
+            "type": "__prim__int",
+            "requires": ["__val__"]
+        },
+        "__bool__": {
+            "args": ["bytes"],
+            "type": "__prim__bool",
+            "requires": ["__len__"]
+        },
+        "__eq__": {
+            "args": ["bytes", "object"],
+            "type": "__prim__bool",
+            "requires": ["__val__", "__len__"]
+        },
+        "__add__": {
+            "args": ["bytes", "bytes"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__"]
+        },
+        "__mul__": {
+            "args": ["bytes", "__prim__int"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__", "bytes___mul__helper"]
+        },
+        "__sil_seq__": {
+            "args": ["bytes"],
+            "type": "__prim__Sequence",
+            "requires": ["__val__"]
+        },
+        "__create__": {
+            "args": ["__prim__Sequence"],
+            "type": "bytes",
+            "requires": ["__len__", "__val__"]
+        },
+        "__val__": {
+            "args": ["bytes"],
+            "type": "__prim__Sequence"
+        },
+        "__getitem__": {
+            "args": ["bytes", "__prim__int"],
+            "type": "int",
+            "requires": ["__len__", "__val__"]
+        },
+        "join": {
+            "args": ["bytes", "list"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__", "bytes_join_val_helper", "list___len__", "list___getitem__"]
+        }
+    },
+    "extends": "object"
+},
 "tuple": {
     "functions": {
         "__create0__": {
@@ -345,6 +399,10 @@
         "__len__": {
             "args": ["tuple"],
             "type": "__prim__int"
+        },
+        "__sil_seq__": {
+            "args": ["tuple"],
+            "type": "__prim__Sequence"
         }
     },
     "extends": "object"
