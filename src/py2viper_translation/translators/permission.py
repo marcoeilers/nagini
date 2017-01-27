@@ -1,0 +1,43 @@
+import ast
+
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    Stmt,
+    StmtsAndExpr,
+)
+from py2viper_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+)
+from py2viper_translation.translators.abstract import Context
+from py2viper_translation.translators.common import CommonTranslator
+
+
+class PermTranslator(CommonTranslator):
+
+    def translate_perm(self, node: ast.AST, ctx: Context) -> Expr:
+        """
+        Generic visitor function for translating a permission amount
+        """
+        method = 'translate_perm_' + node.__class__.__name__
+        visitor = getattr(self, method, self.translate_generic)
+        return visitor(node, ctx)
+
+    def translate_perm_Num(self, node: ast.Num, ctx: Context) -> Expr:
+        if node.n == 1:
+            return self.viper.FullPerm(self.to_position(node, ctx),
+                                       self.no_info(ctx))
+        raise UnsupportedException(node)
+
+    def translate_perm_BinOp(self, node: ast.BinOp, ctx: Context) -> Expr:
+        if isinstance(node.op, ast.Div):
+            left_stmt, left = self.translate_expr(node.left, ctx,
+                                                  self.viper.Int)
+            right_stmt, right = self.translate_expr(node.right, ctx,
+                                                    self.viper.Int)
+            if left_stmt or right_stmt:
+                raise InvalidProgramException(node, 'purity.violated')
+            return self.viper.FractionalPerm(left, right,
+                                             self.to_position(node, ctx),
+                                             self.no_info(ctx))
+        raise UnsupportedException(node)
