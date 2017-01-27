@@ -119,8 +119,8 @@ class ProgramTranslator(CommonTranslator):
                                         self.viper.NullLit(self.no_position(ctx),
                                                            self.no_info(ctx)),
                                         self.no_position(ctx), self.no_info(ctx))
-            new_type = self.type_factory.concrete_type_check(
-                next(iter(method.args.values())).ref(), cls, pos, ctx)
+            new_type = self.type_check(next(iter(method.args.values())).ref(),
+                                       cls, pos, ctx, concrete=True)
             pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():

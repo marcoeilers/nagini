@@ -116,8 +116,7 @@ class CallTranslator(CommonTranslator):
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-        return self.type_factory.concrete_type_check(obj_var, type, position,
-                                                     ctx)
+        return self.type_check(obj_var, type, position, ctx, concrete=True)
 
     def inhale_field_type(self, f: PythonField, receiver: Expr,
                           ctx: Context) -> Stmt:

@@ -90,7 +90,7 @@ class TypeTranslator(CommonTranslator):
         result = do_get_type(node, containers, container).try_box()
         return result
 
-    def set_type_nargs_and_args(self, lhs: Expr, type: GenericType,
+    def set_type_nargs_and_args(self, lhs: Expr, type: PythonType,
                                 prefix: List[Expr], position: Position,
                                 ctx: Context, inhale_exhale: bool) -> Expr:
         """
@@ -108,6 +108,10 @@ class TypeTranslator(CommonTranslator):
         """
         inhale_exhale = False
         true = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        if isinstance(type, PythonClass):
+            result = self.type_factory.type_nargs_check(lhs, 0,
+                                                        prefix, ctx)
+            return result
         if type.name == UNION_TYPE:
             # Special case for union types: We don't want Union to show up
             # in the type info in Silver, instead, we just say that the type
@@ -122,13 +126,13 @@ class TypeTranslator(CommonTranslator):
                     check = self.viper.InhaleExhaleExp(check, true,
                                                        position,
                                                        self.no_info(ctx))
-                if isinstance(option, GenericType):
-                    option_args = self.set_type_nargs_and_args(lhs, option,
-                                                               prefix, position,
-                                                               ctx,
-                                                               inhale_exhale)
-                    check = self.viper.And(check, option_args,
-                                           position, self.no_info(ctx))
+                # if isinstance(option, GenericType):
+                option_args = self.set_type_nargs_and_args(lhs, option,
+                                                           prefix, position,
+                                                           ctx,
+                                                           inhale_exhale)
+                check = self.viper.And(check, option_args,
+                                       position, self.no_info(ctx))
                 result = self.viper.Or(result, check, position,
                                        self.no_info(ctx))
             return result
@@ -156,13 +160,13 @@ class TypeTranslator(CommonTranslator):
                 result = self.viper.And(result, check, position,
                                         self.no_info(ctx))
 
-                if isinstance(arg, GenericType):
-                    # Recurse to include the type arguments of the type argument
-                    arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices,
-                                                             position, ctx,
-                                                             inhale_exhale)
-                    result = self.viper.And(result, arg_nargs, position,
-                                            self.no_info(ctx))
+                # if isinstance(arg, GenericType):
+                # Recurse to include the type arguments of the type argument
+                arg_nargs = self.set_type_nargs_and_args(lhs, arg, indices,
+                                                         position, ctx,
+                                                         inhale_exhale)
+                result = self.viper.And(result, arg_nargs, position,
+                                        self.no_info(ctx))
         else:
             # We want a tuple of unknown length, with all elements being
             # subtypes of some type. We create the condition that all
@@ -208,7 +212,8 @@ class TypeTranslator(CommonTranslator):
 
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position',
-                   ctx: Context, inhale_exhale: bool=True) -> Expr:
+                   ctx: Context, inhale_exhale: bool=True,
+                   concrete: bool=False) -> Expr:
         """
         Returns a type check expression. This may return a simple isinstance
         for simple types, or include information about type arguments for
@@ -231,11 +236,14 @@ class TypeTranslator(CommonTranslator):
                                        self.no_info(ctx))
             return result
         else:
-            result = self.type_factory.type_check(lhs, type, position, ctx)
-            if isinstance(type, GenericType):
-                # Add information about type arguments.
-                args = self.set_type_nargs_and_args(lhs, type, [], position,
-                                                    ctx, inhale_exhale)
-                result = self.viper.And(result, args, position,
-                                        self.no_info(ctx))
+            if concrete:
+                result = self.type_factory.concrete_type_check(lhs, type, position, ctx)
+            else:
+                result = self.type_factory.type_check(lhs, type, position, ctx)
+            #if isinstance(type, GenericType):
+            # Add information about type arguments.
+            args = self.set_type_nargs_and_args(lhs, type, [], position,
+                                                ctx, inhale_exhale)
+            result = self.viper.And(result, args, position,
+                                    self.no_info(ctx))
             return result

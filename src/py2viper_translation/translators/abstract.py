@@ -296,7 +296,8 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position', ctx: Context,
-                   inhale_exhale: bool=True) -> Expr:
+                   inhale_exhale: bool=True, concrete: bool=False) -> Expr:
         return self.config.type_translator.type_check(
-            lhs, type, position, ctx, inhale_exhale=inhale_exhale)
+            lhs, type, position, ctx, inhale_exhale=inhale_exhale,
+            concrete=concrete)
 
