@@ -402,6 +402,10 @@ class ViperAST:
         else:
             return self.QPs.rewriteForall(res)
 
+    def Exists(self, variables, exp, position, info):
+        res = self.ast.Exists(self.to_seq(variables), exp, position, info)
+        return res
+
     def Trigger(self, exps, position, info):
         return self.ast.Trigger(self.to_seq(exps), position, info)
 
