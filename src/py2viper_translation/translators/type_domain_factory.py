@@ -915,12 +915,33 @@ class TypeDomainFactory:
         Creates an expression checking if the given lhs expression
         is of the given type
         """
-        supertype_func = self.translate_type_literal(type, position, ctx)
+        info = self.no_info(ctx)
         type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
                                              self.type_type(), [lhs],
-                                             position,
-                                             self.no_info(ctx),
+                                             position, info,
                                              self.type_domain)
+        if isinstance(type, GenericType) and not type.exact_length:
+            assert type.name == TUPLE_TYPE
+            seq_type = self.viper.SeqType(self.type_type())
+            i_ref = self.viper.LocalVar('i', self.viper.Int, position, info)
+            i_decl = self.viper.LocalVarDecl('i', self.viper.Int, position, info)
+            zero = self.viper.IntLit(0, position, info)
+            i_ge_zero = self.viper.GeCmp(i_ref, zero, position, info)
+            tuple_args = self.viper.DomainFuncApp('tuple_args', [type_func], {}, seq_type, [type_func], position, info, self.type_domain)
+            tuple_args_len = self.viper.SeqLength(tuple_args, position, info)
+            i_lt_len = self.viper.LtCmp(i_ref, tuple_args_len, position, info)
+            i_in_bounds = self.viper.And(i_ge_zero, i_lt_len, position, info)
+            tuple_arg = self.viper.DomainFuncApp('tuple_arg', [type_func, i_ref], {}, self.type_type(), [type_func, i_ref], position, info, self.type_domain)
+            arg_lit = self.translate_type_literal(type.type_args[0], position,
+                                                  ctx)
+            subtype = self.viper.DomainFuncApp('issubtype', [tuple_arg, arg_lit], {}, self.viper.Bool, [tuple_arg, arg_lit], position, info, self.type_domain)
+            implication = self.viper.Implies(i_in_bounds, subtype, position, info)
+            trigger = self.viper.Trigger([tuple_arg], position, info)
+            forall = self.viper.Forall([i_decl], [trigger], implication, position, info)
+            return forall
+
+        supertype_func = self.translate_type_literal(type, position, ctx)
+
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
