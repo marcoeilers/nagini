@@ -21,8 +21,6 @@ domain PyType {
     function issubtype(t1: PyType, t2: PyType):Bool
     unique function int(): PyType
     unique function bool(): PyType
-    function get_type_arg1(obj: Ref, index: Int): PyType
-    function get_type_nargs0(obj: Ref): Int
 }
 
 function __prim__int___box__(prim: Int): Ref

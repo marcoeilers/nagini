@@ -232,10 +232,10 @@ class TypeTranslator(CommonTranslator):
             return result
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
-            if isinstance(type, GenericType):
-                # Add information about type arguments.
-                args = self.set_type_nargs_and_args(lhs, type, [], position,
-                                                    ctx, inhale_exhale)
-                result = self.viper.And(result, args, position,
-                                        self.no_info(ctx))
+            # if isinstance(type, GenericType):
+            #     # Add information about type arguments.
+            #     args = self.set_type_nargs_and_args(lhs, type, [], position,
+            #                                         ctx, inhale_exhale)
+            #     result = self.viper.And(result, args, position,
+            #                             self.no_info(ctx))
             return result

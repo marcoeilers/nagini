@@ -372,6 +372,18 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
+
+        # bound type vars
+        ctx.bound_type_vars = {}
+        if method.cls and method.method_type is MethodType.normal:
+            for name, var in method.cls.type_vars.items():
+                self_arg = next(iter(method.args.values())).ref()
+                literal = self.type_factory.get_type_arg(self_arg, var.target_type, var.index, ctx)
+                ctx.bound_type_vars[name] = literal
+        for name, var in method.type_vars:
+            literal = self.type_factory.get_type_arg(var.target_node, var.target_type, var.index, ctx)
+            ctx.bound_type_vars[name] = literal
+
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
                               ctx.module.global_module.classes['Exception'])

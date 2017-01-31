@@ -383,7 +383,7 @@ class ContractTranslator(CommonTranslator):
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
             type_arg = coll_type.type_args[0]
-        type_lit = self.type_factory.translate_type_literal(type_arg, node,
+        type_lit = self.type_factory.translate_type_literal(type_arg, self.to_position(node, ctx),
                                                             ctx)
         result = self.get_function_call(seq_class, '__create__',
                                         [seq_call, type_lit], [None, None],
@@ -410,7 +410,7 @@ class ContractTranslator(CommonTranslator):
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
         type_arg = seq_type.type_args[0]
-        type_lit = self.type_factory.translate_type_literal(type_arg, node, ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, self.to_position(node, ctx), ctx)
         result = self.get_function_call(seq_type.cls, '__create__',
                                         [result, type_lit], [None, None], node,
                                         ctx)

@@ -5,21 +5,14 @@ field dict_acc : Set[Ref]
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
-    function get_type_arg1(obj: Ref, index: Int): PyType
-    function get_type_arg2(obj: Ref, index: Int, index2: Int): PyType
-    function get_type_arg3(obj: Ref, index: Int, index2: Int, index3: Int): PyType
-    function get_type_arg4(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int): PyType
-    function get_type_arg5(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): PyType
-    function get_type_arg6(obj: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int, index6: Int): PyType
-    function get_type_nargs0(r: Ref): Int
-    function get_type_nargs1(r: Ref, index: Int): Int
-    function get_type_nargs2(r: Ref, index: Int, index2: Int): Int
-    function get_type_nargs3(r: Ref, index: Int, index2: Int, index3: Int): Int
-    function get_type_nargs4(r: Ref, index: Int, index2: Int, index3: Int, index4: Int): Int
-    function get_type_nargs5(r: Ref, index: Int, index2: Int, index3: Int, index4: Int, index5: Int): Int
-    unique function list(): PyType
-    unique function set(): PyType
-    unique function dict(): PyType
+    function list(t: PyType): PyType
+    function list_arg(t: PyType, i: Int): PyType
+    function set_arg(t: PyType, i: Int): PyType
+    function dict_arg(t: PyType, i: Int): PyType
+    function Iterator(t: PyType): PyType
+    function Iterator_arg(t: PyType, i: Int): PyType
+    function set(t: PyType): PyType
+    function dict(t: PyType, v: PyType): PyType
     unique function int(): PyType
     unique function range(): PyType
 }
@@ -27,8 +20,7 @@ domain PyType {
 method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()
-    ensures typeof(res) == list()
-    ensures get_type_nargs0(res) == 1
+    ensures typeof(res) == list(list_arg(typeof(res), 0))
 {
     assume false
 }
@@ -76,18 +68,13 @@ function list___getitem__(self: Ref, key: Ref): Ref
     requires int___unbox__(key) >= 0
     requires int___unbox__(key) < list___len__(self)
     ensures result == self.list_acc[int___unbox__(key)]
-    ensures issubtype(typeof(result), get_type_arg1(self, 0))
-    ensures (get_type_nargs0(result) == get_type_nargs1(self, 0)) &&
-    (forall i1: Int :: {get_type_nargs1(result, i1)} get_type_nargs1(result, i1) == get_type_nargs2(self, 0, i1)) &&
-    (forall i1: Int, i2: Int :: {get_type_nargs2(result, i1, i2)} get_type_nargs2(result, i1, i2) == get_type_nargs3(self, 0, i1, i2)) &&
-    (forall i1: Int :: {get_type_arg1(result, i1)} get_type_arg1(result, i1) == get_type_arg2(self, 0, i1)) &&
-    (forall i1: Int, i2 : Int :: {get_type_arg2(result, i1, i2)} get_type_arg2(result, i1, i2) == get_type_arg3(self, 0, i1, i2))
+    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires acc(self.list_acc)
     requires key >= 0
     requires key < list___len__(self)
-    requires issubtype(typeof(item), get_type_arg1(self, 0))
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[key := item]
 {
@@ -96,7 +83,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
 
 method list_append(self: Ref, item: Ref) returns ()
     requires acc(self.list_acc)
-    requires issubtype(typeof(item), get_type_arg1(self, 0))
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {
@@ -116,10 +103,8 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
-  ensures get_type_arg1(_res, 0) == get_type_arg1(self, 0)
-  ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == get_type_arg1(self, 0)
-  ensures get_type_nargs1(_res.__previous, 0) == get_type_nargs1(self, 0) &&
-    (forall i1: Int :: {get_type_arg2(_res.__previous, 0, i1)} get_type_arg2(_res.__previous, 0, i1) == get_type_arg2(self, 0, i1))
+  ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
+  ensures issubtype(typeof(_res.__previous), list(list_arg(typeof(self), 0)))
 {
   inhale false
 }
@@ -137,10 +122,7 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
   ensures _err != null ==> self.__previous.list_acc == self.list_acc
   ensures _err != null ==> self.__iter_index == |self.list_acc|
-  ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), get_type_arg1(self, 0))
-  ensures |self.list_acc| > 0 ==> (get_type_nargs0(_res) == get_type_nargs1(self, 0)) &&
-    (forall i1: Int :: {get_type_nargs1(_res, i1)} get_type_nargs1(_res, i1) == get_type_nargs2(self, 0, i1)) &&
-    (forall i1: Int :: {get_type_arg1(_res, i1)} get_type_arg1(_res, i1) == get_type_arg2(self, 0, i1))
+  ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
 {
   inhale false
 }
@@ -149,9 +131,9 @@ method Iterator___del__(self: Ref)
   requires acc(self.list_acc, 1 / 20)
   requires acc(self.__container, 1 / 20)
   ensures acc(self.__container, 1 / 20)
-  ensures (issubtype(typeof(self.__container), list())) ==> acc(self.__container.list_acc, 1 / 20)
-  ensures (issubtype(typeof(self.__container), dict())) ==> acc(self.__container.dict_acc, 1 / 20)
-  ensures (issubtype(typeof(self.__container), set())) ==> acc(self.__container.set_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), list(list_arg(typeof(self.__container), 0)))) ==> acc(self.__container.list_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container), 0), dict_arg(typeof(self.__container), 1)))) ==> acc(self.__container.dict_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), set(set_arg(typeof(self.__container), 0)))) ==> acc(self.__container.set_acc, 1 / 20)
 {
   inhale false
 }

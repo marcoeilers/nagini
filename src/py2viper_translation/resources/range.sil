@@ -9,9 +9,8 @@ domain PyType {
     function issubtype(t1: PyType, t2: PyType):Bool
     unique function int(): PyType
     unique function range(): PyType
-    unique function list(): PyType
-    function get_type_arg1(obj: Ref, index: Int): PyType
-    function get_type_nargs0(obj: Ref): Int
+    function list(t: PyType): PyType
+    function list_arg(t: PyType, i: Int): PyType
 }
 
 // Dummies for the version from bool.sil
@@ -61,8 +60,7 @@ method range___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
-  ensures get_type_arg1(_res, 0) == int()
-  ensures issubtype(typeof(_res.__previous), list()) && get_type_nargs0(_res.__previous) == 1 && get_type_arg1(_res.__previous, 0) == int()
+  ensures issubtype(typeof(_res.__previous), list(int()))
 {
   inhale false
 }

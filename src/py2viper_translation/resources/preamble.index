@@ -46,6 +46,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "set":{
@@ -90,6 +91,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "dict": {
@@ -151,6 +153,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 2,
     "extends": "object"
 },
 "object": {
@@ -347,6 +350,7 @@
             "type": "__prim__int"
         }
     },
+    "type_vars": -1,
     "extends": "object"
 },
 "__prim__int": {
@@ -426,6 +430,7 @@
             "requires": ["__unbox__"]
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "range": {
@@ -494,6 +499,7 @@
             "MustTerminate": true
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "Thread": {

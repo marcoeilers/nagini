@@ -233,7 +233,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return result
         arg_type = self.normalize_type(arg_type, ctx)
         type_lit = self.type_factory.translate_type_literal(arg_type,
-                                                            node, ctx)
+                                                            position, ctx)
         return type_lit
 
     def get_function_call(self, receiver: PythonType,

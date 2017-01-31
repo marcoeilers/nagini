@@ -379,7 +379,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             if isinstance(target, PythonClass):
                 return [], self.type_factory.translate_type_literal(target,
-                    node, ctx)
+                    self.to_position(node, ctx), ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:

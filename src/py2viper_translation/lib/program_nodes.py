@@ -114,6 +114,7 @@ class PythonModule(PythonScope, ContainerInterface):
         self.from_imports = []
         self.node_factory = node_factory
         self.types = types
+        self.type_vars = OrderedDict()
 
     def process(self, translator: 'Translator') -> None:
         if self.type_prefix:
@@ -216,6 +217,20 @@ class PythonType(metaclass=ABCMeta):
     """
 
 
+class TypeVar(PythonType):
+
+    def __init__(self, name: str, target_type: PythonType, target_node: Optional[ast.AST],
+                 index: int, bound: Optional[PythonType],
+                 options: List[PythonType], node: ast.AST):
+        self.name = name
+        self.target_type = target_type
+        self.target_node = target_node
+        self.index = index
+        self.node = node
+        self.bound = bound
+        self.options = options
+
+
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
     Represents a class in the Python program.
@@ -243,6 +258,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.interface = interface
         self.defined = False
         self._has_classmethod = False
+        self.type_vars = OrderedDict()
 
     def get_all_methods(self) -> Set['PythonMethod']:
         result = set()
@@ -516,6 +532,9 @@ class GenericType(PythonType):
         """
         return self.get_class().get_func_or_method(name)
 
+    def get_all_methods(self) -> Set['PythonMethod']:
+        return self.get_class().get_all_methods()
+
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the predicate with the given name in this class or a superclass.
@@ -659,6 +678,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.obligation_info = None
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
         self.requires = []
+        self.type_vars = OrderedDict()
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

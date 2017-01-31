@@ -505,9 +505,9 @@ class ProgramTranslator(CommonTranslator):
                 old_class = ctx.current_class
                 ctx.current_class = cls
                 funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.append(funcs)
+                type_funcs.extend(funcs)
                 if axioms:
-                    type_axioms.append(axioms)
+                    type_axioms.extend(axioms)
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
