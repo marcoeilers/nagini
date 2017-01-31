@@ -1,0 +1,66 @@
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    function tuple(s: Seq[PyType]): PyType
+    function tuple_args(t: PyType): Seq[PyType]
+    function tuple_arg(t: PyType, i: Int): PyType
+}
+
+function tuple___create0__(): Ref
+    ensures tuple___len__(result) == 0
+    ensures typeof(result) == tuple(Seq[PyType]())
+
+function tuple___create1__(arg0 : Ref, t0: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    ensures tuple___len__(result) == 1 && tuple___getitem__(result, 0) == arg0
+    ensures typeof(result) == tuple(Seq(t0))
+
+function tuple___create2__(arg0 : Ref, arg1: Ref, t0: PyType, t1: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    ensures tuple___len__(result) == 2 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1
+    ensures typeof(result) == tuple(Seq(t0, t1))
+
+function tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref, t0: PyType, t1: PyType, t2: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    ensures tuple___len__(result) == 3 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2
+    ensures typeof(result) == tuple(Seq(t0, t1, t2))
+
+function tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    ensures tuple___len__(result) == 4 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3))
+
+function tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    requires issubtype(typeof(arg4), t4)
+    ensures tuple___len__(result) == 5 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3, t4))
+
+function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType, t5: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    requires issubtype(typeof(arg4), t4)
+    requires issubtype(typeof(arg5), t5)
+    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3, t4, t5))
+
+function tuple___len__(self: Ref): Int
+{
+	|tuple_args(typeof(self))|
+}
+
+function tuple___getitem__(self: Ref, key: Int): Ref
+    requires key >= 0
+    requires key < tuple___len__(self)
+    ensures issubtype(typeof(result), tuple_arg(typeof(self), key))
