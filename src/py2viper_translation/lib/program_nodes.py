@@ -216,6 +216,22 @@ class PythonType(metaclass=ABCMeta):
     Abstract superclass of all kinds python types.
     """
 
+    def try_box(self) -> 'PythonType':
+        """
+        If this class represents a primitive type, returns the boxed version,
+        otherwise just return the type itself.
+        """
+        # Generic types are never primitive, so just return self.
+        return self
+
+    def try_unbox(self) -> 'PythonType':
+        """
+        If this class represents a boxed version of a primitive type, returns
+        the primitive version, otherwise just returns the type itself.
+        """
+        # Generic types are never primitive, so just return self.
+        return self
+
 
 class TypeVar(PythonType):
 
@@ -229,6 +245,9 @@ class TypeVar(PythonType):
         self.node = node
         self.bound = bound
         self.options = options
+
+    def get_module(self) -> 'PythonModule':
+        return self.target_type.get_module()
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
@@ -268,7 +287,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         return result
 
     def add_field(self, name: str, node: ast.AST,
-                  type: 'PythonClass') -> 'PythonField':
+                  type: 'PythonType') -> 'PythonField':
         """
         Adds a field with the given name and type if it doesn't exist yet in
         this class.
@@ -477,6 +496,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return self.get_module().classes[unboxed_name]
         return self
 
+    def get_class(self) -> 'PythonClass':
+        return self
+
 
 class GenericType(PythonType):
     """
@@ -503,9 +525,22 @@ class GenericType(PythonType):
     def sil_name(self) -> str:
         return self.get_class().sil_name
 
+    def add_field(self, name: str, node: ast.AST,
+                  type: 'PythonType') -> 'PythonField':
+        return self.cls.add_field(name, node, type)
+
     @property
     def superclass(self) -> PythonClass:
-        return self.get_class().superclass
+        result = self.get_class().superclass
+        if isinstance(result, GenericType):
+            args = []
+            for arg in result.type_args:
+                if isinstance(arg, TypeVar):
+                    args.append(self.type_args[arg.index])
+                else:
+                    args.append(arg)
+            result = GenericType(result.cls, args)
+        return result
 
     def get_field(self, name: str) -> Optional['PythonField']:
         """
@@ -549,6 +584,9 @@ class GenericType(PythonType):
             return False
         return self.cls.issubtype(other)
 
+    def get_contents(self, only_top: bool) -> Dict:
+        return self.cls.get_contents(only_top)
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, GenericType):
             return False
@@ -558,22 +596,6 @@ class GenericType(PythonType):
             if my_arg != other_arg:
                 return False
         return True
-
-    def try_box(self) -> 'GenericType':
-        """
-        If this class represents a primitive type, returns the boxed version,
-        otherwise just return the type itself.
-        """
-        # Generic types are never primitive, so just return self.
-        return self
-
-    def try_unbox(self) -> 'GenericType':
-        """
-        If this class represents a boxed version of a primitive type, returns
-        the primitive version, otherwise just returns the type itself.
-        """
-        # Generic types are never primitive, so just return self.
-        return self
 
 
 class UnionType(GenericType):

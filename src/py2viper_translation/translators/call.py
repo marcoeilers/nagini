@@ -116,8 +116,8 @@ class CallTranslator(CommonTranslator):
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-        return self.type_factory.concrete_type_check(obj_var, type, position,
-                                                     ctx)
+        return self.type_factory.type_check(obj_var, type, position, ctx,
+                                            concrete=True)
 
     def inhale_field_type(self, f: PythonField, receiver: Expr,
                           ctx: Context) -> Stmt:
@@ -149,9 +149,9 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
         fields = target_class.get_all_sil_fields()
-        field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
-                              for field in target_class.get_all_fields()
-                              if field.type.name not in PRIMITIVES]
+        # field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
+        #                       for field in target_class.get_all_fields()
+        #                       if field.type.name not in PRIMITIVES]
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
         pos = self.to_position(node, ctx)
@@ -164,7 +164,7 @@ class CallTranslator(CommonTranslator):
         type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
-        stmts = [new, type_inhale] + field_type_inhales
+        stmts = [new, type_inhale] # + field_type_inhales
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls

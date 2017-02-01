@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
+    GenericType,
     MethodType,
     PythonExceptionHandler,
     PythonMethod,
@@ -364,6 +365,26 @@ class MethodTranslator(CommonTranslator):
 
         return assign_stmts
 
+    def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
+        ctx.bound_type_vars = {}
+        if method.cls and method.method_type is MethodType.normal:
+            cls = method.cls
+            while cls:
+                for name, var in cls.type_vars.items():
+                    self_arg = next(iter(method.args.values())).ref()
+                    literal = self.type_factory.get_ref_type_arg(self_arg,
+                                                                 var.target_type,
+                                                                 var.index, ctx)
+                    ctx.bound_type_vars[(var.target_type.name, name)] = literal
+                cls = cls.superclass
+                if isinstance(cls, GenericType):
+                    cls = cls.cls
+        for name, var in method.type_vars:
+            literal = self.type_factory.get_ref_type_arg(var.target_node,
+                                                         var.target_type, var.index,
+                                                         ctx)
+            ctx.bound_type_vars[(var.target_type.name, name)] = literal
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -373,16 +394,7 @@ class MethodTranslator(CommonTranslator):
         old_function = ctx.current_function
         ctx.current_function = method
 
-        # bound type vars
-        ctx.bound_type_vars = {}
-        if method.cls and method.method_type is MethodType.normal:
-            for name, var in method.cls.type_vars.items():
-                self_arg = next(iter(method.args.values())).ref()
-                literal = self.type_factory.get_type_arg(self_arg, var.target_type, var.index, ctx)
-                ctx.bound_type_vars[name] = literal
-        for name, var in method.type_vars:
-            literal = self.type_factory.get_type_arg(var.target_node, var.target_type, var.index, ctx)
-            ctx.bound_type_vars[name] = literal
+        self.bind_type_vars(method, ctx)
 
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
@@ -404,8 +416,9 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            type_check = self.type_factory.concrete_type_check(
-                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx)
+            type_check = self.type_factory.type_check(
+                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx,
+                concrete=True)
             inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
                                             self.no_info(ctx))
             body.append(inhale_type)
