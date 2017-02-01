@@ -34,6 +34,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonNode,
     PythonType,
     PythonVarBase,
+    TypeVar,
     UnionType,
 )
 from py2viper_translation.lib.util import (
@@ -180,7 +181,14 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                         return rectype.type_args[target.generic_type]
             return target.type
         if isinstance(target, PythonField):
-            return target.type
+            result = target.type
+            if isinstance(result, TypeVar):
+                assert isinstance(node, ast.Attribute)
+                rec_type = _do_get_type(node.value, containers, container)
+                while rec_type.get_class() is not result.target_type.get_class():
+                    rec_type = rec_type.superclass
+                result = rec_type.type_args[result.index]
+            return result
         if target:
             # If this is a Sequence(...) call, target will be the Sequence class
             # but won't have generic type information. So we don't return here

@@ -3,6 +3,7 @@ import ast
 from py2viper_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
 from py2viper_translation.lib.program_nodes import (
     GenericType,
+    PythonClass,
     PythonType,
     TypeVar,
     UnionType,
@@ -45,6 +46,8 @@ class TypeDomainFactory:
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
             self.create_union_extends_axiom(ctx),
+            self.create_union_extends2_axiom(ctx),
+            self.create_union_not_extends_axiom(ctx),
             self.create_tuple_arg_axiom(ctx),
             self.create_tuple_args_axiom(ctx),
             self.create_tuple_subtype_axiom(ctx),
@@ -71,8 +74,43 @@ class TypeDomainFactory:
                                        False, position, info, self.type_domain)
         return result
 
+    def create_union_extends2_axiom(self,
+                                   ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        axiom union_extends2 {
+           (forall seq: Seq[PyType], Z: PyType, X: PyType :: {union_type(seq), extends_(X, Z)} ((Z in seq) && extends_(X, Z)) ==> issubtype(X, union_type(seq)))
+        }
+        """
+        name = 'union_extends2'
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        seq_type = self.viper.SeqType(self.type_type())
+        z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
+        z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
+        x_decl = self.viper.LocalVarDecl('X', self.type_type(), position, info)
+        x_ref = self.viper.LocalVar('X', self.type_type(), position, info)
+        seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
+        seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
+        union = self.viper.DomainFuncApp('union_type', [seq_ref], {}, self.type_type(), [seq_ref], position, info, self.type_domain)
+        subtype = self.viper.DomainFuncApp('issubtype', [x_ref, union], {}, self.viper.Bool, [x_ref, union], position, info, self.type_domain)
+        extends = self.viper.DomainFuncApp('extends_', [x_ref, z_ref], {},
+                                           self.viper.Bool, [x_ref, z_ref],
+                                           position, info, self.type_domain)
+        contains = self.viper.SeqContains(z_ref, seq_ref, position, info)
+        lhs = self.viper.And(contains, extends, position, info)
+        body = self.viper.Implies(lhs, subtype, position, info)
+        trigger = self.viper.Trigger([union, extends], position, info)
+        body = self.viper.Forall([seq_decl, z_decl, x_decl], [trigger], body, position, info)
+        result = self.viper.DomainAxiom(name, body, position, info,
+                                        self.type_domain)
+        return result
+
     def create_union_extends_axiom(self,
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        axiom union_extends {
+            (forall seq: Seq[PyType] :: { union_type(seq) } (forall Z: PyType :: (Z in seq) ==> issubtype(Z, union_type(seq))))
+        }
+        """
         name = 'union_extends'
         position, info = self.no_position(ctx), self.no_info(ctx)
         seq_type = self.viper.SeqType(self.type_type())
@@ -80,12 +118,58 @@ class TypeDomainFactory:
         z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
         seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
         seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
-        union = self.viper.DomainFuncApp('union_type', [seq_ref], {}, self.type_type(), [seq_ref], position, info, self.type_domain)
-        extends = self.viper.DomainFuncApp('extends_', [z_ref, union], {}, self.viper.Bool, [z_ref, union], position, info, self.type_domain)
+        union = self.viper.DomainFuncApp('union_type', [seq_ref], {}, self.type_type(),
+                                         [seq_ref], position, info, self.type_domain)
+        extends = self.viper.DomainFuncApp('issubtype', [z_ref, union], {},
+                                           self.viper.Bool, [z_ref, union], position,
+                                           info, self.type_domain)
         contains = self.viper.SeqContains(z_ref, seq_ref, position, info)
-        body = self.viper.EqCmp(extends, contains, position, info)
-        trigger = self.viper.Trigger([contains], position, info)
-        body = self.viper.Forall([seq_decl, z_decl], [trigger], body, position, info)
+
+        body = self.viper.Implies(contains, extends, position, info)
+        body = self.viper.Forall([z_decl], [], body, position, info)
+        trigger = self.viper.Trigger([union], position, info)
+
+        body = self.viper.Forall([seq_decl], [trigger], body,
+                                 position, info)
+        result = self.viper.DomainAxiom(name, body, position, info,
+                                        self.type_domain)
+        return result
+
+    def create_union_not_extends_axiom(self,
+                                   ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        axiom union_not_extends {
+          forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, union_type(seq)) } (forall X: PyType :: (X in seq ==> !issubtype(Z, X))) == !issubtype(Z, union_type(seq))
+        }
+        """
+        name = 'union_not_extends'
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        seq_type = self.viper.SeqType(self.type_type())
+        z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
+        z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
+        x_decl = self.viper.LocalVarDecl('X', self.type_type(), position, info)
+        x_ref = self.viper.LocalVar('X', self.type_type(), position, info)
+        seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
+        seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
+        union = self.viper.DomainFuncApp('union_type', [seq_ref], {}, self.type_type(),
+                                         [seq_ref], position, info, self.type_domain)
+        subtype_z_union = self.viper.DomainFuncApp('issubtype', [z_ref, union], {},
+                                                   self.viper.Bool, [z_ref, union], position,
+                                                   info, self.type_domain)
+        subtype_z_x = self.viper.DomainFuncApp('issubtype', [z_ref, x_ref], {},
+                                               self.viper.Bool,
+                                               [z_ref, x_ref], position,
+                                               info, self.type_domain)
+        contains = self.viper.SeqContains(x_ref, seq_ref, position, info)
+        not_z_x = self.viper.Not(subtype_z_x, position, info)
+        not_z_union = self.viper.Not(subtype_z_union, position, info)
+        body = self.viper.Implies(contains, not_z_x, position, info)
+        lhs = self.viper.Forall([x_decl], [], body, position, info)
+        body = self.viper.EqCmp(lhs, not_z_union, position, info)
+        trigger = self.viper.Trigger([subtype_z_union], position, info)
+
+        body = self.viper.Forall([seq_decl, z_decl], [trigger], body,
+                                 position, info)
         result = self.viper.DomainAxiom(name, body, position, info,
                                         self.type_domain)
         return result
@@ -332,6 +416,7 @@ class TypeDomainFactory:
         """
         type_arg_decls = []
         type_args = []
+        ctx.bound_type_vars = {}
         if type.name == TUPLE_TYPE:
             seq_type = self.viper.SeqType(self.type_type())
             args_ref = self.viper.LocalVar('args', seq_type, position, info)
@@ -343,7 +428,7 @@ class TypeDomainFactory:
                 var = self.viper.LocalVar(name, self.type_type(), position, info)
                 type_args.append(var)
                 type_arg_decls.append(self.viper.LocalVarDecl(name, self.type_type(), position, info))
-                ctx.bound_type_vars[name] = var
+                ctx.bound_type_vars[(type.name, name)] = var
 
         type_var = self.viper.LocalVar('class', self.type_type(), position,
                                        info)
@@ -644,7 +729,7 @@ class TypeDomainFactory:
         biimplication = self.viper.EqCmp(subtype, is_null,
                                          self.no_position(ctx),
                                          self.no_info(ctx))
-        trigger = self.viper.Trigger([subtype], self.no_position(ctx),
+        trigger = self.viper.Trigger([typeof], self.no_position(ctx),
                                      self.no_info(ctx))
         body = self.viper.Forall([arg_r], [trigger],
                                  biimplication, self.no_position(ctx),
@@ -890,27 +975,70 @@ class TypeDomainFactory:
                                              self.type_domain)
         return type_func
 
-    def subtype_check(self, subtype: 'Expr', type: 'PythonType',
+    def subtype_check(self, type_func: 'Expr', type: 'PythonType',
                       position: 'silver.ast.Position',
-                      ctx: Context) -> Expr:
-        supertype_func = self.translate_type_literal(type, position, ctx)
+                      ctx: Context, concrete=False) -> Expr:
+        info = self.no_info(ctx)
+        if isinstance(type, GenericType) and not type.exact_length:
+            assert type.name == TUPLE_TYPE
+            seq_type = self.viper.SeqType(self.type_type())
+            i_ref = self.viper.LocalVar('i', self.viper.Int, position, info)
+            i_decl = self.viper.LocalVarDecl('i', self.viper.Int, position,
+                                             info)
+            zero = self.viper.IntLit(0, position, info)
+            i_ge_zero = self.viper.GeCmp(i_ref, zero, position, info)
+            tuple_args = self.viper.DomainFuncApp('tuple_args', [type_func], {},
+                                                  seq_type, [type_func],
+                                                  position, info,
+                                                  self.type_domain)
+            tuple_args_len = self.viper.SeqLength(tuple_args, position, info)
+            i_lt_len = self.viper.LtCmp(i_ref, tuple_args_len, position, info)
+            i_in_bounds = self.viper.And(i_ge_zero, i_lt_len, position, info)
+            tuple_arg = self.viper.DomainFuncApp('tuple_arg',
+                                                 [type_func, i_ref], {},
+                                                 self.type_type(),
+                                                 [type_func, i_ref], position,
+                                                 info, self.type_domain)
+            arg_lit = self.translate_type_literal(type.type_args[0], position,
+                                                  ctx)
+            if concrete:
+                subtype = self.viper.EqCmp(tuple_arg, arg_lit, position, info)
+            else:
+                subtype = self.viper.DomainFuncApp('issubtype',
+                                                   [tuple_arg, arg_lit], {},
+                                                   self.viper.Bool,
+                                                   [tuple_arg, arg_lit], position,
+                                                   info, self.type_domain)
+            implication = self.viper.Implies(i_in_bounds, subtype, position,
+                                             info)
+            trigger = self.viper.Trigger([tuple_arg], position, info)
+            forall = self.viper.Forall([i_decl], [trigger], implication,
+                                       position, info)
+            return forall
+
+        supertype_func = self.translate_type_literal(type, position, ctx,
+                                                     alias=type_func)
+
         var_sub = self.viper.LocalVar('sub', self.type_type(),
                                       self.no_position(ctx), self.no_info(ctx))
         var_super = self.viper.LocalVar('super', self.type_type(),
                                         self.no_position(ctx),
                                         self.no_info(ctx))
-        result = self.viper.DomainFuncApp('issubtype',
-                                          [subtype, supertype_func], {},
-                                          self.viper.Bool,
-                                          [var_sub, var_super],
-                                          position,
-                                          self.no_info(ctx),
-                                          self.type_domain)
+        if concrete:
+            result = self.viper.EqCmp(type_func, supertype_func, position, info)
+        else:
+            result = self.viper.DomainFuncApp('issubtype',
+                                              [type_func, supertype_func], {},
+                                              self.viper.Bool,
+                                              [var_sub, var_super],
+                                              position,
+                                              self.no_info(ctx),
+                                              self.type_domain)
         return result
 
     def type_check(self, lhs: 'Expr', type: 'PythonType',
                    position: 'silver.ast.Position',
-                   ctx: Context) -> Expr:
+                   ctx: Context, concrete=False) -> Expr:
         """
         Creates an expression checking if the given lhs expression
         is of the given type
@@ -920,46 +1048,13 @@ class TypeDomainFactory:
                                              self.type_type(), [lhs],
                                              position, info,
                                              self.type_domain)
-        if isinstance(type, GenericType) and not type.exact_length:
-            assert type.name == TUPLE_TYPE
-            seq_type = self.viper.SeqType(self.type_type())
-            i_ref = self.viper.LocalVar('i', self.viper.Int, position, info)
-            i_decl = self.viper.LocalVarDecl('i', self.viper.Int, position, info)
-            zero = self.viper.IntLit(0, position, info)
-            i_ge_zero = self.viper.GeCmp(i_ref, zero, position, info)
-            tuple_args = self.viper.DomainFuncApp('tuple_args', [type_func], {}, seq_type, [type_func], position, info, self.type_domain)
-            tuple_args_len = self.viper.SeqLength(tuple_args, position, info)
-            i_lt_len = self.viper.LtCmp(i_ref, tuple_args_len, position, info)
-            i_in_bounds = self.viper.And(i_ge_zero, i_lt_len, position, info)
-            tuple_arg = self.viper.DomainFuncApp('tuple_arg', [type_func, i_ref], {}, self.type_type(), [type_func, i_ref], position, info, self.type_domain)
-            arg_lit = self.translate_type_literal(type.type_args[0], position,
-                                                  ctx)
-            subtype = self.viper.DomainFuncApp('issubtype', [tuple_arg, arg_lit], {}, self.viper.Bool, [tuple_arg, arg_lit], position, info, self.type_domain)
-            implication = self.viper.Implies(i_in_bounds, subtype, position, info)
-            trigger = self.viper.Trigger([tuple_arg], position, info)
-            forall = self.viper.Forall([i_decl], [trigger], implication, position, info)
-            return forall
-
-        supertype_func = self.translate_type_literal(type, position, ctx)
-
-        var_sub = self.viper.LocalVar('sub', self.type_type(),
-                                      self.no_position(ctx), self.no_info(ctx))
-        var_super = self.viper.LocalVar('super', self.type_type(),
-                                        self.no_position(ctx),
-                                        self.no_info(ctx))
-        result = self.viper.DomainFuncApp('issubtype',
-                                          [type_func, supertype_func], {},
-                                          self.viper.Bool,
-                                          [var_sub, var_super],
-                                          position,
-                                          self.no_info(ctx),
-                                          self.type_domain)
-        return result
+        return self.subtype_check(type_func, type, position, ctx,
+                                  concrete=concrete)
 
     def translate_type_literal(self, type: 'PythonType', position: 'Position',
-                               ctx: Context) -> Expr:
+                               ctx: Context, alias=None) -> Expr:
         if isinstance(type, TypeVar):
-            return ctx.bound_type_vars[type.name]
+            return ctx.bound_type_vars[(type.target_type.name, type.name)]
         if type is None:
             type = ctx.module.global_module.classes['NoneType']
         args = []
@@ -968,6 +1063,10 @@ class TypeDomainFactory:
                 args.append(self.translate_type_literal(arg, position, ctx))
             if not isinstance(type, UnionType):
                 type = type.cls
+        elif isinstance(type, PythonClass) and type.type_vars:
+            assert alias
+            for index, arg in enumerate(type.type_vars):
+                args.append(self.get_type_arg(alias, type, index, ctx))
         if type.name in {TUPLE_TYPE, 'Union'}:
             seq_arg = self.viper.ExplicitSeq(args, position, self.no_info(ctx))
             args = [seq_arg]
@@ -982,16 +1081,17 @@ class TypeDomainFactory:
                                              self.type_domain)
         return type_func
 
-    def get_type_arg(self, target_expr: Expr, target_type: PythonType,
+    def get_type_arg(self, type_expr: Expr, target_type: PythonType,
                      index: int, ctx: Context) -> Expr:
         arg_func_name = target_type.sil_name + '_arg'
         index_lit = self.viper.IntLit(index, self.no_position(ctx),
                                       self.no_info(ctx))
-        args = [target_expr, index_lit]
+        args = [type_expr, index_lit]
         result = self.viper.DomainFuncApp(arg_func_name, args, {},
                                           self.type_type(), args,
                                           self.no_position(ctx),
-                                          self.no_info(ctx))
+                                          self.no_info(ctx),
+                                          self.type_domain)
         return result
 
     def get_ref_type_arg(self, target_expr: Expr, target_type: PythonType,
@@ -999,99 +1099,9 @@ class TypeDomainFactory:
         typeof = self.viper.DomainFuncApp('typeof', [target_expr], {},
                                           self.type_type(), [target_expr],
                                           self.no_position(ctx),
-                                          self.no_info(ctx))
+                                          self.no_info(ctx),
+                                          self.type_domain)
         return self.get_type_arg(typeof, target_type, index, ctx)
-
-    def type_arg(self, lhs: Expr, indices: List['Expr'],
-                 ctx: Context) -> 'Expr':
-        name = 'get_type_arg' + str(len(indices))
-        args = [lhs] + indices
-        type_arg_func = self.viper.DomainFuncApp(name, args, {},
-                                                 self.type_type(), args,
-                                                 self.no_position(ctx),
-                                                 self.no_info(ctx),
-                                                 self.type_domain)
-        return type_arg_func
-
-    def type_arg_check(self, lhs: Expr, arg: 'PythonType',
-                       indices: List['Expr'], ctx: Context) -> 'Expr':
-        """
-        Checks if the type argument of ``lhs`` with the given indices is equal
-        to the given type.
-        """
-        type_arg_func = self.type_arg(lhs, indices, ctx)
-        type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
-                                             self.type_type(), [],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
-        eq = self.viper.EqCmp(type_arg_func, type_func, self.no_position(ctx),
-                              self.no_info(ctx))
-        return eq
-
-    def type_arg_check_subtype(self, lhs: Expr, arg: 'PythonType',
-                               indices: List['Expr'], ctx: Context) -> 'Expr':
-        """
-        Checks if the type argument of ``lhs`` with the given indices is a
-        subtype of the given type.
-        """
-        type_arg_func = self.type_arg(lhs, indices, ctx)
-        type_func = self.viper.DomainFuncApp(arg.sil_name, [], {},
-                                             self.type_type(), [],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
-        subtype = self.viper.DomainFuncApp('issubtype',
-                                           [type_arg_func, type_func], {},
-                                           self.viper.Bool,
-                                           [type_arg_func, type_func],
-                                           self.no_position(ctx),
-                                           self.no_info(ctx), self.type_domain)
-        return subtype
-
-    def type_nargs(self, lhs: Expr, indices: List[Expr], ctx: Context) -> Expr:
-        name = 'get_type_nargs' + str(len(indices))
-        args = [lhs] + indices
-        pos = self.no_position(ctx)
-        info = self.no_info(ctx)
-        type_arg_func = self.viper.DomainFuncApp(name,
-                                                 args,
-                                                 {}, self.viper.Int,
-                                                 args,
-                                                 pos,
-                                                 info,
-                                                 self.type_domain)
-        return type_arg_func
-
-    def type_nargs_check(self, lhs: Expr, nargs: int,
-                         indices: List['Expr'], ctx: Context) -> 'Expr':
-        type_arg_func = self.type_nargs(lhs, indices, ctx)
-        nargs_lit = self.viper.IntLit(nargs, self.no_position(ctx),
-                                      self.no_info(ctx))
-        eq = self.viper.EqCmp(type_arg_func, nargs_lit, self.no_position(ctx),
-                              self.no_info(ctx))
-        return eq
-
-    def concrete_type_check(self, lhs: Expr, type: 'PythonClass',
-                            position: 'silver.ast.Position',
-                            ctx: Context) -> Expr:
-        """
-        Creates an expression checking if the given lhs expression
-        is of the given type
-        """
-        type_func = self.viper.DomainFuncApp('typeof', [lhs], {},
-                                             self.type_type(), [lhs],
-                                             self.no_position(ctx),
-                                             self.no_info(ctx),
-                                             self.type_domain)
-        supertype_func = self.viper.DomainFuncApp(type.sil_name, [], {},
-                                                  self.type_type(), [],
-                                                  self.no_position(ctx),
-                                                  self.no_info(ctx),
-                                                  self.type_domain)
-        cmp = self.viper.EqCmp(type_func, supertype_func, position,
-                               self.no_info(ctx))
-        return cmp
 
     def type_comp(self, lhs: Expr, rhs: Expr, ctx: Context, eq=False) -> Expr:
         """

@@ -452,11 +452,14 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+
+        # TODO: create type vars
         functype = self.module.get_func_type(func.get_scope_prefix())
         if func.pure and not functype:
             raise InvalidProgramException(node, 'function.type.none')
-        func.type = self.convert_type(functype)
         self.current_function = func
+        func.type = self.convert_type(functype)
+
         self.visit(node.args, node)
         for child in node.body:
             if is_io_existential(child):
@@ -845,6 +848,16 @@ class Analyzer(ast.NodeVisitor):
                 result = args[0]
             if optional:
                 result = OptionalType(result)
+        elif self.types.is_type_var(mypy_type):
+            name = mypy_type.name
+            assert name in self.module.type_vars
+            if name in self.current_function.type_vars:
+                return self.current_function.type_vars[name]
+            elif (self.current_class and name in self.current_class.type_vars):
+                return self.current_class.type_vars[name]
+            else:
+                assert False, 'Unknown type variable'
+
         else:
             raise UnsupportedException(mypy_type)
         return result

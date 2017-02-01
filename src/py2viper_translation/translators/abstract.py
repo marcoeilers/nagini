@@ -300,3 +300,6 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.type_translator.type_check(
             lhs, type, position, ctx, inhale_exhale=inhale_exhale)
 
+    def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
+        return self.config.method_translator.bind_type_vars(method, ctx)
+
