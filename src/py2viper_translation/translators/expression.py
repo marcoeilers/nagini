@@ -321,7 +321,7 @@ class ExpressionTranslator(CommonTranslator):
         returns the statements to jump there.
         """
         for try_ in tries:
-            if try_.finally_block:
+            if try_.finally_block or try_.with_item:
                 # Propagate return value
                 var_next = try_.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:

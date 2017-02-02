@@ -253,9 +253,13 @@
             "args": ["object"],
             "type": "__prim__bool"
         }
-    }
+    },
+    "extends": "object"
 },
 "Exception": {
+    "extends": "object"
+},
+"traceback": {
     "extends": "object"
 },
 "str": {
@@ -508,7 +512,6 @@
 "LevelType": {
 },
 "type": {},
-"Union": {},
 "Place": {
     "functions": {
         "__eq__": {
