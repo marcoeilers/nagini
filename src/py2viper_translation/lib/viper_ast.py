@@ -181,8 +181,9 @@ class ViperAST:
         return self.ast.DomainType(name, map,
                                    seq)
 
-    def DomainFuncApp(self, funcname, args, typevarmap, typepassed, argspassed,
-                      position, info, domain_name):
+    def DomainFuncApp(self, funcname, args, typepassed,
+                      position, info, domain_name, typevarmap={}):
+        argspassed = args
         def typepassedapply(slf):
             return typepassed
 
@@ -331,6 +332,9 @@ class ViperAST:
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
 
+    def ExplicitSet(self, elems, position, info):
+        return self.ast.ExplicitSet(self.to_seq(elems), position, info)
+
     def EmptySeq(self, type, position, info):
         return self.ast.EmptySeq(type, position, info)
 
@@ -353,6 +357,9 @@ class ViperAST:
 
     def SeqContains(self, elem, s, position, info):
         return self.ast.SeqContains(elem, s, position, info)
+
+    def SetContains(self, elem, s, position, info):
+        return self.ast.AnySetContains(elem, s, position, info)
 
     def SeqLength(self, s, position, info):
         return self.ast.SeqLength(s, position, info)
