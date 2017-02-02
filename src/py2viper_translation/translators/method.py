@@ -498,10 +498,10 @@ class MethodTranslator(CommonTranslator):
             exit_res = ctx.current_function.create_variable('exit_res',
                                                             exit_type,
                                                             self.translator)
-            #TODO: call with proper arguments
+
             type_class = ctx.module.global_module.classes['type']
             exception_class = ctx.module.global_module.classes['Exception']
-            object_class = ctx.module.global_module.classes['object']
+            tb_class = ctx.module.global_module.classes['traceback']
             # The __exit__ method takes three arguments: type, value and
             # traceback.
             type_var = ctx.actual_function.create_variable('t', type_class,
@@ -510,12 +510,35 @@ class MethodTranslator(CommonTranslator):
                                                             exception_class,
                                                             self.translator)
             traceback_var = ctx.actual_function.create_variable('tb',
-                                                                object_class,
+                                                                tb_class,
                                                                 self.translator)
-            value_type = self.type_check(value_var.ref(), exception_class, pos,
-                                         ctx)
-            inhale_types = self.viper.Inhale(value_type, pos, info)
-            body.append(inhale_types)
+            null = self.viper.NullLit(pos, info)
+            one = self.viper.IntLit(1, pos, info)
+            code_var = block.get_finally_var(self.translator)
+            error_cond = self.viper.GtCmp(code_var.ref(), one, pos, info)
+            error_case = []
+            no_error_case = []
+            for var in [value_var, traceback_var]:
+                assign = self.viper.LocalVarAssign(var.ref(), null, pos, info)
+                no_error_case.append(assign)
+
+            value_assign = self.viper.LocalVarAssign(value_var.ref(),
+                                                     block.error_var.ref(), pos,
+                                                     info)
+            error_case.append(value_assign)
+            error_type = self.type_factory.typeof(block.error_var.ref(), ctx)
+            type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
+                                                    pos, info)
+            error_case.append(type_assign)
+
+            tb_type = self.type_check(traceback_var.ref(), tb_class, pos, ctx)
+            inhale_types = self.viper.Inhale(tb_type, pos, info)
+            error_case.append(inhale_types)
+            then_block = self.translate_block(error_case, pos, info)
+            else_block = self.translate_block(no_error_case, pos, info)
+            body.append(self.viper.If(error_cond, then_block, else_block, pos,
+                                      info))
+
             exit_call = self.get_method_call(ctx_type, '__exit__',
                                              [ctx_var.ref(), type_var.ref(),
                                               value_var.ref(),

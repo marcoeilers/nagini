@@ -39,9 +39,9 @@ class TypeDomainFactory:
             self.create_transitivity_axiom(ctx),
             self.create_reflexivity_axiom(ctx),
             self.create_extends_implies_subtype_axiom(ctx),
-            self.create_none_type_subtype_axiom(ctx),
+            # self.create_none_type_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
-            self.create_object_subtype_axiom(ctx),
+            # self.create_object_subtype_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
@@ -648,28 +648,62 @@ class TypeDomainFactory:
         issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
         """
         position, info = self.no_position(ctx), self.no_info(ctx)
-        arg_sub = self.viper.LocalVarDecl('sub', self.type_type(), position,
-                                          info)
-        var_sub = self.viper.LocalVar('sub', self.type_type(), position, info)
-        arg_r = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
-        var_r = self.viper.LocalVar('r', self.viper.Ref, position, info)
+        object_type = self.viper.DomainFuncApp('object', [], self.type_type(),
+                                               position, info, self.type_domain)
         none_type = self.viper.DomainFuncApp('NoneType', [], self.type_type(),
                                              position, info, self.type_domain)
-        typeof = self.typeof(var_r, ctx)
-        subtype = self._issubtype(typeof, var_sub, ctx)
-        subtype_sub_none = self._issubtype(var_sub, none_type, ctx)
-        not_none = self.viper.Not(subtype_sub_none, position, info)
-        not_null = self.viper.NeCmp(var_r,
-                                    self.viper.NullLit(position, info),
-                                    position, info)
-        implication = self.viper.Implies(self.viper.And(subtype, not_none,
-                                                        position, info),
-                                         not_null, position, info)
-        trigger = self.viper.Trigger([subtype], position, info)
-        body = self.viper.Forall([arg_sub, arg_r], [trigger],
-                                 implication, position, info)
+        body = self._isnotsubtype(none_type, object_type, ctx)
+             # body = self.viper.Not(none_object_subtype, position, info)
+        # typeof = self.typeof(var_r, ctx)
+        # subtype = self._issubtype(typeof, var_sub, ctx)
+        # subtype_sub_none = self._issubtype(var_sub, none_type, ctx)
+        # not_none = self.viper.Not(subtype_sub_none, position, info)
+        # not_null = self.viper.NeCmp(var_r,
+        #                             self.viper.NullLit(position, info),
+        #                             position, info)
+        # implication = self.viper.Implies(self.viper.And(subtype, not_none,
+        #                                                 position, info),
+        #                                  not_null, position, info)
+        # trigger = self.viper.Trigger([subtype], position,
+        #                              info)
+        # body = self.viper.Forall([arg_sub, arg_r], [trigger],
+        #                          implication, position, info)
         return self.viper.DomainAxiom('none_type_subtype', body,
                                       position, info, self.type_domain)
+
+    # def create_none_type_subtype_axiom(
+    #         self, ctx: Context) -> 'silver.ast.DomainAxiom':
+    #     """
+    #     Creates an axiom that states that no type is a subtype of NoneType:
+    #
+    #     forall sub: PyType, r: Ref ::
+    #     { issubtype(typeof(r), sub) }
+    #     issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
+    #     """
+    #     position, info = self.no_position(ctx), self.no_info(ctx)
+    #     arg_sub = self.viper.LocalVarDecl('sub', self.type_type(), position,
+    #                                       info)
+    #     var_sub = self.viper.LocalVar('sub', self.type_type(), position, info)
+    #     arg_r = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
+    #     var_r = self.viper.LocalVar('r', self.viper.Ref, position, info)
+    #     none_type = self.viper.DomainFuncApp('NoneType', [], self.type_type(),
+    #                                          position, info, self.type_domain)
+    #     typeof = self.typeof(var_r, ctx)
+    #     subtype = self._issubtype(typeof, var_sub, ctx)
+    #     subtype_sub_none = self._issubtype(var_sub, none_type, ctx)
+    #     not_none = self.viper.Not(subtype_sub_none, position, info)
+    #     not_null = self.viper.NeCmp(var_r,
+    #                                 self.viper.NullLit(position, info),
+    #                                 position, info)
+    #     implication = self.viper.Implies(self.viper.And(subtype, not_none,
+    #                                                     position, info),
+    #                                      not_null, position, info)
+    #     trigger = self.viper.Trigger([subtype], position,
+    #                                  info)
+    #     body = self.viper.Forall([arg_sub, arg_r], [trigger],
+    #                              implication, position, info)
+    #     return self.viper.DomainAxiom('none_type_subtype', body,
+    #                                   position, info, self.type_domain)
 
     def create_object_type(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.create_type_function(OBJECT_TYPE, 0, self.no_position(ctx),
