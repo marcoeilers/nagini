@@ -296,9 +296,10 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position', ctx: Context,
-                   inhale_exhale: bool=True) -> Expr:
+                   inhale_exhale: bool=True, concrete: bool=False) -> Expr:
         return self.config.type_translator.type_check(
-            lhs, type, position, ctx, inhale_exhale=inhale_exhale)
+            lhs, type, position, ctx, inhale_exhale=inhale_exhale,
+            concrete=concrete)
 
     def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
         return self.config.method_translator.bind_type_vars(method, ctx)
