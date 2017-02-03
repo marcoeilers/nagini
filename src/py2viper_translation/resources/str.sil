@@ -16,7 +16,6 @@ function str___create__(len: Int, value: Int) : Ref
 	ensures str___len__(result) == len
 	ensures str___val__(result) == value
 	ensures typeof(result) == str()
-	ensures get_type_nargs0(result) == 0
 
 function str___bool__(self: Ref) : Bool
     requires issubtype(typeof(self), str())
