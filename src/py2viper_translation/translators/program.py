@@ -95,6 +95,9 @@ class ProgramTranslator(CommonTranslator):
         pos = self.viper.to_position(cls.node, ctx.position)
         ctx.position.append(('inheritance', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
+
+        self.bind_type_vars(method, ctx)
+
         params = []
         results = []
         args = []
@@ -119,8 +122,9 @@ class ProgramTranslator(CommonTranslator):
                                         self.viper.NullLit(self.no_position(ctx),
                                                            self.no_info(ctx)),
                                         self.no_position(ctx), self.no_info(ctx))
-            new_type = self.type_check(next(iter(method.args.values())).ref(),
-                                       cls, pos, ctx, concrete=True)
+            new_type = self.type_factory.type_check(
+                next(iter(method.args.values())).ref(), cls, pos, ctx,
+                concrete=True)
             pres = [not_null, new_type] + pres
 
         for arg_name, arg in method.args.items():
@@ -163,6 +167,9 @@ class ProgramTranslator(CommonTranslator):
         ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         self._check_override_validity(method, ctx)
+
+        self.bind_type_vars(method, ctx)
+
         params = []
         args = []
 
@@ -505,9 +512,9 @@ class ProgramTranslator(CommonTranslator):
                 old_class = ctx.current_class
                 ctx.current_class = cls
                 funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.append(funcs)
+                type_funcs.extend(funcs)
                 if axioms:
-                    type_axioms.append(axioms)
+                    type_axioms.extend(axioms)
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:

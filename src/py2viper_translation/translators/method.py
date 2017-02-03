@@ -10,6 +10,7 @@ from py2viper_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
+    GenericType,
     MethodType,
     PythonExceptionHandler,
     PythonMethod,
@@ -21,6 +22,7 @@ from py2viper_translation.lib.program_nodes import (
 from py2viper_translation.lib.typedefs import (
     DomainFuncApp,
     Expr,
+    Position,
     Stmt,
     StmtsAndExpr,
     VarDecl,
@@ -364,6 +366,30 @@ class MethodTranslator(CommonTranslator):
 
         return assign_stmts
 
+    def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
+        """
+        Binds the names of type variables of the given method and its class
+        and superclasses to expressions denoting the values of said types.
+        """
+        ctx.bound_type_vars = {}
+        if method.cls and method.method_type is MethodType.normal:
+            cls = method.cls
+            while cls:
+                for name, var in cls.type_vars.items():
+                    self_arg = next(iter(method.args.values())).ref()
+                    literal = self.type_factory.get_ref_type_arg(self_arg,
+                                                                 var.target_type,
+                                                                 var.index, ctx)
+                    ctx.bound_type_vars[(var.target_type.name, name)] = literal
+                cls = cls.superclass
+                if isinstance(cls, GenericType):
+                    cls = cls.cls
+        for name, var in method.type_vars:
+            literal = self.type_factory.get_ref_type_arg(var.target_node,
+                                                         var.target_type,
+                                                         var.index, ctx)
+            ctx.bound_type_vars[(var.target_type.name, name)] = literal
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -372,6 +398,9 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
+
+        self.bind_type_vars(method, ctx)
+
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
                               ctx.module.global_module.classes['Exception'])
@@ -392,8 +421,9 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            type_check = self.type_check(next(iter(method.args.values())).ref(),
-                                         method.cls, no_pos, ctx, concrete=True)
+            type_check = self.type_factory.type_check(
+                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx,
+                concrete=True)
             inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
                                             self.no_info(ctx))
             body.append(inhale_type)
@@ -449,6 +479,43 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = old_function
         return nodes
 
+    def _assign_exit_vars(self, block: PythonTryBlock, type_var: PythonVar,
+                          value_var: PythonVar, traceback_var: PythonVar,
+                          pos: Position, ctx: Context) -> Stmt:
+        """
+        Assigns the exception and its type to the given variables if there is
+        an incaught exception, otherwise assigns None to everything.
+        """
+        info = self.no_info(ctx)
+        null = self.viper.NullLit(pos, info)
+        one = self.viper.IntLit(1, pos, info)
+        code_var = block.get_finally_var(self.translator)
+        error_cond = self.viper.GtCmp(code_var.ref(), one, pos, info)
+        error_case = []
+        no_error_case = []
+        # FIXME: Cannot currently assign None to type variable, because types
+        # aren't objects.
+        for var in [value_var, traceback_var]:
+            assign = self.viper.LocalVarAssign(var.ref(), null, pos, info)
+            no_error_case.append(assign)
+
+        value_assign = self.viper.LocalVarAssign(value_var.ref(),
+                                                 block.error_var.ref(), pos,
+                                                 info)
+        error_case.append(value_assign)
+        error_type = self.type_factory.typeof(block.error_var.ref(), ctx)
+        type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
+                                                pos, info)
+        error_case.append(type_assign)
+
+        tb_class = ctx.module.global_module.classes['traceback']
+        tb_type = self.type_check(traceback_var.ref(), tb_class, pos, ctx)
+        inhale_types = self.viper.Inhale(tb_type, pos, info)
+        error_case.append(inhale_types)
+        then_block = self.translate_block(error_case, pos, info)
+        else_block = self.translate_block(no_error_case, pos, info)
+        return self.viper.If(error_cond, then_block, else_block, pos, info)
+
     def translate_finally(self, block: PythonTryBlock,
                           ctx: Context) -> List[Stmt]:
         """
@@ -473,10 +540,10 @@ class MethodTranslator(CommonTranslator):
             exit_res = ctx.current_function.create_variable('exit_res',
                                                             exit_type,
                                                             self.translator)
-            #TODO: call with proper arguments
+
             type_class = ctx.module.global_module.classes['type']
             exception_class = ctx.module.global_module.classes['Exception']
-            object_class = ctx.module.global_module.classes['object']
+            tb_class = ctx.module.global_module.classes['traceback']
             # The __exit__ method takes three arguments: type, value and
             # traceback.
             type_var = ctx.actual_function.create_variable('t', type_class,
@@ -485,12 +552,10 @@ class MethodTranslator(CommonTranslator):
                                                             exception_class,
                                                             self.translator)
             traceback_var = ctx.actual_function.create_variable('tb',
-                                                                object_class,
+                                                                tb_class,
                                                                 self.translator)
-            value_type = self.type_check(value_var.ref(), exception_class, pos,
-                                         ctx)
-            inhale_types = self.viper.Inhale(value_type, pos, info)
-            body.append(inhale_types)
+            body.append(self._assign_exit_vars(block, type_var, value_var,
+                                               traceback_var, pos, ctx))
             exit_call = self.get_method_call(ctx_type, '__exit__',
                                              [ctx_var.ref(), type_var.ref(),
                                               value_var.ref(),

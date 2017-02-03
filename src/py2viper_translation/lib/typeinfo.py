@@ -40,6 +40,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.path = path
         self.ignored_lines = ignored_lines
         self.type_aliases = {}
+        self.type_vars = {}
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
@@ -75,6 +76,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             # If it's a type alias, process it as such.
             key = tuple(self.prefix + [node.lvalues[0].name])
             self.type_aliases[key] = node.rvalue.analyzed.type
+        elif (isinstance(node.rvalue, mypy.nodes.CallExpr) and
+                isinstance(node.rvalue.analyzed, mypy.nodes.TypeVarExpr)):
+            key = tuple(self.prefix + [node.rvalue.analyzed._name])
+            self.type_vars[key] = (node.rvalue.analyzed.upper_bound,
+                                   node.rvalue.analyzed.values)
         else:
             super().visit_assignment_stmt(node)
 
@@ -203,6 +209,7 @@ class TypeInfo:
         self.alt_types = {}
         self.files = {}
         self.type_aliases = {}
+        self.type_vars = {}
 
 
     def _create_options(self, strict_optional: bool):
@@ -260,6 +267,7 @@ class TypeInfo:
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
                 self.type_aliases.update(visitor.type_aliases)
+                self.type_vars.update(visitor.type_vars)
             return True
         except mypy.errors.CompileError as e:
             report_errors(e.messages)
@@ -317,6 +325,9 @@ class TypeInfo:
 
     def is_union_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.UnionType)
+
+    def is_type_var(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.TypeVarType)
 
     def is_none_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.NoneTyp)
