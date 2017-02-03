@@ -83,7 +83,7 @@ class TypeTranslator(CommonTranslator):
         containers = [ctx]
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
-            containers.extend(container.get_module().get_included_modules())
+            containers.extend(container.module.get_included_modules())
         else:
             # Assume module
             containers.extend(container.get_included_modules())

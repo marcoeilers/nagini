@@ -149,9 +149,9 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        fields = target_class.get_all_sil_fields()
+        fields = target_class.all_sil_fields
         field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
-                              for field in target_class.get_all_fields()
+                              for field in target_class.all_fields
                               if field.type.name not in PRIMITIVES]
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
@@ -808,7 +808,7 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
 
-        fields = target_class.get_all_sil_fields()
+        fields = target_class.all_sil_fields
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
         pos = self.to_position(node, ctx)

@@ -72,15 +72,17 @@ class PythonScope:
             self.sil_names.append(name)
             return name
 
-    def get_scope_prefix(self) -> List[str]:
+    @property
+    def scope_prefix(self) -> List[str]:
         if self.superscope is None:
             return [self.name]
         else:
-            return self.superscope.get_scope_prefix() + [self.name]
+            return self.superscope.scope_prefix + [self.name]
 
-    def get_module(self) -> 'PythonModule':
+    @property
+    def module(self) -> 'PythonModule':
         if self.superscope is not None:
-            return self.superscope.get_module()
+            return self.superscope.module
         else:
             return self
 
@@ -137,7 +139,8 @@ class PythonModule(PythonScope, ContainerInterface):
         for name, operation in self.io_operations.items():
             operation.process(self.get_fresh_name(name), translator, self)
 
-    def get_scope_prefix(self) -> List[str]:
+    @property
+    def scope_prefix(self) -> List[str]:
         return []
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
@@ -252,8 +255,9 @@ class TypeVar(PythonType):
         self.bound = bound
         self.options = options
 
-    def get_module(self) -> 'PythonModule':
-        return self.target_type.get_module()
+    @property
+    def module(self) -> 'PythonModule':
+        return self.target_type.module
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
@@ -285,10 +289,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self._has_classmethod = False
         self.type_vars = OrderedDict()
 
-    def get_all_methods(self) -> Set['PythonMethod']:
+    @property
+    def all_methods(self) -> Set['PythonMethod']:
         result = set()
         if self.superclass:
-            result |= self.superclass.get_all_methods()
+            result |= self.superclass.all_methods
         result |= set(self.methods.keys())
         return result
 
@@ -378,7 +383,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         else:
             return None
 
-    def get_all_fields(self) -> List['PythonField']:
+    @property
+    def all_fields(self) -> List['PythonField']:
         fields = []
         cls = self
         while cls is not None:
@@ -388,7 +394,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             cls = cls.superclass
         return fields
 
-    def get_all_sil_fields(self) -> List['silver.ast.Field']:
+    @property
+    def all_sil_fields(self) -> List['silver.ast.Field']:
         """
         Returns a list of fields defined in the given class or its superclasses.
         """
@@ -489,7 +496,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if self.name in PRIMITIVES:
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
-            return self.get_module().classes[boxed_name]
+            return self.module.classes[boxed_name]
         return self
 
     def try_unbox(self) -> 'PythonClass':
@@ -499,10 +506,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if self.name in BOXED_PRIMITIVES:
             unboxed_name = PRIMITIVE_PREFIX + self.name
-            return self.get_module().classes[unboxed_name]
+            return self.module.classes[unboxed_name]
         return self
 
-    def get_class(self) -> 'PythonClass':
+    @property
+    def python_class(self) -> 'PythonClass':
         return self
 
 
@@ -516,20 +524,18 @@ class GenericType(PythonType):
     def __init__(self, cls: PythonClass,
                  args: List[PythonType]) -> None:
         self.name = cls.name
-        self.module = cls.get_module()
+        self.module = cls.module
         self.cls = cls
         self.type_args = args
         self.exact_length = True
 
-    def get_class(self) -> PythonClass:
+    @property
+    def python_class(self) -> PythonClass:
         return self.cls
-
-    def get_module(self) -> 'PythonModule':
-        return self.module
 
     @property
     def sil_name(self) -> str:
-        return self.get_class().sil_name
+        return self.python_class.sil_name
 
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonType') -> 'PythonField':
@@ -537,7 +543,7 @@ class GenericType(PythonType):
 
     @property
     def superclass(self) -> PythonClass:
-        result = self.get_class().superclass
+        result = self.python_class.superclass
         if isinstance(result, GenericType):
             # Return a GenericType that has all type variables instantiated
             # based on the type arguments of this type.
@@ -554,46 +560,47 @@ class GenericType(PythonType):
         """
         Returns the field with the given name in this class or a superclass.
         """
-        return self.get_class().get_field(name)
+        return self.python_class.get_field(name)
 
     def get_method(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the method with the given name in this class or a superclass.
         """
-        return self.get_class().get_method(name)
+        return self.python_class.get_method(name)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the function with the given name in this class or a superclass.
         """
-        return self.get_class().get_function(name)
+        return self.python_class.get_function(name)
 
     def get_func_or_method(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the function or method with the given name in this class or a
         superclass.
         """
-        return self.get_class().get_func_or_method(name)
+        return self.python_class.get_func_or_method(name)
 
-    def get_all_methods(self) -> Set['PythonMethod']:
-        return self.get_class().get_all_methods()
+    @property
+    def all_methods(self) -> Set['PythonMethod']:
+        return self.python_class.all_methods
 
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the predicate with the given name in this class or a superclass.
         """
-        return self.get_class().get_predicate(name)
+        return self.python_class.get_predicate(name)
 
     def issubtype(self, other: PythonType) -> bool:
         if isinstance(other, GenericType):
-            if self.cls.issubtype(other.cls):
+            if self.python_class.issubtype(other.cls):
                 if self.type_args == other.type_args:
                     return True
             return False
-        return self.cls.issubtype(other)
+        return self.python_class.issubtype(other)
 
     def get_contents(self, only_top: bool) -> Dict:
-        return self.cls.get_contents(only_top)
+        return self.python_class.get_contents(only_top)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, GenericType):
@@ -627,7 +634,7 @@ class UnionType(GenericType):
                     type_option = type_option.cls
                 cls = cls.get_common_superclass(type_option)
         self.cls = cls
-        self.module = cls.get_module()
+        self.module = cls.module
         self.type_args = args
         self.exact_length = True
 
@@ -728,8 +735,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
             return
-        func_type = self.get_module().types.get_func_type(
-            self.get_scope_prefix())
+        func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
             self.result = self.node_factory.create_python_var(RESULT_NAME, None,
                                                               self.type)
@@ -814,7 +820,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         elif self.kw_arg and self.kw_arg.name == name:
             return self.kw_arg
         else:
-            return self.get_module().global_vars.get(name)
+            return self.module.global_vars.get(name)
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
@@ -1133,7 +1139,7 @@ class PythonTryBlock(PythonNode):
         if self.finally_var:
             return self.finally_var
         sil_name = self.method.get_fresh_name('try_finally')
-        global_module = self.method.get_module().global_module
+        global_module = self.method.module.global_module
         int_type = global_module.classes[PRIMITIVE_INT_TYPE]
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
@@ -1150,7 +1156,7 @@ class PythonTryBlock(PythonNode):
         if self.error_var:
             return self.error_var
         sil_name = self.method.get_fresh_name('error')
-        exc_type = self.method.get_module().global_module.classes['Exception']
+        exc_type = self.method.module.global_module.classes['Exception']
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
@@ -1217,7 +1223,7 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         super().process(sil_name, translator)
         self._translator = translator
-        module = self.type.get_module()
+        module = self.type.module
         self.decl = translator.translate_pythonvar_decl(self, module)
         self._ref = translator.translate_pythonvar_ref(self, module, None, None)
 
@@ -1230,7 +1236,7 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         if not node:
             return self._ref
-        module = self.type.get_module()
+        module = self.type.module
         return self._translator.translate_pythonvar_ref(self, module, node, ctx)
 
 

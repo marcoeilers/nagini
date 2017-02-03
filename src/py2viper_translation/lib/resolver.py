@@ -164,7 +164,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     Does the actual work for get_type without boxing the type.
     """
     if isinstance(container, (PythonIOOperation, PythonMethod)):
-        module = container.get_module()
+        module = container.module
         current_function = container
     else:
         module = container
@@ -186,7 +186,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             if isinstance(result, TypeVar):
                 assert isinstance(node, ast.Attribute)
                 rec_type = _do_get_type(node.value, containers, container)
-                while rec_type.get_class() is not result.target_type.get_class():
+                while (rec_type.python_class is not
+                        result.target_type.python_class):
                     rec_type = rec_type.superclass
                 result = rec_type.type_args[result.index]
             return result

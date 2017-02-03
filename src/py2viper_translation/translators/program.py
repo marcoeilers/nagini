@@ -538,7 +538,7 @@ class ProgramTranslator(CommonTranslator):
                     methods.append(self.translate_method(method, ctx))
                     if method.overrides:
                         methods.append(self.create_override_check(method, ctx))
-                for method_name in cls.get_all_methods():
+                for method_name in cls.all_methods:
                     method = cls.get_method(method_name)
                     if (method.cls and method.cls != cls and
                             method_name != '__init__' and
