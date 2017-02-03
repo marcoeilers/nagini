@@ -98,7 +98,6 @@ class Carbon:
         args.update(3, config.z3_path)
         args.update(4, filename)
         self.carbon.parseCommandLine(args)
-        self.carbon.config().initialize(None)
         self.carbon.start()
         self.ready = True
 
