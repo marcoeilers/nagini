@@ -702,17 +702,6 @@ class StatementTranslator(CommonTranslator):
     def translate_single_assign(self, target: ast.AST, rhs: Expr,
                                 rhs_type: PythonType, node: ast.AST,
                                 ctx: Context) -> List[Stmt]:
-        # stmt = []
-        # if isinstance(target, ast.Tuple):
-        #     if (rhs_type.name != TUPLE_TYPE or
-        #             len(rhs_type.type_args) != len(node.targets[0].elts)):
-        #         raise InvalidProgramException(node, 'invalid.assign')
-        #     # Translate rhs
-        #     for index in range(len(target.elts)):
-        #         stmt += self.assign_to(target.elts[index], rhs,
-        #                                index, rhs_type,
-        #                                node, ctx)
-        #     return stmt
         lhs_stmt, _ = self.assign_to(target, rhs, None, None, rhs_type, node,
                                      ctx)
         return lhs_stmt
