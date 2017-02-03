@@ -39,9 +39,7 @@ class TypeDomainFactory:
             self.create_transitivity_axiom(ctx),
             self.create_reflexivity_axiom(ctx),
             self.create_extends_implies_subtype_axiom(ctx),
-            # self.create_none_type_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
-            # self.create_object_subtype_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
@@ -52,7 +50,6 @@ class TypeDomainFactory:
             self.create_tuple_args_axiom(ctx),
             self.create_tuple_subtype_axiom(ctx),
         ]
-        # tuple_arg, tuple_args, union_extends, tuple_subtype
 
     def get_default_functions(self,
                               ctx: Context) -> List['silver.ast.DomainFunc']:
@@ -79,7 +76,9 @@ class TypeDomainFactory:
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         axiom union_extends2 {
-           (forall seq: Seq[PyType], Z: PyType, X: PyType :: {union_type(seq), extends_(X, Z)} ((Z in seq) && extends_(X, Z)) ==> issubtype(X, union_type(seq)))
+           (forall seq: Seq[PyType], Z: PyType, X: PyType ::
+           {union_type(seq), extends_(X, Z)}
+           ((Z in seq) && extends_(X, Z)) ==> issubtype(X, union_type(seq)))
         }
         """
         name = 'union_extends2'
@@ -109,9 +108,8 @@ class TypeDomainFactory:
     def create_union_extends_axiom(self,
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
         """
-        axiom union_extends {
-            (forall seq: Seq[PyType] :: { union_type(seq) } (forall Z: PyType :: (Z in seq) ==> issubtype(Z, union_type(seq))))
-        }
+        (forall seq: Seq[PyType] :: { union_type(seq) }
+          (forall Z: PyType :: (Z in seq) ==> issubtype(Z, union_type(seq))))
         """
         name = 'union_extends'
         position, info = self.no_position(ctx), self.no_info(ctx)
@@ -139,9 +137,9 @@ class TypeDomainFactory:
     def create_union_not_extends_axiom(self,
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
         """
-        axiom union_not_extends {
-          forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, union_type(seq)) } (forall X: PyType :: (X in seq ==> !issubtype(Z, X))) == !issubtype(Z, union_type(seq))
-        }
+        forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, union_type(seq))}
+          (forall X: PyType ::
+          (X in seq ==> !issubtype(Z, X))) == !issubtype(Z, union_type(seq))
         """
         name = 'union_not_extends'
         position, info = self.no_position(ctx), self.no_info(ctx)
@@ -173,6 +171,14 @@ class TypeDomainFactory:
 
     def create_tuple_subtype_axiom(self,
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        (forall seq1: Seq[PyType], seq2: Seq[PyType] ::
+            seq1 != seq2 && |seq1| == |seq2| &&
+            (forall i: Int :: i >= 0 && i < |seq1| ==>
+                              issubtype(seq1[i], seq2[i]))
+            ==> issubtype(tuple(seq1), tuple(seq2)))
+
+        """
         name = 'tuple_self_subtype'
         position, info = self.no_position(ctx), self.no_info(ctx)
         seq_type = self.viper.SeqType(self.type_type())
@@ -216,6 +222,11 @@ class TypeDomainFactory:
 
     def create_tuple_arg_axiom(self,
                                ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        (forall seq: Seq[PyType], i: Int, Z: PyType ::
+          { tuple(seq),tuple_arg(Z, i) }
+          issubtype(Z, tuple(seq)) ==> issubtype(tuple_arg(Z, i), seq[i]))
+        """
         name = 'tuple_arg_def'
         position, info = self.no_position(ctx), self.no_info(ctx)
         seq_type = self.viper.SeqType(self.type_type())
@@ -246,6 +257,10 @@ class TypeDomainFactory:
 
     def create_tuple_args_axiom(self,
                                    ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        (forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, tuple(seq)) }
+          issubtype(Z, tuple(seq)) ==> |tuple_args(Z)| == |seq|)
+        """
         name = 'tuple_args_def'
         position, info = self.no_position(ctx), self.no_info(ctx)
         seq_type = self.viper.SeqType(self.type_type())
@@ -324,8 +339,12 @@ class TypeDomainFactory:
 
     def create_arg_axioms(self, cls: 'PythonClass',
                           ctx: Context) -> List['silver.ast.DomainAxiom']:
-        # issubtype(Z, func(bla)) ==> func1(Z) == bla  # unsound with not-nonvariant type args
-        # issubtype(Z, func(bla)) ==> issubtype(func1(Z), bla)  # for not-nonvariant type args
+        """
+        Creates an axiom defining the type argument getter functions for a given
+        type, e.g. for Sequence:
+        (forall Z: PyType, arg0: PyType ::
+          issubtype(Z, Sequence(arg0)) ==> Sequence_arg(Z, 0) == arg0)
+        """
         position, info = self.no_position(ctx), self.no_info(ctx)
         z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
         z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
@@ -426,9 +445,11 @@ class TypeDomainFactory:
                              ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         Creates a domain axiom that indicates a subtype relationship
-        between type and supertype:
+        between type and supertype, quantified over type variables.
 
-        extends_(type(), supertype())
+        E.g. for class Sub(Generic[T], Super[T, int]):
+        forall arg0: PyType :: {Sub(arg0)}
+          extends_(Sub(arg0), Super(arg0, int()))
         """
         type_arg_decls = []
         type_args = []
@@ -459,7 +480,14 @@ class TypeDomainFactory:
                                                      position, ctx)
         body = self._extends(type_func, supertype_func, ctx, position)
         if type.name == TUPLE_TYPE:
-            # (forall e: PyType :: e in args ==> e == object()) ==>
+            # Special case for tuples:
+            # forall args: Seq[PyType] :: { tuple(args) }
+            # (forall e: PyType :: (e in args) ==> e == object())
+            #                       ==> extends_(tuple(args), object())
+            # This way, tuple(Seq(object(), object())) extends_ object,
+            # but tuple(int(), int()) does not, which we need, because types
+            # that extend_ the same supertype are said not to be subtypes of
+            # each other by issubtype_exclusion.
             e_decl = self.viper.LocalVarDecl('e', self.type_type(), position,
                                              info)
             e_ref = self.viper.LocalVar('e', self.type_type(), position, info)
@@ -512,6 +540,11 @@ class TypeDomainFactory:
 
     def create_subtype_exclusion_axiom_2(self,
             ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        forall sub: PyType, super: PyType ::
+        { issubtype(sub, super) } { issubtype(super, sub) }
+        issubtype(sub, super) && sub != super ==> !issubtype(super, sub)
+        """
         position, info = self.no_position(ctx), self.no_info(ctx)
         arg_sub = self.viper.LocalVarDecl('sub', self.type_type(),
                                           position, info)
@@ -618,8 +651,8 @@ class TypeDomainFactory:
         """
         Creates an axiom that states that the type of null is None:
 
-        forall r: Ref :: {issubtype(typeof(r), NoneType())}
-        issubtype(typeof(r), NoneType()) <==> r == null
+        forall r: Ref :: { typeof(r) }
+          issubtype(typeof(r), NoneType()) == (r == null)
         """
         position, info = self.no_position(ctx), self.no_info(ctx)
         arg_r = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
@@ -637,73 +670,6 @@ class TypeDomainFactory:
                                  biimplication, position, info)
         return self.viper.DomainAxiom('null_nonetype', body, position, info,
                                       self.type_domain)
-
-    def create_none_type_subtype_axiom(
-            self, ctx: Context) -> 'silver.ast.DomainAxiom':
-        """
-        Creates an axiom that states that no type is a subtype of NoneType:
-
-        forall sub: PyType, r: Ref ::
-        { issubtype(typeof(r), sub) }
-        issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
-        """
-        position, info = self.no_position(ctx), self.no_info(ctx)
-        object_type = self.viper.DomainFuncApp('object', [], self.type_type(),
-                                               position, info, self.type_domain)
-        none_type = self.viper.DomainFuncApp('NoneType', [], self.type_type(),
-                                             position, info, self.type_domain)
-        body = self._isnotsubtype(none_type, object_type, ctx)
-             # body = self.viper.Not(none_object_subtype, position, info)
-        # typeof = self.typeof(var_r, ctx)
-        # subtype = self._issubtype(typeof, var_sub, ctx)
-        # subtype_sub_none = self._issubtype(var_sub, none_type, ctx)
-        # not_none = self.viper.Not(subtype_sub_none, position, info)
-        # not_null = self.viper.NeCmp(var_r,
-        #                             self.viper.NullLit(position, info),
-        #                             position, info)
-        # implication = self.viper.Implies(self.viper.And(subtype, not_none,
-        #                                                 position, info),
-        #                                  not_null, position, info)
-        # trigger = self.viper.Trigger([subtype], position,
-        #                              info)
-        # body = self.viper.Forall([arg_sub, arg_r], [trigger],
-        #                          implication, position, info)
-        return self.viper.DomainAxiom('none_type_subtype', body,
-                                      position, info, self.type_domain)
-
-    # def create_none_type_subtype_axiom(
-    #         self, ctx: Context) -> 'silver.ast.DomainAxiom':
-    #     """
-    #     Creates an axiom that states that no type is a subtype of NoneType:
-    #
-    #     forall sub: PyType, r: Ref ::
-    #     { issubtype(typeof(r), sub) }
-    #     issubtype(typeof(r), sub) && (sub != NoneType()) ==> (r != null)
-    #     """
-    #     position, info = self.no_position(ctx), self.no_info(ctx)
-    #     arg_sub = self.viper.LocalVarDecl('sub', self.type_type(), position,
-    #                                       info)
-    #     var_sub = self.viper.LocalVar('sub', self.type_type(), position, info)
-    #     arg_r = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
-    #     var_r = self.viper.LocalVar('r', self.viper.Ref, position, info)
-    #     none_type = self.viper.DomainFuncApp('NoneType', [], self.type_type(),
-    #                                          position, info, self.type_domain)
-    #     typeof = self.typeof(var_r, ctx)
-    #     subtype = self._issubtype(typeof, var_sub, ctx)
-    #     subtype_sub_none = self._issubtype(var_sub, none_type, ctx)
-    #     not_none = self.viper.Not(subtype_sub_none, position, info)
-    #     not_null = self.viper.NeCmp(var_r,
-    #                                 self.viper.NullLit(position, info),
-    #                                 position, info)
-    #     implication = self.viper.Implies(self.viper.And(subtype, not_none,
-    #                                                     position, info),
-    #                                      not_null, position, info)
-    #     trigger = self.viper.Trigger([subtype], position,
-    #                                  info)
-    #     body = self.viper.Forall([arg_sub, arg_r], [trigger],
-    #                              implication, position, info)
-    #     return self.viper.DomainAxiom('none_type_subtype', body,
-    #                                   position, info, self.type_domain)
 
     def create_object_type(self, ctx: Context) -> 'silver.ast.DomainFunc':
         return self.create_type_function(OBJECT_TYPE, 0, self.no_position(ctx),
@@ -834,7 +800,12 @@ class TypeDomainFactory:
 
     def subtype_check(self, type_func: 'Expr', type: 'PythonType',
                       position: 'silver.ast.Position',
-                      ctx: Context, concrete=False) -> Expr:
+                      ctx: Context, concrete: bool = False) -> Expr:
+        """
+        Creates an expression which denotes if the given ``type_func``
+        expression is a subtype of (or, if ``concrete`` is true, equivalent to)
+        the given ``type``.
+        """
         info = self.no_info(ctx)
         if isinstance(type, GenericType) and not type.exact_length:
             assert type.name == TUPLE_TYPE
@@ -884,10 +855,11 @@ class TypeDomainFactory:
 
     def type_check(self, lhs: 'Expr', type: 'PythonType',
                    position: 'silver.ast.Position',
-                   ctx: Context, concrete=False) -> Expr:
+                   ctx: Context, concrete: bool = False) -> Expr:
         """
-        Creates an expression checking if the given lhs expression
-        is of the given type
+        Creates an expression checking if the type of the expression ``lhs``
+        is a subtype of (or, if ``concrete`` is true, equivalent to) the given
+        ``type``.
         """
         info = self.no_info(ctx)
         type_func = self.typeof(lhs, ctx)
@@ -895,7 +867,14 @@ class TypeDomainFactory:
                                   concrete=concrete)
 
     def translate_type_literal(self, type: 'PythonType', position: 'Position',
-                               ctx: Context, alias=None) -> Expr:
+                               ctx: Context, alias: Expr = None) -> Expr:
+        """
+        Translates the given type to a type literal. If the given type is
+        a generic type with missing type argument information, the type
+        arguments will be taken from the ``alias`` expression (which typically
+        would be some expression known to be equivalent to the type being
+        described).
+        """
         if isinstance(type, TypeVar):
             return ctx.bound_type_vars[(type.target_type.name, type.name)]
         if type is None:
@@ -928,6 +907,11 @@ class TypeDomainFactory:
 
     def get_type_arg(self, type_expr: Expr, target_type: PythonType,
                      index: int, ctx: Context) -> Expr:
+        """
+        Returns an expression denoting the type argument of the given type
+        expression ``type_expr`` relative to the given ``target_type`` with
+        the index ``index``.
+        """
         arg_func_name = target_type.sil_name + '_arg'
         index_lit = self.viper.IntLit(index, self.no_position(ctx),
                                       self.no_info(ctx))
