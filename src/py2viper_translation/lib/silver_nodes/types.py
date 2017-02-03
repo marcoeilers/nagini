@@ -114,7 +114,7 @@ class DomainFuncApp:
                 for arg in self._args]
         domain = self._domain.translate(translator)
         return translator.viper.DomainFuncApp(
-            self._name, args, {}, domain, args, position, info,
+            self._name, args, domain, position, info,
             self._domain.name)
 
 

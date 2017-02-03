@@ -386,7 +386,7 @@ class StatementTranslator(CommonTranslator):
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
-        result = iterable_stmt + iter_assign + next_call + iter_assign + loop + iter_del
+        result = iterable_stmt + iter_assign + next_call + assign_stmt + loop + iter_del
         result += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
@@ -639,8 +639,8 @@ class StatementTranslator(CommonTranslator):
                                                   target_type=self.viper.Int)
             args = [target, index, rhs]
             arg_types = [None, None, None]
-            stmt = [self.get_method_call(target_cls, '__setitem__', args,
-                                         arg_types, [], node, ctx)]
+            stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                         arg_types, [], node, ctx)
             item = self.get_function_call(target_cls, '__getitem__',
                                           [target, index], [None, None], node,
                                           ctx)

@@ -340,7 +340,7 @@ class ExpressionTranslator(CommonTranslator):
         returns the statements to jump there.
         """
         for try_ in tries:
-            if try_.finally_block:
+            if try_.finally_block or try_.with_item:
                 # Propagate return value
                 var_next = try_.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
@@ -398,7 +398,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             if isinstance(target, PythonClass):
                 return [], self.type_factory.translate_type_literal(target,
-                    node, ctx)
+                    self.to_position(node, ctx), ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:

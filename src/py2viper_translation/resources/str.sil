@@ -2,9 +2,7 @@ domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
     unique function str(): PyType
-    unique function list(): PyType
-    function get_type_arg1(obj: Ref, index: Int): PyType
-    function get_type_nargs0(r: Ref): Int
+    function list(t: PyType): PyType
 }
 
 field list_acc : Seq[Ref]
@@ -18,28 +16,30 @@ function str___create__(len: Int, value: Int) : Ref
 	ensures str___len__(result) == len
 	ensures str___val__(result) == value
 	ensures typeof(result) == str()
-	ensures get_type_nargs0(result) == 0
 
 function str___bool__(self: Ref) : Bool
+    requires issubtype(typeof(self), str())
 	ensures result == str___len__(self) != 0
 
 function str___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), str())
     ensures (str___val__(self) == str___val__(other)) == result
     ensures result ==> (str___len__(self) == str___len__(other))
 
 function str___add__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), str())
     ensures str___len__(result) == str___len__(self) + str___len__(other)
     ensures typeof(result) == str()
 
 function str_join(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), str())
     ensures issubtype(typeof(result), str())
 
 function str___mod__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), str())
     ensures issubtype(typeof(result), str())
 
 method str_split(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), str())
-    ensures issubtype(typeof(res), list())
-    ensures get_type_nargs0(res) == 1
-    ensures get_type_arg1(res, 0) == str()
+    ensures issubtype(typeof(res), list(str()))
     ensures acc(res.list_acc)

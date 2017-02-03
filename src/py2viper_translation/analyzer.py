@@ -35,6 +35,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
     PythonMethod,
+    TypeVar,
     UnionType,
 )
 from  py2viper_translation.lib.resolver import get_target as do_get_target
@@ -226,6 +227,11 @@ class Analyzer(ast.NodeVisitor):
         for class_name in interface:
             cls = self.find_or_create_class(class_name)
             if_cls = interface[class_name]
+            if 'type_vars' in if_cls:
+                for i in range(if_cls['type_vars']):
+                    name = 'var' + str(i)
+                    cls.type_vars[name] = TypeVar(name, cls, None, i, None, [],
+                                                  None)
             if 'extends' in if_cls:
                 superclass = self.find_or_create_class(if_cls['extends'],
                     module=self.module.global_module)
@@ -326,6 +332,16 @@ class Analyzer(ast.NodeVisitor):
         current module if none is provided). If no such class exists, one will
         be created.
         """
+        # If the name refers to a type alias from the typing module, get
+        # the actual name
+        aliases = {'List': 'list',
+                   'Tuple': 'tuple',
+                   'Set': 'set',
+                   'Dict': 'dict',
+                   'Type': 'type',}
+        name = aliases.get(name, name)
+        if self.current_class and name in self.current_class.type_vars:
+            return self.current_class.type_vars[name]
         if not module:
             module = self.module
         if name in module.global_module.classes:
@@ -348,6 +364,15 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
+        elif isinstance(node, ast.Subscript):
+            cls = self.find_or_create_target_class(node.value)
+            if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            else:
+                ast_args = node.slice.value.elts
+            args = [self.find_or_create_target_class(arg) for arg in ast_args]
+            result = GenericType(cls, args)
+            return result
         else:
             raise UnsupportedException(node,
                                        'class literal has unsupported format')
@@ -360,14 +385,33 @@ class Analyzer(ast.NodeVisitor):
         cls = self.find_or_create_class(name)
         cls.defined = True
         cls.node = node
-        if len(node.bases) > 1:
-            raise UnsupportedException(node)
-        if len(node.bases) == 1:
-            superclass = self.find_or_create_target_class(node.bases[0])
-            cls.superclass = superclass
+        self.current_class = cls
+        actual_bases = []
+        current_index = 0
+        for base in node.bases:
+            if isinstance(base, ast.Subscript) and base.value.id == 'Generic':
+                if isinstance(base.slice.value, ast.Name):
+                    arg_names = [base.slice.value.id]
+                else:
+                    arg_names = [elmt.id for elmt in base.slice.value.elts]
+                for arg_name in arg_names:
+                    assert arg_name in self.module.type_vars
+                    var_info = self.module.type_vars[arg_name]
+                    bound = self.convert_type(var_info[0])
+                    options = [self.convert_type(typ) for typ in var_info[1]]
+                    var = TypeVar(arg_name, cls, None, current_index, bound,
+                                  options, base)
+                    cls.type_vars[arg_name] = var
+                    current_index += 1
+            else:
+                actual_bases.append(base)
+        if len(actual_bases) > 1:
+            raise UnsupportedException(node, 'multiple inheritance')
+        if len(actual_bases) == 1:
+            cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
-        self.current_class = cls
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -413,11 +457,14 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+
+        # TODO: create type vars
         functype = self.module.get_func_type(func.get_scope_prefix())
         if func.pure and not functype:
             raise InvalidProgramException(node, 'function.type.none')
-        func.type = self.convert_type(functype)
         self.current_function = func
+        func.type = self.convert_type(functype)
+
         self.visit(node.args, node)
         for child in node.body:
             if is_io_existential(child):
@@ -457,6 +504,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_Assign(self, node: ast.Assign) -> None:
         alias = False
+        type_var = False
         # Check if this is a type alias
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             lhs_name = (self.module.type_prefix, node.targets[0].id)
@@ -466,6 +514,11 @@ class Analyzer(ast.NodeVisitor):
                 aliased_type = self.convert_type(type_name)
                 self.module.classes[node.targets[0].id] = aliased_type
                 alias = True
+            # If it's a type variable markes by mypy
+            elif lhs_name in self.types.type_vars:
+                var = self.types.type_vars[lhs_name]
+                self.module.type_vars[node.targets[0].id] = var
+                type_var = True
             # Could still be a type alias if RHS refers to class
             elif not isinstance(node.value, ast.Call):
                 target = self.get_target(node.value, self.module)
@@ -473,11 +526,14 @@ class Analyzer(ast.NodeVisitor):
                     self.module.classes[node.targets[0].id] = target
                     alias = True
 
-        # Nothing else to do for type aliases, for all other cases proceed as
-        # usual.
+        # Nothing else to do for type aliases and type vars,, for all other
+        # cases proceed as usual.
         if alias:
             if self.current_function or self.current_class:
                 raise InvalidProgramException(node, 'local.type.alias')
+        elif type_var:
+            if self.current_function or self.current_class:
+                raise InvalidProgramException(node, 'local.typevar')
         else:
             self.visit_default(node)
 
@@ -799,6 +855,16 @@ class Analyzer(ast.NodeVisitor):
                 result = args[0]
             if optional:
                 result = OptionalType(result)
+        elif self.types.is_type_var(mypy_type):
+            name = mypy_type.name
+            assert name in self.module.type_vars
+            if name in self.current_function.type_vars:
+                return self.current_function.type_vars[name]
+            elif (self.current_class and name in self.current_class.type_vars):
+                return self.current_class.type_vars[name]
+            else:
+                assert False, 'Unknown type variable'
+
         else:
             raise UnsupportedException(mypy_type)
         return result

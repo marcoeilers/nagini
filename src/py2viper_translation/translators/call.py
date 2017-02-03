@@ -74,8 +74,9 @@ class CallTranslator(CommonTranslator):
                              ctx: Context) -> StmtsAndExpr:
         stmt, object_arg = self.translate_expr(node.args[1], ctx)
         cast_type = self.get_type(node, ctx)
+        arg_pos = self.to_position(node.args[0], ctx)
         type_arg = self.type_factory.translate_type_literal(cast_type,
-                                                            node.args[0], ctx)
+                                                            arg_pos, ctx)
         pos = self.to_position(node, ctx)
         object_class = ctx.module.global_module.classes['object']
         result = self.get_function_call(object_class, '__cast__',
@@ -116,7 +117,8 @@ class CallTranslator(CommonTranslator):
         obj_var = self.viper.LocalVar(name, self.viper.Ref,
                                       self.no_position(ctx),
                                       self.no_info(ctx))
-        return self.type_check(obj_var, type, position, ctx, concrete=True)
+        return self.type_factory.type_check(obj_var, type, position, ctx,
+                                            concrete=True)
 
     def inhale_field_type(self, f: PythonField, receiver: Expr,
                           ctx: Context) -> Stmt:

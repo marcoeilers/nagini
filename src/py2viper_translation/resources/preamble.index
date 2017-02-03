@@ -46,6 +46,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "set":{
@@ -90,6 +91,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "dict": {
@@ -151,6 +153,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": 2,
     "extends": "object"
 },
 "object": {
@@ -250,9 +253,13 @@
             "args": ["object"],
             "type": "__prim__bool"
         }
-    }
+    },
+    "extends": "object"
 },
 "Exception": {
+    "extends": "object"
+},
+"traceback": {
     "extends": "object"
 },
 "str": {
@@ -405,6 +412,7 @@
             "type": "__prim__Sequence"
         }
     },
+    "type_vars": -1,
     "extends": "object"
 },
 "__prim__int": {
@@ -484,6 +492,7 @@
             "requires": ["__unbox__"]
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "range": {
@@ -552,6 +561,7 @@
             "MustTerminate": true
         }
     },
+    "type_vars": 1,
     "extends": "object"
 },
 "Thread": {
@@ -560,7 +570,6 @@
 "LevelType": {
 },
 "type": {},
-"Union": {},
 "Place": {
     "functions": {
         "__eq__": {

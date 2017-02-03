@@ -60,6 +60,6 @@ class FuncTripleDomainFactory:
             type_passed = self.config.type_translator.translate_type(
                 ret_type, ctx)
 
-        return self.viper.DomainFuncApp(name, args, var_map, type_passed, args,
-                                        pos, info, self.domain_name)
+        return self.viper.DomainFuncApp(name, args, type_passed, pos, info,
+                                        self.domain_name, typevarmap=var_map)
 

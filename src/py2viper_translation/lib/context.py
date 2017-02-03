@@ -7,6 +7,7 @@ from py2viper_translation.lib.program_nodes import (
     PythonVar,
     PythonVarBase,
 )
+from py2viper_translation.lib.typedefs import Expr
 from typing import Dict, List
 
 
@@ -33,6 +34,7 @@ class Context:
         self.obligation_context = ObligationContext()
         self._alias_context_stack = []
         self._current_alias_context = []
+        self.bound_type_vars = {}
 
     def get_all_vars(self) -> List[PythonVar]:
         res = []
