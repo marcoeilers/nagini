@@ -1,0 +1,63 @@
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function int(): PyType
+    unique function bool(): PyType
+    unique function range(): PyType
+    function Sequence(t: PyType): PyType
+    function Sequence_arg(t: PyType, i: Int): PyType
+}
+
+// Dummy for the version from bool.sil
+function int___unbox__(self: Ref): Int
+
+function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
+    ensures typeof(result) == Sequence(cont_type)
+    ensures Sequence___unbox__(result) == prim
+
+function Sequence___unbox__(box: Ref): Seq[Ref]
+    requires issubtype(typeof(box), Sequence(Sequence_arg(typeof(box), 0)))
+
+function Sequence___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == (item in Sequence___unbox__(self))
+    ensures result ==> issubtype(typeof(item), Sequence_arg(typeof(self), 0))
+
+function Sequence___getitem__(self: Ref, index: Ref): Ref
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    requires issubtype(typeof(index), int())
+    requires (int___unbox__(index) >= 0 && int___unbox__(index) < Sequence___len__(self))
+    ensures result == Sequence___unbox__(self)[int___unbox__(index)]
+    ensures issubtype(typeof(result), Sequence_arg(typeof(self), 0))
+
+function Sequence___sil_seq__(self: Ref): Seq[Ref]
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == Sequence___unbox__(self)
+
+function Sequence___len__(self: Ref): Int
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == |Sequence___unbox__(self)|
+
+function Sequence_take(self: Ref, no: Int): Ref
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == Sequence___create__(Sequence___unbox__(self)[..no], Sequence_arg(typeof(self), 0))
+
+function Sequence_drop(self: Ref, no: Int): Ref
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == Sequence___create__(Sequence___unbox__(self)[no..], Sequence_arg(typeof(self), 0))
+
+function Sequence_update(self: Ref, index: Int, val: Ref): Ref
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    ensures result == Sequence___create__(Sequence___unbox__(self)[index := val], Sequence_arg(typeof(self), 0))
+
+function Sequence___add__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), Sequence(Sequence_arg(typeof(other), 0)))
+    requires Sequence_arg(typeof(self), 0) == Sequence_arg(typeof(other), 0)
+    ensures result == Sequence___create__(Sequence___unbox__(self) ++ Sequence___unbox__(other), Sequence_arg(typeof(self), 0))
+
+function Sequence___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), Sequence(Sequence_arg(typeof(other), 0)))
+    requires Sequence_arg(typeof(self), 0) == Sequence_arg(typeof(other), 0)
+    ensures result == (Sequence___unbox__(self) == Sequence___unbox__(other))

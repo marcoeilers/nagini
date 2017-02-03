@@ -1,0 +1,71 @@
+field list_acc : Seq[Ref]
+
+field __container : Ref
+field __iter_index : Int
+field __previous: Ref
+
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function int(): PyType
+    unique function range(): PyType
+    function list(t: PyType): PyType
+    function list_arg(t: PyType, i: Int): PyType
+}
+
+// Dummies for the version from bool.sil
+function __prim__int___box__(prim: Int): Ref
+function int___unbox__(box: Ref): Int
+
+
+function range___create__(start: Int, stop: Int, ctr: Int): Ref
+  requires stop >= start
+  ensures range___val__(result) == [start..stop)
+  ensures range___start__(result) == start
+  ensures range___stop__(result) == stop
+  ensures typeof(result) == range()
+
+
+function range___val__(self: Ref): Seq[Int]
+
+function range___start__(self: Ref): Int
+function range___stop__(self: Ref): Int
+
+
+function range___len__(self: Ref): Int
+  requires issubtype(typeof(self), range())
+  ensures result == |range___val__(self)|
+
+
+function range___getitem__(self: Ref, index: Ref): Int
+  requires issubtype(typeof(self), range())
+  requires issubtype(typeof(index), int())
+  requires (int___unbox__(index) in range___val__(self))
+  ensures result == range___val__(self)[int___unbox__(index)]
+
+
+function range___sil_seq__(self: Ref): Seq[Ref]
+  requires issubtype(typeof(self), range())
+  ensures |result| == range___len__(self)
+  ensures (forall i: Int :: i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
+  ensures (forall i: Ref :: { (i in result) } (i in result) == (issubtype(typeof(i), int()) && (int___unbox__(i) in range___val__(self))))
+  ensures (forall i: Int, j: Int :: result[i] == result[j] <==> i == j)
+
+
+function range___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), range())
+    requires issubtype(typeof(item), int())
+    ensures result == (item in range___sil_seq__(self))
+
+method range___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), range())
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures _res.list_acc == range___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+  ensures issubtype(typeof(_res.__previous), list(int()))
+{
+  inhale false
+}

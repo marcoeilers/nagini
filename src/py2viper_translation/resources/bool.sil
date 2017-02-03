@@ -1,0 +1,116 @@
+field list_acc : Seq[Ref]
+
+field __container : Ref
+field __iter_index : Int
+field __previous: Ref
+
+function object___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function NoneType___bool__(self: Ref) : Bool
+    ensures result == (self != null)
+
+function bool___bool__(self: Bool) : Bool
+    ensures result == self
+
+function int___bool__(self: Int) : Bool
+    ensures result == (self != 0)
+
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function int(): PyType
+    unique function bool(): PyType
+}
+
+function __prim__int___box__(prim: Int): Ref
+    ensures typeof(result) == int()
+    ensures int___unbox__(result) == prim
+    ensures forall other: Int :: {__prim__int___box__(other)} ((__prim__int___box__(other) == result) <==> (other == prim))
+
+function int___unbox__(box: Ref): Int
+    requires issubtype(typeof(box), int())
+    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+    ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
+
+function __prim__bool___box__(prim: Bool): Ref
+    ensures typeof(result) == bool()
+    ensures bool___unbox__(result) == prim
+    ensures int___unbox__(result) == (prim ? 1 : 0)
+
+function bool___unbox__(box: Ref): Bool
+    requires issubtype(typeof(box), bool())
+    ensures __prim__bool___box__(result) == box
+
+function int___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+{
+    int___unbox__(self) == int___unbox__(other)
+}
+
+function bool___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), bool())
+    requires issubtype(typeof(other), bool())
+{
+    bool___unbox__(self) == bool___unbox__(other)
+}
+
+function int___ge__(self: Int, other: Int): Bool
+{
+    self >= other
+}
+
+function int___gt__(self: Int, other: Int): Bool
+{
+    self > other
+}
+
+function int___le__(self: Int, other: Int): Bool
+{
+    self <= other
+}
+
+function int___lt__(self: Int, other: Int): Bool
+{
+    self < other
+}
+
+function int___add__(self: Int, other: Int): Int
+{
+    self + other
+}
+
+function int___sub__(self: Int, other: Int): Int
+{
+    self - other
+}
+
+function int___mul__(self: Int, other: Int): Int
+{
+    self * other
+}
+
+function int___floordiv__(self: Int, other: Int): Int
+    requires other != 0
+{
+    self \ other
+}
+
+function int___mod__(self: Int, other: Int): Int
+    requires other != 0
+{
+    self % other
+}
+
+function object___eq__(self: Ref, other: Ref): Bool
+    ensures self == other ==> result
+    ensures ((self == null) != (other == null)) ==> !result
+
+function Place___eq__(self: Ref, other: Ref): Bool
+    ensures result == (self == other)
+
+function object___cast__(typ: PyType, obj: Ref): Ref
+    requires issubtype(typeof(obj), typ)
+    ensures result == obj
+    ensures issubtype(typeof(obj), typ)
