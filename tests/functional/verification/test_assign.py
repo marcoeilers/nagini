@@ -1,6 +1,7 @@
 from py2viper_contracts.contracts import *
 from typing import cast
 
+
 class A:
     pass
 
@@ -34,8 +35,10 @@ def m3() -> None:
 
 
 def m4() -> None:
-    a = [("asd", A(), 'asd2', 34)]
+    hlpr = ("asd", A(), 'asd2', 34)
+    a = [hlpr]
     for b, *c in a:
+        Invariant(Forall(a, lambda e: (e is hlpr, [])))
         assert b is 'asd'
         assert len(c) == 3
         assert isinstance(c[0], A)
@@ -62,6 +65,7 @@ def m5() -> None:
 
 def helper(l: List[int]) -> List[int]:
     Requires(Acc(list_pred(l), 2/3))
+    Ensures(Result() is l)
     return l
 
 

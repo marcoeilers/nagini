@@ -49,12 +49,11 @@ function bytes___mul__(self: Ref, factor: Int): Ref
   requires factor >= 0
   ensures typeof(result) == bytes()
   ensures bytes___len__(result) == factor * bytes___len__(self)
-  //ensures bytes___val__(result) == bytes___mul__helper(bytes___val__(self), factor)
 {
     bytes___create__(bytes___mul__helper(bytes___val__(self), factor))
 }
 
-
+// Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
   requires factor >= 0
   ensures (forall e: Ref :: (e in result) ==> (e in seq))
@@ -73,21 +72,23 @@ function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), list(bytes()))
     requires acc(other.list_acc, wildcard)
     ensures issubtype(typeof(result), bytes())
-    //ensures bytes___val__(result) == (list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0))
 {
     bytes___create__((list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0)))
 }
 
+// Helper function for defining the meaning of byte join
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
     requires issubtype(typeof(l), list(bytes()))
     requires acc(l.list_acc, wildcard)
     requires index >= 0 && index < list___len__(l)
-    ensures |result| == (index < list___len__(l) - 1 ? bytes___len__(list___getitem__(l, __prim__int___box__(index))) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| : bytes___len__(list___getitem__(l, __prim__int___box__(index))))
+    ensures |result| == (index < list___len__(l) - 1 ?
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| :
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))))
 {
-    (index < list___len__(l) - 1 ? bytes___val__(list___getitem__(l, __prim__int___box__(index))) ++ sep ++ bytes_join_val_helper(l, sep, index + 1) : bytes___val__(list___getitem__(l, __prim__int___box__(index))))
+    (index < list___len__(l) - 1 ?
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))) ++ sep ++ bytes_join_val_helper(l, sep, index + 1) :
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))))
 }
-
-
 
 function bytes___getitem__(self: Ref, index: Int): Ref
     requires issubtype(typeof(self), bytes())

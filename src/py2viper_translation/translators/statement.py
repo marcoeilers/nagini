@@ -1,6 +1,7 @@
 import ast
 
 from py2viper_translation.lib.constants import (
+    BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
     LIST_TYPE,
@@ -107,6 +108,9 @@ class StatementTranslator(CommonTranslator):
                       iter.__iter_index <= |iter.list_acc|
             invariant |iter.list_acc| > 0 ==>
                       c == iter.list_acc[iter.__iter_index - 1]
+            invariant (if there are multiple loop targets, relations between
+                       c and the loop targets, e.g. a == getitem(c, 0) etc.,
+                       as given in ``assign_expr``)
             invariant |iter.list_acc| > 0 ==> (c in iter.list_acc)
             invariant iter_err == null ==>
                           iter.__previous.list_acc ==
@@ -254,9 +258,9 @@ class StatementTranslator(CommonTranslator):
                                       ctx)
         invariant.append(self.viper.Implies(non_empty_iterator, target_type,
                                             pos, info))
-
-        for ae in assign_expr:
-            invariant.append(self.viper.Implies(non_empty_iterator, ae,
+        # Add information about and permissions for actual loop targets
+        for target_info in assign_expr:
+            invariant.append(self.viper.Implies(non_empty_iterator, target_info,
                                                 pos, info))
 
         previous_is_all = self.viper.EqCmp(previous_list_acc, iter_acc, pos,
@@ -340,29 +344,42 @@ class StatementTranslator(CommonTranslator):
         return result
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
+        position, info = self.to_position(node, ctx), self.no_info(ctx)
         post_label = ctx.actual_function.get_fresh_name('post_loop')
         end_label = ctx.actual_function.get_fresh_name('loop_end')
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
                                                    node, ctx)
+        # Find type of the collection content we're iterating over.
         if iterable_type.name in {LIST_TYPE, DICT_TYPE, SET_TYPE}:
             target_type = iterable_type.type_args[0]
         elif iterable_type.name in {RANGE_TYPE, BYTES_TYPE}:
             target_type = ctx.module.global_module.classes[INT_TYPE]
         else:
             raise UnsupportedException(node, 'unknown.iterable')
-        target_var = ctx.actual_function.create_variable('loop_target', target_type, self.translator)
+
+        # Create artificial new variable to store current iteration content.
+        target_var = ctx.actual_function.create_variable('loop_target',
+                                                         target_type,
+                                                         self.translator)
 
         err_var, next_call = self._get_next_call(iter_var, target_var,
                                                  node, ctx)
-        assign_stmt, assign_expr = self.assign_to(node.target, target_var.ref(), None, None, target_type, node, ctx)
+
+        # Assign target_var contents to actual loop target(s).
+        assign_stmt, assign_expr = self.assign_to(node.target, target_var.ref(),
+                                                  None, None, target_type, node,
+                                                  ctx)
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
 
         invariant = self._create_for_loop_invariant(iter_var, target_var,
                                                     err_var, iterable,
-                                                    iterable_type, assign_expr, node, ctx)
+                                                    iterable_type, assign_expr,
+                                                    node, ctx)
         bodyindex = get_body_start_index(node.body)
+
+        # Remember type information about havoced local variables.
         invariant.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
                                                          ctx))
 
@@ -372,28 +389,27 @@ class StatementTranslator(CommonTranslator):
 
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
-        body.append(self.viper.Label(end_label, self.to_position(node, ctx),
-                                     self.no_info(ctx)))
+        # Label for continue to jump to
+        body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
         body.extend(assign_stmt)
         cond = self.viper.EqCmp(err_var.ref(),
-                                self.viper.NullLit(self.no_position(ctx),
-                                                   self.no_info(ctx)),
-                                self.to_position(node, ctx),
-                                self.no_info(ctx))
+                                self.viper.NullLit(position, info),
+                                position, info)
         loop = self.create_while_node(
             ctx, cond, invariant, [], body, node)
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
-        result = iterable_stmt + iter_assign + next_call + assign_stmt + loop + iter_del
+        result = (iterable_stmt + iter_assign + next_call + assign_stmt +
+                  loop + iter_del)
         result += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
             result += translated_block
-        result.append(self.viper.Label(post_label, self.to_position(node, ctx),
-                                       self.no_info(ctx)))
+        # Label for break to jump to
+        result.append(self.viper.Label(post_label, position, info))
         return result
 
     def translate_stmt_Assert(self, node: ast.Assert,
@@ -553,49 +569,23 @@ class StatementTranslator(CommonTranslator):
     def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
                   rhs_end: Optional[Expr],
                   rhs_type: PythonType,
-                  node: ast.AST, ctx: Context) -> List[Stmt]:
+                  node: ast.AST, ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        """
+        Assigns the given expression ``rhs`` to the target given in ``lhs``.
+        If ``rhs_index`` is set, will only assign the element of ``rhs`` at
+        this index; if ``rhs_end`` is also set, will assign a list containing
+        the given range of elements to ``lhs`` (assuming ``lhs`` is of type
+        ast.Starred).
+
+        In addition to assignment statements, returns a list of assertions
+        which are known to hold after the asignment, to be used in loop
+        invariants.
+        """
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         if isinstance(lhs, ast.Starred):
-            assert rhs_index is not None and rhs_end
-            rhs_lit = self.viper.IntLit(rhs_index, position, info)
-            list_class = ctx.module.global_module.classes[LIST_TYPE]
-            stmt, res_var = self.translate_expr(lhs.value, ctx)
-
-            targets = [res_var]
-
-            constr_call = self.get_method_call(list_class, '__init__', [], [],
-                                               [res_var], node, ctx)
-            stmt += constr_call
-            # Inhale the type of the newly created list (including type arguments)
-            list_type = self.get_type(lhs.value, ctx)
-            position = self.to_position(node, ctx)
-            stmt.append(
-                self.viper.Inhale(self.type_check(res_var,
-                                                  list_type, position, ctx),
-                                  position, self.no_info(ctx)))
-            # set list_acc to sil_seq
-            seq = self.get_function_call(rhs_type, '__sil_seq__',
-                                         [rhs], [None], node, ctx)
-
-            seq_until = self.viper.SeqTake(seq, rhs_end, position, info)
-            seq_from = self.viper.SeqDrop(seq_until, rhs_lit, position, info)
-            list_field = self.viper.Field('list_acc',
-                                          self.viper.SeqType(self.viper.Ref),
-                                          self.no_position(ctx), info)
-            list_field_acc = self.viper.FieldAccess(res_var, list_field,
-                                                    position, info)
-            val = []
-            full = self.viper.FullPerm(position, info)
-            list_perm = self.viper.FieldAccessPredicate(list_field_acc,
-                                                        full, position,
-                                                        info)
-            val.append(list_perm)
-            list_type = self.type_check(res_var, list_type, position, ctx)
-            val.append(list_type)
-            assign_stmt = self.viper.FieldAssign(list_field_acc, seq_from, position, info)
-            assign_val = self.viper.EqCmp(list_field_acc, seq_from, position, info)
-            return stmt + [assign_stmt], val + [assign_val]
+            return self._assign_to_starred(lhs, rhs, rhs_index, rhs_end,
+                                           rhs_type, node, ctx)
         if rhs_index is not None:
             rhs_lit = self.viper.IntLit(rhs_index, position, info)
             args = [rhs, rhs_lit]
@@ -607,32 +597,21 @@ class StatementTranslator(CommonTranslator):
             else:
                 rhs_type = rhs_type.type_args[0]
         if isinstance(lhs, ast.Tuple):
-            no_after_starred = 0
-            next = 0
-            stmt_result = []
-            val_result = []
-            for index, e in enumerate(lhs.elts):
-                if isinstance(e, ast.Starred):
-                    no_after_starred = len(lhs.elts) - index - 1
-                    next = -no_after_starred
-                else:
-                    next = next + 1
-                next_expr = self.viper.IntLit(next, position, info)
-                if next <= 0:
-                    len_expr = self.get_function_call(rhs_type, '__len__',
-                                                      [rhs], [None], node, ctx)
-                    next_expr = self.viper.Add(len_expr, next_expr, position,
-                                               info)
+            return self._assign_to_tuple(lhs, rhs, rhs_type, node, ctx)
 
-                stmt, val = self.assign_to(e, rhs, index, next_expr,
-                                           rhs_type, node, ctx)
-                stmt_result += stmt
-                val_result += val
-            return stmt_result, val_result
-        # Now the simple, single assignment cases
+        return self._assign_single_value(lhs, rhs, rhs_type, node, ctx)
+
+    def _assign_single_value(self, lhs: ast.AST, rhs: Expr,
+                             rhs_type: PythonType, node: ast.AST,
+                             ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
         if isinstance(lhs, ast.Subscript):
+            # Special treatment for subscript; instead of an assignment, we
+            # need to call a setitem method.
             if not isinstance(node.targets[0].slice, ast.Index):
-                raise UnsupportedException(node)
+                raise UnsupportedException(node, 'assignment to slice')
             target_cls = self.get_type(lhs.value, ctx)
             lhs_stmt, target = self.translate_expr(lhs.value, ctx)
             ind_stmt, index = self.translate_expr(lhs.slice.value, ctx,
@@ -640,7 +619,9 @@ class StatementTranslator(CommonTranslator):
             args = [target, index, rhs]
             arg_types = [None, None, None]
             stmt = self.get_method_call(target_cls, '__setitem__', args,
-                                         arg_types, [], node, ctx)
+                                        arg_types, [], node, ctx)
+            # The respective assertion states that getitem with the given index
+            # now has the assigned value.
             item = self.get_function_call(target_cls, '__getitem__',
                                           [target, index], [None, None], node,
                                           ctx)
@@ -657,35 +638,89 @@ class StatementTranslator(CommonTranslator):
         assign_val = self.viper.EqCmp(var, rhs, position, info)
         return lhs_stmt + [assign_stmt], [assign_val]
 
-    def _field_assign(self, field_acc, val, position, info):
-        return [self.viper.FieldAssign(field_acc, val, position, info)], []
-
-    def _field_equals(self, field_acc, val, position, info):
-        return [], [self.viper.EqCmp(field_acc, val, position, info)]
-
-    def _var_assign(self, field_acc, val, position, info):
-        return [self.viper.LocalVarAssign(field_acc, val, position, info)], []
-
-    def _var_equals(self, field_acc, val, position, info):
-        return [], [self.viper.EqCmp(field_acc, val, position, info)]
-
-    def _subscript_assign(self, target: Expr, target_cls: PythonClass,
-                          rhs: Expr, index: Expr, node: ast.Assign,
-                          ctx: Context) -> StmtsAndExpr:
-        args = [target, index, rhs]
-        arg_types = [None, None, None]
-        call = self.get_method_call(target_cls, '__setitem__', args,
-                                    arg_types, [], node, ctx)
-        return [call], []
-
-    def _subscript_equals(self, target: Expr, target_cls: PythonClass,
-                          rhs: Expr, index: Expr, node: ast.Assign,
-                          ctx: Context) -> StmtsAndExpr:
+    def _assign_to_tuple(self, lhs: ast.Tuple, rhs: Expr, rhs_type: PythonType,
+                         node: ast.AST,
+                         ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
         position = self.to_position(node, ctx)
-        item = self.get_function_call(target_cls, '__getitem__',
-                                      [target, index], [None, None], node, ctx)
-        result = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
-        return [], [result]
+        info = self.no_info(ctx)
+
+        no_after_starred = 0
+        next = 0
+        stmt_result = []
+        val_result = []
+        # Need to find out how many other receivers come after a starred
+        # expression (if any) to calculate the last index that should be
+        # assigned to the starred expression.
+        for index, e in enumerate(lhs.elts):
+            if isinstance(e, ast.Starred):
+                no_after_starred = len(lhs.elts) - index - 1
+                next = -no_after_starred
+            else:
+                next = next + 1
+            next_expr = self.viper.IntLit(next, position, info)
+            if next <= 0:
+                # Calculate next index dynamically as len(rhs) + next
+                # because len(rhs) might be unknown statically.
+                len_expr = self.get_function_call(rhs_type, '__len__',
+                                                  [rhs], [None], node, ctx)
+                next_expr = self.viper.Add(len_expr, next_expr, position,
+                                           info)
+
+            stmt, val = self.assign_to(e, rhs, index, next_expr,
+                                       rhs_type, node, ctx)
+            stmt_result += stmt
+            val_result += val
+        return stmt_result, val_result
+
+    def _assign_to_starred(self, lhs: ast.Starred, rhs: Expr,
+                           rhs_index: Optional[int], rhs_end: Optional[Expr],
+                           rhs_type: PythonType, node: ast.AST,
+                           ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        assert rhs_index is not None and rhs_end
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+
+        rhs_lit = self.viper.IntLit(rhs_index, position, info)
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
+        stmt, res_var = self.translate_expr(lhs.value, ctx)
+
+        targets = [res_var]
+        # Create a new list and assign it to starred variable
+        constr_call = self.get_method_call(list_class, '__init__', [], [],
+                                           [res_var], node, ctx)
+        stmt += constr_call
+        # Inhale the type of the newly created list (including type arguments)
+        list_type = self.get_type(lhs.value, ctx)
+        position = self.to_position(node, ctx)
+        stmt.append(
+            self.viper.Inhale(self.type_check(res_var,
+                                              list_type, position, ctx),
+                              position, info))
+        # Set list contents to segment of rhs from rhs_index until rhs_end
+        seq = self.get_function_call(rhs_type, '__sil_seq__',
+                                     [rhs], [None], node, ctx)
+
+        seq_until = self.viper.SeqTake(seq, rhs_end, position, info)
+        seq_from = self.viper.SeqDrop(seq_until, rhs_lit, position, info)
+        list_field = self.viper.Field('list_acc',
+                                      self.viper.SeqType(self.viper.Ref),
+                                      self.no_position(ctx), info)
+        list_field_acc = self.viper.FieldAccess(res_var, list_field,
+                                                position, info)
+        # Also return new list permission...
+        val = []
+        full = self.viper.FullPerm(position, info)
+        list_perm = self.viper.FieldAccessPredicate(list_field_acc,
+                                                    full, position,
+                                                    info)
+        val.append(list_perm)
+        list_type = self.type_check(res_var, list_type, position, ctx)
+        val.append(list_type)
+        assign_stmt = self.viper.FieldAssign(list_field_acc, seq_from, position,
+                                             info)
+        # ... and information about the list contents
+        assign_val = self.viper.EqCmp(list_field_acc, seq_from, position, info)
+        return stmt + [assign_stmt], val + [assign_val]
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
@@ -695,16 +730,10 @@ class StatementTranslator(CommonTranslator):
         rhs_stmt, rhs = rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign_stmts = []
         for target in node.targets:
-            assign_stmts += self.translate_single_assign(target, rhs, rhs_type,
-                                                         node, ctx)
+            target_stmt, _ = self.assign_to(target, rhs, None, None, rhs_type,
+                                            node, ctx)
+            assign_stmts += target_stmt
         return rhs_stmt + assign_stmts
-
-    def translate_single_assign(self, target: ast.AST, rhs: Expr,
-                                rhs_type: PythonType, node: ast.AST,
-                                ctx: Context) -> List[Stmt]:
-        lhs_stmt, _ = self.assign_to(target, rhs, None, None, rhs_type, node,
-                                     ctx)
-        return lhs_stmt
 
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
