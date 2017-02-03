@@ -213,7 +213,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Compare):
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
-        return module.global_module.classes[BOOL_TYPE]
+        operand_types = [get_type(operand, containers, container)
+                         for operand in node.values]
+        return common_supertype(operand_types)
     elif isinstance(node, ast.List):
         return _get_collection_literal_type(node, ['elts'], LIST_TYPE, module,
                                             containers, container)
