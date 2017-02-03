@@ -26,14 +26,17 @@ method list___init__() returns (res: Ref)
 }
 
 function list___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
     ensures result == (item in self.list_acc)
 
 function list___bool__(self: Ref) : Bool
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
     ensures result == (|self.list_acc| != 0)
 
 function list___len__(self: Ref) : Int
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
 {
  |self.list_acc|
@@ -42,27 +45,8 @@ function list___len__(self: Ref) : Int
 // Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
 
-/*
-// TODO: It would make sense to have functions like this for assertions we need
-// for lots of different functions/methods (list___getitem__, Iterator___next__,
-// list___iter__, ...), but it seems that Silicon doesn't always expand the
-// function and becomes incomplete if we do that.
-function type_args_plus_1(self: Ref, other: Ref, ind: Int): Bool
-{
-    (get_type_nargs0(other) == get_type_nargs1(self, ind)) &&
-    (forall i1: Int :: {get_type_nargs1(other, i1)} get_type_nargs1(other, i1) == get_type_nargs2(self, ind, i1)) &&
-    (forall i1: Int, i2: Int :: {get_type_nargs2(other, i1, i2)} get_type_nargs2(other, i1, i2) == get_type_nargs3(self, ind, i1, i2)) &&
-    (forall i1: Int :: {get_type_arg1(other, i1)} get_type_arg1(other, i1) == get_type_arg2(self, ind, i1)) &&
-    (forall i1: Int, i2 : Int :: {get_type_arg2(other, i1, i2)} get_type_arg2(other, i1, i2) == get_type_arg3(self, ind, i1, i2))
-}
-
-function type_arg_eq(self: Ref, other: Ref, ind1: Int, ind2: Int): Bool
-{
-    get_type_nargs1(other, ind2) == get_type_nargs1(self, ind1) &&
-    (forall i1: Int :: {get_type_arg2(other, ind2, i1)} get_type_arg2(other, ind2, i1) == get_type_arg2(self, ind1, i1))
-}*/
-
 function list___getitem__(self: Ref, key: Ref): Ref
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
     requires int___unbox__(key) >= 0
@@ -71,6 +55,7 @@ function list___getitem__(self: Ref, key: Ref): Ref
     ensures issubtype(typeof(result), list_arg(typeof(self), 0))
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc)
     requires key >= 0
     requires key < list___len__(self)
@@ -82,6 +67,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
 }
 
 method list_append(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc)
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
@@ -95,6 +81,7 @@ field __iter_index : Int
 field __previous: Ref
 
 method list___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 10)
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
@@ -110,6 +97,7 @@ method list___iter__(self: Ref) returns (_res: Ref)
 }
 
 method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
+  requires issubtype(typeof(self), Iterator(Iterator_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 40)
   requires acc(self.__iter_index, write)
   requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
@@ -128,6 +116,7 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
 }
 
 method Iterator___del__(self: Ref)
+  requires issubtype(typeof(self), Iterator(Iterator_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 20)
   requires acc(self.__container, 1 / 20)
   ensures acc(self.__container, 1 / 20)

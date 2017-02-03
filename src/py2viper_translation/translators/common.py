@@ -221,13 +221,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         info = self.no_info(ctx)
         if arg_type.name == UNION_TYPE:
             first_arg = self.normalize_type(arg_type.type_args[0], ctx)
-            result = self.type_factory.translate_type_literal(first_arg, position,
-                                                              ctx)
+            result = self.type_factory.translate_type_literal(first_arg,
+                                                              position, ctx)
             for option in arg_type.type_args[1:]:
                 option = self.normalize_type(option, ctx)
                 check = self.type_check(arg, option, position, ctx, False)
                 type_lit = self.type_factory.translate_type_literal(option,
-                                                                    position, ctx)
+                                                                    position,
+                                                                    ctx)
                 result = self.viper.CondExp(check, type_lit, result, position,
                                             info)
             return result

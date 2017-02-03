@@ -74,8 +74,9 @@ class CallTranslator(CommonTranslator):
                              ctx: Context) -> StmtsAndExpr:
         stmt, object_arg = self.translate_expr(node.args[1], ctx)
         cast_type = self.get_type(node, ctx)
+        arg_pos = self.to_position(node.args[0], ctx)
         type_arg = self.type_factory.translate_type_literal(cast_type,
-                                                            self.to_position(node.args[0], ctx), ctx)
+                                                            arg_pos, ctx)
         pos = self.to_position(node, ctx)
         object_class = ctx.module.global_module.classes['object']
         result = self.get_function_call(object_class, '__cast__',

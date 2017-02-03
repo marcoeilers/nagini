@@ -36,33 +36,3 @@ for name in dir(ASTConverter):
     m = getattr(ASTConverter, name)
     if callable(m) and name.startswith('visit_'):
         setattr(ASTConverter, name, with_column(m))
-
-recorded_type_args = {}
-last_call = [None]
-
-def record_current_call(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        res = f(*args, **kwargs)
-        context = args[5]
-        if hasattr(context, 'line') and hasattr(context, 'column') and context.line >= 0:
-            last_call[0] = str(context.line) + '___' + str(context.column)
-        return res
-    return wrapper
-
-
-def record_args(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        res = f(*args, **kwargs)
-        recorded_type_args[last_call[0]] = res
-        return res
-    return wrapper
-
-ExpressionChecker = mypy.checkexpr.ExpressionChecker
-f = ExpressionChecker.infer_function_type_arguments
-setattr(ExpressionChecker, 'infer_function_type_arguments', record_current_call(f))
-
-checkexpr = mypy.checkexpr
-f = checkexpr.infer_function_type_arguments
-setattr(checkexpr, 'infer_function_type_arguments', record_args(f))

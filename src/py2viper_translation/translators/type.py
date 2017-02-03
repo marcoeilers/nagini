@@ -104,22 +104,6 @@ class TypeTranslator(CommonTranslator):
             return self.type_factory.type_check(lhs, none_type, position, ctx)
         elif type.name == 'type':
             return self.viper.TrueLit(position, self.no_info(ctx))
-        # elif type.name == UNION_TYPE:
-        #     # Union type should not directly show up on Silver level, instead
-        #     # say the type is either type option 1 or type option 2 etc.
-        #     result = self.viper.FalseLit(position, self.no_info(ctx))
-        #     for type_option in type.type_args:
-        #         option_result = self.type_check(lhs, type_option, position, ctx,
-        #                                         inhale_exhale)
-        #         result = self.viper.Or(result, option_result, position,
-        #                                self.no_info(ctx))
-        #     return result
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
-            # if isinstance(type, GenericType):
-            #     # Add information about type arguments.
-            #     args = self.set_type_nargs_and_args(lhs, type, [], position,
-            #                                         ctx, inhale_exhale)
-            #     result = self.viper.And(result, args, position,
-            #                             self.no_info(ctx))
             return result
