@@ -399,7 +399,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return True
         elif len(node.args) == 2:
             target = do_get_target(node.args[0],
-                                   container.get_module().get_included_modules(),
+                                   container.module.get_included_modules(),
                                    container)
             return (isinstance(target, PythonClass) and
                     isinstance(node.args[1], ast.Name) and
@@ -412,7 +412,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         containers = [ctx]
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
-            containers.extend(container.get_module().get_included_modules())
+            containers.extend(container.module.get_included_modules())
         else:
             # Assume module
             containers.extend(container.get_included_modules())

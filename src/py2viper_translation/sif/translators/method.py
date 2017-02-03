@@ -106,8 +106,8 @@ class SIFMethodTranslator(MethodTranslator):
         self_var = method.args[next(iter(method.args))]
         self_ref = self_var.ref()
         self_ref_prime = self_var.var_prime.ref()
-        fields = method.cls.get_all_fields()
-        sil_fields = method.cls.get_all_sil_fields()
+        fields = method.cls.all_fields
+        sil_fields = method.cls.all_sil_fields
         sil_fields_prime = [f.field_prime.sil_field for f in fields]
         # Generate permissions for all fields.
         accs = self.get_all_field_accs(sil_fields, self_ref,

@@ -61,5 +61,5 @@ class FuncTripleDomainFactory:
                 ret_type, ctx)
 
         return self.viper.DomainFuncApp(name, args, type_passed, pos, info,
-                                        self.domain_name, typevarmap=var_map)
+                                        self.domain_name, type_var_map=var_map)
 

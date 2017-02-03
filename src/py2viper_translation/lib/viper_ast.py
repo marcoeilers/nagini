@@ -70,9 +70,9 @@ class ViperAST:
         result.update(0, element)
         return result
 
-    def append(self, list, toappend):
-        if not toappend is None:
-            lsttoappend = self.singleton_seq(toappend)
+    def append(self, list, to_append):
+        if not to_append is None:
+            lsttoappend = self.singleton_seq(to_append)
             list.append(lsttoappend)
 
     def to_seq(self, list):
@@ -175,27 +175,28 @@ class ViperAST:
     def DomainAxiom(self, name, expr, position, info, domain_name):
         return self.ast.DomainAxiom(name, expr, position, info, domain_name)
 
-    def DomainType(self, name, typevarsmap, typevars):
-        map = self.to_map(typevarsmap)
-        seq = self.to_seq(typevars)
+    def DomainType(self, name, type_vars_map, type_vars):
+        map = self.to_map(type_vars_map)
+        seq = self.to_seq(type_vars)
         return self.ast.DomainType(name, map,
                                    seq)
 
-    def DomainFuncApp(self, funcname, args, typepassed,
-                      position, info, domain_name, typevarmap={}):
-        argspassed = args
-        def typepassedapply(slf):
-            return typepassed
+    def DomainFuncApp(self, func_name, args, type_passed,
+                      position, info, domain_name, type_var_map={}):
+        args_passed = args
 
-        def argspassedapply(slf):
-            return self.to_seq(argspassed)
+        def type_passed_apply(slf):
+            return type_passed
 
-        typepassedfunc = self.to_function0(typepassedapply)
-        argspassedfunc = self.to_function0(argspassedapply)
-        result = self.ast.DomainFuncApp(funcname, self.to_seq(args),
-                                        self.to_map(typevarmap), position, info,
-                                        typepassedfunc, argspassedfunc,
-                                        domain_name)
+        def args_passed_apply(slf):
+            return self.to_seq(args_passed)
+
+        type_passed_func = self.to_function0(type_passed_apply)
+        args_passed_func = self.to_function0(args_passed_apply)
+        result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
+                                        self.to_map(type_var_map), position,
+                                        info, type_passed_func,
+                                        args_passed_func, domain_name)
         return result
 
     def TypeVar(self, name):
