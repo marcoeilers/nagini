@@ -217,7 +217,8 @@ class ExpressionTranslator(CommonTranslator):
         func_name = '__create' + str(len(node.elts)) + '__'
         vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
                        for (t, v) in zip(val_types, vals)]
-        val_types += [type_class] * len(val_types)
+        val_types += [type_class] * len(val_types) + [None]
+        vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call

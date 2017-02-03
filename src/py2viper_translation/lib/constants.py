@@ -104,6 +104,21 @@ VIPER_KEYWORDS = [
     'perm',
     'unique']
 
+LEGAL_MAGIC_METHODS = {
+    '__eq__',
+    '__ne__',
+    '__gt__',
+    '__ge__',
+    '__lt__',
+    '__le__',
+    '__add__',
+    '__sub_',
+    '__mul__',
+    '__floordiv__',
+    '__mod__',
+    '__init__',
+}
+
 RESULT_NAME = '_res'
 
 ERROR_NAME = '_err'

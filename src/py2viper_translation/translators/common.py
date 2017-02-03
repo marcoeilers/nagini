@@ -418,3 +418,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             containers.extend(container.get_included_modules())
         result = do_get_target(node, containers, container)
         return result
+
+    def get_fresh_int_lit(self, ctx: Context) -> Expr:
+        return self.viper.IntLit(ctx.fresh_int, self.no_position(ctx),
+                                 self.no_info(ctx))

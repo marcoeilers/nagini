@@ -214,8 +214,8 @@ class CallTranslator(CommonTranslator):
         start_stmt, start = self.translate_expr(node.args[0], ctx,
                                                 self.viper.Int)
         end_stmt, end = self.translate_expr(node.args[1], ctx, self.viper.Int)
-        args = [start, end]
-        arg_types = [None, None]
+        args = [start, end, self.get_fresh_int_lit(ctx)]
+        arg_types = [None, None, None]
         call = self.get_function_call(range_class, '__create__', args,
                                       arg_types, node, ctx)
         return start_stmt + end_stmt, call
@@ -497,7 +497,8 @@ class CallTranslator(CommonTranslator):
         vals = args + [self.get_tuple_type_arg(arg, typ, node, ctx)
                        for (typ, arg) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
-        val_types = types + [type_class] * len(types)
+        val_types = types + [type_class] * len(types) + [None]
+        vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call
