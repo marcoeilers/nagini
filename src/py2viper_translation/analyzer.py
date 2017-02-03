@@ -406,7 +406,7 @@ class Analyzer(ast.NodeVisitor):
             else:
                 actual_bases.append(base)
         if len(actual_bases) > 1:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 1:
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
