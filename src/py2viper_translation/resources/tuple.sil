@@ -59,14 +59,6 @@ function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
 function tuple___sil_seq__(self: Ref): Seq[Ref]
     ensures |result| == tuple___len__(self)
     ensures forall i: Int :: i >= 0 && i < tuple___len__(self) ==> (result[i] == tuple___getitem__(self, i))
-/*{
-    let l == (tuple___len__(self)) in (len == 0 ? Seq[Ref]() :
-    (len == 1 ? Seq(tuple___getitem__(self, 0)) :
-    (len == 2 ? Seq(tuple___getitem__(self, 0), tuple___getitem__(self, 1)) :
-    (len == 3 ? Seq(tuple___getitem__(self, 0), tuple___getitem__(self, 1), tuple___getitem__(self, 2)) :
-    (len == 4 ? Seq(tuple___getitem__(self, 0), tuple___getitem__(self, 1), tuple___getitem__(self, 2), tuple___getitem__(self, 3)) :
-    ())))))
-}*/
 
 function tuple___len__(self: Ref): Int
 {
