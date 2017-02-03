@@ -73,7 +73,7 @@ class SIFCallTranslator(CallTranslator):
         call_results.add_result(res_var.ref())
         call_results.add_result(res_var.var_prime.ref())
         fields = []
-        for field in target_class.get_all_fields():
+        for field in target_class.all_fields:
             fields.append(field.sil_field)
             fields.append(field.field_prime.sil_field)
         new_stmt = self.viper.NewStmt(res_var.ref(), fields,

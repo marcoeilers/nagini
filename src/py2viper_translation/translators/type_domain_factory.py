@@ -73,7 +73,7 @@ class TypeDomainFactory:
         return result
 
     def create_union_extends2_axiom(self,
-                                   ctx: Context) -> 'silver.ast.DomainAxiom':
+                                    ctx: Context) -> 'silver.ast.DomainAxiom':
         """
         axiom union_extends2 {
            (forall seq: Seq[PyType], Z: PyType, X: PyType ::
@@ -301,7 +301,7 @@ class TypeDomainFactory:
         Creates the type domain function and subtype axiom for this class
         """
         if not cls.superclass:
-            supertype = cls.get_module().global_module.classes[OBJECT_TYPE]
+            supertype = cls.module.global_module.classes[OBJECT_TYPE]
         else:
             supertype = cls.superclass
         position = self.to_position(cls.node, ctx)
@@ -484,9 +484,9 @@ class TypeDomainFactory:
             # forall args: Seq[PyType] :: { tuple(args) }
             # (forall e: PyType :: (e in args) ==> e == object())
             #                       ==> extends_(tuple(args), object())
-            # This way, tuple(Seq(object(), object())) extends_ object,
+            # This way, tuple(Seq(object(), object())) extends object,
             # but tuple(int(), int()) does not, which we need, because types
-            # that extend_ the same supertype are said not to be subtypes of
+            # that extend the same supertype are said not to be subtypes of
             # each other by issubtype_exclusion.
             e_decl = self.viper.LocalVarDecl('e', self.type_type(), position,
                                              info)

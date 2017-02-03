@@ -321,7 +321,7 @@ class Analyzer(ast.NodeVisitor):
         """
         containers = [container]
         if isinstance(container, (PythonMethod, PythonIOOperation)):
-            containers.extend(container.get_module().get_included_modules())
+            containers.extend(container.module.get_included_modules())
         else:
             containers.extend(container.get_included_modules())
         return do_get_target(node, containers, container)
@@ -458,8 +458,10 @@ class Analyzer(ast.NodeVisitor):
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
 
-        # TODO: create type vars
-        functype = self.module.get_func_type(func.get_scope_prefix())
+        # TODO: When we want to support method type parameters, this would be
+        # the place to find all type variables used in the parameters which
+        # don't stem from the class and add them to func.type_vars.
+        functype = self.module.get_func_type(func.scope_prefix)
         if func.pure and not functype:
             raise InvalidProgramException(node, 'function.type.none')
         self.current_function = func
@@ -503,8 +505,8 @@ class Analyzer(ast.NodeVisitor):
         self.visit_loop(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        alias = False
-        type_var = False
+        is_alias = False
+        is_type_var = False
         # Check if this is a type alias
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             lhs_name = (self.module.type_prefix, node.targets[0].id)
@@ -513,25 +515,25 @@ class Analyzer(ast.NodeVisitor):
                 type_name = self.types.type_aliases[lhs_name]
                 aliased_type = self.convert_type(type_name)
                 self.module.classes[node.targets[0].id] = aliased_type
-                alias = True
+                is_alias = True
             # If it's a type variable markes by mypy
             elif lhs_name in self.types.type_vars:
                 var = self.types.type_vars[lhs_name]
                 self.module.type_vars[node.targets[0].id] = var
-                type_var = True
+                is_type_var = True
             # Could still be a type alias if RHS refers to class
             elif not isinstance(node.value, ast.Call):
                 target = self.get_target(node.value, self.module)
                 if isinstance(target, PythonType):
                     self.module.classes[node.targets[0].id] = target
-                    alias = True
+                    is_alias = True
 
-        # Nothing else to do for type aliases and type vars,, for all other
+        # Nothing else to do for type aliases and type vars, for all other
         # cases proceed as usual.
-        if alias:
+        if is_alias:
             if self.current_function or self.current_class:
                 raise InvalidProgramException(node, 'local.type.alias')
-        elif type_var:
+        elif is_type_var:
             if self.current_function or self.current_class:
                 raise InvalidProgramException(node, 'local.typevar')
         else:
@@ -818,7 +820,8 @@ class Analyzer(ast.NodeVisitor):
         """
         Converts an internal mypy type to a PythonType.
         """
-        if self.types.is_void_type(mypy_type):
+        if (self.types.is_void_type(mypy_type) or
+                self.types.is_none_type(mypy_type)):
             result = None
         elif self.types.is_instance_type(mypy_type):
             result = self.convert_type(mypy_type.type)
@@ -826,48 +829,56 @@ class Analyzer(ast.NodeVisitor):
                 args = [self.convert_type(arg) for arg in mypy_type.args]
                 result = GenericType(result, args)
         elif self.types.is_normal_type(mypy_type):
-            prefix = mypy_type._fullname
-            if prefix.endswith('.' + mypy_type.name()):
-                prefix = prefix[:-(len(mypy_type.name()) + 1)]
-            target_module = self.module
-            for module in self.modules.values():
-                if module.type_prefix == prefix:
-                    target_module = module
-                    break
-            result = self.find_or_create_class(mypy_type.name(),
-                                               module=target_module)
+            return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
             args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
-        elif self.types.is_none_type(mypy_type):
-            result = None
         elif self.types.is_union_type(mypy_type):
-            args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
-            optional = False
-            if None in args:
-                # It's an optional type, remember this and wrap it later
-                optional = True
-                args.remove(None)
-            if len(args) > 1:
-                result = UnionType(args)
-            else:
-                result = args[0]
-            if optional:
-                result = OptionalType(result)
+            return self._convert_union_type(mypy_type)
         elif self.types.is_type_var(mypy_type):
-            name = mypy_type.name
-            assert name in self.module.type_vars
-            if name in self.current_function.type_vars:
-                return self.current_function.type_vars[name]
-            elif (self.current_class and name in self.current_class.type_vars):
-                return self.current_class.type_vars[name]
-            else:
-                assert False, 'Unknown type variable'
-
+            return self._convert_type_var(mypy_type)
         else:
             raise UnsupportedException(mypy_type)
         return result
+
+    def _convert_normal_type(self, mypy_type) -> PythonType:
+        prefix = mypy_type._fullname
+        if prefix.endswith('.' + mypy_type.name()):
+            prefix = prefix[:-(len(mypy_type.name()) + 1)]
+        target_module = self.module
+        for module in self.modules.values():
+            if module.type_prefix == prefix:
+                target_module = module
+                break
+        result = self.find_or_create_class(mypy_type.name(),
+                                           module=target_module)
+        return result
+
+    def _convert_union_type(self, mypy_type) -> PythonType:
+        args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
+        optional = False
+        if None in args:
+            # It's an optional type, remember this and wrap it later
+            optional = True
+            args.remove(None)
+        if len(args) > 1:
+            result = UnionType(args)
+        else:
+            result = args[0]
+        if optional:
+            result = OptionalType(result)
+        return result
+
+    def _convert_type_var(self, mypy_type) -> PythonType:
+        name = mypy_type.name
+        assert name in self.module.type_vars
+        if name in self.current_function.type_vars:
+            return self.current_function.type_vars[name]
+        elif (self.current_class and name in self.current_class.type_vars):
+            return self.current_class.type_vars[name]
+        else:
+            assert False, 'Unknown type variable'
 
     def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
         """

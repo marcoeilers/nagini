@@ -341,7 +341,7 @@ class MethodTranslator(CommonTranslator):
         Generates preconditions specific to the '__init__' method.
         """
         self_var = method.args[next(iter(method.args))].ref()
-        fields = method.cls.get_all_sil_fields()
+        fields = method.cls.all_sil_fields
         accs = self.get_all_field_accs(fields, self_var,
                                        self.to_position(method.node, ctx),
                                        ctx)
@@ -484,7 +484,7 @@ class MethodTranslator(CommonTranslator):
                           pos: Position, ctx: Context) -> Stmt:
         """
         Assigns the exception and its type to the given variables if there is
-        an incaught exception, otherwise assigns None to everything.
+        an uncaught exception, otherwise assigns None to everything.
         """
         info = self.no_info(ctx)
         null = self.viper.NullLit(pos, info)

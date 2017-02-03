@@ -166,7 +166,7 @@ class BaseObligationInfo(GuardCollectingVisitor):
     def _create_var(
             self, name: str, class_name: str,
             translator: 'Translator', local: bool = False) -> PythonVar:
-        module = self._method.get_module()
+        module = self._method.module
         cls = module.global_module.classes[class_name]
         return self._method.create_variable(
             name, cls, translator, local=local)
