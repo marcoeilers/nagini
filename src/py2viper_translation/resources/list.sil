@@ -97,7 +97,6 @@ method list___iter__(self: Ref) returns (_res: Ref)
 }
 
 method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
-  requires issubtype(typeof(self), Iterator(Iterator_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 40)
   requires acc(self.__iter_index, write)
   requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
@@ -116,7 +115,6 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
 }
 
 method Iterator___del__(self: Ref)
-  requires issubtype(typeof(self), Iterator(Iterator_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 20)
   requires acc(self.__container, 1 / 20)
   ensures acc(self.__container, 1 / 20)
