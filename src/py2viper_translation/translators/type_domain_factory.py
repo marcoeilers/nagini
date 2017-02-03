@@ -875,6 +875,7 @@ class TypeDomainFactory:
         would be some expression known to be equivalent to the type being
         described).
         """
+        info = self.no_info(ctx)
         if isinstance(type, TypeVar):
             return ctx.bound_type_vars[(type.target_type.name, type.name)]
         if type is None:
@@ -890,10 +891,13 @@ class TypeDomainFactory:
             for index, arg in enumerate(type.type_vars):
                 args.append(self.get_type_arg(alias, type, index, ctx))
         if type.name == TUPLE_TYPE:
-            seq_arg = self.viper.ExplicitSeq(args, position, self.no_info(ctx))
+            if args:
+                seq_arg = self.viper.ExplicitSeq(args, position, info)
+            else:
+                seq_arg = self.viper.EmptySeq(self.type_type(), position, info)
             args = [seq_arg]
         if type.name == 'Union':
-            seq_arg = self.viper.ExplicitSet(args, position, self.no_info(ctx))
+            seq_arg = self.viper.ExplicitSet(args, position, info)
             args = [seq_arg]
         if type.name == 'Union':
             type_func_name = 'union_type'
@@ -901,8 +905,7 @@ class TypeDomainFactory:
             type_func_name = type.sil_name
         type_func = self.viper.DomainFuncApp(type_func_name, args,
                                              self.type_type(), position,
-                                             self.no_info(ctx),
-                                             self.type_domain)
+                                             info, self.type_domain)
         return type_func
 
     def get_type_arg(self, type_expr: Expr, target_type: PythonType,
