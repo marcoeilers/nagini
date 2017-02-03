@@ -3,10 +3,8 @@ domain PyType {
     function issubtype(t1: PyType, t2: PyType):Bool
     unique function bytes(): PyType
     unique function bytearray(): PyType
-    unique function list(): PyType
+    function list(t: PyType): PyType
     unique function int(): PyType
-    function get_type_arg1(obj: Ref, index: Int): PyType
-    function get_type_nargs0(r: Ref): Int
 }
 
 field list_acc : Seq[Ref]
@@ -72,8 +70,7 @@ function __prim__int___box__(prim: Int): Ref
 
 function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), bytes())
-    requires issubtype(typeof(other), list())
-    requires get_type_arg1(other, 0) == bytes()
+    requires issubtype(typeof(other), list(bytes()))
     requires acc(other.list_acc, wildcard)
     ensures issubtype(typeof(result), bytes())
     //ensures bytes___val__(result) == (list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0))
@@ -82,7 +79,7 @@ function bytes_join(self: Ref, other: Ref): Ref
 }
 
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
-    requires issubtype(typeof(l), list()) && get_type_arg1(l, 0) == bytes()
+    requires issubtype(typeof(l), list(bytes()))
     requires acc(l.list_acc, wildcard)
     requires index >= 0 && index < list___len__(l)
     ensures |result| == (index < list___len__(l) - 1 ? bytes___len__(list___getitem__(l, __prim__int___box__(index))) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| : bytes___len__(list___getitem__(l, __prim__int___box__(index))))
