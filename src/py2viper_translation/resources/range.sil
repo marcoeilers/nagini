@@ -33,16 +33,19 @@ function range___stop__(self: Ref): Int
 
 
 function range___len__(self: Ref): Int
+  requires issubtype(typeof(self), range())
   ensures result == |range___val__(self)|
 
 
 function range___getitem__(self: Ref, index: Ref): Int
+  requires issubtype(typeof(self), range())
   requires issubtype(typeof(index), int())
   requires (int___unbox__(index) in range___val__(self))
   ensures result == range___val__(self)[int___unbox__(index)]
 
 
 function range___sil_seq__(self: Ref): Seq[Ref]
+  requires issubtype(typeof(self), range())
   ensures |result| == range___len__(self)
   ensures (forall i: Int :: i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (issubtype(typeof(i), int()) && (int___unbox__(i) in range___val__(self))))
@@ -50,10 +53,12 @@ function range___sil_seq__(self: Ref): Seq[Ref]
 
 
 function range___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), range())
     requires issubtype(typeof(item), int())
     ensures result == (item in range___sil_seq__(self))
 
 method range___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), range())
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
   ensures _res.list_acc == range___sil_seq__(self)

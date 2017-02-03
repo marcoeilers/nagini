@@ -332,6 +332,8 @@ class Analyzer(ast.NodeVisitor):
         current module if none is provided). If no such class exists, one will
         be created.
         """
+        # If the name refers to a type alias from the typing module, get
+        # the actual name
         aliases = {'List': 'list',
                    'Tuple': 'tuple',
                    'Set': 'set',
@@ -364,7 +366,10 @@ class Analyzer(ast.NodeVisitor):
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
-            ast_args = [node.slice.value] if isinstance(node.slice.value, ast.Name) else node.slice.value.elts
+            if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            else:
+                ast_args = node.slice.value.elts
             args = [self.find_or_create_target_class(arg) for arg in ast_args]
             result = GenericType(cls, args)
             return result
@@ -509,8 +514,10 @@ class Analyzer(ast.NodeVisitor):
                 aliased_type = self.convert_type(type_name)
                 self.module.classes[node.targets[0].id] = aliased_type
                 alias = True
+            # If it's a type variable markes by mypy
             elif lhs_name in self.types.type_vars:
-                self.module.type_vars[node.targets[0].id] = self.types.type_vars[lhs_name]
+                var = self.types.type_vars[lhs_name]
+                self.module.type_vars[node.targets[0].id] = var
                 type_var = True
             # Could still be a type alias if RHS refers to class
             elif not isinstance(node.value, ast.Call):
@@ -519,8 +526,8 @@ class Analyzer(ast.NodeVisitor):
                     self.module.classes[node.targets[0].id] = target
                     alias = True
 
-        # Nothing else to do for type aliases, for all other cases proceed as
-        # usual.
+        # Nothing else to do for type aliases and type vars,, for all other
+        # cases proceed as usual.
         if alias:
             if self.current_function or self.current_class:
                 raise InvalidProgramException(node, 'local.type.alias')

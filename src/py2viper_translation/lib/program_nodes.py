@@ -221,7 +221,7 @@ class PythonType(metaclass=ABCMeta):
         If this class represents a primitive type, returns the boxed version,
         otherwise just return the type itself.
         """
-        # Generic types are never primitive, so just return self.
+        # By default, just return self. Subclasses can override.
         return self
 
     def try_unbox(self) -> 'PythonType':
@@ -229,15 +229,21 @@ class PythonType(metaclass=ABCMeta):
         If this class represents a boxed version of a primitive type, returns
         the primitive version, otherwise just returns the type itself.
         """
-        # Generic types are never primitive, so just return self.
+        # By default, just return self. Subclasses can override.
         return self
 
 
 class TypeVar(PythonType):
+    """
+    Represents a type variable.
+    """
 
     def __init__(self, name: str, target_type: PythonType, target_node: Optional[ast.AST],
                  index: int, bound: Optional[PythonType],
                  options: List[PythonType], node: ast.AST):
+        # TODO: This is all preliminary, it works with what we have now, but
+        # may have to be reworked once we properly support type arguments for
+        # methods etc.
         self.name = name
         self.target_type = target_type
         self.target_node = target_node
@@ -533,6 +539,8 @@ class GenericType(PythonType):
     def superclass(self) -> PythonClass:
         result = self.get_class().superclass
         if isinstance(result, GenericType):
+            # Return a GenericType that has all type variables instantiated
+            # based on the type arguments of this type.
             args = []
             for arg in result.type_args:
                 if isinstance(arg, TypeVar):

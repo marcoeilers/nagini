@@ -7,7 +7,6 @@ import sys
 from mypy.build import BuildSource
 from py2viper_translation.lib import config
 from py2viper_translation.lib.constants import IGNORED_IMPORTS, LITERALS
-from py2viper_translation.lib.mypy_parser_patch import recorded_type_args
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
     InvalidProgramException,
@@ -164,11 +163,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         for a in node.args:
             a.accept(self)
         node.callee.accept(self)
-        if hasattr(node, 'line') and hasattr(node, 'column') and node.line >= 0:
-            key = str(node.line) + '___' + str(node.column)
-            if key in recorded_type_args:
-                args = recorded_type_args[key]
-                print("12")
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):

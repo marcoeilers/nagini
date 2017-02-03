@@ -342,8 +342,6 @@ class ViperAST:
         return self.ast.LocalVarDecl(name, type, position, info)
 
     def LocalVar(self, name, type, position, info):
-        if name == 'T':
-            print("112")
         return self.ast.LocalVar(name, type, position, info)
 
     def Result(self, type, position, info):
