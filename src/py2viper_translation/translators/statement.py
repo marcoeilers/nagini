@@ -4,6 +4,7 @@ from py2viper_translation.lib.constants import (
     BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
+    INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
