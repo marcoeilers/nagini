@@ -65,3 +65,9 @@ function tuple___getitem__(self: Ref, key: Int): Ref
     requires key >= 0
     requires key < tuple___len__(self)
     ensures issubtype(typeof(result), tuple_arg(typeof(self), key))
+
+function tuple___eq__(self: Ref, other: Ref): Bool
+    ensures (tuple___len__(self) == tuple___len__(other) &&
+             (forall i: Int :: i >= 0 && i < tuple___len__(self)
+                                ==> tuple___getitem__(self, i) == tuple___getitem__(other, i)))
+             ==> result

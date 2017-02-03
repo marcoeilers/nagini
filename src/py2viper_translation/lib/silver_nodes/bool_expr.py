@@ -18,7 +18,7 @@ from py2viper_translation.lib.typedefs import (
     Position,
 )
 from py2viper_translation.lib.util import (
-    join_expressions,
+    join_expressions_simple,
 )
 
 
@@ -177,7 +177,7 @@ class BigAnd(BoolExpression):
             and_operator = (
                 lambda left, right:
                 translator.viper.And(left, right, position, info))
-            return join_expressions(and_operator, conjuncts)
+            return join_expressions_simple(and_operator, conjuncts)
 
 
 class BigOr(BoolExpression):
@@ -210,7 +210,7 @@ class BigOr(BoolExpression):
             or_operator = (
                 lambda left, right:
                 translator.viper.Or(left, right, position, info))
-            return join_expressions(or_operator, disjuncts)
+            return join_expressions_simple(or_operator, disjuncts)
 
 
 class BoolCondExp(BoolExpression):

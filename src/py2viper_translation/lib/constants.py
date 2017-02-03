@@ -117,6 +117,8 @@ LEGAL_MAGIC_METHODS = {
     '__floordiv__',
     '__mod__',
     '__init__',
+    '__enter__',
+    '__exit__',
 }
 
 RESULT_NAME = '_res'

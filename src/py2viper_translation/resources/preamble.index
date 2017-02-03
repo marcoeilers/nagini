@@ -352,6 +352,11 @@
         "__len__": {
             "args": ["tuple"],
             "type": "__prim__int"
+        },
+        "__eq__": {
+            "args": ["tuple", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__getitem__"]
         }
     },
     "type_vars": -1,
