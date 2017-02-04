@@ -672,8 +672,8 @@ class ExpressionTranslator(CommonTranslator):
             bool_parts.append(bool_expression)
             types_parts.append(typ)
 
-        all_bool = all(typ.name == 'bool' for typ in types_parts)
-        all_pure = all(e.isPure() for e in expression_parts)
+        all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
+        all_pure = all(self.unwrap(e).isPure() for e in expression_parts)
 
         if isinstance(node.op, ast.And):
             operator = (

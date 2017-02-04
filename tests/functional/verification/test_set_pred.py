@@ -6,12 +6,15 @@ bla45 = ('bla', 45)
 
 
 def main() -> None:
-    value = {('asd', 46), ('b', 23), ('dd', 2)}
-    Assert(('asd', 46) in value)
-    Assert(('dd', 2) in value)
+    asd46 = ('asd', 46)
+    b23 = ('b', 23)
+    dd2 = ('dd', 2)
+    value = {asd46, b23, dd2}
+    Assert(asd46 in value)
+    Assert(dd2 in value)
     Assert(('bla', 45) not in value)
     append_bla_45(value)
-    Assert(('dd', 2) in value)
+    Assert(dd2 in value)
     Assert(len(value) == 4)
     Assert(bla45 in value)
     #:: ExpectedOutput(assert.failed:assertion.false)

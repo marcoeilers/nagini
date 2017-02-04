@@ -44,7 +44,7 @@ class StatementTranslator(CommonTranslator):
                  type_info: 'TypeInfo', viper_ast: 'ViperAST') -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
         # Keep track of the end and after labels of loops we are currently in.
-        self.loops = []
+        self.loops = {}
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         """
@@ -380,6 +380,7 @@ class StatementTranslator(CommonTranslator):
             result += translated_block
         result.append(self.viper.Label(post_label, self.to_position(node, ctx),
                                        self.no_info(ctx)))
+        result += self._set_result_none(ctx)
         return result
 
     def translate_stmt_Assert(self, node: ast.Assert,
@@ -629,17 +630,17 @@ class StatementTranslator(CommonTranslator):
             loop += translated_block
         loop.append(self.viper.Label(post_label, self.to_position(node, ctx),
                     self.no_info(ctx)))
+        loop += self._set_result_none(ctx)
         return loop
 
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], post_label: str,
             end_label: str, ctx: Context,
             err_var: PythonVar = None) -> None:
-        self.loops.append((node, post_label, end_label))
+        self.loops[node] = (post_label, end_label)
         super().enter_loop_translation(node, ctx, err_var)
 
     def leave_loop_translation(self, ctx: Context) -> None:
-        self.loops.pop()
         super().leave_loop_translation(ctx)
 
     def _set_result_none(self, ctx: Context) -> List[Stmt]:
@@ -648,29 +649,42 @@ class StatementTranslator(CommonTranslator):
         return variable), to be used after loops which may havoc the result
         variable (if there is a return within the loop body).
         """
+        result = []
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         if ctx.actual_function.type:
-            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
             result_none = self.viper.LocalVarAssign(
                 ctx.actual_function.result.ref(),
                 null, self.no_position(ctx),
                 self.no_info(ctx))
-            return [result_none]
-        return []
+            result.append(result_none)
+        if ctx.actual_function.declared_exceptions:
+            error_none = self.viper.LocalVarAssign(
+                ctx.actual_function.error_var.ref(),
+                null, self.no_position(ctx), self.no_info(ctx))
+            result.append(error_none)
+        return result
 
     def translate_stmt_Break(self, node: ast.Break, ctx: Context) -> List[Stmt]:
         loop = get_parent_of_type(node, (ast.While, ast.For))
-        loop_and_label = self.loops[-1]
-        assert loop_and_label[0] is loop
-        result = self.viper.Goto(loop_and_label[1], self.to_position(node, ctx),
+        loop_and_label = self.loops[loop]
+        result = self.viper.Goto(loop_and_label[0], self.to_position(node, ctx),
                                  self.no_info(ctx))
         return [result]
 
-    def translate_stmt_Continue(self, node: ast.Break,
+    def translate_stmt_Continue(self, node: ast.Continue,
                                 ctx: Context) -> List[Stmt]:
-        loop = get_parent_of_type(node, (ast.While, ast.For))
-        loop_and_label = self.loops[-1]
-        assert loop_and_label[0] is loop
-        result = self.viper.Goto(loop_and_label[2], self.to_position(node, ctx),
+
+        parent = node
+        while not isinstance(parent._parent, (ast.While, ast.For)):
+            if isinstance(parent._parent, ast.Try):
+                if parent in parent._parent.finalbody:
+                    raise InvalidProgramException(node, 'continue.in.finally')
+            else:
+                parent = parent._parent
+
+        loop = parent._parent
+        loop_and_label = self.loops[loop]
+        result = self.viper.Goto(loop_and_label[1], self.to_position(node, ctx),
                                  self.no_info(ctx))
         return [result]
 

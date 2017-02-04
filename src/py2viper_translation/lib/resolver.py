@@ -191,6 +191,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 result = rec_type.type_args[result.index]
             return result
         if target:
+            if isinstance(target, PythonIOOperation):
+                return module.global_module.classes[BOOL_TYPE]
             # If this is a Sequence(...) call, target will be the Sequence class
             # but won't have generic type information. So we don't return here
             # and let the code below take care of the call.
@@ -296,6 +298,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
+    if func_name in {'token', 'ctoken', 'MustTerminate', 'MustRelease'}:
+        return module.global_module.classes[BOOL_TYPE]
     if func_name == 'Sequence':
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
                                             containers, container)
