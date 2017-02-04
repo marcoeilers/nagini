@@ -89,19 +89,23 @@ class ExpressionTranslator(CommonTranslator):
         if expression:
             self._is_expression = True
 
-        method = 'translate_' + node.__class__.__name__
-        visitor = getattr(self, method, self.translate_generic)
         if not target_type:
             target_type = self.viper.Ref
         old_target = self._target_type
         self._target_type = target_type
-        stmt, result = visitor(node, ctx)
+        stmt, result = self._translate_only(node, ctx)
 
         if target_type != result.typ():
             result = self.convert_to_type(result, target_type, ctx, node)
 
         self._is_expression = old_is_expression
         self._target_type = old_target
+        return stmt, result
+
+    def _translate_only(self, node: ast.AST, ctx: Context):
+        method = 'translate_' + node.__class__.__name__
+        visitor = getattr(self, method, self.translate_generic)
+        stmt, result = visitor(node, ctx)
         return stmt, result
 
     def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
@@ -662,8 +666,11 @@ class ExpressionTranslator(CommonTranslator):
         types_parts = []
         for value in node.values:
             typ = self.get_type(value, ctx)
-            statements_part, expression_part = self.translate_expr(
+            old_target = self._target_type
+            self._target_type = self.viper.Bool
+            statements_part, expression_part = self._translate_only(
                 value, ctx)
+            self._target_type = old_target
             bool_expression = self.to_bool(expression_part, ctx, value)
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
@@ -672,8 +679,14 @@ class ExpressionTranslator(CommonTranslator):
             bool_parts.append(bool_expression)
             types_parts.append(typ)
 
+        def is_pure(e):
+            e = self.unwrap(e)
+            if isinstance(e, self.viper.ast.And):
+                return is_pure(e.left()) and is_pure(e.right())
+            return e.isPure()
+
         all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
-        all_pure = all(self.unwrap(e).isPure() for e in expression_parts)
+        all_pure = all(is_pure(e) for e in expression_parts)
 
         if isinstance(node.op, ast.And):
             operator = (
