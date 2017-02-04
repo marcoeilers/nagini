@@ -61,3 +61,93 @@ def m5_f() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert a is empty
 
+
+class Container:
+    def __init__(self) -> None:
+        Ensures(Acc(self.value) and self.value == 0)  # type: ignore
+        self.value = 0
+
+
+class A:
+    def test(self, c: Container) -> None:
+        Requires(Acc(c.value))
+        Ensures(Acc(c.value) and c.value == 5)
+        c.value = 5
+
+
+class B(A):
+    pass
+
+
+class C(A):
+    pass
+
+
+class D():
+    def __init__(self) -> None:
+        Requires(False)
+
+
+class E():
+    def __init__(self, c: Container) -> None:
+        Requires(Acc(c.value))
+        Ensures(Acc(c.value) and c.value == Old(c.value) + 5)
+        c.value += 5
+
+
+def m_type() -> None:
+    c = Container()
+    (B() or C()).test(c)
+    assert c.value == 5
+
+
+def m_type_2() -> A:
+    c = Container()
+    return B() and C()
+
+
+def m_type_f() -> None:
+    c = Container()
+    (B() or C()).test(c)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
+
+
+def m_type_2_f() -> A:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(False)
+    c = Container()
+    return B() and C()
+
+
+def m_stmt_or() -> None:
+    c = Container()
+    a = E(c) or D()
+    assert c.value == 5
+
+
+def m_stmt_or_2() -> None:
+    c = Container()
+    l = []  # type: List[int]
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a = l or D()
+
+
+def m_stmt_and() -> None:
+    c = Container()
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    a = E(c) and D()
+
+
+def m_stmt_and_2() -> None:
+    c = Container()
+    a = E(c) and E(c)
+    assert c.value == 10
+
+
+def m_stmt_and_3() -> None:
+    c = Container()
+    l = []  # type: List[int]
+    a = l and E(c)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c.value == 5

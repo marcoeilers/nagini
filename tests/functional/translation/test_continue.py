@@ -15,18 +15,6 @@ def break_out(c: Container) -> None:
         try:
             raise Exception()
         finally:
-            break
-    c.value = 5
-
-
-def break_out_2(c: Container) -> None:
-    Requires(Acc(c.value))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 210)
-    Ensures(Acc(c.value) and c.value == 6)
-    while True:
-        Invariant(Acc(c.value))
-        try:
-            raise Exception()
-        finally:
-            break
+            #:: ExpectedOutput(invalid.program:continue.in.finally)
+            continue
     c.value = 5
