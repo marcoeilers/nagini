@@ -92,6 +92,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 self.set_type(self.prefix + [node.name], name_type,
                               node.line, col(node))
 
+    def visit_star_expr(self, node: mypy.nodes.StarExpr):
+        node.expr.accept(self)
+
     def visit_func_def(self, node: mypy.nodes.FuncDef):
         oldprefix = self.prefix
         self.prefix = self.prefix + [node.name()]

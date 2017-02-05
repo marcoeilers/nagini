@@ -5,6 +5,7 @@ from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     BOXED_PRIMITIVES,
     BUILTINS,
+    BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
     INT_TYPE,
@@ -212,6 +213,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return _get_subscript_type(node, module, containers, container)
     elif isinstance(node, ast.Str):
         return module.global_module.classes[STRING_TYPE]
+    elif isinstance(node, ast.Bytes):
+        return module.global_module.classes[BYTES_TYPE]
     elif isinstance(node, ast.Compare):
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
@@ -266,18 +269,18 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
     for a dict), returns the type of the collection.
     """
-    if all(getattr(node, arg_field) for arg_field in arg_fields):
+    if node._parent and isinstance(node._parent, ast.Assign):
+        # Constructor is assigned to variable;
+        # we get the type of the dict from the type of the
+        # variable it's assigned to.
+        args = get_type(node._parent.targets[0], containers,
+                        container).type_args
+    elif all(getattr(node, arg_field) for arg_field in arg_fields):
         args = []
         for arg_field in arg_fields:
             arg_types = [get_type(arg, containers, container) for arg in
                          getattr(node, arg_field)]
             args.append(common_supertype(arg_types))
-    elif node._parent and isinstance(node._parent, ast.Assign):
-        # Empty constructor is assigned to variable;
-        # we get the type of the empty dict from the type of the
-        # variable it's assigned to.
-        args = get_type(node._parent.targets[0], containers,
-                        container).type_args
     else:
         object_class = module.global_module.classes[OBJECT_TYPE]
         args = [object_class for arg_field in arg_fields]
@@ -367,7 +370,7 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.name == DICT_TYPE:
         return value_type.type_args[1]
-    elif value_type.name == RANGE_TYPE:
+    elif value_type.name in {RANGE_TYPE, BYTES_TYPE}:
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == SEQ_TYPE:
         return value_type.type_args[0]

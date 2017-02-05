@@ -143,6 +143,8 @@ SET_TYPE = 'set'
 
 STRING_TYPE = 'str'
 
+BYTES_TYPE = 'bytes'
+
 INT_TYPE = 'int'
 
 BOOL_TYPE = 'bool'

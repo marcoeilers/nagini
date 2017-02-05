@@ -307,6 +307,60 @@
     },
     "extends": "object"
 },
+"bytes": {
+    "functions": {
+        "__len__": {
+            "args": ["bytes"],
+            "type": "__prim__int",
+            "requires": ["__val__"]
+        },
+        "__bool__": {
+            "args": ["bytes"],
+            "type": "__prim__bool",
+            "requires": ["__len__"]
+        },
+        "__eq__": {
+            "args": ["bytes", "object"],
+            "type": "__prim__bool",
+            "requires": ["__val__", "__len__"]
+        },
+        "__add__": {
+            "args": ["bytes", "bytes"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__"]
+        },
+        "__mul__": {
+            "args": ["bytes", "__prim__int"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__", "bytes___mul__helper"]
+        },
+        "__sil_seq__": {
+            "args": ["bytes"],
+            "type": "__prim__Sequence",
+            "requires": ["__val__"]
+        },
+        "__create__": {
+            "args": ["__prim__Sequence"],
+            "type": "bytes",
+            "requires": ["__len__", "__val__"]
+        },
+        "__val__": {
+            "args": ["bytes"],
+            "type": "__prim__Sequence"
+        },
+        "__getitem__": {
+            "args": ["bytes", "__prim__int"],
+            "type": "int",
+            "requires": ["__len__", "__val__"]
+        },
+        "join": {
+            "args": ["bytes", "list"],
+            "type": "bytes",
+            "requires": ["__val__", "__len__", "bytes_join_val_helper", "list___len__", "list___getitem__"]
+        }
+    },
+    "extends": "object"
+},
 "tuple": {
     "functions": {
         "__create0__": {
@@ -315,32 +369,32 @@
             "requires": ["__len__"]
         },
         "__create1__": {
-            "args": ["object", "type", "__prim__int"],
+            "args": ["object", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create2__": {
-            "args": ["object", "object", "type", "type", "__prim__int"],
+            "args": ["object", "object", "type", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create3__": {
-            "args": ["object", "object", "object", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "type", "type", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create4__": {
-            "args": ["object", "object", "object", "object", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create5__": {
-            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create6__": {
-            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
@@ -357,6 +411,10 @@
             "args": ["tuple", "object"],
             "type": "__prim__bool",
             "requires": ["__len__", "__getitem__"]
+        },
+        "__sil_seq__": {
+            "args": ["tuple"],
+            "type": "__prim__Sequence"
         }
     },
     "type_vars": -1,

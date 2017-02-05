@@ -3,6 +3,7 @@ import ast
 from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     BOXED_PRIMITIVES,
+    BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
     INT_TYPE,
@@ -207,6 +208,24 @@ class ExpressionTranslator(CommonTranslator):
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
         return [], call
+
+    def translate_Bytes(self, node: ast.Bytes, ctx: Context) -> StmtsAndExpr:
+        elems = []
+        for c in node.s:
+            lit = self.viper.IntLit(c, self.to_position(node, ctx),
+                                    self.no_info(ctx))
+            elems.append(self.to_ref(lit, ctx))
+        if elems:
+            seq = self.viper.ExplicitSeq(elems, self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        else:
+            seq = self.viper.EmptySeq(self.viper.Ref,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        bytes_class = ctx.module.global_module.classes[BYTES_TYPE]
+        result = self.get_function_call(bytes_class, '__create__', [seq],
+                                        [None], node, ctx)
+        return [], result
 
     def translate_Tuple(self, node: ast.Tuple, ctx: Context) -> StmtsAndExpr:
         stmts = []
