@@ -15,6 +15,7 @@ domain PyType {
     function dict(t: PyType, v: PyType): PyType
     unique function int(): PyType
     unique function range(): PyType
+    unique function slice(): PyType
 }
 
 method list___init__() returns (res: Ref)
@@ -45,14 +46,41 @@ function list___len__(self: Ref) : Int
 // Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
 
+
+function slice___create__(start: Ref, stop: Ref): Ref
+    requires start == null || issubtype(typeof(start), int())
+    requires stop == null || issubtype(typeof(stop), int())
+    ensures slice___start__(result) == start
+    ensures slice___stop__(result) == stop
+    ensures typeof(result) == slice()
+
+function slice___start__(self: Ref): Ref
+    ensures result == null || issubtype(typeof(result), int())
+
+function slice___stop__(self: Ref): Ref
+    ensures result == null || issubtype(typeof(result), int())
+
 function list___getitem__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
-    requires int___unbox__(key) >= 0
-    requires int___unbox__(key) < list___len__(self)
-    ensures result == self.list_acc[int___unbox__(key)]
+    requires int___unbox__(key) < 0 ==> int___unbox__(key) >= -list___len__(self)
+    requires int___unbox__(key) >= 0 ==> int___unbox__(key) < list___len__(self)
+    ensures int___unbox__(key) >= 0 ==> result == self.list_acc[int___unbox__(key)]
+    ensures int___unbox__(key) < 0 ==> result == self.list_acc[list___len__(self) + int___unbox__(key)]
     ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+
+method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), slice())
+    requires acc(self.list_acc, 1/1000)
+    ensures acc(self.list_acc, 1/1000)
+    ensures acc(_res.list_acc)
+    ensures typeof(_res) == typeof(self)
+    ensures _res.list_acc == self.list_acc[(slice___start__(key) == null ? 0 : int___unbox__(slice___start__(key)))..(slice___stop__(key) == null ? list___len__(self) : (int___unbox__(slice___stop__(key)) < 0 ? (list___len__(self) - int___unbox__(slice___stop__(key))): (int___unbox__(slice___stop__(key)))))]
+{
+    assume false
+}
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
