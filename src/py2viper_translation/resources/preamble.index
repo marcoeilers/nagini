@@ -21,6 +21,10 @@
             "args": ["list"],
             "type": "Iterator",
             "MustTerminate": true
+        },
+        "__getitem_slice__": {
+            "args": ["list", "slice"],
+            "type": "list"
         }
     },
     "functions": {
@@ -498,6 +502,24 @@
         }
     },
     "type_vars": 1,
+    "extends": "object"
+},
+"slice": {
+    "functions": {
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "slice",
+            "requires": ["__start__", "__stop__"]
+        },
+        "__start__": {
+            "args": ["slice"],
+            "type": "int"
+        },
+        "__stop__": {
+            "args": ["slice"],
+            "type": "int"
+        }
+    },
     "extends": "object"
 },
 "range": {
