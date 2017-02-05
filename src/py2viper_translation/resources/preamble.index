@@ -407,6 +407,11 @@
             "args": ["tuple"],
             "type": "__prim__int"
         },
+        "__eq__": {
+            "args": ["tuple", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__getitem__"]
+        },
         "__sil_seq__": {
             "args": ["tuple"],
             "type": "__prim__Sequence"
@@ -498,7 +503,7 @@
 "range": {
     "functions": {
         "__create__": {
-            "args": ["__prim__int", "__prim__int"],
+            "args": ["__prim__int", "__prim__int", "__prim__int"],
             "type": "range",
             "requires": ["__val__", "__start__", "__stop__"]
         },

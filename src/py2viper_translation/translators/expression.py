@@ -35,6 +35,7 @@ from py2viper_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
     join_expressions,
+    join_expressions_simple,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -89,19 +90,23 @@ class ExpressionTranslator(CommonTranslator):
         if expression:
             self._is_expression = True
 
-        method = 'translate_' + node.__class__.__name__
-        visitor = getattr(self, method, self.translate_generic)
         if not target_type:
             target_type = self.viper.Ref
         old_target = self._target_type
         self._target_type = target_type
-        stmt, result = visitor(node, ctx)
+        stmt, result = self._translate_only(node, ctx)
 
         if target_type != result.typ():
             result = self.convert_to_type(result, target_type, ctx, node)
 
         self._is_expression = old_is_expression
         self._target_type = old_target
+        return stmt, result
+
+    def _translate_only(self, node: ast.AST, ctx: Context):
+        method = 'translate_' + node.__class__.__name__
+        visitor = getattr(self, method, self.translate_generic)
+        stmt, result = visitor(node, ctx)
         return stmt, result
 
     def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
@@ -236,7 +241,8 @@ class ExpressionTranslator(CommonTranslator):
         func_name = '__create' + str(len(node.elts)) + '__'
         vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
                        for (t, v) in zip(val_types, vals)]
-        val_types += [type_class] * len(val_types)
+        val_types += [type_class] * len(val_types) + [None]
+        vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call
@@ -675,13 +681,31 @@ class ExpressionTranslator(CommonTranslator):
 
         statements_parts = []
         expression_parts = []
+        bool_parts = []
+        types_parts = []
         for value in node.values:
-            statements_part, expression_part = self.translate_expr(
-                value, ctx, target_type=self.viper.Bool)
+            typ = self.get_type(value, ctx)
+            old_target = self._target_type
+            self._target_type = self.viper.Bool
+            statements_part, expression_part = self._translate_only(
+                value, ctx)
+            self._target_type = old_target
+            bool_expression = self.to_bool(expression_part, ctx, value)
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)
             expression_parts.append(expression_part)
+            bool_parts.append(bool_expression)
+            types_parts.append(typ)
+
+        def is_pure(e):
+            e = self.unwrap(e)
+            if isinstance(e, self.viper.ast.And):
+                return is_pure(e.left()) and is_pure(e.right())
+            return e.isPure()
+
+        all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
+        all_pure = all(is_pure(e) for e in expression_parts)
 
         if isinstance(node.op, ast.And):
             operator = (
@@ -692,15 +716,31 @@ class ExpressionTranslator(CommonTranslator):
                 lambda left, right:
                 self.viper.Or(left, right, position, info))
 
-        joined_expression_parts = [
-            join_expressions(operator, expression_parts[:i+1])
-            for i in range(len(expression_parts))
+        joined_bool_parts = [
+            join_expressions_simple(operator, bool_parts[:i+1])
+            for i in range(len(bool_parts))
             ]
+        if all_pure and not all_bool:
+            if isinstance(node.op, ast.And):
+                operator = (
+                    lambda left, left_bool, right:
+                    self.viper.CondExp(left_bool, right, left, position, info)
+                )
+            else:
+                operator = (
+                    lambda left, left_bool, right:
+                    self.viper.CondExp(left_bool, left, right, position, info)
+                )
+            joined_expression_parts = [
+                join_expressions(operator, expression_parts[:i + 1],
+                                 bool_parts[:i + 1], expression_parts[i])
+                for i in range(len(bool_parts))
+                ]
 
         statements = statements_parts[0]
         for i, part in enumerate(statements_parts[1:]):
 
-            cond = joined_expression_parts[i]
+            cond = joined_bool_parts[i]
             if isinstance(node.op, ast.Or):
                 cond = self.viper.Not(cond, position, info)
 
@@ -710,8 +750,11 @@ class ExpressionTranslator(CommonTranslator):
                 if_stmt = self.viper.If(cond, then_block, else_block,
                                         position, info)
                 statements.append(if_stmt)
-
-        return statements, joined_expression_parts[-1]
+        if all_pure and not all_bool:
+            res_val = joined_expression_parts[-1]
+        else:
+            res_val = joined_bool_parts[-1]
+        return statements, res_val
 
     def translate_pythonvar_decl(self, var: PythonVar,
                                  ctx: Context) -> 'silver.ast.LocalVarDecl':

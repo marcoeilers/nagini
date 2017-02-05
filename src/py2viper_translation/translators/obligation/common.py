@@ -12,7 +12,7 @@ from py2viper_translation.lib.typedefs import (
 )
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
-    join_expressions,
+    join_expressions_simple,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.abstract import TranslatorConfig
@@ -77,7 +77,8 @@ class CommonObligationTranslator(CommonTranslator):
         and_operator = (
             lambda left, right:
             self.viper.And(left, right, position, info))
-        return ([], join_expressions(and_operator, translated_expressions))
+        return ([], join_expressions_simple(and_operator,
+                                            translated_expressions))
 
     def translate_must_invoke(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
