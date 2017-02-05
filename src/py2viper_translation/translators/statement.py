@@ -367,6 +367,13 @@ class StatementTranslator(CommonTranslator):
 
         err_var, next_call = self._get_next_call(iter_var, target_var,
                                                  node, ctx)
+
+        # Assign target_var contents to actual loop target(s).
+        assign_stmt, assign_expr = self.assign_to(node.target,
+                                                  target_var.ref(),
+                                                  None, None, target_type,
+                                                  node, ctx)
+
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
 
         invariant = self._create_for_loop_invariant(iter_var, target_var,
@@ -619,7 +626,14 @@ class StatementTranslator(CommonTranslator):
             arg_types = [None, None, None]
             stmt = self.get_method_call(target_cls, '__setitem__', args,
                                         arg_types, [], node, ctx)
-            return lhs_stmt + ind_stmt + call
+            # The respective assertion states that getitem with the given index
+            # now has the assigned value.
+            item = self.get_function_call(target_cls, '__getitem__',
+                                          [target, index], [None, None], node,
+                                          ctx)
+            val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
+            index_type = self.get_type(lhs.slice.value, ctx)
+            return lhs_stmt + ind_stmt + stmt, [val]
         target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
         if isinstance(target, ast.Name):
