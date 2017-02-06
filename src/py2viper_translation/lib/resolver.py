@@ -364,7 +364,7 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.name == DICT_TYPE:
         return value_type.type_args[1]
-    elif value_type.name in {RANGE_TYPE, BYTES_TYPE}:
+    elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == SEQ_TYPE:
         return value_type.type_args[0]
