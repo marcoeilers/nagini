@@ -16,7 +16,7 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
 )
 from py2viper_translation.lib.util import (
-    join_expressions_simple,
+    join_expressions,
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.translators.io_operation.common import (
@@ -101,7 +101,7 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
             lambda left, right:
             self._viper.And(left, right,
                             self._position(), self._no_info()))
-        condition = join_expressions_simple(
+        condition = join_expressions(
             and_operator, [self._termination_condition] + guard_sil_parts)
         return condition
 

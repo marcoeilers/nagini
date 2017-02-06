@@ -18,7 +18,7 @@ from py2viper_translation.lib.typedefs import (
     Position,
 )
 from py2viper_translation.lib.util import (
-    join_expressions_simple,
+    join_expressions,
 )
 
 
@@ -154,7 +154,7 @@ class Sum(IntExpression):
             plus_operator = (
                 lambda left, right:
                 translator.viper.Add(left, right, position, info))
-            return join_expressions_simple(plus_operator, elements)
+            return join_expressions(plus_operator, elements)
 
 
 class Inc(IntExpression):

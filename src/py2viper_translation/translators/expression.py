@@ -34,8 +34,8 @@ from py2viper_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
+    join_three_expressions,
     join_expressions,
-    join_expressions_simple,
     UnsupportedException,
 )
 from py2viper_translation.translators.abstract import Context
@@ -717,7 +717,7 @@ class ExpressionTranslator(CommonTranslator):
                 self.viper.Or(left, right, position, info))
 
         joined_bool_parts = [
-            join_expressions_simple(operator, bool_parts[:i+1])
+            join_expressions(operator, bool_parts[:i + 1])
             for i in range(len(bool_parts))
             ]
         if all_pure and not all_bool:
@@ -732,8 +732,8 @@ class ExpressionTranslator(CommonTranslator):
                     self.viper.CondExp(left_bool, left, right, position, info)
                 )
             joined_expression_parts = [
-                join_expressions(operator, expression_parts[:i + 1],
-                                 bool_parts[:i + 1], expression_parts[i])
+                join_three_expressions(operator, expression_parts[:i + 1],
+                                       bool_parts[:i + 1], expression_parts[i])
                 for i in range(len(bool_parts))
                 ]
 
