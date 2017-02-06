@@ -245,17 +245,17 @@ def get_parent_of_type(node: ast.AST, typ: type) -> ast.AST:
     return None
 
 
-def join_expressions_simple(operator: Callable[[T, T], T],
-                            expressions: List[T]) -> T:
+def join_expressions(operator: Callable[[T, T], T],
+                     expressions: List[T]) -> T:
     first = expressions[-1]
 
     def new_op(first, second, third):
         return operator(second, third)
-    return join_expressions(new_op, expressions, expressions, first)
+    return join_three_expressions(new_op, expressions, expressions, first)
 
 
-def join_expressions(operator: Callable[[T, T, T], T],
-                     expressions: List[T], bools: List[T], first: T) -> T:
+def join_three_expressions(operator: Callable[[T, T, T], T],
+                           expressions: List[T], bools: List[T], first: T) -> T:
     """
     Joins expressions with ``operator``.
 
