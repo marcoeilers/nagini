@@ -403,9 +403,9 @@
             "requires": ["__len__", "__getitem__"]
         },
         "__getitem__": {
-            "args": ["tuple", "__prim__int"],
+            "args": ["tuple", "int"],
             "type": "object",
-            "requires": ["__len__"]
+            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__len__": {
             "args": ["tuple"],
@@ -518,6 +518,16 @@
         "__stop__": {
             "args": ["slice"],
             "type": "int"
+        },
+        "__actualstart__": {
+            "args": ["slice"],
+            "type": "int",
+            "requires": ["__start__"]
+        },
+        "__actualstop__": {
+            "args": ["slice"],
+            "type": "int",
+            "requires": ["__stop__"]
         }
     },
     "extends": "object"
