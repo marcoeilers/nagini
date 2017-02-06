@@ -345,7 +345,8 @@ class StatementTranslator(CommonTranslator):
         return result
 
     def translate_stmt_For(self, node: ast.For, ctx: Context) -> List[Stmt]:
-        position, info = self.to_position(node, ctx), self.no_info(ctx)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         post_label = ctx.actual_function.get_fresh_name('post_loop')
         end_label = ctx.actual_function.get_fresh_name('loop_end')
         iterable_type = self.get_type(node.iter, ctx)
@@ -353,9 +354,9 @@ class StatementTranslator(CommonTranslator):
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
                                                    node, ctx)
         # Find type of the collection content we're iterating over.
-        if iterable_type.name in {LIST_TYPE, DICT_TYPE, SET_TYPE}:
+        if iterable_type.name in (LIST_TYPE, DICT_TYPE, SET_TYPE):
             target_type = iterable_type.type_args[0]
-        elif iterable_type.name in {RANGE_TYPE, BYTES_TYPE}:
+        elif iterable_type.name in (RANGE_TYPE, BYTES_TYPE):
             target_type = ctx.module.global_module.classes[INT_TYPE]
         else:
             raise UnsupportedException(node, 'unknown.iterable')
