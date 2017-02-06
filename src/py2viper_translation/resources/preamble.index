@@ -24,7 +24,8 @@
         },
         "__getitem_slice__": {
             "args": ["list", "slice"],
-            "type": "list"
+            "type": "list",
+            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
         }
     },
     "functions": {
@@ -353,7 +354,7 @@
             "type": "__prim__Sequence"
         },
         "__getitem__": {
-            "args": ["bytes", "__prim__int"],
+            "args": ["bytes", "int"],
             "type": "int",
             "requires": ["__len__", "__val__"]
         },
@@ -553,8 +554,8 @@
         },
         "__getitem__": {
             "args": ["range", "int"],
-            "type": "__prim__int",
-            "requires": ["__val__", "int___unbox__"]
+            "type": "int",
+            "requires": ["__val__", "int___unbox__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__contains__": {
             "args": ["range", "int"],
@@ -574,6 +575,11 @@
             "args": ["range"],
             "type": "__prim__Sequence",
             "requires": ["__val__", "__len__", "__prim__int___box__", "int___unbox__", "__start__", "__stop__"]
+        },
+        "__eq__": {
+            "args": ["range", "object"],
+            "type": "__prim__bool",
+            "requires": ["__val__", "__len__"]
         }
     },
     "methods": {

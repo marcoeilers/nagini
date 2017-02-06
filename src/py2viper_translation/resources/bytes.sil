@@ -5,6 +5,7 @@ domain PyType {
     unique function bytearray(): PyType
     function list(t: PyType): PyType
     unique function int(): PyType
+    unique function slice(): PyType
 }
 
 field list_acc : Seq[Ref]
@@ -66,6 +67,10 @@ function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
 function list___len__(self: Ref): Int
 function list___getitem__(self: Ref, i: Ref): Ref
 function __prim__int___box__(prim: Int): Ref
+function int___unbox__(self: Ref): Int
+function slice___actualstart__(self: Ref, len: Int): Int
+function slice___actualstop__(self: Ref, len: Int): Int
+
 
 function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), bytes())
@@ -90,8 +95,16 @@ function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
         bytes___val__(list___getitem__(l, __prim__int___box__(index))))
 }
 
-function bytes___getitem__(self: Ref, index: Int): Ref
+function bytes___getitem__(self: Ref, index: Ref): Ref
     requires issubtype(typeof(self), bytes())
-    requires index >= 0 && index < bytes___len__(self)
-    ensures issubtype(typeof(result), int())
-    ensures result == bytes___val__(self)[index]
+    requires issubtype(typeof(index), int()) || issubtype(typeof(index), slice())
+    requires (issubtype(typeof(index), int()) && int___unbox__(index) >= 0) ==> int___unbox__(index) < bytes___len__(self)
+    requires (issubtype(typeof(index), int()) && int___unbox__(index) < 0) ==> int___unbox__(index) >= -bytes___len__(self)
+    requires issubtype(typeof(index), slice()) ==> (slice___actualstart__(index, bytes___len__(self)) >= 0 && slice___actualstart__(index, bytes___len__(self)) <= bytes___len__(self))
+    requires issubtype(typeof(index), slice()) ==> (slice___actualstop__(index, bytes___len__(self)) >= 0 && slice___actualstop__(index, bytes___len__(self)) <= bytes___len__(self))
+    ensures issubtype(typeof(index), int()) ==> issubtype(typeof(result), int())
+    ensures issubtype(typeof(index), slice()) ==> issubtype(typeof(result), bytes())
+    ensures (issubtype(typeof(index), int()) && int___unbox__(index) >= 0) ==> result == bytes___val__(self)[int___unbox__(index)]
+    ensures (issubtype(typeof(index), int()) && int___unbox__(index) < 0) ==> result == bytes___val__(self)[bytes___len__(self) + int___unbox__(index)]
+    ensures issubtype(typeof(index), slice()) ==> bytes___len__(result) == (slice___actualstop__(index, bytes___len__(self)) - slice___actualstart__(index, bytes___len__(self)))
+    ensures issubtype(typeof(index), slice()) ==> bytes___val__(result) == bytes___val__(self)[slice___actualstart__(index, bytes___len__(self))..slice___actualstop__(index, bytes___len__(self))]
