@@ -45,6 +45,7 @@ function list___len__(self: Ref) : Int
 
 // Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
+function __prim__int___box__(num: Int): Ref
 
 
 function slice___create__(start: Ref, stop: Ref): Ref
@@ -56,6 +57,16 @@ function slice___create__(start: Ref, stop: Ref): Ref
 
 function slice___start__(self: Ref): Ref
     ensures result == null || issubtype(typeof(result), int())
+
+function slice___actualstart__(self: Ref, len: Int): Int
+{
+    slice___start__(self) == null ? 0 : (int___unbox__(slice___start__(self)) < 0 ? len + int___unbox__(slice___start__(self)) : int___unbox__(slice___start__(self)))
+}
+
+function slice___actualstop__(self: Ref, len: Int): Int
+{
+    slice___stop__(self) == null ? len : (int___unbox__(slice___stop__(self)) < 0 ? len + int___unbox__(slice___stop__(self)) : int___unbox__(slice___stop__(self)))
+}
 
 function slice___stop__(self: Ref): Ref
     ensures result == null || issubtype(typeof(result), int())
@@ -77,7 +88,7 @@ method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     ensures acc(self.list_acc, 1/1000)
     ensures acc(_res.list_acc)
     ensures typeof(_res) == typeof(self)
-    ensures _res.list_acc == self.list_acc[(slice___start__(key) == null ? 0 : int___unbox__(slice___start__(key)))..(slice___stop__(key) == null ? list___len__(self) : (int___unbox__(slice___stop__(key)) < 0 ? (list___len__(self) - int___unbox__(slice___stop__(key))): (int___unbox__(slice___stop__(key)))))]
+    ensures _res.list_acc == self.list_acc[slice___actualstart__(key, list___len__(self))..slice___actualstop__(key, list___len__(self))]
 {
     assume false
 }

@@ -359,11 +359,26 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def _get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
+    if node._parent and isinstance(node._parent, ast.Assign):
+        # Constructor is assigned to variable;
+        # we get the type of the dict from the type of the
+        # variable it's assigned to.
+        return get_type(node._parent.targets[0], containers,
+                        container)
     value_type = get_type(node.value, containers, container)
     if value_type.name == TUPLE_TYPE:
+        if isinstance(node.slice, ast.Slice):
+            raise UnsupportedException(node, 'tuple slice type')
         if len(value_type.type_args) == 1:
             return value_type.type_args[0]
-        return value_type.type_args[node.slice.value.n]
+        if isinstance(node.slice.value, ast.UnaryOp):
+            if isinstance(node.slice.value.op, ast.USub) and isinstance(node.slice.value.operand, ast.Num):
+                index = -node.slice.value.operand.n
+            else:
+                raise UnsupportedException(node, 'dynamic subscript type')
+        elif isinstance(node.slice.value, ast.Num):
+            index = node.slice.value.n
+        return value_type.type_args[index]
     elif value_type.name == LIST_TYPE:
         return value_type.type_args[0]
     elif value_type.name == SET_TYPE:
