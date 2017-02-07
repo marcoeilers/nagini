@@ -1,0 +1,97 @@
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    unique function bytes(): PyType
+    unique function bytearray(): PyType
+    function list(t: PyType): PyType
+    unique function int(): PyType
+}
+
+field list_acc : Seq[Ref]
+
+function bytes___len__(self: Ref): Int
+    requires issubtype(typeof(self), bytes())
+	ensures result >= 0
+{
+    |bytes___val__(self)|
+}
+
+function bytes___val__(self: Ref): Seq[Ref]
+
+function bytes___create__(value: Seq[Ref]) : Ref
+    ensures typeof(result) == bytes()
+	ensures bytes___len__(result) == |value|
+	ensures bytes___val__(result) == value
+
+function bytes___bool__(self: Ref) : Bool
+    requires issubtype(typeof(self), bytes())
+	ensures result == bytes___len__(self) != 0
+
+function bytes___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), bytes())
+    ensures (bytes___val__(self) == bytes___val__(other)) == result
+    ensures result ==> (issubtype(typeof(other), bytes()) && bytes___len__(self) == bytes___len__(other))
+
+function bytes___sil_seq__(self: Ref) : Seq[Ref]
+{
+    bytes___val__(self)
+}
+
+function bytes___add__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), bytes())
+    requires issubtype(typeof(other), bytes())
+    ensures typeof(result) == bytes()
+    ensures bytes___len__(result) == bytes___len__(self) + bytes___len__(other)
+    ensures bytes___val__(result) == bytes___val__(self) ++ bytes___val__(other)
+
+function bytes___mul__(self: Ref, factor: Int): Ref
+  requires issubtype(typeof(self), bytes())
+  requires factor >= 0
+  ensures typeof(result) == bytes()
+  ensures bytes___len__(result) == factor * bytes___len__(self)
+{
+    bytes___create__(bytes___mul__helper(bytes___val__(self), factor))
+}
+
+// Helper function for defining the meaning of byte multiplication
+function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
+  requires factor >= 0
+  ensures (forall e: Ref :: (e in result) ==> (e in seq))
+  ensures |result| == factor * |seq|
+{
+  (factor == 0 ? Seq[Ref]() : (factor == 1 ? seq : bytes___mul__helper(seq, factor - 1) ++ seq))
+}
+
+// Dummy
+function list___len__(self: Ref): Int
+function list___getitem__(self: Ref, i: Ref): Ref
+function __prim__int___box__(prim: Int): Ref
+
+function bytes_join(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), bytes())
+    requires issubtype(typeof(other), list(bytes()))
+    requires acc(other.list_acc, wildcard)
+    ensures issubtype(typeof(result), bytes())
+{
+    bytes___create__((list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0)))
+}
+
+// Helper function for defining the meaning of byte join
+function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
+    requires issubtype(typeof(l), list(bytes()))
+    requires acc(l.list_acc, wildcard)
+    requires index >= 0 && index < list___len__(l)
+    ensures |result| == (index < list___len__(l) - 1 ?
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| :
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))))
+{
+    (index < list___len__(l) - 1 ?
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))) ++ sep ++ bytes_join_val_helper(l, sep, index + 1) :
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))))
+}
+
+function bytes___getitem__(self: Ref, index: Int): Ref
+    requires issubtype(typeof(self), bytes())
+    requires index >= 0 && index < bytes___len__(self)
+    ensures issubtype(typeof(result), int())
+    ensures result == bytes___val__(self)[index]
