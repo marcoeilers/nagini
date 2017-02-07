@@ -418,6 +418,10 @@ class Analyzer(ast.NodeVisitor):
         self.current_class = None
 
     def _is_illegal_magic_method_name(self, name: str) -> bool:
+        """
+        Anything that could potentially be a magic method, i.e. anything that has __this__ form,
+        is considered illegal unless it is one of the names we explicitly support.
+        """
         if name.startswith('__') and name.endswith('__'):
             if name not in LEGAL_MAGIC_METHODS:
                 return True

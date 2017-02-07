@@ -633,7 +633,6 @@ class StatementTranslator(CommonTranslator):
                                           [target, index], [None, None], node,
                                           ctx)
             val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
-            index_type = self.get_type(lhs.slice.value, ctx)
             return lhs_stmt + ind_stmt + stmt, [val]
         target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
@@ -800,6 +799,7 @@ class StatementTranslator(CommonTranslator):
                 null, self.no_position(ctx),
                 self.no_info(ctx))
             result.append(result_none)
+        # Do the same for the error variable
         if ctx.actual_function.declared_exceptions:
             error_none = self.viper.LocalVarAssign(
                 ctx.actual_function.error_var.ref(),
@@ -818,9 +818,13 @@ class StatementTranslator(CommonTranslator):
                                 ctx: Context) -> List[Stmt]:
 
         parent = node
+        # Find the loop surrounding this node.
         while not isinstance(parent._parent, (ast.While, ast.For)):
+            # If we find, on the way, that we're in a try block
             if isinstance(parent._parent, ast.Try):
+                # namely, in the finally branch
                 if parent in parent._parent.finalbody:
+                    # this is illegal in Python any mypy doesn't check it.
                     raise InvalidProgramException(node, 'continue.in.finally')
             else:
                 parent = parent._parent

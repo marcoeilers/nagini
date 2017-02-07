@@ -498,6 +498,8 @@ class CallTranslator(CommonTranslator):
                        for (typ, arg) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
         val_types = types + [type_class] * len(types) + [None]
+        # Also add a running integer s.t. other tuples with same contents are not
+        # reference-identical.
         vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)

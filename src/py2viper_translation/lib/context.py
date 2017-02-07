@@ -37,8 +37,7 @@ class Context:
         self.bound_type_vars = {}
         self._global_counter = 0
 
-    @property
-    def fresh_int(self) -> int:
+    def get_fresh_int(self) -> int:
         result = self._global_counter
         self._global_counter += 1
         return result

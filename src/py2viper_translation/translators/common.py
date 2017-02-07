@@ -420,5 +420,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return result
 
     def get_fresh_int_lit(self, ctx: Context) -> Expr:
-        return self.viper.IntLit(ctx.fresh_int, self.no_position(ctx),
+        """
+        Returns an integer literal with a fresh value.
+        """
+        return self.viper.IntLit(ctx.get_fresh_int(), self.no_position(ctx),
                                  self.no_info(ctx))
