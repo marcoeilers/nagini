@@ -10,6 +10,8 @@ domain PyType {
 
 // Dummy for the version from bool.sil
 function int___unbox__(self: Ref): Int
+function slice___actualstart__(self: Ref, len: Int): Int
+function slice___actualstop__(self: Ref, len: Int): Int
 
 function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
     ensures typeof(result) == Sequence(cont_type)

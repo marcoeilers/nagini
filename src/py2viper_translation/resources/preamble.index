@@ -21,6 +21,11 @@
             "args": ["list"],
             "type": "Iterator",
             "MustTerminate": true
+        },
+        "__getitem_slice__": {
+            "args": ["list", "slice"],
+            "type": "list",
+            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
         }
     },
     "functions": {
@@ -349,7 +354,7 @@
             "type": "__prim__Sequence"
         },
         "__getitem__": {
-            "args": ["bytes", "__prim__int"],
+            "args": ["bytes", "int"],
             "type": "int",
             "requires": ["__len__", "__val__"]
         },
@@ -399,9 +404,9 @@
             "requires": ["__len__", "__getitem__"]
         },
         "__getitem__": {
-            "args": ["tuple", "__prim__int"],
+            "args": ["tuple", "int"],
             "type": "object",
-            "requires": ["__len__"]
+            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__len__": {
             "args": ["tuple"],
@@ -500,6 +505,34 @@
     "type_vars": 1,
     "extends": "object"
 },
+"slice": {
+    "functions": {
+        "__create__": {
+            "args": ["int", "int"],
+            "type": "slice",
+            "requires": ["__start__", "__stop__"]
+        },
+        "__start__": {
+            "args": ["slice"],
+            "type": "int"
+        },
+        "__stop__": {
+            "args": ["slice"],
+            "type": "int"
+        },
+        "__actualstart__": {
+            "args": ["slice"],
+            "type": "int",
+            "requires": ["__start__"]
+        },
+        "__actualstop__": {
+            "args": ["slice"],
+            "type": "int",
+            "requires": ["__stop__"]
+        }
+    },
+    "extends": "object"
+},
 "range": {
     "functions": {
         "__create__": {
@@ -521,8 +554,8 @@
         },
         "__getitem__": {
             "args": ["range", "int"],
-            "type": "__prim__int",
-            "requires": ["__val__", "int___unbox__"]
+            "type": "int",
+            "requires": ["__val__", "int___unbox__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__contains__": {
             "args": ["range", "int"],
@@ -542,6 +575,11 @@
             "args": ["range"],
             "type": "__prim__Sequence",
             "requires": ["__val__", "__len__", "__prim__int___box__", "int___unbox__", "__start__", "__stop__"]
+        },
+        "__eq__": {
+            "args": ["range", "object"],
+            "type": "__prim__bool",
+            "requires": ["__val__", "__len__"]
         }
     },
     "methods": {
