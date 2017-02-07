@@ -254,11 +254,38 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
-        if not isinstance(node.slice, ast.Index):
-            raise UnsupportedException(node)
+        target_type = self.get_type(node.value, ctx)
         target_stmt, target = self.translate_expr(node.value, ctx,
                                                   target_type=self.viper.Ref)
-        target_type = self.get_type(node.value, ctx)
+        if not isinstance(node.slice, ast.Index):
+            if node.slice.step:
+                raise UnsupportedException(node, 'slice step')
+            slice_class = ctx.module.global_module.classes['slice']
+            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            start = stop = null
+            start_stmt = stop_stmt = []
+            if node.slice.lower:
+                start_stmt, start = self.translate_expr(node.slice.lower, ctx)
+            if node.slice.upper:
+                stop_stmt, stop = self.translate_expr(node.slice.upper, ctx)
+            slice = self.get_function_call(slice_class, '__create__',
+                                           [start, stop], [None, None],
+                                           node.slice, ctx)
+            args = [target, slice]
+            stmt = target_stmt + start_stmt + stop_stmt
+            if target_type.get_method('__getitem_slice__'):
+                result_var = ctx.actual_function.create_variable(
+                    'slice_res', target_type, self.translator)
+                call = self.get_method_call(target_type, '__getitem_slice__',
+                                            args, [None, None],
+                                            [result_var.ref()], node, ctx)
+                stmt += call
+                return stmt, result_var.ref()
+            else:
+                call = self.get_function_call(target_type, '__getitem__', args,
+                                              [None, None], node, ctx)
+                return stmt, call
+
         index_stmt, index = self.translate_expr(node.slice.value, ctx,
                                                 target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
