@@ -218,6 +218,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Compare):
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
+        # And and Or always return one of their operands, so we use the common supertype of all
+        # arguments.
+        # TODO: We could also use a union type, but since support for e.g. calling methods on
+        # those isn't amazing yet, we don't do that yet.
         operand_types = [get_type(operand, containers, container)
                          for operand in node.values]
         return common_supertype(operand_types)
@@ -301,7 +305,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
-    if func_name in {'token', 'ctoken', 'MustTerminate', 'MustRelease'}:
+    if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
     if func_name == 'Sequence':
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,

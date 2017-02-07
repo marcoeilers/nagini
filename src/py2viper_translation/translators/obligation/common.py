@@ -77,8 +77,7 @@ class CommonObligationTranslator(CommonTranslator):
         and_operator = (
             lambda left, right:
             self.viper.And(left, right, position, info))
-        return ([], join_expressions(and_operator,
-                                     translated_expressions))
+        return ([], join_expressions(and_operator, translated_expressions))
 
     def translate_must_invoke(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
