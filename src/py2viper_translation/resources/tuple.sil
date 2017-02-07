@@ -56,6 +56,10 @@ function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
     ensures typeof(result) == tuple(Seq(t0, t1, t2, t3, t4, t5))
     ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
 
+function tuple___sil_seq__(self: Ref): Seq[Ref]
+    ensures |result| == tuple___len__(self)
+    ensures forall i: Int :: i >= 0 && i < tuple___len__(self) ==> (result[i] == tuple___getitem__(self, i))
+
 function tuple___len__(self: Ref): Int
 {
 	|tuple_args(typeof(self))|
