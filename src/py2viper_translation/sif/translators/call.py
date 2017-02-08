@@ -11,6 +11,7 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
+from py2viper_translation.sif.lib.expr_cache import ExprCache
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
@@ -22,33 +23,7 @@ from py2viper_translation.translators.abstract import (
     StmtsAndExpr,
 )
 from py2viper_translation.translators.call import CallTranslator
-from typing import List, Optional, Tuple
-
-
-class CallResults:
-    """
-    Container for the results of an already translated call node.
-    """
-    def __init__(self):
-        self._results = []
-        self._idx = 0
-
-    def next(self) -> Optional[Expr]:
-        """
-        Returns the next result expr or None if there are no more available.
-        """
-        res = None
-        if self._idx < len(self._results):
-            res = self._results[self._idx]
-            self._idx += 1
-
-        return res
-
-    def add_result(self, result: Expr):
-        self._results.append(result)
-
-    def __len__(self) -> int:
-        return len(self._results)
+from typing import List, Tuple
 
 
 class SIFCallTranslator(CallTranslator):
@@ -59,7 +34,7 @@ class SIFCallTranslator(CallTranslator):
                  type_info: TypeInfo, viper_ast: ViperAST) -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
         # Map of already translated call nodes.
-        self.translated_calls = {}  # Map[ast.Call, CallResults]
+        self.translated_calls = {}  # Map[ast.Call, ExprCache]
 
     def _translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
@@ -238,8 +213,8 @@ class SIFCallTranslator(CallTranslator):
             if call_expr:
                 return [], call_expr
         elif func_name in CONTRACT_FUNCS:
-            # Contract functions need no CallResult.
+            # Contract functions need no ExprCache.
             return self.translate_contractfunc_call(node, ctx)
 
-        self.translated_calls[node] = CallResults()
+        self.translated_calls[node] = ExprCache()
         return super().translate_Call(node, ctx)
