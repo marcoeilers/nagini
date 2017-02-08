@@ -489,19 +489,20 @@ class CallTranslator(CommonTranslator):
         """
         Wraps the given arguments into a tuple to be passed to an *args param.
         """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         stmts = []
-        func_name = '__create' + str(len(args)) + '__'
+        func_name = '__create__'
         # __createX__ must be called with the types of the arguments as
         # additional arguments.
-        vals = args + [self.get_tuple_type_arg(arg, typ, node, ctx)
-                       for (typ, arg) in zip(types, args)]
-        type_class = ctx.module.global_module.classes['type']
-        val_types = types + [type_class] * len(types) + [None]
+        val_seq = self.viper.ExplicitSeq(args, position, info)
+        type_seq = self.viper.ExplicitSeq(types, position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
-        vals += [self.get_fresh_int_lit(ctx)]
-        call = self.get_function_call(tuple_class, func_name, vals, val_types,
+        args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
+        arg_types = [None, None, None]
+        call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return stmts, call
 

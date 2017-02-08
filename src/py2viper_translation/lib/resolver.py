@@ -363,7 +363,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def _get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
-    if node._parent and isinstance(node._parent, ast.Assign):
+    if (node._parent and isinstance(node._parent, ast.Assign) and
+            node is node._parent.value):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.
@@ -376,7 +377,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         if len(value_type.type_args) == 1:
             return value_type.type_args[0]
         if isinstance(node.slice.value, ast.UnaryOp):
-            if isinstance(node.slice.value.op, ast.USub) and isinstance(node.slice.value.operand, ast.Num):
+            if (isinstance(node.slice.value.op, ast.USub) and
+                    isinstance(node.slice.value.operand, ast.Num)):
                 index = -node.slice.value.operand.n
             else:
                 raise UnsupportedException(node, 'dynamic subscript type')

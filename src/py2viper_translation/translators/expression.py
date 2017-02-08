@@ -226,11 +226,14 @@ class ExpressionTranslator(CommonTranslator):
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
         bytes_class = ctx.module.global_module.classes[BYTES_TYPE]
-        result = self.get_function_call(bytes_class, '__create__', [seq],
-                                        [None], node, ctx)
+        args = [seq, self.get_fresh_int_lit(ctx)]
+        result = self.get_function_call(bytes_class, '__create__', args,
+                                        [None, None], node, ctx)
         return [], result
 
     def translate_Tuple(self, node: ast.Tuple, ctx: Context) -> StmtsAndExpr:
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmts = []
         vals = []
         val_types = []
@@ -241,14 +244,16 @@ class ExpressionTranslator(CommonTranslator):
             val_types.append(self.get_type(el, ctx))
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
-        func_name = '__create' + str(len(node.elts)) + '__'
-        vals = vals + [self.get_tuple_type_arg(v, t, node, ctx)
-                       for (t, v) in zip(val_types, vals)]
-        val_types += [type_class] * len(val_types) + [None]
+        func_name = '__create__'
+        val_seq = self.viper.ExplicitSeq(vals, position, info)
+        types = [self.get_tuple_type_arg(v, t, node, ctx)
+                 for (t, v) in zip(val_types, vals)]
+        type_seq = self.viper.ExplicitSeq(types, position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
-        vals += [self.get_fresh_int_lit(ctx)]
-        call = self.get_function_call(tuple_class, func_name, vals, val_types,
+        args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
+        arg_types = [None, None, None]
+        call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return stmts, call
 
@@ -273,7 +278,8 @@ class ExpressionTranslator(CommonTranslator):
                                            node.slice, ctx)
             args = [target, slice]
             stmt = target_stmt + start_stmt + stop_stmt
-            if target_type.get_method('__getitem_slice__'):
+            getitem = target_type.get_func_or_method('__getitem_slice__')
+            if not getitem.pure:
                 result_var = ctx.actual_function.create_variable(
                     'slice_res', target_type, self.translator)
                 call = self.get_method_call(target_type, '__getitem_slice__',
@@ -282,8 +288,8 @@ class ExpressionTranslator(CommonTranslator):
                 stmt += call
                 return stmt, result_var.ref()
             else:
-                call = self.get_function_call(target_type, '__getitem__', args,
-                                              [None, None], node, ctx)
+                call = self.get_function_call(target_type, '__getitem_slice__',
+                                              args, [None, None], node, ctx)
                 return stmt, call
 
         index_stmt, index = self.translate_expr(node.slice.value, ctx,
