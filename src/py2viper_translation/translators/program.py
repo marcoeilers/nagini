@@ -450,6 +450,8 @@ class ProgramTranslator(CommonTranslator):
         functions = []
         methods = []
 
+        functions.append(self.viper.Function('newCtr', [self.viper.LocalVarDecl('r', self.viper.Ref, self.no_position(ctx), self.no_info(ctx))], self.viper.Int, [], [], None, self.no_position(ctx), self.no_info(ctx)))
+
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)

@@ -30,7 +30,7 @@
     },
     "functions": {
         "__getitem__": {
-            "args": ["list", "int"],
+            "args": ["list", "__prim__int"],
             "type": "object",
             "requires": ["__len__"]
         },
@@ -345,7 +345,7 @@
             "requires": ["__val__"]
         },
         "__create__": {
-            "args": ["__prim__Sequence"],
+            "args": ["__prim__Sequence", "__prim__int"],
             "type": "bytes",
             "requires": ["__len__", "__val__"]
         },
@@ -353,8 +353,13 @@
             "args": ["bytes"],
             "type": "__prim__Sequence"
         },
+        "__getitem_slice__": {
+            "args": ["bytes", "slice"],
+            "type": "int",
+            "requires": ["__len__", "__val__", "slice___actualstart__", "slice___actualstop__"]
+        },
         "__getitem__": {
-            "args": ["bytes", "int"],
+            "args": ["bytes", "__prim__int"],
             "type": "int",
             "requires": ["__len__", "__val__"]
         },
@@ -372,6 +377,11 @@
             "args": [],
             "type": "tuple",
             "requires": ["__len__"]
+        },
+        "__create__": {
+            "args": ["__prim__Sequence", "__prim__Sequence_type", "__prim__int"],
+            "type": "tuple",
+            "requires": ["__val__"]
         },
         "__create1__": {
             "args": ["object", "type", "__prim__int"],
@@ -404,13 +414,22 @@
             "requires": ["__len__", "__getitem__"]
         },
         "__getitem__": {
-            "args": ["tuple", "int"],
+            "args": ["tuple", "__prim__int"],
             "type": "object",
-            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
+            "requires": ["__len__", "__val__"]
+        },
+        "__getitem_slice__": {
+            "args": ["tuple", "slice"],
+            "type": "object",
+            "requires": ["__len__", "__getitem__", "__val__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__len__": {
             "args": ["tuple"],
             "type": "__prim__int"
+        },
+        "__val__": {
+            "args": ["tuple"],
+            "type": "__prim__Sequence"
         },
         "__eq__": {
             "args": ["tuple", "object"],
@@ -553,8 +572,13 @@
             "type": "object"
         },
         "__getitem__": {
-            "args": ["range", "int"],
-            "type": "int",
+            "args": ["range", "__prim__int"],
+            "type": "__prim__int",
+            "requires": ["__val__"]
+        },
+        "__getitem_slice__": {
+            "args": ["range", "slice"],
+            "type": "range",
             "requires": ["__val__", "int___unbox__", "slice___actualstart__", "slice___actualstop__"]
         },
         "__contains__": {

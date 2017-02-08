@@ -39,20 +39,25 @@ function range___len__(self: Ref): Int
   ensures result == |range___val__(self)|
 
 
-function range___getitem__(self: Ref, index: Ref): Ref
+function range___getitem__(self: Ref, index: Int): Int
   requires issubtype(typeof(self), range())
-  requires issubtype(typeof(index), int()) || issubtype(typeof(index), slice())
-  requires (issubtype(typeof(index), int()) && int___unbox__(index) >= 0) ==> int___unbox__(index) < range___len__(self)
-  requires (issubtype(typeof(index), int()) && int___unbox__(index) < 0) ==> int___unbox__(index) >= -range___len__(self)
-  requires issubtype(typeof(index), slice()) ==> (slice___actualstart__(index, range___len__(self)) >= 0 && slice___actualstart__(index, range___len__(self)) <= range___len__(self))
-  requires issubtype(typeof(index), slice()) ==> (slice___actualstop__(index, range___len__(self)) >= 0 && slice___actualstop__(index, range___len__(self)) <= range___len__(self))
-  ensures issubtype(typeof(index), int()) ==> issubtype(typeof(result), int())
-  ensures issubtype(typeof(index), slice()) ==> issubtype(typeof(result), range())
-  ensures (issubtype(typeof(index), int()) && int___unbox__(index) >= 0) ==> result == __prim__int___box__(range___val__(self)[int___unbox__(index)])
-  ensures (issubtype(typeof(index), int()) && int___unbox__(index) < 0) ==> result == __prim__int___box__(range___val__(self)[range___len__(self) + int___unbox__(index)])
-  ensures issubtype(typeof(index), slice()) ==> range___len__(result) == (slice___actualstop__(index, range___len__(self)) - slice___actualstart__(index, range___len__(self)))
-  ensures issubtype(typeof(index), slice()) ==> range___val__(result) == range___val__(self)[slice___actualstart__(index, range___len__(self))..slice___actualstop__(index, range___len__(self))]
+  requires index >= 0 ==> index < range___len__(self)
+  requires index < 0 ==> index >= -range___len__(self)
+  ensures index >= 0 ==> result == range___val__(self)[index]
+  ensures index < 0 ==> result == range___val__(self)[range___len__(self) + index]
 
+
+function range___getitem_slice__(self: Ref, index: Ref): Ref
+  requires issubtype(typeof(self), range())
+  requires issubtype(typeof(index), slice())
+  requires (slice___actualstart__(index, range___len__(self)) >= 0 && slice___actualstart__(index, range___len__(self)) <= range___len__(self))
+  requires (slice___actualstop__(index, range___len__(self)) >= 0 && slice___actualstop__(index, range___len__(self)) <= range___len__(self))
+  ensures issubtype(typeof(result), range())
+  ensures range___len__(result) == (slice___actualstop__(index, range___len__(self)) - slice___actualstart__(index, range___len__(self)))
+  ensures range___val__(result) == range___val__(self)[slice___actualstart__(index, range___len__(self))..slice___actualstop__(index, range___len__(self))]
+//{
+//    range___create__(range___val__(self)[slice___actualstart__(index, range___len__(self))], range___val__(self)[slice___actualstop__(index, range___len__(self)) - 1] + 1, newCtr(self))
+//}
 
 
 function range___sil_seq__(self: Ref): Seq[Ref]

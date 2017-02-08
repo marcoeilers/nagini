@@ -71,15 +71,18 @@ function slice___actualstop__(self: Ref, len: Int): Int
 function slice___stop__(self: Ref): Ref
     ensures result == null || issubtype(typeof(result), int())
 
-function list___getitem__(self: Ref, key: Ref): Ref
+function list___getitem__(self: Ref, key: Int): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-    requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
-    requires int___unbox__(key) < 0 ==> int___unbox__(key) >= -list___len__(self)
-    requires int___unbox__(key) >= 0 ==> int___unbox__(key) < list___len__(self)
-    ensures int___unbox__(key) >= 0 ==> result == self.list_acc[int___unbox__(key)]
-    ensures int___unbox__(key) < 0 ==> result == self.list_acc[list___len__(self) + int___unbox__(key)]
-    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+    requires key < 0 ==> key >= -list___len__(self)
+    requires key >= 0 ==> key < list___len__(self)
+    ensures result == (key >= 0 ? self.list_acc[key] : self.list_acc[list___len__(self) + key])
+    //ensures key >= 0 ==> result == self.list_acc[key]
+    //ensures key < 0 ==> result == self.list_acc[list___len__(self) + key]
+    ensures [issubtype(typeof(result), list_arg(typeof(self), 0)), true]
+{
+    key >= 0 ? self.list_acc[key] : self.list_acc[list___len__(self) + key]
+}
 
 method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

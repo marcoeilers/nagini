@@ -12,6 +12,7 @@ from py2viper_translation.lib.constants import (
     INTERNAL_NAMES,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
+    PRIMITIVE_SEQ_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
@@ -494,7 +495,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         If this class represents a primitive type, returns the boxed version,
         otherwise just return the type itself.
         """
-        if self.name in PRIMITIVES:
+        if self.name in PRIMITIVES and self.name != PRIMITIVE_SEQ_TYPE + '_type':
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             return self.module.classes[boxed_name]
         return self
