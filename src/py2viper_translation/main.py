@@ -52,15 +52,22 @@ def parse_sil_file(sil_path: str, jvm):
 sil_programs = []
 
 
-def load_sil_files(jvm: JVM):
+def load_sil_files(jvm: JVM, sif: bool = False):
     sil_files = ['bool.sil', 'range.sil', 'list.sil', 'set_dict.sil', 'str.sil',
-                 'tuple.sil', 'seq.sil', 'bytes.sil', 'func_triple.sil',
-                 'lock.sil']
+                 'tuple.sil', 'seq.sil', 'bytes.sil', 'lock.sil']
+    sif_sil_files = ['func_triple.sil', 'list.sil']
     if not config.obligation_config.disable_measures:
         sil_files.append('measures.sil')
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    native_sil = [os.path.join(resources_path, f) for f in sil_files]
+    if sif:
+        sif_resources_path = os.path.join(current_path, 'sif/resources')
+        native_sil = [os.path.join(resources_path, f) for f in sil_files
+                      if f not in sif_sil_files]
+        native_sil += [os.path.join(sif_resources_path, f)
+                       for f in sif_sil_files]
+    else:
+        native_sil = [os.path.join(resources_path, f) for f in sil_files]
     sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path
                          in native_sil])
 
@@ -98,7 +105,7 @@ def translate(path: str, jvm: JVM, sif: bool = False):
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
     if not sil_programs:
-        load_sil_files(jvm)
+        load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs)
     return prog

@@ -389,9 +389,9 @@ class ProgramTranslator(CommonTranslator):
         of Silver programs, applies the necessary conversions (e.g. related to
         obligations) to them, and returns them in separate lists.
         """
-        domains = []
-        functions = []
-        predicates = []
+        domains = set()
+        functions = set()
+        predicates = set()
         methods = []
 
         used_names = set()
@@ -425,18 +425,19 @@ class ProgramTranslator(CommonTranslator):
         self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
-            domains += [domain
-                        for domain in self.viper.to_list(sil_prog.domains())
-                        if domain.name() != 'PyType']
-            function_names = [function.name() for function in functions]
-            functions += [
+            domains |= set(
+                [domain for domain in self.viper.to_list(sil_prog.domains())
+                 if domain.name() != 'PyType'])
+
+            function_names = {function.name() for function in functions}
+            functions |= set([
                 function
                 for function in self.viper.to_list(sil_prog.functions())
                 if (function.name() in used_names and
-                    function.name() not in function_names)]
-            predicates += self.viper.to_list(sil_prog.predicates())
+                    function.name() not in function_names)])
+            predicates |= set(self.viper.to_list(sil_prog.predicates()))
 
-        return domains, predicates, functions, methods
+        return list(domains), list(predicates), list(functions), methods
 
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List,
@@ -577,6 +578,9 @@ class ProgramTranslator(CommonTranslator):
         predicates += s_predicates
         functions += s_functions
         methods += s_methods
+
+        for domain in domains:
+            print(domain.name())
 
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),

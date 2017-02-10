@@ -1,13 +1,11 @@
 import ast
 import logging
-import mypy
 import os
 import py2viper_contracts.io_builtins
 import py2viper_contracts.lock
 import py2viper_translation.external.astpp
 import tokenize
 
-from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from py2viper_translation.analyzer_io import IOOperationAnalyzer
@@ -17,7 +15,6 @@ from py2viper_translation.lib.constants import (
     LITERALS,
     OBJECT_TYPE,
     TUPLE_TYPE,
-    UNION_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
     ContainerInterface,
@@ -38,7 +35,7 @@ from py2viper_translation.lib.program_nodes import (
     TypeVar,
     UnionType,
 )
-from  py2viper_translation.lib.resolver import get_target as do_get_target
+from py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
@@ -49,7 +46,7 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.lib.views import PythonModuleView
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 logger = logging.getLogger('py2viper_translation.analyzer')
@@ -249,17 +246,17 @@ class Analyzer(ast.NodeVisitor):
                 self._add_native_silver_method(pred_name, if_pred, cls,
                                                True, True)
 
-    def _add_native_silver_method(self, method_name: str, if_method: str,
-                                  cls: PythonClass, pure: bool,
-                                  predicate: bool = False) -> None:
-        method = PythonMethod(method_name, None, cls, self.module,
-                              pure, False, self.node_factory, True,
-                              if_method)
+    def _add_native_silver_method(
+        self, method_name: str, if_method: Dict[str, Any], cls: PythonClass,
+        pure: bool, predicate: bool = False) -> None:
+        method = self.node_factory.create_python_method(
+            method_name, None, cls, self.module, pure, False, self.node_factory,
+            interface=True, interface_dict=if_method)
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
-            arg = self.node_factory.create_python_var(name, None,
-                self.find_or_create_class(arg_type))
+            arg = self.node_factory.create_python_var(
+                name, None, self.find_or_create_class(arg_type))
             ctr += 1
             method.add_arg(name, arg)
         if if_method['type']:

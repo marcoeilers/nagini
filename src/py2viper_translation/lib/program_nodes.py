@@ -27,7 +27,7 @@ from py2viper_translation.lib.views import (
     CombinedDict,
     IOOperationContentDict,
 )
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class ContainerInterface(metaclass=ABCMeta):
@@ -1417,7 +1417,7 @@ class PythonField(PythonNode):
 class ProgramNodeFactory:
     """
     Factory to create Python ProgramNodes.
-    
+
     TODO: Add more interfaces for other types of containers if needed.
     """
 
@@ -1441,13 +1441,17 @@ class ProgramNodeFactory:
             type_: PythonClass) -> PythonIOExistentialVar:
         return PythonVarCreator(name, node, type_)
 
-    def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
-                             superscope: PythonScope,
-                             pure: bool, contract_only: bool,
-                             container_factory: 'ProgramNodeFactory',
-                             interface: bool = False) -> PythonMethod:
+    def create_python_method(
+            self, name: str, node: ast.AST, cls: PythonClass,
+            superscope: PythonScope,
+            pure: bool, contract_only: bool,
+            container_factory: 'ProgramNodeFactory',
+            interface: bool = False,
+            interface_dict: Dict[str, Any] = None,
+            method_type: MethodType = MethodType.normal) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
-                            container_factory, interface)
+                            container_factory, interface, interface_dict,
+                            method_type)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
