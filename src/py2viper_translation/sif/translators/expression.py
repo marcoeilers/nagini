@@ -61,17 +61,19 @@ class SIFExpressionTranslator(ExpressionTranslator):
             el_stmts, el_expr = self.translate_expr(el, ctx)
             with ctx.prime_ctx():
                 el_stmts_p, el_expr_p = self.translate_expr(el, ctx)
+            assert el_expr
             args = [res_var.ref(), res_var.var_prime.ref(), el_expr, el_expr_p,
                     ctx.current_tl_var_expr]
             arg_types = [None, None, el_type, el_type, bool_type]
             append_call = self.get_method_call(
                 list_class, 'append', args, arg_types,
-                [ctx.current_tl_car_expr], node, ctx)
+                [ctx.current_tl_var_expr], node, ctx)
             stmts += el_stmts + el_stmts_p + append_call
 
         # Cache translated expression.
         cache = ExprCache()
         cache.add_result(res_var.var_prime.ref())
+        self._translated_exprs[node] = cache
 
         return stmts, res_var.ref(node, ctx)
 

@@ -1,4 +1,5 @@
-from typing import Expr, Optional
+from py2viper_translation.lib.typedefs import Expr
+from typing import Optional
 
 
 class ExprCache:

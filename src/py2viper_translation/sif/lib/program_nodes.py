@@ -2,6 +2,7 @@ import ast
 
 from py2viper_translation.lib.constants import PRIMITIVE_BOOL_TYPE
 from py2viper_translation.lib.program_nodes import (
+    MethodType,
     PythonClass,
     PythonField,
     PythonMethod,
@@ -15,7 +16,7 @@ from py2viper_translation.sif.lib.constants import (
     TL_VAR_NAME,
 )
 from py2viper_translation.translator import Translator
-from typing import List
+from typing import Any, Dict, List
 
 
 class SIFPythonMethod(PythonMethod):
@@ -26,9 +27,11 @@ class SIFPythonMethod(PythonMethod):
                  superscope: PythonScope,
                  pure: bool, contract_only: bool,
                  node_factory: 'ProgramNodeFactory',
-                 interface: bool = False):
+                 interface: bool = False,
+                 interface_dict: Dict[str, Any] = None,
+                 method_type: MethodType = MethodType.normal):
         super().__init__(name, node, cls, superscope, pure, contract_only,
-                         node_factory, interface)
+                         node_factory, interface, interface_dict, method_type)
         bool_type = superscope.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
         self.tl_var = PythonVar(TL_VAR_NAME, None, bool_type)
         self.new_tl_var = PythonVar(NEW_TL_VAR_NAME, None, bool_type)
@@ -43,6 +46,9 @@ class SIFPythonMethod(PythonMethod):
         # then I'd need to subclass it, which I think is not reasonable just
         # for this single case. If the need for a custom analyzer increases
         # we can move this there eventually.
+        if not self.node:
+            self._preserves_tl = False
+            return
         decorators = {d.id for d in self.node.decorator_list}
         self._preserves_tl = 'NotPreservingTL' not in decorators
 
@@ -146,10 +152,13 @@ class SIFProgramNodeFactory(ProgramNodeFactory):
                             cls: PythonClass):
         return SIFPythonField(name, node, type_, cls)
 
-    def create_python_method(self, name: str, node: ast.AST, cls: PythonClass,
-                             superscope: PythonScope,
-                             pure: bool, contract_only: bool,
-                             container_factory: 'ProgramNodeFactory',
-                             interface: bool = False) -> SIFPythonMethod:
+    def create_python_method(
+            self, name: str, node: ast.AST, cls: PythonClass,
+            superscope: PythonScope,
+            pure: bool, contract_only: bool,
+            container_factory: 'ProgramNodeFactory',
+            interface: bool = False,
+            interface_dict: Dict[str, Any] = None,
+            method_type: MethodType = MethodType.normal) -> SIFPythonMethod:
         return SIFPythonMethod(name, node, cls, superscope, pure, contract_only,
                                container_factory, interface)

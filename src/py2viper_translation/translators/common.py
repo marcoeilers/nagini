@@ -295,7 +295,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if not func:
             raise InvalidProgramException(node, 'unknown.function.called')
         actual_args = []
-        for arg, param, type in zip(args, func.args.values(), arg_types):
+        for arg, param, type in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
             elif param.type.name == '__prim__int':
