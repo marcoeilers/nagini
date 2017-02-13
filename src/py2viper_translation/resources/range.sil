@@ -18,7 +18,7 @@ function __prim__int___box__(prim: Int): Ref
 function int___unbox__(box: Ref): Int
 
 
-function range___create__(start: Int, stop: Int): Ref
+function range___create__(start: Int, stop: Int, ctr: Int): Ref
   requires stop >= start
   ensures range___val__(result) == [start..stop)
   ensures range___start__(result) == start
