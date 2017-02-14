@@ -214,6 +214,7 @@ class CallTranslator(CommonTranslator):
         start_stmt, start = self.translate_expr(node.args[0], ctx,
                                                 self.viper.Int)
         end_stmt, end = self.translate_expr(node.args[1], ctx, self.viper.Int)
+        # Add unique integer to make new instance different from other ranges.
         args = [start, end, self.get_fresh_int_lit(ctx)]
         arg_types = [None, None, None]
         call = self.get_function_call(range_class, '__create__', args,
@@ -458,12 +459,9 @@ class CallTranslator(CommonTranslator):
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
-            var_stmt, var_arg_list = self._wrap_var_args(var_args,
-                                                         var_arg_types, node,
-                                                         ctx)
+            var_arg_list = self.create_tuple(var_args, var_arg_types, node, ctx)
             args.append(var_arg_list)
             arg_types.append(target.var_arg.type)
-            arg_stmts += var_stmt
 
         if target.kw_arg:
             kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node,

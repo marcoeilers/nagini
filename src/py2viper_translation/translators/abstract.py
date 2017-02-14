@@ -303,3 +303,8 @@ class AbstractTranslator(metaclass=ABCMeta):
     def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
         return self.config.method_translator.bind_type_vars(method, ctx)
 
+    def create_tuple(self, vals: List[Expr], val_types: List[PythonType],
+                     node: ast.AST, ctx: Context) -> Expr:
+        return self.config.expr_translator.create_tuple(vals, val_types, node,
+                                                        ctx)
+
