@@ -10,6 +10,7 @@ domain PyType {
     function set_arg(t: PyType, i: Int): PyType
     function list_arg(t: PyType, i: Int): PyType
     function dict_arg(t: PyType, i: Int): PyType
+    unique function NoneType(): PyType
 }
 
 method set___init__() returns (res: Ref)

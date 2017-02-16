@@ -87,7 +87,9 @@ class TypeTranslator(CommonTranslator):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        result = do_get_type(node, containers, container).try_box()
+        result = do_get_type(node, containers, container)
+        if result:
+            result = result.try_box()
         return result
 
     def type_check(self, lhs: Expr, type: PythonType,

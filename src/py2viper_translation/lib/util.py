@@ -254,9 +254,22 @@ def join_expressions(operator: Callable[[T, T], T],
     are most nested) in order to avoid Silicon issue
     `241 <https://bitbucket.org/viperproject/silicon/issues/241>`_.
     """
+    first = expressions[-1]
+
+    def new_op(first, second, third):
+        return operator(second, third)
+    return join_three_expressions(new_op, expressions, expressions, first)
+
+
+def join_three_expressions(operator: Callable[[T, T, T], T],
+                           expressions: List[T], bools: List[T], first: T) -> T:
+    """
+    Joins three expressions with ``operator`` in the same way as ``join_expressions``.
+    """
     result = expressions[-1]
-    for part in reversed(expressions[:-1]):
-        result = operator(part, result)
+    for part_expr, part_bool in zip(reversed(expressions[:-1]),
+                                    reversed(bools[:-1])):
+        result = operator(part_expr, part_bool, result)
     return result
 
 

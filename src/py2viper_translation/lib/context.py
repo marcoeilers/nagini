@@ -35,15 +35,31 @@ class Context:
         self._alias_context_stack = []
         self._current_alias_context = []
         self.bound_type_vars = {}
+        self._global_counter = 0
 
-    def get_all_vars(self) -> List[PythonVar]:
+    def get_fresh_int(self) -> int:
+        """
+        Returns a fresh integer value, to be used as a globally used counter
+        where needed. Current use case is as an argument to constructors for
+        various data types, to make the instances unique.
+        """
+        result = self._global_counter
+        self._global_counter += 1
+        return result
+
+    @property
+    def all_vars(self) -> List[PythonVar]:
+        """
+        Returns all variables accessible in the current context, i.e., global
+        variables as well as local variables and arguments of the current
+        function, if any.
+        """
         res = []
         if self.current_function:
             res += list(self.current_function.locals.items())
             res += list(self.current_function.args.items())
         if self.module:
             res += list(self.module.global_vars.items())
-
         return res
 
     @property
