@@ -14,6 +14,7 @@ from py2viper_translation.analyzer_io import IOOperationAnalyzer
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import (
     IGNORED_IMPORTS,
+    LEGAL_MAGIC_METHODS,
     LITERALS,
     OBJECT_TYPE,
     TUPLE_TYPE,
@@ -416,10 +417,22 @@ class Analyzer(ast.NodeVisitor):
             self.visit(member, node)
         self.current_class = None
 
+    def _is_illegal_magic_method_name(self, name: str) -> bool:
+        """
+        Anything that could potentially be a magic method, i.e. anything that has __this__ form,
+        is considered illegal unless it is one of the names we explicitly support.
+        """
+        if name.startswith('__') and name.endswith('__'):
+            if name not in LEGAL_MAGIC_METHODS:
+                return True
+        return False
+
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
         name = node.name
+        if self._is_illegal_magic_method_name(name):
+            raise InvalidProgramException(node, 'illegal.magic.method')
         if not isinstance(name, str):
             raise Exception(name)
         if self.is_io_operation(node):
