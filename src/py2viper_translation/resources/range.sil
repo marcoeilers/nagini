@@ -1,9 +1,3 @@
-field list_acc : Seq[Ref]
-
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-
 function range___create__(start: Int, stop: Int, ctr: Int): Ref
   requires stop >= start
   ensures range___val__(result) == [start..stop)
@@ -13,7 +7,6 @@ function range___create__(start: Int, stop: Int, ctr: Int): Ref
 
 
 function range___val__(self: Ref): Seq[Int]
-
 function range___start__(self: Ref): Int
 function range___stop__(self: Ref): Int
 

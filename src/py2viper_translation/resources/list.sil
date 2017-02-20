@@ -56,10 +56,6 @@ method list_append(self: Ref, item: Ref) returns ()
     assume false
 }
 
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 10)

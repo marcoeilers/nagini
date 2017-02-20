@@ -1,5 +1,3 @@
-field list_acc : Seq[Ref]
-
 function bytes___len__(self: Ref): Int
     requires issubtype(typeof(self), bytes())
 	ensures result >= 0
