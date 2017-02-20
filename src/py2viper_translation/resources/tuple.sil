@@ -1,11 +1,3 @@
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    function tuple(s: Seq[PyType]): PyType
-    function tuple_args(t: PyType): Seq[PyType]
-    function tuple_arg(t: PyType, i: Int): PyType
-}
-
 function tuple___create0__(): Ref
     ensures typeof(result) == tuple(Seq[PyType]())
     ensures tuple___len__(result) == 0

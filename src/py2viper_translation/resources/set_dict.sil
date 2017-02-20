@@ -1,18 +1,5 @@
 field set_acc : Set[Ref]
 
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    function set(t: PyType): PyType
-    function dict(t: PyType, v: PyType): PyType
-    function list(t: PyType): PyType
-    function Iterator(t: PyType): PyType
-    function set_arg(t: PyType, i: Int): PyType
-    function list_arg(t: PyType, i: Int): PyType
-    function dict_arg(t: PyType, i: Int): PyType
-    unique function NoneType(): PyType
-}
-
 method set___init__() returns (res: Ref)
     ensures acc(res.set_acc)
     ensures res.set_acc == Set[Ref]()

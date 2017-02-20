@@ -33,6 +33,7 @@ from py2viper_translation.verifier import (
 
 def parse_sil_file(sil_path: str, jvm):
     parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
+    assert parser
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
@@ -53,11 +54,7 @@ sil_programs = []
 
 
 def load_sil_files(jvm: JVM):
-    sil_files = ['bool.sil', 'range.sil', 'list.sil', 'set_dict.sil', 'str.sil',
-                 'tuple.sil', 'seq.sil', 'bytes.sil', 'func_triple.sil',
-                 'lock.sil']
-    if not config.obligation_config.disable_measures:
-        sil_files.append('measures.sil')
+    sil_files = ['all.sil']
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     native_sil = [os.path.join(resources_path, f) for f in sil_files]

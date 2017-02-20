@@ -1,16 +1,3 @@
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    unique function int(): PyType
-    unique function bool(): PyType
-    unique function range(): PyType
-    function Sequence(t: PyType): PyType
-    function Sequence_arg(t: PyType, i: Int): PyType
-}
-
-// Dummy for the version from bool.sil
-function int___unbox__(self: Ref): Int
-
 function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
     ensures typeof(result) == Sequence(cont_type)
     ensures Sequence___unbox__(result) == prim
