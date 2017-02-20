@@ -37,7 +37,8 @@ def parse_sil_file(sil_path: str, jvm):
     file = open(sil_path, 'r')
     text = file.read()
     file.close()
-    parsed = parser.parse(text, None)
+    path = jvm.java.nio.file.Paths.get(sil_path, [])
+    parsed = parser.parse(text, path)
     assert (isinstance(parsed, getattr(jvm.fastparse.core,
                                        'Parsed$Success')))
     parse_result = parsed.value()
