@@ -23,11 +23,6 @@ function set___bool__(self: Ref) : Bool
     requires acc(self.set_acc, wildcard)
     ensures result == (|self.set_acc| != 0)
 
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-field list_acc : Seq[Ref]
-
 method set___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
   requires acc(self.set_acc, 1 / 10)
