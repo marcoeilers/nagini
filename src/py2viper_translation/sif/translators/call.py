@@ -88,10 +88,11 @@ class SIFCallTranslator(CallTranslator):
                                 ctx: SIFContext) -> StmtsAndExpr:
         raise UnsupportedException(node, "Built-ins not supported.")
 
-    def _translate_function_call(self, target: SIFPythonMethod, args: List[Expr],
-                                 formal_args: List[Expr], arg_stmts: List[Stmt],
-                                 position: 'silver.ast.Position', node: ast.AST,
-                                 ctx: SIFContext) -> StmtsAndExpr:
+    def _translate_function_call(
+            self, target: SIFPythonMethod, args: List[Expr],
+            formal_args: List[Expr], arg_stmts: List[Stmt],
+            position: 'silver.ast.Position', node: ast.AST,
+            ctx: SIFContext) -> StmtsAndExpr:
         assert not ctx.use_prime
         info = self.no_info(ctx)
         call_results = self.translated_calls[node]

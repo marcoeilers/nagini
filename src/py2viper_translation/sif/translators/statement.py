@@ -78,6 +78,21 @@ class SIFStatementTranslator(StatementTranslator):
         with ctx.prime_ctx():
             stmts += super().translate_stmt_Assign(node, ctx)
 
+        # Update timelevel after function call or subscript.
+        update_tl = isinstance(node.value, ast.Subscript)
+        if isinstance(node.value, ast.Call):
+            target = self.get_target(node.value, ctx)
+            update_tl = target.pure
+
+        if update_tl:
+            tl_stmts, tl_expr = self.translate_expr(
+                node.value, ctx, target_type=self.viper.Bool)
+            assert not tl_stmts
+            tl_assign = self.viper.LocalVarAssign(
+                ctx.actual_function.new_tl_var.ref(), tl_expr,
+                self.to_position(node, ctx), self.no_info(ctx))
+            stmts.append(tl_assign)
+
         return stmts
 
     def translate_stmt_While(self, node: ast.While,
@@ -141,8 +156,8 @@ class SIFStatementTranslator(StatementTranslator):
         cond_stmts, cond = self.translate_expr(condition, ctx,
                                                target_type=self.viper.Bool)
         with ctx.prime_ctx():
-            cond_stmts_p, cond_p = self.translate_expr(condition, ctx,
-                                                       target_type=self.viper.Bool)
+            cond_stmts_p, cond_p = self.translate_expr(
+                condition, ctx, target_type=self.viper.Bool)
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)
