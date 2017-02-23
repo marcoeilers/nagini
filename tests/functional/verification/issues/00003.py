@@ -21,7 +21,7 @@ def break_out(c: Container) -> None:
 
 def break_out_2(c: Container) -> None:
     Requires(Acc(c.value))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 210)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(c.value) and c.value == 6)
     while True:
         Invariant(Acc(c.value))
