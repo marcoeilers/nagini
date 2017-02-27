@@ -84,8 +84,13 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             super().visit_assignment_stmt(node)
 
     def visit_name_expr(self, node: mypy.nodes.NameExpr):
-        if (node.name not in LITERALS and
-                tuple([self.prefix[0]] + [node.name]) not in self.type_aliases):
+        is_alias = False
+        for i in range(len(self.prefix)):
+            key = tuple(self.prefix[:i] + [node.name])
+            if key in self.type_aliases:
+                is_alias = True
+                break
+        if (node.name not in LITERALS and not is_alias):
             name_type = self.type_of(node)
             if not isinstance(name_type, mypy.types.CallableType):
                 self.set_type(self.prefix + [node.name], name_type,
@@ -319,6 +324,9 @@ class TypeInfo:
 
     def is_union_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.UnionType)
+
+    def is_type_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.TypeType)
 
     def is_type_var(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeVarType)

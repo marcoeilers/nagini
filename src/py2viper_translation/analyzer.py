@@ -16,6 +16,7 @@ from py2viper_translation.lib.constants import (
     IGNORED_IMPORTS,
     LEGAL_MAGIC_METHODS,
     LITERALS,
+    MYPY_SUPERCLASSES,
     OBJECT_TYPE,
     TUPLE_TYPE,
     UNION_TYPE,
@@ -347,11 +348,13 @@ class Analyzer(ast.NodeVisitor):
             return self.current_class.type_vars[name]
         if not module:
             module = self.module
-        if name in module.global_module.classes:
-            cls = module.global_module.classes[name]
-        elif name in module.classes:
-            cls = module.classes[name]
+        for visible_module in module.get_included_modules(True):
+            if name in visible_module.classes:
+                cls = visible_module.classes[name]
+                break
         else:
+            if name == 'SCIONElement':
+                print("asdasd")
             cls = self.node_factory.create_python_class(name, module,
                                                         self.node_factory)
             module.classes[name] = cls
@@ -407,10 +410,14 @@ class Analyzer(ast.NodeVisitor):
                     cls.type_vars[arg_name] = var
                     current_index += 1
             else:
-                actual_bases.append(base)
+                if not (isinstance(base, ast.Name) and
+                        base.id in MYPY_SUPERCLASSES):
+                    actual_bases.append(base)
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 1:
+            if isinstance(actual_bases[0], ast.Name) and actual_bases[0].id == 'SCIONElement':
+                print("asdasdasd")
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
@@ -524,7 +531,9 @@ class Analyzer(ast.NodeVisitor):
         is_type_var = False
         # Check if this is a type alias
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            lhs_name = (self.module.type_prefix, node.targets[0].id)
+            actual_prefix = self.module.type_prefix.split('.') if self.module.type_prefix else []
+            actual_prefix.append(node.targets[0].id)
+            lhs_name = tuple(actual_prefix)
             # If it's a type alias marked by mypy
             if lhs_name in self.types.type_aliases:
                 type_name = self.types.type_aliases[lhs_name]
@@ -753,8 +762,8 @@ class Analyzer(ast.NodeVisitor):
                     return
                 cls = self.typeof(node)
                 self.define_new(self.current_class, node.id, node)
-                var = self.node_factory.create_python_var(node.id,
-                                                          node, cls)
+                var = self.node_factory.create_python_global_var(node.id,
+                                                                 node, cls)
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):
@@ -825,10 +834,10 @@ class Analyzer(ast.NodeVisitor):
         # is also accessed in a simpler expression elsewhere, we just do
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
-                not isinstance(node.value, ast.Subscript) and
-                not isinstance(self.get_target(node.value, self.module),
-                               PythonModule)):
-            test = self.get_target(node.value, self.module)
+                not isinstance(node.value, ast.Subscript)):
+            target = self.get_target(node.value, self.module)
+            if isinstance(target, (PythonModule, PythonClass)):
+                return
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
@@ -855,6 +864,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_union_type(mypy_type)
         elif self.types.is_type_var(mypy_type):
             return self._convert_type_var(mypy_type)
+        elif self.types.is_type_type(mypy_type):
+            return self._convert_type_type(mypy_type)
         else:
             raise UnsupportedException(mypy_type)
         return result
@@ -896,6 +907,12 @@ class Analyzer(ast.NodeVisitor):
             return self.current_class.type_vars[name]
         else:
             assert False, 'Unknown type variable'
+
+    def _convert_type_type(self, mypy_type) -> PythonType:
+        name = 'type'
+        type_class = self.module.global_module.classes['type']
+        args = [self.convert_type(mypy_type.item)]
+        return GenericType(type_class, args)
 
     def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
         """
@@ -950,6 +967,8 @@ class Analyzer(ast.NodeVisitor):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
+            if len(context) == 1 and context[0] == "Element":
+                print("123")
             type, _ = self.module.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):

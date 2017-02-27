@@ -81,6 +81,8 @@ class TypeTranslator(CommonTranslator):
         """
         container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
+        if ctx.current_class:
+            containers.append(ctx.current_class)
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.append(container)
             containers.extend(container.module.get_included_modules())

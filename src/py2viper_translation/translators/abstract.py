@@ -106,6 +106,12 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         return self.config.call_translator.translate_Call(node, ctx)
 
+    def translate_constructor_call(self, target_class: PythonClass,
+                                   node: ast.Call, args: List, arg_stmts: List,
+                                   ctx: Context) -> StmtsAndExpr:
+        return self.config.call_translator.translate_constructor_call(
+            target_class, node, args, arg_stmts, ctx)
+
     def translate_predicate(self, pred: PythonMethod,
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)

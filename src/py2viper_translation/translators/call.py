@@ -133,7 +133,7 @@ class CallTranslator(CommonTranslator):
         check = self.type_check(field_acc, f.type, position, ctx)
         return self.viper.Inhale(check, position, info)
 
-    def _translate_constructor_call(self, target_class: PythonClass,
+    def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
         """
@@ -294,6 +294,8 @@ class CallTranslator(CommonTranslator):
         Returns the target of the given call; for constructor calls, the class
         whose constructor is called, for everything else the method.
         """
+        if get_func_name(node) == 'Event':
+            print("asd")
         target = self.get_target(node.func, ctx)
         if target:
             return target
@@ -310,10 +312,13 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func.value, ast.Call):
                 if get_func_name(node.func.value) == 'super':
                     # Super call
-                    target_class = self.get_type(node.func.value, ctx)
+                    # Why not just get superclass of current class?
+                    target_class = self.get_target(node.func.value, ctx)
                     return target_class.get_func_or_method(node.func.attr)
             # Method called on an object
             receiver_class = self.get_type(node.func.value, ctx)
+            if receiver_class is None:
+                print("123")
             target = receiver_class.get_predicate(node.func.attr)
             if not target:
                 target = receiver_class.get_func_or_method(node.func.attr)
@@ -662,6 +667,8 @@ class CallTranslator(CommonTranslator):
         arg_stmts, args, arg_types = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
+        if name == '__init__':
+            print("123123")
         target = self._get_call_target(node, ctx)
         if not target:
             # Must be a function that exists (otherwise mypy would complain)
@@ -671,7 +678,7 @@ class CallTranslator(CommonTranslator):
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
         if isinstance(target, PythonClass):
-            return self._translate_constructor_call(target, node, args,
+            return self.translate_constructor_call(target, node, args,
                                                     arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
@@ -762,18 +769,20 @@ class CallTranslator(CommonTranslator):
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
         """
+        is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)
-        if func_name in CONTRACT_WRAPPER_FUNCS:
-            raise InvalidProgramException(node, 'invalid.contract.position')
-        elif func_name in CONTRACT_FUNCS:
-            return self.translate_contractfunc_call(node, ctx)
-        elif func_name in IO_CONTRACT_FUNCS:
-            return self.translate_io_contractfunc_call(node, ctx)
-        elif func_name in OBLIGATION_CONTRACT_FUNCS:
-            return self.translate_obligation_contractfunc_call(node, ctx)
-        elif func_name in BUILTINS:
-            return self._translate_builtin_func(node, ctx)
-        elif self._is_cls_call(node, ctx):
+        if is_name:
+            if func_name in CONTRACT_WRAPPER_FUNCS:
+                raise InvalidProgramException(node, 'invalid.contract.position')
+            elif func_name in CONTRACT_FUNCS:
+                return self.translate_contractfunc_call(node, ctx)
+            elif func_name in IO_CONTRACT_FUNCS:
+                return self.translate_io_contractfunc_call(node, ctx)
+            elif func_name in OBLIGATION_CONTRACT_FUNCS:
+                return self.translate_obligation_contractfunc_call(node, ctx)
+            elif func_name in BUILTINS:
+                return self._translate_builtin_func(node, ctx)
+        if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)

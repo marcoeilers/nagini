@@ -928,6 +928,8 @@ class TypeDomainFactory:
             if not isinstance(type, UnionType):
                 type = type.cls
         elif isinstance(type, PythonClass) and type.type_vars:
+            if not alias:
+                print("123123")
             assert alias
             for index, arg in enumerate(type.type_vars):
                 args.append(self.get_type_arg(alias, type, index, ctx))
