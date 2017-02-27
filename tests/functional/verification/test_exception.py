@@ -256,6 +256,7 @@ def nested_try_finally(out: Container) -> None:
             try:
                 raise MyException()
             finally:
+                #:: UnexpectedOutput(silicon)(assignment.failed:insufficient.permission, 269)
                 out.value = 30
         except MyException as e:
             out.value = out.value + 3
@@ -283,6 +284,7 @@ def nested_try_finally_2(out: Container) -> None:
             try:
                 raise MyException()
             finally:
+                #:: UnexpectedOutput(silicon)(assignment.failed:insufficient.permission, 269)
                 out.value = 30
         except MyException as e:
             out.value = out.value + 3
@@ -295,7 +297,7 @@ def nested_try_finally_2(out: Container) -> None:
         if out.value == 33:
             raise MyOtherException()
         else:
-            #:: ExpectedOutput(assert.failed:assertion.false)
+            #:: ExpectedOutput(assert.failed:assertion.false)|MissingOutput(silicon)(assert.failed:assertion.false, 34)
             Assert(False)
         Assert(False)
     except MyOtherException:
@@ -312,6 +314,7 @@ def return_finally(out: Container) -> int:
         try:
             return 15
         finally:
+            #:: UnexpectedOutput(silicon)(assignment.failed:insufficient.permission, 269)
             out.value = out.value * 3
     except MyException:
         out.value = out.value + 1000
@@ -320,7 +323,7 @@ def return_finally(out: Container) -> int:
 
 def return_finally_2(out: Container) -> int:
     Requires(Acc(out.value))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 34)
     Ensures(Acc(out.value) and out.value == 1)
     Ensures(Result() == 15)
     out.value = 1
@@ -328,6 +331,7 @@ def return_finally_2(out: Container) -> int:
         try:
             return 15
         finally:
+            #:: UnexpectedOutput(silicon)(assignment.failed:insufficient.permission, 269)
             out.value = out.value * 3
     except MyException:
         out.value = out.value + 1000
