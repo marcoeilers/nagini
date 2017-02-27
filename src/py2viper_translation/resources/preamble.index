@@ -403,6 +403,11 @@
             "type": "object",
             "requires": ["__len__"]
         },
+        "__contains__": {
+            "args": ["tuple", "object"],
+            "type": "__prim__bool",
+            "requires": []
+        },
         "__len__": {
             "args": ["tuple"],
             "type": "__prim__int"

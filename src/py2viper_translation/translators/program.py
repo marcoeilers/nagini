@@ -103,6 +103,8 @@ class ProgramTranslator(CommonTranslator):
         args = []
         locals_before = set(method.locals.values())
         if method.type:
+            if not method.result:
+                print("123123")
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,
@@ -145,7 +147,7 @@ class ProgramTranslator(CommonTranslator):
         result = self.create_method_node(
             ctx, mname, params, results, pres, posts, locals, stmts,
             self.no_position(ctx), self.no_info(ctx),
-            method=method)
+            method=method, overriding_check=True)
 
         ctx.current_function = old_function
 
@@ -475,10 +477,11 @@ class ProgramTranslator(CommonTranslator):
                     continue
                 containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
+                ctx.current_class = cls
                 for name, field in cls.static_fields.items():
                     functions.append(self.create_global_var_function(field,
                                                                      ctx))
-
+            ctx.current_class = None
             # Translate default args
             for container in containers:
                 for function in container.functions.values():
@@ -530,7 +533,7 @@ class ProgramTranslator(CommonTranslator):
                     methods.append(self.translate_method(method, ctx))
                     if ((method_name != '__init__' or
                              (cls.superclass and
-                              cls.superclass.has_classmethod)) and
+                              cls.superclass.python_class.has_classmethod)) and
                             method.overrides):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.static_methods:
@@ -542,16 +545,18 @@ class ProgramTranslator(CommonTranslator):
                     method = cls.get_method(method_name)
                     if (method.cls and method.cls != cls and
                             method_name != '__init__' and
-                            method.method_type == MethodType.normal):
+                            method.method_type == MethodType.normal and
+                            not method.interface):
                         # Inherited
                         methods.append(self.create_inherit_check(method, cls,
                                                                  ctx))
                 for field_name in cls.static_fields:
                     field = cls.static_fields[field_name]
-                    if cls.superclass:
-                        if cls.superclass.get_static_field(field_name):
-                            raise InvalidProgramException(field.node,
-                                                          'invalid.override')
+                    # TODO: prevent access on instances
+                    # if cls.superclass:
+                    #     if cls.superclass.get_static_field(field_name):
+                    #         raise InvalidProgramException(field.node,
+                    #                                       'invalid.override')
                 for pred_name in cls.predicates:
                     pred = cls.predicates[pred_name]
                     cpred = pred

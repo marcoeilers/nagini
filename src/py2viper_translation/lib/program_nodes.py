@@ -145,6 +145,8 @@ class PythonModule(PythonScope, ContainerInterface):
 
     def get_func_or_method(self, name: str) -> 'PythonMethod':
         for module in [self] + self.from_imports + [self.global_module]:
+            if not isinstance(module, PythonModule):
+                module = module.module
             if name in module.functions:
                 return module.functions[name]
             elif name in module.methods:
@@ -390,7 +392,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         fields = []
         cls = self
         while cls is not None:
-            for field in cls.fields.values():
+            for field in cls.python_class.fields.values():
                 if field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
@@ -404,7 +406,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         fields = []
         cls = self
         while cls is not None:
-            for field in cls.fields.values():
+            for field in cls.python_class.fields.values():
                 if field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
@@ -485,10 +487,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         elements that can be accessed without a receiver.
         """
         dicts = [self.functions,  self.methods, self.static_methods,
-                 self.predicates]
+                 self.predicates, self.static_fields]
         if not only_top:
             dicts.append(self.fields)
-            dicts.append(self.static_fields)
+            # dicts.append(self.static_fields)
         return CombinedDict([], dicts)
 
     def try_box(self) -> 'PythonClass':
@@ -1224,6 +1226,8 @@ class PythonVar(PythonVarBase, abc.ABC):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
+        if name == 'LINE_LEN':
+            print("234234")
         self.decl = None
         self._ref = None
         self._translator = None
@@ -1236,6 +1240,8 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         super().process(sil_name, translator)
         self._translator = translator
+        if self.type is None:
+            print("123123")
         module = self.type.module
         self.decl = translator.translate_pythonvar_decl(self, module)
         self._ref = translator.translate_pythonvar_ref(self, module, None, None)

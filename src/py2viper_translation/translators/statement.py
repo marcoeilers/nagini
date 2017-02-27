@@ -522,7 +522,12 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         var = self.get_error_var(node, ctx)
-        stmt, exception = self.translate_expr(node.exc, ctx)
+        raised = self.get_target(node.exc, ctx)
+        if isinstance(raised, PythonType):
+            stmt, exception = self.translate_constructor_call(raised, node, [],
+                                                              [], ctx)
+        else:
+            stmt, exception = self.translate_expr(node.exc, ctx)
         position = self.to_position(node, ctx)
         if node.cause:
             cause_stmt, cause = self.translate_expr(node.cause, ctx)
@@ -534,6 +539,8 @@ class StatementTranslator(CommonTranslator):
         return stmt + [assignment] + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
+        if get_func_name(node) == 'set':
+            print("asdasd")
         stmt, expr = self.translate_Call(node, ctx)
         if expr:
             type = self.get_type(node, ctx)
@@ -548,8 +555,8 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
             return self.translate_stmt(node.value, ctx)
-        elif isinstance(node.value, ast.Str):
-            # Docstring, just skip.
+        elif isinstance(node.value, (ast.Str, ast.Ellipsis)):
+            # Docstring or ellipsis, just skip.
             return []
         else:
             raise UnsupportedException(node)

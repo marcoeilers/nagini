@@ -165,6 +165,10 @@ PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE}
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 
+MYPY_SUPERCLASSES = {
+    'Sized',
+}
+
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',
                    'builtins',
@@ -173,7 +177,6 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'py2viper_contracts.io',
                    'py2viper_contracts.obligations',
                    'sys',
-                   'threading',
                    'types',
                    'typing',
                    }
