@@ -119,6 +119,8 @@ LEGAL_MAGIC_METHODS = {
     '__init__',
     '__enter__',
     '__exit__',
+    '__str__',
+    '__len__',
 }
 
 RESULT_NAME = '_res'

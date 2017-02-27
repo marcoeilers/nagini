@@ -715,7 +715,7 @@ class ExpressionTranslator(CommonTranslator):
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)
-            expression_parts.append(expression_part)
+            expression_parts.append(self.to_ref(expression_part, ctx))
             bool_parts.append(bool_expression)
             types_parts.append(typ)
 

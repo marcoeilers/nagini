@@ -8,6 +8,8 @@ import sys
 import time
 import traceback
 
+import py2viper_translation.lib.mypy_parser_patch
+
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
@@ -110,11 +112,12 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     for them.
     """
     main_module = analyzer.module
-    module_index = 0
-    while module_index < len(analyzer.module_paths):
-        module = analyzer.module_paths[module_index]
-        analyzer.collect_imports(module)
-        module_index += 1
+    analyzer.module_index = 0
+    analyzer.collect_imports(path)
+    # while module_index < len(analyzer.module_paths):
+    #     module = analyzer.module_paths[module_index]
+    #     analyzer.collect_imports(module)
+    #     module_index += 1
 
     for module in analyzer.module_paths:
         if module.startswith('mod$'):

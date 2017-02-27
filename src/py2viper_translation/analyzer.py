@@ -161,6 +161,7 @@ class Analyzer(ast.NodeVisitor):
                     names = [(name.name, name.asname if name.asname else None)
                              for name in stmt.names] # TODO rename?
                 self.add_module(path, abs_path, None, names)
+        self.module_index = self.module_paths.index(abs_path) + 1
 
     def add_module(self, abs_path: str, into: str, as_name: Optional[str],
                    names: List[Tuple[str, str]] = None) -> None:
@@ -186,12 +187,13 @@ class Analyzer(ast.NodeVisitor):
             return
         if abs_path not in self.module_paths:
             # Module has not been imported yet
-            self.module_paths.append(abs_path)
+            self.module_paths.insert(self.module_index, abs_path)
             type_prefix = self.types.get_type_prefix(abs_path)
             new_module = PythonModule(self.module.types, self.node_factory,
                                       type_prefix, self.module.global_module,
                                       self.module.sil_names)
             self.modules[abs_path] = new_module
+            self.collect_imports(abs_path)
         else:
             new_module = self.modules[abs_path]
         into_mod = self.modules[into]
@@ -747,6 +749,8 @@ class Analyzer(ast.NodeVisitor):
                 self.track_access(node, var)
             else:
                 # Node is a static field.
+                if isinstance(node.ctx, ast.Load):
+                    return
                 cls = self.typeof(node)
                 self.define_new(self.current_class, node.id, node)
                 var = self.node_factory.create_python_var(node.id,
@@ -923,6 +927,8 @@ class Analyzer(ast.NodeVisitor):
         Returns the type of the given AST node.
         """
         if isinstance(node, ast.Name):
+            if node.id == 'AddrType':
+                print("12223")
             if node.id in LITERALS:
                 raise UnsupportedException(node)
             if node.id in self.module.classes:
@@ -940,7 +946,10 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
-            context = [receiver.name]
+            if isinstance(receiver, OptionalType):
+                context = [receiver.optional_type.name]
+            else:
+                context = [receiver.name]
             type, _ = self.module.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):

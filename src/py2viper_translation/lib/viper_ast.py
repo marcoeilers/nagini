@@ -183,6 +183,8 @@ class ViperAST:
 
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
+        if func_name == 'union_type_1':
+            print("12")
         args_passed = args
 
         def type_passed_apply(slf):

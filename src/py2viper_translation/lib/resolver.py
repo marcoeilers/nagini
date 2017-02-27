@@ -191,14 +191,13 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rec_type = rec_type.superclass
                 result = rec_type.type_args[result.index]
             return result
-        if target:
-            if isinstance(target, PythonIOOperation):
-                return module.global_module.classes[BOOL_TYPE]
-            # If this is a Sequence(...) call, target will be the Sequence class
-            # but won't have generic type information. So we don't return here
-            # and let the code below take care of the call.
-            if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
-                return target
+        if isinstance(target, PythonIOOperation):
+            return module.global_module.classes[BOOL_TYPE]
+        # If this is a Sequence(...) call, target will be the Sequence class
+        # but won't have generic type information. So we don't return here
+        # and let the code below take care of the call.
+        if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
+            return target
     if isinstance(node, (ast.Attribute, ast.Name)):
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
@@ -218,10 +217,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Compare):
         return module.global_module.classes[BOOL_TYPE]
     elif isinstance(node, ast.BoolOp):
-        # And and Or always return one of their operands, so we use the common supertype of all
-        # arguments.
-        # TODO: We could also use a union type, but since support for e.g. calling methods on
-        # those isn't amazing yet, we don't do that yet.
+        # And and Or always return one of their operands, so we use the common
+        # supertype of all arguments.
+        # TODO: We could also use a union type, but since support for e.g.
+        # calling methods on those isn't amazing yet, we don't do that yet.
         operand_types = [get_type(operand, containers, container)
                          for operand in node.values]
         return common_supertype(operand_types)
