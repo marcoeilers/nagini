@@ -273,6 +273,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
+        if name == 'SCMPExt':
+            print("123")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
@@ -625,18 +627,25 @@ class UnionType(GenericType):
     """
     def __init__(self, args: List[PythonType]) -> None:
         self.name = 'Union'
-        cls = args[0]
-        if isinstance(cls, GenericType):
-            cls = cls.cls
-        for type_option in args[1:]:
-            if type_option:
-                if isinstance(type_option, GenericType):
-                    type_option = type_option.cls
-                cls = cls.get_common_superclass(type_option)
-        self.cls = cls
-        self.module = cls.module
+        self._cls = None
+        self.module = args[0].module
         self.type_args = args
         self.exact_length = True
+
+    @property
+    def cls(self):
+        if self._cls is None:
+            args = self.type_args
+            cls = args[0]
+            if isinstance(cls, GenericType):
+                cls = cls.cls
+            for type_option in args[1:]:
+                if type_option:
+                    if isinstance(type_option, GenericType):
+                        type_option = type_option.cls
+                    cls = cls.get_common_superclass(type_option)
+            self._cls = cls
+        return self._cls
 
 
 class OptionalType(UnionType):
@@ -650,6 +659,10 @@ class OptionalType(UnionType):
         super().__init__([typ])
         self.type_args = [None, typ]
         self.optional_type = typ
+
+    @property
+    def cls(self):
+        return self.optional_type
 
 
 class MethodType(Enum):

@@ -1,7 +1,6 @@
 import logging
 import mypy.build
 import os
-import py2viper_translation.lib.mypy_parser_patch
 import sys
 
 from mypy.build import BuildSource
@@ -132,11 +131,6 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 error = ' error: Encountered Any type. Type annotation missing?'
                 msg = ':'.join([self.path, str(line), error])
                 raise TypeException([msg])
-        if (isinstance(type, mypy.types.Instance) and
-                    type.type.fullname() == 'builtins.float'):
-            error = ' error: Encountered float type.'
-            msg = ':'.join([self.path, str(line), error])
-            raise TypeException([msg])
         key = tuple(fqn)
         if key in self.all_types:
             if not self.type_equals(self.all_types[key], type):
@@ -211,7 +205,6 @@ class TypeInfo:
         self.type_aliases = {}
         self.type_vars = {}
 
-
     def _create_options(self, strict_optional: bool):
         """
         Creates an Options object for mypy and activates strict optional typing
@@ -222,6 +215,7 @@ class TypeInfo:
         result = mypy.options.Options()
         result.strict_optional = strict_optional
         result.show_none_errors = strict_optional
+        result.show_traceback = True
         # This is an experimental feature atm and you actually have to
         # enable it like this
         mypy.experiments.STRICT_OPTIONAL = strict_optional
