@@ -296,22 +296,25 @@ class ExpressionTranslator(CommonTranslator):
         if goto_finally:
             uncaught_option = goto_finally
         else:
+            end_label = ctx.get_label_name(END_LABEL)
+            goto_end = self.viper.Goto(end_label, position,
+                                       self.no_info(ctx))
             if ctx.actual_function.declared_exceptions:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
-                end_label = ctx.get_label_name(END_LABEL)
-                gotoend = self.viper.Goto(end_label, position,
-                                          self.no_info(ctx))
-                uncaught_option = self.translate_block([assignerror, gotoend],
+                uncaught_option = self.translate_block([assignerror, goto_end],
                                                        position,
                                                        self.no_info(ctx))
             else:
                 error_string = '"method raises no exceptions"'
                 error_pos = self.to_position(call, ctx, error_string)
-                uncaught_option = self.viper.Exhale(
+                exhale_false = self.viper.Exhale(
                     self.viper.FalseLit(error_pos, self.no_info(ctx)),
                     error_pos,
                     self.no_info(ctx))
+                uncaught_option = self.translate_block([exhale_false, goto_end],
+                                                       position,
+                                                       self.no_info(ctx))
 
         for block in relevant_try_blocks:
             for handler in block.handlers:
