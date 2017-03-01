@@ -24,7 +24,7 @@ def break_out_exception(c: Container, b: bool) -> None:
 
 def break_out_exception_2(c: Container, b: bool) -> None:
     Requires(Acc(c.value))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 210)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(c.value) and c.value == 9)
     Exsures(Exception, Acc(c.value) and c.value == 7)
     while True:
@@ -40,7 +40,7 @@ def break_out_exception_2(c: Container, b: bool) -> None:
 def break_out_exception_3(c: Container, b: bool) -> None:
     Requires(Acc(c.value))
     Ensures(Acc(c.value) and c.value == 8)
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 210)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Exsures(Exception, Acc(c.value) and c.value == 9)
     while True:
         Invariant(Acc(c.value))
@@ -63,7 +63,7 @@ def break_out(c: Container, b: bool) -> Optional[int]:
 
 def break_out_2(c: Container, b: bool) -> Optional[int]:
     Requires(Acc(c.value))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(silicon)(postcondition.violated:assertion.false, 210)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Acc(c.value) and c.value == 9)
     while True:
         Invariant(Acc(c.value))
