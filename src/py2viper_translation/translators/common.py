@@ -219,8 +219,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         position = self.no_position(ctx)
         info = self.no_info(ctx)
-        if arg_type is None:
-            print("123")
         if arg_type.name == UNION_TYPE:
             first_arg = self.normalize_type(arg_type.type_args[0], ctx)
             result = self.type_factory.translate_type_literal(first_arg,

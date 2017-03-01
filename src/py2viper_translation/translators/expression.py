@@ -126,8 +126,6 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
-        if not ctx.current_function:
-            print("123")
         res_var = ctx.current_function.create_variable('dict',
             ctx.module.global_module.classes[DICT_TYPE], self.translator)
         dict_class = ctx.module.global_module.classes[DICT_TYPE]
@@ -237,8 +235,6 @@ class ExpressionTranslator(CommonTranslator):
         stmts = []
         vals = []
         val_types = []
-        if len(node.elts) == 6:
-            print("123")
         for el in node.elts:
             el_stmt, el_val = self.translate_expr(el, ctx)
             stmts += el_stmt
@@ -411,8 +407,6 @@ class ExpressionTranslator(CommonTranslator):
         return self.translate_expr(node.value, ctx)
 
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
-        if node.id == 'LINE_LEN':
-            print("123")
         target = self.get_target(node, ctx)
         if isinstance(target, PythonGlobalVar):
             var = target

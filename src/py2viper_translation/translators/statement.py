@@ -539,8 +539,6 @@ class StatementTranslator(CommonTranslator):
         return stmt + [assignment] + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
-        if get_func_name(node) == 'set':
-            print("asdasd")
         stmt, expr = self.translate_Call(node, ctx)
         if expr:
             type = self.get_type(node, ctx)
