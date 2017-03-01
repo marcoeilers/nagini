@@ -103,8 +103,6 @@ class ProgramTranslator(CommonTranslator):
         args = []
         locals_before = set(method.locals.values())
         if method.type:
-            if not method.result:
-                print("123123")
             results.append(method.result.decl)
 
         error_var = PythonVar(ERROR_NAME, None,

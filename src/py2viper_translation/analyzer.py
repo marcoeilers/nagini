@@ -353,8 +353,6 @@ class Analyzer(ast.NodeVisitor):
                 cls = visible_module.classes[name]
                 break
         else:
-            if name == 'SCIONElement':
-                print("asdasd")
             cls = self.node_factory.create_python_class(name, module,
                                                         self.node_factory)
             module.classes[name] = cls
@@ -416,8 +414,6 @@ class Analyzer(ast.NodeVisitor):
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 1:
-            if isinstance(actual_bases[0], ast.Name) and actual_bases[0].id == 'SCIONElement':
-                print("asdasdasd")
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
@@ -428,8 +424,9 @@ class Analyzer(ast.NodeVisitor):
 
     def _is_illegal_magic_method_name(self, name: str) -> bool:
         """
-        Anything that could potentially be a magic method, i.e. anything that has __this__ form,
-        is considered illegal unless it is one of the names we explicitly support.
+        Anything that could potentially be a magic method, i.e. anything that
+        has __this__ form, is considered illegal unless it is one of the names
+        we explicitly support.
         """
         if name.startswith('__') and name.endswith('__'):
             if name not in LEGAL_MAGIC_METHODS:
@@ -944,8 +941,6 @@ class Analyzer(ast.NodeVisitor):
         Returns the type of the given AST node.
         """
         if isinstance(node, ast.Name):
-            if node.id == 'AddrType':
-                print("12223")
             if node.id in LITERALS:
                 raise UnsupportedException(node)
             if node.id in self.module.classes:
@@ -967,8 +962,6 @@ class Analyzer(ast.NodeVisitor):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
-            if len(context) == 1 and context[0] == "Element":
-                print("123")
             type, _ = self.module.get_type(context, node.attr)
             return self.convert_type(type)
         elif isinstance(node, ast.arg):

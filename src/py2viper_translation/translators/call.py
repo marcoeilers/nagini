@@ -294,8 +294,6 @@ class CallTranslator(CommonTranslator):
         Returns the target of the given call; for constructor calls, the class
         whose constructor is called, for everything else the method.
         """
-        if get_func_name(node) == 'Event':
-            print("asd")
         target = self.get_target(node.func, ctx)
         if target:
             return target
@@ -317,8 +315,6 @@ class CallTranslator(CommonTranslator):
                     return target_class.get_func_or_method(node.func.attr)
             # Method called on an object
             receiver_class = self.get_type(node.func.value, ctx)
-            if receiver_class is None:
-                print("123")
             target = receiver_class.get_predicate(node.func.attr)
             if not target:
                 target = receiver_class.get_func_or_method(node.func.attr)
@@ -667,8 +663,6 @@ class CallTranslator(CommonTranslator):
         arg_stmts, args, arg_types = self._translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
-        if name == '__init__':
-            print("123123")
         target = self._get_call_target(node, ctx)
         if not target:
             # Must be a function that exists (otherwise mypy would complain)

@@ -275,8 +275,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         :param interface: True iff the class implementation is provided in
         native Silver.
         """
-        if name == 'SCMPExt':
-            print("123")
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
         self.node_factory = node_factory
@@ -1226,8 +1224,6 @@ class PythonVar(PythonVarBase, abc.ABC):
 
     def __init__(self, name: str, node: ast.AST, type: PythonClass):
         super().__init__(name, node, type)
-        if name == 'LINE_LEN':
-            print("234234")
         self.decl = None
         self._ref = None
         self._translator = None
@@ -1240,8 +1236,6 @@ class PythonVar(PythonVarBase, abc.ABC):
         """
         super().process(sil_name, translator)
         self._translator = translator
-        if self.type is None:
-            print("123123")
         module = self.type.module
         self.decl = translator.translate_pythonvar_decl(self, module)
         self._ref = translator.translate_pythonvar_ref(self, module, None, None)
