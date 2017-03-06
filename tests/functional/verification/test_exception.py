@@ -276,7 +276,7 @@ def nested_try_finally(out: Container) -> None:
 
 def nested_try_finally_2(out: Container) -> None:
     Requires(Acc(out.value))
-    Ensures(Acc(out.value) and out.value == 1 )
+    Ensures(Acc(out.value) and out.value == 1)
     try:
 
         try:

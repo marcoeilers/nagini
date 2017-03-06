@@ -496,8 +496,8 @@ class AnnotationManager:
                     break
             else:
                 unexpected_errors.append(error)
-        assert not annotations
         assert not unexpected_errors
+        assert not annotations
 
     def has_unexpected_missing(self) -> bool:
         """Check if there are unexpected or missing output annotations."""

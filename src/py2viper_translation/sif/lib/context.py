@@ -46,7 +46,7 @@ class SIFContext(Context):
             # aliases.
             self._old_vars = self.var_aliases.copy()
         if not aliases:
-            aliases = {k:v.var_prime for (k, v) in self.get_all_vars() if
+            aliases = {k:v.var_prime for (k, v) in self.all_vars if
                        isinstance(v, SIFPythonVar)}
 
         self.var_aliases.update(aliases)

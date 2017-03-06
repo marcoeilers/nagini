@@ -1,21 +1,4 @@
 field list_acc : Seq[Ref]
-field set_acc : Set[Ref]
-field dict_acc : Set[Ref]
-
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    function list(t: PyType): PyType
-    function list_arg(t: PyType, i: Int): PyType
-    function set_arg(t: PyType, i: Int): PyType
-    function dict_arg(t: PyType, i: Int): PyType
-    function Iterator(t: PyType): PyType
-    function Iterator_arg(t: PyType, i: Int): PyType
-    function set(t: PyType): PyType
-    function dict(t: PyType, v: PyType): PyType
-    unique function int(): PyType
-    unique function range(): PyType
-}
 
 method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
@@ -41,9 +24,6 @@ function list___len__(self: Ref) : Int
 {
  |self.list_acc|
 }
-
-// Dummy for the version from bool.sil
-function int___unbox__(self: Ref): Int
 
 function list___getitem__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -76,10 +56,6 @@ method list_append(self: Ref, item: Ref) returns ()
     assume false
 }
 
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 10)
@@ -92,35 +68,6 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
   ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
   ensures issubtype(typeof(_res.__previous), list(list_arg(typeof(self), 0)))
-{
-  inhale false
-}
-
-method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
-  requires acc(self.list_acc, 1 / 40)
-  requires acc(self.__iter_index, write)
-  requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
-  ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
-  ensures acc(self.__iter_index, write)
-  ensures old(self.__iter_index == |self.list_acc|) <==> _err != null
-  ensures acc(self.__previous, 1 / 40) && (self.__previous == old(self.__previous)) && acc(self.__previous.list_acc, write)
-  ensures _err == null ==> (self.__iter_index == old(self.__iter_index) + 1)
-  ensures _err == null ==> self.__previous.list_acc == self.list_acc[..self.__iter_index - 1]
-  ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
-  ensures _err != null ==> self.__previous.list_acc == self.list_acc
-  ensures _err != null ==> self.__iter_index == |self.list_acc|
-  ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
-{
-  inhale false
-}
-
-method Iterator___del__(self: Ref)
-  requires acc(self.list_acc, 1 / 20)
-  requires acc(self.__container, 1 / 20)
-  ensures acc(self.__container, 1 / 20)
-  ensures (issubtype(typeof(self.__container), list(list_arg(typeof(self.__container), 0)))) ==> acc(self.__container.list_acc, 1 / 20)
-  ensures (issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container), 0), dict_arg(typeof(self.__container), 1)))) ==> acc(self.__container.dict_acc, 1 / 20)
-  ensures (issubtype(typeof(self.__container), set(set_arg(typeof(self.__container), 0)))) ==> acc(self.__container.set_acc, 1 / 20)
 {
   inhale false
 }

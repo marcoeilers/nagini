@@ -1,9 +1,3 @@
-field list_acc : Seq[Ref]
-
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-
 function object___bool__(self: Ref) : Bool
     ensures result == (self != null)
 
@@ -15,13 +9,6 @@ function bool___bool__(self: Bool) : Bool
 
 function int___bool__(self: Int) : Bool
     ensures result == (self != 0)
-
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    unique function int(): PyType
-    unique function bool(): PyType
-}
 
 function __prim__int___box__(prim: Int): Ref
     ensures typeof(result) == int()

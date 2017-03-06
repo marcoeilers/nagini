@@ -12,6 +12,7 @@ from py2viper_translation.analyzer_io import IOOperationAnalyzer
 from py2viper_translation.external.ast_util import mark_text_ranges
 from py2viper_translation.lib.constants import (
     IGNORED_IMPORTS,
+    LEGAL_MAGIC_METHODS,
     LITERALS,
     OBJECT_TYPE,
     TUPLE_TYPE,
@@ -436,6 +437,8 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
         name = node.name
+        if self._is_illegal_magic_method_name(name):
+            raise InvalidProgramException(node, 'illegal.magic.method')
         if not isinstance(name, str):
             raise Exception(name)
         if self.is_io_operation(node):
