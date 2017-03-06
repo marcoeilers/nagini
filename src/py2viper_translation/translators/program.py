@@ -579,9 +579,6 @@ class ProgramTranslator(CommonTranslator):
         functions += s_functions
         methods += s_methods
 
-        for domain in domains:
-            print(domain.name())
-
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
