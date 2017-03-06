@@ -370,32 +370,32 @@
             "requires": ["__len__"]
         },
         "__create1__": {
-            "args": ["object", "type"],
+            "args": ["object", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create2__": {
-            "args": ["object", "object", "type", "type"],
+            "args": ["object", "object", "type", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create3__": {
-            "args": ["object", "object", "object", "type", "type", "type"],
+            "args": ["object", "object", "object", "type", "type", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create4__": {
-            "args": ["object", "object", "object", "object", "type", "type", "type", "type"],
+            "args": ["object", "object", "object", "object", "type", "type", "type", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create5__": {
-            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type"],
+            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create6__": {
-            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type"],
+            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
@@ -407,6 +407,11 @@
         "__len__": {
             "args": ["tuple"],
             "type": "__prim__int"
+        },
+        "__eq__": {
+            "args": ["tuple", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__getitem__"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
@@ -499,7 +504,7 @@
 "range": {
     "functions": {
         "__create__": {
-            "args": ["__prim__int", "__prim__int"],
+            "args": ["__prim__int", "__prim__int", "__prim__int"],
             "type": "range",
             "requires": ["__val__", "__start__", "__stop__"]
         },

@@ -214,8 +214,9 @@ class CallTranslator(CommonTranslator):
         start_stmt, start = self.translate_expr(node.args[0], ctx,
                                                 self.viper.Int)
         end_stmt, end = self.translate_expr(node.args[1], ctx, self.viper.Int)
-        args = [start, end]
-        arg_types = [None, None]
+        # Add unique integer to make new instance different from other ranges.
+        args = [start, end, self.get_fresh_int_lit(ctx)]
+        arg_types = [None, None, None]
         call = self.get_function_call(range_class, '__create__', args,
                                       arg_types, node, ctx)
         return start_stmt + end_stmt, call
@@ -458,12 +459,9 @@ class CallTranslator(CommonTranslator):
                 arg_types[index] = self.get_type(target.args[key].default, ctx)
 
         if target.var_arg:
-            var_stmt, var_arg_list = self._wrap_var_args(var_args,
-                                                         var_arg_types, node,
-                                                         ctx)
+            var_arg_list = self.create_tuple(var_args, var_arg_types, node, ctx)
             args.append(var_arg_list)
             arg_types.append(target.var_arg.type)
-            arg_stmts += var_stmt
 
         if target.kw_arg:
             kw_stmt, kw_arg_dict = self._wrap_kw_args(kw_args, node,
@@ -497,7 +495,10 @@ class CallTranslator(CommonTranslator):
         vals = args + [self.get_tuple_type_arg(arg, typ, node, ctx)
                        for (typ, arg) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
-        val_types = types + [type_class] * len(types)
+        val_types = types + [type_class] * len(types) + [None]
+        # Also add a running integer s.t. other tuples with same contents are not
+        # reference-identical.
+        vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
         return stmts, call
