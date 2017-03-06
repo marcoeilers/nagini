@@ -58,15 +58,16 @@ class Analyzer(ast.NodeVisitor):
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str, node_factory: ProgramNodeFactory):
+                 path: str):
+        self._node_factory = None
         self.viper = viperast
         self.java = jvm.java
         self.scala = jvm.scala
         self.viper = jvm.viper
         self.types = types
-        self.global_module = PythonModule(types, node_factory, None, None)
+        self.global_module = PythonModule(types, self.node_factory, None, None)
         self.global_module.global_module = self.global_module
-        self.module = PythonModule(types, node_factory, '__main__',
+        self.module = PythonModule(types, self.node_factory, '__main__',
                                    self.global_module,
                                    sil_names=self.global_module.sil_names)
         self.current_class = None
@@ -76,12 +77,18 @@ class Analyzer(ast.NodeVisitor):
         self.module_paths = [os.path.abspath(path)]
         self.modules = {os.path.abspath(path): self.module}
         self.asts = {}
-        self.node_factory = node_factory
-        self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
-        self._is_io_existential = False     # Are we defining an
-                                            # IOExists block?
-        self._aliases = {}                  # Dict[str, PythonBaseVar]
+        self.io_operation_analyzer = IOOperationAnalyzer(
+            self, self.node_factory)
+        # Are we defining an IOExists block?
+        self._is_io_existential = False
+        self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
+
+    @property
+    def node_factory(self):
+        if not self._node_factory:
+            self._node_factory = ProgramNodeFactory()
+        return self._node_factory
 
     def define_new(self, container: Union[PythonModule, PythonClass],
                    name: str, node: ast.AST) -> None:
@@ -99,10 +106,10 @@ class Analyzer(ast.NodeVisitor):
                     hasattr(container.global_vars[name], 'value')):
                 raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
-                    name in container.methods or
-                    name in container.predicates or
-                    (isinstance(container, PythonClass) and
-                    name in container.static_methods)):
+                name in container.methods or
+                name in container.predicates or
+                (isinstance(container, PythonClass) and
+                 name in container.static_methods)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
@@ -126,8 +133,6 @@ class Analyzer(ast.NodeVisitor):
         self.asts[abs_path] = parse_result
         logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
-        imports = [s for s in parse_result.body
-                   if isinstance(s, (ast.Import, ast.ImportFrom))]
         for stmt in parse_result.body:
             if isinstance(stmt, ast.Import):
                 for name in stmt.names:
@@ -247,15 +252,18 @@ class Analyzer(ast.NodeVisitor):
                                                True, True)
 
     def _add_native_silver_method(
-        self, method_name: str, if_method: Dict[str, Any], cls: PythonClass,
-        pure: bool, predicate: bool = False) -> None:
-        method = self.node_factory.create_python_method(
-            method_name, None, cls, self.module, pure, False, self.node_factory,
+            self, method_name: str, if_method: Dict[str, Any], cls: PythonClass,
+            pure: bool, predicate: bool = False,
+            node_factory: ProgramNodeFactory = None) -> None:
+        if not node_factory:
+            node_factory = self.node_factory
+        method = node_factory.create_python_method(
+            method_name, None, cls, self.module, pure, False, node_factory,
             interface=True, interface_dict=if_method)
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
-            arg = self.node_factory.create_python_var(
+            arg = node_factory.create_python_var(
                 name, None, self.find_or_create_class(arg_type))
             ctr += 1
             method.add_arg(name, arg)
@@ -412,6 +420,17 @@ class Analyzer(ast.NodeVisitor):
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
+
+    def _is_illegal_magic_method_name(self, name: str) -> bool:
+        """
+        Anything that could potentially be a magic method, i.e. anything that
+        has __this__ form, is considered illegal unless it is one of the names
+        we explicitly support.
+        """
+        if name.startswith('__') and name.endswith('__'):
+            if name not in LEGAL_MAGIC_METHODS:
+                return True
+        return False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:

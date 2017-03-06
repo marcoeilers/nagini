@@ -52,6 +52,9 @@ class SIFPythonMethod(PythonMethod):
         decorators = {d.id for d in self.node.decorator_list}
         self._preserves_tl = 'NotPreservingTL' not in decorators
 
+    def get_tl_var(self) -> 'SIFPythonVar':
+        return self.tl_var if self.pure else self.new_tl_var
+
     def process(self, sil_name: str, translator: 'Translator'):
         super().process(sil_name, translator)
         self.tl_var.process(self.tl_var.name, translator)
@@ -161,4 +164,4 @@ class SIFProgramNodeFactory(ProgramNodeFactory):
             interface_dict: Dict[str, Any] = None,
             method_type: MethodType = MethodType.normal) -> SIFPythonMethod:
         return SIFPythonMethod(name, node, cls, superscope, pure, contract_only,
-                               container_factory, interface)
+                               container_factory, interface, interface_dict)

@@ -97,6 +97,8 @@ class ObligationMethodNodeConstructor:
         self._position = position
         self._info = info
         self._overriding_check = overriding_check
+        if not self._python_method.interface_dict:
+            print("No interface dict for %s" % self._python_method.name)
         """Are we translating a behavioral subtyping check?"""
 
     def construct_node(self) -> Method:
