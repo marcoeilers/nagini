@@ -1,20 +1,5 @@
-domain FuncTriple[T, S ,R] {
-	function ft_get1(t: FuncTriple[T, S, R]) : T
-	function ft_get2(t: FuncTriple[T, S, R]) : S
-	function ft_get3(t: FuncTriple[T, S, R]) : R
-	function ft_create(a: T, b: S, c: R) : FuncTriple[T, S, R]
-}
-
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    function list(t: PyType): PyType
-    function list_arg(t: PyType, i: Int): PyType
-    unique function int(): PyType
-}
-
-field list_acc : Seq[Ref]
-field list_acc_p : Seq[Ref]
+field list_acc: Seq[Ref]
+field list_acc_p: Seq[Ref]
 
 method list___init__(__tl: Bool) returns (res: Ref, res_p: Ref, __new_tl: Bool)
     ensures acc(res.list_acc) && acc(res.list_acc_p)
@@ -47,20 +32,19 @@ method list___setitem__(self: Ref, self_p: Ref,
 }
 
 function list___getitem__(self: Ref, self_p: Ref,
-                          key: Int, key_p: Int,
+                          key: Ref, key_p: Ref,
                           __tl: Bool): FuncTriple[Ref, Ref, Bool]
     requires acc(self.list_acc, wildcard) && acc(self_p.list_acc_p, wildcard)
-    requires key >= 0 && key_p >= 0
-    requires key < |self.list_acc| && key_p < |self_p.list_acc_p|
+    requires issubtype(typeof(key), int()) && issubtype(typeof(key_p), int())
+    requires int___unbox__(key) >= 0 && int___unbox__(key_p) >= 0
+    requires int___unbox__(key) < |self.list_acc| && int___unbox__(key_p) < |self_p.list_acc_p|
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(self_p), list(list_arg(typeof(self_p), 0)))
-    ensures ft_get1(result) == self.list_acc[key]
-    ensures ft_get2(result) == self_p.list_acc_p[key_p]
-    ensures (!__tl && key == key_p) ==> !ft_get3(result)
-{
-    let __new_tl == (__tl || key != key_p) in
-    ft_create(self.list_acc[key], self_p.list_acc_p[key_p], __new_tl)
-}
+    ensures ft_get1(result) == self.list_acc[int___unbox__(key)]
+    ensures ft_get2(result) == self_p.list_acc_p[int___unbox__(key_p)]
+    ensures (!__tl && int___unbox__(key) == int___unbox__(key_p)) ==> !ft_get3(result)
+    ensures issubtype(typeof(ft_get1(result)), list_arg(typeof(self), 0))
+    ensures issubtype(typeof(ft_get2(result)), list_arg(typeof(self_p), 0))
 
 function list___contains__(self: Ref, self_p: Ref, item: Ref, item_p: Ref,
                            __tl: Bool): FuncTriple[Bool, Bool, Bool]

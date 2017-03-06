@@ -250,7 +250,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if receiver:
             target_cls = receiver
             func = target_cls.get_function(func_name)
-            print("FunctionCall for %s: %s" % (func_name, func))
         else:
             for container in ctx.module.get_included_modules():
                 if func_name in container.functions:

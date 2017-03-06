@@ -68,7 +68,8 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: SIFContext) -> List[Stmt]:
         if len(node.targets) != 1:
-            raise UnsupportedException(node)
+            raise UnsupportedException(
+                node, "complex assignments not supported")
 
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
@@ -81,11 +82,10 @@ class SIFStatementTranslator(StatementTranslator):
         if isinstance(node.value, ast.Call):
             target = self.get_target(node.value, ctx)
             update_tl = target.pure
+        # Except if the target is a subscript
+        update_tl &= (not isinstance(node.targets[0], ast.Subscript))
 
         if update_tl:
-            # tl_stmts, tl_expr = self.translate_expr(
-            #     node.value, ctx, target_type=self.viper.Bool)
-            # assert not tl_stmts
             tl_assign = self.viper.LocalVarAssign(
                 ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
                 self.to_position(node, ctx), self.no_info(ctx))
@@ -117,9 +117,9 @@ class SIFStatementTranslator(StatementTranslator):
                 lhs.slice.value, ctx, target_type=self.viper.Int)
         args = [target, target_p, idx, idx_p, rhs, rhs_p,
                 ctx.current_tl_var_expr]
-        arg_types = [None] * 5
+        arg_types = [None] * 7
         call_targets = [ctx.actual_function.get_tl_var().ref()]
-        setitem_stmt = self.get_method_call(
+        setitem_stmts = self.get_method_call(
             target_cls, '__setitem__', args, arg_types, call_targets, node, ctx)
 
         # Build list of statements.
@@ -129,7 +129,7 @@ class SIFStatementTranslator(StatementTranslator):
         res_stmts.extend(lhs_stmts_p)
         res_stmts.extend(idx_stmts)
         res_stmts.extend(idx_stmts_p)
-        res_stmts.append(setitem_stmt)
+        res_stmts.extend(setitem_stmts)
 
         return res_stmts, []
 
