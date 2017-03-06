@@ -250,6 +250,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if receiver:
             target_cls = receiver
             func = target_cls.get_function(func_name)
+            print("FunctionCall for %s: %s" % (func_name, func))
         else:
             for container in ctx.module.get_included_modules():
                 if func_name in container.functions:
@@ -259,7 +260,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
         actual_args = []
-        for arg, param, type in zip(args, func.args.values(), arg_types):
+        assert len(args) == len(func.get_args())
+        for arg, param, type in zip(args, func.get_args(), arg_types):
             formal_args.append(param.decl)
             if param.type.name == '__prim__bool':
                 actual_arg = self.to_bool(arg, ctx)

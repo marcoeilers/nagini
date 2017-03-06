@@ -47,7 +47,8 @@
         }
     },
     "type_vars": 1,
-    "extends": "object"
+    "extends": "object",
+    "generate_sif": true
 },
 "set":{
     "methods": {

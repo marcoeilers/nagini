@@ -13,14 +13,10 @@ from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
 from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
-from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
-from py2viper_translation.lib.util import (
-    InvalidProgramException,
-    UnsupportedException,
-)
+from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.sif.lib.program_nodes import SIFProgramNodeFactory
+from py2viper_translation.sif_analyzer import SIFAnalyzer
 from py2viper_translation.sif_translator import SIFTranslator
 from py2viper_translation.translator import Translator
 from py2viper_translation.verifier import (
@@ -53,23 +49,12 @@ sil_programs = []
 
 
 def load_sil_files(jvm: JVM, sif: bool = False):
-    sil_files = ['bool.sil', 'range.sil', 'list.sil', 'set_dict.sil', 'str.sil',
-                 'tuple.sil', 'seq.sil', 'bytes.sil', 'lock.sil']
-    sif_sil_files = ['func_triple.sil', 'list.sil']
-    if not config.obligation_config.disable_measures:
-        sil_files.append('measures.sil')
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     if sif:
-        sif_resources_path = os.path.join(current_path, 'sif/resources')
-        native_sil = [os.path.join(resources_path, f) for f in sil_files
-                      if f not in sif_sil_files]
-        native_sil += [os.path.join(sif_resources_path, f)
-                       for f in sif_sil_files]
-    else:
-        native_sil = [os.path.join(resources_path, f) for f in sil_files]
-    sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path
-                         in native_sil])
+        resources_path = os.path.join(current_path, 'sif/resources')
+    sil_programs.append(parse_sil_file(
+        os.path.join(resources_path, 'all.sil'), jvm))
 
 
 def translate(path: str, jvm: JVM, sif: bool = False):
@@ -90,10 +75,9 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     if not type_correct:
         return None
     if sif:
-        node_factory = SIFProgramNodeFactory()
+        analyzer = SIFAnalyzer(jvm, viperast, types, path)
     else:
-        node_factory = ProgramNodeFactory()
-    analyzer = Analyzer(jvm, viperast, types, path, node_factory)
+        analyzer = Analyzer(jvm, viperast, types, path)
     main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))
