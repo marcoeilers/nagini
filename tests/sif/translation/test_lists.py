@@ -25,3 +25,8 @@ def test_contains() -> None:
     if 3 not in l:
         l.append(3)
     Assert(3 in l)
+
+
+def test_len() -> None:
+    l = [1, 2, 3]
+    Assert(len(l) == 3)

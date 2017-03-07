@@ -55,6 +55,13 @@ function list___contains__(self: Ref, self_p: Ref, item: Ref, item_p: Ref,
     ensures ft_get2(result) == (item_p in self_p.list_acc_p)
     ensures (!__tl && item == item_p) ==> !ft_get3(result)
 
+function list___len__(self: Ref, self_p: Ref, __tl: Bool) : FuncTriple[Int, Int, Bool]
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(self_p), list(list_arg(typeof(self_p), 0)))
+    requires acc(self.list_acc, wildcard) && acc(self_p.list_acc_p, wildcard)
+    ensures ft_get1(result) == |self.list_acc| && ft_get2(result) == |self_p.list_acc_p|
+    ensures (!__tl && |self.list_acc| == |self_p.list_acc_p|) ==> !ft_get3(result)
+
 method list_append(self: Ref, self_p: Ref,
                    item: Ref, item_p: Ref,
                    __tl: Bool) returns (__new_tl: Bool)

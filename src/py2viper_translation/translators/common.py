@@ -24,7 +24,6 @@ from py2viper_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
 )
-from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -33,18 +32,13 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
 )
-from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException
 )
-from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.translators.abstract import (
-    AbstractTranslator,
-    Context,
-)
+from py2viper_translation.translators.abstract import AbstractTranslator
 from typing import List, Tuple, Union
 
 
