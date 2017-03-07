@@ -18,3 +18,10 @@ def test_setitem() -> None:
     l = [1, 2, 3]
     l[0] = inc(l[1] + l[2])
     Assert(l[0] == 6)
+
+
+def test_contains() -> None:
+    l = [1, 2]
+    if 3 not in l:
+        l.append(3)
+    Assert(3 in l)

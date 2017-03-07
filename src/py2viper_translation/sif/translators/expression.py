@@ -3,17 +3,22 @@ import ast
 from py2viper_translation.lib.constants import (
     BOOL_TYPE,
     LIST_TYPE,
+    PRIMITIVE_BOOL_TYPE,
 )
+from py2viper_translation.lib.program_nodes import PythonType
 from py2viper_translation.lib.util import UnsupportedException
+from py2viper_translation.lib.typedefs import (
+    Expr,
+    StmtsAndExpr,
+)
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.expr_cache import ExprCache
 from py2viper_translation.sif.lib.program_nodes import SIFPythonField
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
     FuncTripleDomainFactory as FTDF,
 )
-from py2viper_translation.translators.abstract import StmtsAndExpr
 from py2viper_translation.translators.expression import ExpressionTranslator
-from typing import cast
+from typing import cast, List
 
 
 class SIFExpressionTranslator(ExpressionTranslator):
@@ -36,11 +41,8 @@ class SIFExpressionTranslator(ExpressionTranslator):
                                              self.no_info(ctx)))
 
     def translate_List(self, node: ast.List, ctx: SIFContext) -> StmtsAndExpr:
-        if node in self._translated_exprs:
-            assert len(self._translated_exprs[node]) == 1
-            expr = self._translated_exprs[node].next()
-            if not len(self._translated_exprs[node]):
-                del self._translated_exprs[node]
+        expr = self._try_cache(node)
+        if expr:
             return [], expr
         list_class = ctx.module.global_module.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(
@@ -75,10 +77,7 @@ class SIFExpressionTranslator(ExpressionTranslator):
                 [ctx.current_tl_var_expr], node, ctx)
             stmts += el_stmts + el_stmts_p + append_call
 
-        # Cache translated expression.
-        cache = ExprCache()
-        cache.add_result(res_var.var_prime.ref())
-        self._translated_exprs[node] = cache
+        self._cache_results(node, [res_var.var_prime.ref()])
 
         return stmts, res_var.ref(node, ctx)
 
@@ -86,12 +85,9 @@ class SIFExpressionTranslator(ExpressionTranslator):
             self, node: ast.Subscript, ctx: SIFContext) -> StmtsAndExpr:
         if not isinstance(node.slice, ast.Index):
             raise UnsupportedException(node, "Slices not supported yet.")
-        if node in self._translated_exprs:
-            expr = self._translated_exprs[node].next()
-            if not len(self._translated_exprs[node]):
-                del self._translated_exprs[node]
+        expr = self._try_cache(node)
+        if expr:
             return [], expr
-
         # Translate the target expression of the subscript.
         target_type = self.get_type(node.value, ctx)
         if target_type.name != LIST_TYPE:
@@ -116,28 +112,60 @@ class SIFExpressionTranslator(ExpressionTranslator):
                      ctx.module.global_module.classes[BOOL_TYPE]]
         func_app = self.get_function_call(
             target_type, '__getitem__', args, arg_types, node, ctx)
-        res_expr = self.config.func_triple_factory.get_call(
-            FTDF.GET, [func_app], target_type, position, info, ctx)
-        res_expr_p = self.config.func_triple_factory.get_call(
-            FTDF.GET_PRIME, [func_app], target_type, position, info, ctx)
-        # Update the current timeLevel var expression.
-        tl_expr = self.config.func_triple_factory.get_call(
-            FTDF.GET_TL, [func_app], target_type, position, info, ctx)
+        res_expr, res_expr_p, tl_expr = \
+            self.config.func_triple_factory.extract_results(
+                func_app, target_type, position, info, ctx)
         ctx.current_tl_var_expr = tl_expr
 
-        # Cache translated expression.
-        cache = ExprCache()
-        cache.add_result(res_expr_p)
-        cache.add_result(tl_expr)
-        self._translated_exprs[node] = cache
+        self._cache_results(node, [res_expr_p, tl_expr])
 
         return (target_stmts + target_stmts_p + index_stmts + index_stmts_p,
                 res_expr)
 
+    def _translate_contains(
+            self, left: Expr, right: Expr, left_type: PythonType,
+            right_type: PythonType, node: ast.AST,
+            ctx: SIFContext) -> StmtsAndExpr:
+        expr = self._try_cache(node)
+        if expr:
+            return [], expr
+        # Translate the left and right expressions in the prime context.
+        with ctx.prime_ctx():
+            left_stmts_p, left_p = self.translate_expr(node.left, ctx)
+            right_stmts_p, right_p = self.translate_expr(
+                node.comparators[0], ctx)
 
+        bool_type = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
+        args = [right, right_p, left, left_p, ctx.current_tl_var_expr]
+        arg_types = [right_type, right_type, left_type, left_type, bool_type]
+        func_app = self.get_function_call(
+            right_type, '__contains__', args, arg_types, node, ctx)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        res_expr, res_expr_p, tl_expr = \
+            self.config.func_triple_factory.extract_results(
+                func_app, bool_type, position, info, ctx)
+        if isinstance(node.ops[0], ast.NotIn):
+            res_expr = self.viper.Not(res_expr, position, info)
+            res_expr_p = self.viper.Not(res_expr_p, position, info)
+        # Update the current timeLevel var expression.
+        ctx.current_tl_var_expr = tl_expr
 
+        self._cache_results(node, [res_expr_p, tl_expr])
 
+        return left_stmts_p + right_stmts_p, res_expr
 
+    def _try_cache(self, node: ast.AST) -> Expr:
+        if node in self._translated_exprs:
+            expr = self._translated_exprs[node].next()
+            if not len(self._translated_exprs[node]):
+                del self._translated_exprs[node]
+            return expr
+        return None
 
-
-
+    def _cache_results(self, node: ast.AST, results: List[Expr]):
+        assert node not in self._translated_exprs
+        cache = ExprCache()
+        for res in results:
+            cache.add_result(res)
+        self._translated_exprs[node] = cache

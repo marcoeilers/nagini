@@ -54,10 +54,6 @@ function list___contains__(self: Ref, self_p: Ref, item: Ref, item_p: Ref,
     ensures ft_get1(result) == (item in self.list_acc)
     ensures ft_get2(result) == (item_p in self_p.list_acc_p)
     ensures (!__tl && item == item_p) ==> !ft_get3(result)
-{
-    let __new_tl == (__tl || item != item_p) in
-    ft_create(item in self.list_acc, item_p in self_p.list_acc_p, __new_tl)
-}
 
 method list_append(self: Ref, self_p: Ref,
                    item: Ref, item_p: Ref,

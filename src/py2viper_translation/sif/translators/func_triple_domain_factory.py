@@ -11,6 +11,7 @@ from py2viper_translation.lib.typedefs import (
 from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
+from typing import Tuple
 
 
 class FuncTripleDomainFactory:
@@ -44,14 +45,16 @@ class FuncTripleDomainFactory:
 
         return self.viper.DomainType(self.domain_name, var_map, self.type_vars)
 
-    def get_call(self, name: str, args: List[Expr],
-                 ret_type: PythonClass, pos: Position, info: Info,
-                 ctx: SIFContext) -> 'silver.ast.DomainFuncApp':
+    def get_call(
+            self, name: str, args: List[Expr], ret_type: PythonClass,
+            pos: Position, info: Info, ctx: SIFContext,
+            var_map: Dict[TypeVar, Type] = None) -> 'silver.ast.DomainFuncApp':
         """
         Creates a DomainFuncApp for the function 'name' of the FuncTriple
         Domain.
         """
-        var_map = self._create_var_map(ret_type, ctx)
+        if not var_map:
+            var_map = self._create_var_map(ret_type, ctx)
         if name == self.CREATE:
             type_passed = self.get_type(ret_type, ctx)
         elif name == self.GET_TL:
@@ -62,4 +65,19 @@ class FuncTripleDomainFactory:
 
         return self.viper.DomainFuncApp(name, args, type_passed, pos, info,
                                         self.domain_name, type_var_map=var_map)
+
+    def extract_results(self, func_app: Expr, ret_type: PythonClass,
+                        pos: Position, info: Info,
+                        ctx: SIFContext) -> Tuple['silver.ast.DomainFuncApp',
+                                                  'silver.ast.DomainFuncApp',
+                                                  'silver.ast.DomainFuncApp']:
+        var_map = self._create_var_map(ret_type, ctx)
+        func_app1 = self.get_call(
+            self.GET, [func_app], ret_type, pos, info, ctx, var_map)
+        func_app2 = self.get_call(
+            self.GET_PRIME, [func_app], ret_type, pos, info, ctx, var_map)
+        func_app3 = self.get_call(
+            self.GET_TL, [func_app], None, pos, info, ctx, var_map)
+
+        return func_app1, func_app2, func_app3
 
