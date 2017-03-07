@@ -12,23 +12,19 @@ from py2viper_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from py2viper_translation.sif.lib.context import SIFContext
-from py2viper_translation.sif.lib.expr_cache import ExprCache
+from py2viper_translation.sif.lib.expr_cache import ExprCacheMixin
 from py2viper_translation.sif.lib.program_nodes import SIFPythonField
-from py2viper_translation.sif.translators.func_triple_domain_factory import (
-    FuncTripleDomainFactory as FTDF,
-)
 from py2viper_translation.translators.expression import ExpressionTranslator
-from typing import cast, List
+from typing import cast
 
 
-class SIFExpressionTranslator(ExpressionTranslator):
+class SIFExpressionTranslator(ExpressionTranslator, ExprCacheMixin):
     """
     SIF version of the ExpressionTranslator.
     """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-        self._translated_exprs = {}  # Map[ast.Node, ExprCache]
+        ExprCacheMixin.__init__(self)
 
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: SIFContext) -> StmtsAndExpr:
@@ -154,18 +150,3 @@ class SIFExpressionTranslator(ExpressionTranslator):
         self._cache_results(node, [res_expr_p, tl_expr])
 
         return left_stmts_p + right_stmts_p, res_expr
-
-    def _try_cache(self, node: ast.AST) -> Expr:
-        if node in self._translated_exprs:
-            expr = self._translated_exprs[node].next()
-            if not len(self._translated_exprs[node]):
-                del self._translated_exprs[node]
-            return expr
-        return None
-
-    def _cache_results(self, node: ast.AST, results: List[Expr]):
-        assert node not in self._translated_exprs
-        cache = ExprCache()
-        for res in results:
-            cache.add_result(res)
-        self._translated_exprs[node] = cache

@@ -1,5 +1,7 @@
+import ast
+
 from py2viper_translation.lib.typedefs import Expr
-from typing import Optional
+from typing import List, Optional
 
 
 class ExprCache:
@@ -26,3 +28,28 @@ class ExprCache:
 
     def __len__(self) -> int:
         return len(self._results)
+
+
+class ExprCacheMixin:
+    """
+    A mixin that can be used by translators that want to cache translation
+    results.
+    """
+    def __init__(self):
+        # Map of already translated expressions.
+        self._translated_exprs = {}  # Map[ast.Call, ExprCache]
+
+    def _try_cache(self, node: ast.AST) -> Expr:
+        if node in self._translated_exprs:
+            expr = self._translated_exprs[node].next()
+            if not len(self._translated_exprs[node]):
+                del self._translated_exprs[node]
+            return expr
+        return None
+
+    def _cache_results(self, node: ast.AST, results: List[Expr]):
+        assert node not in self._translated_exprs
+        cache = ExprCache()
+        for res in results:
+            cache.add_result(res)
+        self._translated_exprs[node] = cache
