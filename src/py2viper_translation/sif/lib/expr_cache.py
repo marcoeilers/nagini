@@ -48,7 +48,6 @@ class ExprCacheMixin:
         return None
 
     def _cache_results(self, node: ast.AST, results: List[Expr]):
-        assert node not in self._translated_exprs
         cache = ExprCache()
         for res in results:
             cache.add_result(res)
