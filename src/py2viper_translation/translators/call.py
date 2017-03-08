@@ -168,11 +168,13 @@ class CallTranslator(CommonTranslator):
         stmts = [new, type_inhale] + field_type_inhales
         target = target_class.get_method('__init__')
         if target:
+
             target_class = target.cls
             targets = []
             if target.declared_exceptions:
                 error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
+            #init = self.get_method_call(target_class, '__init__', args, [None] * len(args), targets, node, ctx)
             method_name = target_class.get_method('__init__').sil_name
             init = self.create_method_call_node(
                 ctx, method_name, args, targets, self.to_position(node, ctx),
@@ -363,9 +365,9 @@ class CallTranslator(CommonTranslator):
         else:
             return False
 
-    def _translate_args(self, node: ast.Call,
-                        ctx: Context) -> Tuple[List[Stmt], List[Expr],
-                                               List[PythonType]]:
+    def translate_args(self, node: ast.Call,
+                       ctx: Context) -> Tuple[List[Stmt], List[Expr],
+                                              List[PythonType]]:
         """
         Returns the args and types of the given call. Named args are put into
         the correct position; for *args and **kwargs, tuples and dicts are
@@ -374,7 +376,7 @@ class CallTranslator(CommonTranslator):
         """
         target = self._get_call_target(node, ctx)
         if isinstance(target, PythonClass):
-            constr = target.methods.get('__init__')
+            constr = target.get_method('__init__')
             target = constr
 
         args = []
@@ -608,7 +610,7 @@ class CallTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         old_position = ctx.position
         ctx.position.append((inline_reason, position))
-        arg_stmts, arg_vals, arg_types = self._translate_args(node, ctx)
+        arg_stmts, arg_vals, arg_types = self.translate_args(node, ctx)
         args = []
         stmts = arg_stmts
 
@@ -659,8 +661,10 @@ class CallTranslator(CommonTranslator):
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
         """
+        if isinstance(node.func, ast.Name) and node.func.id == 'SCIONIFVerificationError':
+            print("123123")
         formal_args = []
-        arg_stmts, args, arg_types = self._translate_args(node, ctx)
+        arg_stmts, args, arg_types = self.translate_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         target = self._get_call_target(node, ctx)
@@ -672,8 +676,10 @@ class CallTranslator(CommonTranslator):
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
         if isinstance(target, PythonClass):
+            if target.name == 'SCIONIFVerificationError':
+                print("123123")
             return self.translate_constructor_call(target, node, args,
-                                                    arg_stmts, ctx)
+                                                   arg_stmts, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
