@@ -314,3 +314,8 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.expr_translator.create_tuple(vals, val_types, node,
                                                         ctx)
 
+    def translate_args(self, node: ast.Call,
+                       ctx: Context) -> Tuple[List[Stmt], List[Expr],
+                                              List[PythonType]]:
+        return self.config.call_translator.translate_args(node, ctx)
+

@@ -92,7 +92,8 @@ class PythonModule(PythonScope, ContainerInterface):
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
                  global_module: 'PythonModule',
-                 sil_names: List[str] = None) -> None:
+                 sil_names: List[str] = None,
+                 file: str = None) -> None:
         """
         Represents a module, i.e. either a directory that only contains other
         modules or an actual file that may contain classes, methods etc.
@@ -117,6 +118,7 @@ class PythonModule(PythonScope, ContainerInterface):
         self.node_factory = node_factory
         self.types = types
         self.type_vars = OrderedDict()
+        self.file = file
 
     def process(self, translator: 'Translator') -> None:
         if self.type_prefix:

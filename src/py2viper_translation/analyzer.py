@@ -190,9 +190,13 @@ class Analyzer(ast.NodeVisitor):
             # Module has not been imported yet
             self.module_paths.insert(self.module_index, abs_path)
             type_prefix = self.types.get_type_prefix(abs_path)
+            if type_prefix:
+                file = abs_path[abs_path.index(type_prefix.split('.')[0]):]
+            else:
+                file = None
             new_module = PythonModule(self.module.types, self.node_factory,
                                       type_prefix, self.module.global_module,
-                                      self.module.sil_names)
+                                      self.module.sil_names, file)
             self.modules[abs_path] = new_module
             self.collect_imports(abs_path)
         else:

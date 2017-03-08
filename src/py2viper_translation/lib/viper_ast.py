@@ -438,7 +438,7 @@ class ViperAST:
         return self.ast.SimpleInfo(self.to_seq(comments))
 
     def to_position(self, expr, vias, error_string: str=None,
-                    rules: Rules=None):
+                    rules: Rules=None, file: str = None):
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
@@ -447,7 +447,9 @@ class ViperAST:
             # create artificial ast.Name objects which don't have it. That
             # should probably be changed.
             return self.NoPosition
-        path = self.java.nio.file.Paths.get(str(self.sourcefile), [])
+        if not file:
+            file = str(self.sourcefile)
+        path = self.java.nio.file.Paths.get(file, [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
         id = error_manager.add_error_information(
             expr, list(vias), error_string, rules)

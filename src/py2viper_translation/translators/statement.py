@@ -523,9 +523,14 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         var = self.get_error_var(node, ctx)
         raised = self.get_target(node.exc, ctx)
-        if isinstance(raised, PythonType):
-            stmt, exception = self.translate_constructor_call(raised, node, [],
-                                                              [], ctx)
+        if not isinstance(node.exc, ast.Call) and isinstance(raised, PythonType):
+            args = []
+            if isinstance(node.exc, ast.Call):
+                args, _, _ = self.translate_args(node.exc, ctx)
+            # TODO: need to call translate_args, so need a version that doesn't
+            # take an ast.Call.
+            stmt, exception = self.translate_constructor_call(raised, node.exc,
+                                                              args, [], ctx)
         else:
             stmt, exception = self.translate_expr(node.exc, ctx)
         position = self.to_position(node, ctx)

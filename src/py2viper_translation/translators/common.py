@@ -178,7 +178,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         Extracts the position from a node, assigns an ID to the node and stores
         the node and the position in the context for it.
         """
-        return self.viper.to_position(node, ctx.position, error_string, rules)
+        return self.viper.to_position(node, ctx.position, error_string, rules,
+                                      ctx.module.file)
 
     def no_position(self, ctx: Context, error_string: str=None,
             rules: Rules=None) -> 'silver.ast.Position':
@@ -293,7 +294,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             func = ctx.module.methods[func_name]
         if not func:
-            raise InvalidProgramException(node, 'unknown.function.called')
+            raise InvalidProgramException(node, 'unknown.method.called')
         actual_args = []
         for arg, param, type in zip(args, func.args.values(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
