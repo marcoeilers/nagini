@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.program_nodes import PythonMethod
 from py2viper_translation.lib.typedefs import Expr, StmtsAndExpr
 from py2viper_translation.lib.util import (
     flatten,
@@ -81,7 +82,8 @@ class SIFStatementTranslator(StatementTranslator):
         update_tl = isinstance(node.value, ast.Subscript)
         if isinstance(node.value, ast.Call):
             target = self.get_target(node.value, ctx)
-            update_tl = target.pure
+            if isinstance(target, PythonMethod):
+                update_tl = target.pure
         # Except if the target is a subscript
         update_tl &= (not isinstance(node.targets[0], ast.Subscript))
 

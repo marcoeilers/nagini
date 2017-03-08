@@ -594,7 +594,7 @@ class TranslationTest(AnnotatedTest):
             pytest.skip('Ignored')
         try:
             translate(path, jvm, sif)
-            assert False
+            actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
         except TypeException as exp2:

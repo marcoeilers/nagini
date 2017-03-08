@@ -34,11 +34,9 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
             self, target_class: PythonClass, node: ast.Call, args: List,
             arg_stmts: List, ctx: SIFContext) -> StmtsAndExpr:
         info = self.no_info(ctx)
-        call_results = self.translated_calls[node]
         res_var = ctx.current_function.create_variable(
             target_class.name + '_res', target_class, self.translator)
-        call_results.add_result(res_var.ref())
-        call_results.add_result(res_var.var_prime.ref())
+        self._cache_results(node, [res_var.var_prime.ref()])
         fields = []
         for field in target_class.all_fields:
             fields.append(field.sil_field)
@@ -74,7 +72,7 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
                 target_method=target, target_node=node)
             stmts.extend(init)
 
-        return arg_stmts + stmts, call_results.next()
+        return arg_stmts + stmts, res_var.ref()
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: SIFContext) -> StmtsAndExpr:

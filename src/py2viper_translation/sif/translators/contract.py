@@ -11,6 +11,7 @@ from py2viper_translation.sif.translators.func_triple_domain_factory import (
 )
 from py2viper_translation.translators.abstract import StmtsAndExpr
 from py2viper_translation.translators.contract import ContractTranslator
+from typing import List
 
 
 class SIFContractTranslator(ContractTranslator):
@@ -41,7 +42,13 @@ class SIFContractTranslator(ContractTranslator):
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: SIFContext) -> StmtsAndExpr:
-        raise UnsupportedException(node, "Acc predicates not yet supported.")
+        stmt, acc = super().translate_acc_predicate(node, perm, ctx)
+        with ctx.prime_ctx():
+            stmt_p, acc_p = super().translate_acc_predicate(node, perm, ctx)
+        # Acc(obj) && Acc(obj)
+        and_accs = self.viper.And(acc, acc_p, self.to_position(node, ctx),
+                                  self.no_info(ctx))
+        return [], and_accs
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: SIFContext):
@@ -56,6 +63,22 @@ class SIFContractTranslator(ContractTranslator):
                                   self.no_info(ctx))
 
         return [], and_accs
+
+    def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
+                                    args: List[Expr], ctx: SIFContext) -> Expr:
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        name = node.func.id
+        seq_ref = self.viper.SeqType(self.viper.Ref)
+        if name == 'list_pred':
+            field_name = 'list_acc_p' if ctx.use_prime else 'list_acc'
+            field = self.viper.Field(
+                field_name, seq_ref, self.no_position(ctx), self.no_info(ctx))
+        else:
+            raise UnsupportedException(node, "Only lists supported for Accs.")
+        field_acc = self.viper.FieldAccess(args[0], field, position, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, position, info)
+        return pred
 
     def translate_low(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
         if len(node.args) > 1:
