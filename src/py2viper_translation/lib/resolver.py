@@ -372,6 +372,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
     elif value_type.name == SET_TYPE:
         return value_type.type_args[0]
     elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+        # FIXME: This is very unfortunate, but right now we cannot handle this
+        # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[1]
     elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
         return module.global_module.classes[INT_TYPE]

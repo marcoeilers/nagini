@@ -191,6 +191,8 @@ class Analyzer(ast.NodeVisitor):
             self.module_paths.insert(self.module_index, abs_path)
             type_prefix = self.types.get_type_prefix(abs_path)
             if type_prefix:
+                # Get the part of the path that corresponds to modules (i.e.
+                # drop prefix that just goes to library directory).
                 file = abs_path[abs_path.index(type_prefix.split('.')[0]):]
             else:
                 file = None
@@ -352,11 +354,13 @@ class Analyzer(ast.NodeVisitor):
             return self.current_class.type_vars[name]
         if not module:
             module = self.module
+        # Check all imported modules for the class.
         for visible_module in module.get_included_modules(True):
             if name in visible_module.classes:
                 cls = visible_module.classes[name]
                 break
         else:
+            # Class doesn't exist yet, create it.
             cls = self.node_factory.create_python_class(name, module,
                                                         self.node_factory)
             module.classes[name] = cls
@@ -412,6 +416,8 @@ class Analyzer(ast.NodeVisitor):
                     cls.type_vars[arg_name] = var
                     current_index += 1
             else:
+                # Drop stuff like Sized that is only needed for mypy and does
+                # not correspond to an actual superclass.
                 if not (isinstance(base, ast.Name) and
                         base.id in MYPY_SUPERCLASSES):
                     actual_bases.append(base)
@@ -532,7 +538,9 @@ class Analyzer(ast.NodeVisitor):
         is_type_var = False
         # Check if this is a type alias
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            actual_prefix = self.module.type_prefix.split('.') if self.module.type_prefix else []
+            actual_prefix = []
+            if self.module.type_prefix:
+                actual_prefix = self.module.type_prefix.split('.')
             actual_prefix.append(node.targets[0].id)
             lhs_name = tuple(actual_prefix)
             # If it's a type alias marked by mypy

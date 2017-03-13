@@ -550,11 +550,10 @@ class ProgramTranslator(CommonTranslator):
                                                                  ctx))
                 for field_name in cls.static_fields:
                     field = cls.static_fields[field_name]
-                    # TODO: prevent access on instances
-                    # if cls.superclass:
-                    #     if cls.superclass.get_static_field(field_name):
-                    #         raise InvalidProgramException(field.node,
-                    #                                       'invalid.override')
+                    if cls.superclass:
+                        if cls.superclass.get_static_field(field_name):
+                            raise InvalidProgramException(field.node,
+                                                          'invalid.override')
                 for pred_name in cls.predicates:
                     pred = cls.predicates[pred_name]
                     cpred = pred

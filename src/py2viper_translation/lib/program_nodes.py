@@ -148,6 +148,7 @@ class PythonModule(PythonScope, ContainerInterface):
     def get_func_or_method(self, name: str) -> 'PythonMethod':
         for module in [self] + self.from_imports + [self.global_module]:
             if not isinstance(module, PythonModule):
+                # It's a ModuleView, we take the actual module wrapped by it.
                 module = module.module
             if name in module.functions:
                 return module.functions[name]
@@ -490,7 +491,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                  self.predicates, self.static_fields]
         if not only_top:
             dicts.append(self.fields)
-            # dicts.append(self.static_fields)
         return CombinedDict([], dicts)
 
     def try_box(self) -> 'PythonClass':
@@ -637,6 +637,7 @@ class UnionType(GenericType):
     @property
     def cls(self):
         if self._cls is None:
+            # Get common supertype of all types in the union.
             args = self.type_args
             cls = args[0]
             if isinstance(cls, GenericType):
