@@ -78,22 +78,27 @@ class SIFStatementTranslator(StatementTranslator):
         with ctx.prime_ctx():
             stmts += super().translate_stmt_Assign(node, ctx)
 
-        # Update timelevel after function call or subscript.
-        update_tl = isinstance(node.value, ast.Subscript)
-        if isinstance(node.value, ast.Call):
-            target = self.get_target(node.value, ctx)
-            if isinstance(target, PythonMethod):
-                update_tl = target.pure
-        # Except if the target is a subscript
-        update_tl &= (not isinstance(node.targets[0], ast.Subscript))
-
-        if update_tl:
+        if self._tl_needs_update(node, ctx):
             tl_assign = self.viper.LocalVarAssign(
                 ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
                 self.to_position(node, ctx), self.no_info(ctx))
             stmts.append(tl_assign)
 
         return stmts
+
+    def _tl_needs_update(self, node: ast.Assign, ctx: SIFContext):
+        """Return True if the timelevel needs to be updated after Assign."""
+        # Update TL after call to a pure function (including magic functions).
+        update_tl = isinstance(node.value, ast.Subscript)
+        if isinstance(node.value, ast.Call):
+            target = self.get_target(node.value, ctx)
+            if isinstance(target, PythonMethod):
+                update_tl = target.pure
+        elif isinstance(node.value, ast.Compare):
+            update_tl = isinstance(node.value.ops[0], (ast.In, ast.NotIn))
+        # Except if the target is a subscript
+        update_tl &= (not isinstance(node.targets[0], ast.Subscript))
+        return update_tl
 
     def _assign_with_subscript(
             self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,

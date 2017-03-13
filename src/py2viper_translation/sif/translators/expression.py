@@ -23,7 +23,7 @@ class SIFExpressionTranslator(ExpressionTranslator, ExprCacheMixin):
     SIF version of the ExpressionTranslator.
     """
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        ExpressionTranslator.__init__(self, *args, **kwargs)
         ExprCacheMixin.__init__(self)
 
     def translate_Attribute(self, node: ast.Attribute,
