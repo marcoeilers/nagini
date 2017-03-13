@@ -27,7 +27,7 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
     SIF version of the CallTranslator.
     """
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        CallTranslator.__init__(self, *args, **kwargs)
         ExprCacheMixin.__init__(self)
 
     def _translate_constructor_call(

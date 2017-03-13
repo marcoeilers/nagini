@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.constants import BUILTIN_PREDICATES
 from py2viper_translation.lib.typedefs import Expr
 from py2viper_translation.lib.util import (
     InvalidProgramException,
@@ -42,10 +43,17 @@ class SIFContractTranslator(ContractTranslator):
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: SIFContext) -> StmtsAndExpr:
+        # TODO(shitz): This currently only handles the special case of
+        # list_pred. In general, we only have one predicate call with doubled
+        # parameters and contents. This needs to be revised.
+        if (not isinstance(node.args[0].func, ast.Name) or
+                node.args[0].func.id not in BUILTIN_PREDICATES):
+            raise UnsupportedException(
+                node, "Only list access predicates supported.")
         stmt, acc = super().translate_acc_predicate(node, perm, ctx)
         with ctx.prime_ctx():
             stmt_p, acc_p = super().translate_acc_predicate(node, perm, ctx)
-        # Acc(obj) && Acc(obj)
+        # Acc(obj) && Acc(obj_p)
         and_accs = self.viper.And(acc, acc_p, self.to_position(node, ctx),
                                   self.no_info(ctx))
         return [], and_accs

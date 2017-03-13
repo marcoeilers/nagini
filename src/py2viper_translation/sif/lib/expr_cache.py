@@ -37,7 +37,7 @@ class ExprCacheMixin:
     """
     def __init__(self):
         # Map of already translated expressions.
-        self._translated_exprs = {}  # Map[ast.Call, ExprCache]
+        self._translated_exprs = {}  # Map[ast.AST, ExprCache]
 
     def _try_cache(self, node: ast.AST) -> Expr:
         if node in self._translated_exprs:
