@@ -183,7 +183,8 @@ class ViperAST:
 
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
-        arg_decls = [self.LocalVarDecl(str(i), arg.typ(), arg.pos(), arg.info())
+        arg_decls = [self.LocalVarDecl('arg' + str(i), arg.typ(), arg.pos(),
+                                       arg.info())
                      for i, arg in enumerate(args)]
 
         def type_passed_apply(slf):

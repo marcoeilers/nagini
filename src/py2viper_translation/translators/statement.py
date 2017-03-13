@@ -523,7 +523,10 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         var = self.get_error_var(node, ctx)
         raised = self.get_target(node.exc, ctx)
-        if not isinstance(node.exc, ast.Call) and isinstance(raised, PythonType):
+        if (not isinstance(node.exc, ast.Call) and
+                isinstance(raised, PythonType)):
+            # The argument of raise is a class; call constructor with no
+            # arguments.
             args = []
             init = raised.get_method('__init__')
             if init:

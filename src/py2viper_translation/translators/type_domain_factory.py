@@ -44,9 +44,6 @@ class TypeDomainFactory:
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
-            # self.create_union_extends_axiom(ctx),
-            # self.create_union_extends2_axiom(ctx),
-            # self.create_union_not_extends_axiom(ctx),
             self.create_tuple_arg_axiom(ctx),
             self.create_tuple_args_axiom(ctx),
             self.create_tuple_subtype_axiom(ctx),
@@ -67,6 +64,10 @@ class TypeDomainFactory:
         return result
 
     def union_funcs(self, ctx: Context) -> List['silver.ast.DomainFunc']:
+        """
+        Creates UNION_TYPE_SIZE functions of the following form:
+        function union_type_n(arg_1: PyType, ..., arg_n: PyType): PyType
+        """
         result = []
         position, info = self.no_position(ctx), self.no_info(ctx)
         args = []
@@ -82,6 +83,13 @@ class TypeDomainFactory:
 
     def create_union_subtype_axioms(self,
             ctx: Context) -> List['silver.ast.DomainAxiom']:
+        """
+        Creates UNION_TYPE_SIZE axioms of the following form:
+        (forall arg_1: PyType, ..., arg_n: PyType, X: PyType ::
+        { issubtype(X, union_type_n(arg_1, ..., arg_n)) }
+          issubtype(X, union_type_n(arg_1, ..., arg_n)) ==
+          (false || issubtype(X, arg_1) || ... || issubtype(X, arg_n)))
+        """
         result = []
         position, info = self.no_position(ctx), self.no_info(ctx)
         arg_decls = []
@@ -111,103 +119,6 @@ class TypeDomainFactory:
             axiom = self.viper.DomainAxiom('union_subtype_' + str(i), forall,
                                            position, info, self.type_domain)
             result.append(axiom)
-        return result
-
-    def create_union_extends2_axiom(self,
-                                    ctx: Context) -> 'silver.ast.DomainAxiom':
-        """
-        axiom union_extends2 {
-           (forall seq: Seq[PyType], Z: PyType, X: PyType ::
-           {union_type(seq), extends_(X, Z)}
-           ((Z in seq) && extends_(X, Z)) ==> issubtype(X, union_type(seq)))
-        }
-        """
-        name = 'union_extends2'
-        position, info = self.no_position(ctx), self.no_info(ctx)
-        seq_type = self.viper.SetType(self.type_type())
-        z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
-        z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
-        x_decl = self.viper.LocalVarDecl('X', self.type_type(), position, info)
-        x_ref = self.viper.LocalVar('X', self.type_type(), position, info)
-        seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
-        seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
-        union = self.viper.DomainFuncApp('union_type', [seq_ref],
-                                         self.type_type(), position, info,
-                                         self.type_domain)
-        subtype = self._issubtype(x_ref, union, ctx)
-        extends = self._extends(x_ref, z_ref, ctx)
-        contains = self.viper.SetContains(z_ref, seq_ref, position, info)
-        lhs = self.viper.And(contains, extends, position, info)
-        body = self.viper.Implies(lhs, subtype, position, info)
-        trigger = self.viper.Trigger([union, extends], position, info)
-        body = self.viper.Forall([seq_decl, z_decl, x_decl], [trigger], body,
-                                 position, info)
-        result = self.viper.DomainAxiom(name, body, position, info,
-                                        self.type_domain)
-        return result
-
-    def create_union_extends_axiom(self,
-                                   ctx: Context) -> 'silver.ast.DomainAxiom':
-        """
-        (forall seq: Seq[PyType] :: { union_type(seq) }
-          (forall Z: PyType :: (Z in seq) ==> issubtype(Z, union_type(seq))))
-        """
-        name = 'union_extends'
-        position, info = self.no_position(ctx), self.no_info(ctx)
-        seq_type = self.viper.SetType(self.type_type())
-        z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
-        z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
-        seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
-        seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
-        union = self.viper.DomainFuncApp('union_type', [seq_ref],
-                                         self.type_type(), position, info,
-                                         self.type_domain)
-        extends = self._issubtype(z_ref, union, ctx)
-        contains = self.viper.SetContains(z_ref, seq_ref, position, info)
-
-        body = self.viper.Implies(contains, extends, position, info)
-        body = self.viper.Forall([z_decl], [], body, position, info)
-        trigger = self.viper.Trigger([union], position, info)
-
-        body = self.viper.Forall([seq_decl], [trigger], body,
-                                 position, info)
-        result = self.viper.DomainAxiom(name, body, position, info,
-                                        self.type_domain)
-        return result
-
-    def create_union_not_extends_axiom(self,
-                                       ctx: Context) -> 'silver.ast.DomainAxiom':
-        """
-        forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, union_type(seq))}
-          (forall X: PyType ::
-          (X in seq ==> !issubtype(Z, X))) == !issubtype(Z, union_type(seq))
-        """
-        name = 'union_not_extends'
-        position, info = self.no_position(ctx), self.no_info(ctx)
-        seq_type = self.viper.SetType(self.type_type())
-        z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)
-        z_ref = self.viper.LocalVar('Z', self.type_type(), position, info)
-        x_decl = self.viper.LocalVarDecl('X', self.type_type(), position, info)
-        x_ref = self.viper.LocalVar('X', self.type_type(), position, info)
-        seq_decl = self.viper.LocalVarDecl('seq', seq_type, position, info)
-        seq_ref = self.viper.LocalVar('seq', seq_type, position, info)
-        union = self.viper.DomainFuncApp('union_type', [seq_ref],
-                                         self.type_type(), position, info,
-                                         self.type_domain)
-        subtype_z_union = self._issubtype(z_ref, union, ctx)
-        subtype_z_x = self._issubtype(z_ref, x_ref, ctx)
-        contains = self.viper.SetContains(x_ref, seq_ref, position, info)
-        not_z_x = self.viper.Not(subtype_z_x, position, info)
-        not_z_union = self.viper.Not(subtype_z_union, position, info)
-        body = self.viper.Implies(contains, not_z_x, position, info)
-        lhs = self.viper.Forall([x_decl], [], body, position, info)
-        body = self.viper.EqCmp(lhs, not_z_union, position, info)
-        trigger = self.viper.Trigger([subtype_z_union], position, info)
-
-        body = self.viper.Forall([seq_decl, z_decl], [trigger], body,
-                                 position, info)
-        result = self.viper.DomainAxiom(name, body, position, info,
-                                        self.type_domain)
         return result
 
     def create_tuple_subtype_axiom(self,

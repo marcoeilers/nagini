@@ -168,13 +168,11 @@ class CallTranslator(CommonTranslator):
         stmts = [new, type_inhale] + field_type_inhales
         target = target_class.get_method('__init__')
         if target:
-
             target_class = target.cls
             targets = []
             if target.declared_exceptions:
                 error_var = self.get_error_var(node, ctx)
                 targets.append(error_var)
-            #init = self.get_method_call(target_class, '__init__', args, [None] * len(args), targets, node, ctx)
             method_name = target_class.get_method('__init__').sil_name
             init = self.create_method_call_node(
                 ctx, method_name, args, targets, self.to_position(node, ctx),
@@ -312,7 +310,6 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func.value, ast.Call):
                 if get_func_name(node.func.value) == 'super':
                     # Super call
-                    # Why not just get superclass of current class?
                     target_class = self.get_target(node.func.value, ctx)
                     return target_class.get_func_or_method(node.func.attr)
             # Method called on an object
@@ -506,8 +503,8 @@ class CallTranslator(CommonTranslator):
                        for (typ, arg) in zip(types, args)]
         type_class = ctx.module.global_module.classes['type']
         val_types = types + [type_class] * len(types) + [None]
-        # Also add a running integer s.t. other tuples with same contents are not
-        # reference-identical.
+        # Also add a running integer s.t. other tuples with same contents are
+        # not reference-identical.
         vals += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, vals, val_types,
                                       node, ctx)
@@ -668,8 +665,6 @@ class CallTranslator(CommonTranslator):
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
         """
-        if isinstance(node.func, ast.Name) and node.func.id == 'SCIONIFVerificationError':
-            print("123123")
         formal_args = []
         arg_stmts, args, arg_types = self._translate_call_args(node, ctx)
         name = get_func_name(node)
@@ -683,8 +678,6 @@ class CallTranslator(CommonTranslator):
                 msg += ' or indirect call of classmethod argument'
             raise UnsupportedException(node, msg + '.')
         if isinstance(target, PythonClass):
-            if target.name == 'SCIONIFVerificationError':
-                print("123123")
             return self.translate_constructor_call(target, node, args,
                                                    arg_stmts, ctx)
         is_predicate = True

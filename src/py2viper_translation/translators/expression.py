@@ -422,8 +422,6 @@ class ExpressionTranslator(CommonTranslator):
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:
-                if ctx.actual_function is None:
-                    print(node.id)
                 var = ctx.actual_function.get_variable(node.id)
             if (isinstance(var, PythonIOExistentialVar) and
                     not var.is_defined()):
