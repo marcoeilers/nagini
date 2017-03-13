@@ -365,20 +365,25 @@ class CallTranslator(CommonTranslator):
         else:
             return False
 
-    def translate_args(self, node: ast.Call,
-                       ctx: Context) -> Tuple[List[Stmt], List[Expr],
+    def _translate_call_args(self, node: ast.Call,
+                             ctx: Context) -> Tuple[List[Stmt], List[Expr],
                                               List[PythonType]]:
+        target = self._get_call_target(node, ctx)
+        if isinstance(target, PythonClass):
+            constr = target.get_method('__init__')
+            target = constr
+        return self.translate_args(target, node.args, node.keywords, node, ctx)
+
+    def translate_args(self, target: PythonMethod, arg_nodes: List,
+                       keywords: List, node: ast.AST, ctx: Context,
+                       implicit_receiver=None) -> Tuple[List[Stmt], List[Expr],
+                                                        List[PythonType]]:
         """
         Returns the args and types of the given call. Named args are put into
         the correct position; for *args and **kwargs, tuples and dicts are
         created and all arguments not bound to any other parameter are put in
         there.
         """
-        target = self._get_call_target(node, ctx)
-        if isinstance(target, PythonClass):
-            constr = target.get_method('__init__')
-            target = constr
-
         args = []
         arg_types = []
         arg_stmts = []
@@ -386,7 +391,7 @@ class CallTranslator(CommonTranslator):
         unpacked_args = []
         unpacked_arg_types = []
 
-        for arg in node.args:
+        for arg in arg_nodes:
             if isinstance(arg, ast.Starred):
                 # If it's a starred expression, unpack all values separately
                 # into unpacked_args.
@@ -422,7 +427,9 @@ class CallTranslator(CommonTranslator):
         if not target:
             return arg_stmts, unpacked_args, unpacked_arg_types
 
-        implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
+        if implicit_receiver is None:
+            implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
+
         nargs = target.nargs
         keys = list(target.args.keys())
         if implicit_receiver:
@@ -441,7 +448,7 @@ class CallTranslator(CommonTranslator):
         kw_args = OrderedDict()
 
         # Named args
-        for kw in node.keywords:
+        for kw in keywords:
             if kw.arg in keys:
                 index = keys.index(kw.arg)
                 arg_stmt, arg_expr = self.translate_expr(kw.value, ctx)
@@ -610,7 +617,7 @@ class CallTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         old_position = ctx.position
         ctx.position.append((inline_reason, position))
-        arg_stmts, arg_vals, arg_types = self.translate_args(node, ctx)
+        arg_stmts, arg_vals, arg_types = self._translate_call_args(node, ctx)
         args = []
         stmts = arg_stmts
 
@@ -664,7 +671,7 @@ class CallTranslator(CommonTranslator):
         if isinstance(node.func, ast.Name) and node.func.id == 'SCIONIFVerificationError':
             print("123123")
         formal_args = []
-        arg_stmts, args, arg_types = self.translate_args(node, ctx)
+        arg_stmts, args, arg_types = self._translate_call_args(node, ctx)
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         target = self._get_call_target(node, ctx)

@@ -525,10 +525,10 @@ class StatementTranslator(CommonTranslator):
         raised = self.get_target(node.exc, ctx)
         if not isinstance(node.exc, ast.Call) and isinstance(raised, PythonType):
             args = []
-            if isinstance(node.exc, ast.Call):
-                args, _, _ = self.translate_args(node.exc, ctx)
-            # TODO: need to call translate_args, so need a version that doesn't
-            # take an ast.Call.
+            init = raised.get_method('__init__')
+            if init:
+                _, args, _ = self.translate_args(init, [], [], node.exc, ctx,
+                                                 True)
             stmt, exception = self.translate_constructor_call(raised, node.exc,
                                                               args, [], ctx)
         else:
