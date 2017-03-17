@@ -245,10 +245,17 @@ class ExpressionTranslator(CommonTranslator):
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
         func_name = '__create__'
-        val_seq = self.viper.ExplicitSeq(vals, position, info)
+        if vals:
+            val_seq = self.viper.ExplicitSeq(vals, position, info)
+        else:
+            val_seq = self.viper.EmptySeq(self.viper.Ref, position, info)
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
-        type_seq = self.viper.ExplicitSeq(types, position, info)
+        if types:
+            type_seq = self.viper.ExplicitSeq(types, position, info)
+        else:
+            type_seq = self.viper.EmptySeq(self.type_factory.type_type(),
+                                           position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
         args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
@@ -321,22 +328,24 @@ class ExpressionTranslator(CommonTranslator):
         if goto_finally:
             uncaught_option = goto_finally
         else:
+            end_label = ctx.get_label_name(END_LABEL)
+            goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
             if ctx.actual_function.declared_exceptions:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
-                end_label = ctx.get_label_name(END_LABEL)
-                gotoend = self.viper.Goto(end_label, position,
-                                          self.no_info(ctx))
-                uncaught_option = self.translate_block([assignerror, gotoend],
+                uncaught_option = self.translate_block([assignerror, goto_end],
                                                        position,
                                                        self.no_info(ctx))
             else:
                 error_string = '"method raises no exceptions"'
                 error_pos = self.to_position(call, ctx, error_string)
-                uncaught_option = self.viper.Exhale(
+                exhale_false = self.viper.Exhale(
                     self.viper.FalseLit(error_pos, self.no_info(ctx)),
                     error_pos,
                     self.no_info(ctx))
+                uncaught_option = self.translate_block([exhale_false, goto_end],
+                                                       position,
+                                                       self.no_info(ctx))
 
         for block in relevant_try_blocks:
             for handler in block.handlers:

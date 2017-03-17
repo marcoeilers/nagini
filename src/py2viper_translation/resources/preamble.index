@@ -381,7 +381,7 @@
         "__create__": {
             "args": ["__prim__Sequence", "__prim__Sequence_type", "__prim__int"],
             "type": "tuple",
-            "requires": ["__val__"]
+            "requires": ["__val__", "__len__"]
         },
         "__create1__": {
             "args": ["object", "type", "__prim__int"],
@@ -416,7 +416,7 @@
         "__getitem__": {
             "args": ["tuple", "__prim__int"],
             "type": "object",
-            "requires": ["__len__", "__val__"]
+            "requires": ["__len__", "__val__", "__len__"]
         },
         "__getitem_slice__": {
             "args": ["tuple", "slice"],
@@ -438,7 +438,8 @@
         },
         "__sil_seq__": {
             "args": ["tuple"],
-            "type": "__prim__Sequence"
+            "type": "__prim__Sequence",
+            "requires": ["__len__"]
         }
     },
     "type_vars": -1,

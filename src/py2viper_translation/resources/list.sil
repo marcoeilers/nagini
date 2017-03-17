@@ -74,8 +74,8 @@ function slice___stop__(self: Ref): Ref
 function list___getitem__(self: Ref, key: Int): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
-    requires key < 0 ==> key >= -list___len__(self)
-    requires key >= 0 ==> key < list___len__(self)
+    requires let ln == (list___len__(self)) in ((key < 0 ==> key >= -ln) && (key >= 0 ==> key < ln))
+    //requires key >= 0 ==> key < list___len__(self)
     ensures result == (key >= 0 ? self.list_acc[key] : self.list_acc[list___len__(self) + key])
     //ensures key >= 0 ==> result == self.list_acc[key]
     //ensures key < 0 ==> result == self.list_acc[list___len__(self) + key]
