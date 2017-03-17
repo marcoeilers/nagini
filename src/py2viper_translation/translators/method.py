@@ -629,6 +629,7 @@ class MethodTranslator(CommonTranslator):
             false = self.viper.FalseLit(error_pos, info)
             assert_false = self.viper.Exhale(false, error_pos, info)
             except_block.append(assert_false)
+            except_block.append(goto_end)
         except_block = self.translate_block(except_block, pos, info)
         return_block = self.translate_block(return_block, pos, info)
 

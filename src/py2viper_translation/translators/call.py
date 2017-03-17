@@ -497,6 +497,8 @@ class CallTranslator(CommonTranslator):
         # __createX__ must be called with the types of the arguments as
         # additional arguments.
         val_seq = self.viper.ExplicitSeq(args, position, info)
+        types = [self.type_factory.translate_type_literal(t, position, ctx)
+                 for t in types]
         type_seq = self.viper.ExplicitSeq(types, position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.

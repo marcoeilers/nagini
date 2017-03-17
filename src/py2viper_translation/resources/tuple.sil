@@ -72,7 +72,7 @@ function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Re
 
 function tuple___sil_seq__(self: Ref): Seq[Ref]
     ensures |result| == tuple___len__(self)
-    ensures forall i: Int :: i >= 0 && i < tuple___len__(self) ==> (result[i] == tuple___getitem__(self, i))
+    ensures forall i: Int :: {result[i]} i >= 0 && i < tuple___len__(self) ==> (result[i] == tuple___getitem__(self, i))
 
 function tuple___len__(self: Ref): Int
 {
@@ -88,8 +88,8 @@ function int___unbox__(self: Ref): Int
 function __prim__int___box__(self: Int): Ref
 
 function tuple___getitem__(self: Ref, key: Int): Ref
-    requires key >= 0 ==> key < tuple___len__(self)
-    requires key < 0 ==> key >= -tuple___len__(self)
+    requires let ln == (tuple___len__(self)) in ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))
+    //requires key < 0 ==> key >= -tuple___len__(self)
     ensures key >= 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), key))
     ensures key < 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), tuple___len__(self) + key))
     ensures key >= 0 ==> result == tuple___val__(self)[key]
@@ -111,7 +111,7 @@ function tuple___getitem_slice__(self: Ref, key: Ref): Ref
 
 function tuple___eq__(self: Ref, other: Ref): Bool
     ensures (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Int :: i >= 0 && i < tuple___len__(self)
+             (forall i: Int :: {tuple___getitem__(self, i)} {tuple___getitem__(other, i)} i >= 0 && i < tuple___len__(self)
                                 ==> tuple___getitem__(self, i) == tuple___getitem__(other, i)))
              ==> result
 
