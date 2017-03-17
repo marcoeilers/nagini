@@ -389,9 +389,9 @@ class ProgramTranslator(CommonTranslator):
         of Silver programs, applies the necessary conversions (e.g. related to
         obligations) to them, and returns them in separate lists.
         """
-        domains = set()
-        functions = set()
-        predicates = set()
+        domains = []
+        functions = []
+        predicates = []
         methods = []
 
         used_names = set()
@@ -425,19 +425,19 @@ class ProgramTranslator(CommonTranslator):
         self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
-            domains |= set(
-                [domain for domain in self.viper.to_list(sil_prog.domains())
-                 if domain.name() != 'PyType'])
+            domains += [
+                domain for domain in self.viper.to_list(sil_prog.domains())
+                if domain.name() != 'PyType']
 
-            function_names = {function.name() for function in functions}
-            functions |= set([
+            function_names = [function.name() for function in functions]
+            functions += [
                 function
                 for function in self.viper.to_list(sil_prog.functions())
                 if (function.name() in used_names and
-                    function.name() not in function_names)])
-            predicates |= set(self.viper.to_list(sil_prog.predicates()))
+                    function.name() not in function_names)]
+            predicates += self.viper.to_list(sil_prog.predicates())
 
-        return list(domains), list(predicates), list(functions), methods
+        return domains, predicates, functions, methods
 
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List,
