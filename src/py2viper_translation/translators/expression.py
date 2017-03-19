@@ -254,8 +254,9 @@ class ExpressionTranslator(CommonTranslator):
                        for (t, v) in zip(val_types, vals)]
         arg_types = val_types + [type_class] * len(val_types) + [None]
         # Also add a running integer s.t. other tuples with same contents are
-        # not reference-equal.
-        args += [self.get_fresh_int_lit(ctx)]
+        # not reference-equal (except for an empty tuple).
+        if vals:
+            args += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return call
