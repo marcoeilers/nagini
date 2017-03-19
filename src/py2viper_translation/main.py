@@ -30,9 +30,8 @@ from py2viper_translation.verifier import (
 def parse_sil_file(sil_path: str, jvm):
     parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
     assert parser
-    file = open(sil_path, 'r')
-    text = file.read()
-    file.close()
+    with open(sil_path, 'r') as file:
+        text = file.read()
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     parsed = parser.parse(text, path)
     assert (isinstance(parsed, getattr(jvm.fastparse.core,
@@ -43,6 +42,11 @@ def parse_sil_file(sil_path: str, jvm):
     resolved = resolver.run()
     resolved = resolved.get()
     translator = jvm.viper.silver.parser.Translator(resolved)
+    # Reset messages in global Consistency object. Otherwise, left-over
+    # translation errors from previous translations prevent loading of the
+    # built-in silver files.
+    jvm.viper.silver.ast.utility.Consistency.resetMessages()
+    print(jvm.viper.silver.ast.utility.Consistency.messages())
     program = translator.translate()
     return program.get()
 
@@ -59,7 +63,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
         os.path.join(resources_path, 'all.sil'), jvm))
 
 
-def translate(path: str, jvm: JVM, sif: bool = False):
+def translate(path: str, jvm: JVM, sif: bool = False,
+              reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -90,7 +95,9 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    if not sil_programs:
+    global sil_programs
+    if not sil_programs or reload_resources:
+        sil_programs = []
         load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs)

@@ -549,12 +549,12 @@ class VerificationTest(AnnotatedTest):
 
     def test_file(
             self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-            sif: bool):
+            sif: bool, reload_resources: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
-        prog = translate(path, jvm, sif)
+        prog = translate(path, jvm, sif=sif, reload_resources=reload_resources)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
         self._evaluate_result(vresult, annotation_manager, jvm)
@@ -579,21 +579,22 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, verifier, sif):
+def test_verification(path, verifier, sif, reload_resources):
     """Execute provided verification test."""
-    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif)
+    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources)
 
 
 class TranslationTest(AnnotatedTest):
     """Test for testing translation errors."""
 
-    def test_file(self, path: str, jvm: jvmaccess.JVM, sif: bool):
+    def test_file(self, path: str, jvm: jvmaccess.JVM, sif: bool,
+                  reload_resources: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         try:
-            translate(path, jvm, sif)
+            translate(path, jvm, sif=sif, reload_resources=reload_resources)
             actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
@@ -609,6 +610,6 @@ class TranslationTest(AnnotatedTest):
 _TRANSLATION_TESTER = TranslationTest()
 
 
-def test_translation(path, sif):
+def test_translation(path, sif, reload_resources):
     """Execute provided translation test."""
-    _TRANSLATION_TESTER.test_file(path, _JVM, sif)
+    _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources)
