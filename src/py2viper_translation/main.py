@@ -46,7 +46,6 @@ def parse_sil_file(sil_path: str, jvm):
     # translation errors from previous translations prevent loading of the
     # built-in silver files.
     jvm.viper.silver.ast.utility.Consistency.resetMessages()
-    print(jvm.viper.silver.ast.utility.Consistency.messages())
     program = translator.translate()
     return program.get()
 
