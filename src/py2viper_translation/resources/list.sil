@@ -1,0 +1,79 @@
+field list_acc : Seq[Ref]
+
+method list___init__() returns (res: Ref)
+    ensures acc(res.list_acc)
+    ensures res.list_acc == Seq[Ref]()
+    ensures typeof(res) == list(list_arg(typeof(res), 0))
+{
+    assume false
+}
+
+function list___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+    ensures result == (item in self.list_acc)
+
+function list___bool__(self: Ref) : Bool
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+    ensures result == (|self.list_acc| != 0)
+
+function list___len__(self: Ref) : Int
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+{
+ |self.list_acc|
+}
+
+function list___getitem__(self: Ref, key: Ref): Ref
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), int())
+    requires acc(self.list_acc, wildcard)
+    requires int___unbox__(key) >= 0
+    requires int___unbox__(key) < list___len__(self)
+    ensures result == self.list_acc[int___unbox__(key)]
+    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+
+method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires key >= 0
+    requires key < list___len__(self)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    ensures acc(self.list_acc)
+    ensures self.list_acc == old(self.list_acc)[key := item]
+{
+    assume false
+}
+
+method list_append(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    ensures acc(self.list_acc)
+    ensures self.list_acc == old(self.list_acc) ++ Seq(item)
+{
+    assume false
+}
+
+method list___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+  requires acc(self.list_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.list_acc, 1 / 20)
+  ensures _res.list_acc == self.list_acc
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+  ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
+  ensures issubtype(typeof(_res.__previous), list(list_arg(typeof(self), 0)))
+{
+  inhale false
+}
+
+function list___sil_seq__(self: Ref): Seq[Ref]
+    requires acc(self.list_acc, wildcard)
+{
+    self.list_acc
+}
