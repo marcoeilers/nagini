@@ -19,7 +19,7 @@ from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
 from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.sif.lib.program_nodes import SIFAnalyzer
+from py2viper_translation.sif_analyzer import SIFAnalyzer
 from py2viper_translation.sif_translator import SIFTranslator
 from py2viper_translation.translator import Translator
 from py2viper_translation.verifier import (
