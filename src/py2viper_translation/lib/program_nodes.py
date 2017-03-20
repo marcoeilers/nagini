@@ -487,10 +487,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         used by get_target). If 'only_top' is true, returns only top level
         elements that can be accessed without a receiver.
         """
-        dicts = [self.functions,  self.methods, self.static_methods,
-                 self.predicates, self.static_fields]
+        dicts = [self.static_methods, self.static_fields]
         if not only_top:
-            dicts.append(self.fields)
+            dicts.extend([self.functions, self.fields, self.methods,
+                          self.predicates])
         return CombinedDict([], dicts)
 
     def try_box(self) -> 'PythonClass':
