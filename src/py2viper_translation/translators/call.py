@@ -493,7 +493,7 @@ class CallTranslator(CommonTranslator):
         info = self.no_info(ctx)
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         stmts = []
-        func_name = '__create__'
+        func_name = '__create' + str(len(args)) + '__'
         # __createX__ must be called with the types of the arguments as
         # additional arguments.
         val_seq = self.viper.ExplicitSeq(args, position, info)
@@ -502,8 +502,9 @@ class CallTranslator(CommonTranslator):
         type_seq = self.viper.ExplicitSeq(types, position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
-        args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
-        arg_types = [None, None, None]
+        # args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
+        args = args + types + [self.get_fresh_int_lit(ctx)]
+        arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return stmts, call

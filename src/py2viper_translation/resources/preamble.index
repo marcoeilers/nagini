@@ -30,7 +30,7 @@
     },
     "functions": {
         "__getitem__": {
-            "args": ["list", "__prim__int"],
+            "args": ["list", "int"],
             "type": "object",
             "requires": ["__len__"]
         },

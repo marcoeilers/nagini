@@ -244,22 +244,22 @@ class ExpressionTranslator(CommonTranslator):
             val_types.append(self.get_type(el, ctx))
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
-        func_name = '__create__'
-        if vals:
-            val_seq = self.viper.ExplicitSeq(vals, position, info)
-        else:
-            val_seq = self.viper.EmptySeq(self.viper.Ref, position, info)
+        func_name = '__create' + str(len(vals)) + '__'
+        # if vals:
+        #     val_seq = self.viper.ExplicitSeq(vals, position, info)
+        # else:
+        #     val_seq = self.viper.EmptySeq(self.viper.Ref, position, info)
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
-        if types:
-            type_seq = self.viper.ExplicitSeq(types, position, info)
-        else:
-            type_seq = self.viper.EmptySeq(self.type_factory.type_type(),
-                                           position, info)
+        # if types:
+        #     type_seq = self.viper.ExplicitSeq(types, position, info)
+        # else:
+        #     type_seq = self.viper.EmptySeq(self.type_factory.type_type(),
+        #                                    position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
-        args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
-        arg_types = [None, None, None]
+        args = vals + types + [self.get_fresh_int_lit(ctx)]
+        arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return stmts, call

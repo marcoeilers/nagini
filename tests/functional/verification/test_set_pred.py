@@ -12,7 +12,7 @@ def main() -> None:
     value = {asd46, b23, dd2}
     Assert(asd46 in value)
     Assert(dd2 in value)
-    Assert(('bla', 45) not in value)
+    Assert(('blu', 45) not in value)
     append_bla_45(value)
     Assert(dd2 in value)
     Assert(len(value) == 4)
