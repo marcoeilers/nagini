@@ -65,7 +65,7 @@ function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
 
 // Dummy
 function list___len__(self: Ref): Int
-function list___getitem__(self: Ref, i: Int): Ref
+function list___getitem__(self: Ref, i: Ref): Ref
 function __prim__int___box__(prim: Int): Ref
 function int___unbox__(self: Ref): Int
 function slice___actualstart__(self: Ref, len: Int): Int
@@ -87,12 +87,12 @@ function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
     requires acc(l.list_acc, wildcard)
     requires index >= 0 && index < list___len__(l)
     ensures |result| == (index < list___len__(l) - 1 ?
-                           bytes___len__(list___getitem__(l, index)) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| :
-                           bytes___len__(list___getitem__(l, index)))
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))) + |sep| + |bytes_join_val_helper(l, sep, index + 1)| :
+                           bytes___len__(list___getitem__(l, __prim__int___box__(index))))
 {
     (index < list___len__(l) - 1 ?
-        bytes___val__(list___getitem__(l, index)) ++ sep ++ bytes_join_val_helper(l, sep, index + 1) :
-        bytes___val__(list___getitem__(l, index)))
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))) ++ sep ++ bytes_join_val_helper(l, sep, index + 1) :
+        bytes___val__(list___getitem__(l, __prim__int___box__(index))))
 }
 
 function bytes___getitem__(self: Ref, index: Int): Ref
