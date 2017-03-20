@@ -11,6 +11,7 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.sif.lib.context import SIFContext
+from py2viper_translation.sif.lib.expr_cache import ExprCacheMixin
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
 from py2viper_translation.sif.translators.func_triple_domain_factory import (
@@ -22,7 +23,7 @@ from py2viper_translation.translators.abstract import (
     StmtsAndExpr,
 )
 from py2viper_translation.translators.call import CallTranslator
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 class CallResults:
@@ -51,7 +52,7 @@ class CallResults:
         return len(self._results)
 
 
-class SIFCallTranslator(CallTranslator):
+class SIFCallTranslator(CallTranslator, ExprCacheMixin):
     """
     SIF version of the CallTranslator.
     """
