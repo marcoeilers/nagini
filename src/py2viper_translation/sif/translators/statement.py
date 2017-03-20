@@ -1,5 +1,6 @@
 import ast
 
+from py2viper_translation.lib.program_nodes import PythonMethod
 from py2viper_translation.lib.typedefs import Expr, StmtsAndExpr
 from py2viper_translation.lib.util import (
     flatten,
@@ -10,7 +11,7 @@ from py2viper_translation.lib.util import (
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.translators.abstract import Stmt
 from py2viper_translation.translators.statement import StatementTranslator
-from typing import List
+from typing import List, Tuple
 
 
 class SIFStatementTranslator(StatementTranslator):
@@ -68,9 +69,8 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: SIFContext) -> List[Stmt]:
         if len(node.targets) != 1:
-            raise UnsupportedException(node)
-        if isinstance(node.targets[0], ast.Subscript):
-            raise UnsupportedException(node)
+            raise UnsupportedException(
+                node, "complex assignments not supported")
 
         # First translate assignment for normal variables.
         stmts = super().translate_stmt_Assign(node, ctx)
@@ -78,7 +78,67 @@ class SIFStatementTranslator(StatementTranslator):
         with ctx.prime_ctx():
             stmts += super().translate_stmt_Assign(node, ctx)
 
+        if self._tl_needs_update(node, ctx):
+            tl_assign = self.viper.LocalVarAssign(
+                ctx.actual_function.new_tl_var.ref(), ctx.current_tl_var_expr,
+                self.to_position(node, ctx), self.no_info(ctx))
+            stmts.append(tl_assign)
+
         return stmts
+
+    def _tl_needs_update(self, node: ast.Assign, ctx: SIFContext):
+        """Return True if the timelevel needs to be updated after Assign."""
+        # Update TL after call to a pure function (including magic functions).
+        update_tl = isinstance(node.value, ast.Subscript)
+        if isinstance(node.value, ast.Call):
+            target = self.get_target(node.value, ctx)
+            if isinstance(target, PythonMethod):
+                update_tl = target.pure
+        elif isinstance(node.value, ast.Compare):
+            update_tl = isinstance(node.value.ops[0], (ast.In, ast.NotIn))
+        # Except if the target is a subscript
+        update_tl &= (not isinstance(node.targets[0], ast.Subscript))
+        return update_tl
+
+    def _assign_with_subscript(
+            self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
+            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
+        if isinstance(node.targets[0].slice, ast.ExtSlice):
+            raise UnsupportedException(
+                node, "assignment to slice not supported")
+        if ctx.use_prime:
+            return [], []
+        # First we have to translate the rhs in the prime ctx, since the entire
+        # assignment gets translated to one method call instead of the usual
+        # multiple assignments.
+        with ctx.prime_ctx():
+            rhs_stmts_p, rhs_p = self.translate_expr(node.value, ctx)
+
+        target_cls = self.get_type(lhs.value, ctx)
+        lhs_stmts, target = self.translate_expr(lhs.value, ctx)
+        idx_stmts, idx = self.translate_expr(
+            lhs.slice.value, ctx, target_type=self.viper.Int)
+        with ctx.prime_ctx():
+            lhs_stmts_p, target_p = self.translate_expr(lhs.value, ctx)
+            idx_stmts_p, idx_p = self.translate_expr(
+                lhs.slice.value, ctx, target_type=self.viper.Int)
+        args = [target, target_p, idx, idx_p, rhs, rhs_p,
+                ctx.current_tl_var_expr]
+        arg_types = [None] * 7
+        call_targets = [ctx.actual_function.get_tl_var().ref()]
+        setitem_stmts = self.get_method_call(
+            target_cls, '__setitem__', args, arg_types, call_targets, node, ctx)
+
+        # Build list of statements.
+        res_stmts = []
+        res_stmts.extend(rhs_stmts_p)
+        res_stmts.extend(lhs_stmts)
+        res_stmts.extend(lhs_stmts_p)
+        res_stmts.extend(idx_stmts)
+        res_stmts.extend(idx_stmts_p)
+        res_stmts.extend(setitem_stmts)
+
+        return res_stmts, []
 
     def translate_stmt_While(self, node: ast.While,
                              ctx: SIFContext) -> List[Stmt]:
@@ -126,8 +186,8 @@ class SIFStatementTranslator(StatementTranslator):
                                           self.no_position(ctx), ctx))
         return result
 
-    def _create_condition_and_timelevel_statements(self, condition: ast.AST,
-            ctx: SIFContext) -> StmtsAndExpr:
+    def _create_condition_and_timelevel_statements(
+            self, condition: ast.AST, ctx: SIFContext) -> StmtsAndExpr:
         """
         Creates the timelevel statement before ifs and whiles.
 
@@ -141,8 +201,8 @@ class SIFStatementTranslator(StatementTranslator):
         cond_stmts, cond = self.translate_expr(condition, ctx,
                                                target_type=self.viper.Bool)
         with ctx.prime_ctx():
-            cond_stmts_p, cond_p = self.translate_expr(condition, ctx,
-                                                       target_type=self.viper.Bool)
+            cond_stmts_p, cond_p = self.translate_expr(
+                condition, ctx, target_type=self.viper.Bool)
         # tl := tl || cond != cond_p
         cond_cmp = self.viper.NeCmp(cond, cond_p, pos, info)
         or_expr = self.viper.Or(ctx.current_tl_var_expr, cond_cmp, pos, info)

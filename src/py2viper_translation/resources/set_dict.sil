@@ -1,18 +1,5 @@
 field set_acc : Set[Ref]
 
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    function set(t: PyType): PyType
-    function dict(t: PyType, v: PyType): PyType
-    function list(t: PyType): PyType
-    function Iterator(t: PyType): PyType
-    function set_arg(t: PyType, i: Int): PyType
-    function list_arg(t: PyType, i: Int): PyType
-    function dict_arg(t: PyType, i: Int): PyType
-    unique function NoneType(): PyType
-}
-
 method set___init__() returns (res: Ref)
     ensures acc(res.set_acc)
     ensures res.set_acc == Set[Ref]()
@@ -35,11 +22,6 @@ function set___bool__(self: Ref) : Bool
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures result == (|self.set_acc| != 0)
-
-field __container : Ref
-field __iter_index : Int
-field __previous: Ref
-field list_acc : Seq[Ref]
 
 method set___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))

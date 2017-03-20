@@ -157,24 +157,29 @@ def pytest_configure(config: 'pytest.config.Config'):
 def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
     """Parametrizes test functions based on the config."""
     func_name = metafunc.function.__name__
+    test_files = []
+    reload_triggers = set()
+    params = []
     if func_name == _TRANSLATION_TEST_FUNCTION_NAME:
-        test_files = []
         for test_dir in _pytest_config.translation_test_dirs:
-            test_files.extend(_test_files(test_dir))
-        params = []
+            files = _test_files(test_dir)
+            test_files.extend(files)
+            reload_triggers.add(files[0])
         for file in test_files:
-            sif = True if 'sif' in file else False
-            params.append((file, sif))
-        metafunc.parametrize('path,sif', params)
+            sif = 'sif' in file
+            reload_resources = file in reload_triggers
+            params.append((file, sif, reload_resources))
+        metafunc.parametrize('path,sif,reload_resources', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
-        test_files = []
         for test_dir in _pytest_config.verification_test_dirs:
-            test_files.extend(_test_files(test_dir))
-        params = []
+            files = _test_files(test_dir)
+            test_files.extend(files)
+            reload_triggers.add(files[0])
         for file in test_files:
-            sif = True if 'sif' in file else False
-            params.extend([(file, verifier, sif) for verifier
+            sif = 'sif' in file
+            reload_resources = file in reload_triggers
+            params.extend([(file, verifier, sif, reload_resources) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,verifier,sif', params)
+        metafunc.parametrize('path,verifier,sif,reload_resources', params)
     else:
         pytest.exit('Unrecognized test function.')

@@ -16,14 +16,10 @@ from py2viper_translation.analyzer import Analyzer
 from py2viper_translation.lib import config
 from py2viper_translation.lib.errors import error_manager
 from py2viper_translation.lib.jvmaccess import JVM
-from py2viper_translation.lib.program_nodes import ProgramNodeFactory
 from py2viper_translation.lib.typeinfo import TypeException, TypeInfo
-from py2viper_translation.lib.util import (
-    InvalidProgramException,
-    UnsupportedException,
-)
+from py2viper_translation.lib.util import InvalidProgramException
 from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.sif.lib.program_nodes import SIFProgramNodeFactory
+from py2viper_translation.sif_analyzer import SIFAnalyzer
 from py2viper_translation.sif_translator import SIFTranslator
 from py2viper_translation.translator import Translator
 from py2viper_translation.verifier import (
@@ -36,10 +32,11 @@ from py2viper_translation.verifier import (
 
 def parse_sil_file(sil_path: str, jvm):
     parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
-    file = open(sil_path, 'r')
-    text = file.read()
-    file.close()
-    parsed = parser.parse(text, None)
+    assert parser
+    with open(sil_path, 'r') as file:
+        text = file.read()
+    path = jvm.java.nio.file.Paths.get(sil_path, [])
+    parsed = parser.parse(text, path)
     assert (isinstance(parsed, getattr(jvm.fastparse.core,
                                        'Parsed$Success')))
     parse_result = parsed.value()
@@ -48,6 +45,10 @@ def parse_sil_file(sil_path: str, jvm):
     resolved = resolver.run()
     resolved = resolved.get()
     translator = jvm.viper.silver.parser.Translator(resolved)
+    # Reset messages in global Consistency object. Otherwise, left-over
+    # translation errors from previous translations prevent loading of the
+    # built-in silver files.
+    jvm.viper.silver.ast.utility.Consistency.resetMessages()
     program = translator.translate()
     return program.get()
 
@@ -55,20 +56,17 @@ def parse_sil_file(sil_path: str, jvm):
 sil_programs = []
 
 
-def load_sil_files(jvm: JVM):
-    sil_files = ['bool.sil', 'range.sil', 'list.sil', 'set_dict.sil', 'str.sil',
-                 'tuple.sil', 'seq.sil', 'bytes.sil', 'func_triple.sil',
-                 'lock.sil']
-    if not config.obligation_config.disable_measures:
-        sil_files.append('measures.sil')
+def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    native_sil = [os.path.join(resources_path, f) for f in sil_files]
-    sil_programs.extend([parse_sil_file(sil_path, jvm) for sil_path
-                         in native_sil])
+    if sif:
+        resources_path = os.path.join(current_path, 'sif/resources')
+    sil_programs.append(parse_sil_file(
+        os.path.join(resources_path, 'all.sil'), jvm))
 
 
-def translate(path: str, jvm: JVM, sif: bool = False):
+def translate(path: str, jvm: JVM, sif: bool = False,
+              reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -86,10 +84,9 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     if not type_correct:
         return None
     if sif:
-        node_factory = SIFProgramNodeFactory()
+        analyzer = SIFAnalyzer(jvm, viperast, types, path)
     else:
-        node_factory = ProgramNodeFactory()
-    analyzer = Analyzer(jvm, viperast, types, path, node_factory)
+        analyzer = Analyzer(jvm, viperast, types, path)
     main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))
@@ -100,8 +97,10 @@ def translate(path: str, jvm: JVM, sif: bool = False):
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    if not sil_programs:
-        load_sil_files(jvm)
+    global sil_programs
+    if not sil_programs or reload_resources:
+        sil_programs = []
+        load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs)
     return prog
