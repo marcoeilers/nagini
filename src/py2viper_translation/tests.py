@@ -554,6 +554,7 @@ class VerificationTest(AnnotatedTest):
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
+        path = os.path.abspath(path)
         prog = translate(path, jvm, sif)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)

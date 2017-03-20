@@ -61,7 +61,7 @@ class SIFCallTranslator(CallTranslator):
         # Map of already translated call nodes.
         self.translated_calls = {}  # Map[ast.Call, CallResults]
 
-    def _translate_constructor_call(self, target_class: PythonClass,
+    def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: SIFContext) -> StmtsAndExpr:
         info = self.no_info(ctx)
@@ -175,7 +175,7 @@ class SIFCallTranslator(CallTranslator):
 
         return arg_stmts + call, res_expr
 
-    def _translate_args(self, node: ast.Call,
+    def _translate_call_args(self, node: ast.Call,
                         ctx: SIFContext) -> Tuple[List[Stmt], List[Expr],
                                                   List[PythonType]]:
         args = []
