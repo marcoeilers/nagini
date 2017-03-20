@@ -626,27 +626,8 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
 
         if isinstance(lhs, ast.Subscript):
-            # Special treatment for subscript; instead of an assignment, we
-            # need to call a setitem method.
-            if not isinstance(node.targets[0].slice, ast.Index):
-                raise UnsupportedException(node, 'assignment to slice')
-            target_cls = self.get_type(lhs.value, ctx)
-            lhs_stmt, target = self.translate_expr(lhs.value, ctx)
-            ind_stmt, index = self.translate_expr(lhs.slice.value, ctx,
-                                                  target_type=self.viper.Int)
-            index_type = self.get_type(lhs.slice.value, ctx)
+            return self._assign_with_subscript(lhs, rhs, node, ctx)
 
-            args = [target, index, rhs]
-            arg_types = [None, None, None]
-            stmt = self.get_method_call(target_cls, '__setitem__', args,
-                                        arg_types, [], node, ctx)
-            # The respective assertion states that getitem with the given index
-            # now has the assigned value.
-            item = self.get_function_call(target_cls, '__getitem__',
-                                          [target, index], [None, None], node,
-                                          ctx)
-            val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
-            return lhs_stmt + ind_stmt + stmt, [val]
         target = lhs
         lhs_stmt, var = self.translate_expr(target, ctx)
         if isinstance(target, ast.Name):
@@ -656,6 +637,28 @@ class StatementTranslator(CommonTranslator):
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
         return lhs_stmt + [assign_stmt], [assign_val]
+
+    def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
+                               ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+        # Special treatment for subscript; instead of an assignment, we
+        # need to call a setitem method.
+        if not isinstance(node.targets[0].slice, ast.Index):
+            raise UnsupportedException(node, 'assignment to slice')
+        position = self.to_position(node, ctx)
+        target_cls = self.get_type(lhs.value, ctx)
+        lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+        ind_stmt, index = self.translate_expr(lhs.slice.value, ctx,
+                                              target_type=self.viper.Int)
+        args = [target, index, rhs]
+        arg_types = [None, None, None]
+        stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                    arg_types, [], node, ctx)
+        # The respective assertion states that getitem with the given index
+        # now has the assigned value.
+        item = self.get_function_call(
+            target_cls, '__getitem__', [target, index], [None, None], node, ctx)
+        val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
+        return lhs_stmt + ind_stmt + stmt, [val]
 
     def _assign_to_tuple(self, lhs: ast.Tuple, rhs: Expr, rhs_type: PythonType,
                          node: ast.AST,
@@ -746,7 +749,7 @@ class StatementTranslator(CommonTranslator):
         if is_get_ghost_output(node):
             return self.translate_get_ghost_output(node, ctx)
         rhs_type = self.get_type(node.value, ctx)
-        rhs_stmt, rhs = rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         assign_stmts = []
         for target in node.targets:
             target_stmt, _ = self.assign_to(target, rhs, None, None, rhs_type,

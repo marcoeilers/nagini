@@ -24,7 +24,6 @@ from py2viper_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
 )
-from py2viper_translation.lib.jvmaccess import JVM
 from py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typedefs import (
     Expr,
@@ -33,18 +32,13 @@ from py2viper_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
 )
-from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException
 )
-from py2viper_translation.lib.viper_ast import ViperAST
-from py2viper_translation.translators.abstract import (
-    AbstractTranslator,
-    Context,
-)
+from py2viper_translation.translators.abstract import AbstractTranslator
 from typing import List, Tuple, Union
 
 
@@ -260,7 +254,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
         actual_args = []
-        for arg, param, type in zip(args, func.args.values(), arg_types):
+        assert len(args) == len(func.get_args())
+        for arg, param, type in zip(args, func.get_args(), arg_types):
             formal_args.append(param.decl)
             if param.type.name == '__prim__bool':
                 actual_arg = self.to_bool(arg, ctx)
@@ -296,7 +291,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if not func:
             raise InvalidProgramException(node, 'unknown.method.called')
         actual_args = []
-        for arg, param, type in zip(args, func.args.values(), arg_types):
+        for arg, param, type in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
             elif param.type.name == '__prim__int':

@@ -1,13 +1,11 @@
 import ast
 import logging
-import mypy
 import os
 import py2viper_contracts.io_builtins
 import py2viper_contracts.lock
 import py2viper_translation.external.astpp
 import tokenize
 
-from collections import OrderedDict
 from py2viper_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from py2viper_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from py2viper_translation.analyzer_io import IOOperationAnalyzer
@@ -19,7 +17,6 @@ from py2viper_translation.lib.constants import (
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
     TUPLE_TYPE,
-    UNION_TYPE,
 )
 from py2viper_translation.lib.program_nodes import (
     ContainerInterface,
@@ -40,7 +37,7 @@ from py2viper_translation.lib.program_nodes import (
     TypeVar,
     UnionType,
 )
-from  py2viper_translation.lib.resolver import get_target as do_get_target
+from py2viper_translation.lib.resolver import get_target as do_get_target
 from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     construct_lambda_prefix,
@@ -51,7 +48,7 @@ from py2viper_translation.lib.util import (
     UnsupportedException,
 )
 from py2viper_translation.lib.views import PythonModuleView
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 logger = logging.getLogger('py2viper_translation.analyzer')
@@ -63,15 +60,16 @@ class Analyzer(ast.NodeVisitor):
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str, node_factory: ProgramNodeFactory):
+                 path: str):
+        self._node_factory = None
         self.viper = viperast
         self.java = jvm.java
         self.scala = jvm.scala
         self.viper = jvm.viper
         self.types = types
-        self.global_module = PythonModule(types, node_factory, None, None)
+        self.global_module = PythonModule(types, self.node_factory, None, None)
         self.global_module.global_module = self.global_module
-        self.module = PythonModule(types, node_factory, '__main__',
+        self.module = PythonModule(types, self.node_factory, '__main__',
                                    self.global_module,
                                    sil_names=self.global_module.sil_names)
         self.current_class = None
@@ -81,12 +79,18 @@ class Analyzer(ast.NodeVisitor):
         self.module_paths = [os.path.abspath(path)]
         self.modules = {os.path.abspath(path): self.module}
         self.asts = {}
-        self.node_factory = node_factory
-        self.io_operation_analyzer = IOOperationAnalyzer(self, node_factory)
-        self._is_io_existential = False     # Are we defining an
-                                            # IOExists block?
-        self._aliases = {}                  # Dict[str, PythonBaseVar]
+        self.io_operation_analyzer = IOOperationAnalyzer(
+            self, self.node_factory)
+        # Are we defining an IOExists block?
+        self._is_io_existential = False
+        self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
+
+    @property
+    def node_factory(self):
+        if not self._node_factory:
+            self._node_factory = ProgramNodeFactory()
+        return self._node_factory
 
     def define_new(self, container: Union[PythonModule, PythonClass],
                    name: str, node: ast.AST) -> None:
@@ -104,10 +108,10 @@ class Analyzer(ast.NodeVisitor):
                     hasattr(container.global_vars[name], 'value')):
                 raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
-                    name in container.methods or
-                    name in container.predicates or
-                    (isinstance(container, PythonClass) and
-                    name in container.static_methods)):
+                name in container.methods or
+                name in container.predicates or
+                (isinstance(container, PythonClass) and
+                 name in container.static_methods)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
@@ -131,8 +135,6 @@ class Analyzer(ast.NodeVisitor):
         self.asts[abs_path] = parse_result
         logger.debug(py2viper_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
-        imports = [s for s in parse_result.body
-                   if isinstance(s, (ast.Import, ast.ImportFrom))]
         for stmt in parse_result.body:
             if isinstance(stmt, ast.Import):
                 for name in stmt.names:
@@ -235,41 +237,47 @@ class Analyzer(ast.NodeVisitor):
             cls.interface = True
             cls.defined = True
         for class_name in interface:
-            cls = self.find_or_create_class(class_name)
-            if_cls = interface[class_name]
-            if 'type_vars' in if_cls:
-                for i in range(if_cls['type_vars']):
-                    name = 'var' + str(i)
-                    cls.type_vars[name] = TypeVar(name, cls, None, i, None, [],
-                                                  None)
-            if 'extends' in if_cls:
-                superclass = self.find_or_create_class(if_cls['extends'],
-                    module=self.module.global_module)
-                cls.superclass = superclass
-            for method_name in if_cls.get('methods', []):
-                if_method = if_cls['methods'][method_name]
-                self._add_native_silver_method(method_name, if_method, cls,
-                                               False)
-            for method_name in if_cls.get('functions', []):
-                if_method = if_cls['functions'][method_name]
-                self._add_native_silver_method(method_name, if_method, cls,
-                                               True)
-            for pred_name in if_cls.get('predicates', []):
-                if_pred = if_cls['predicates'][pred_name]
-                self._add_native_silver_method(pred_name, if_pred, cls,
-                                               True, True)
+            self._process_interface_class(class_name, interface[class_name])
 
-    def _add_native_silver_method(self, method_name: str, if_method: str,
-                                  cls: PythonClass, pure: bool,
-                                  predicate: bool = False) -> None:
-        method = PythonMethod(method_name, None, cls, self.module,
-                              pure, False, self.node_factory, True,
-                              if_method)
+    def _process_interface_class(self, class_name: str, if_cls: Dict,
+                                 node_factory: ProgramNodeFactory = None):
+        cls = self.find_or_create_class(class_name)
+        if 'type_vars' in if_cls:
+            for i in range(if_cls['type_vars']):
+                name = 'var' + str(i)
+                cls.type_vars[name] = TypeVar(
+                    name, cls, None, i, None, [], None)
+        if 'extends' in if_cls:
+            superclass = self.find_or_create_class(
+                if_cls['extends'], module=self.module.global_module)
+            cls.superclass = superclass
+        for method_name in if_cls.get('methods', []):
+            if_method = if_cls['methods'][method_name]
+            self._add_native_silver_method(
+                method_name, if_method, cls, False, node_factory=node_factory)
+        for method_name in if_cls.get('functions', []):
+            if_method = if_cls['functions'][method_name]
+            self._add_native_silver_method(
+                method_name, if_method, cls, True, node_factory=node_factory)
+        for pred_name in if_cls.get('predicates', []):
+            if_pred = if_cls['predicates'][pred_name]
+            self._add_native_silver_method(
+                pred_name, if_pred, cls, True, True, node_factory=node_factory)
+
+    def _add_native_silver_method(
+            self, method_name: str, if_method: Dict[str, Any], cls: PythonClass,
+            pure: bool, predicate: bool = False,
+            node_factory: ProgramNodeFactory = None) -> None:
+        if not node_factory:
+            node_factory = self.node_factory
+        method = node_factory.create_python_method(
+            method_name, None, cls, self.module, pure, False, node_factory,
+            interface=True, interface_dict=if_method)
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
-            arg = self.node_factory.create_python_var(name, None,
-                self.find_or_create_class(arg_type))
+            arg = node_factory.create_python_var(
+                name, None, self.find_or_create_class(arg_type))
             ctr += 1
             method.add_arg(name, arg)
         if if_method['type']:

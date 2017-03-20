@@ -1,0 +1,25 @@
+domain PyType {
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    function list(t: PyType): PyType
+    function list_arg(t: PyType, i: Int): PyType
+    function set(t: PyType): PyType
+    function set_arg(t: PyType, i: Int): PyType
+    function dict(t: PyType, v: PyType): PyType
+    function dict_arg(t: PyType, i: Int): PyType
+    function tuple(s: Seq[PyType]): PyType
+    function tuple_args(t: PyType): Seq[PyType]
+    function tuple_arg(t: PyType, i: Int): PyType
+    function Iterator(t: PyType): PyType
+    function Iterator_arg(t: PyType, i: Int): PyType
+    function Sequence(t: PyType): PyType
+    function Sequence_arg(t: PyType, i: Int): PyType
+
+    unique function int(): PyType
+    unique function bool(): PyType
+    unique function bytes(): PyType
+    unique function bytearray(): PyType
+    unique function range(): PyType
+    unique function str(): PyType
+    unique function NoneType(): PyType
+}

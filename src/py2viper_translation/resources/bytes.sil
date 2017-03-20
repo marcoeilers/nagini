@@ -1,14 +1,3 @@
-domain PyType {
-    function typeof(r: Ref): PyType
-    function issubtype(t1: PyType, t2: PyType):Bool
-    unique function bytes(): PyType
-    unique function bytearray(): PyType
-    function list(t: PyType): PyType
-    unique function int(): PyType
-}
-
-field list_acc : Seq[Ref]
-
 function bytes___len__(self: Ref): Int
     requires issubtype(typeof(self), bytes())
 	ensures result >= 0
@@ -61,11 +50,6 @@ function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
 {
   (factor == 0 ? Seq[Ref]() : (factor == 1 ? seq : bytes___mul__helper(seq, factor - 1) ++ seq))
 }
-
-// Dummy
-function list___len__(self: Ref): Int
-function list___getitem__(self: Ref, i: Ref): Ref
-function __prim__int___box__(prim: Int): Ref
 
 function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), bytes())

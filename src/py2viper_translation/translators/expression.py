@@ -255,8 +255,9 @@ class ExpressionTranslator(CommonTranslator):
                        for (t, v) in zip(val_types, vals)]
         arg_types = val_types + [type_class] * len(val_types) + [None]
         # Also add a running integer s.t. other tuples with same contents are
-        # not reference-equal.
-        args += [self.get_fresh_int_lit(ctx)]
+        # not reference-equal (except for an empty tuple).
+        if vals:
+            args += [self.get_fresh_int_lit(ctx)]
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
         return call
@@ -299,7 +300,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             end_label = ctx.get_label_name(END_LABEL)
             goto_end = self.viper.Goto(end_label, position,
-                                      self.no_info(ctx))
+                                       self.no_info(ctx))
             if ctx.actual_function.declared_exceptions:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
@@ -630,13 +631,10 @@ class ExpressionTranslator(CommonTranslator):
         elif isinstance(node.ops[0], ast.IsNot):
             return (stmts, self.viper.NeCmp(left, right, position, info))
         elif isinstance(node.ops[0], (ast.In, ast.NotIn)):
-            args = [right, left]
-            arg_types = [right_type, left_type]
-            app = self.get_function_call(right_type, '__contains__',
-                                         args, arg_types, node, ctx)
-            if isinstance(node.ops[0], ast.NotIn):
-                app = self.viper.Not(app, position, info)
-            return stmts, app
+            contains_stmts, contains_expr = self._translate_contains(
+                left, right, left_type, right_type, node, ctx)
+            stmts.extend(contains_stmts)
+            return stmts, contains_expr
         if isinstance(node.ops[0], ast.Eq):
             int_compare = self.viper.EqCmp
             compare_func = '__eq__'
@@ -674,6 +672,19 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'undefined.comparison')
         return stmts, comparison
+
+    def _translate_contains(
+            self, left: Expr, right: Expr, left_type: PythonType,
+            right_type: PythonType, node: ast.AST,
+            ctx: Context) -> StmtsAndExpr:
+        args = [right, left]
+        arg_types = [right_type, left_type]
+        app = self.get_function_call(
+            right_type, '__contains__', args, arg_types, node, ctx)
+        if isinstance(node.ops[0], ast.NotIn):
+            app = self.viper.Not(
+                app, self.to_position(node, ctx), self.no_info(ctx))
+        return [], app
 
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:

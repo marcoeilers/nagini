@@ -425,9 +425,10 @@ class ProgramTranslator(CommonTranslator):
         self._add_all_used_names(used_names)
 
         for sil_prog in sil_progs:
-            domains += [domain
-                        for domain in self.viper.to_list(sil_prog.domains())
-                        if domain.name() != 'PyType']
+            domains += [
+                domain for domain in self.viper.to_list(sil_prog.domains())
+                if domain.name() != 'PyType']
+
             function_names = [function.name() for function in functions]
             functions += [
                 function

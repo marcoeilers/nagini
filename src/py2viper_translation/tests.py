@@ -496,8 +496,8 @@ class AnnotationManager:
                     break
             else:
                 unexpected_errors.append(error)
-        assert not annotations
         assert not unexpected_errors
+        assert not annotations
 
     def has_unexpected_missing(self) -> bool:
         """Check if there are unexpected or missing output annotations."""
@@ -549,13 +549,13 @@ class VerificationTest(AnnotatedTest):
 
     def test_file(
             self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-            sif: bool):
+            sif: bool, reload_resources: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
-        path = os.path.abspath(path)
-        prog = translate(path, jvm, sif)
+
+        prog = translate(path, jvm, sif=sif, reload_resources=reload_resources)
         assert prog is not None
         vresult = verify(prog, path, jvm, verifier)
         self._evaluate_result(vresult, annotation_manager, jvm)

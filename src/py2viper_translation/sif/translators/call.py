@@ -1,15 +1,15 @@
 import ast
 
-from py2viper_contracts.contracts import CONTRACT_FUNCS
-from py2viper_translation.lib.constants import BOOL_TYPE
-from py2viper_translation.lib.jvmaccess import JVM
+from py2viper_translation.lib.constants import (
+    BOOL_TYPE,
+    PRIMITIVE_BOOL_TYPE,
+    PRIMITIVE_INT_TYPE,
+)
 from py2viper_translation.lib.program_nodes import PythonClass, PythonType
-from py2viper_translation.lib.typeinfo import TypeInfo
 from py2viper_translation.lib.util import (
     get_func_name,
     UnsupportedException,
 )
-from py2viper_translation.lib.viper_ast import ViperAST
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
 from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
@@ -22,7 +22,7 @@ from py2viper_translation.translators.abstract import (
     StmtsAndExpr,
 )
 from py2viper_translation.translators.call import CallTranslator
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 
 class CallResults:
@@ -55,23 +55,17 @@ class SIFCallTranslator(CallTranslator):
     """
     SIF version of the CallTranslator.
     """
-    def __init__(self, config: SIFTranslatorConfig, jvm: JVM, source_file: str,
-                 type_info: TypeInfo, viper_ast: ViperAST) -> None:
-        super().__init__(config, jvm, source_file, type_info, viper_ast)
-        # Map of already translated call nodes.
-        self.translated_calls = {}  # Map[ast.Call, CallResults]
+    def __init__(self, *args, **kwargs) -> None:
+        CallTranslator.__init__(self, *args, **kwargs)
+        ExprCacheMixin.__init__(self)
 
-    def translate_constructor_call(self, target_class: PythonClass,
-            node: ast.Call, args: List, arg_stmts: List,
-            ctx: SIFContext) -> StmtsAndExpr:
+    def translate_constructor_call(
+            self, target_class: PythonClass, node: ast.Call, args: List,
+            arg_stmts: List, ctx: SIFContext) -> StmtsAndExpr:
         info = self.no_info(ctx)
-        call_results = self.translated_calls[node]
-        res_var = ctx.current_function.create_variable(target_class.name +
-                                                       '_res',
-                                                       target_class,
-                                                       self.translator)
-        call_results.add_result(res_var.ref())
-        call_results.add_result(res_var.var_prime.ref())
+        res_var = ctx.current_function.create_variable(
+            target_class.name + '_res', target_class, self.translator)
+        self._cache_results(node, [res_var.var_prime.ref()])
         fields = []
         for field in target_class.all_fields:
             fields.append(field.sil_field)
@@ -107,46 +101,59 @@ class SIFCallTranslator(CallTranslator):
                 target_method=target, target_node=node)
             stmts.extend(init)
 
-        return arg_stmts + stmts, call_results.next()
+        return arg_stmts + stmts, res_var.ref()
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: SIFContext) -> StmtsAndExpr:
-        raise UnsupportedException(node, "Built-ins not supported.")
+        func_name = get_func_name(node)
+        if func_name == 'len':
+            return self._translate_len(node, ctx)
+        raise UnsupportedException(
+            node, "Built-in not supported: %s" % func_name)
 
-    def _translate_function_call(self, target: SIFPythonMethod, args: List[Expr],
-                                 formal_args: List[Expr], arg_stmts: List[Stmt],
-                                 position: 'silver.ast.Position', node: ast.AST,
-                                 ctx: SIFContext) -> StmtsAndExpr:
+    def _translate_len(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmts, target = self.translate_expr(node.args[0], ctx)
+        with ctx.prime_ctx():
+            stmts_p, target_p = self.translate_expr(node.args[0], ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        args = [target, target_p, ctx.current_tl_var_expr]
+        arg_types = [arg_type, arg_type,
+                     ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]]
+        func_app = self.get_function_call(
+            arg_type, '__len__', args, arg_types, node, ctx)
+        res_expr, res_expr_p, tl_expr = \
+            self.config.func_triple_factory.extract_results(
+                func_app, ctx.module.global_module.classes[PRIMITIVE_INT_TYPE],
+                self.to_position(node, ctx), self.no_info(ctx), ctx)
+        ctx.current_tl_var_expr = tl_expr
+        self._cache_results(node, [res_expr_p, tl_expr])
+
+        return stmts + stmts_p, res_expr
+
+    def _translate_function_call(
+            self, target: SIFPythonMethod, args: List[Expr],
+            formal_args: List[Expr], arg_stmts: List[Stmt],
+            position: 'silver.ast.Position', node: ast.AST,
+            ctx: SIFContext) -> StmtsAndExpr:
         assert not ctx.use_prime
         info = self.no_info(ctx)
-        call_results = self.translated_calls[node]
-
         type_ = self.translate_type(target.type, ctx)
         func_app = self.viper.FuncApp(target.sil_name, args, position,
                                       info, type_, formal_args)
-        # We have to update the current timeLevel var expression.
-        tl_expr = self.config.func_triple_factory.get_call(FTDF.GET_TL,
-            [func_app], target.type, position, info, ctx)
+        res_expr, res_expr_p, tl_expr = \
+            self.config.func_triple_factory.extract_results(
+                func_app, target.type, position, info, ctx)
         ctx.current_tl_var_expr = tl_expr
+        self._cache_results(node, [res_expr_p, tl_expr])
 
-        # Add the resulting expressions to call_results.
-        res_expr = self.config.func_triple_factory.get_call(FTDF.GET,
-            [func_app], target.type, position, info, ctx)
-        res_expr_p = self.config.func_triple_factory.get_call(FTDF.GET_PRIME,
-            [func_app], target.type, position, info, ctx)
-        call_results.add_result(res_expr)
-        call_results.add_result(res_expr_p)
-        call_results.add_result(tl_expr)
-
-        return arg_stmts, call_results.next()
+        return arg_stmts, res_expr
 
     def _translate_method_call(self, target: SIFPythonMethod, args: List[Expr],
                                arg_stmts: List[Stmt],
                                position: 'silver.ast.Position', node: ast.AST,
                                ctx: SIFContext) -> StmtsAndExpr:
-        call_results = self.translated_calls[node]
         targets = []
-
         if ctx.current_function is None:
             if ctx.current_class is None:
                 # global variable
@@ -160,18 +167,18 @@ class SIFCallTranslator(CallTranslator):
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
             targets.append(result_var.ref())
-            call_results.add_result(result_var.ref())
             targets.append(result_var.var_prime.ref())
-            call_results.add_result(result_var.var_prime.ref())
+            self._cache_results(
+                node, [result_var.ref(), result_var.var_prime.ref()])
         if target.declared_exceptions:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, 'Exceptions not supported.')
         # Add timeLevel to targets.
         targets.append(ctx.current_function.new_tl_var.ref())
 
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
-        res_expr = call_results.next() if target.type else None
+        res_expr = self._try_cache(node)
 
         return arg_stmts + call, res_expr
 
@@ -207,6 +214,7 @@ class SIFCallTranslator(CallTranslator):
     def _translate_receiver(self, node: ast.Call, target: SIFPythonMethod,
             ctx: SIFContext) -> Tuple[List[Stmt], List[Expr], List[PythonType]]:
         info = self.no_info(ctx)
+        position = self.to_position(node, ctx)
         recv_stmts, recv = self.translate_expr(node.func.value, ctx)
         with ctx.prime_ctx():
             recv_stmts_p, recv_p = self.translate_expr(node.func.value, ctx)
@@ -215,14 +223,10 @@ class SIFCallTranslator(CallTranslator):
 
         # timeLevel := timeLevel || !(typeof(recv) == typeof(recv_p))
         type_expr = self.type_factory.type_comp(recv, recv_p, ctx)
-        rhs = self.viper.Or(ctx.current_function.new_tl_var.ref(),
-                            type_expr,
-                            self.no_position(ctx),
-                            info)
-        assign = self.viper.LocalVarAssign(ctx.current_function.new_tl_var.ref(),
-                                           rhs,
-                                           self.no_position(ctx),
-                                           info)
+        rhs = self.viper.Or(
+            ctx.current_function.new_tl_var.ref(), type_expr, position, info)
+        assign = self.viper.LocalVarAssign(
+            ctx.current_function.new_tl_var.ref(), rhs, position, info)
         return recv_stmts + [assign], [recv, recv_p], [recv_type, recv_type]
 
     def translate_Call(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
@@ -231,15 +235,8 @@ class SIFCallTranslator(CallTranslator):
         translated (returning the next result). Calls super().translate_Call
         if that isn't the case.
         """
-        func_name = get_func_name(node)
-        if node in self.translated_calls:
-            assert len(self.translated_calls[node])
-            call_expr = self.translated_calls[node].next()
-            if call_expr:
-                return [], call_expr
-        elif func_name in CONTRACT_FUNCS:
-            # Contract functions need no CallResult.
-            return self.translate_contractfunc_call(node, ctx)
+        call_expr = self._try_cache(node)
+        if call_expr:
+            return [], call_expr
 
-        self.translated_calls[node] = CallResults()
         return super().translate_Call(node, ctx)
