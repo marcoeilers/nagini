@@ -243,6 +243,14 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
+        call = self.create_tuple(vals, val_types, node, ctx)
+        return stmts, call
+
+    def create_tuple(self, vals: List[Expr], val_types: List[PythonType],
+                     node: ast.AST, ctx: Context) -> Expr:
+        """
+        Creates a tuple containing the given values.
+        """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
@@ -259,11 +267,13 @@ class ExpressionTranslator(CommonTranslator):
         #                                    position, info)
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
-        args = vals + types + [self.get_fresh_int_lit(ctx)]
+        args = vals + types
+        if args:
+            args.append(self.get_fresh_int_lit(ctx))
         arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
-        return stmts, call
+        return call
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:

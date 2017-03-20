@@ -508,7 +508,9 @@ class CallTranslator(CommonTranslator):
         # Also add a running integer s.t. other tuples with same contents are not
         # reference-identical.
         # args = [val_seq, type_seq, self.get_fresh_int_lit(ctx)]
-        args = args + types + [self.get_fresh_int_lit(ctx)]
+        args = args + types
+        if args:
+            args.append(self.get_fresh_int_lit(ctx))
         arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)

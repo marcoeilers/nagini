@@ -93,5 +93,3 @@ function bytes___getitem_slice__(self: Ref, index: Ref): Ref
 //{
 //    bytes___create__(bytes___val__(self)[slice___actualstart__(index, bytes___len__(self))..slice___actualstop__(index, bytes___len__(self))], newCtr(self))
 //}
-
-function newCtr(r: Ref): Int
