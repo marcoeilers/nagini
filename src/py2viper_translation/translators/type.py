@@ -57,9 +57,14 @@ class TypeTranslator(CommonTranslator):
     def __init__(self, config: TranslatorConfig, jvm: JVM, source_file: str,
                  type_info: TypeInfo, viper_ast: ViperAST) -> None:
         super().__init__(config, jvm, source_file, type_info, viper_ast)
-        self.builtins = {'builtins.int': viper_ast.Int,
-                         'builtins.bool': viper_ast.Bool,
-                         'builtins.Sequence': viper_ast.SeqType(viper_ast.Ref)}
+
+    @property
+    def builtins(self):
+        return {'builtins.int': self.viper.Int,
+                'builtins.bool': self.viper.Bool,
+                'builtins.Sequence': self.viper.SeqType(self.viper.Ref),
+                'builtins.__prim__Sequence_type': self.viper.SeqType(self.type_factory.type_type())
+                }
 
     def translate_type(self, cls: PythonClass,
                        ctx: Context) -> 'silver.ast.Type':

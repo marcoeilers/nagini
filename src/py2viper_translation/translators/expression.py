@@ -227,11 +227,14 @@ class ExpressionTranslator(CommonTranslator):
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
         bytes_class = ctx.module.global_module.classes[BYTES_TYPE]
-        result = self.get_function_call(bytes_class, '__create__', [seq],
-                                        [None], node, ctx)
+        args = [seq, self.get_fresh_int_lit(ctx)]
+        result = self.get_function_call(bytes_class, '__create__', args,
+                                        [None, None], node, ctx)
         return [], result
 
     def translate_Tuple(self, node: ast.Tuple, ctx: Context) -> StmtsAndExpr:
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmts = []
         vals = []
         val_types = []
@@ -240,35 +243,63 @@ class ExpressionTranslator(CommonTranslator):
             stmts += el_stmt
             vals.append(el_val)
             val_types.append(self.get_type(el, ctx))
-        call = self.create_tuple(vals, val_types, node, ctx)
-        return stmts, call
-
-    def create_tuple(self, vals: List[Expr], val_types: List[PythonType],
-                     node: ast.AST, ctx: Context) -> Expr:
-        """
-        Creates a tuple containing the given values.
-        """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
-        args = vals + [self.get_tuple_type_arg(v, t, node, ctx)
-                       for (t, v) in zip(val_types, vals)]
-        arg_types = val_types + [type_class] * len(val_types) + [None]
-        # Also add a running integer s.t. other tuples with same contents are
-        # not reference-equal (except for an empty tuple).
-        if vals:
-            args += [self.get_fresh_int_lit(ctx)]
+        # if vals:
+        #     val_seq = self.viper.ExplicitSeq(vals, position, info)
+        # else:
+        #     val_seq = self.viper.EmptySeq(self.viper.Ref, position, info)
+        types = [self.get_tuple_type_arg(v, t, node, ctx)
+                 for (t, v) in zip(val_types, vals)]
+        # if types:
+        #     type_seq = self.viper.ExplicitSeq(types, position, info)
+        # else:
+        #     type_seq = self.viper.EmptySeq(self.type_factory.type_type(),
+        #                                    position, info)
+        # Also add a running integer s.t. other tuples with same contents are not
+        # reference-identical.
+        args = vals + types + [self.get_fresh_int_lit(ctx)]
+        arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,
                                       node, ctx)
-        return call
+        return stmts, call
 
     def translate_Subscript(self, node: ast.Subscript,
                             ctx: Context) -> StmtsAndExpr:
-        if not isinstance(node.slice, ast.Index):
-            raise UnsupportedException(node)
+        target_type = self.get_type(node.value, ctx)
         target_stmt, target = self.translate_expr(node.value, ctx,
                                                   target_type=self.viper.Ref)
-        target_type = self.get_type(node.value, ctx)
+        if not isinstance(node.slice, ast.Index):
+            if node.slice.step:
+                raise UnsupportedException(node, 'slice step')
+            slice_class = ctx.module.global_module.classes['slice']
+            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            start = stop = null
+            start_stmt = stop_stmt = []
+            if node.slice.lower:
+                start_stmt, start = self.translate_expr(node.slice.lower, ctx)
+            if node.slice.upper:
+                stop_stmt, stop = self.translate_expr(node.slice.upper, ctx)
+            slice = self.get_function_call(slice_class, '__create__',
+                                           [start, stop], [None, None],
+                                           node.slice, ctx)
+            args = [target, slice]
+            stmt = target_stmt + start_stmt + stop_stmt
+            getitem = target_type.get_func_or_method('__getitem_slice__')
+            if not getitem.pure:
+                result_var = ctx.actual_function.create_variable(
+                    'slice_res', target_type, self.translator)
+                call = self.get_method_call(target_type, '__getitem_slice__',
+                                            args, [None, None],
+                                            [result_var.ref()], node, ctx)
+                stmt += call
+                return stmt, result_var.ref()
+            else:
+                call = self.get_function_call(target_type, '__getitem_slice__',
+                                              args, [None, None], node, ctx)
+                return stmt, call
+
         index_stmt, index = self.translate_expr(node.slice.value, ctx,
                                                 target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
@@ -299,8 +330,7 @@ class ExpressionTranslator(CommonTranslator):
             uncaught_option = goto_finally
         else:
             end_label = ctx.get_label_name(END_LABEL)
-            goto_end = self.viper.Goto(end_label, position,
-                                       self.no_info(ctx))
+            goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
             if ctx.actual_function.declared_exceptions:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
