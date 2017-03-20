@@ -13,10 +13,6 @@ from py2viper_translation.lib.util import (
 from py2viper_translation.sif.lib.context import SIFContext
 from py2viper_translation.sif.lib.expr_cache import ExprCacheMixin
 from py2viper_translation.sif.lib.program_nodes import SIFPythonMethod
-from py2viper_translation.sif.translators.abstract import SIFTranslatorConfig
-from py2viper_translation.sif.translators.func_triple_domain_factory import (
-    FuncTripleDomainFactory as FTDF,
-)
 from py2viper_translation.translators.abstract import (
     Expr,
     Stmt,
