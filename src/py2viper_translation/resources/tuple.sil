@@ -74,7 +74,6 @@ function tuple___len__(self: Ref): Int
 
 function tuple___getitem__(self: Ref, key: Int): Ref
     requires let ln == (tuple___len__(self)) in ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))
-    //requires key < 0 ==> key >= -tuple___len__(self)
     ensures key >= 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), key))
     ensures key < 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), tuple___len__(self) + key))
     ensures key >= 0 ==> result == tuple___val__(self)[key]
@@ -88,11 +87,6 @@ function tuple___getitem_slice__(self: Ref, key: Ref): Ref
     ensures forall i: Int :: {tuple_arg(typeof(result), i)} (i >= 0 && i < (slice___actualstop__(key, tuple___len__(self)) - slice___actualstart__(key, tuple___len__(self)))) ==> tuple_arg(typeof(result), i) == tuple_arg(typeof(self), i + slice___actualstart__(key, tuple___len__(self)))
     ensures tuple___len__(result) == (slice___actualstop__(key, tuple___len__(self)) - slice___actualstart__(key, tuple___len__(self)))
     ensures tuple___val__(result) == tuple___val__(self)[slice___actualstart__(key, tuple___len__(self))..slice___actualstop__(key, tuple___len__(self))]
-    //ensures (forall i: Int :: {tuple___getitem__(result, i)} ((i >= 0 && i < (slice___actualstop__(key, tuple___len__(self)) - slice___actualstart__(key, tuple___len__(self)))) ==>
-    //                          (tuple___getitem__(result, i) == tuple___getitem__(self, i + slice___actualstart__(key, tuple___len__(self))) )))
-//{
-//    tuple___create__(tuple___val__(self)[slice___actualstart__(key, tuple___len__(self))..slice___actualstop__(key, tuple___len__(self))], tuple_args(typeof(self))[slice___actualstart__(key, tuple___len__(self))..slice___actualstop__(key, tuple___len__(self))], newCtr(self))
-//}
 
 function tuple___contains__(self: Ref, item: Ref): Bool
 function tuple___eq__(self: Ref, other: Ref): Bool
@@ -100,5 +94,3 @@ function tuple___eq__(self: Ref, other: Ref): Bool
              (forall i: Int :: {tuple___getitem__(self, i)} {tuple___getitem__(other, i)} i >= 0 && i < tuple___len__(self)
                                 ==> tuple___getitem__(self, i) == tuple___getitem__(other, i)))
              ==> result
-
-function newCtr(r: Ref): Int

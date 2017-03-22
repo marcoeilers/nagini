@@ -38,9 +38,7 @@ function bytes___mul__(self: Ref, factor: Int): Ref
   requires factor >= 0
   ensures typeof(result) == bytes()
   ensures bytes___len__(result) == factor * bytes___len__(self)
-{
-    bytes___create__(bytes___mul__helper(bytes___val__(self), factor), newCtr(self) + factor)
-}
+  ensures bytes___val__(result) == bytes___mul__helper(bytes___val__(self), factor)k
 
 // Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
@@ -90,6 +88,3 @@ function bytes___getitem_slice__(self: Ref, index: Ref): Ref
     ensures issubtype(typeof(result), bytes())
     ensures bytes___len__(result) == (slice___actualstop__(index, bytes___len__(self)) - slice___actualstart__(index, bytes___len__(self)))
     ensures bytes___val__(result) == bytes___val__(self)[slice___actualstart__(index, bytes___len__(self))..slice___actualstop__(index, bytes___len__(self))]
-//{
-//    bytes___create__(bytes___val__(self)[slice___actualstart__(index, bytes___len__(self))..slice___actualstop__(index, bytes___len__(self))], newCtr(self))
-//}
