@@ -61,6 +61,5 @@ class PythonRefExpression(RefExpression):
             self._node, ctx, expression=True)
         assert not stmt
         typ = translator.get_type(self._node, ctx)
-        for primitive in PRIMITIVES:
-            assert typ is not ctx.module.global_module.classes[primitive]
+        assert typ.name not in PRIMITIVES
         return expr
