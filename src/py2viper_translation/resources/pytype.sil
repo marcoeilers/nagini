@@ -20,6 +20,7 @@ domain PyType {
     unique function bytes(): PyType
     unique function bytearray(): PyType
     unique function range(): PyType
+    unique function slice(): PyType
     unique function str(): PyType
     unique function NoneType(): PyType
 }
