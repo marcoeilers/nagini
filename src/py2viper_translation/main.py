@@ -8,8 +8,8 @@ import sys
 import time
 import traceback
 
-# This import mobkey-patches mypy and should happen as early as possible.
-import py2viper_translation.lib.mypy_patch
+# This import monkey-patches mypy and should happen as early as possible.
+import py2viper_translation.mypy.mypy_patch
 
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer

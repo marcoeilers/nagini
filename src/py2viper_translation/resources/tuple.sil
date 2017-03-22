@@ -63,6 +63,7 @@ function tuple___getitem__(self: Ref, key: Int): Ref
     ensures issubtype(typeof(result), tuple_arg(typeof(self), key))
 
 function tuple___contains__(self: Ref, item: Ref): Bool
+    ensures result == item in tuple___sil_seq__(self)
 
 function tuple___eq__(self: Ref, other: Ref): Bool
     ensures (tuple___len__(self) == tuple___len__(other) &&
