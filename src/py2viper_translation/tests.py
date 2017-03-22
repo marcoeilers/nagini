@@ -597,6 +597,7 @@ class TranslationTest(AnnotatedTest):
         path = os.path.abspath(path)
         try:
             translate(path, jvm, sif=sif, reload_resources=reload_resources)
+            actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
         except TypeException as exp2:
