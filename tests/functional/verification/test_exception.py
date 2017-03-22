@@ -5,6 +5,11 @@ class MyException(Exception):
     pass
 
 
+class VarArgException(Exception):
+    def __init__(self, *args: object) -> None:
+        Requires(len(args) == 0)
+
+
 class MySpecialException(MyException):
     pass
 
@@ -24,6 +29,18 @@ class Container:
     def __init__(self) -> None:
         Ensures(Acc(self.value))  # type: ignore
         self.value = 0
+
+
+def special_raise() -> None:
+    Ensures(False)
+    Exsures(MyException, True)
+    raise MyException
+
+
+def special_raise_2() -> None:
+    Ensures(False)
+    Exsures(VarArgException, True)
+    raise VarArgException
 
 
 def raised_and_declared(input: int, incon: Container) -> Container:

@@ -3,6 +3,7 @@ from py2viper_contracts.contracts import *
 
 class A:
     SOME_CONST = 23
+    SOME_CONST_2 = SOME_CONST + 4
 
     def a(self) -> int:
         Ensures(Result() > 22)
@@ -15,8 +16,8 @@ class A:
 
     @staticmethod
     def something() -> int:
-        Ensures(Result() >= OTHER_CONST)
-        return A.SOME_CONST
+        Ensures(Result() >= OTHER_CONST + 3)
+        return A.SOME_CONST_2
 
     @staticmethod
     def something_else() -> int:
@@ -39,12 +40,12 @@ def whatever(b: bool) -> int:
 
 def whatever_2(b: bool) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Result() > OTHER_CONST)
+    Ensures(Result() <= OTHER_CONST)
     a = A()
     return a.something()
 
 
 def whatever_3(b: bool) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Result() > OTHER_CONST)
+    Ensures(Result() <= OTHER_CONST)
     return A.something()
