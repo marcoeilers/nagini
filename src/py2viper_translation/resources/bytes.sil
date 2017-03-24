@@ -54,9 +54,7 @@ function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), list(bytes()))
     requires acc(other.list_acc, wildcard)
     ensures issubtype(typeof(result), bytes())
-{
-    bytes___create__((list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0)), newCtr(self) + newCtr(other))
-}
+    ensures bytes___val__(result) == (list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0))
 
 // Helper function for defining the meaning of byte join
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
