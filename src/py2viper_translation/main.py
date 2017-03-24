@@ -9,7 +9,7 @@ import time
 import traceback
 
 # This import monkey-patches mypy and should happen as early as possible.
-import py2viper_translation.mypy.mypy_patch
+import py2viper_translation.mypy_patches.mypy_patch
 
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer

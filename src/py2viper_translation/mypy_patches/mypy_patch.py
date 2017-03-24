@@ -13,7 +13,7 @@ Also monkey patches member access resolution for union types so that no error
 message is generated when accessing members of optional types, and type
 inference and checking can proceed normally.
 """
-
+import mypy
 import mypy.fastparse
 import mypy.checkmember
 
