@@ -41,7 +41,7 @@ from py2viper_translation.lib.util import (
 )
 from py2viper_translation.translators.abstract import Context
 from py2viper_translation.translators.common import CommonTranslator
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 class ExpressionTranslator(CommonTranslator):
@@ -254,20 +254,11 @@ class ExpressionTranslator(CommonTranslator):
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
         type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
-        # if vals:
-        #     val_seq = self.viper.ExplicitSeq(vals, position, info)
-        # else:
-        #     val_seq = self.viper.EmptySeq(self.viper.Ref, position, info)
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
-        # if types:
-        #     type_seq = self.viper.ExplicitSeq(types, position, info)
-        # else:
-        #     type_seq = self.viper.EmptySeq(self.type_factory.type_type(),
-        #                                    position, info)
-        # Also add a running integer s.t. other tuples with same contents are not
-        # reference-identical.
         args = vals + types
+        # Also add a running integer s.t. other tuples with same contents are
+        # not reference-identical (except for empty tuples).
         if args:
             args.append(self.get_fresh_int_lit(ctx))
         arg_types = [None] * len(args)
@@ -453,10 +444,15 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
         target = self.get_target(node, ctx)
         if isinstance(target, PythonGlobalVar):
+            position = self.to_position(node, ctx)
+            if target.cls:
+                # This is a static field
+                field_func = self.translate_static_field_access(target,
+                    ctx.current_class, position, ctx)
+                return [], field_func
             var = target
             type = self.translate_type(var.type, ctx)
-            func_app = self.viper.FuncApp(var.sil_name, [],
-                                          self.to_position(node, ctx),
+            func_app = self.viper.FuncApp(var.sil_name, [], position,
                                           self.no_info(ctx), type, [])
             return [], func_app
         else:
@@ -496,41 +492,66 @@ class ExpressionTranslator(CommonTranslator):
 
         return field
 
+    def translate_static_field_access(self, field: PythonGlobalVar,
+                                      receiver: Union[Expr, PythonType],
+                                      position, ctx: Context) -> Expr:
+        """
+        Translates an access to the given field via the given receiver. The
+        receiver can either be the type literal via which the field is
+        accessed, an expression of type 'type' (e.g. cls in classmethods) or
+        a normal object.
+        """
+        while field.overrides:
+            field = field.overrides
+        field_type = self.translate_type(field.type, ctx)
+
+        if isinstance(receiver, PythonType):
+            type_arg = self.type_factory.translate_type_literal(receiver,
+                                                                position, ctx)
+        else:
+            if receiver.typ() != self.type_factory.type_type():
+                # Normal object, get its type.
+                type_arg = self.type_factory.typeof(receiver, ctx)
+            else:
+                # Type expression, use it directly.
+                type_arg = receiver
+        info = self.no_info(ctx)
+        param = self.viper.LocalVarDecl('receiver',
+                                        self.type_factory.type_type(), position,
+                                        info)
+        return self.viper.FuncApp(field.sil_name, [type_arg], position, info,
+                                  field_type, [param])
+
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
+        position = self.to_position(node, ctx)
         target = self.get_target(node.value, ctx)
         func_name = get_func_name(node.value)
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
-                # Global var?
-                pos = self.to_position(node, ctx)
+                # Global var
                 info = self.no_info(ctx)
                 var_type = self.translate_type(target.type, ctx)
-                return [], self.viper.FuncApp(target.sil_name, [], pos, info,
-                                              var_type, [])
+                return [], self.viper.FuncApp(target.sil_name, [], position,
+                                              info, var_type, [])
             else:
                 raise UnsupportedException(node)
         elif isinstance(target, PythonClass) and func_name != 'Result':
             field = target.get_static_field(node.attr)
-            type = self.translate_type(field.type, ctx)
-            func_app = self.viper.FuncApp(field.sil_name, [],
-                                          self.to_position(node, ctx),
-                                          self.no_info(ctx), type, [])
-            return [], func_app
+            field_func = self.translate_static_field_access(field, target,
+                                                            position, ctx)
+            return [], field_func
         else:
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             field = self._lookup_field(node, ctx)
-            if isinstance(field, PythonVarBase):
-                type = self.translate_type(field.type, ctx)
-                func_app = self.viper.FuncApp(field.sil_name, [],
-                                              self.to_position(node, ctx),
-                                              self.no_info(ctx), type, [])
-                return [], func_app
+            if isinstance(field, PythonGlobalVar):
+                field_func = self.translate_static_field_access(field, receiver,
+                                                                position, ctx)
+                return [], field_func
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
-                                                 self.to_position(node, ctx),
-                                                 self.no_info(ctx)))
+                                                 position, self.no_info(ctx)))
 
     def translate_UnaryOp(self, node: ast.UnaryOp,
                           ctx: Context) -> StmtsAndExpr:

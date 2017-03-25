@@ -1262,6 +1262,17 @@ class PythonGlobalVar(PythonVarBase):
     Represents a global variable in Python.
     """
 
+    def __init__(self, name: str, node: ast.AST, type: PythonClass,
+                 cls: PythonClass = None):
+        super().__init__(name, node, type)
+        self.cls = cls
+        self.overrides = None
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        super().process(sil_name, translator)
+        if self.cls is not None and self.cls.superclass is not None:
+            self.overrides = self.cls.superclass.get_static_field(self.name)
+
 
 class PythonIOExistentialVar(PythonVarBase):
     """
@@ -1447,6 +1458,11 @@ class ProgramNodeFactory:
             self, name: str, node: ast.AST,
             type_: PythonClass) -> PythonGlobalVar:
         return PythonGlobalVar(name, node, type_)
+
+    def create_static_field(
+            self, name: str, node: ast.AST, type_: PythonClass,
+            cls: PythonClass) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_, cls)
 
     def create_python_io_existential_var(
             self, name: str, node: ast.AST,
