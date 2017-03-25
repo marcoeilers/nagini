@@ -38,7 +38,7 @@ function bytes___mul__(self: Ref, factor: Int): Ref
   requires factor >= 0
   ensures typeof(result) == bytes()
   ensures bytes___len__(result) == factor * bytes___len__(self)
-  ensures bytes___val__(result) == bytes___mul__helper(bytes___val__(self), factor)k
+  ensures bytes___val__(result) == bytes___mul__helper(bytes___val__(self), factor)
 
 // Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]

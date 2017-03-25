@@ -779,8 +779,8 @@ class Analyzer(ast.NodeVisitor):
                     return
                 cls = self.typeof(node)
                 self.define_new(self.current_class, node.id, node)
-                var = self.node_factory.create_python_global_var(node.id,
-                                                                 node, cls)
+                var = self.node_factory.create_static_field(node.id, node, cls,
+                                                            self.current_class)
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
                         or len(assign.targets) != 1):

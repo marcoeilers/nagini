@@ -54,7 +54,7 @@ class D:
 
     @classmethod
     def access_static(cls) -> int:
-        Ensures(Result() == 46)
+        Ensures(Implies(cls is D, Result() == 46))
         return cls.double(cls.some_field)
 
 

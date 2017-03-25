@@ -377,7 +377,7 @@
         "__create0__": {
             "args": [],
             "type": "tuple",
-            "requires": ["__len__"]
+            "requires": ["__val__", "__len__"]
         },
         "__create__": {
             "args": ["__prim__Sequence", "__prim__Sequence_type", "__prim__int"],
@@ -427,7 +427,7 @@
         "__contains__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": []
+            "requires": ["__val__"]
         },
         "__len__": {
             "args": ["tuple"],
@@ -445,7 +445,7 @@
         "__sil_seq__": {
             "args": ["tuple"],
             "type": "__prim__Sequence",
-            "requires": ["__len__"]
+            "requires": ["__len__", "__val__"]
         }
     },
     "type_vars": -1,
@@ -643,7 +643,9 @@
 },
 "LevelType": {
 },
-"type": {},
+"type": {
+    "extends": "object"
+},
 "Place": {
     "functions": {
         "__eq__": {

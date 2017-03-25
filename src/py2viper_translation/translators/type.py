@@ -63,7 +63,6 @@ class TypeTranslator(CommonTranslator):
         return {'builtins.int': self.viper.Int,
                 'builtins.bool': self.viper.Bool,
                 'builtins.Sequence': self.viper.SeqType(self.viper.Ref),
-                'builtins.__prim__Sequence_type': self.viper.SeqType(self.type_factory.type_type())
                 }
 
     def translate_type(self, cls: PythonClass,

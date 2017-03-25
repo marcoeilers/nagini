@@ -372,7 +372,7 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
     value_type = get_type(node.value, containers, container)
     if value_type.name == TUPLE_TYPE:
         if isinstance(node.slice, ast.Slice):
-            raise UnsupportedException(node, 'tuple slice type')
+            raise UnsupportedException(node, 'tuple slicing')
         if len(value_type.type_args) == 1:
             return value_type.type_args[0]
         if isinstance(node.slice.value, ast.UnaryOp):
