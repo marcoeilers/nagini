@@ -25,7 +25,7 @@
         "__getitem_slice__": {
             "args": ["list", "slice"],
             "type": "list",
-            "requires": ["__len__", "slice___actualstart__", "slice___actualstop__"]
+            "requires": ["__len__", "slice___start__", "slice___stop__"]
         }
     },
     "functions": {
@@ -357,7 +357,7 @@
         "__getitem_slice__": {
             "args": ["bytes", "slice"],
             "type": "int",
-            "requires": ["__len__", "__val__", "slice___actualstart__", "slice___actualstop__"]
+            "requires": ["__len__", "__val__", "slice___start__", "slice___stop__"]
         },
         "__getitem__": {
             "args": ["bytes", "__prim__int"],
@@ -422,7 +422,7 @@
         "__getitem_slice__": {
             "args": ["tuple", "slice"],
             "type": "object",
-            "requires": ["__len__", "__getitem__", "__val__", "slice___actualstart__", "slice___actualstop__"]
+            "requires": ["__len__", "__getitem__", "__val__", "slice___start__", "slice___stop__"]
         },
         "__contains__": {
             "args": ["tuple", "object"],
@@ -536,25 +536,25 @@
         "__create__": {
             "args": ["int", "int"],
             "type": "slice",
-            "requires": ["__start__", "__stop__"]
+            "requires": ["__internal_start__", "__internal_stop__"]
+        },
+        "__internal_start__": {
+            "args": ["slice"],
+            "type": "int"
+        },
+        "__internal_stop__": {
+            "args": ["slice"],
+            "type": "int"
         },
         "__start__": {
             "args": ["slice"],
-            "type": "int"
+            "type": "int",
+            "requires": ["__internal_start__"]
         },
         "__stop__": {
             "args": ["slice"],
-            "type": "int"
-        },
-        "__actualstart__": {
-            "args": ["slice"],
             "type": "int",
-            "requires": ["__start__"]
-        },
-        "__actualstop__": {
-            "args": ["slice"],
-            "type": "int",
-            "requires": ["__stop__"]
+            "requires": ["__internal_stop__"]
         }
     },
     "extends": "object"
@@ -586,7 +586,7 @@
         "__getitem_slice__": {
             "args": ["range", "slice"],
             "type": "range",
-            "requires": ["__val__", "int___unbox__", "slice___actualstart__", "slice___actualstop__"]
+            "requires": ["__val__", "int___unbox__", "slice___start__", "slice___stop__"]
         },
         "__contains__": {
             "args": ["range", "int"],

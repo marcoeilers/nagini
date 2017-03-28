@@ -272,34 +272,8 @@ class ExpressionTranslator(CommonTranslator):
         target_stmt, target = self.translate_expr(node.value, ctx,
                                                   target_type=self.viper.Ref)
         if not isinstance(node.slice, ast.Index):
-            if node.slice.step:
-                raise UnsupportedException(node, 'slice step')
-            slice_class = ctx.module.global_module.classes['slice']
-            null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-            start = stop = null
-            start_stmt = stop_stmt = []
-            if node.slice.lower:
-                start_stmt, start = self.translate_expr(node.slice.lower, ctx)
-            if node.slice.upper:
-                stop_stmt, stop = self.translate_expr(node.slice.upper, ctx)
-            slice = self.get_function_call(slice_class, '__create__',
-                                           [start, stop], [None, None],
-                                           node.slice, ctx)
-            args = [target, slice]
-            stmt = target_stmt + start_stmt + stop_stmt
-            getitem = target_type.get_func_or_method('__getitem_slice__')
-            if not getitem.pure:
-                result_var = ctx.actual_function.create_variable(
-                    'slice_res', target_type, self.translator)
-                call = self.get_method_call(target_type, '__getitem_slice__',
-                                            args, [None, None],
-                                            [result_var.ref()], node, ctx)
-                stmt += call
-                return stmt, result_var.ref()
-            else:
-                call = self.get_function_call(target_type, '__getitem_slice__',
-                                              args, [None, None], node, ctx)
-                return stmt, call
+            return self._translate_slice_subscript(node, target, target_type,
+                                                   target_stmt, ctx)
 
         index_stmt, index = self.translate_expr(node.slice.value, ctx,
                                                 target_type=self.viper.Ref)
@@ -311,6 +285,39 @@ class ExpressionTranslator(CommonTranslator):
         result = call
         result_type = self.get_type(node, ctx)
         return target_stmt + index_stmt, result
+
+    def _translate_slice_subscript(self, node: ast.Subscript, target: Expr,
+                                   target_type: PythonType,
+                                   target_stmt: List[Stmt],
+                                   ctx: Context) -> StmtsAndExpr:
+        if node.slice.step:
+            raise UnsupportedException(node, 'slice step')
+        slice_class = ctx.module.global_module.classes['slice']
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        start = stop = null
+        start_stmt = stop_stmt = []
+        if node.slice.lower:
+            start_stmt, start = self.translate_expr(node.slice.lower, ctx)
+        if node.slice.upper:
+            stop_stmt, stop = self.translate_expr(node.slice.upper, ctx)
+        slice = self.get_function_call(slice_class, '__create__',
+                                       [start, stop], [None, None],
+                                       node.slice, ctx)
+        args = [target, slice]
+        stmt = target_stmt + start_stmt + stop_stmt
+        getitem = target_type.get_func_or_method('__getitem_slice__')
+        if not getitem.pure:
+            result_var = ctx.actual_function.create_variable(
+                'slice_res', target_type, self.translator)
+            call = self.get_method_call(target_type, '__getitem_slice__',
+                                        args, [None, None],
+                                        [result_var.ref()], node, ctx)
+            stmt += call
+            return stmt, result_var.ref()
+        else:
+            call = self.get_function_call(target_type, '__getitem_slice__',
+                                          args, [None, None], node, ctx)
+            return stmt, call
 
     def create_exception_catchers(self, var: PythonVar,
                                   try_blocks: List[PythonTryBlock],

@@ -59,12 +59,17 @@ class ProgramTranslator(CommonTranslator):
 
         return fields
 
-    def create_static_field_function(self, root: PythonVar, fields: PythonVar,
+    def create_static_field_function(self, root: PythonVar,
+                                     classes: List[PythonClass],
                                      ctx: Context) -> 'silver.ast.Function':
         """
         Creates a function which represents a static field. The function takes
         a parameter which represents the class on which it is called, and has
         postconditions defining its return value based on this parameter.
+
+        'root' must be the version of the field in the class that is highest in
+        the inheritance hierarchy. 'classes' must be a list of classes that
+        inherit or redefine it.
         """
         type = self.translate_type(root.type, ctx)
         position = self.to_position(root.node, ctx)
@@ -77,14 +82,18 @@ class ProgramTranslator(CommonTranslator):
         type_ref = self.viper.LocalVar('receiver', type_type, position, info)
         if root.type.name not in PRIMITIVES:
             posts.append(self.type_check(result, root.type, position, ctx))
-        for field in fields:
-            if not hasattr(field, 'value'):
-                continue
+        # Iterate through all classes that 'inherit' or redefine this field
+        for cls in classes:
+            # Get their version (might be redefined or inherited).
+            field = cls.get_static_field(root.name)
             ctx.current_class = field.cls
+            # Compute the field value
             stmt, value = self.translate_expr(field.value, ctx)
             if stmt:
                 raise InvalidProgramException('purity.violated', field.node)
             field_position = self.to_position(field.node, ctx)
+            # Create a postcondition of the form
+            # receiver == cls ==> result == value
             has_value = self.viper.EqCmp(result, value, field_position, info)
             type_literal = self.type_factory.translate_type_literal(
                 field.cls, field_position, ctx)
@@ -92,6 +101,7 @@ class ProgramTranslator(CommonTranslator):
                                           info)
             posts.append(self.viper.Implies(exact_type, has_value,
                                             field_position, info))
+        # Create a single function that represents all
         return self.viper.Function(root.sil_name, [type_decl], type, [], posts,
                                    None, position, info)
 
@@ -512,14 +522,12 @@ class ProgramTranslator(CommonTranslator):
                 containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
                 ctx.current_class = cls
-                for name, field in cls.static_fields.items():
+                for field_name in cls.all_static_fields:
+                    field = cls.get_static_field(field_name)
                     current_field = field
                     while current_field.overrides:
                         current_field = current_field.overrides
-                    if current_field in static_fields:
-                        static_fields[current_field].append(field)
-                    else:
-                        static_fields[current_field] = [field]
+                    static_fields.setdefault(current_field, []).append(cls)
 
             ctx.current_class = None
             # Translate default args
@@ -531,8 +539,8 @@ class ProgramTranslator(CommonTranslator):
                 for pred in container.predicates.values():
                     self.translate_default_args(pred, ctx)
 
-        for root, instances in static_fields.items():
-            functions.append(self.create_static_field_function(root, instances,
+        for root, classes in static_fields.items():
+            functions.append(self.create_static_field_function(root, classes,
                                                                ctx))
 
         # Second iteration over all modules: Translate everything else.

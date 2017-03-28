@@ -81,8 +81,8 @@ function bytes___getitem__(self: Ref, index: Int): Ref
 function bytes___getitem_slice__(self: Ref, index: Ref): Ref
     requires issubtype(typeof(self), bytes())
     requires issubtype(typeof(index), slice())
-    requires (slice___actualstart__(index, bytes___len__(self)) >= 0 && slice___actualstart__(index, bytes___len__(self)) <= bytes___len__(self))
-    requires (slice___actualstop__(index, bytes___len__(self)) >= 0 && slice___actualstop__(index, bytes___len__(self)) <= bytes___len__(self))
+    requires (slice___start__(index, bytes___len__(self)) >= 0 && slice___start__(index, bytes___len__(self)) <= bytes___len__(self))
+    requires (slice___stop__(index, bytes___len__(self)) >= 0 && slice___stop__(index, bytes___len__(self)) <= bytes___len__(self))
     ensures issubtype(typeof(result), bytes())
-    ensures bytes___len__(result) == (slice___actualstop__(index, bytes___len__(self)) - slice___actualstart__(index, bytes___len__(self)))
-    ensures bytes___val__(result) == bytes___val__(self)[slice___actualstart__(index, bytes___len__(self))..slice___actualstop__(index, bytes___len__(self))]
+    ensures bytes___len__(result) == (slice___stop__(index, bytes___len__(self)) - slice___start__(index, bytes___len__(self)))
+    ensures bytes___val__(result) == bytes___val__(self)[slice___start__(index, bytes___len__(self))..slice___stop__(index, bytes___len__(self))]

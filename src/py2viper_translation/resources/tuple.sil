@@ -81,12 +81,12 @@ function tuple___getitem__(self: Ref, key: Int): Ref
 
 function tuple___getitem_slice__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(key), slice())
-    requires (slice___actualstart__(key, tuple___len__(self)) >= 0 && slice___actualstart__(key, tuple___len__(self)) <= tuple___len__(self))
-    requires (slice___actualstop__(key, tuple___len__(self)) >= 0 && slice___actualstop__(key, tuple___len__(self)) <= tuple___len__(self))
-    ensures typeof(result) == tuple(tuple_args(typeof(self))[slice___actualstart__(key, tuple___len__(self))..slice___actualstop__(key, tuple___len__(self))])
-    ensures forall i: Int :: {tuple_arg(typeof(result), i)} (i >= 0 && i < (slice___actualstop__(key, tuple___len__(self)) - slice___actualstart__(key, tuple___len__(self)))) ==> tuple_arg(typeof(result), i) == tuple_arg(typeof(self), i + slice___actualstart__(key, tuple___len__(self)))
-    ensures tuple___len__(result) == (slice___actualstop__(key, tuple___len__(self)) - slice___actualstart__(key, tuple___len__(self)))
-    ensures tuple___val__(result) == tuple___val__(self)[slice___actualstart__(key, tuple___len__(self))..slice___actualstop__(key, tuple___len__(self))]
+    requires (slice___start__(key, tuple___len__(self)) >= 0 && slice___start__(key, tuple___len__(self)) <= tuple___len__(self))
+    requires (slice___stop__(key, tuple___len__(self)) >= 0 && slice___stop__(key, tuple___len__(self)) <= tuple___len__(self))
+    ensures typeof(result) == tuple(tuple_args(typeof(self))[slice___start__(key, tuple___len__(self))..slice___stop__(key, tuple___len__(self))])
+    ensures forall i: Int :: {tuple_arg(typeof(result), i)} (i >= 0 && i < (slice___stop__(key, tuple___len__(self)) - slice___start__(key, tuple___len__(self)))) ==> tuple_arg(typeof(result), i) == tuple_arg(typeof(self), i + slice___start__(key, tuple___len__(self)))
+    ensures tuple___len__(result) == (slice___stop__(key, tuple___len__(self)) - slice___start__(key, tuple___len__(self)))
+    ensures tuple___val__(result) == tuple___val__(self)[slice___start__(key, tuple___len__(self))..slice___stop__(key, tuple___len__(self))]
 
 function tuple___contains__(self: Ref, item: Ref): Bool
     ensures result == item in tuple___val__(self)

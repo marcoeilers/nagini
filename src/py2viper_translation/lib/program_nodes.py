@@ -296,11 +296,19 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.type_vars = OrderedDict()
 
     @property
-    def all_methods(self) -> Set['PythonMethod']:
+    def all_methods(self) -> Set[str]:
         result = set()
         if self.superclass:
             result |= self.superclass.all_methods
         result |= set(self.methods.keys())
+        return result
+
+    @property
+    def all_static_fields(self) -> Set[str]:
+        result = set()
+        if self.superclass:
+            result |= self.superclass.all_static_fields
+        result |= set(self.static_fields)
         return result
 
     def add_field(self, name: str, node: ast.AST,
@@ -587,8 +595,12 @@ class GenericType(PythonType):
         return self.python_class.get_func_or_method(name)
 
     @property
-    def all_methods(self) -> Set['PythonMethod']:
+    def all_methods(self) -> Set[str]:
         return self.python_class.all_methods
+
+    @property
+    def all_static_fields(self) -> Set[str]:
+        return self.python_class.all_static_fields
 
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
         """
