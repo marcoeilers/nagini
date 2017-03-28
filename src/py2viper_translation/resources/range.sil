@@ -27,11 +27,11 @@ function range___getitem__(self: Ref, index: Int): Int
 function range___getitem_slice__(self: Ref, index: Ref): Ref
   requires issubtype(typeof(self), range())
   requires issubtype(typeof(index), slice())
-  requires (slice___actualstart__(index, range___len__(self)) >= 0 && slice___actualstart__(index, range___len__(self)) <= range___len__(self))
-  requires (slice___actualstop__(index, range___len__(self)) >= 0 && slice___actualstop__(index, range___len__(self)) <= range___len__(self))
+  requires (slice___start__(index, range___len__(self)) >= 0 && slice___start__(index, range___len__(self)) <= range___len__(self))
+  requires (slice___stop__(index, range___len__(self)) >= 0 && slice___stop__(index, range___len__(self)) <= range___len__(self))
   ensures issubtype(typeof(result), range())
-  ensures range___len__(result) == (slice___actualstop__(index, range___len__(self)) - slice___actualstart__(index, range___len__(self)))
-  ensures range___val__(result) == range___val__(self)[slice___actualstart__(index, range___len__(self))..slice___actualstop__(index, range___len__(self))]
+  ensures range___len__(result) == (slice___stop__(index, range___len__(self)) - slice___start__(index, range___len__(self)))
+  ensures range___val__(result) == range___val__(self)[slice___start__(index, range___len__(self))..slice___stop__(index, range___len__(self))]
 
 
 function range___sil_seq__(self: Ref): Seq[Ref]

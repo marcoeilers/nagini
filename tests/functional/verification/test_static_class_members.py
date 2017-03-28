@@ -34,7 +34,7 @@ class B(A):
 OTHER_CONST = A.SOME_CONST
 
 
-def whatever(b: bool) -> int:
+def static_and_dynamic(b: bool) -> int:
     Ensures(Result() > OTHER_CONST - 1)
     if b:
         return A.something()
@@ -43,35 +43,35 @@ def whatever(b: bool) -> int:
         return a.something()
 
 
-def whatever_2(b: bool) -> int:
+def dynamic_fail(b: bool) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() <= OTHER_CONST)
     a = A()
     return a.something()
 
 
-def whatever_3(b: bool) -> int:
+def static_fail(b: bool) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() <= OTHER_CONST)
     return A.something()
 
-def whatever_4() -> int:
+def subtype() -> int:
     Ensures(Result() == 12)
     return B.SOME_CONST
 
-def whatever_5() -> int:
+def subtype_fail() -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 13)
     return B.SOME_CONST
 
-def whatever_6(a: A) -> int:
+def dynamic_subtype_1(a: A) -> int:
     Ensures(Implies(type(a) is A, Result() == 23))
     Ensures(Implies(type(a) is B, Result() == 12))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == 23)
     return a.SOME_CONST
 
-def whatever_7(a: B) -> int:
+def dynamic_subtype_2(a: B) -> int:
     Ensures(Implies(type(a) is A, Result() == 23))
     Ensures(Implies(type(a) is B, Result() == 12))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
