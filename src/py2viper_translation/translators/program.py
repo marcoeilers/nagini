@@ -71,6 +71,7 @@ class ProgramTranslator(CommonTranslator):
         the inheritance hierarchy. 'classes' must be a list of classes that
         inherit or redefine it.
         """
+        current_module = ctx.module
         type = self.translate_type(root.type, ctx)
         position = self.to_position(root.node, ctx)
         info = self.no_info(ctx)
@@ -87,6 +88,7 @@ class ProgramTranslator(CommonTranslator):
             # Get their version (might be redefined or inherited).
             field = cls.get_static_field(root.name)
             ctx.current_class = field.cls
+            ctx.module = field.cls.module
             # Compute the field value
             stmt, value = self.translate_expr(field.value, ctx)
             if stmt:
@@ -101,6 +103,7 @@ class ProgramTranslator(CommonTranslator):
                                           info)
             posts.append(self.viper.Implies(exact_type, has_value,
                                             field_position, info))
+        ctx.module = current_module
         # Create a single function that represents all
         return self.viper.Function(root.sil_name, [type_decl], type, [], posts,
                                    None, position, info)
