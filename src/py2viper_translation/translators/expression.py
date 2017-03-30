@@ -791,7 +791,7 @@ class ExpressionTranslator(CommonTranslator):
             self._target_type = old_target
             # Get a version that is converted to a boolean. Unless we have
             # something impure.
-            if all_pure and self._is_pure(expression_part):
+            if self._is_pure(expression_part):
                 bool_expression = self.to_bool(expression_part, ctx, value)
             else:
                 bool_expression = expression_part
