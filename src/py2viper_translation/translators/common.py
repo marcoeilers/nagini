@@ -81,12 +81,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result = self.to_int(e, ctx)
         return result
 
+    def _is_pure(self, e: Expr) -> bool:
+        e = self.unwrap(e)
+        if isinstance(e, (self.viper.ast.And, self.viper.ast.Or)):
+            return self._is_pure(e.left()) and self._is_pure(e.right())
+        return e.isPure()
+
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Ref
         if it isn't already, either by boxing a primitive or undoing a
         previous unboxing operation.
         """
+        # Avoid wrapping non-pure expressions (leads to errors within Silver's
+        # Consistency object)
+        if not self._is_pure(e):
+            return e
         result = e
         if e.typ() == self.viper.Int:
             if (isinstance(e, self.viper.ast.FuncApp) and
@@ -114,6 +124,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if it isn't already, either by calling __bool__ on an object and
         possibly unboxing the result, or by undoing a previous boxing operation.
         """
+        # Avoid wrapping non-pure expressions (leads to errors within Silver's
+        # Consistency object)
+        if not self._is_pure(e):
+            return e
         if e.typ() == self.viper.Bool:
             return e
         if e.typ() != self.viper.Ref:
@@ -144,6 +158,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if it isn't already, either by unboxing a reference or undoing a
         previous boxing operation.
         """
+        # Avoid wrapping non-pure expressions (leads to errors within Silver's
+        # Consistency object)
+        if not self._is_pure(e):
+            return e
         if e.typ() == self.viper.Int:
             return e
         if e.typ() != self.viper.Ref:
