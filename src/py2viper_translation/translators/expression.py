@@ -769,12 +769,6 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def _is_pure(self, e: Expr) -> bool:
-        e = self.unwrap(e)
-        if isinstance(e, (self.viper.ast.And, self.viper.ast.Or)):
-            return self._is_pure(e.left()) and self._is_pure(e.right())
-        return e.isPure()
-
     def translate_BoolOp(self, node: ast.BoolOp, ctx: Context) -> StmtsAndExpr:
         assert isinstance(node.op, ast.Or) or isinstance(node.op, ast.And)
 
@@ -785,25 +779,32 @@ class ExpressionTranslator(CommonTranslator):
         expression_parts = []
         bool_parts = []
         types_parts = []
+        all_pure = True
         for value in node.values:
             typ = self.get_type(value, ctx)
             old_target = self._target_type
-            # Translate expression to its original type, but with boolean subexpressions.
+            # Translate expression to its original type, but with boolean
+            # subexpressions.
             self._target_type = self.viper.Bool
             statements_part, expression_part = self._translate_only(
                 value, ctx)
             self._target_type = old_target
-            # Get a version that is converted to a boolean.
-            bool_expression = self.to_bool(expression_part, ctx, value)
+            # Get a version that is converted to a boolean. Unless we have
+            # something impure.
+            if all_pure and self._is_pure(expression_part):
+                bool_expression = self.to_bool(expression_part, ctx, value)
+            else:
+                bool_expression = expression_part
+                all_pure = False
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
             statements_parts.append(statements_part)
-            expression_parts.append(self.to_ref(expression_part, ctx))
+            if all_pure:
+                expression_parts.append(self.to_ref(expression_part, ctx))
             bool_parts.append(bool_expression)
             types_parts.append(typ)
 
         all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
-        all_pure = all(self._is_pure(e) for e in expression_parts)
 
         if isinstance(node.op, ast.And):
             operator = (
