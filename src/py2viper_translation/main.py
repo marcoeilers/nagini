@@ -8,8 +8,9 @@ import sys
 import time
 import traceback
 
-# This import monkey-patches mypy and should happen as early as possible.
-import py2viper_translation.mypy.mypy_patch
+# These imports monkey-patch mypy and should happen as early as possible.
+import py2viper_translation.mypy_patches.column_info_patch
+import py2viper_translation.mypy_patches.optional_patch
 
 from jpype import JavaException
 from py2viper_translation.analyzer import Analyzer
