@@ -489,27 +489,6 @@ class CallTranslator(CommonTranslator):
 
         return rec_stmts, [receiver], [receiver_type]
 
-    def _wrap_var_args(self, args: List[Expr], types: List[PythonType],
-                       node: ast.AST, ctx: Context) -> StmtsAndExpr:
-        """
-        Wraps the given arguments into a tuple to be passed to an *args param.
-        """
-        tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
-        stmts = []
-        func_name = '__create' + str(len(args)) + '__'
-        # __createX__ must be called with the types of the arguments as
-        # additional arguments.
-        vals = args + [self.get_tuple_type_arg(arg, typ, node, ctx)
-                       for (typ, arg) in zip(types, args)]
-        type_class = ctx.module.global_module.classes['type']
-        val_types = types + [type_class] * len(types) + [None]
-        # Also add a running integer s.t. other tuples with same contents are
-        # not reference-identical.
-        vals += [self.get_fresh_int_lit(ctx)]
-        call = self.get_function_call(tuple_class, func_name, vals, val_types,
-                                      node, ctx)
-        return stmts, call
-
     def _wrap_kw_args(self, args: Dict[str, ast.AST], node: ast.Call,
                       kw_type: PythonType, ctx: Context) -> StmtsAndExpr:
         """

@@ -7,7 +7,7 @@ function bytes___len__(self: Ref): Int
 
 function bytes___val__(self: Ref): Seq[Ref]
 
-function bytes___create__(value: Seq[Ref]) : Ref
+function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
     ensures typeof(result) == bytes()
 	ensures bytes___len__(result) == |value|
 	ensures bytes___val__(result) == value
@@ -38,9 +38,7 @@ function bytes___mul__(self: Ref, factor: Int): Ref
   requires factor >= 0
   ensures typeof(result) == bytes()
   ensures bytes___len__(result) == factor * bytes___len__(self)
-{
-    bytes___create__(bytes___mul__helper(bytes___val__(self), factor))
-}
+  ensures bytes___val__(result) == bytes___mul__helper(bytes___val__(self), factor)
 
 // Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
@@ -56,9 +54,7 @@ function bytes_join(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), list(bytes()))
     requires acc(other.list_acc, wildcard)
     ensures issubtype(typeof(result), bytes())
-{
-    bytes___create__((list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0)))
-}
+    ensures bytes___val__(result) == (list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0))
 
 // Helper function for defining the meaning of byte join
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
@@ -76,6 +72,17 @@ function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
 
 function bytes___getitem__(self: Ref, index: Int): Ref
     requires issubtype(typeof(self), bytes())
-    requires index >= 0 && index < bytes___len__(self)
+    requires index >= 0 ==> index < bytes___len__(self)
+    requires index < 0 ==> index >= -bytes___len__(self)
     ensures issubtype(typeof(result), int())
-    ensures result == bytes___val__(self)[index]
+    ensures index >= 0 ==> result == bytes___val__(self)[index]
+    ensures index < 0 ==> result == bytes___val__(self)[bytes___len__(self) + index]
+
+function bytes___getitem_slice__(self: Ref, index: Ref): Ref
+    requires issubtype(typeof(self), bytes())
+    requires issubtype(typeof(index), slice())
+    requires (slice___start__(index, bytes___len__(self)) >= 0 && slice___start__(index, bytes___len__(self)) <= bytes___len__(self))
+    requires (slice___stop__(index, bytes___len__(self)) >= 0 && slice___stop__(index, bytes___len__(self)) <= bytes___len__(self))
+    ensures issubtype(typeof(result), bytes())
+    ensures bytes___len__(result) == (slice___stop__(index, bytes___len__(self)) - slice___start__(index, bytes___len__(self)))
+    ensures bytes___val__(result) == bytes___val__(self)[slice___start__(index, bytes___len__(self))..slice___stop__(index, bytes___len__(self))]

@@ -59,6 +59,55 @@ class ProgramTranslator(CommonTranslator):
 
         return fields
 
+    def create_static_field_function(self, root: PythonVar,
+                                     classes: List[PythonClass],
+                                     ctx: Context) -> 'silver.ast.Function':
+        """
+        Creates a function which represents a static field. The function takes
+        a parameter which represents the class on which it is called, and has
+        postconditions defining its return value based on this parameter.
+
+        'root' must be the version of the field in the class that is highest in
+        the inheritance hierarchy. 'classes' must be a list of classes that
+        inherit or redefine it.
+        """
+        current_module = ctx.module
+        type = self.translate_type(root.type, ctx)
+        position = self.to_position(root.node, ctx)
+        info = self.no_info(ctx)
+        posts = []
+        result = self.viper.Result(type, position, info)
+        type_type = self.type_factory.type_type()
+        type_decl = self.viper.LocalVarDecl('receiver', type_type, position,
+                                            info)
+        type_ref = self.viper.LocalVar('receiver', type_type, position, info)
+        if root.type.name not in PRIMITIVES:
+            posts.append(self.type_check(result, root.type, position, ctx))
+        # Iterate through all classes that 'inherit' or redefine this field
+        for cls in classes:
+            # Get their version (might be redefined or inherited).
+            field = cls.get_static_field(root.name)
+            ctx.current_class = field.cls
+            ctx.module = field.cls.module
+            # Compute the field value
+            stmt, value = self.translate_expr(field.value, ctx)
+            if stmt:
+                raise InvalidProgramException('purity.violated', field.node)
+            field_position = self.to_position(field.node, ctx)
+            # Create a postcondition of the form
+            # receiver == cls ==> result == value
+            has_value = self.viper.EqCmp(result, value, field_position, info)
+            type_literal = self.type_factory.translate_type_literal(
+                field.cls, field_position, ctx)
+            exact_type = self.viper.EqCmp(type_ref, type_literal, position,
+                                          info)
+            posts.append(self.viper.Implies(exact_type, has_value,
+                                            field_position, info))
+        ctx.module = current_module
+        # Create a single function that represents all
+        return self.viper.Function(root.sil_name, [type_decl], type, [], posts,
+                                   None, position, info)
+
     def create_global_var_function(self, var: PythonVar,
                                    ctx: Context) -> 'silver.ast.Function':
         """
@@ -429,12 +478,10 @@ class ProgramTranslator(CommonTranslator):
                 domain for domain in self.viper.to_list(sil_prog.domains())
                 if domain.name() != 'PyType']
 
-            function_names = [function.name() for function in functions]
             functions += [
                 function
                 for function in self.viper.to_list(sil_prog.functions())
-                if (function.name() in used_names and
-                    function.name() not in function_names)]
+                if function.name() in used_names]
             predicates += self.viper.to_list(sil_prog.predicates())
 
         return domains, predicates, functions, methods
@@ -460,6 +507,7 @@ class ProgramTranslator(CommonTranslator):
         type_axioms = self.type_factory.get_default_axioms(ctx)
 
         predicate_families = OrderedDict()
+        static_fields = OrderedDict()
 
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
@@ -477,9 +525,13 @@ class ProgramTranslator(CommonTranslator):
                 containers.append(cls)
                 fields += self._translate_fields(cls, ctx)
                 ctx.current_class = cls
-                for name, field in cls.static_fields.items():
-                    functions.append(self.create_global_var_function(field,
-                                                                     ctx))
+                for field_name in cls.all_static_fields:
+                    field = cls.get_static_field(field_name)
+                    current_field = field
+                    while current_field.overrides:
+                        current_field = current_field.overrides
+                    static_fields.setdefault(current_field, []).append(cls)
+
             ctx.current_class = None
             # Translate default args
             for container in containers:
@@ -489,6 +541,10 @@ class ProgramTranslator(CommonTranslator):
                     self.translate_default_args(method, ctx)
                 for pred in container.predicates.values():
                     self.translate_default_args(pred, ctx)
+
+        for root, classes in static_fields.items():
+            functions.append(self.create_static_field_function(root, classes,
+                                                               ctx))
 
         # Second iteration over all modules: Translate everything else.
         for module in modules:
@@ -549,12 +605,6 @@ class ProgramTranslator(CommonTranslator):
                         # Inherited
                         methods.append(self.create_inherit_check(method, cls,
                                                                  ctx))
-                for field_name in cls.static_fields:
-                    field = cls.static_fields[field_name]
-                    if cls.superclass:
-                        if cls.superclass.get_static_field(field_name):
-                            raise InvalidProgramException(field.node,
-                                                          'invalid.override')
                 for pred_name in cls.predicates:
                     pred = cls.predicates[pred_name]
                     cpred = pred

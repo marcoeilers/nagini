@@ -29,10 +29,21 @@ function list___getitem__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
-    requires int___unbox__(key) >= 0
-    requires int___unbox__(key) < list___len__(self)
-    ensures result == self.list_acc[int___unbox__(key)]
-    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+    requires let ln == (list___len__(self)) in ((int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln) && (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
+    ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
+    ensures [issubtype(typeof(result), list_arg(typeof(self), 0)), true]
+
+method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), slice())
+    requires acc(self.list_acc, 1/1000)
+    ensures acc(self.list_acc, 1/1000)
+    ensures acc(_res.list_acc)
+    ensures typeof(_res) == typeof(self)
+    ensures _res.list_acc == self.list_acc[slice___start__(key, list___len__(self))..slice___stop__(key, list___len__(self))]
+{
+    assume false
+}
 
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

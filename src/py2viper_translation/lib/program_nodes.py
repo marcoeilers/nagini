@@ -12,6 +12,7 @@ from py2viper_translation.lib.constants import (
     INTERNAL_NAMES,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
+    PRIMITIVE_SEQ_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
@@ -295,11 +296,19 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.type_vars = OrderedDict()
 
     @property
-    def all_methods(self) -> Set['PythonMethod']:
+    def all_methods(self) -> Set[str]:
         result = set()
         if self.superclass:
             result |= self.superclass.all_methods
         result |= set(self.methods.keys())
+        return result
+
+    @property
+    def all_static_fields(self) -> Set[str]:
+        result = set()
+        if self.superclass:
+            result |= self.superclass.all_static_fields
+        result |= set(self.static_fields)
         return result
 
     def add_field(self, name: str, node: ast.AST,
@@ -498,7 +507,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         If this class represents a primitive type, returns the boxed version,
         otherwise just return the type itself.
         """
-        if self.name in PRIMITIVES:
+        if self.name in PRIMITIVES and self.name != PRIMITIVE_SEQ_TYPE + '_type':
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             return self.module.classes[boxed_name]
         return self
@@ -586,8 +595,12 @@ class GenericType(PythonType):
         return self.python_class.get_func_or_method(name)
 
     @property
-    def all_methods(self) -> Set['PythonMethod']:
+    def all_methods(self) -> Set[str]:
         return self.python_class.all_methods
+
+    @property
+    def all_static_fields(self) -> Set[str]:
+        return self.python_class.all_static_fields
 
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
         """
@@ -1261,6 +1274,17 @@ class PythonGlobalVar(PythonVarBase):
     Represents a global variable in Python.
     """
 
+    def __init__(self, name: str, node: ast.AST, type: PythonClass,
+                 cls: PythonClass = None):
+        super().__init__(name, node, type)
+        self.cls = cls
+        self.overrides = None
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        super().process(sil_name, translator)
+        if self.cls is not None and self.cls.superclass is not None:
+            self.overrides = self.cls.superclass.get_static_field(self.name)
+
 
 class PythonIOExistentialVar(PythonVarBase):
     """
@@ -1446,6 +1470,11 @@ class ProgramNodeFactory:
             self, name: str, node: ast.AST,
             type_: PythonClass) -> PythonGlobalVar:
         return PythonGlobalVar(name, node, type_)
+
+    def create_static_field(
+            self, name: str, node: ast.AST, type_: PythonClass,
+            cls: PythonClass) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_, cls)
 
     def create_python_io_existential_var(
             self, name: str, node: ast.AST,
