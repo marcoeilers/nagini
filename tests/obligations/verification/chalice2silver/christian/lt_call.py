@@ -5,15 +5,15 @@ suite.
 """
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Acc,
     Assert,
     Ensures,
     Invariant,
     Requires,
 )
-from py2viper_contracts.obligations import *
-from py2viper_contracts.lock import Lock
+from nagini_contracts.obligations import *
+from nagini_contracts.lock import Lock
 from typing import Optional
 
 

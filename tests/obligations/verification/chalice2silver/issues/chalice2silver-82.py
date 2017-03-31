@@ -4,13 +4,13 @@ This is an example that illustrates Chalice2Silver
 """
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Ensures,
     Invariant,
     Requires,
 )
-from py2viper_contracts.obligations import *
-from py2viper_contracts.lock import Lock
+from nagini_contracts.obligations import *
+from nagini_contracts.lock import Lock
 
 
 def test1(l: Lock) -> None:

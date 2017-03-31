@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import Ensures, Low, Requires, Result
+from nagini_contracts.contracts import Ensures, Low, Requires, Result
 
 
 def input_high() -> int:

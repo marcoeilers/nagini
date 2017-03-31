@@ -1,5 +1,5 @@
-from py2viper_contracts.contracts import Requires, Implies
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import Requires, Implies
+from nagini_contracts.io import *
 
 
 @IOOperation

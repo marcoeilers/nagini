@@ -1,18 +1,18 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     ContractOnly,
     Ensures,
     Pure,
     Result,
     Requires,
 )
-from py2viper_contracts.io import *
-from py2viper_contracts.io_builtins import (
+from nagini_contracts.io import *
+from nagini_contracts.io_builtins import (
     gap_io,
     Gap,
     end_io,
     End,
 )
-from py2viper_contracts.obligations import (
+from nagini_contracts.obligations import (
     MustTerminate,
 )
 from typing import Tuple

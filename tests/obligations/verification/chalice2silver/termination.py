@@ -4,13 +4,13 @@ test from Chalice2Silver test suite.
 """
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Assert,
     Requires,
     Invariant,
     Implies,
 )
-from py2viper_contracts.obligations import *
+from nagini_contracts.obligations import *
 
 
 def over_in_one() -> None:

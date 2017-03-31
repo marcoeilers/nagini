@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 def some_string_ops() -> None:

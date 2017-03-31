@@ -1,10 +1,10 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Implies,
     Pure,
     Result,
 )
-from py2viper_contracts.io import *
-from py2viper_contracts.io_builtins import (
+from nagini_contracts.io import *
+from nagini_contracts.io_builtins import (
     end_io,
     gap_io,
     no_op_io,

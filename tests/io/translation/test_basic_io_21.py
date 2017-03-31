@@ -1,5 +1,5 @@
-from py2viper_contracts.contracts import ContractOnly, Result, Requires
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import ContractOnly, Result, Requires
+from nagini_contracts.io import *
 
 
 @ContractOnly

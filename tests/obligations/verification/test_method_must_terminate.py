@@ -1,12 +1,12 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Requires,
     Ensures,
     Invariant,
     Implies,
     Assert,
 )
-from py2viper_contracts.io import IOExists1
-from py2viper_contracts.obligations import *
+from nagini_contracts.io import IOExists1
+from nagini_contracts.obligations import *
 
 
 # Test for name conflicts with builtin names.

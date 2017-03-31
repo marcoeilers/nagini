@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 import resources.namespace_test as nt
 from resources.namespace_test_3 import a_function, P as PPP
 

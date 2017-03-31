@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Acc,
     ContractOnly,
     Requires,
@@ -8,12 +8,12 @@ from py2viper_contracts.contracts import (
     Unfold,
     Fold,
 )
-from py2viper_contracts.io import *
-from py2viper_contracts.io_builtins import (
+from nagini_contracts.io import *
+from nagini_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )
-from py2viper_contracts.obligations import (
+from nagini_contracts.obligations import (
     MustTerminate,
 )
 from typing import Tuple, Optional

@@ -1,9 +1,9 @@
 #:: IgnoreFile(29)
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Requires,
     Ensures,
 )
-from py2viper_contracts.io import *
+from nagini_contracts.io import *
 from typing import Tuple
 
 

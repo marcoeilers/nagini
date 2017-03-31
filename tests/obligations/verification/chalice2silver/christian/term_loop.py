@@ -5,13 +5,13 @@ test suite.
 """
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Acc,
     Assert,
     Requires,
     Invariant,
 )
-from py2viper_contracts.obligations import *
+from nagini_contracts.obligations import *
 
 
 class A:

@@ -1,7 +1,7 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Ensures,
 )
-from py2viper_contracts.obligations import *
+from nagini_contracts.obligations import *
 
 
 def return_termination() -> None:

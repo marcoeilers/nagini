@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 from resources.test_import_2_file_1 import test_func
 
 

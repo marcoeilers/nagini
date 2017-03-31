@@ -1,11 +1,11 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     ContractOnly,
     Ensures,
     Invariant,
     Requires,
     Result,
 )
-from py2viper_contracts.io import *
+from nagini_contracts.io import *
 from typing import Tuple, Callable
 
 

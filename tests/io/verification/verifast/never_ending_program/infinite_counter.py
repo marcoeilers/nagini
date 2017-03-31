@@ -1,12 +1,12 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Ensures,
     Invariant,
     Requires,
     Result,
 )
-from py2viper_contracts.io import *
+from nagini_contracts.io import *
 
-from py2viper_contracts.io_builtins import (
+from nagini_contracts.io_builtins import (
     no_op_io,
     NoOp,
 )

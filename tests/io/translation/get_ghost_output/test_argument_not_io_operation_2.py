@@ -1,4 +1,4 @@
-from py2viper_contracts.io import *
+from nagini_contracts.io import *
 
 
 def read_int_io(t_pre: Place) -> bool:

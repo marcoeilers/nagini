@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Acc,
     Assert,
     ContractOnly,
@@ -9,8 +9,8 @@ from py2viper_contracts.contracts import (
     Result,
     RaisedException,
 )
-from py2viper_contracts.io import *
-from py2viper_contracts.io_builtins import (
+from nagini_contracts.io import *
+from nagini_contracts.io_builtins import (
     no_op_io,
     NoOp,
     split_io,
@@ -18,7 +18,7 @@ from py2viper_contracts.io_builtins import (
     join_io,
     Join,
 )
-from py2viper_contracts.obligations import (
+from nagini_contracts.obligations import (
     MustTerminate,
 )
 from typing import Tuple

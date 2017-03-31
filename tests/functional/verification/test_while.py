@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 def method_with_loop() -> int:

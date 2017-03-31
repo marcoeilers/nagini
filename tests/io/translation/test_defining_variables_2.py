@@ -1,5 +1,5 @@
-from py2viper_contracts.contracts import Ensures
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import Ensures
+from nagini_contracts.io import *
 from typing import Tuple, Callable
 
 

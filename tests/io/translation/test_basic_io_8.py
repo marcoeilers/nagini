@@ -1,5 +1,5 @@
-from py2viper_contracts.contracts import Requires, Predicate, Result
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import Requires, Predicate, Result
+from nagini_contracts.io import *
 
 
 #:: ExpectedOutput(invalid.program:invalid.io_operation.invalid_postset)

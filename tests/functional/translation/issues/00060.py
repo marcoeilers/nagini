@@ -1,7 +1,7 @@
 #:: IgnoreFile(60)
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Requires,
     Acc,
 )

@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 from typing import TypeVar, Generic, Tuple
 
 T = TypeVar('T')

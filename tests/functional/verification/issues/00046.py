@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 def test_list_3(r: List[int]) -> None:

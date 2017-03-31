@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 from resources.namespace_test_3 import a_function, P
 
 

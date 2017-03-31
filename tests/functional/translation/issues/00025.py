@@ -1,5 +1,5 @@
 #:: IgnoreFile(25)
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 class C:
     def __init__(self) -> None:

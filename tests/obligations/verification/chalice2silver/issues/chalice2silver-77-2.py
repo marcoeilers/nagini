@@ -4,11 +4,11 @@ This is an example that illustrates Chalice2Silver
 """
 
 
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Implies,
     Invariant,
 )
-from py2viper_contracts.obligations import *
+from nagini_contracts.obligations import *
 
 
 def test1() -> None:

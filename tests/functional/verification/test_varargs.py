@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 def w(normal: int, *args: int, other: bool, **kwargs: bool) -> int:

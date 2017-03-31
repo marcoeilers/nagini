@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 from resources.sif_utils import input_high, input_low, sif_print
 from typing import List
 

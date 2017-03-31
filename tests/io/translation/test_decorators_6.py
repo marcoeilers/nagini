@@ -1,6 +1,6 @@
 #:: IgnoreFile(28)
-from py2viper_contracts.contracts import GhostReturns
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import GhostReturns
+from nagini_contracts.io import *
 
 
 #:: ExpectedOutput(invalid.program:decorators.incompatible)

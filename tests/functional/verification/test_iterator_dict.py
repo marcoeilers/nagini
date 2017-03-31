@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import *
+from nagini_contracts.contracts import *
 
 
 # TODO: There is a problem with accessing values in the loop, I can't seem to

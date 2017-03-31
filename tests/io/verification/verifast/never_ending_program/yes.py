@@ -1,10 +1,10 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Ensures,
     Invariant,
     Requires,
     Result,
 )
-from py2viper_contracts.io import *
+from nagini_contracts.io import *
 from verifast.stdio_simple import (
     putchar,
     stdout,

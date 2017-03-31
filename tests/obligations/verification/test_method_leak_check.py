@@ -1,9 +1,9 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Requires,
 )
-from py2viper_contracts.io import *
-from py2viper_contracts.obligations import *
-from py2viper_contracts.lock import Lock
+from nagini_contracts.io import *
+from nagini_contracts.obligations import *
+from nagini_contracts.lock import Lock
 
 
 def MustInvoke_callee_1(t1: Place) -> None:

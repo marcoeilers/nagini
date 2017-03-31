@@ -1,4 +1,4 @@
-from py2viper_contracts.contracts import (
+from nagini_contracts.contracts import (
     Acc,
     Assert,
     Requires,
@@ -7,8 +7,8 @@ from py2viper_contracts.contracts import (
     list_pred,
     Previous,
 )
-from py2viper_contracts.io import IOExists1
-from py2viper_contracts.obligations import *
+from nagini_contracts.io import IOExists1
+from nagini_contracts.obligations import *
 from typing import List
 
 

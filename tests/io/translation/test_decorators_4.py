@@ -1,5 +1,5 @@
-from py2viper_contracts.contracts import Ghost, Result
-from py2viper_contracts.io import *
+from nagini_contracts.contracts import Ghost, Result
+from nagini_contracts.io import *
 
 
 #:: ExpectedOutput(invalid.program:decorators.incompatible)

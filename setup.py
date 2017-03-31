@@ -8,7 +8,7 @@ setup(
         version='0.1',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
-        packages=['py2viper_translation',],
+        packages=['nagini_translation',],
         package_dir={'': 'src'},
         requires=[
             'distribute',
@@ -22,7 +22,7 @@ setup(
             ],
         entry_points = {
              'console_scripts': [
-                 'py2viper = py2viper_translation.main:main',
+                 'py2viper = nagini_translation.main:main',
                  ]
              },
         url='http://www.pm.inf.ethz.ch/research/viper.html',
