@@ -68,9 +68,8 @@ function tuple___sil_seq__(self: Ref): Seq[Ref]
     ensures result == tuple___val__(self)
 
 function tuple___len__(self: Ref): Int
-{
-	|tuple_args(typeof(self))|
-}
+    ensures result == |tuple_args(typeof(self))|
+    ensures result == |tuple___val__(self)|
 
 function tuple___getitem__(self: Ref, key: Int): Ref
     requires let ln == (tuple___len__(self)) in ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))

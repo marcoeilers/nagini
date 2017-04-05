@@ -238,6 +238,9 @@ class StatementTranslator(CommonTranslator):
                                                       target_var.type, None,
                                                       ctx)
 
+        positive_index = self.viper.GtCmp(iter_index_acc, zero, pos, info)
+        invariant.append(self.viper.Implies(non_empty_iterator, positive_index,
+                                            pos, info))
         current_element_index = self.viper.EqCmp(target_var.ref(),
                                                  iter_current_index, pos, info)
         current_element_contained = self.viper.SeqContains(boxed_target,
