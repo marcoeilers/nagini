@@ -231,7 +231,7 @@ class StatementTranslator(CommonTranslator):
         iter_current_index = self.viper.SeqIndex(iter_acc, index_minus_one, pos,
                                                  info)
         boxed_target = target_var.ref()
-        if target_var.type.name in PRIMITIVES:
+        if target_var.type.name in PRIMITIVES: 
             boxed_target = self.box_primitive(boxed_target, target_var.type,
                                               None, ctx)
             iter_current_index = self.unbox_primitive(iter_current_index,
