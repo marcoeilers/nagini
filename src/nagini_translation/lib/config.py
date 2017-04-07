@@ -184,7 +184,7 @@ def _get_mypy_path():
     """ Construct MYPYPATH.
 
     If MYPYPATH environment variable is not defined, then sets it to
-    ``py2viper-contracts`` directory.
+    ``nagini-contracts`` directory.
     """
 
     mypy_path = os.environ.get('MYPYPATH')
@@ -240,9 +240,9 @@ MYPY search path. Initialized by calling :py:func:`_get_mypy_path`.
 """
 
 
-file_config = FileConfig('py2viper.cfg')
+file_config = FileConfig('nagini.cfg')
 """
-Configuration read from ``py2viper.cfg`` file.
+Configuration read from ``nagini.cfg`` file.
 """
 
 

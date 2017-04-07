@@ -1,78 +1,76 @@
 CHECKED_TRANSLATOR_FILES:=\
-	src/py2viper_translation/analyzer_io.py \
-	src/py2viper_translation/tests.py \
-	src/py2viper_translation/lib/io_context.py \
-	src/py2viper_translation/lib/io_checkers.py \
-	src/py2viper_translation/lib/guard_collectors.py \
-	src/py2viper_translation/lib/errors/__init__.py \
-	src/py2viper_translation/lib/errors/manager.py \
-	src/py2viper_translation/lib/errors/messages.py \
-	src/py2viper_translation/lib/errors/rules.py \
-	src/py2viper_translation/lib/errors/wrappers.py \
-	src/py2viper_translation/lib/obligation_context.py \
-	src/py2viper_translation/lib/silver_nodes/__init__.py \
-	src/py2viper_translation/lib/silver_nodes/base.py \
-	src/py2viper_translation/lib/silver_nodes/bool_expr.py \
-	src/py2viper_translation/lib/silver_nodes/call.py \
-	src/py2viper_translation/lib/silver_nodes/expression.py \
-	src/py2viper_translation/lib/silver_nodes/int_cmp_expr.py \
-	src/py2viper_translation/lib/silver_nodes/int_expr.py \
-	src/py2viper_translation/lib/silver_nodes/location_expr.py \
-	src/py2viper_translation/lib/silver_nodes/perm_cmp_expr.py \
-	src/py2viper_translation/lib/silver_nodes/perm_expr.py \
-	src/py2viper_translation/lib/silver_nodes/program.py \
-	src/py2viper_translation/lib/silver_nodes/reference_expr.py \
-	src/py2viper_translation/lib/silver_nodes/statement.py \
-	src/py2viper_translation/lib/silver_nodes/types.py \
-	src/py2viper_translation/translators/io_operation/common.py \
-	src/py2viper_translation/translators/io_operation/definition.py \
-	src/py2viper_translation/translators/io_operation/__init__.py \
-	src/py2viper_translation/translators/io_operation/interface.py \
-	src/py2viper_translation/translators/io_operation/termination_check.py \
-	src/py2viper_translation/translators/io_operation/use.py \
-	src/py2viper_translation/translators/io_operation/utils.py \
-	src/py2viper_translation/translators/io_operation/opener.py \
-	src/py2viper_translation/translators/io_operation/result_translator.py \
-	src/py2viper_translation/translators/obligation/__init__.py \
-	src/py2viper_translation/translators/obligation/common.py \
-	src/py2viper_translation/translators/obligation/inexhale.py \
-	src/py2viper_translation/translators/obligation/interface.py \
-	src/py2viper_translation/translators/obligation/loop.py \
-	src/py2viper_translation/translators/obligation/loop_node.py \
-	src/py2viper_translation/translators/obligation/manager.py \
-	src/py2viper_translation/translators/obligation/measures.py \
-	src/py2viper_translation/translators/obligation/method.py \
-	src/py2viper_translation/translators/obligation/method_call_node.py \
-	src/py2viper_translation/translators/obligation/method_node.py \
-	src/py2viper_translation/translators/obligation/node_constructor.py \
-	src/py2viper_translation/translators/obligation/obligation_info.py \
-	src/py2viper_translation/translators/obligation/utils.py \
-	src/py2viper_translation/translators/obligation/types/__init__.py \
-	src/py2viper_translation/translators/obligation/types/base.py \
-	src/py2viper_translation/translators/obligation/types/must_invoke.py \
-	src/py2viper_translation/translators/obligation/types/must_release.py \
-	src/py2viper_translation/translators/obligation/types/must_terminate.py \
-	src/py2viper_translation/translators/obligation/waitlevel.py
+	src/nagini_translation/analyzer_io.py \
+	src/nagini_translation/tests.py \
+	src/nagini_translation/lib/io_context.py \
+	src/nagini_translation/lib/io_checkers.py \
+	src/nagini_translation/lib/guard_collectors.py \
+	src/nagini_translation/lib/errors/__init__.py \
+	src/nagini_translation/lib/errors/manager.py \
+	src/nagini_translation/lib/errors/messages.py \
+	src/nagini_translation/lib/errors/rules.py \
+	src/nagini_translation/lib/errors/wrappers.py \
+	src/nagini_translation/lib/obligation_context.py \
+	src/nagini_translation/lib/silver_nodes/__init__.py \
+	src/nagini_translation/lib/silver_nodes/base.py \
+	src/nagini_translation/lib/silver_nodes/bool_expr.py \
+	src/nagini_translation/lib/silver_nodes/call.py \
+	src/nagini_translation/lib/silver_nodes/expression.py \
+	src/nagini_translation/lib/silver_nodes/int_cmp_expr.py \
+	src/nagini_translation/lib/silver_nodes/int_expr.py \
+	src/nagini_translation/lib/silver_nodes/location_expr.py \
+	src/nagini_translation/lib/silver_nodes/perm_cmp_expr.py \
+	src/nagini_translation/lib/silver_nodes/perm_expr.py \
+	src/nagini_translation/lib/silver_nodes/program.py \
+	src/nagini_translation/lib/silver_nodes/reference_expr.py \
+	src/nagini_translation/lib/silver_nodes/statement.py \
+	src/nagini_translation/lib/silver_nodes/types.py \
+	src/nagini_translation/translators/io_operation/common.py \
+	src/nagini_translation/translators/io_operation/definition.py \
+	src/nagini_translation/translators/io_operation/__init__.py \
+	src/nagini_translation/translators/io_operation/interface.py \
+	src/nagini_translation/translators/io_operation/termination_check.py \
+	src/nagini_translation/translators/io_operation/use.py \
+	src/nagini_translation/translators/io_operation/utils.py \
+	src/nagini_translation/translators/io_operation/opener.py \
+	src/nagini_translation/translators/io_operation/result_translator.py \
+	src/nagini_translation/translators/obligation/__init__.py \
+	src/nagini_translation/translators/obligation/common.py \
+	src/nagini_translation/translators/obligation/inexhale.py \
+	src/nagini_translation/translators/obligation/interface.py \
+	src/nagini_translation/translators/obligation/loop.py \
+	src/nagini_translation/translators/obligation/loop_node.py \
+	src/nagini_translation/translators/obligation/manager.py \
+	src/nagini_translation/translators/obligation/measures.py \
+	src/nagini_translation/translators/obligation/method.py \
+	src/nagini_translation/translators/obligation/method_call_node.py \
+	src/nagini_translation/translators/obligation/method_node.py \
+	src/nagini_translation/translators/obligation/node_constructor.py \
+	src/nagini_translation/translators/obligation/obligation_info.py \
+	src/nagini_translation/translators/obligation/utils.py \
+	src/nagini_translation/translators/obligation/types/__init__.py \
+	src/nagini_translation/translators/obligation/types/base.py \
+	src/nagini_translation/translators/obligation/types/must_invoke.py \
+	src/nagini_translation/translators/obligation/types/must_release.py \
+	src/nagini_translation/translators/obligation/types/must_terminate.py \
+	src/nagini_translation/translators/obligation/waitlevel.py
 CHECKED_CONTRACT_FILES:=\
-	deps/py2viper-contracts/src/py2viper_contracts/io.py \
-	deps/py2viper-contracts/src/py2viper_contracts/io_builtins.py \
-	deps/py2viper-contracts/src/py2viper_contracts/obligations.py \
-	deps/py2viper-contracts/src/py2viper_contracts/lock.py
+	src/nagini_contracts/io.py \
+	src/nagini_contracts/io_builtins.py \
+	src/nagini_contracts/obligations.py \
+	src/nagini_contracts/lock.py
 
 CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
-CHECKED_TRANSLATOR_MODULES:=$(subst /,.,$(CHECKED_TRANSLATOR_FILES:src/%.py=%))
-CHECKED_CONTRACT_MODULES:=$(subst /,.,$(CHECKED_CONTRACT_FILES:deps/py2viper-contracts/src/%.py=%))
-CHECKED_MODULES:=$(CHECKED_TRANSLATOR_MODULES) $(CHECKED_CONTRACT_MODULES)
+CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
 
 BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
 test: bin/py.test
-	bin/py.test --all-tests --all-verifiers -v src/py2viper_translation/tests.py
+	bin/py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
 mypy: bin/mypy
-	MYPYPATH=stubs:deps/py2viper-contracts/src bin/mypy --fast-parser -s $(CHECKED_FILES)
+	MYPYPATH=stubs:src bin/mypy --fast-parser -s $(CHECKED_FILES)
 
 flake8: bin/flake8
 	bin/flake8 --ignore=F401,F403,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
@@ -119,12 +117,8 @@ bin/python: $(BUILDOUT_DEPS)
 buildout: $(BUILDOUT_DEPS)
 	$(BUILDOUT_CMD)
 
-bin/buildout: bootstrap.py env deps/py2viper-contracts
+bin/buildout: bootstrap.py env
 	env/bin/python bootstrap.py
-
-deps/py2viper-contracts:
-	mkdir -p deps
-	hg clone ssh://hg@bitbucket.org/viperproject/py2viper-contracts deps/py2viper-contracts
 
 env: .virtualenv
 	python3 .virtualenv/source/virtualenv.py env

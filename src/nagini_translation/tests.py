@@ -300,7 +300,7 @@ class UnexpectedOutputAnnotation(
         Supported info:
 
         +   id – mandatory.
-        +   backend – optional, ``None`` means ``py2viper``.
+        +   backend – optional, ``None`` means ``nagini``.
         +   issue_id – mandatory.
         +   labels – optional.
         """
@@ -329,7 +329,7 @@ class MissingOutputAnnotation(
         Supported info:
 
         +   id – mandatory.
-        +   backend – optional, ``None`` means ``py2viper``.
+        +   backend – optional, ``None`` means ``nagini``.
         +   issue_id – mandatory.
         +   labels – optional.
         """
@@ -397,7 +397,7 @@ class IgnoreFileAnnotation(
         Supported info:
 
         +   id – mandatory, used as issue_id.
-        +   backend – optional, ``None`` means ``py2viper``.
+        +   backend – optional, ``None`` means ``nagini``.
         """
         self._issue_id = _consume('id', group_dict, True)
         assert self._issue_id.isnumeric(), "Issue id must be a number."

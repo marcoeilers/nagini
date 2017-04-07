@@ -2,7 +2,7 @@
 
 This includes:
 
-1.  Converting Silver level errors to py2viper errors.
+1.  Converting Silver level errors to Nagini errors.
 2.  Creating human readable error messages.
 """
 

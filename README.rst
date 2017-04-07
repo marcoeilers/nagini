@@ -4,7 +4,7 @@ Getting Started (Ubuntu Linux only)
 1.  `Install Viper <https://bitbucket.org/viperproject/documentation/wiki/Home#markdown-header-binary-packages-ubuntu-linux-only>`_.
 2.  Clone repository::
 
-        hg clone https://bitbucket.org/viperproject/py2viper-translation
+        git clone https://github.com/marcoeilers/nagini.git
 
 3.  Install dependencies and run tests::
 
@@ -41,13 +41,12 @@ Running on Windows
 
 3.  In CMD, do the following::
 
-        hg clone -b win-setup https://bitbucket.org/viperproject/py2viper-translation
-        cd py2viper-translation
-        hg clone https://bitbucket.org/viperproject/py2viper-contracts deps\py2viper-contracts
+        git clone -b win-setup https://github.com/marcoeilers/nagini.git
+        cd nagini
         python bootstrap.py
         bin\buildout.exe
 
-4.  Download and extract `ViperToolsWin <http://viper.ethz.ch/downloads/ViperToolsWin.zip>`_ to the py2viper-translation directory
+4.  Download and extract `ViperToolsWin <http://viper.ethz.ch/downloads/ViperToolsWin.zip>`_ to the nagini directory
 
 5.  In CMD, do the following (adjust the paths if you have extracted ViperToolsWin somewhere else)::
 
@@ -58,13 +57,13 @@ Running on Windows
 
 6.  To run the tests, do the following::
 
-        bin\py.test --all-tests --all-verifiers -v src/py2viper_translation/tests.py
+        bin\py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
 7.  To verify a specific file, run e.g.::
 
-        bin\py2viper.exe --verifier silicon tests\functional\verification\examples\test_student_enroll_preds.py
+        bin\nagini.exe --verifier silicon tests\functional\verification\examples\test_student_enroll_preds.py
 
-    To see more options (e.g. for supplying paths to Viper, Boogie and Z3 without using environment variables), invoke ``bin\py2viper.exe`` without arguments.
+    To see more options (e.g. for supplying paths to Viper, Boogie and Z3 without using environment variables), invoke ``bin\nagini.exe`` without arguments.
 
 Windows Troubleshooting
 =======================
@@ -75,7 +74,7 @@ Windows Troubleshooting
 
 2.  While running the tests or verifying a single file, you get a stack trace ending with something like ``TypeError: Package viper.silver.ast.LocalVarDecl is not Callable``:
 
-    The verifier cannot find the Viper .jar files. You either did not set the required environment variables (SILICONJAR etc., see above) or use the respective command line options for bin\py2viper.exe, or the paths you supplied are invalid, or do not point to silicon.jar and carbon.jar.
+    The verifier cannot find the Viper .jar files. You either did not set the required environment variables (SILICONJAR etc., see above) or use the respective command line options for bin\nagini.exe, or the paths you supplied are invalid, or do not point to silicon.jar and carbon.jar.
 
 3.  While running the tests or verifying a single file, you get a stack trace containing the string "Z3_EXE" or "BOOGIE_EXE":
 

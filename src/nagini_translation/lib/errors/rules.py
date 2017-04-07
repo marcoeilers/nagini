@@ -1,4 +1,4 @@
-"""Conversion rules from Silver level errors to py2viper errors."""
+"""Conversion rules from Silver level errors to Nagini errors."""
 
 
 from typing import Dict, Tuple

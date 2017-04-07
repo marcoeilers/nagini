@@ -4,7 +4,7 @@ from distutils.core import setup
 
 
 setup(
-        name='py2viper-translation',
+        name='nagini',
         version='0.1',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
@@ -22,7 +22,7 @@ setup(
             ],
         entry_points = {
              'console_scripts': [
-                 'py2viper = nagini_translation.main:main',
+                 'nagini = nagini_translation.main:main',
                  ]
              },
         url='http://www.pm.inf.ethz.ch/research/viper.html',

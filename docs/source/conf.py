@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# py2viper-translation documentation build configuration file, created by
+# nagini documentation build configuration file, created by
 # sphinx-quickstart on Mon Mar  7 15:10:50 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -55,8 +55,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'py2viper-translation'
-copyright = '2016, Viper Team'
+project = 'nagini'
+copyright = '2017, Viper Team'
 author = 'Viper Team'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -209,7 +209,7 @@ html_static_path = ['.static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'py2viper-translationdoc'
+htmlhelp_basename = 'naginidoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -231,7 +231,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'py2viper-translation.tex', 'py2viper-translation Documentation',
+    (master_doc, 'nagini.tex', 'nagini Documentation',
      'Viper Team', 'manual'),
 ]
 
@@ -261,7 +261,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'py2viper-translation', 'py2viper-translation Documentation',
+    (master_doc, 'nagini', 'nagini Documentation',
      [author], 1)
 ]
 
@@ -275,8 +275,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'py2viper-translation', 'py2viper-translation Documentation',
-     author, 'py2viper-translation', 'One line description of project.',
+    (master_doc, 'nagini', 'nagini Documentation',
+     author, 'nagini', 'One line description of project.',
      'Miscellaneous'),
 ]
 
