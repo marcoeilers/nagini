@@ -502,9 +502,11 @@ class Analyzer(ast.NodeVisitor):
         if func.pure and not functype:
             raise InvalidProgramException(node, 'function.type.none')
         self.current_function = func
-        func.type = self.convert_type(functype)
 
         self.visit(node.args, node)
+
+        func.type = self.convert_type(functype)
+
         for child in node.body:
             if is_io_existential(child):
                 self._is_io_existential = True
