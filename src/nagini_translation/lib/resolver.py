@@ -201,6 +201,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
+                # This is a call to a constructor of a generic class; it's not
+                # enough to just return the class, we need the entire type with
+                # type arguments. We only support that if we can get it directly
+                # from mypy, i.e., when the result is assigned to a variable
+                # and we can get the variable type.
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)

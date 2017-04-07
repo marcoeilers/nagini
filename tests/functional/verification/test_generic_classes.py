@@ -94,3 +94,18 @@ def client_subclass(a_tuple: A[Tuple[str, str]]) -> None:
     assert isinstance(v, bool)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
+
+
+class TestClass:
+    def m(self) -> int:
+        Ensures(Result() == 2)
+        return 2
+
+
+W = TypeVar('W', bound=TestClass)
+
+
+class TestClassGeneric(Generic[W]):
+    def __init__(self, w: W) -> None:
+        Ensures(Acc(self.val))  # type: ignore
+        self.val = w.m()

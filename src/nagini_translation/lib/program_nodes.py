@@ -242,13 +242,13 @@ class PythonType(metaclass=ABCMeta):
         return self
 
 
-class TypeVar(PythonType):
+class TypeVar(PythonType, ContainerInterface):
     """
     Represents a type variable.
     """
 
     def __init__(self, name: str, target_type: PythonType, target_node: Optional[ast.AST],
-                 index: int, bound: Optional[PythonType],
+                 index: int, bound: PythonType,
                  options: List[PythonType], node: ast.AST):
         # TODO: This is all preliminary, it works with what we have now, but
         # may have to be reworked once we properly support type arguments for
@@ -264,6 +264,9 @@ class TypeVar(PythonType):
     @property
     def module(self) -> 'PythonModule':
         return self.target_type.module
+
+    def get_contents(self, only_top: bool) -> Dict:
+        return self.bound.get_contents(only_top)
 
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):

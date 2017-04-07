@@ -152,21 +152,28 @@ class CallTranslator(CommonTranslator):
         result_type = self.get_type(node, ctx)
         pos = self.to_position(node, ctx)
 
-        arg_keys = set()
-        if isinstance(result_type, GenericType):
-            for (name, var), arg in zip(target_class.type_vars.items(), result_type.type_args):
-                literal = self.type_factory.translate_type_literal(arg, pos, ctx)
-                key = (var.target_type.name, name)
-                ctx.bound_type_vars[key] = literal
-                arg_keys.add(key)
+        # Temporarily bind the type variables of the constructed class to
+        # the concrete type arguments.
+        old_bound_type_vars = ctx.bound_type_vars
+        ctx.bound_type_vars = old_bound_type_vars.copy()
+        current_type = result_type
+        while current_type:
+            if isinstance(current_type, GenericType):
+                vars_args = zip(current_type.cls.type_vars.items(),
+                                current_type.type_args)
+                for (name, var), arg in vars_args:
+                    literal = self.type_factory.translate_type_literal(arg, pos,
+                                                                       ctx)
+                    key = (var.target_type.name, name)
+                    ctx.bound_type_vars[key] = literal
+            current_type = current_type.superclass
 
-        fields = target_class.all_sil_fields
+        fields = list(target_class.all_sil_fields)
         field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
                               for field in target_class.all_fields
                               if field.type.name not in PRIMITIVES]
 
-        # for key in arg_keys:
-        #     del ctx.bound_type_vars[key]
+        ctx.bound_type_vars = old_bound_type_vars
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
 
