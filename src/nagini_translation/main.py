@@ -71,6 +71,7 @@ def translate(path: str, jvm: JVM, sif: bool = False,
     """
     Translates the Python module at the given path to a Viper program
     """
+    path = os.path.abspath(path)
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
