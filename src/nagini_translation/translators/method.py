@@ -200,6 +200,11 @@ class MethodTranslator(CommonTranslator):
                                                        pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
+        if func.cls:
+            for name, var in func.cls.type_vars.items():
+                var_expr = self.type_factory.translate_type_literal(var, pos, ctx)
+                check = self.type_factory.subtype_check(var_expr, var.bound, pos, ctx)
+                pres.append(check)
         return pres
 
     def _translate_params(self, func: PythonMethod,

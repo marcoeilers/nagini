@@ -149,15 +149,29 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
+        result_type = self.get_type(node, ctx)
+        pos = self.to_position(node, ctx)
+
+        arg_keys = set()
+        if isinstance(result_type, GenericType):
+            for (name, var), arg in zip(target_class.type_vars.items(), result_type.type_args):
+                literal = self.type_factory.translate_type_literal(arg, pos, ctx)
+                key = (var.target_type.name, name)
+                ctx.bound_type_vars[key] = literal
+                arg_keys.add(key)
+
         fields = target_class.all_sil_fields
         field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
                               for field in target_class.all_fields
                               if field.type.name not in PRIMITIVES]
+
+        # for key in arg_keys:
+        #     del ctx.bound_type_vars[key]
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
-        pos = self.to_position(node, ctx)
+
         result_has_type = self._var_concrete_type_check(res_var.name,
-                                                        target_class,
+                                                        result_type,
                                                         pos,
                                                         ctx)
         # Inhale the type information about the newly created object

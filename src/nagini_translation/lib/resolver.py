@@ -40,6 +40,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.util import (
     get_func_name,
+    InvalidProgramException,
     UnsupportedException,
 )
 from typing import List, Optional
@@ -197,6 +198,15 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # but won't have generic type information. So we don't return here
         # and let the code below take care of the call.
         if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
+            if (isinstance(node, ast.Call) and
+                    isinstance(target, PythonClass) and
+                    target.type_vars):
+                if node._parent and isinstance(node._parent, ast.Assign):
+                    return get_type(node._parent.targets[0], containers,
+                                    container)
+                else:
+                    error = 'generic.constructor.without.type'
+                    raise InvalidProgramException(node, error)
             return target
     if isinstance(node, (ast.Attribute, ast.Name)):
         # All these cases should be handled by get_target, so if we get here,

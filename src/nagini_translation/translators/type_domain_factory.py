@@ -41,6 +41,7 @@ class TypeDomainFactory:
             self.create_reflexivity_axiom(ctx),
             self.create_extends_implies_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
+            self.create_object_subtype_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
@@ -455,6 +456,12 @@ class TypeDomainFactory:
                                          info)
             body = self.viper.Implies(body_lhs, body, position, info)
         if type_arg_decls:
+            none_type = self.viper.DomainFuncApp('NoneType', [],
+                                                 self.type_type(),
+                                                 position, info,
+                                                 self.type_domain)
+            not_none = self.viper.NeCmp(type_func, none_type, position, info)
+            body = self.viper.And(body, not_none, position, info)
             trigger = self.viper.Trigger([type_func], position, info)
             body = self.viper.Forall(type_arg_decls, [trigger], body, position,
                                      info)
