@@ -246,7 +246,7 @@ class Analyzer(ast.NodeVisitor):
             for i in range(if_cls['type_vars']):
                 name = 'var' + str(i)
                 cls.type_vars[name] = TypeVar(
-                    name, cls, None, i, None, [], None)
+                    name, cls, None, i, None, [], None, self.module.global_module)
         if 'extends' in if_cls:
             superclass = self.find_or_create_class(
                 if_cls['extends'], module=self.module.global_module)
@@ -420,7 +420,7 @@ class Analyzer(ast.NodeVisitor):
                     bound = self.convert_type(var_info[0])
                     options = [self.convert_type(typ) for typ in var_info[1]]
                     var = TypeVar(arg_name, cls, None, current_index, bound,
-                                  options, base)
+                                  options, base, self.module)
                     cls.type_vars[arg_name] = var
                     current_index += 1
             else:
@@ -640,11 +640,29 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
+        node_type = self.typeof(node)
         self.current_function.args[node.arg] = \
-            self.node_factory.create_python_var(node.arg, node,
-                                                self.typeof(node))
+            self.node_factory.create_python_var(node.arg, node, node_type)
+        # If we just introduced new type variables, create the expression that
+        # represents their value.
+        for tv in self.current_function.type_vars.values():
+            if tv.value:
+                continue
+            tv.value = self.assign_type_var_def(tv, node_type)
         alts = self.get_alt_types(node)
         self.current_function.args[node.arg].alt_types = alts
+
+    def assign_type_var_def(self, tv: TypeVar, node_type: PythonType):
+        if isinstance(node_type, PythonClass):
+            return None
+        if isinstance(node_type, GenericType):
+            for i, arg in enumerate(node_type.type_args):
+                f = self.assign_type_var_def(tv, arg)
+                if f:
+                    return lambda t, tt, ctx : t.get_type_arg(f(t, tt, ctx), node_type, i, ctx)
+        if node_type is tv:
+            return lambda t, tt, ctx: tt
+        return None
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
         if var is None:
@@ -861,7 +879,7 @@ class Analyzer(ast.NodeVisitor):
             field = receiver.add_field(node.attr, node, self.typeof(node))
             self.track_access(node, field)
 
-    def convert_type(self, mypy_type) -> PythonType:
+    def convert_type(self, mypy_type, node=None) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
         """
@@ -869,22 +887,23 @@ class Analyzer(ast.NodeVisitor):
                 self.types.is_none_type(mypy_type)):
             result = None
         elif self.types.is_instance_type(mypy_type):
-            result = self.convert_type(mypy_type.type)
+            result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
-                args = [self.convert_type(arg) for arg in mypy_type.args]
+                args = [self.convert_type(arg, node) for arg in mypy_type.args]
                 result = GenericType(result, args)
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
-            args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
+            args = [self.convert_type(arg_type, node)
+                    for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
                                  args)
         elif self.types.is_union_type(mypy_type):
-            return self._convert_union_type(mypy_type)
+            return self._convert_union_type(mypy_type, node)
         elif self.types.is_type_var(mypy_type):
-            return self._convert_type_var(mypy_type)
+            return self._convert_type_var(mypy_type, node)
         elif self.types.is_type_type(mypy_type):
-            return self._convert_type_type(mypy_type)
+            return self._convert_type_type(mypy_type, node)
         else:
             raise UnsupportedException(mypy_type)
         return result
@@ -902,8 +921,8 @@ class Analyzer(ast.NodeVisitor):
                                            module=target_module)
         return result
 
-    def _convert_union_type(self, mypy_type) -> PythonType:
-        args = [self.convert_type(arg_type) for arg_type in mypy_type.items]
+    def _convert_union_type(self, mypy_type, node) -> PythonType:
+        args = [self.convert_type(arg_type, node) for arg_type in mypy_type.items]
         optional = False
         if None in args:
             # It's an optional type, remember this and wrap it later
@@ -917,17 +936,20 @@ class Analyzer(ast.NodeVisitor):
             result = OptionalType(result)
         return result
 
-    def _convert_type_var(self, mypy_type) -> PythonType:
+    def _convert_type_var(self, mypy_type, node) -> PythonType:
         name = mypy_type.name
         assert name in self.module.type_vars
+        if (self.current_class and name in self.current_class.type_vars):
+            return self.current_class.type_vars[name]
         if name in self.current_function.type_vars:
             return self.current_function.type_vars[name]
-        elif (self.current_class and name in self.current_class.type_vars):
-            return self.current_class.type_vars[name]
-        else:
-            assert False, 'Unknown type variable'
+        tv = TypeVar(name, None, node, None,
+                     self.convert_type(self.module.type_vars[name][0], node),
+                     None, None, self.module)
+        self.current_function.type_vars[name] = tv
+        return tv
 
-    def _convert_type_type(self, mypy_type) -> PythonType:
+    def _convert_type_type(self, mypy_type, node) -> PythonType:
         name = 'type'
         type_class = self.module.global_module.classes['type']
         args = [self.convert_type(mypy_type.item)]
@@ -1001,7 +1023,7 @@ class Analyzer(ast.NodeVisitor):
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, _ = self.module.get_type(context, node.arg)
-            return self.convert_type(type)
+            return self.convert_type(type, node)
         elif (isinstance(node, ast.Call) and
               isinstance(node.func, ast.Name) and
               node.func.id in CONTRACT_FUNCS):

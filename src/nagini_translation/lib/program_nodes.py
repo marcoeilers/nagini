@@ -249,7 +249,7 @@ class TypeVar(PythonType, ContainerInterface):
 
     def __init__(self, name: str, target_type: PythonType, target_node: Optional[ast.AST],
                  index: int, bound: PythonType,
-                 options: List[PythonType], node: ast.AST):
+                 options: List[PythonType], node: ast.AST, module):
         # TODO: This is all preliminary, it works with what we have now, but
         # may have to be reworked once we properly support type arguments for
         # methods etc.
@@ -260,10 +260,8 @@ class TypeVar(PythonType, ContainerInterface):
         self.node = node
         self.bound = bound
         self.options = options
-
-    @property
-    def module(self) -> 'PythonModule':
-        return self.target_type.module
+        self.value = None
+        self.module = module
 
     def get_contents(self, only_top: bool) -> Dict:
         return self.bound.get_contents(only_top)

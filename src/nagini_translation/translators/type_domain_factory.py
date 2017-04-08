@@ -836,7 +836,11 @@ class TypeDomainFactory:
         """
         info = self.no_info(ctx)
         if isinstance(type, TypeVar):
-            return ctx.bound_type_vars[(type.target_type.name, type.name)]
+            if type.target_type:
+                key = (type.target_type.name, type.name)
+            else:
+                key = (type.name,)
+            return ctx.bound_type_vars[key]
         if type is None:
             type = ctx.module.global_module.classes['NoneType']
         args = []
