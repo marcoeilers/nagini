@@ -152,7 +152,7 @@ class ProgramTranslator(CommonTranslator):
             args.append(arg)
             params.append(arg.decl)
 
-        self.bind_type_vars(method, ctx, args)
+        self.bind_type_vars(method, ctx)
 
         results = []
         locals_before = set(method.locals.values())
@@ -225,7 +225,7 @@ class ProgramTranslator(CommonTranslator):
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref())
 
-        self.bind_type_vars(method, ctx, args)
+        self.bind_type_vars(method, ctx)
 
         mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',

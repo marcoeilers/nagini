@@ -379,7 +379,7 @@ class MethodTranslator(CommonTranslator):
 
         return assign_stmts
 
-    def bind_type_vars(self, method: PythonMethod, ctx: Context, args) -> None:
+    def bind_type_vars(self, method: PythonMethod, ctx: Context) -> None:
         """
         Binds the names of type variables of the given method and its class
         and superclasses to expressions denoting the values of said types.
@@ -404,13 +404,9 @@ class MethodTranslator(CommonTranslator):
                 # var.type_expr is currently the function that will create the
                 # type expression when given the parameter that defines the
                 # type variable (identified by var.target_node).
-                index = -1
-                for i, pvar in enumerate(method.args.values()):
-                    if pvar.node is var.target_node:
-                        index = i
-                decl = args[index]
-                ref = self.viper.LocalVar(decl.name(), decl.typ(), decl.pos(),
-                                          decl.info())
+                for i, python_var in enumerate(method.args.values()):
+                    if python_var.node is var.target_node:
+                        ref = python_var.ref()
                 typeof = self.type_factory.typeof(ref, ctx)
                 literal = var.type_expr(self.type_factory, typeof, ctx)
                 var.type_expr = literal
@@ -427,7 +423,7 @@ class MethodTranslator(CommonTranslator):
         old_function = ctx.current_function
         ctx.current_function = method
         args = self._translate_params(method, ctx)
-        self.bind_type_vars(method, ctx, args)
+        self.bind_type_vars(method, ctx)
 
         results = [res.decl for res in method.get_results()]
         error_var = PythonVar(ERROR_NAME, None,
