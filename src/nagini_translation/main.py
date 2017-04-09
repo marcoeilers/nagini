@@ -29,6 +29,7 @@ from nagini_translation.verifier import (
     VerificationResult,
     ViperVerifier
 )
+from typing import Set
 
 
 def parse_sil_file(sil_path: str, jvm):
@@ -66,7 +67,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
         os.path.join(resources_path, 'all.sil'), jvm))
 
 
-def translate(path: str, jvm: JVM, sif: bool = False,
+def translate(path: str, jvm: JVM, selected: Set[str], sif: bool = False,
               reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
@@ -80,15 +81,15 @@ def translate(path: str, jvm: JVM, sif: bool = False,
         sil_interface = [file.read()]
 
     modules = [path] + builtins
-    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path, selected)
     types = TypeInfo()
     type_correct = types.check(os.path.abspath(path))
     if not type_correct:
         return None
     if sif:
-        analyzer = SIFAnalyzer(jvm, viperast, types, path)
+        analyzer = SIFAnalyzer(jvm, viperast, types, path, selected)
     else:
-        analyzer = Analyzer(jvm, viperast, types, path)
+        analyzer = Analyzer(jvm, viperast, types, path, selected)
     main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))
@@ -221,6 +222,11 @@ def main() -> None:
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
+    parser.add_argument(
+        '--select',
+        default=None,
+        help='select specific methods or classes to verify'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -236,7 +242,8 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args):
     try:
-        prog = translate(python_file, jvm, args.sif)
+        selected = set(args.select.split(';')) if args.select else set()
+        prog = translate(python_file, jvm, selected, args.sif)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:

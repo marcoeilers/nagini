@@ -621,10 +621,23 @@ class ProgramTranslator(CommonTranslator):
                                                  ctx)
             predicates.append(pf)
 
+        if selected:
+            all_used_names = list(selected_names)
+            i = 0
+            while i < len(all_used_names):
+                name = all_used_names[i]
+                all_used_names.extend(self.viper.used_names[name])
+                i += 1
+
+            predicates = [p for p in predicates if p.name() in all_used_names]
+            functions = [f for f in functions if f.name() in all_used_names]
+            methods = [m for m in methods if m.name() in all_used_names]
+
         domains += [self.type_factory.create_type_domain(type_funcs,
                                                          type_axioms, ctx)]
 
-        converted_sil_progs = self._convert_silver_elements(sil_progs, ctx)
+        converted_sil_progs = self._convert_silver_elements(sil_progs,
+                                                            all_used_names, ctx)
         s_domains, s_predicates, s_functions, s_methods = converted_sil_progs
         domains += s_domains
         predicates += s_predicates

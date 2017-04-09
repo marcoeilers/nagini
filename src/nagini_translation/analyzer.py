@@ -48,7 +48,7 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -60,7 +60,7 @@ class Analyzer(ast.NodeVisitor):
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str):
+                 path: str, selected: Set[str]):
         self._node_factory = None
         self.viper = viperast
         self.java = jvm.java
@@ -85,6 +85,7 @@ class Analyzer(ast.NodeVisitor):
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
+        self.selected = selected
 
     @property
     def node_factory(self):
@@ -1099,7 +1100,20 @@ class Analyzer(ast.NodeVisitor):
         decorators = {d.id for d in func.decorator_list}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        return 'ContractOnly' in decorators
+        result = 'ContractOnly' in decorators
+        if self.selected:
+            selected = False
+            if self.current_class:
+                if self.current_class.name in self.selected:
+                    selected = True
+                else:
+                    combined = self.current_class.name + '.' + func.name
+                    if combined in self.selected:
+                        selected = True
+            if func.name in self.selected:
+                selected = True
+            result = result or (not selected)
+        return result
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
