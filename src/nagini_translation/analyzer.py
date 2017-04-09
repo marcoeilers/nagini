@@ -48,7 +48,7 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -245,8 +245,8 @@ class Analyzer(ast.NodeVisitor):
         if 'type_vars' in if_cls:
             for i in range(if_cls['type_vars']):
                 name = 'var' + str(i)
-                cls.type_vars[name] = TypeVar(
-                    name, cls, None, i, None, [], None, self.module.global_module)
+                cls.type_vars[name] = TypeVar(name, cls, None, i, None,
+                                              self.module.global_module)
         if 'extends' in if_cls:
             superclass = self.find_or_create_class(
                 if_cls['extends'], module=self.module.global_module)
@@ -418,9 +418,8 @@ class Analyzer(ast.NodeVisitor):
                     assert arg_name in self.module.type_vars
                     var_info = self.module.type_vars[arg_name]
                     bound = self.convert_type(var_info[0])
-                    options = [self.convert_type(typ) for typ in var_info[1]]
                     var = TypeVar(arg_name, cls, None, current_index, bound,
-                                  options, base, self.module)
+                                  self.module)
                     cls.type_vars[arg_name] = var
                     current_index += 1
             else:
@@ -646,20 +645,30 @@ class Analyzer(ast.NodeVisitor):
         # If we just introduced new type variables, create the expression that
         # represents their value.
         for tv in self.current_function.type_vars.values():
-            if tv.value:
+            if tv.type_expr:
                 continue
-            tv.value = self.assign_type_var_def(tv, node_type)
+            tv.type_expr = self.create_type_var_definition(tv, node_type)
         alts = self.get_alt_types(node)
         self.current_function.args[node.arg].alt_types = alts
 
-    def assign_type_var_def(self, tv: TypeVar, node_type: PythonType):
+    def create_type_var_definition(self, tv: TypeVar, node_type: PythonType) \
+            -> Callable[['Translator', 'Expr', 'Context'], 'Expr']:
+        """
+        Creates a function that returns a type expression which defines the
+        given type var when given the type of the defining expression, which has
+        type 'node_type'.
+        """
         if isinstance(node_type, PythonClass):
             return None
         if isinstance(node_type, GenericType):
             for i, arg in enumerate(node_type.type_args):
-                f = self.assign_type_var_def(tv, arg)
+                f = self.create_type_var_definition(tv, arg)
                 if f:
-                    return lambda t, tt, ctx : t.get_type_arg(f(t, tt, ctx), node_type, i, ctx)
+                    def result(translator, typ, ctx):
+                        previous = f(translator, typ, ctx)
+                        return translator.get_type_arg(previous, node_type, i,
+                                                       ctx)
+                    return result
         if node_type is tv:
             return lambda t, tt, ctx: tt
         return None
@@ -922,7 +931,8 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
-        args = [self.convert_type(arg_type, node) for arg_type in mypy_type.items]
+        args = [self.convert_type(arg_type, node)
+                for arg_type in mypy_type.items]
         optional = False
         if None in args:
             # It's an optional type, remember this and wrap it later
@@ -945,7 +955,7 @@ class Analyzer(ast.NodeVisitor):
             return self.current_function.type_vars[name]
         tv = TypeVar(name, None, node, None,
                      self.convert_type(self.module.type_vars[name][0], node),
-                     None, None, self.module)
+                     self.module)
         self.current_function.type_vars[name] = tv
         return tv
 

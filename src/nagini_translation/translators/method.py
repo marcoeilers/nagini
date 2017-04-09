@@ -209,7 +209,7 @@ class MethodTranslator(CommonTranslator):
                                                         pos, ctx)
                 pres.append(check)
         for name, var in func.type_vars.items():
-            var_expr = var.value
+            var_expr = var.type_expr
             check = self.type_factory.subtype_check(var_expr, var.bound,
                                                     pos, ctx)
             pres.append(check)
@@ -385,6 +385,7 @@ class MethodTranslator(CommonTranslator):
         and superclasses to expressions denoting the values of said types.
         """
         ctx.bound_type_vars = {}
+        # Class type variables first.
         if method.cls and method.method_type is MethodType.normal:
             cls = method.cls
             while cls:
@@ -397,19 +398,24 @@ class MethodTranslator(CommonTranslator):
                 cls = cls.superclass
                 if isinstance(cls, GenericType):
                     cls = cls.cls
+        # Now method type variables.
         for name, var in method.type_vars.items():
-            if callable(var.value):
+            if callable(var.type_expr):
+                # var.type_expr is currently the function that will create the
+                # type expression when given the parameter that defines the
+                # type variable (identified by var.target_node).
                 index = -1
                 for i, pvar in enumerate(method.args.values()):
                     if pvar.node is var.target_node:
                         index = i
                 decl = args[index]
-                ref = self.viper.LocalVar(decl.name(), decl.typ(), decl.pos(), decl.info())
+                ref = self.viper.LocalVar(decl.name(), decl.typ(), decl.pos(),
+                                          decl.info())
                 typeof = self.type_factory.typeof(ref, ctx)
-                literal = var.value(self.type_factory, typeof, ctx)
-                var.value = literal
+                literal = var.type_expr(self.type_factory, typeof, ctx)
+                var.type_expr = literal
             else:
-                literal = var.value
+                literal = var.type_expr
             ctx.bound_type_vars[(var.name,)] = literal
 
     def translate_method(self, method: PythonMethod,

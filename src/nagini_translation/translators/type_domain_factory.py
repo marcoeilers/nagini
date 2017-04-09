@@ -837,8 +837,10 @@ class TypeDomainFactory:
         info = self.no_info(ctx)
         if isinstance(type, TypeVar):
             if type.target_type:
+                # Type parameter belongs to generic class.
                 key = (type.target_type.name, type.name)
             else:
+                # Type parameter belongs to generic method.
                 key = (type.name,)
             return ctx.bound_type_vars[key]
         if type is None:
