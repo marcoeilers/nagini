@@ -496,13 +496,13 @@ class ProgramTranslator(CommonTranslator):
             used_names = self.viper.used_names_sets[node.sil_name]
         else:
             used_names = set()
-        if not selected_names:
-            return
         self.viper.used_names = used_names
         self.viper.used_names_sets[node.sil_name] = used_names
+        if selected_names is None:
+            return
         if ctx.module.type_prefix is '__main__':
             if (node.name in selected or
-                    (hasattr(node.cls) and node.cls.name + '.' + node.name in selected)):
+                    (hasattr(node, 'cls') and node.cls and node.cls.name + '.' + node.name in selected)):
                 selected_names.append(node.sil_name)
 
     def translate_program(self, modules: List[PythonModule],
@@ -660,7 +660,14 @@ class ProgramTranslator(CommonTranslator):
             i = 0
             while i < len(all_used_names):
                 name = all_used_names[i]
-                all_used_names.extend(self.viper.used_names[name])
+                to_add = set()
+                if name in self.viper.used_names_sets:
+                    to_add = self.viper.used_names_sets[name]
+                if name in self.required_names:
+                    to_add = self.required_names[name]
+                for add in to_add:
+                    if not add in all_used_names:
+                        all_used_names.append(add)
                 i += 1
 
             predicates = [p for p in predicates if p.name() in all_used_names]

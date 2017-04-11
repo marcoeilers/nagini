@@ -105,7 +105,7 @@ def translate(path: str, jvm: JVM, selected: Set[str], sif: bool = False,
         sil_programs = []
         load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs)
+    prog = translator.translate_program(modules, sil_programs, selected)
     return prog
 
 

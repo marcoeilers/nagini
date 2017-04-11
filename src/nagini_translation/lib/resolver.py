@@ -79,7 +79,8 @@ def get_target(node: ast.AST,
         if isinstance(lhs, UnionType):
             # It's a regular union type; we don't support that at the
             # moment.
-            raise UnsupportedException(node, 'Member access on union type.')
+            # raise UnsupportedException(node, 'Member access on union type.')
+            lhs = lhs.cls
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
