@@ -23,14 +23,15 @@ class ViperAST:
     to Scala BigInts, and wrap Scala Option types where necessary.
     """
 
-    def __init__(self, jvm, java, scala, viper, sourcefile, selected):
+    def __init__(self, jvm, java, scala, viper, sourcefile):
         ast = viper.silver.ast
         self.ast = ast
         self.java = java
         self.scala = scala
         self.jvm = jvm
         self.nodes = {}
-        self.used_names = {} if selected else set()
+        self.used_names = set()
+        self.used_names_sets = {}
 
         def getconst(name):
             return getobject(ast, name)

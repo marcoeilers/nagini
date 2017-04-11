@@ -81,7 +81,7 @@ def translate(path: str, jvm: JVM, selected: Set[str], sif: bool = False,
         sil_interface = [file.read()]
 
     modules = [path] + builtins
-    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path, selected)
+    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
     type_correct = types.check(os.path.abspath(path))
     if not type_correct:
