@@ -644,33 +644,39 @@ class Analyzer(ast.NodeVisitor):
             self.node_factory.create_python_var(node.arg, node, node_type)
         # If we just introduced new type variables, create the expression that
         # represents their value.
-        for tv in self.current_function.type_vars.values():
-            if tv.type_expr:
+        for type_var in self.current_function.type_vars.values():
+            if type_var.type_expr:
                 continue
-            tv.type_expr = self.create_type_var_definition(tv, node_type)
+            type_var.type_expr = self.create_type_var_definition(type_var,
+                                                                 node_type)
         alts = self.get_alt_types(node)
         self.current_function.args[node.arg].alt_types = alts
 
-    def create_type_var_definition(self, tv: TypeVar, node_type: PythonType) \
-            -> Callable[['Translator', 'Expr', 'Context'], 'Expr']:
+    def create_type_var_definition(
+            self, type_var: TypeVar, node_type: PythonType) -> Callable[
+                ['Translator', 'Expr', 'Context'], 'Expr']:
         """
         Creates a function that returns a type expression which defines the
         given type var when given the type of the defining expression, which has
-        type 'node_type'.
+        type ``node_type``.
         """
         if isinstance(node_type, PythonClass):
             return None
         if isinstance(node_type, GenericType):
             for i, arg in enumerate(node_type.type_args):
-                f = self.create_type_var_definition(tv, arg)
-                if f:
+                # Check if the type argument defines the type variable, i.e. if
+                # the recursive call returns a definition.
+                arg_def = self.create_type_var_definition(type_var, arg)
+                if arg_def:
                     def result(translator, typ, ctx):
-                        previous = f(translator, typ, ctx)
+                        previous = arg_def(translator, typ, ctx)
                         return translator.get_type_arg(previous, node_type, i,
                                                        ctx)
                     return result
-        if node_type is tv:
-            return lambda t, tt, ctx: tt
+        if node_type is type_var:
+            def result(translator, typ, ctx):
+                return typ
+            return result
         return None
 
     def track_access(self, node: ast.AST, var: PythonVar) -> None:
@@ -953,11 +959,10 @@ class Analyzer(ast.NodeVisitor):
             return self.current_class.type_vars[name]
         if name in self.current_function.type_vars:
             return self.current_function.type_vars[name]
-        tv = TypeVar(name, None, node, None,
-                     self.convert_type(self.module.type_vars[name][0], node),
-                     self.module)
-        self.current_function.type_vars[name] = tv
-        return tv
+        bound_type = self.convert_type(self.module.type_vars[name][0], node)
+        type_var = TypeVar(name, None, node, None, bound_type, self.module)
+        self.current_function.type_vars[name] = type_var
+        return type_var
 
     def _convert_type_type(self, mypy_type, node) -> PythonType:
         name = 'type'
