@@ -484,9 +484,13 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            contract_only = self.contract_only or self.is_contract_only(node)
+            pure = self.is_pure(node)
+            if pure:
+                contract_only = self.is_declared_contract_only(node)
+            else:
+                contract_only = self.contract_only or self.is_contract_only(node)
             func = self.node_factory.create_python_method(name, node,
-                self.current_class, scope_container, self.is_pure(node),
+                self.current_class, scope_container, pure,
                 contract_only, self.node_factory)
             container[name] = func
         if self.is_static_method(node):
@@ -1096,11 +1100,15 @@ class Analyzer(ast.NodeVisitor):
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)))
 
-    def is_contract_only(self, func: ast.FunctionDef) -> bool:
+    def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         result = 'ContractOnly' in decorators
+        return result
+
+    def is_contract_only(self, func: ast.FunctionDef) -> bool:
+        result = self.is_declared_contract_only(func)
         if self.selected:
             selected = False
             if self.current_class:
