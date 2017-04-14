@@ -488,8 +488,17 @@ class ProgramTranslator(CommonTranslator):
 
         return domains, predicates, functions, methods
 
-    def do_selection_stuff(self, selected_names: List[str], selected: Set[str],
+    def track_dependencies(self, selected_names: List[str], selected: Set[str],
                            node: PythonNode, ctx: Context) -> None:
+        """
+        If specific parts of the program have been selected to be verified,
+        marks that the given PythonNode is about to be translated, s.t. it can
+        be tracked which other elements are referenced by the translation of
+        this node. Also checks if the given element is among those selected
+        to be verified, and adds its Silver name to the list of selected Silver
+        names later used when computing which parts of the program to give to
+        Viper.
+        """
         if not selected:
             return
         if node.sil_name in self.viper.used_names_sets:
@@ -502,7 +511,8 @@ class ProgramTranslator(CommonTranslator):
             return
         if ctx.module.type_prefix is '__main__':
             if (node.name in selected or
-                    (hasattr(node, 'cls') and node.cls and node.cls.name + '.' + node.name in selected)):
+                    (hasattr(node, 'cls') and node.cls and
+                     node.cls.name + '.' + node.name in selected)):
                 selected_names.append(node.sil_name)
 
     def translate_program(self, modules: List[PythonModule],
@@ -528,6 +538,8 @@ class ProgramTranslator(CommonTranslator):
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
 
+        # Silver names of the set of nodes which have been selected by the user
+        # to be verified (if any).
         selected_names = []
 
         # First iteration over all modules: translate global variables, static
@@ -535,7 +547,7 @@ class ProgramTranslator(CommonTranslator):
         for module in modules:
             ctx.module = module
             for var in module.global_vars.values():
-                self.do_selection_stuff(selected_names, selected, var, ctx)
+                self.track_dependencies(selected_names, selected, var, ctx)
                 functions.append(
                     self.create_global_var_function(var, ctx))
             containers = [module]
@@ -557,17 +569,17 @@ class ProgramTranslator(CommonTranslator):
             # Translate default args
             for container in containers:
                 for function in container.functions.values():
-                    self.do_selection_stuff(None, selected, function, ctx)
+                    self.track_dependencies(None, selected, function, ctx)
                     self.translate_default_args(function, ctx)
                 for method in container.methods.values():
-                    self.do_selection_stuff(None, selected, method, ctx)
+                    self.track_dependencies(None, selected, method, ctx)
                     self.translate_default_args(method, ctx)
                 for pred in container.predicates.values():
-                    self.do_selection_stuff(None, selected, pred, ctx)
+                    self.track_dependencies(None, selected, pred, ctx)
                     self.translate_default_args(pred, ctx)
 
         for root, classes in static_fields.items():
-            self.do_selection_stuff(None, selected, root, ctx)
+            self.track_dependencies(None, selected, root, ctx)
             functions.append(self.create_static_field_function(root, classes,
                                                                ctx))
 
@@ -576,16 +588,16 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = module
 
             for function in module.functions.values():
-                self.do_selection_stuff(selected_names, selected, function, ctx)
+                self.track_dependencies(selected_names, selected, function, ctx)
                 functions.append(self.translate_function(function, ctx))
             for method in module.methods.values():
-                self.do_selection_stuff(selected_names, selected, method, ctx)
+                self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
             for pred in module.predicates.values():
-                self.do_selection_stuff(selected_names, selected, pred, ctx)
+                self.track_dependencies(selected_names, selected, pred, ctx)
                 predicates.append(self.translate_predicate(pred, ctx))
             for operation in module.io_operations.values():
-                self.do_selection_stuff(selected_names, selected, predicate, ctx)
+                self.track_dependencies(selected_names, selected, predicate, ctx)
                 predicate, getters, checkers = self.translate_io_operation(
                         operation,
                         ctx)
@@ -606,7 +618,7 @@ class ProgramTranslator(CommonTranslator):
                     func = cls.functions[func_name]
                     if func.interface:
                         continue
-                    self.do_selection_stuff(selected_names, selected, func, ctx)
+                    self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     if func.overrides:
                         raise InvalidProgramException(func.node,
@@ -615,7 +627,7 @@ class ProgramTranslator(CommonTranslator):
                     method = cls.methods[method_name]
                     if method.interface:
                         continue
-                    self.do_selection_stuff(selected_names, selected, method, ctx)
+                    self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))
                     if ((method_name != '__init__' or
                              (cls.superclass and
@@ -624,7 +636,7 @@ class ProgramTranslator(CommonTranslator):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.static_methods:
                     method = cls.static_methods[method_name]
-                    self.do_selection_stuff(selected_names, selected, method, ctx)
+                    self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))
                     if method.overrides:
                         methods.append(self.create_override_check(method, ctx))
@@ -649,13 +661,14 @@ class ProgramTranslator(CommonTranslator):
                 ctx.current_class = old_class
 
         for root in predicate_families:
-            self.do_selection_stuff(selected_names, selected, root, ctx)
+            self.track_dependencies(selected_names, selected, root, ctx)
             pf = self.translate_predicate_family(root, predicate_families[root],
                                                  ctx)
             predicates.append(pf)
 
         all_used_names = None
         if selected:
+            # Compute all dependencies of directly selected methods/...
             all_used_names = list(selected_names)
             i = 0
             while i < len(all_used_names):
@@ -670,6 +683,7 @@ class ProgramTranslator(CommonTranslator):
                         all_used_names.append(add)
                 i += 1
 
+            # Filter out anything the selected part does not depend on.
             predicates = [p for p in predicates if p.name() in all_used_names]
             functions = [f for f in functions if f.name() in all_used_names]
             methods = [m for m in methods if m.name() in all_used_names]

@@ -143,8 +143,6 @@ class ViperAST:
                                   body, position, info)
 
     def PredicateAccess(self, args, pred_name, position, info):
-        if pred_name == 'MustInvokeBounded':
-            print("12")
         self.used_names.add(pred_name)
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
                                         info)

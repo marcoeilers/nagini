@@ -1101,6 +1101,10 @@ class Analyzer(ast.NodeVisitor):
                 (('IOOperation' in decorators) and (len(decorators) != 1)))
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
+        """
+        Checks if the given function is declared to be contract only by the
+        respective decorator.
+        """
         decorators = {d.id for d in func.decorator_list}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
@@ -1108,6 +1112,12 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def is_contract_only(self, func: ast.FunctionDef) -> bool:
+        """
+        Checks if the given function is supposed to be treated as contract only
+        because it is either declared to be so with a decorator, because it's
+        not in the main module that's being verified, or because some methods
+        were explicitly selected to be verified and this one is not one of them.
+        """
         result = self.is_declared_contract_only(func)
         if self.selected:
             selected = False

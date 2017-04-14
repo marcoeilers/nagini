@@ -77,9 +77,8 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # It's a regular union type; we don't support that at the
-            # moment.
-            # raise UnsupportedException(node, 'Member access on union type.')
+            # Try to access the member on the common supertype of all union
+            # elements.
             lhs = lhs.cls
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
