@@ -36,7 +36,7 @@ from nagini_translation.translators.type import TypeTranslator
 from nagini_translation.translators.type_domain_factory import (
     TypeDomainFactory
 )
-from typing import List
+from typing import List, Set
 
 
 class SIFTranslator(Translator):
@@ -78,13 +78,14 @@ class SIFTranslator(Translator):
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
-    def translate_program(self, modules: List[PythonModule],
-                          sil_progs: List) -> 'silver.ast.Program':
+    def translate_program(self, modules: List[PythonModule], sil_progs: List,
+                          selected: Set[str] = None) -> 'silver.ast.Program':
         ctx = SIFContext()
         ctx.current_class = None
         ctx.current_function = None
         ctx.module = modules[0]
-        return self.prog_translator.translate_program(modules, sil_progs, ctx)
+        return self.prog_translator.translate_program(modules, sil_progs, ctx,
+                                                      selected)
 
     def translate_pythonvar_decl(self, var: SIFPythonVar,
             module: PythonModule) -> 'silver.ast.LocalVarDecl':
