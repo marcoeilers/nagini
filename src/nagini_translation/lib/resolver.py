@@ -3,25 +3,18 @@ import ast
 from nagini_contracts.contracts import CONTRACT_FUNCS
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
-    BOXED_PRIMITIVES,
     BUILTINS,
     BYTES_TYPE,
     DICT_TYPE,
-    END_LABEL,
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
-    PRIMITIVE_INT_TYPE,
-    PRIMITIVE_PREFIX,
-    PRIMITIVES,
     RANGE_TYPE,
-    RESULT_NAME,
     SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
-    UNION_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -40,6 +33,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.util import (
     get_func_name,
+    InvalidProgramException,
     UnsupportedException,
 )
 from typing import List, Optional
@@ -77,9 +71,9 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # It's a regular union type; we don't support that at the
-            # moment.
-            raise UnsupportedException(node, 'Member access on union type.')
+            # Try to access the member on the common supertype of all union
+            # elements.
+            lhs = lhs.cls
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
@@ -257,7 +251,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         else:
             raise UnsupportedException(node)
     elif isinstance(node, ast.Call):
-        return _get_call_type(node, module, containers, container)
+        return _get_call_type(node, module, current_function, containers,
+                              container)
     else:
         raise UnsupportedException(node)
 
@@ -292,6 +287,7 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
 
 
 def _get_call_type(node: ast.Call, module: PythonModule,
+                   current_function: PythonMethod,
                    containers: List[ContainerInterface],
                    container: PythonNode) -> PythonType:
     func_name = get_func_name(node)
@@ -370,6 +366,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return get_type(node._parent.targets[0], containers,
                         container)
     value_type = get_type(node.value, containers, container)
+    if isinstance(value_type, OptionalType):
+        value_type = value_type.cls
     if value_type.name == TUPLE_TYPE:
         if isinstance(node.slice, ast.Slice):
             raise UnsupportedException(node, 'tuple slicing')

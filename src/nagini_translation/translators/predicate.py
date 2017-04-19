@@ -48,7 +48,7 @@ class PredicateTranslator(CommonTranslator):
         for pred in preds:
             value = {pred.overrides} if pred.overrides else set()
             dependencies[pred] = value
-        sorted = toposort_flatten(dependencies)
+        sorted = toposort_flatten(dependencies, False)
 
         name = root.sil_name
         args = []
