@@ -177,10 +177,9 @@ class CallTranslator(CommonTranslator):
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
 
-        result_has_type = self._var_concrete_type_check(res_var.name,
-                                                        result_type,
-                                                        pos,
-                                                        ctx)
+        result_has_type = self._var_concrete_type_check(
+            res_var.name, result_type, pos, ctx)
+
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,

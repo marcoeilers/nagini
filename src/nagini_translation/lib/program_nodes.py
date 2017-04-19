@@ -247,10 +247,10 @@ class TypeVar(PythonType, ContainerInterface):
     Represents a type variable.
     """
 
-    def __init__(self, name: str, target_type: Optional[PythonType],
-                 target_node: Optional[ast.AST],
-                 index: Optional[int], bound: PythonType,
-                 module: PythonModule):
+    def __init__(self, name: str, bound: PythonType,
+                 module: PythonModule, target_type: PythonType = None,
+                 target_node: ast.AST = None,
+                 index: int = None):
         """
         For class parameters, supply target_type, target_node and index. For
         method parameters, supply the defining node as target_node and later

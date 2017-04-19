@@ -209,8 +209,7 @@ class MethodTranslator(CommonTranslator):
                                                         pos, ctx)
                 pres.append(check)
         for name, var in func.type_vars.items():
-            var_expr = var.type_expr
-            check = self.type_factory.subtype_check(var_expr, var.bound,
+            check = self.type_factory.subtype_check(var.type_expr, var.bound,
                                                     pos, ctx)
             pres.append(check)
         return pres

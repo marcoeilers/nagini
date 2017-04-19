@@ -457,9 +457,8 @@ class TypeDomainFactory:
             body = self.viper.Implies(body_lhs, body, position, info)
         if type_arg_decls:
             none_type = self.viper.DomainFuncApp('NoneType', [],
-                                                 self.type_type(),
-                                                 position, info,
-                                                 self.type_domain)
+                                                 self.type_type(), position,
+                                                 info, self.type_domain)
             not_none = self.viper.NeCmp(type_func, none_type, position, info)
             body = self.viper.And(body, not_none, position, info)
             trigger = self.viper.Trigger([type_func], position, info)
