@@ -67,8 +67,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
         os.path.join(resources_path, 'all.sil'), jvm))
 
 
-def translate(path: str, jvm: JVM, selected: Set[str], sif: bool = False,
-              reload_resources: bool = False):
+def translate(path: str, jvm: JVM, selected: Set[str] = set(),
+              sif: bool = False, reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
