@@ -489,8 +489,8 @@ class Analyzer(ast.NodeVisitor):
                 contract_only = self.is_declared_contract_only(node)
             else:
                 contract_only = self.contract_only or self.is_contract_only(node)
-            func = self.node_factory.create_python_method(name, node,
-                self.current_class, scope_container, pure,
+            func = self.node_factory.create_python_method(
+                name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory)
             container[name] = func
         if self.is_static_method(node):

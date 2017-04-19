@@ -426,11 +426,12 @@ class ProgramTranslator(CommonTranslator):
                     to_add.extend(self.required_names[current])
             index = index + 1
 
-    def _convert_silver_elements(self, sil_progs: List[Program],
-                                 all_used, ctx: Context) -> Tuple[List[Domain],
-                                                        List[Predicate],
-                                                        List[Function],
-                                                        List[Method]]:
+    def _convert_silver_elements(
+            self, sil_progs: List[Program], all_used: List[str],
+            ctx: Context) -> Tuple[List[Domain],
+                                   List[Predicate],
+                                   List[Function],
+                                   List[Method]]:
         """
         Extracts domains, functions, predicates and methods from the given list
         of Silver programs, applies the necessary conversions (e.g. related to

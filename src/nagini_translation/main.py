@@ -225,7 +225,7 @@ def main() -> None:
     parser.add_argument(
         '--select',
         default=None,
-        help='select specific methods or classes to verify'
+        help='select specific methods or classes to verify, separated by commas'
     )
     args = parser.parse_args()
 
