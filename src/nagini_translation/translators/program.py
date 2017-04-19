@@ -597,7 +597,7 @@ class ProgramTranslator(CommonTranslator):
                 self.track_dependencies(selected_names, selected, pred, ctx)
                 predicates.append(self.translate_predicate(pred, ctx))
             for operation in module.io_operations.values():
-                self.track_dependencies(selected_names, selected, predicate, ctx)
+                self.track_dependencies(selected_names, selected, operation, ctx)
                 predicate, getters, checkers = self.translate_io_operation(
                         operation,
                         ctx)
