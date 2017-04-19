@@ -200,6 +200,18 @@ class MethodTranslator(CommonTranslator):
                                                        pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
+        if func.cls:
+            # Add upper bound information for type variables.
+            for name, var in func.cls.type_vars.items():
+                var_expr = self.type_factory.translate_type_literal(var, pos,
+                                                                    ctx)
+                check = self.type_factory.subtype_check(var_expr, var.bound,
+                                                        pos, ctx)
+                pres.append(check)
+        for name, var in func.type_vars.items():
+            check = self.type_factory.subtype_check(var.type_expr, var.bound,
+                                                    pos, ctx)
+            pres.append(check)
         return pres
 
     def _translate_params(self, func: PythonMethod,
@@ -373,6 +385,7 @@ class MethodTranslator(CommonTranslator):
         and superclasses to expressions denoting the values of said types.
         """
         ctx.bound_type_vars = {}
+        # Class type variables first.
         if method.cls and method.method_type is MethodType.normal:
             cls = method.cls
             while cls:
@@ -385,11 +398,21 @@ class MethodTranslator(CommonTranslator):
                 cls = cls.superclass
                 if isinstance(cls, GenericType):
                     cls = cls.cls
-        for name, var in method.type_vars:
-            literal = self.type_factory.get_ref_type_arg(var.target_node,
-                                                         var.target_type,
-                                                         var.index, ctx)
-            ctx.bound_type_vars[(var.target_type.name, name)] = literal
+        # Now method type variables.
+        for name, var in method.type_vars.items():
+            if callable(var.type_expr):
+                # var.type_expr is currently the function that will create the
+                # type expression when given the parameter that defines the
+                # type variable (identified by var.target_node).
+                for i, python_var in enumerate(method.args.values()):
+                    if python_var.node is var.target_node:
+                        ref = python_var.ref()
+                typeof = self.type_factory.typeof(ref, ctx)
+                literal = var.type_expr(self.type_factory, typeof, ctx)
+                var.type_expr = literal
+            else:
+                literal = var.type_expr
+            ctx.bound_type_vars[(var.name,)] = literal
 
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
@@ -399,7 +422,7 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
-
+        args = self._translate_params(method, ctx)
         self.bind_type_vars(method, ctx)
 
         results = [res.decl for res in method.get_results()]
@@ -416,7 +439,6 @@ class MethodTranslator(CommonTranslator):
         if method.declared_exceptions:
             results.append(error_var_decl)
 
-        args = self._translate_params(method, ctx)
         # Translate body
         body = []
         no_pos = self.no_position(ctx)

@@ -149,17 +149,37 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        fields = target_class.all_sil_fields
+        result_type = self.get_type(node, ctx)
+        pos = self.to_position(node, ctx)
+
+        # Temporarily bind the type variables of the constructed class to
+        # the concrete type arguments.
+        old_bound_type_vars = ctx.bound_type_vars
+        ctx.bound_type_vars = old_bound_type_vars.copy()
+        current_type = result_type
+        while current_type:
+            if isinstance(current_type, GenericType):
+                vars_args = zip(current_type.cls.type_vars.items(),
+                                current_type.type_args)
+                for (name, var), arg in vars_args:
+                    literal = self.type_factory.translate_type_literal(arg, pos,
+                                                                       ctx)
+                    key = (var.target_type.name, name)
+                    ctx.bound_type_vars[key] = literal
+            current_type = current_type.superclass
+
+        fields = list(target_class.all_sil_fields)
         field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
                               for field in target_class.all_fields
                               if field.type.name not in PRIMITIVES]
+
+        ctx.bound_type_vars = old_bound_type_vars
         new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
                                  self.no_info(ctx))
-        pos = self.to_position(node, ctx)
-        result_has_type = self._var_concrete_type_check(res_var.name,
-                                                        target_class,
-                                                        pos,
-                                                        ctx)
+
+        result_has_type = self._var_concrete_type_check(
+            res_var.name, result_type, pos, ctx)
+
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,

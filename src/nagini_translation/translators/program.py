@@ -143,11 +143,16 @@ class ProgramTranslator(CommonTranslator):
         ctx.position.append(('inheritance', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
 
+        args = []
+        params = []
+
+        for arg_name, arg in method.args.items():
+            args.append(arg)
+            params.append(arg.decl)
+
         self.bind_type_vars(method, ctx)
 
-        params = []
         results = []
-        args = []
         locals_before = set(method.locals.values())
         if method.type:
             results.append(method.result.decl)
@@ -173,10 +178,6 @@ class ProgramTranslator(CommonTranslator):
                 next(iter(method.args.values())).ref(), cls, pos, ctx,
                 concrete=True)
             pres = [not_null, new_type] + pres
-
-        for arg_name, arg in method.args.items():
-            args.append(arg)
-            params.append(arg.decl)
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
                                             error_var, ctx)
@@ -215,10 +216,14 @@ class ProgramTranslator(CommonTranslator):
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         self._check_override_validity(method, ctx)
 
-        self.bind_type_vars(method, ctx)
-
         params = []
         args = []
+
+        for arg in method.overrides.args:
+            params.append(method.overrides.args[arg].decl)
+            args.append(method.overrides.args[arg].ref())
+
+        self.bind_type_vars(method, ctx)
 
         mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')
         pres, posts = self.extract_contract(method.overrides, '_err',
@@ -260,10 +265,6 @@ class ProgramTranslator(CommonTranslator):
                                                           self.no_position(ctx),
                                                           self.no_info(ctx))
                     pres.append(acc)
-
-        for arg in method.overrides.args:
-            params.append(method.overrides.args[arg].decl)
-            args.append(method.overrides.args[arg].ref())
 
         called_name = method.sil_name
         ctx.position.pop()
