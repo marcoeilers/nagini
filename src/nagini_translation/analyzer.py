@@ -49,7 +49,7 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -61,7 +61,7 @@ class Analyzer(ast.NodeVisitor):
     """
 
     def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str):
+                 path: str, selected: Set[str]):
         self._node_factory = None
         self.viper = viperast
         self.java = jvm.java
@@ -86,6 +86,7 @@ class Analyzer(ast.NodeVisitor):
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
+        self.selected = selected
 
     @property
     def node_factory(self):
@@ -486,9 +487,13 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            contract_only = self.contract_only or self.is_contract_only(node)
-            func = self.node_factory.create_python_method(name, node,
-                self.current_class, scope_container, self.is_pure(node),
+            pure = self.is_pure(node)
+            if pure:
+                contract_only = self.is_declared_contract_only(node)
+            else:
+                contract_only = self.contract_only or self.is_contract_only(node)
+            func = self.node_factory.create_python_method(
+                name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory)
             container[name] = func
         if self.is_static_method(node):
@@ -1138,11 +1143,38 @@ class Analyzer(ast.NodeVisitor):
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)))
 
-    def is_contract_only(self, func: ast.FunctionDef) -> bool:
+    def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
+        """
+        Checks if the given function is declared to be contract only by the
+        respective decorator.
+        """
         decorators = {d.id for d in func.decorator_list}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        return 'ContractOnly' in decorators
+        result = 'ContractOnly' in decorators
+        return result
+
+    def is_contract_only(self, func: ast.FunctionDef) -> bool:
+        """
+        Checks if the given function is supposed to be treated as contract only
+        because it is either declared to be so with a decorator, because it's
+        not in the main module that's being verified, or because some methods
+        were explicitly selected to be verified and this one is not one of them.
+        """
+        result = self.is_declared_contract_only(func)
+        if self.selected:
+            selected = False
+            if self.current_class:
+                if self.current_class.name in self.selected:
+                    selected = True
+                else:
+                    combined = self.current_class.name + '.' + func.name
+                    if combined in self.selected:
+                        selected = True
+            if func.name in self.selected:
+                selected = True
+            result = result or (not selected)
+        return result
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         decorators = {d.id for d in func.decorator_list}

@@ -263,8 +263,9 @@ class MethodTranslator(CommonTranslator):
         body_index = get_body_start_index(statements)
         # Translate body
         actual_body = statements[body_index:]
-        if (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
-            isinstance(actual_body[0].value, ast.Ellipsis)):
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
             body = None
         else:
             body = self.translate_exprs(actual_body, func, ctx)

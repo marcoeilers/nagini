@@ -31,6 +31,7 @@ class ViperAST:
         self.jvm = jvm
         self.nodes = {}
         self.used_names = set()
+        self.used_names_sets = {}
 
         def getconst(name):
             return getobject(ast, name)
@@ -142,6 +143,7 @@ class ViperAST:
                                   body, position, info)
 
     def PredicateAccess(self, args, pred_name, position, info):
+        self.used_names.add(pred_name)
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
                                         info)
 
@@ -263,8 +265,11 @@ class ViperAST:
     def CurrentPerm(self, location, position, info):
         return self.ast.CurrentPerm(location, position, info)
 
-    def ForPerm(self, variable, accessList, body, position, info):
-        return self.ast.ForPerm(variable, self.to_seq(accessList), body,
+    def ForPerm(self, variable, access_list, body, position, info):
+        for acc in access_list:
+            if isinstance(acc, self.ast.Predicate):
+                self.used_names.add(acc.name())
+        return self.ast.ForPerm(variable, self.to_seq(access_list), body,
                                 position, info)
 
     def PermMinus(self, exp, position, info):

@@ -29,6 +29,7 @@ from nagini_translation.verifier import (
     VerificationResult,
     ViperVerifier
 )
+from typing import Set
 
 
 def parse_sil_file(sil_path: str, jvm):
@@ -66,8 +67,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
         os.path.join(resources_path, 'all.sil'), jvm))
 
 
-def translate(path: str, jvm: JVM, sif: bool = False,
-              reload_resources: bool = False):
+def translate(path: str, jvm: JVM, selected: Set[str] = set(),
+              sif: bool = False, reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -86,9 +87,9 @@ def translate(path: str, jvm: JVM, sif: bool = False,
     if not type_correct:
         return None
     if sif:
-        analyzer = SIFAnalyzer(jvm, viperast, types, path)
+        analyzer = SIFAnalyzer(jvm, viperast, types, path, selected)
     else:
-        analyzer = Analyzer(jvm, viperast, types, path)
+        analyzer = Analyzer(jvm, viperast, types, path, selected)
     main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))
@@ -104,7 +105,7 @@ def translate(path: str, jvm: JVM, sif: bool = False,
         sil_programs = []
         load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs)
+    prog = translator.translate_program(modules, sil_programs, selected)
     return prog
 
 
@@ -221,6 +222,11 @@ def main() -> None:
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
+    parser.add_argument(
+        '--select',
+        default=None,
+        help='select specific methods or classes to verify, separated by commas'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -236,7 +242,8 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args):
     try:
-        prog = translate(python_file, jvm, args.sif)
+        selected = set(args.select.split(';')) if args.select else set()
+        prog = translate(python_file, jvm, selected, args.sif)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:
