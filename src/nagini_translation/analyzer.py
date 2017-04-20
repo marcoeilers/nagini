@@ -617,6 +617,15 @@ class Analyzer(ast.NodeVisitor):
                                                          annotated_type)
             self.current_function.kw_arg = kw_arg
 
+    def visit_ListComp(self, node: ast.Lambda) -> None:
+        name = construct_lambda_prefix(node.lineno, node.col_offset)
+        target = node.generators[0].target
+        local_name = name + '$' + target.id
+        var = self.node_factory.create_python_var(
+            target.id, target, self.typeof(target))
+        self.current_function.special_vars[local_name] = var
+        return
+
     def visit_Lambda(self, node: ast.Lambda) -> None:
         assert self.current_function
         name = construct_lambda_prefix(node.lineno, node.col_offset)

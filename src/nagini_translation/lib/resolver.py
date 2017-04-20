@@ -267,6 +267,14 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.Call):
         return _get_call_type(node, module, current_function, containers,
                               container)
+    elif isinstance(node, ast.ListComp):
+        if (node._parent and isinstance(node._parent, ast.Assign) and
+                    node is node._parent.value):
+            # Constructor is assigned to variable;
+            # we get the type of the dict from the type of the
+            # variable it's assigned to.
+            return get_type(node._parent.targets[0], containers,
+                            container)
     else:
         raise UnsupportedException(node)
 
