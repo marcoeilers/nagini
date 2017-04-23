@@ -665,6 +665,10 @@ class UnionType(GenericType):
             self._cls = cls
         return self._cls
 
+    @property
+    def python_class(self) -> PythonClass:
+        return self.cls
+
 
 class OptionalType(UnionType):
     """

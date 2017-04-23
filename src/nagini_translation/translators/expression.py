@@ -681,8 +681,8 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        left_type_boxed = left_type.try_box()
-        right_type_boxed = right_type.try_box()
+        left_type_boxed = left_type.python_class.try_box()
+        right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
                 right_type_boxed.name == left_type_boxed.name)
 
@@ -694,7 +694,7 @@ class ExpressionTranslator(CommonTranslator):
         the given operands to a primitive Viper BinOp.
         """
         op = self._primitive_operations[type(op)]
-        if op_type.try_box().name == INT_TYPE:
+        if op_type.python_class.try_box().name == INT_TYPE:
             wrap = self.to_int
         else:
             wrap = self.to_bool

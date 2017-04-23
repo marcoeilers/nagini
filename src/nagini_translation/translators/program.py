@@ -444,7 +444,7 @@ class ProgramTranslator(CommonTranslator):
         methods = []
 
         if all_used:
-            used_names = all_used
+            used_names = set(all_used)
             self.viper.used_names = set()
         else:
             used_names = set()
@@ -511,7 +511,7 @@ class ProgramTranslator(CommonTranslator):
         self.viper.used_names_sets[node.sil_name] = used_names
         if selected_names is None:
             return
-        if ctx.module.type_prefix is '__main__':
+        if True or ctx.module.type_prefix is '__main__':
             if (node.name in selected or
                     (hasattr(node, 'cls') and node.cls and
                      node.cls.name + '.' + node.name in selected)):

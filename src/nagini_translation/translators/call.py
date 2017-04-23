@@ -93,6 +93,15 @@ class CallTranslator(CommonTranslator):
                                       node, ctx)
         return stmt, call
 
+    def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        args = [target]
+        arg_type = self.get_type(node.args[0], ctx)
+        call = self.get_function_call(arg_type, '__str__', [target], [None],
+                                      node, ctx)
+        return stmt, call
+
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
             if self.is_valid_super_call(node, ctx):
@@ -253,6 +262,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_super(node, ctx)
         elif func_name == 'len':
             return self._translate_len(node, ctx)
+        elif func_name == 'str':
+            return self._translate_str(node, ctx)
         elif func_name == 'set':
             return self._translate_set(node, ctx)
         elif func_name == 'range':
