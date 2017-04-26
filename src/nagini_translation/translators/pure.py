@@ -72,7 +72,11 @@ class PureTranslator(CommonTranslator):
 
     def translate_pure_generic(self, conds: List,
                                node: ast.AST, ctx: Context) -> List[Wrapper]:
+        if isinstance(node.value, ast.Str):
+            return []
         raise UnsupportedException(node)
+
+
 
     def translate_pure_If(self, conds: List, node: ast.If,
                           ctx: Context) -> List[Wrapper]:
