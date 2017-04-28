@@ -56,6 +56,7 @@ class ViperAST:
         self.SubOp = getconst('SubOp')
         self.NoPosition = getconst('NoPosition')
         self.NoInfo = getconst('NoInfo')
+        self.NoTrafos = getconst('NoTrafos')
         self.Int = getconst('Int')
         self.Bool = getconst('Bool')
         self.Ref = getconst('Ref')
@@ -119,45 +120,45 @@ class ViperAST:
                 info):
         return self.ast.Program(self.to_seq(domains), self.to_seq(fields),
                                 self.to_seq(functions), self.to_seq(predicates),
-                                self.to_seq(methods), position, info)
+                                self.to_seq(methods), position, info, self.NoTrafos)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
         body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
                                  self.to_seq(posts),
-                                 body, position, info)
+                                 body, position, info, self.NoTrafos)
 
     def Method(self, name, args, returns, pres, posts, locals, body, position,
                info):
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
-                               self.to_seq(locals), body, position, info)
+                               self.to_seq(locals), body, position, info, self.NoTrafos)
 
     def Field(self, name, type, position, info):
-        return self.ast.Field(name, type, position, info)
+        return self.ast.Field(name, type, position, info, self.NoTrafos)
 
     def Predicate(self, name, args, body, position, info):
         body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Predicate(name, self.to_seq(args),
-                                  body, position, info)
+                                  body, position, info, self.NoTrafos)
 
     def PredicateAccess(self, args, pred_name, position, info):
         self.used_names.add(pred_name)
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
-                                        info)
+                                        info, self.NoTrafos)
 
     def PredicateAccessPredicate(self, loc, perm, position, info):
-        return self.ast.PredicateAccessPredicate(loc, perm, position, info)
+        return self.ast.PredicateAccessPredicate(loc, perm, position, info, self.NoTrafos)
 
     def Fold(self, predicate, position, info):
-        return self.ast.Fold(predicate, position, info)
+        return self.ast.Fold(predicate, position, info, self.NoTrafos)
 
     def Unfold(self, predicate, position, info):
-        return self.ast.Unfold(predicate, position, info)
+        return self.ast.Unfold(predicate, position, info, self.NoTrafos)
 
     def Unfolding(self, predicate, expr, position, info):
-        return self.ast.Unfolding(predicate, expr, position, info)
+        return self.ast.Unfolding(predicate, expr, position, info, self.NoTrafos)
 
     def SeqType(self, element_type):
         return self.ast.SeqType(element_type)
@@ -168,14 +169,15 @@ class ViperAST:
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
                                self.to_seq(axioms), self.to_seq(typevars),
-                               position, info)
+                               position, info, self.NoTrafos)
 
     def DomainFunc(self, name, args, type, unique, position, info, domain_name):
         return self.ast.DomainFunc(name, self.to_seq(args), type, unique,
-                                   position, info, domain_name)
+                                   position, info, domain_name, self.NoTrafos)
 
     def DomainAxiom(self, name, expr, position, info, domain_name):
-        return self.ast.DomainAxiom(name, expr, position, info, domain_name)
+        return self.ast.DomainAxiom(name, expr, position, info, domain_name,
+                                    self.NoTrafos)
 
     def DomainType(self, name, type_vars_map, type_vars):
         map = self.to_map(type_vars_map)
@@ -200,7 +202,7 @@ class ViperAST:
         result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
                                         self.to_map(type_var_map), position,
                                         info, type_passed_func,
-                                        args_passed_func, domain_name)
+                                        args_passed_func, domain_name, self.NoTrafos)
         return result
 
     def TypeVar(self, name):
@@ -209,169 +211,169 @@ class ViperAST:
     def MethodCall(self, method_name, args, targets, position, info):
         self.used_names.add(method_name)
         return self.ast.MethodCall(method_name, self.to_seq(args),
-                                   self.to_seq(targets), position, info)
+                                   self.to_seq(targets), position, info, self.NoTrafos)
 
     def NewStmt(self, lhs, fields, position, info):
-        return self.ast.NewStmt(lhs, self.to_seq(fields), position, info)
+        return self.ast.NewStmt(lhs, self.to_seq(fields), position, info, self.NoTrafos)
 
     def Label(self, name, position, info):
-        return self.ast.Label(name, self.to_seq([]), position, info)
+        return self.ast.Label(name, self.to_seq([]), position, info, self.NoTrafos)
 
     def Goto(self, name, position, info):
-        return self.ast.Goto(name, position, info)
+        return self.ast.Goto(name, position, info, self.NoTrafos)
 
     def Seqn(self, body, position, info):
-        return self.ast.Seqn(self.to_seq(body), position, info)
+        return self.ast.Seqn(self.to_seq(body), position, info, self.NoTrafos)
 
     def LocalVarAssign(self, lhs, rhs, position, info):
-        return self.ast.LocalVarAssign(lhs, rhs, position, info)
+        return self.ast.LocalVarAssign(lhs, rhs, position, info, self.NoTrafos)
 
     def FieldAssign(self, lhs, rhs, position, info):
-        return self.ast.FieldAssign(lhs, rhs, position, info)
+        return self.ast.FieldAssign(lhs, rhs, position, info, self.NoTrafos)
 
     def FieldAccess(self, receiver, field, position, info):
-        return self.ast.FieldAccess(receiver, field, position, info)
+        return self.ast.FieldAccess(receiver, field, position, info, self.NoTrafos)
 
     def FieldAccessPredicate(self, fieldacc, perm, position, info):
-        return self.ast.FieldAccessPredicate(fieldacc, perm, position, info)
+        return self.ast.FieldAccessPredicate(fieldacc, perm, position, info, self.NoTrafos)
 
     def Old(self, expr, position, info):
-        return self.ast.Old(expr, position, info)
+        return self.ast.Old(expr, position, info, self.NoTrafos)
 
     def Inhale(self, expr, position, info):
-        return self.ast.Inhale(expr, position, info)
+        return self.ast.Inhale(expr, position, info, self.NoTrafos)
 
     def Exhale(self, expr, position, info):
-        return self.ast.Exhale(expr, position, info)
+        return self.ast.Exhale(expr, position, info, self.NoTrafos)
 
     def InhaleExhaleExp(self, inhale, exhale, position, info):
-        return self.ast.InhaleExhaleExp(inhale, exhale, position, info)
+        return self.ast.InhaleExhaleExp(inhale, exhale, position, info, self.NoTrafos)
 
     def Assert(self, expr, position, info):
-        return self.ast.Assert(expr, position, info)
+        return self.ast.Assert(expr, position, info, self.NoTrafos)
 
     def FullPerm(self, position, info):
-        return self.ast.FullPerm(position, info)
+        return self.ast.FullPerm(position, info, self.NoTrafos)
 
     def NoPerm(self, position, info):
-        return self.ast.NoPerm(position, info)
+        return self.ast.NoPerm(position, info, self.NoTrafos)
 
     def WildcardPerm(self, position, info):
-        return self.ast.WildcardPerm(position, info)
+        return self.ast.WildcardPerm(position, info, self.NoTrafos)
 
     def FractionalPerm(self, left, right, position, info):
-        return self.ast.FractionalPerm(left, right, position, info)
+        return self.ast.FractionalPerm(left, right, position, info, self.NoTrafos)
 
     def CurrentPerm(self, location, position, info):
-        return self.ast.CurrentPerm(location, position, info)
+        return self.ast.CurrentPerm(location, position, info, self.NoTrafos)
 
     def ForPerm(self, variable, access_list, body, position, info):
         for acc in access_list:
             if isinstance(acc, self.ast.Predicate):
                 self.used_names.add(acc.name())
         return self.ast.ForPerm(variable, self.to_seq(access_list), body,
-                                position, info)
+                                position, info, self.NoTrafos)
 
     def PermMinus(self, exp, position, info):
-        return self.ast.PermMinus(exp, position, info)
+        return self.ast.PermMinus(exp, position, info, self.NoTrafos)
 
     def PermAdd(self, left, right, position, info):
-        return self.ast.PermAdd(left, right, position, info)
+        return self.ast.PermAdd(left, right, position, info, self.NoTrafos)
 
     def PermSub(self, left, right, position, info):
-        return self.ast.PermSub(left, right, position, info)
+        return self.ast.PermSub(left, right, position, info, self.NoTrafos)
 
     def PermMul(self, left, right, position, info):
-        return self.ast.PermMul(left, right, position, info)
+        return self.ast.PermMul(left, right, position, info, self.NoTrafos)
 
     def IntPermMul(self, left, right, position, info):
-        return self.ast.IntPermMul(left, right, position, info)
+        return self.ast.IntPermMul(left, right, position, info, self.NoTrafos)
 
     def PermLtCmp(self, left, right, position, info):
-        return self.ast.PermLtCmp(left, right, position, info)
+        return self.ast.PermLtCmp(left, right, position, info, self.NoTrafos)
 
     def PermLeCmp(self, left, right, position, info):
-        return self.ast.PermLeCmp(left, right, position, info)
+        return self.ast.PermLeCmp(left, right, position, info, self.NoTrafos)
 
     def PermGtCmp(self, left, right, position, info):
-        return self.ast.PermGtCmp(left, right, position, info)
+        return self.ast.PermGtCmp(left, right, position, info, self.NoTrafos)
 
     def PermGeCmp(self, left, right, position, info):
-        return self.ast.PermGeCmp(left, right, position, info)
+        return self.ast.PermGeCmp(left, right, position, info, self.NoTrafos)
 
     def Not(self, expr, position, info):
-        return self.ast.Not(expr, position, info)
+        return self.ast.Not(expr, position, info, self.NoTrafos)
 
     def Minus(self, expr, position, info):
-        return self.ast.Minus(expr, position, info)
+        return self.ast.Minus(expr, position, info, self.NoTrafos)
 
     def CondExp(self, cond, then, els, position, info):
-        return self.ast.CondExp(cond, then, els, position, info)
+        return self.ast.CondExp(cond, then, els, position, info, self.NoTrafos)
 
     def EqCmp(self, left, right, position, info):
-        return self.ast.EqCmp(left, right, position, info)
+        return self.ast.EqCmp(left, right, position, info, self.NoTrafos)
 
     def NeCmp(self, left, right, position, info):
-        return self.ast.NeCmp(left, right, position, info)
+        return self.ast.NeCmp(left, right, position, info, self.NoTrafos)
 
     def GtCmp(self, left, right, position, info):
-        return self.ast.GtCmp(left, right, position, info)
+        return self.ast.GtCmp(left, right, position, info, self.NoTrafos)
 
     def GeCmp(self, left, right, position, info):
-        return self.ast.GeCmp(left, right, position, info)
+        return self.ast.GeCmp(left, right, position, info, self.NoTrafos)
 
     def LtCmp(self, left, right, position, info):
-        return self.ast.LtCmp(left, right, position, info)
+        return self.ast.LtCmp(left, right, position, info, self.NoTrafos)
 
     def LeCmp(self, left, right, position, info):
-        return self.ast.LeCmp(left, right, position, info)
+        return self.ast.LeCmp(left, right, position, info, self.NoTrafos)
 
     def IntLit(self, num, position, info):
-        return self.ast.IntLit(self.to_big_int(num), position, info)
+        return self.ast.IntLit(self.to_big_int(num), position, info, self.NoTrafos)
 
     def Implies(self, left, right, position, info):
-        return self.ast.Implies(left, right, position, info)
+        return self.ast.Implies(left, right, position, info, self.NoTrafos)
 
     def FuncApp(self, name, args, position, info, type, formalargs):
         self.used_names.add(name)
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
-                                self.to_seq(formalargs))
+                                self.to_seq(formalargs), self.NoTrafos)
 
     def ExplicitSeq(self, elems, position, info):
-        return self.ast.ExplicitSeq(self.to_seq(elems), position, info)
+        return self.ast.ExplicitSeq(self.to_seq(elems), position, info, self.NoTrafos)
 
     def ExplicitSet(self, elems, position, info):
-        return self.ast.ExplicitSet(self.to_seq(elems), position, info)
+        return self.ast.ExplicitSet(self.to_seq(elems), position, info, self.NoTrafos)
 
     def EmptySeq(self, type, position, info):
-        return self.ast.EmptySeq(type, position, info)
+        return self.ast.EmptySeq(type, position, info, self.NoTrafos)
 
     def LocalVarDecl(self, name, type, position, info):
-        return self.ast.LocalVarDecl(name, type, position, info)
+        return self.ast.LocalVarDecl(name, type, position, info, self.NoTrafos)
 
     def LocalVar(self, name, type, position, info):
-        return self.ast.LocalVar(name, type, position, info)
+        return self.ast.LocalVar(name, type, position, info, self.NoTrafos)
 
     def Result(self, type, position, info):
-        return self.ast.Result(type, position, info)
+        return self.ast.Result(type, position, info, self.NoTrafos)
 
     def AnySetContains(self, elem, s, position, info):
-        return self.ast.AnySetContains(elem, s, position, info)
+        return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
     def SeqAppend(self, left, right, position, info):
-        return self.ast.SeqAppend(left, right, position, info)
+        return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)
 
     def SeqContains(self, elem, s, position, info):
-        return self.ast.SeqContains(elem, s, position, info)
+        return self.ast.SeqContains(elem, s, position, info, self.NoTrafos)
 
     def SetContains(self, elem, s, position, info):
-        return self.ast.AnySetContains(elem, s, position, info)
+        return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
     def SeqLength(self, s, position, info):
-        return self.ast.SeqLength(s, position, info)
+        return self.ast.SeqLength(s, position, info, self.NoTrafos)
 
     def SeqIndex(self, s, ind, position, info):
-        return self.ast.SeqIndex(s, ind, position, info)
+        return self.ast.SeqIndex(s, ind, position, info, self.NoTrafos)
 
     def SeqTake(self, s, end, postion, info):
         return self.ast.SeqTake(s, end, postion, info)
@@ -380,60 +382,60 @@ class ViperAST:
         return self.ast.SeqDrop(s, end, postion, info)
 
     def Add(self, left, right, position, info):
-        return self.ast.Add(left, right, position, info)
+        return self.ast.Add(left, right, position, info, self.NoTrafos)
 
     def Sub(self, left, right, position, info):
-        return self.ast.Sub(left, right, position, info)
+        return self.ast.Sub(left, right, position, info, self.NoTrafos)
 
     def Mul(self, left, right, position, info):
-        return self.ast.Mul(left, right, position, info)
+        return self.ast.Mul(left, right, position, info, self.NoTrafos)
 
     def Div(self, left, right, position, info):
-        return self.ast.Div(left, right, position, info)
+        return self.ast.Div(left, right, position, info, self.NoTrafos)
 
     def Mod(self, left, right, position, info):
-        return self.ast.Mod(left, right, position, info)
+        return self.ast.Mod(left, right, position, info, self.NoTrafos)
 
     def And(self, left, right, position, info):
-        return self.ast.And(left, right, position, info)
+        return self.ast.And(left, right, position, info, self.NoTrafos)
 
     def Or(self, left, right, position, info):
-        return self.ast.Or(left, right, position, info)
+        return self.ast.Or(left, right, position, info, self.NoTrafos)
 
     def If(self, cond, thn, els, position, info):
-        return self.ast.If(cond, thn, els, position, info)
+        return self.ast.If(cond, thn, els, position, info, self.NoTrafos)
 
     def TrueLit(self, position, info):
-        return self.ast.TrueLit(position, info)
+        return self.ast.TrueLit(position, info, self.NoTrafos)
 
     def FalseLit(self, position, info):
-        return self.ast.FalseLit(position, info)
+        return self.ast.FalseLit(position, info, self.NoTrafos)
 
     def NullLit(self, position, info):
-        return self.ast.NullLit(position, info)
+        return self.ast.NullLit(position, info, self.NoTrafos)
 
     def Forall(self, variables, triggers, exp, position, info):
         res = self.ast.Forall(self.to_seq(variables), self.to_seq(triggers),
-                               exp, position, info)
+                               exp, position, info, self.NoTrafos)
         if res.isPure():
             return res
         else:
             return self.QPs.rewriteForall(res)
 
     def Exists(self, variables, exp, position, info):
-        res = self.ast.Exists(self.to_seq(variables), exp, position, info)
+        res = self.ast.Exists(self.to_seq(variables), exp, position, info, self.NoTrafos)
         return res
 
     def Trigger(self, exps, position, info):
-        return self.ast.Trigger(self.to_seq(exps), position, info)
+        return self.ast.Trigger(self.to_seq(exps), position, info, self.NoTrafos)
 
     def While(self, cond, invariants, locals, body, position, info):
         return self.ast.While(cond, self.to_seq(invariants),
                               self.to_seq(locals),
-                              body, position, info)
+                              body, position, info, self.NoTrafos)
 
     def Let(self, variable, exp, body, position, info):
-        return self.ast.Let(variable, exp, body, position, info)
+        return self.ast.Let(variable, exp, body, position, info, self.NoTrafos)
 
     def to_function0(self, func):
         func0 = Function0()
