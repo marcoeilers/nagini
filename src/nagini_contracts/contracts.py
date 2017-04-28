@@ -182,6 +182,13 @@ def Acc(field, ratio=1) -> bool:
     pass
 
 
+def Rd(field) -> bool:
+    """
+    Read permission to a predicate or field, only to be used in pure contexts.
+    """
+    pass
+
+
 def Fold(predicate: bool) -> None:
     pass
 
