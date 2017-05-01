@@ -375,11 +375,11 @@ class ViperAST:
     def SeqIndex(self, s, ind, position, info):
         return self.ast.SeqIndex(s, ind, position, info, self.NoTrafos)
 
-    def SeqTake(self, s, end, postion, info):
-        return self.ast.SeqTake(s, end, postion, info)
+    def SeqTake(self, s, end, position, info):
+        return self.ast.SeqTake(s, end, position, info, self.NoTrafos)
 
-    def SeqDrop(self, s, end, postion, info):
-        return self.ast.SeqDrop(s, end, postion, info)
+    def SeqDrop(self, s, end, position, info):
+        return self.ast.SeqDrop(s, end, position, info, self.NoTrafos)
 
     def Add(self, left, right, position, info):
         return self.ast.Add(left, right, position, info, self.NoTrafos)

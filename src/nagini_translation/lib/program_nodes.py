@@ -267,6 +267,10 @@ class TypeVar(PythonType, ContainerInterface):
     def get_contents(self, only_top: bool) -> Dict:
         return self.bound.get_contents(only_top)
 
+    @property
+    def python_class(self) -> 'PythonClass':
+        return self.bound
+
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """

@@ -122,6 +122,7 @@ LEGAL_MAGIC_METHODS = {
     '__exit__',
     '__str__',
     '__len__',
+    '__bool__',
 }
 
 RESULT_NAME = '_res'

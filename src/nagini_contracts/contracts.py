@@ -18,7 +18,7 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Fold', 'Unfold', 'Unfolding', 
+                  'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq']
 
 T = TypeVar('T')
@@ -298,6 +298,7 @@ __all__ = [
         'Exists',
         'Low',
         'Acc',
+        'Rd',
         'Fold',
         'Unfold',
         'Unfolding',

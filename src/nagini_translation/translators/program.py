@@ -622,7 +622,8 @@ class ProgramTranslator(CommonTranslator):
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
-                    if func.overrides:
+                    if func.overrides and not (func_name in ('__str__', '__bool__') and
+                                               func.overrides.cls.name == 'object'):
                         raise InvalidProgramException(func.node,
                                                       'invalid.override')
                 for method_name in cls.methods:

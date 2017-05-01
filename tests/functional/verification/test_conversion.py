@@ -96,7 +96,6 @@ def test_none_super_wrong(a: int) -> int:
 
 def test_param_object(a: int, b: Optional[object]) -> int:
     Ensures(Implies(b == None, Result() == 88))
-    Ensures(Implies(b != None, Result() == 99))
     return 99 if b else 88
 
 

@@ -34,6 +34,10 @@ import tokenize
 
 import pytest
 
+# These imports monkey-patch mypy and should happen as early as possible.
+import nagini_translation.mypy_patches.column_info_patch
+import nagini_translation.mypy_patches.optional_patch
+
 from typing import Any, Dict, List, Optional
 
 from nagini_translation.lib import config, jvmaccess
