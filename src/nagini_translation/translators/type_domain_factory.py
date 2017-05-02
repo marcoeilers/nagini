@@ -3,6 +3,7 @@ import ast
 from nagini_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
 from nagini_translation.lib.program_nodes import (
     GenericType,
+    OptionalType,
     PythonClass,
     PythonType,
     TypeVar,
@@ -886,6 +887,14 @@ class TypeDomainFactory:
         """
         info = self.no_info(ctx)
         type_func = self.typeof(lhs, ctx)
+        if isinstance(type, OptionalType):
+            # Shortcut for performance reasons: Instead of using a real union type,
+            # we say that lhs is None or it has the given type.
+            none_part = self.viper.EqCmp(lhs, self.viper.NullLit(position, info),
+                                         position, info)
+            just_part = self.subtype_check(type_func, type.cls, position, ctx,
+                                           concrete=concrete)
+            return self.viper.Or(none_part, just_part, position, info)
         return self.subtype_check(type_func, type, position, ctx,
                                   concrete=concrete)
 
