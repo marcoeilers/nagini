@@ -511,11 +511,10 @@ class ProgramTranslator(CommonTranslator):
         self.viper.used_names_sets[node.sil_name] = used_names
         if selected_names is None:
             return
-        if True or ctx.module.type_prefix is '__main__':
-            if (node.name in selected or
-                    (hasattr(node, 'cls') and node.cls and
-                     node.cls.name + '.' + node.name in selected)):
-                selected_names.append(node.sil_name)
+        if (node.name in selected or
+                (hasattr(node, 'cls') and node.cls and
+                 node.cls.name + '.' + node.name in selected)):
+            selected_names.append(node.sil_name)
 
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List, ctx: Context,
@@ -624,6 +623,8 @@ class ProgramTranslator(CommonTranslator):
                     functions.append(self.translate_function(func, ctx))
                     if func.overrides and not (func_name in ('__str__', '__bool__') and
                                                func.overrides.cls.name == 'object'):
+                        # We allow overriding certain methods, since the basic versions
+                        # in object are already minimal.
                         raise InvalidProgramException(func.node,
                                                       'invalid.override')
                 for method_name in cls.methods:

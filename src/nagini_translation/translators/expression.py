@@ -123,14 +123,11 @@ class ExpressionTranslator(CommonTranslator):
             raise UnsupportedException(node, 'Multiple generators in list comprehension.')
         if node.generators[0].ifs:
             raise UnsupportedException(node, 'Filter in list comprehension.')
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         list_class = ctx.module.global_module.classes['list']
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         target = node.generators[0].target
         local_name = name + '$' + target.id
         element_var = ctx.actual_function.special_vars[local_name]
-        element_type = element_var.type
         ctx.set_alias(target.id, element_var)
         body_stmt, body = self.translate_expr(node.elt, ctx)
         result_type = self.get_type(node.elt, ctx)
@@ -140,6 +137,21 @@ class ExpressionTranslator(CommonTranslator):
         ctx.remove_alias(target.id)
         result_var = ctx.actual_function.create_variable('listcomp', list_type,
                                                          self.translator)
+        stmt = self._create_list_comp_inhale(result_var, list_type, element_var,
+                                             body, node, ctx)
+        return stmt, result_var.ref()
+
+    def _create_list_comp_inhale(self, result_var: PythonVar, list_type: PythonType,
+                                 element_var: PythonVar, body: Expr, node: ast.ListComp,
+                                 ctx: Context) -> List[Stmt]:
+        # Create an inhale of the following form:
+        # Inhale issubtype(typeof(result), list(result_type)) && acc(result.list_acc) &&
+        # len(result) == |iter.__sil_seq__()| &&
+        # forall 0 <= i < len(result) :: result.list_acc[i] ==
+        #                                (let e == iter.__sil_seq__()[i] in body)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        list_class = ctx.module.global_module.classes['list']
         type_check = self.type_check(result_var.ref(), list_type, position, ctx, False)
         list_acc_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
                                           position, info)
@@ -156,7 +168,8 @@ class ExpressionTranslator(CommonTranslator):
         sil_seq = self.get_function_call(iter_type.cls, '__sil_seq__', [iter], [None],
                                          node, ctx)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
-        len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position, info)
+        len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
+                                     info)
         int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
         index_var = ctx.actual_function.create_variable('i', int_class, self.translator,
                                                         False)
@@ -168,7 +181,7 @@ class ExpressionTranslator(CommonTranslator):
         value_i = self.viper.SeqIndex(field_acc, index_var.ref(), position, info)
         sil_seq_i = self.get_function_call(iter_type.cls, '__getitem__',
                                            [iter, index_var.ref()], [None, None],
-                                           node, ctx) # self.viper.SeqIndex(sil_seq, index_var.ref(), position, info)
+                                           node, ctx)
 
         let = self.viper.Let(element_var.decl, sil_seq_i, body, position, info)
         value = self.viper.EqCmp(value_i, let, position, info)
@@ -179,7 +192,7 @@ class ExpressionTranslator(CommonTranslator):
         contents = self.viper.And(len_equal, values, position, info)
         all = self.viper.And(type_and_perm, contents, position, info)
         inhale = self.viper.Inhale(all, position, info)
-        return iter_stmt + [inhale], result_var.ref()
+        return iter_stmt + [inhale]
 
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:

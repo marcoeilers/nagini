@@ -126,6 +126,13 @@ class TypeDomainFactory:
 
     def create_subtype_union_axioms(self,
                                     ctx: Context) -> List['silver.ast.DomainAxiom']:
+        """
+            Creates UNION_TYPE_SIZE axioms of the following form:
+            (forall arg_1: PyType, ..., arg_n: PyType, X: PyType ::
+            { issubtype(union_type_n(arg_1, ..., arg_n), X) }
+              issubtype(union_type_n(arg_1, ..., arg_n), X) ==
+              (true && issubtype(arg_1, X) && ... && issubtype(arg_n, X)))
+            """
         result = []
         position, info = self.no_position(ctx), self.no_info(ctx)
         arg_decls = []

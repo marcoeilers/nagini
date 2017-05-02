@@ -275,6 +275,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             # variable it's assigned to.
             return get_type(node._parent.targets[0], containers,
                             container)
+        else:
+            raise UnsupportedException(node, 'List comprehensions must be directly '
+                                       'assigned to a local variable.')
     else:
         raise UnsupportedException(node)
 
