@@ -142,7 +142,7 @@ class SIFPythonField(PythonField):
         super()._set_sil_field(field)
         # Make a Silver-AST copy.
         sil_field = field.copy(self.field_prime.sil_name,
-                               field.typ(), field.pos(), field.info())
+                               field.typ(), field.pos(), field.info(), field.errT())
         self.field_prime.sil_field = sil_field
 
 
