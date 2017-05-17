@@ -217,6 +217,7 @@ class StatementTranslator(CommonTranslator):
         iter_list_len = self.viper.SeqLength(iter_acc, pos, info)
 
         non_empty_iterator = self.viper.GtCmp(iter_list_len, zero, pos, info)
+        empty_iterator = self.viper.EqCmp(iter_list_len, zero, pos, info)
 
         no_error_implies_non_empty = self.viper.Implies(no_error,
                                                         non_empty_iterator, pos,
@@ -271,6 +272,7 @@ class StatementTranslator(CommonTranslator):
                                            info)
         invariant.append(self.viper.Implies(some_error, previous_is_all, pos,
                                             info))
+        invariant.append(self.viper.Implies(empty_iterator, some_error, pos, info))
         return invariant
 
     def _get_iterator(self, iterable: Expr, iterable_type: PythonType,
@@ -354,6 +356,12 @@ class StatementTranslator(CommonTranslator):
         end_label = ctx.actual_function.get_fresh_name('loop_end')
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
+        iterable_var = ctx.actual_function.create_variable('iterable', iterable_type,
+                                                           self.translator, True)
+        iterable_assign = self.viper.LocalVarAssign(iterable_var.ref(), iterable,
+                                                    position, info)
+        iterable = iterable_var.ref()
+        iterable_stmt.append(iterable_assign)
         iter_var, iter_assign = self._get_iterator(iterable, iterable_type,
                                                    node, ctx)
         # Find type of the collection content we're iterating over.

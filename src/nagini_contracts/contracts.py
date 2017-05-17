@@ -18,7 +18,7 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Fold', 'Unfold', 'Unfolding', 
+                  'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq']
 
 T = TypeVar('T')
@@ -182,6 +182,13 @@ def Acc(field, ratio=1) -> bool:
     pass
 
 
+def Rd(field) -> bool:
+    """
+    Read permission to a predicate or field, only to be used in pure contexts.
+    """
+    pass
+
+
 def Fold(predicate: bool) -> None:
     pass
 
@@ -291,6 +298,7 @@ __all__ = [
         'Exists',
         'Low',
         'Acc',
+        'Rd',
         'Fold',
         'Unfold',
         'Unfolding',

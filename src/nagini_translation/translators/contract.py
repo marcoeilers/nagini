@@ -18,7 +18,6 @@ from nagini_translation.lib.util import (
     construct_lambda_prefix,
     find_loop_for_previous,
     get_func_name,
-    get_parent_of_type,
     InvalidProgramException,
     UnsupportedException,
 )
@@ -82,6 +81,8 @@ class ContractTranslator(CommonTranslator):
         Returns the permission for a Acc() contract function.
         """
         # Only one argument means implicit full permission
+        if ctx.current_function.pure:
+            return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
         if len(node.args) == 1:
             perm = self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))
@@ -481,8 +482,12 @@ class ContractTranslator(CommonTranslator):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
-        elif func_name == 'Acc':
-            perm = self._get_perm(node, ctx)
+        elif func_name in ('Acc', 'Rd'):
+            if func_name == 'Rd':
+                perm = self.viper.WildcardPerm(self.to_position(node, ctx),
+                                               self.no_info(ctx))
+            else:
+                perm = self._get_perm(node, ctx)
             if isinstance(node.args[0], ast.Call):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:

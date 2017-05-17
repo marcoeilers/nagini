@@ -242,7 +242,7 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args):
     try:
-        selected = set(args.select.split(';')) if args.select else set()
+        selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif)
         if args.verbose:
             print('Translation successful.')

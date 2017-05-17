@@ -15,6 +15,7 @@ from nagini_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
+    GenericType,
     PythonClass,
     PythonField,
     PythonGlobalVar,
@@ -23,7 +24,6 @@ from nagini_translation.lib.program_nodes import (
     PythonTryBlock,
     PythonType,
     PythonVar,
-    PythonVarBase,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -32,6 +32,7 @@ from nagini_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
+    construct_lambda_prefix,
     get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
@@ -106,7 +107,8 @@ class ExpressionTranslator(CommonTranslator):
 
     def _translate_only(self, node: ast.AST, ctx: Context):
         """
-        Translates an expression, but does so without changing the expression's type in any way.
+        Translates an expression, but does so without changing the expression's type in
+        any way.
         """
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
@@ -115,6 +117,83 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
+
+    def translate_ListComp(self, node: ast.ListComp, ctx: Context) -> StmtsAndExpr:
+        if len(node.generators) != 1:
+            raise UnsupportedException(node, 'Multiple generators in list comprehension.')
+        if node.generators[0].ifs:
+            raise UnsupportedException(node, 'Filter in list comprehension.')
+        list_class = ctx.module.global_module.classes['list']
+        name = construct_lambda_prefix(node.lineno, node.col_offset)
+        target = node.generators[0].target
+        local_name = name + '$' + target.id
+        element_var = ctx.actual_function.special_vars[local_name]
+        ctx.set_alias(target.id, element_var)
+        body_stmt, body = self.translate_expr(node.elt, ctx)
+        result_type = self.get_type(node.elt, ctx)
+        list_type = GenericType(list_class, [result_type])
+        if body_stmt:
+            raise InvalidProgramException(node, 'impure.list.comprehension.body')
+        ctx.remove_alias(target.id)
+        result_var = ctx.actual_function.create_variable('listcomp', list_type,
+                                                         self.translator)
+        stmt = self._create_list_comp_inhale(result_var, list_type, element_var,
+                                             body, node, ctx)
+        return stmt, result_var.ref()
+
+    def _create_list_comp_inhale(self, result_var: PythonVar, list_type: PythonType,
+                                 element_var: PythonVar, body: Expr, node: ast.ListComp,
+                                 ctx: Context) -> List[Stmt]:
+        # Create an inhale of the following form:
+        # Inhale issubtype(typeof(result), list(result_type)) && acc(result.list_acc) &&
+        # len(result) == |iter.__sil_seq__()| &&
+        # forall 0 <= i < len(result) :: result.list_acc[i] ==
+        #                                (let e == iter.__sil_seq__()[i] in body)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        list_class = ctx.module.global_module.classes['list']
+        type_check = self.type_check(result_var.ref(), list_type, position, ctx, False)
+        list_acc_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
+                                          position, info)
+        field_acc = self.viper.FieldAccess(result_var.ref(), list_acc_field, position,
+                                           info)
+        acc_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                   self.viper.FullPerm(position, info),
+                                                   position, info)
+        type_and_perm = self.viper.And(type_check, acc_pred, position, info)
+        result_len = self.get_function_call(list_class, '__len__', [result_var.ref()],
+                                            [None], node, ctx)
+        iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
+        iter_type = self.get_type(node.generators[0].iter, ctx)
+        sil_seq = self.get_function_call(iter_type.cls, '__sil_seq__', [iter], [None],
+                                         node, ctx)
+        seq_len = self.viper.SeqLength(sil_seq, position, info)
+        len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
+                                     info)
+        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        index_var = ctx.actual_function.create_variable('i', int_class, self.translator,
+                                                        False)
+        index_positive = self.viper.GeCmp(index_var.ref(),
+                                          self.viper.IntLit(0, position, info),
+                                          position, info)
+        index_lt_len = self.viper.LtCmp(index_var.ref(), seq_len, position, info)
+        index_in_bounds = self.viper.And(index_positive, index_lt_len, position, info)
+        value_i = self.viper.SeqIndex(field_acc, index_var.ref(), position, info)
+        sil_seq_i = self.get_function_call(iter_type.cls, '__getitem__',
+                                           [iter, index_var.ref()], [None, None],
+                                           node, ctx)
+
+        let = self.viper.Let(element_var.decl, sil_seq_i, body, position, info)
+        value = self.viper.EqCmp(value_i, let, position, info)
+        trigger = self.viper.Trigger([value_i], position, info)
+        value_in_bounds = self.viper.Implies(index_in_bounds, value, position, info)
+        values = self.viper.Forall([index_var.decl], [trigger], value_in_bounds, position,
+                                   info)
+        contents = self.viper.And(len_equal, values, position, info)
+        all = self.viper.And(type_and_perm, contents, position, info)
+        inhale = self.viper.Inhale(all, position, info)
+        return iter_stmt + [inhale]
+
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
         lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
@@ -615,8 +694,8 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        left_type_boxed = left_type.try_box()
-        right_type_boxed = right_type.try_box()
+        left_type_boxed = left_type.python_class.try_box()
+        right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
                 right_type_boxed.name == left_type_boxed.name)
 
@@ -628,7 +707,7 @@ class ExpressionTranslator(CommonTranslator):
         the given operands to a primitive Viper BinOp.
         """
         op = self._primitive_operations[type(op)]
-        if op_type.try_box().name == INT_TYPE:
+        if op_type.python_class.try_box().name == INT_TYPE:
             wrap = self.to_int
         else:
             wrap = self.to_bool

@@ -1,8 +1,16 @@
 function object___bool__(self: Ref) : Bool
-    ensures result == (self != null)
+    ensures self == null ==> !result
+    // We can't actually say that the result is true if self is not None, because
+    // this is not the case for collections.
+    ensures self != null ==> (let t == (typeof(self)) in ((!issubtype(t, list(list_arg(t, 0))) &&
+                                                           !issubtype(t, set(set_arg(t, 0))) &&
+                                                           !issubtype(t, dict(dict_arg(t, 0), dict_arg(t, 1)))) ==> result))
 
 function NoneType___bool__(self: Ref) : Bool
-    ensures result == (self != null)
+    ensures self == null ==> !result
+
+function object___str__(self: Ref) : Ref
+    ensures issubtype(typeof(result), str())
 
 function bool___bool__(self: Bool) : Bool
     ensures result == self

@@ -93,6 +93,24 @@ class CallTranslator(CommonTranslator):
                                       node, ctx)
         return stmt, call
 
+    def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        args = [target]
+        arg_type = self.get_type(node.args[0], ctx)
+        call = self.get_function_call(arg_type, '__str__', [target], [None],
+                                      node, ctx)
+        return stmt, call
+
+    def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        args = [target]
+        arg_type = self.get_type(node.args[0], ctx)
+        call = self.get_function_call(arg_type, '__bool__', [target], [None],
+                                      node, ctx)
+        return stmt, call
+
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
             if self.is_valid_super_call(node, ctx):
@@ -253,6 +271,10 @@ class CallTranslator(CommonTranslator):
             return self._translate_super(node, ctx)
         elif func_name == 'len':
             return self._translate_len(node, ctx)
+        elif func_name == 'str':
+            return self._translate_str(node, ctx)
+        elif func_name == 'bool':
+            return self._translate_bool(node, ctx)
         elif func_name == 'set':
             return self._translate_set(node, ctx)
         elif func_name == 'range':
@@ -751,7 +773,10 @@ class CallTranslator(CommonTranslator):
                        family_root.superclass.get_predicate(name)):
                     family_root = family_root.superclass
                 target_name = family_root.get_predicate(name).sil_name
-            perm = self.viper.FullPerm(position, self.no_info(ctx))
+            if ctx.current_function.pure:
+                perm = self.viper.WildcardPerm(position, self.no_info(ctx))
+            else:
+                perm = self.viper.FullPerm(position, self.no_info(ctx))
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
