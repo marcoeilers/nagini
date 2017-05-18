@@ -20,6 +20,7 @@ from nagini_translation.lib.program_nodes import (
     PythonField,
     PythonGlobalVar,
     PythonIOExistentialVar,
+    PythonMethod,
     PythonModule,
     PythonTryBlock,
     PythonType,
@@ -568,13 +569,13 @@ class ExpressionTranslator(CommonTranslator):
                     recv.python_class.get_static_field(node.attr)):
                 var = recv.python_class.static_fields[node.attr]
                 return var
-            recv = self.get_type(node.value, ctx)
             raise InvalidProgramException(node, 'field.nonexistent')
-        while field.inherited is not None:
-            field = field.inherited
-        if field.is_mangled() and (field.cls is not ctx.current_class and
-                                   field.cls is not ctx.actual_function.cls):
-            raise InvalidProgramException(node, 'private.field.access')
+        if isinstance(field, PythonField):
+            while field.inherited is not None:
+                field = field.inherited
+            if field.is_mangled() and (field.cls is not ctx.current_class and
+                                       field.cls is not ctx.actual_function.cls):
+                raise InvalidProgramException(node, 'private.field.access')
 
         return field
 
@@ -636,6 +637,14 @@ class ExpressionTranslator(CommonTranslator):
                 field_func = self.translate_static_field_access(field, receiver,
                                                                 position, ctx)
                 return [], field_func
+            if isinstance(field, PythonMethod):
+                target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
+                target_param = self.viper.LocalVarDecl('self', target_type, position,
+                                                       self.no_info(ctx))
+                property_type = self.translate_type(field.type, ctx)
+                return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
+                                                self.no_info(ctx), property_type,
+                                                [target_param])
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 

@@ -49,13 +49,21 @@ class ProgramTranslator(CommonTranslator):
     def _translate_fields(self, cls: PythonClass,
                           ctx: Context) -> List['silver.ast.Field']:
         fields = []
+        functions = []
+        methods = []
         for field in cls.fields.values():
-            if field.inherited is None:
+            if isinstance(field, PythonField) and field.inherited is None:
                 sil_field = self.translate_field(field, ctx)
                 field.sil_field = sil_field
                 fields.append(sil_field)
+            elif isinstance(field, PythonMethod):
+                getter = self.translate_function(field, ctx)
+                functions.append(getter)
+                if field.setter:
+                    setter = self.translate_method(field.setter, ctx)
+                    methods.append(setter)
 
-        return fields
+        return fields, functions, methods
 
     def create_static_field_function(self, root: PythonVar,
                                      classes: List[PythonClass],
@@ -557,7 +565,10 @@ class ProgramTranslator(CommonTranslator):
                     # Skip primitives or entries for type variables.
                     continue
                 containers.append(cls)
-                fields += self._translate_fields(cls, ctx)
+                f_fields, f_funcs, f_methods = self._translate_fields(cls, ctx)
+                fields += f_fields
+                methods += f_methods
+                functions += f_funcs
                 ctx.current_class = cls
                 for field_name in cls.all_static_fields:
                     field = cls.get_static_field(field_name)

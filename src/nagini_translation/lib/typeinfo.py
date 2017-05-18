@@ -50,6 +50,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return True
         return False
 
+    def visit_decorator(self, node: mypy.nodes.Decorator):
+        self.visit_func_def(node.func)
+
     def visit_member_expr(self, node: mypy.nodes.MemberExpr):
         rectype = self.type_of(node.expr)
         if (not self._is_result_call(node.expr) and

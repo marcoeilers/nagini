@@ -423,7 +423,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         cls = self
         while cls is not None:
             for field in cls.python_class.fields.values():
-                if field.inherited is None:
+                if isinstance(field, PythonField) and field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
         return fields
@@ -455,8 +455,16 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)
         for name, field in self.fields.items():
-            field_name = self.name + '_' + name
-            field.process(self.get_fresh_name(field_name))
+            if isinstance(field, PythonMethod):
+                # This is a property.
+                getter_name = self.name + '_' + name + '_getter'
+                setter_name = self.name + '_' + name + '_setter'
+                field.process(self.get_fresh_name(getter_name), translator)
+                if field.setter:
+                    field.setter.process(self.get_fresh_name(setter_name), translator)
+            else:
+                field_name = self.name + '_' + name
+                field.process(self.get_fresh_name(field_name))
         for name, field in self.static_fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name), translator)
@@ -755,6 +763,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
         self.requires = []
         self.type_vars = OrderedDict()
+        self.setter = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
