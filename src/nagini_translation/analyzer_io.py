@@ -98,6 +98,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 lambda_: ast.Lambda = None) -> nodes.PythonType:
         """Get the type of the given AST node."""
         assert isinstance(node, ast.arg)
+        if self._current_io_operation.name == 'eval_io' and node.arg == 'arg':
+            return self._parent.module.global_module.classes['object']
         scopes = [self._current_io_operation.name]
         if lambda_:
             prefix = construct_lambda_prefix(
@@ -128,13 +130,14 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             return []
         if not inputs or self._typeof(inputs[0]) != self._place_class:
             self._raise_invalid_operation('invalid_preset')
-        for inp in inputs[1:]:
-            if self._typeof(inp) == self._place_class:
+        start_index = 1
+        for inp in inputs[start_index:]:
+            if self._current_io_operation.name != 'eval_io' and self._typeof(inp) == self._place_class:
                 self._raise_invalid_operation('invalid_preset')
         in_place = self._node_factory.create_python_var(
             inputs[0].arg, inputs[0], self._place_class)
         self._current_io_operation.set_preset([in_place])
-        return inputs[1:]
+        return inputs[start_index:]
 
     def _set_postset(self, outputs: List[ast.arg]) -> List[ast.arg]:
         """Check and set postset.

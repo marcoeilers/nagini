@@ -70,7 +70,9 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name in PRIMITIVES:
+        if cls.name == 'Callable':
+            return self.viper.DomainType('Functions', {}, [])
+        elif cls.name in PRIMITIVES:
             cls = cls.try_box()
             return self.builtins['builtins.' + cls.name]
         elif cls.name == 'type':

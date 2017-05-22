@@ -17,6 +17,7 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     get_func_name,
+    InvalidProgramException,
     UnsupportedException,
 )
 from nagini_translation.translators.io_operation.common import (
@@ -177,9 +178,27 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             return self.translate_must_invoke_ctoken(node, ctx)
         elif func_name == 'Open':
             return self._translate_open(node, ctx)
+        elif func_name == 'Eval':
+            return self._translate_eval(node, ctx)
         else:
             raise UnsupportedException(node,
                                        'Unsupported contract function.')
+
+    def _translate_eval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        if not isinstance(node.args[1], ast.Name):
+            raise InvalidProgramException(node, 'invalid.eval.function')
+        target = self.get_target(node.args[1], ctx)
+        if not target.pure:
+            raise InvalidProgramException(node, 'invalid.eval.function')
+        arg_stmt, arg = self.translate_expr(node.args[2], ctx)
+        if arg_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        arg_type = self.get_type(node.args[2], ctx)
+        call_stmt, call_val = self.translate_normal_call(target, [], [arg], [arg_type], node, ctx)
+        if call_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        tk = self.translate_must_invoke_token(node, ctx)
+        return [], call_val
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

@@ -208,10 +208,11 @@ class MethodTranslator(CommonTranslator):
                 check = self.type_factory.subtype_check(var_expr, var.bound,
                                                         pos, ctx)
                 pres.append(check)
-        for name, var in func.type_vars.items():
-            check = self.type_factory.subtype_check(var.type_expr, var.bound,
-                                                    pos, ctx)
-            pres.append(check)
+        if func.name != 'Eval':
+            for name, var in func.type_vars.items():
+                check = self.type_factory.subtype_check(var.type_expr, var.bound,
+                                                        pos, ctx)
+                pres.append(check)
         return pres
 
     def _translate_params(self, func: PythonMethod,
@@ -413,6 +414,10 @@ class MethodTranslator(CommonTranslator):
             else:
                 literal = var.type_expr
             ctx.bound_type_vars[(var.name,)] = literal
+        if method.name == 'Eval':
+            object_type = ctx.module.global_module.classes['object']
+            literal = self.type_factory.translate_type_literal(object_type, self.no_position(ctx), ctx)
+            ctx.bound_type_vars[('V',)] = literal
 
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':

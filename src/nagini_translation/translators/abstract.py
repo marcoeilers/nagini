@@ -173,8 +173,12 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_contractfunc_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
-        return self.config.contract_translator.translate_contractfunc_call(node,
-                                                                           ctx)
+        return self.config.contract_translator.translate_contractfunc_call(node, ctx)
+
+    def translate_normal_call(self, target: PythonMethod, arg_stmts, args, arg_types,
+                              node: ast.AST, ctx: Context) -> StmtsAndExpr:
+        return self.config.call_translator.translate_normal_call(target, arg_stmts, args,
+                                                                 arg_types, node, ctx)
 
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:

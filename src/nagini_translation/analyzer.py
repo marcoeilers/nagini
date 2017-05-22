@@ -461,9 +461,10 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
-        if not isinstance(name, str):
-            raise Exception(name)
+        assert isinstance(name, str)
         if self.is_io_operation(node):
+            # if node.name == 'eval_io':
+            #     return
             self.io_operation_analyzer.analyze_io_operation(node)
             return
         if self.current_class is None:
@@ -520,7 +521,8 @@ class Analyzer(ast.NodeVisitor):
 
         self.visit(node.args, node)
 
-        func.type = self.convert_type(functype)
+        if not is_setter:
+            func.type = self.convert_type(functype)
 
         for child in node.body:
             if is_io_existential(child):
@@ -944,6 +946,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_type_var(mypy_type, node)
         elif self.types.is_type_type(mypy_type):
             return self._convert_type_type(mypy_type, node)
+        elif self.types.is_callable_type(mypy_type):
+            return self._convert_callable_type(mypy_type, node)
         else:
             raise UnsupportedException(mypy_type)
         return result
@@ -960,6 +964,9 @@ class Analyzer(ast.NodeVisitor):
         result = self.find_or_create_class(mypy_type.name(),
                                            module=target_module)
         return result
+
+    def _convert_callable_type(self, mypy_type, node) -> PythonType:
+        return self.find_or_create_class('Callable', module=self.module.global_module)
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
         args = [self.convert_type(arg_type, node)

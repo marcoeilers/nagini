@@ -7,6 +7,7 @@ from enum import Enum
 from nagini_contracts.io import BUILTIN_IO_OPERATIONS
 from nagini_translation.lib.constants import (
     BOXED_PRIMITIVES,
+    CALLABLE_TYPE,
     END_LABEL,
     ERROR_NAME,
     INTERNAL_NAMES,
@@ -521,7 +522,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         If this class represents a primitive type, returns the boxed version,
         otherwise just return the type itself.
         """
-        if self.name in PRIMITIVES and self.name != PRIMITIVE_SEQ_TYPE + '_type':
+        if self.name in PRIMITIVES and self.name not in (PRIMITIVE_SEQ_TYPE + '_type',
+                                                         CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             return self.module.classes[boxed_name]
         return self
@@ -764,6 +766,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
+        self.func_constant = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -772,6 +775,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        if self.pure:
+            self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
             arg.process(self.get_fresh_name(name), translator)
         if self.var_arg:
