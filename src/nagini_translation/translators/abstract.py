@@ -180,6 +180,9 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.call_translator.translate_normal_call(target, arg_stmts, args,
                                                                  arg_types, node, ctx)
 
+    def translate_normal_call_node(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        return self.config.call_translator.translate_normal_call_node(node, ctx)
+
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:
         translator = self.config.io_operation_translator

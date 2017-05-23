@@ -524,6 +524,16 @@ class ProgramTranslator(CommonTranslator):
                  node.cls.name + '.' + node.name in selected)):
             selected_names.append(node.sil_name)
 
+    def create_functions_domain(self, constants: List, ctx: Context):
+        return self.viper.Domain('Function', constants, [], [],
+                                 self.no_position(ctx), self.no_info(ctx))
+
+    def translate_function_constant(self, func: PythonMethod, ctx: Context):
+        func_type = self.viper.DomainType('Function', {}, [])
+        return self.viper.DomainFunc(func.func_constant, [], func_type, True,
+                                     self.to_position(func.node, ctx), self.no_info(ctx),
+                                     'Function')
+
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List, ctx: Context,
                           selected: Set[str] = None) -> 'silver.ast.Program':
@@ -546,6 +556,7 @@ class ProgramTranslator(CommonTranslator):
 
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
+        func_constants = []
 
         # Silver names of the set of nodes which have been selected by the user
         # to be verified (if any).
@@ -602,6 +613,7 @@ class ProgramTranslator(CommonTranslator):
             for function in module.functions.values():
                 self.track_dependencies(selected_names, selected, function, ctx)
                 functions.append(self.translate_function(function, ctx))
+                func_constants.append(self.translate_function_constant(function, ctx))
             for method in module.methods.values():
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
@@ -632,6 +644,7 @@ class ProgramTranslator(CommonTranslator):
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
+                    func_constants.append(self.translate_function_constant(func, ctx))
                     if func.overrides and not (func_name in ('__str__', '__bool__') and
                                                func.overrides.cls.name == 'object'):
                         # We allow overriding certain methods, since the basic versions
@@ -703,8 +716,9 @@ class ProgramTranslator(CommonTranslator):
             functions = [f for f in functions if f.name() in all_used_names]
             methods = [m for m in methods if m.name() in all_used_names]
 
-        domains += [self.type_factory.create_type_domain(type_funcs,
-                                                         type_axioms, ctx)]
+        domains.append(self.type_factory.create_type_domain(type_funcs,
+                                                            type_axioms, ctx))
+        domains.append(self.create_functions_domain(func_constants, ctx))
 
         converted_sil_progs = self._convert_silver_elements(sil_progs,
                                                             all_used_names, ctx)

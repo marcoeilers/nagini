@@ -185,6 +185,8 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
                                        'Unsupported contract function.')
 
     def _translate_eval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         if not isinstance(node.args[1], ast.Name):
             raise InvalidProgramException(node, 'invalid.eval.function')
         target = self.get_target(node.args[1], ctx)
@@ -194,11 +196,28 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         if arg_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         arg_type = self.get_type(node.args[2], ctx)
-        call_stmt, call_val = self.translate_normal_call(target, [], [arg], [arg_type], node, ctx)
-        if call_stmt:
+        func_stmt, func_val = self.translate_normal_call(target, [], [arg], [arg_type],
+                                                         node, ctx)
+        if func_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        tk = self.translate_must_invoke_token(node, ctx)
-        return [], call_val
+        call_stmt, call = self.translate_normal_call_node(node, ctx)
+        args = []
+        for arg in node.args:
+            stmt, arg_val = self.translate_expr(arg, ctx)
+            assert not stmt
+            args.append(arg_val)
+
+        for module in ctx.module.from_imports:
+            if module.type_prefix == 'nagini_contracts.io_builtins':
+                io_builtins = module
+                break
+        else:
+            io_builtins = ctx.module.namespaces['nagini_contracts'].namespaces['io_builtins']
+        eval_io = io_builtins.io_operations['eval_io']
+        getter = self.create_result_getter(node, eval_io.get_results()[0], ctx, args, eval_io)
+        assume = self.viper.Inhale(self.viper.EqCmp(func_val, getter, position, info),
+                                   position, info)
+        return [assume] + call_stmt, call
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

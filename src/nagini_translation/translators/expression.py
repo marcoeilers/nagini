@@ -544,9 +544,9 @@ class ExpressionTranslator(CommonTranslator):
             return [], func_app
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],
-                                            self.viper.DomainType('Functions', {}, []),
+                                            self.viper.DomainType('Function', {}, []),
                                             self.to_position(node, ctx), self.no_info(ctx),
-                                            'Functions')
+                                            'Function')
             return [], func
         else:
             if isinstance(target, PythonType):

@@ -40,13 +40,15 @@ class IOOperationCommonTranslator(CommonTranslator):
 
     def create_result_getter(
             self, node: ast.Call, result: PythonVar, ctx: Context,
-            sil_args: Optional[List[ast.Expr]] = None) -> Expr:
+            sil_args: List[ast.Expr] = None,
+            operation: PythonIOOperation = None) -> Expr:
         """Construct a getter for an IO operation result."""
         position = self.no_position(ctx)
         info = self.no_info(ctx)
 
-        operation = self.get_target(node, ctx)
-        assert isinstance(operation, PythonIOOperation)
+        if not operation:
+            operation = self.get_target(node, ctx)
+            assert isinstance(operation, PythonIOOperation)
 
         if sil_args is None:
             parameters = operation.get_parameters()

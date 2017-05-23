@@ -49,7 +49,7 @@ def get_target(node: ast.AST,
     PythonMethods, the Context, PythonModules, etc).
     """
     if isinstance(node, ast.Name):
-        return _find_entry(node.id, True, containers)
+        return find_entry(node.id, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
@@ -95,7 +95,7 @@ def get_target(node: ast.AST,
                    containers[-1].superclass):
             # If we're looking in a class, add all superclasses as well.
             containers.append(containers[-1].superclass)
-        return _find_entry(node.attr, False, containers)
+        return find_entry(node.attr, False, containers)
     elif isinstance(node, ast.Subscript):
         # This might be a type literal like List[int]
         if isinstance(node.value, ast.Name):
@@ -124,8 +124,8 @@ def get_target(node: ast.AST,
         return None
 
 
-def _find_entry(target_name: str, only_top: bool,
-                containers: List[ContainerInterface]) -> Optional[PythonNode]:
+def find_entry(target_name: str, only_top: bool,
+               containers: List[ContainerInterface]) -> Optional[PythonNode]:
     """
     Returns the PythonNode identified by the given name in the given containers.
     """
