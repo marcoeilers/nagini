@@ -4,6 +4,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
 import time
 import traceback
@@ -18,7 +19,7 @@ from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
-from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.sif_analyzer import SIFAnalyzer
 from nagini_translation.sif_translator import SIFTranslator
@@ -30,6 +31,10 @@ from nagini_translation.verifier import (
     ViperVerifier
 )
 from typing import Set
+
+
+TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
+TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
 def parse_sil_file(sil_path: str, jvm):
@@ -276,16 +281,35 @@ def translate_and_verify(python_file, jvm, args):
             sys.exit(0)
         else:
             sys.exit(1)
-    except (TypeException, InvalidProgramException) as e:
+    except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
-        if isinstance(e, InvalidProgramException):
-            print(python_file + ':' + str(e.node.lineno) + ': error: ' + e.code)
-            if e.message:
-                print(e.message)
-            print(astunparse.unparse(e.node))
+        if isinstance(e, (InvalidProgramException, UnsupportedException)):
+            if isinstance(e, InvalidProgramException):
+                issue = 'Invalid program: '
+                if e.message:
+                    issue += e.message
+                else:
+                    issue += e.code
+            else:
+                issue = 'Not supported: '
+                if e.args[0]:
+                    issue += e.args[0]
+                else:
+                    issue += str(e.node)
+            line = str(e.node.lineno)
+            col = str(e.node.col_offset)
+            print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
         if isinstance(e, TypeException):
             for msg in e.messages:
-                print(msg)
+                parts = TYPE_ERROR_MATCHER.match(msg)
+                if parts:
+                    parts = parts.groupdict()
+                    file = parts['file']
+                    if file == '__main__':
+                        file = python_file
+                    msg = parts['msg']
+                    line = parts['line']
+                    print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
         sys.exit(2)
     except JavaException as e:
         print(e.stacktrace())
