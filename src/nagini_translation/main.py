@@ -277,10 +277,6 @@ def translate_and_verify(python_file, jvm, args):
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode))
-        if vresult:
-            sys.exit(0)
-        else:
-            sys.exit(1)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
@@ -310,10 +306,10 @@ def translate_and_verify(python_file, jvm, args):
                     msg = parts['msg']
                     line = parts['line']
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
-        sys.exit(2)
     except JavaException as e:
         print(e.stacktrace())
         raise e
+    sys.exit(0)
 
 
 if __name__ == '__main__':

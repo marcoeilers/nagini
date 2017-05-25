@@ -14,8 +14,5 @@ class JVM:
         self.viper = jpype.JPackage('viper')
         self.fastparse = jpype.JPackage('fastparse')
 
-    def __del__(self):
-        jpype.shutdownJVM()
-
     def get_proxy(self, supertype, instance):
         return jpype.JProxy(supertype, inst=instance)
