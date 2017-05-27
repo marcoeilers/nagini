@@ -26,6 +26,7 @@ IO_CONTRACT_FUNCS = [
     'token',
     'Open',
     'Eval',
+    'eval_io',
 ]
 
 

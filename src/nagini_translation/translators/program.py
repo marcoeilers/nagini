@@ -620,14 +620,6 @@ class ProgramTranslator(CommonTranslator):
             for pred in module.predicates.values():
                 self.track_dependencies(selected_names, selected, pred, ctx)
                 predicates.append(self.translate_predicate(pred, ctx))
-            for operation in module.io_operations.values():
-                self.track_dependencies(selected_names, selected, operation, ctx)
-                predicate, getters, checkers = self.translate_io_operation(
-                        operation,
-                        ctx)
-                predicates.append(predicate)
-                functions.extend(getters)
-                methods.extend(checkers)
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives and type variable entries.
@@ -687,6 +679,16 @@ class ProgramTranslator(CommonTranslator):
                     else:
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
+
+        for module in modules:
+            for operation in module.io_operations.values():
+                self.track_dependencies(selected_names, selected, operation, ctx)
+                predicate, getters, checkers = self.translate_io_operation(
+                    operation,
+                    ctx)
+                predicates.append(predicate)
+                functions.extend(getters)
+                methods.extend(checkers)
 
         for root in predicate_families:
             self.track_dependencies(selected_names, selected, root, ctx)

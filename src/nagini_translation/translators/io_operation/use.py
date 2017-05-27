@@ -8,7 +8,9 @@ from typing import cast, List
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonIOExistentialVar,
+    PythonMethod,
     PythonIOOperation,
+    TypeVar,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -180,9 +182,30 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             return self._translate_open(node, ctx)
         elif func_name == 'Eval':
             return self._translate_eval(node, ctx)
+        elif func_name == 'eval_io':
+            return self._translate_eval_io(node, ctx)
         else:
             raise UnsupportedException(node,
                                        'Unsupported contract function.')
+
+    def _translate_eval_io(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        if not isinstance(node.args[1], ast.Name):
+            raise InvalidProgramException(node, 'invalid.eval.function')
+        target = self.get_target(node.args[1], ctx)
+        if isinstance(target, PythonMethod) and not target.pure:
+            raise InvalidProgramException(node, 'invalid.eval.function')
+        stmt, res = self.translate_io_operation_call(node, ctx)
+        func_stmt, func_arg = self.translate_expr(node.args[1], ctx)
+        if func_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        eval_io = self.get_target(node, ctx)
+        if not hasattr(eval_io, 'func_args'):
+            eval_io.func_args = []
+        arg_type = self.get_type(node.args[1], ctx)
+        if arg_type.name != 'Callable':
+            print("1313")
+            eval_io.func_args.append((func_arg, arg_type))
+        return stmt, res
 
     def _translate_eval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         position = self.to_position(node, ctx)

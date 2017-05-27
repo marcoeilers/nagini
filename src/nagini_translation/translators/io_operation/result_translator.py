@@ -2,6 +2,7 @@
 
 
 import ast
+import copy
 
 from typing import cast, List
 
@@ -63,8 +64,9 @@ class IOOperationResult:
     def var(self, var: PythonVarBase) -> None:
         assert var is not None
         if var.type != self.definition.type:
-            raise_invalid_existential_var(
-                'defining_expression_type_mismatch', self._node)
+            if not (self.var_name == 'result' and self._node.func.id == 'eval_io'):
+                raise_invalid_existential_var(
+                    'defining_expression_type_mismatch', self._node)
         self._var = var
 
 
@@ -107,7 +109,15 @@ class ResultTranslator:
     @property
     def _result_definitions(self) -> List[PythonVar]:
         """Return results as defined in IO operation definition."""
-        return self._operation.get_results()
+        result = self._operation.get_results()
+        if self._operation.name == 'eval_io':
+            result = result[:]
+            result_var = copy.copy(result[0])
+            target = self._translator.get_target(self._node.args[1], self._ctx)
+            if target.type.name != 'Callable':
+                result_var.type = target.type
+            result[0] = result_var
+        return result
 
     @property
     def _result_instances(self) -> List[ast.expr]:

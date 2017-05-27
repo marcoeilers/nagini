@@ -87,6 +87,18 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
             posts = [result_type_expr]
         else:
             posts = []
+        if operation.name == 'eval_io' and operation_result.name == 'result':
+            getter_result = self.viper.Result(typ, position, info)
+            func_param = operation._inputs[0].ref()
+            if not operation.func_args:
+                print("1212")
+            for func_arg, func_type in operation.func_args:
+                result_type_expr = self.type_check(
+                    getter_result, func_type, position, ctx)
+                this_func = self.viper.EqCmp(func_arg, func_param, position, info)
+                implication = self.viper.Implies(this_func, result_type_expr, position,
+                                                 info)
+                posts.append(implication)
         getter = self.viper.Function(
             name, args, typ, [], posts, None, position, info)
         return getter
