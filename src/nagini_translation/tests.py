@@ -44,7 +44,7 @@ from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException
-from nagini_translation.main import translate, verify
+from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
 os.environ['MYPYPATH'] = config.mypy_path
@@ -52,8 +52,8 @@ os.environ['MYPYPATH'] = config.mypy_path
 assert config.classpath
 _JVM = jvmaccess.JVM(config.classpath)
 
-_TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
-_MYPY_ERROR_MATCHER = re.compile(_TYPE_ERROR_PATTERN)
+
+_MYPY_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 _BACKEND_SILICON = 'silicon'
 _BACKEND_CARBON = 'carbon'

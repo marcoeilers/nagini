@@ -48,10 +48,7 @@ class UnsupportedException(Exception):
 
     def __init__(self, ast_element: ast.AST, desc=""):
         self.node = ast_element
-        ex_str = str(ast_element)
-        if desc:
-            ex_str += ': ' + desc
-        super().__init__(ex_str)
+        super().__init__(desc)
 
 
 class InvalidProgramException(Exception):
