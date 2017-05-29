@@ -8,7 +8,12 @@ from nagini_translation.lib.constants import (
     RANGE_TYPE,
     SEQ_TYPE,
 )
-from nagini_translation.lib.program_nodes import PythonModule, PythonVar
+from nagini_translation.lib.program_nodes import (
+    PythonField,
+    PythonMethod,
+    PythonModule,
+    PythonVar,
+)
 from nagini_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -39,7 +44,7 @@ class ContractTranslator(CommonTranslator):
 
     def translate_contract_Call(self, node: ast.Call, ctx: Context) -> Expr:
         if get_func_name(node) in CONTRACT_WRAPPER_FUNCS:
-            stmt, res = self.translate_expr(node.args[0], ctx, self.viper.Bool)
+            stmt, res = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
             if stmt:
                 raise InvalidProgramException(node, 'purity.violated')
             return res
@@ -156,6 +161,8 @@ class ContractTranslator(CommonTranslator):
                 args = [receiver] + args
         else:
             raise UnsupportedException(node)
+        if not (isinstance(pred, PythonMethod) and pred.predicate):
+            raise InvalidProgramException(node, 'invalid.acc')
         pred_name = pred.sil_name
         # If the predicate is part of a family, find the correct version.
         if pred.cls:
@@ -170,6 +177,9 @@ class ContractTranslator(CommonTranslator):
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
         assert isinstance(node.args[0], ast.Attribute)
+        field = self.get_target(node.args[0], ctx)
+        if not isinstance(field, PythonField):
+            raise InvalidProgramException(node, 'invalid.acc')
         stmt, fieldacc = self.translate_expr(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
@@ -191,12 +201,13 @@ class ContractTranslator(CommonTranslator):
         Translates a call to Assert().
         """
         assert len(node.args) == 1
-        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool)
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
         assertion = self.viper.Assert(expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
-    def translate_implies(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_implies(self, node: ast.Call, ctx: Context,
+                          impure=False) -> StmtsAndExpr:
         """
         Translates a call to the Implies() contract function.
         """
@@ -205,7 +216,7 @@ class ContractTranslator(CommonTranslator):
         cond_stmt, cond = self.translate_expr(node.args[0], ctx,
                                               target_type=self.viper.Bool)
         then_stmt, then = self.translate_expr(node.args[1], ctx,
-                                              target_type=self.viper.Bool)
+                                              target_type=self.viper.Bool, impure=impure)
         implication = self.viper.Implies(cond, then,
                                          self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -229,7 +240,7 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
-                                              self.viper.Bool)
+                                              self.viper.Bool, True)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -273,7 +284,7 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
-                                              self.viper.Bool)
+                                              self.viper.Bool, True)
         if self._is_family_fold(node):
             # Predicate called on receiver, so it belongs to a family
             if ctx.ignore_family_folds:
@@ -284,17 +295,18 @@ class ContractTranslator(CommonTranslator):
                                    self.no_info(ctx))
         return [unfold], None
 
-    def translate_unfolding(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_unfolding(self, node: ast.Call, ctx: Context,
+                            impure=False) -> StmtsAndExpr:
         """
         Translates a call to the Unfolding() contract function.
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
-                                              self.viper.Bool)
+                                              self.viper.Bool, True)
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        expr_stmt, expr = self.translate_expr(node.args[1], ctx)
+        expr_stmt, expr = self.translate_expr(node.args[1], ctx, impure)
         expr = self.unwrap(expr)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
@@ -420,7 +432,8 @@ class ContractTranslator(CommonTranslator):
                                         ctx)
         return val_stmts, result
 
-    def translate_forall(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_forall(self, node: ast.Call, ctx: Context,
+                         impure=False) -> StmtsAndExpr:
         domain_node = node.args[0]
 
         lambda_ = node.args[1]
@@ -435,7 +448,7 @@ class ContractTranslator(CommonTranslator):
 
         ctx.set_alias(arg.arg, var, None)
         body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
-                                             self.viper.Bool)
+                                             self.viper.Bool, impure)
 
         triggers = self._translate_triggers(lambda_.body, node, ctx)
 
@@ -472,8 +485,8 @@ class ContractTranslator(CommonTranslator):
                                    self.no_info(ctx))
         return dom_stmt, forall
 
-    def translate_contractfunc_call(self, node: ast.Call,
-                                    ctx: Context) -> StmtsAndExpr:
+    def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
+                                    impure=False) -> StmtsAndExpr:
         """
         Translates calls to contract functions like Result() and Acc()
         """
@@ -483,6 +496,7 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd'):
+            self._assert_impure(node, impure)
             if func_name == 'Rd':
                 perm = self.viper.WildcardPerm(self.to_position(node, ctx),
                                                self.no_info(ctx))
@@ -495,7 +509,7 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
         elif func_name == 'Implies':
-            return self.translate_implies(node, ctx)
+            return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':
             return self.translate_old(node, ctx)
         elif func_name == 'Fold':
@@ -503,11 +517,11 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'Unfold':
             return self.translate_unfold(node, ctx)
         elif func_name == 'Unfolding':
-            return self.translate_unfolding(node, ctx)
+            return self.translate_unfolding(node, ctx, impure)
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
         elif func_name == 'Forall':
-            return self.translate_forall(node, ctx)
+            return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
         elif func_name == 'Sequence':
@@ -516,3 +530,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_to_sequence(node, ctx)
         else:
             raise UnsupportedException(node)
+
+    def _assert_impure(self, node: ast.AST, impure: bool) -> None:
+        if not impure:
+            raise InvalidProgramException(node, 'invalid.contract.position')

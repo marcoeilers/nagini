@@ -100,8 +100,7 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         # TODO: The result of this call must not only be an expression,
         # but a pure expression.
         right_stmt, right = self.translate_expr(
-            node.comparators[0], ctx,
-            expression=True)
+            node.comparators[0], ctx)
         assert not right_stmt   # Should be handled by expression=True.
 
         name_node = cast(ast.Name, node.left)
