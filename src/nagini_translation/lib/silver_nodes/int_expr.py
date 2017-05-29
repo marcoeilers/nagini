@@ -76,7 +76,7 @@ class PythonIntExpression(IntExpression):
         int_class = ctx.module.global_module.classes['int']
         assert translator.get_type(self._node, ctx) is int_class
         stmt, expr = translator.translate_expr(
-            self._node, ctx, target_type=translator.viper.Int, expression=True)
+            self._node, ctx, target_type=translator.viper.Int)
         assert not stmt
         return expr
 

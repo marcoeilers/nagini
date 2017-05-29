@@ -680,8 +680,8 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def _translate_normal_call(self, node: ast.Call,
-                               ctx: Context) -> StmtsAndExpr:
+    def _translate_normal_call(self, node: ast.Call, ctx: Context,
+                               impure=False) -> StmtsAndExpr:
         """
         Translates 'normal' function calls, i.e. function, method, constructor
         or predicate calls.
@@ -777,6 +777,8 @@ class CallTranslator(CommonTranslator):
                 perm = self.viper.WildcardPerm(position, self.no_info(ctx))
             else:
                 perm = self.viper.FullPerm(position, self.no_info(ctx))
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
         elif target.pure:
@@ -786,7 +788,7 @@ class CallTranslator(CommonTranslator):
             return self._translate_method_call(target, args, arg_stmts,
                                                position, node, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
         like Assert, a builtin Python function like isinstance, a
@@ -799,7 +801,7 @@ class CallTranslator(CommonTranslator):
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             elif func_name in CONTRACT_FUNCS:
-                return self.translate_contractfunc_call(node, ctx)
+                return self.translate_contractfunc_call(node, ctx, impure)
             elif func_name in IO_CONTRACT_FUNCS:
                 return self.translate_io_contractfunc_call(node, ctx)
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
@@ -811,7 +813,7 @@ class CallTranslator(CommonTranslator):
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
         else:
-            return self._translate_normal_call(node, ctx)
+            return self._translate_normal_call(node, ctx, impure)
 
     def _is_cls_call(self, node: ast.Call, ctx: Context) -> bool:
         """

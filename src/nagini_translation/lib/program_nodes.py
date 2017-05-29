@@ -409,7 +409,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         cls = self
         while cls is not None:
             for field in cls.python_class.fields.values():
-                if field.inherited is None:
+                if isinstance(field, PythonField) and field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
         return fields

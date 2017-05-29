@@ -33,4 +33,4 @@ class SIFProgramTranslator(ProgramTranslator):
                 field.field_prime.sil_field = sil_field_p
                 fields.append(sil_field_p)
 
-        return fields
+        return fields, [], []

@@ -58,7 +58,7 @@ class PythonRefExpression(RefExpression):
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
         stmt, expr = translator.translate_expr(
-            self._node, ctx, expression=True)
+            self._node, ctx, impure=False)
         assert not stmt
         typ = translator.get_type(self._node, ctx)
         assert typ.name not in PRIMITIVES

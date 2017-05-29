@@ -13,5 +13,5 @@ class TestClass:
 
     @Predicate
     def some_pred(self, val: int) -> bool:
-        #:: ExpectedOutput(invalid.program:not_expression)
+        #:: ExpectedOutput(invalid.program:invalid.predicate)
         return Acc(self.fld) and self.some_func() == val

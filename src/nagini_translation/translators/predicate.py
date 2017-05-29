@@ -28,8 +28,16 @@ class PredicateTranslator(CommonTranslator):
                                        self.no_position(ctx), ctx)
             arg_types = self.viper.And(arg_types, arg_type,
                                        self.no_position(ctx), self.no_info(ctx))
-        body = self.to_bool(self.translate_exprs(pred.node.body, pred, ctx),
-                            ctx)
+        if len(pred.node.body) != 1:
+            raise InvalidProgramException(pred.node,
+                                          'invalid.predicate')
+        stmt, body = self.translate_expr(
+            pred.node.body[0],
+            ctx, impure=True,
+            target_type=self.viper.Bool)
+        if stmt:
+            raise InvalidProgramException(pred.node,
+                                          'invalid.predicate')
         body = self.viper.And(arg_types, body, self.no_position(ctx),
                               self.no_info(ctx))
         ctx.current_function = None
@@ -80,9 +88,8 @@ class PredicateTranslator(CommonTranslator):
                                               'invalid.predicate')
             stmt, current = self.translate_expr(
                     instance.node.body[0],
-                    ctx,
-                    target_type=self.viper.Bool,
-                    expression=True)
+                    ctx, impure=True,
+                    target_type=self.viper.Bool)
             if stmt:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')

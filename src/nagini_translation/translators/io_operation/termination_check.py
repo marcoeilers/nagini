@@ -166,7 +166,7 @@ class TerminationCheckGenerator(GuardCollectingVisitor):
 
     def _translate_expr(self, node: ast.AST, target_type=None) -> Expr:
         statement, expression = self._io_translator.translate_expr(
-            node, self._ctx, target_type=target_type, expression=True)
+            node, self._ctx, target_type=target_type)
         assert not statement
         return expression
 

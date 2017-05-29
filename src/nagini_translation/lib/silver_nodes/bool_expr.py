@@ -101,7 +101,7 @@ class PythonBoolExpression(BoolExpression):
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
         stmt, expr = translator.translate_expr(
-            self._node, ctx, target_type=translator.viper.Bool, expression=True)
+            self._node, ctx, target_type=translator.viper.Bool)
         assert not stmt
         return expr
 

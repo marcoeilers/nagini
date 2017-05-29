@@ -26,6 +26,7 @@ from nagini_translation.lib.program_nodes import (
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
+    PythonField,
     PythonGlobalVar,
     PythonIOOperation,
     PythonModule,
@@ -520,7 +521,8 @@ class Analyzer(ast.NodeVisitor):
 
         self.visit(node.args, node)
 
-        func.type = self.convert_type(functype)
+        if not is_setter:
+            func.type = self.convert_type(functype)
 
         for child in node.body:
             if is_io_existential(child):
@@ -704,7 +706,7 @@ class Analyzer(ast.NodeVisitor):
             return result
         return None
 
-    def track_access(self, node: ast.AST, var: PythonVar) -> None:
+    def track_access(self, node: ast.AST, var: Union[PythonVar, PythonField]) -> None:
         if var is None:
             return
         if isinstance(node.ctx, ast.Load):
@@ -917,7 +919,8 @@ class Analyzer(ast.NodeVisitor):
                 return
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
-            self.track_access(node, field)
+            if isinstance(field, PythonField):
+                self.track_access(node, field)
 
     def convert_type(self, mypy_type, node=None) -> PythonType:
         """
