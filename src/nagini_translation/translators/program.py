@@ -57,6 +57,8 @@ class ProgramTranslator(CommonTranslator):
                 field.sil_field = sil_field
                 fields.append(sil_field)
             elif isinstance(field, PythonMethod):
+                if field.overrides:
+                    raise InvalidProgramException(field.node, 'invalid.override')
                 getter = self.translate_function(field, ctx)
                 functions.append(getter)
                 if field.setter:

@@ -23,6 +23,7 @@ from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
+    InvalidProgramException,
 )
 from nagini_translation.lib.views import (
     CombinedDict,
@@ -789,11 +790,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
                                                               self.type)
             self.result.process(RESULT_NAME, translator)
         if self.cls is not None and self.cls.superclass is not None:
-            if self.predicate:
-                self.overrides = self.cls.superclass.get_predicate(self.name)
-            else:
-                self.overrides = self.cls.superclass.get_func_or_method(
-                    self.name)
+            try:
+                self.overrides = self.cls.superclass.get_contents(False)[self.name]
+            except KeyError:
+                pass
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         for name in self.special_vars:
@@ -1302,7 +1302,12 @@ class PythonGlobalVar(PythonVarBase):
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)
         if self.cls is not None and self.cls.superclass is not None:
-            self.overrides = self.cls.superclass.get_static_field(self.name)
+            try:
+                self.overrides = self.cls.superclass.get_contents(False)[self.name]
+                if not isinstance(self.overrides, PythonGlobalVar):
+                    raise InvalidProgramException(self.node, 'invalid.override')
+            except KeyError:
+                pass
 
 
 class PythonIOExistentialVar(PythonVarBase):
