@@ -496,7 +496,8 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd'):
-            self._assert_impure(node, impure)
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
                 perm = self.viper.WildcardPerm(self.to_position(node, ctx),
                                                self.no_info(ctx))
@@ -530,7 +531,3 @@ class ContractTranslator(CommonTranslator):
             return self.translate_to_sequence(node, ctx)
         else:
             raise UnsupportedException(node)
-
-    def _assert_impure(self, node: ast.AST, impure: bool) -> None:
-        if not impure:
-            raise InvalidProgramException(node, 'invalid.contract.position')

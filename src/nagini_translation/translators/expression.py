@@ -47,6 +47,11 @@ from nagini_translation.translators.common import CommonTranslator
 from typing import List, Optional, Union
 
 
+# Maps function names to bools; caches which functions take an additonal argument
+# encoding if impure assertions are allowed or not.
+TAKES_IMPURE_ARGS = {}
+
+
 class ExpressionTranslator(CommonTranslator):
 
     def __init__(self, *args, **kwargs) -> None:
@@ -81,7 +86,9 @@ class ExpressionTranslator(CommonTranslator):
             The Silver type this expression should be translated to, defaults
             to Ref if no arguments is provided.
         :param impure:
-            Indicates if ``node`` may be translated to an impure assertion.
+            Indicates if ``node`` may be translated to an impure assertion. If False,
+            translating a predicate or field permission will result in an
+            InvalidProgramException.
         """
 
         if not target_type:
@@ -103,10 +110,13 @@ class ExpressionTranslator(CommonTranslator):
         """
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        sig = inspect.signature(visitor)
-        p = sig.parameters
-        l = len(p)
-        if len(sig.parameters) > 2:
+        if method in TAKES_IMPURE_ARGS:
+            impure_arg = TAKES_IMPURE_ARGS[method]
+        else:
+            sig = inspect.signature(visitor)
+            impure_arg = len(sig.parameters) > 2
+            TAKES_IMPURE_ARGS[method] = impure_arg
+        if impure_arg:
             stmt, result = visitor(node, ctx, impure)
         else:
             stmt, result = visitor(node, ctx)
@@ -641,6 +651,8 @@ class ExpressionTranslator(CommonTranslator):
                                                                 position, ctx)
                 return [], field_func
             if isinstance(field, PythonMethod):
+                # This is a reference to a property, so we translate it to a call of
+                # the property getter function.
                 target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
                 target_param = self.viper.LocalVarDecl('self', target_type, position,
                                                        self.no_info(ctx))
