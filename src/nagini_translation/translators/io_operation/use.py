@@ -188,10 +188,14 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
                                        'Unsupported contract function.')
 
     def _translate_eval_io(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a reference to the eval_io IOOperation as usual, but also stores the
+        information which function is used as the argument.
+        """
         if not isinstance(node.args[1], ast.Name):
             raise InvalidProgramException(node, 'invalid.eval.function')
         target = self.get_target(node.args[1], ctx)
-        if isinstance(target, PythonMethod) and not target.pure:
+        if not isinstance(target, PythonMethod) or not target.pure:
             raise InvalidProgramException(node, 'invalid.eval.function')
         stmt, res = self.translate_io_operation_call(node, ctx)
         func_stmt, func_arg = self.translate_expr(node.args[1], ctx)
@@ -202,11 +206,16 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             eval_io.func_args = []
         arg_type = self.get_type(node.args[1], ctx)
         if arg_type.name != 'Callable':
-            print("1313")
             eval_io.func_args.append((func_arg, arg_type))
         return stmt, res
 
     def _translate_eval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Eval method (which implements the eval_io IOOperation).
+        The translation is like for other method calls, except we also inhale that the
+        result of the operation is equal to the given function applied to the given
+        argument.
+        """
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         if not isinstance(node.args[1], ast.Name):
@@ -234,12 +243,14 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
                 io_builtins = module
                 break
         else:
-            io_builtins = ctx.module.namespaces['nagini_contracts'].namespaces['io_builtins']
+            contracts = ctx.module.namespaces['nagini_contracts']
+            io_builtins = contracts.namespaces['io_builtins']
         eval_io = io_builtins.io_operations['eval_io']
-        getter = self.create_result_getter(node, eval_io.get_results()[0], ctx, args, eval_io)
+        getter = self.create_result_getter(node, eval_io.get_results()[0], ctx, args,
+                                           eval_io)
         assume = self.viper.Inhale(self.viper.EqCmp(func_val, getter, position, info),
                                    position, info)
-        return [assume] + call_stmt, call
+        return call_stmt + [assume], call
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

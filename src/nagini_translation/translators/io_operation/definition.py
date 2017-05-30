@@ -88,10 +88,9 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
         else:
             posts = []
         if operation.name == 'eval_io' and operation_result.name == 'result':
+            # Add postconditions about return type.
             getter_result = self.viper.Result(typ, position, info)
             func_param = operation._inputs[0].ref()
-            if not operation.func_args:
-                print("1212")
             for func_arg, func_type in operation.func_args:
                 result_type_expr = self.type_check(
                     getter_result, func_type, position, ctx)

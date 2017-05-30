@@ -464,8 +464,6 @@ class Analyzer(ast.NodeVisitor):
             raise InvalidProgramException(node, 'illegal.magic.method')
         assert isinstance(name, str)
         if self.is_io_operation(node):
-            # if node.name == 'eval_io':
-            #     return
             self.io_operation_analyzer.analyze_io_operation(node)
             return
         if self.current_class is None:

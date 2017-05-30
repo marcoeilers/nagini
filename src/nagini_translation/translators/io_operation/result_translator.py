@@ -111,6 +111,7 @@ class ResultTranslator:
         """Return results as defined in IO operation definition."""
         result = self._operation.get_results()
         if self._operation.name == 'eval_io':
+            # Special treatment: Exchange result arg with one with the correct type.
             result = result[:]
             result_var = copy.copy(result[0])
             target = self._translator.get_target(self._node.args[1], self._ctx)

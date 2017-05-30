@@ -642,6 +642,8 @@ class StatementTranslator(CommonTranslator):
 
         target = self.get_target(lhs, ctx)
         if isinstance(target, PythonMethod):
+            # We're assigning to a field that's actually a property, so we need to
+            # call the property setter method.
             assert isinstance(lhs, ast.Attribute)
             assert target.setter
             arg_stmt, arg = self.translate_expr(lhs.value, ctx)

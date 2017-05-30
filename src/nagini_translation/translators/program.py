@@ -48,6 +48,10 @@ class ProgramTranslator(CommonTranslator):
 
     def _translate_fields(self, cls: PythonClass,
                           ctx: Context) -> List['silver.ast.Field']:
+        """
+        Translates fields and properties of a class to Viper Fields, Viper Functions
+        (property getters) and Viper Methods (property setters).
+        """
         fields = []
         functions = []
         methods = []
@@ -682,6 +686,8 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
 
+        # IO operations are translated last because we need to know which functions are
+        # used with Eval.
         for module in modules:
             for operation in module.io_operations.values():
                 self.track_dependencies(selected_names, selected, operation, ctx)
