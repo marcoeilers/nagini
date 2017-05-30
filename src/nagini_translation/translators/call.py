@@ -701,8 +701,8 @@ class CallTranslator(CommonTranslator):
         return self.translate_normal_call(target, arg_stmts, args, arg_types, node, ctx,
                                           impure)
 
-
-    def translate_normal_call(self, target: PythonMethod, arg_stmts, args, arg_types,
+    def translate_normal_call(self, target: PythonMethod, arg_stmts: List[Stmt],
+                              args: List[Expr], arg_types: List[PythonType],
                               node: ast.AST, ctx: Context, impure=False) -> StmtsAndExpr:
         formal_args = []
         name = get_func_name(node)
