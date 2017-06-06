@@ -420,7 +420,11 @@ class ViperAST:
         if res.isPure():
             return res
         else:
-            return self.QPs.rewriteForall(res)
+            desugared = self.to_list(self.QPs.desugareSourceSyntax(res))
+            result = self.TrueLit(position, info)
+            for qp in desugared:
+                result = self.And(result, qp, position, info)
+            return result
 
     def Exists(self, variables, exp, position, info):
         res = self.ast.Exists(self.to_seq(variables), exp, position, info, self.NoTrafos)
