@@ -82,6 +82,9 @@ class Silicon:
         else:
             return Success()
 
+    def __del__(self):
+        self.silicon.stop()
+
 
 class Carbon:
     """
