@@ -791,6 +791,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
             self.result.process(RESULT_NAME, translator)
         if self.cls is not None and self.cls.superclass is not None:
             try:
+                # Could be overridden by anything, so we have to check if there's
+                # anything with the same name.
                 self.overrides = self.cls.superclass.get_contents(False)[self.name]
             except KeyError:
                 pass
