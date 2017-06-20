@@ -26,6 +26,7 @@ from nagini_translation.lib.program_nodes import (
     ProgramNodeFactory,
     PythonClass,
     PythonExceptionHandler,
+    PythonField,
     PythonGlobalVar,
     PythonIOOperation,
     PythonModule,
@@ -471,7 +472,11 @@ class Analyzer(ast.NodeVisitor):
         else:
             scope_container = self.current_class
         self.define_new(scope_container, name, node)
-        if self.is_predicate(node):
+        is_property_getter = self.is_property_getter(node)
+        is_property_setter = self.is_property_setter(node)
+        if is_property_getter or is_property_setter:
+            container = scope_container.fields
+        elif self.is_predicate(node):
             container = scope_container.predicates
         elif self.is_pure(node):
             container = scope_container.functions
@@ -479,7 +484,7 @@ class Analyzer(ast.NodeVisitor):
             container = scope_container.static_methods
         else:
             container = scope_container.methods
-        if name in container:
+        if not (is_property_getter or is_property_setter) and name in container:
             func = container[name]
             if not self.is_static_method(node):
                 func.cls = self.current_class
@@ -487,7 +492,7 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            pure = self.is_pure(node)
+            pure = is_property_getter or self.is_pure(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
@@ -495,7 +500,10 @@ class Analyzer(ast.NodeVisitor):
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory)
-            container[name] = func
+            if is_property_setter:
+                container[name].setter = func
+            else:
+                container[name] = func
         if self.is_static_method(node):
             func.method_type = MethodType.static_method
         elif self.is_class_method(node):
@@ -513,7 +521,8 @@ class Analyzer(ast.NodeVisitor):
 
         self.visit(node.args, node)
 
-        func.type = self.convert_type(functype)
+        if not is_property_setter:
+            func.type = self.convert_type(functype)
 
         for child in node.body:
             if is_io_existential(child):
@@ -697,7 +706,7 @@ class Analyzer(ast.NodeVisitor):
             return result
         return None
 
-    def track_access(self, node: ast.AST, var: PythonVar) -> None:
+    def track_access(self, node: ast.AST, var: Union[PythonVar, PythonField]) -> None:
         if var is None:
             return
         if isinstance(node.ctx, ast.Load):
@@ -910,7 +919,8 @@ class Analyzer(ast.NodeVisitor):
                 return
             receiver = self.typeof(node.value)
             field = receiver.add_field(node.attr, node, self.typeof(node))
-            self.track_access(node, field)
+            if isinstance(field, PythonField):
+                self.track_access(node, field)
 
     def convert_type(self, mypy_type, node=None) -> PythonType:
         """
@@ -1150,14 +1160,15 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
-                (('IOOperation' in decorators) and (len(decorators) != 1)))
+                (('IOOperation' in decorators) and (len(decorators) != 1)) or
+                (('property' in decorators) and (len(decorators) != 1)))
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """
         Checks if the given function is declared to be contract only by the
         respective decorator.
         """
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         result = 'ContractOnly' in decorators
@@ -1186,31 +1197,46 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Pure' in decorators
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'Predicate' in decorators
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'staticmethod' in decorators
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'classmethod' in decorators
 
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list}
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
         return 'IOOperation' in decorators
+
+    def is_property_getter(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'property' in decorators
+
+    def is_property_setter(self, func: ast.FunctionDef) -> bool:
+        setter_decorator = [d for d in func.decorator_list
+                            if isinstance(d, ast.Attribute)]
+        if len(setter_decorator) == 0:
+            return False
+        if len(setter_decorator) > 1 or setter_decorator[0].attr != 'setter':
+            raise InvalidProgramException(func, 'unknown.decorator')
+        return self.current_class.fields[setter_decorator[0].value.id]

@@ -79,9 +79,9 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type: object = None,
-                       expression: bool = False) -> StmtsAndExpr:
+                       impure: bool = False) -> StmtsAndExpr:
         return self.config.expr_translator.translate_expr(
-            node, ctx, target_type, expression)
+            node, ctx, target_type, impure)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
@@ -103,8 +103,8 @@ class AbstractTranslator(metaclass=ABCMeta):
                        ctx: Context) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        return self.config.call_translator.translate_Call(node, ctx)
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
+        return self.config.call_translator.translate_Call(node, ctx, impure)
 
     def translate_constructor_call(self, target_class: PythonClass,
                                    node: ast.Call, args: List, arg_stmts: List,
@@ -171,10 +171,10 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                          result_var, error_var,
                                                          ctx)
 
-    def translate_contractfunc_call(self, node: ast.Call,
-                                    ctx: Context) -> StmtsAndExpr:
-        return self.config.contract_translator.translate_contractfunc_call(node,
-                                                                           ctx)
+    def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
+                                    impure=False) -> StmtsAndExpr:
+        return self.config.contract_translator.translate_contractfunc_call(node, ctx,
+                                                                           impure)
 
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:

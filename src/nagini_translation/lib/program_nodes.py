@@ -23,6 +23,7 @@ from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
+    InvalidProgramException,
 )
 from nagini_translation.lib.views import (
     CombinedDict,
@@ -409,7 +410,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         cls = self
         while cls is not None:
             for field in cls.python_class.fields.values():
-                if field.inherited is None:
+                if isinstance(field, PythonField) and field.inherited is None:
                     fields.append(field)
             cls = cls.superclass
         return fields
@@ -423,7 +424,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         cls = self
         while cls is not None:
             for field in cls.python_class.fields.values():
-                if field.inherited is None:
+                if isinstance(field, PythonField) and field.inherited is None:
                     fields.append(field.sil_field)
             cls = cls.superclass
         return fields
@@ -455,8 +456,16 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)
         for name, field in self.fields.items():
-            field_name = self.name + '_' + name
-            field.process(self.get_fresh_name(field_name))
+            if isinstance(field, PythonMethod):
+                # This is a property.
+                getter_name = self.name + '_' + name + '_getter'
+                setter_name = self.name + '_' + name + '_setter'
+                field.process(self.get_fresh_name(getter_name), translator)
+                if field.setter:
+                    field.setter.process(self.get_fresh_name(setter_name), translator)
+            else:
+                field_name = self.name + '_' + name
+                field.process(self.get_fresh_name(field_name))
         for name, field in self.static_fields.items():
             field_name = self.name + '_' + name
             field.process(self.get_fresh_name(field_name), translator)
@@ -755,6 +764,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
         self.requires = []
         self.type_vars = OrderedDict()
+        self.setter = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -780,11 +790,12 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
                                                               self.type)
             self.result.process(RESULT_NAME, translator)
         if self.cls is not None and self.cls.superclass is not None:
-            if self.predicate:
-                self.overrides = self.cls.superclass.get_predicate(self.name)
-            else:
-                self.overrides = self.cls.superclass.get_func_or_method(
-                    self.name)
+            try:
+                # Could be overridden by anything, so we have to check if there's
+                # anything with the same name.
+                self.overrides = self.cls.superclass.get_contents(False)[self.name]
+            except KeyError:
+                pass
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         for name in self.special_vars:
@@ -1293,7 +1304,12 @@ class PythonGlobalVar(PythonVarBase):
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)
         if self.cls is not None and self.cls.superclass is not None:
-            self.overrides = self.cls.superclass.get_static_field(self.name)
+            try:
+                self.overrides = self.cls.superclass.get_contents(False)[self.name]
+                if not isinstance(self.overrides, PythonGlobalVar):
+                    raise InvalidProgramException(self.node, 'invalid.override')
+            except KeyError:
+                pass
 
 
 class PythonIOExistentialVar(PythonVarBase):

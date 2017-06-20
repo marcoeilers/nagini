@@ -168,7 +168,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if isinstance(target, PythonVarBase):
             return target.get_specific_type(node)
         if isinstance(target, PythonMethod):
-            if isinstance(node.func, ast.Attribute):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
                 rec_target = get_target(node.func.value, containers, container)
                 if not isinstance(rec_target, PythonModule):
                     rectype = get_type(node.func.value, containers, container)

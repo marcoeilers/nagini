@@ -422,7 +422,7 @@ class AnnotationManager:
             r'\('
             # Error message, or label id. Matches everything except
             # comma.
-            r'(?P<id>[a-zA-Z\.\(\)_:;\d ?\'"]+)'
+            r'(?P<id>[a-zA-Z\.\(\)_\-:;\d ?\'"]+)'
             # Issue id in the issue tracker.
             r'(, (?P<issue_id>\d+))?'
             # Labels. Note that label must start with a letter.

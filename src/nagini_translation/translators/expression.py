@@ -1,4 +1,5 @@
 import ast
+import inspect
 
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
@@ -20,6 +21,7 @@ from nagini_translation.lib.program_nodes import (
     PythonField,
     PythonGlobalVar,
     PythonIOExistentialVar,
+    PythonMethod,
     PythonModule,
     PythonTryBlock,
     PythonType,
@@ -43,6 +45,11 @@ from nagini_translation.lib.util import (
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from typing import List, Optional, Union
+
+
+# Maps function names to bools; caches which functions take an additonal argument
+# encoding if impure assertions are allowed or not.
+TAKES_IMPURE_ARGS = {}
 
 
 class ExpressionTranslator(CommonTranslator):
@@ -71,52 +78,53 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type = None,
-                       expression: bool = False) -> StmtsAndExpr:
+                       impure: bool = False) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression.
 
         :param target_type:
             The Silver type this expression should be translated to, defaults
             to Ref if no arguments is provided.
-        :param expression:
-            Indicates if ``node`` must be translated into Silver
-            expression.
-
-            +   If ``True``, then sets a flag that ``node`` must be
-                translated into Silver expression.
-            +   If ``False``, leaves the flag unaltered.
+        :param impure:
+            Indicates if ``node`` may be translated to an impure assertion. If False,
+            translating a predicate or field permission will result in an
+            InvalidProgramException.
         """
-
-        old_is_expression = self._is_expression
-
-        if expression:
-            self._is_expression = True
 
         if not target_type:
             target_type = self.viper.Ref
         old_target = self._target_type
         self._target_type = target_type
-        stmt, result = self._translate_only(node, ctx)
+        stmt, result = self._translate_only(node, ctx, impure)
 
         if target_type != result.typ():
             result = self.convert_to_type(result, target_type, ctx, node)
 
-        self._is_expression = old_is_expression
         self._target_type = old_target
         return stmt, result
 
-    def _translate_only(self, node: ast.AST, ctx: Context):
+    def _translate_only(self, node: ast.AST, ctx: Context, impure=False):
         """
         Translates an expression, but does so without changing the expression's type in
         any way.
         """
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
-        stmt, result = visitor(node, ctx)
+        if method in TAKES_IMPURE_ARGS:
+            impure_arg = TAKES_IMPURE_ARGS[method]
+        else:
+            sig = inspect.signature(visitor)
+            impure_arg = len(sig.parameters) > 2
+            TAKES_IMPURE_ARGS[method] = impure_arg
+        if impure_arg:
+            stmt, result = visitor(node, ctx, impure)
+        else:
+            stmt, result = visitor(node, ctx)
         return stmt, result
 
-    def translate_Return(self, node: ast.Return, ctx: Context) -> StmtsAndExpr:
-        return self.translate_expr(node.value, ctx)
+    def translate_Return(self, node: ast.Return, ctx: Context,
+                         impure=False) -> StmtsAndExpr:
+        return self.translate_expr(node.value, ctx, impure=impure)
 
     def translate_ListComp(self, node: ast.ListComp, ctx: Context) -> StmtsAndExpr:
         if len(node.generators) != 1:
@@ -568,13 +576,13 @@ class ExpressionTranslator(CommonTranslator):
                     recv.python_class.get_static_field(node.attr)):
                 var = recv.python_class.static_fields[node.attr]
                 return var
-            recv = self.get_type(node.value, ctx)
             raise InvalidProgramException(node, 'field.nonexistent')
-        while field.inherited is not None:
-            field = field.inherited
-        if field.is_mangled() and (field.cls is not ctx.current_class and
-                                   field.cls is not ctx.actual_function.cls):
-            raise InvalidProgramException(node, 'private.field.access')
+        if isinstance(field, PythonField):
+            while field.inherited is not None:
+                field = field.inherited
+            if field.is_mangled() and (field.cls is not ctx.current_class and
+                                       field.cls is not ctx.actual_function.cls):
+                raise InvalidProgramException(node, 'private.field.access')
 
         return field
 
@@ -636,6 +644,16 @@ class ExpressionTranslator(CommonTranslator):
                 field_func = self.translate_static_field_access(field, receiver,
                                                                 position, ctx)
                 return [], field_func
+            if isinstance(field, PythonMethod):
+                # This is a reference to a property, so we translate it to a call of
+                # the property getter function.
+                target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
+                target_param = self.viper.LocalVarDecl('self', target_type, position,
+                                                       self.no_info(ctx))
+                property_type = self.translate_type(field.type, ctx)
+                return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
+                                                self.no_info(ctx), property_type,
+                                                [target_param])
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 
@@ -654,14 +672,17 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> StmtsAndExpr:
+    def translate_IfExp(self, node: ast.IfExp, ctx: Context,
+                        impure=False) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         then_stmt, then = self.translate_expr(node.body, ctx,
-                                              target_type=self._target_type)
+                                              target_type=self._target_type,
+                                              impure=impure)
         else_stmt, else_ = self.translate_expr(node.orelse, ctx,
-                                               target_type=self._target_type)
+                                               target_type=self._target_type,
+                                               impure=impure)
         if then_stmt or else_stmt:
             then_block = self.translate_block(then_stmt, position,
                                               self.no_info(ctx))
@@ -848,7 +869,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node)
 
-    def translate_BoolOp(self, node: ast.BoolOp, ctx: Context) -> StmtsAndExpr:
+    def translate_BoolOp(self, node: ast.BoolOp, ctx: Context,
+                         impure=False) -> StmtsAndExpr:
         assert isinstance(node.op, ast.Or) or isinstance(node.op, ast.And)
 
         position = self.to_position(node, ctx)
@@ -866,7 +888,7 @@ class ExpressionTranslator(CommonTranslator):
             # subexpressions.
             self._target_type = self.viper.Bool
             statements_part, expression_part = self._translate_only(
-                value, ctx)
+                value, ctx, impure)
             self._target_type = old_target
             # Get a version that is converted to a boolean. Unless we have
             # something impure.

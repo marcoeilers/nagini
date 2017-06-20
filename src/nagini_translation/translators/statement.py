@@ -16,6 +16,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.program_nodes import (
     GenericType,
     PythonClass,
+    PythonMethod,
     PythonType,
     PythonVar,
 )
@@ -639,9 +640,23 @@ class StatementTranslator(CommonTranslator):
         if isinstance(lhs, ast.Subscript):
             return self._assign_with_subscript(lhs, rhs, node, ctx)
 
-        target = lhs
-        lhs_stmt, var = self.translate_expr(target, ctx)
-        if isinstance(target, ast.Name):
+        target = self.get_target(lhs, ctx)
+        if isinstance(target, PythonMethod):
+            # We're assigning to a property, so we have to call the method representing
+            # the property setter.
+            assert isinstance(lhs, ast.Attribute)
+            assert target.setter
+            arg_stmt, arg = self.translate_expr(lhs.value, ctx)
+            call = self.create_method_call_node(ctx, target.setter.sil_name, [arg, rhs],
+                                                [], position, info, target.setter, lhs)
+            getter_type = self.translate_type(target.type, ctx)
+            self_arg = self.viper.LocalVarDecl('self', self.viper.Ref, position, info)
+            getter = self.viper.FuncApp(target.sil_name, [arg], position, info,
+                                        getter_type, [self_arg])
+            getter_equal = self.viper.EqCmp(getter, rhs, position, info)
+            return arg_stmt + call, [getter_equal]
+        lhs_stmt, var = self.translate_expr(lhs, ctx)
+        if isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
         else:
             assignment = self.viper.FieldAssign
@@ -867,6 +882,8 @@ class StatementTranslator(CommonTranslator):
             return []
         type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        if not ctx.result_var:
+            raise InvalidProgramException(node, 'invalid.return')
         assign = self.viper.LocalVarAssign(
             ctx.result_var.ref(node, ctx),
             rhs, self.to_position(node, ctx),
