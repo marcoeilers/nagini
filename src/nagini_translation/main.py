@@ -1,11 +1,9 @@
 import argparse
-import astunparse
 import inspect
 import json
 import logging
 import os
 import re
-import sys
 import time
 import traceback
 
@@ -35,6 +33,7 @@ from typing import Set
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
+DEFAULT_SOCKET = "tcp://*:5555"
 
 
 def parse_sil_file(sil_path: str, jvm):
@@ -232,6 +231,11 @@ def main() -> None:
         default=None,
         help='select specific methods or classes to verify, separated by commas'
     )
+    parser.add_argument(
+        '--server',
+        action='store_true',
+        help='Start Nagini server'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -242,10 +246,29 @@ def main() -> None:
 
     os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
-    translate_and_verify(args.python_file, jvm, args)
+    if args.server:
+        import zmq
+        context = zmq.Context()
+
+        socket = context.socket(zmq.REP)
+        socket.bind(DEFAULT_SOCKET)
+
+        load_sil_files(jvm, args.sif)
+
+        while True:
+            file = socket.recv_string()
+            response = ['']
+
+            def add_response(part):
+                response[0] = response[0] + '\n' + part
+
+            translate_and_verify(file, jvm, args, add_response)
+            socket.send_string(response[0])
+    else:
+        translate_and_verify(args.python_file, jvm, args)
 
 
-def translate_and_verify(python_file, jvm, args):
+def translate_and_verify(python_file, jvm, args, print=print):
     try:
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif)
@@ -309,7 +332,6 @@ def translate_and_verify(python_file, jvm, args):
     except JavaException as e:
         print(e.stacktrace())
         raise e
-    sys.exit(0)
 
 
 if __name__ == '__main__':
