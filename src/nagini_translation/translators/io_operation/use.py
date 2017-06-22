@@ -5,6 +5,7 @@ import ast
 
 from typing import cast, List
 
+from nagini_translation.lib.constants import CALLABLE_TYPE
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonIOExistentialVar,
@@ -189,23 +190,25 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
 
     def _translate_eval_io(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
-        Translates a reference to the eval_io IOOperation as usual, but also stores the
-        information which function is used as the argument.
+        Translates a reference to the eval_io IOOperation as usual. Also stores the
+        information that given argument function is among the argument functions used with
+        eval_io in the program; this information is used to generate additional return
+        type postconditions for the result getter of eval_io.
         """
         if not isinstance(node.args[1], ast.Name):
             raise InvalidProgramException(node, 'invalid.eval.function')
         target = self.get_target(node.args[1], ctx)
-        if not isinstance(target, PythonMethod) or not target.pure:
+        if (ctx.current_function.name != 'Eval' and
+                (not isinstance(target, PythonMethod) or not target.pure)):
             raise InvalidProgramException(node, 'invalid.eval.function')
         stmt, res = self.translate_io_operation_call(node, ctx)
         func_stmt, func_arg = self.translate_expr(node.args[1], ctx)
         if func_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         eval_io = self.get_target(node, ctx)
-        if not hasattr(eval_io, 'func_args'):
-            eval_io.func_args = []
+
         arg_type = self.get_type(node.args[1], ctx)
-        if arg_type.name != 'Callable':
+        if arg_type.name != CALLABLE_TYPE:
             eval_io.func_args.append((func_arg, arg_type))
         return stmt, res
 
@@ -238,6 +241,14 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             assert not stmt
             args.append(arg_val)
 
+        eval_io = self._get_eval_io_operation(ctx)
+        getter = self.create_result_getter(node, eval_io.get_results()[0], ctx, args,
+                                           eval_io)
+        assume = self.viper.Inhale(self.viper.EqCmp(func_val, getter, position, info),
+                                   position, info)
+        return call_stmt + [assume], call
+
+    def _get_eval_io_operation(self, ctx: Context) -> PythonIOOperation:
         for module in ctx.module.from_imports:
             if module.type_prefix == 'nagini_contracts.io_builtins':
                 io_builtins = module
@@ -246,11 +257,7 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
             contracts = ctx.module.namespaces['nagini_contracts']
             io_builtins = contracts.namespaces['io_builtins']
         eval_io = io_builtins.io_operations['eval_io']
-        getter = self.create_result_getter(node, eval_io.get_results()[0], ctx, args,
-                                           eval_io)
-        assume = self.viper.Inhale(self.viper.EqCmp(func_val, getter, position, info),
-                                   position, info)
-        return call_stmt + [assume], call
+        return eval_io
 
     def _translate_open(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translate ``Open(io_operation)``."""

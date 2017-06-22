@@ -683,8 +683,7 @@ class CallTranslator(CommonTranslator):
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
         """
-        Translates 'normal' function calls, i.e. function, method, constructor
-        or predicate calls.
+        Translates a call node which refers to a 'normal' function, method or predicate.
         """
         arg_stmts, args, arg_types = self._translate_call_args(node, ctx)
         target = self._get_call_target(node, ctx)
@@ -704,6 +703,10 @@ class CallTranslator(CommonTranslator):
     def translate_normal_call(self, target: PythonMethod, arg_stmts: List[Stmt],
                               args: List[Expr], arg_types: List[PythonType],
                               node: ast.AST, ctx: Context, impure=False) -> StmtsAndExpr:
+        """
+        Translates a 'normal' function call, i.e., target must refer to a normal function,
+        method or predicate.
+        """
         formal_args = []
         name = get_func_name(node)
         position = self.to_position(node, ctx)

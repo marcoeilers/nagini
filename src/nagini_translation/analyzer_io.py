@@ -10,8 +10,8 @@ from typing import cast, List
 from nagini_translation.lib import program_nodes as nodes
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
-    BOXED_PRIMITIVES,
-    PRIMITIVE_PREFIX,
+    EVAL_IO_SIGNATURE,
+    OBJECT_TYPE,
 )
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
@@ -98,8 +98,9 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 lambda_: ast.Lambda = None) -> nodes.PythonType:
         """Get the type of the given AST node."""
         assert isinstance(node, ast.arg)
-        if self._current_io_operation.name == 'eval_io' and node.arg == 'arg':
-            return self._parent.module.global_module.classes['object']
+        if (self._current_io_operation.name == EVAL_IO_SIGNATURE[0] and
+                node.arg == EVAL_IO_SIGNATURE[2]):
+            return self._parent.module.global_module.classes[OBJECT_TYPE]
         scopes = [self._current_io_operation.name]
         if lambda_:
             prefix = construct_lambda_prefix(
@@ -131,8 +132,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         if not inputs or self._typeof(inputs[0]) != self._place_class:
             self._raise_invalid_operation('invalid_preset')
         for inp in inputs[1:]:
-            if (self._current_io_operation.name != 'eval_io' and
-                    self._typeof(inp) == self._place_class):
+            if self._typeof(inp) == self._place_class:
                 self._raise_invalid_operation('invalid_preset')
         in_place = self._node_factory.create_python_var(
             inputs[0].arg, inputs[0], self._place_class)

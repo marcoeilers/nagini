@@ -14,6 +14,8 @@ BUILTINS = ['cast',
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
+FUNCTION_DOMAIN_NAME = 'Function'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -38,6 +40,7 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    FUNCTION_DOMAIN_NAME,
 ]
 
 VIPER_KEYWORDS = [
@@ -172,6 +175,8 @@ BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 MYPY_SUPERCLASSES = {
     'Sized',
 }
+
+EVAL_IO_SIGNATURE = ('eval_io', 'func', 'arg', 'result')
 
 IGNORED_IMPORTS = {'_importlib_modulespec',
                    'abc',

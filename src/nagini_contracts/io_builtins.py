@@ -223,6 +223,11 @@ def Eval(t_pre: Place, func: Callable[[T], V], arg: T) -> Tuple[V, Place]:
                 token(t_post) and
                 t_post is Result()[1] and
                 result is Result()[0]
+                # and resul result == func(arg)
+                # This is part of the contract but guaranteed via additional inhales after
+                # any call to Eval, and cannot be part of the contract written here
+                # because the fact that func can have an arbitrary precondition would make
+                # the contract of Eval not well-formed.
             ),
         )
     )

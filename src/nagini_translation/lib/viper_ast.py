@@ -1,6 +1,7 @@
 import ast
 import types
 
+from nagini_translation.lib.constants import FUNCTION_DOMAIN_NAME
 from nagini_translation.lib.errors import error_manager, Rules
 
 
@@ -63,6 +64,9 @@ class ViperAST:
         self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
+
+    def function_domain_type(self):
+        return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
 
     def empty_seq(self):
         return self.scala.collection.mutable.ListBuffer()

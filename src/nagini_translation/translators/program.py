@@ -3,6 +3,7 @@ import ast
 from collections import OrderedDict
 from nagini_translation.lib.constants import (
     ERROR_NAME,
+    FUNCTION_DOMAIN_NAME,
     PRIMITIVES,
     RESULT_NAME
 )
@@ -534,14 +535,14 @@ class ProgramTranslator(CommonTranslator):
             selected_names.append(node.sil_name)
 
     def create_functions_domain(self, constants: List, ctx: Context):
-        return self.viper.Domain('Function', constants, [], [],
+        return self.viper.Domain(FUNCTION_DOMAIN_NAME, constants, [], [],
                                  self.no_position(ctx), self.no_info(ctx))
 
     def translate_function_constant(self, func: PythonMethod, ctx: Context):
-        func_type = self.viper.DomainType('Function', {}, [])
+        func_type = self.viper.function_domain_type()
         return self.viper.DomainFunc(func.func_constant, [], func_type, True,
                                      self.to_position(func.node, ctx), self.no_info(ctx),
-                                     'Function')
+                                     FUNCTION_DOMAIN_NAME)
 
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List, ctx: Context,

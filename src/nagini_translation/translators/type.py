@@ -1,55 +1,28 @@
 import ast
 
-from nagini_contracts.contracts import CONTRACT_FUNCS
 from nagini_translation.lib.constants import (
-    BOOL_TYPE,
-    BUILTINS,
-    DICT_TYPE,
-    INT_TYPE,
-    LIST_TYPE,
-    OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
-    PRIMITIVE_INT_TYPE,
-    PRIMITIVE_PREFIX,
+    CALLABLE_TYPE,
     PRIMITIVES,
-    RANGE_TYPE,
-    SET_TYPE,
-    STRING_TYPE,
-    TUPLE_TYPE,
-    UNION_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
-    GenericType,
     PythonClass,
     PythonIOOperation,
     PythonMethod,
-    PythonModule,
-    PythonNode,
     PythonType,
-    PythonVar,
-    PythonVarBase,
 )
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.resolver import get_type as do_get_type
 from nagini_translation.lib.typedefs import (
     Expr,
-    Position,
-    Stmt,
-    StmtsAndExpr,
 )
 from nagini_translation.lib.typeinfo import TypeInfo
-from nagini_translation.lib.util import (
-    get_func_name,
-    InvalidProgramException,
-    UnsupportedException,
-)
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.translators.abstract import (
     Context,
     TranslatorConfig,
 )
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional
+from typing import Optional
 
 
 class TypeTranslator(CommonTranslator):
@@ -70,8 +43,8 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name == 'Callable':
-            return self.viper.DomainType('Function', {}, [])
+        if cls.name == CALLABLE_TYPE:
+            return self.viper.function_domain_type()
         elif cls.name in PRIMITIVES:
             cls = cls.try_box()
             return self.builtins['builtins.' + cls.name]

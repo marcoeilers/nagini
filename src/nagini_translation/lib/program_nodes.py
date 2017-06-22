@@ -948,6 +948,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self._termination_measure = None
         self._body = None
         self._io_existentials = None
+        self.func_args = []
 
     @property
     def is_builtin(self) -> bool:

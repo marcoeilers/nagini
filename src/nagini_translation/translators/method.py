@@ -1,13 +1,10 @@
 import ast
 
 from nagini_translation.lib.constants import (
-    DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
-    LIST_TYPE,
+    OBJECT_TYPE,
     PRIMITIVES,
-    SET_TYPE,
-    TUPLE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -15,22 +12,18 @@ from nagini_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonMethod,
     PythonTryBlock,
-    PythonType,
     PythonVar,
-    PythonVarBase,
 )
 from nagini_translation.lib.typedefs import (
     DomainFuncApp,
     Expr,
     Position,
     Stmt,
-    StmtsAndExpr,
     VarDecl,
 )
 from nagini_translation.lib.util import (
     flatten,
     get_body_start_index,
-    get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException
 )
@@ -209,6 +202,8 @@ class MethodTranslator(CommonTranslator):
                                                         pos, ctx)
                 pres.append(check)
         if func.name != 'Eval':
+            # Make an exception for Eval because it uses type variables in ways we don't
+            # generally support.
             for name, var in func.type_vars.items():
                 check = self.type_factory.subtype_check(var.type_expr, var.bound,
                                                         pos, ctx)
@@ -415,8 +410,12 @@ class MethodTranslator(CommonTranslator):
                 literal = var.type_expr
             ctx.bound_type_vars[(var.name,)] = literal
         if method.name == 'Eval':
-            object_type = ctx.module.global_module.classes['object']
-            literal = self.type_factory.translate_type_literal(object_type, self.no_position(ctx), ctx)
+            # Eval uses type parameters in ways we don't usually support;
+            # while translating it, we're treating the type parameter V as type
+            # object.
+            object_type = ctx.module.global_module.classes[OBJECT_TYPE]
+            literal = self.type_factory.translate_type_literal(object_type,
+                                                               self.no_position(ctx), ctx)
             ctx.bound_type_vars[('V',)] = literal
 
     def translate_method(self, method: PythonMethod,

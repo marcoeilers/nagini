@@ -92,9 +92,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if not type_correct:
         return None
     if sif:
-        analyzer = SIFAnalyzer(jvm, viperast, types, path, selected)
+        analyzer = SIFAnalyzer(types, path, selected)
     else:
-        analyzer = Analyzer(jvm, viperast, types, path, selected)
+        analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))

@@ -6,6 +6,7 @@ import copy
 
 from typing import cast, List
 
+from nagini_translation.lib.constants import EVAL_IO_SIGNATURE
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.io_context import IOOpenContext
 from nagini_translation.lib.program_nodes import (
@@ -64,7 +65,8 @@ class IOOperationResult:
     def var(self, var: PythonVarBase) -> None:
         assert var is not None
         if var.type != self.definition.type:
-            if not (self.var_name == 'result' and self._node.func.id == 'eval_io'):
+            if not (self.var_name == EVAL_IO_SIGNATURE[3] and
+                    self._node.func.id == EVAL_IO_SIGNATURE[0]):
                 raise_invalid_existential_var(
                     'defining_expression_type_mismatch', self._node)
         self._var = var
@@ -110,7 +112,7 @@ class ResultTranslator:
     def _result_definitions(self) -> List[PythonVar]:
         """Return results as defined in IO operation definition."""
         result = self._operation.get_results()
-        if self._operation.name == 'eval_io':
+        if self._operation.name == EVAL_IO_SIGNATURE[0]:
             # Special treatment: Exchange result arg with one with the correct type.
             result = result[:]
             result_var = copy.copy(result[0])

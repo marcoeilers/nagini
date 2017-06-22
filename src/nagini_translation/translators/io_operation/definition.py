@@ -3,7 +3,7 @@
 
 from typing import List, Tuple
 
-from nagini_translation.lib.constants import PRIMITIVES
+from nagini_translation.lib.constants import EVAL_IO_SIGNATURE, PRIMITIVES
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonIOOperation,
@@ -87,10 +87,13 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
             posts = [result_type_expr]
         else:
             posts = []
-        if operation.name == 'eval_io' and operation_result.name == 'result':
+        if (operation.name == EVAL_IO_SIGNATURE[0] and
+                operation_result.name == EVAL_IO_SIGNATURE[3]):
             # Add postconditions about return type.
             getter_result = self.viper.Result(typ, position, info)
             func_param = operation._inputs[0].ref()
+            # For each function for which it's called in the program, add a postcondition
+            # stating the result type in that case.
             for func_arg, func_type in operation.func_args:
                 result_type_expr = self.type_check(
                     getter_result, func_type, position, ctx)

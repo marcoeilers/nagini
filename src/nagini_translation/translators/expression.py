@@ -7,6 +7,7 @@ from nagini_translation.lib.constants import (
     BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
+    FUNCTION_DOMAIN_NAME,
     INT_TYPE,
     LIST_TYPE,
     OPERATOR_FUNCTIONS,
@@ -551,9 +552,9 @@ class ExpressionTranslator(CommonTranslator):
             return [], func_app
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],
-                                            self.viper.DomainType('Function', {}, []),
+                                            self.viper.function_domain_type(),
                                             self.to_position(node, ctx), self.no_info(ctx),
-                                            'Function')
+                                            FUNCTION_DOMAIN_NAME)
             return [], func
         else:
             if isinstance(target, PythonType):
