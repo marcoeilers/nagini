@@ -57,9 +57,10 @@ class PythonScope:
         self.superscope = superscope
 
     def contains_name(self, name: str) -> bool:
-        result = name in self.sil_names
-        if self.superscope is not None:
-            result = result or self.superscope.contains_name(name)
+        if self.sil_names is not None:
+            result = name in self.sil_names
+        else:
+            result = self.superscope.contains_name(name)
         return result
 
     def get_fresh_name(self, name: str) -> str:
@@ -69,11 +70,17 @@ class PythonScope:
             while self.contains_name(new_name):
                 counter += 1
                 new_name = name + '_' + str(counter)
-            self.sil_names.append(new_name)
+            self._add_name(new_name)
             return new_name
         else:
-            self.sil_names.append(name)
+            self._add_name(name)
             return name
+
+    def _add_name(self, new_name: str) -> None:
+        if self.sil_names is not None:
+            self.sil_names.append(new_name)
+        else:
+            self.superscope._add_name(new_name)
 
     @property
     def scope_prefix(self) -> List[str]:
@@ -107,6 +114,7 @@ class PythonModule(PythonScope, ContainerInterface):
         """
         if sil_names is None:
             sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
+            sil_names.extend([RESULT_NAME, ERROR_NAME, END_LABEL])
         super().__init__(sil_names, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
@@ -288,7 +296,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES, superscope)
+        PythonScope.__init__(self, None, superscope)
         self.node_factory = node_factory
         self.superclass = superclass
         self.functions = OrderedDict()
@@ -731,9 +739,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         native Silver.
         """
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, VIPER_KEYWORDS + INTERNAL_NAMES +
-                             [RESULT_NAME, ERROR_NAME, END_LABEL],
-                             superscope)
+        PythonScope.__init__(self, None, superscope)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
@@ -939,7 +945,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
             node_factory: 'ProgramNodeFactory',
             ):
         PythonNode.__init__(self, name, node)
-        PythonScope.__init__(self, [], superscope)
+        PythonScope.__init__(self, None, superscope)
         self._preset = []
         self._postset = []
         self._inputs = []

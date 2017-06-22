@@ -120,8 +120,7 @@ class ViperAST:
             result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)
 
-    def Program(self, domains, fields, functions, predicates, methods, position,
-                info):
+    def Program(self, domains, fields, functions, predicates, methods, position, info):
         return self.ast.Program(self.to_seq(domains), self.to_seq(fields),
                                 self.to_seq(functions), self.to_seq(predicates),
                                 self.to_seq(methods), position, info, self.NoTrafos)
