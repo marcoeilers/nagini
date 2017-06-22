@@ -650,6 +650,9 @@
 "type": {
     "extends": "object"
 },
+"Callable": {
+    "extends": "object"
+},
 "Place": {
     "functions": {
         "__eq__": {

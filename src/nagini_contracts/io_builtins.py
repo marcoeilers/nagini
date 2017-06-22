@@ -3,7 +3,7 @@
 # pragma pylint: disable=invalid-name,unused-argument
 
 
-from typing import Tuple
+from typing import Callable, Tuple, TypeVar
 
 from nagini_contracts.contracts import (
     ContractOnly,
@@ -16,6 +16,7 @@ from nagini_contracts.io import (
     ctoken,
     IOExists1,
     IOExists2,
+    IOExists3,
     IOOperation,
     Place,
     Terminates,
@@ -188,6 +189,45 @@ def SetVar(t_pre: Place, value: int) -> Tuple[int, Place]:
                 t_post == Result()[1] and
                 result == Result()[0] and
                 value == result
+            ),
+        )
+    )
+
+
+T = TypeVar('T')
+V = TypeVar('V')
+
+
+@IOOperation
+def eval_io(
+        t_pre: Place,
+        func: Callable[[T], V],
+        arg: T,
+        result: object = Result(),
+        t_post: Place = Result()) -> bool:
+    """Evaluate func in the current state."""
+    Terminates(True)
+
+
+@Ghost
+@ContractOnly
+def Eval(t_pre: Place, func: Callable[[T], V], arg: T) -> Tuple[V, Place]:
+    IOExists2(Place, object)(
+        lambda t_post, result: (
+            Requires(
+                token(t_pre, 1) and
+                eval_io(t_pre, func, arg, result, t_post) and
+                MustTerminate(1)
+            ),
+            Ensures(
+                token(t_post) and
+                t_post is Result()[1] and
+                result is Result()[0]
+                # and resul result == func(arg)
+                # This is part of the contract but guaranteed via additional inhales after
+                # any call to Eval, and cannot be part of the contract written here
+                # because the fact that func can have an arbitrary precondition would make
+                # the contract of Eval not well-formed.
             ),
         )
     )

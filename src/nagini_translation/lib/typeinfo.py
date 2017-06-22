@@ -107,7 +107,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         oldprefix = self.prefix
         self.prefix = self.prefix + [node.name()]
         functype = self.type_of(node)
-        self.set_type(self.prefix, functype, node.line, col(node))
+        self.set_type(self.prefix, functype, node.line, col(node), True)
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
                           arg.variable.type, arg.line, col(arg))
@@ -130,8 +130,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_class_def(node)
         self.prefix = oldprefix
 
-    def set_type(self, fqn, type, line, col):
-        if isinstance(type, mypy.types.CallableType):
+    def set_type(self, fqn, type, line, col, return_type=False):
+        if return_type and isinstance(type, mypy.types.CallableType):
             type = type.ret_type
         if not type or isinstance(type, mypy.types.AnyType):
             if line in self.ignored_lines:
@@ -328,6 +328,9 @@ class TypeInfo:
 
     def is_union_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.UnionType)
+
+    def is_callable_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.CallableType)
 
     def is_type_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeType)

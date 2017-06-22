@@ -11,6 +11,7 @@ from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
+    CALLABLE_TYPE,
     IGNORED_IMPORTS,
     LEGAL_MAGIC_METHODS,
     LITERALS,
@@ -61,13 +62,8 @@ class Analyzer(ast.NodeVisitor):
     Walks through the Python AST and collects the structures to be translated.
     """
 
-    def __init__(self, jvm: 'JVM', viperast: 'ViperAST', types: TypeInfo,
-                 path: str, selected: Set[str]):
+    def __init__(self, types: TypeInfo, path: str, selected: Set[str]):
         self._node_factory = None
-        self.viper = viperast
-        self.java = jvm.java
-        self.scala = jvm.scala
-        self.viper = jvm.viper
         self.types = types
         self.global_module = PythonModule(types, self.node_factory, None, None)
         self.global_module.global_module = self.global_module
@@ -462,8 +458,7 @@ class Analyzer(ast.NodeVisitor):
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
-        if not isinstance(name, str):
-            raise Exception(name)
+        assert isinstance(name, str)
         if self.is_io_operation(node):
             self.io_operation_analyzer.analyze_io_operation(node)
             return
@@ -947,6 +942,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_type_var(mypy_type, node)
         elif self.types.is_type_type(mypy_type):
             return self._convert_type_type(mypy_type, node)
+        elif self.types.is_callable_type(mypy_type):
+            return self._convert_callable_type(mypy_type, node)
         else:
             raise UnsupportedException(mypy_type)
         return result
@@ -963,6 +960,9 @@ class Analyzer(ast.NodeVisitor):
         result = self.find_or_create_class(mypy_type.name(),
                                            module=target_module)
         return result
+
+    def _convert_callable_type(self, mypy_type, node) -> PythonType:
+        return self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module)
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
         args = [self.convert_type(arg_type, node)
