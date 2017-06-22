@@ -1,4 +1,5 @@
 import ast
+import copy
 
 from nagini_translation.lib.constants import BOOL_TYPE
 from nagini_translation.lib.util import InvalidProgramException
@@ -78,11 +79,18 @@ class PredicateTranslator(CommonTranslator):
                                               'invalid.predicate')
             ctx.current_function = instance
             ctx.module = instance.module
+            # Replace variables in instance by variables in root, since we use the
+            # parameter names from root.
             for root_name, current_name in zip(root.args.keys(),
                                                instance.args.keys()):
-                if root_name != next(iter(root.args.keys())):
-                    root_var = root.args[root_name]
-                    ctx.set_alias(current_name, root_var)
+                root_var = root.args[root_name]
+                # For the receiver parameter, we need it to have the same sil_name as
+                # that of the root, but the type of the current instance when translating
+                # it, otherwise some fields/functions/predicates may not be found.
+                if root_name == next(iter(root.args.keys())):
+                    root_var = copy.copy(root_var)
+                    root_var.type = instance.cls
+                ctx.set_alias(current_name, root_var)
             if len(instance.node.body) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
