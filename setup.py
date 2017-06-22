@@ -19,6 +19,7 @@ setup(
             'jpype1',
             'astunparse',
             'typed-ast',
+            'pyzmq',
             ],
         entry_points = {
              'console_scripts': [
