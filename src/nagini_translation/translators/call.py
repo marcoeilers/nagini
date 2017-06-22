@@ -680,16 +680,12 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def _translate_normal_call(self, node: ast.Call, ctx: Context,
-                               impure=False) -> StmtsAndExpr:
+    def translate_normal_call_node(self, node: ast.Call, ctx: Context,
+                                   impure=False) -> StmtsAndExpr:
         """
-        Translates 'normal' function calls, i.e. function, method, constructor
-        or predicate calls.
+        Translates a call node which refers to a 'normal' function, method or predicate.
         """
-        formal_args = []
         arg_stmts, args, arg_types = self._translate_call_args(node, ctx)
-        name = get_func_name(node)
-        position = self.to_position(node, ctx)
         target = self._get_call_target(node, ctx)
         if not target:
             # Must be a function that exists (otherwise mypy would complain)
@@ -701,6 +697,19 @@ class CallTranslator(CommonTranslator):
         if isinstance(target, PythonClass):
             return self.translate_constructor_call(target, node, args,
                                                    arg_stmts, ctx)
+        return self.translate_normal_call(target, arg_stmts, args, arg_types, node, ctx,
+                                          impure)
+
+    def translate_normal_call(self, target: PythonMethod, arg_stmts: List[Stmt],
+                              args: List[Expr], arg_types: List[PythonType],
+                              node: ast.AST, ctx: Context, impure=False) -> StmtsAndExpr:
+        """
+        Translates a 'normal' function call, i.e., target must refer to a normal function,
+        method or predicate.
+        """
+        formal_args = []
+        name = get_func_name(node)
+        position = self.to_position(node, ctx)
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
@@ -813,7 +822,7 @@ class CallTranslator(CommonTranslator):
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
         else:
-            return self._translate_normal_call(node, ctx, impure)
+            return self.translate_normal_call_node(node, ctx, impure)
 
     def _is_cls_call(self, node: ast.Call, ctx: Context) -> bool:
         """
