@@ -47,10 +47,12 @@ class ProgramTranslator(CommonTranslator):
                                 self.no_info(ctx))
 
     def _translate_fields(self, cls: PythonClass,
-                          ctx: Context) -> List['silver.ast.Field']:
+                          ctx: Context) -> Tuple[List['silver.ast.Field'],
+                                                 List['silver.ast.Function'],
+                                                 List['silver.ast.Method']]:
         """
-        Translates fields and properties of a class to Viper Fields, Viper Functions
-        (property getters) and Viper Methods (property setters).
+        Translates fields and properties to Viper. Normal fields get translated to
+        Viper fields, properties to functions and property setters to methods.
         """
         fields = []
         functions = []
@@ -61,6 +63,7 @@ class ProgramTranslator(CommonTranslator):
                 field.sil_field = sil_field
                 fields.append(sil_field)
             elif isinstance(field, PythonMethod):
+                # This is a property
                 if field.overrides:
                     raise InvalidProgramException(field.node, 'invalid.override')
                 getter = self.translate_function(field, ctx)

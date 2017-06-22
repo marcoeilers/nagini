@@ -471,9 +471,9 @@ class Analyzer(ast.NodeVisitor):
         else:
             scope_container = self.current_class
         self.define_new(scope_container, name, node)
-        is_property = self.is_property_getter(node)
-        is_setter = self.is_property_setter(node)
-        if is_property or is_setter:
+        is_property_getter = self.is_property_getter(node)
+        is_property_setter = self.is_property_setter(node)
+        if is_property_getter or is_property_setter:
             container = scope_container.fields
         elif self.is_predicate(node):
             container = scope_container.predicates
@@ -483,7 +483,7 @@ class Analyzer(ast.NodeVisitor):
             container = scope_container.static_methods
         else:
             container = scope_container.methods
-        if not (is_property or is_setter) and name in container:
+        if not (is_property_getter or is_property_setter) and name in container:
             func = container[name]
             if not self.is_static_method(node):
                 func.cls = self.current_class
@@ -491,7 +491,7 @@ class Analyzer(ast.NodeVisitor):
             func.node = node
             func.superscope = scope_container
         else:
-            pure = is_property or self.is_pure(node)
+            pure = is_property_getter or self.is_pure(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
@@ -499,7 +499,7 @@ class Analyzer(ast.NodeVisitor):
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
                 contract_only, self.node_factory)
-            if is_setter:
+            if is_property_setter:
                 container[name].setter = func
             else:
                 container[name] = func
@@ -520,7 +520,7 @@ class Analyzer(ast.NodeVisitor):
 
         self.visit(node.args, node)
 
-        if not is_setter:
+        if not is_property_setter:
             func.type = self.convert_type(functype)
 
         for child in node.body:
