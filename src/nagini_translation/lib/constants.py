@@ -1,5 +1,9 @@
 import ast
 
+DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
+DEFAULT_SERVER_SOCKET = "tcp://*:5555"
+
+
 LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['cast',

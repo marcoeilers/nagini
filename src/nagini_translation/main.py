@@ -14,6 +14,7 @@ import nagini_translation.mypy_patches.optional_patch
 from jpype import JavaException
 from nagini_translation.analyzer import Analyzer
 from nagini_translation.lib import config
+from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
@@ -33,7 +34,6 @@ from typing import Set
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
-DEFAULT_SOCKET = "tcp://*:5555"
 
 
 def parse_sil_file(sil_path: str, jvm):
@@ -249,10 +249,8 @@ def main() -> None:
     if args.server:
         import zmq
         context = zmq.Context()
-
         socket = context.socket(zmq.REP)
-        socket.bind(DEFAULT_SOCKET)
-
+        socket.bind(DEFAULT_SERVER_SOCKET)
         load_sil_files(jvm, args.sif)
 
         while True:

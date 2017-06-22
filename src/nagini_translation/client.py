@@ -1,13 +1,13 @@
 import argparse
 import zmq
 
+from nagini_translation.lib.constants import DEFAULT_CLIENT_SOCKET
 
-DEFAULT_SOCKET = "tcp://localhost:5555"
 
 context = zmq.Context()
 
 socket = context.socket(zmq.REQ)
-socket.connect(DEFAULT_SOCKET)
+socket.connect(DEFAULT_CLIENT_SOCKET)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

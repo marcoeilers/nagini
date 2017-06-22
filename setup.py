@@ -8,6 +8,7 @@ setup(
         version='0.1',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
+        license='MPL-2.0',
         packages=['nagini_translation',],
         package_dir={'': 'src'},
         requires=[
@@ -35,10 +36,9 @@ setup(
             'Development Status :: 3 - Alpha',
             'Environment :: Console',
             'Intended Audience :: Developers',
-            # TODO: License? 
+            'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
             'Operating System :: OS Independent',
             'Programming Language :: Python :: 3 :: Only',
             'Topic :: Software Development',
             ],
-        #TODO: license=
         )
