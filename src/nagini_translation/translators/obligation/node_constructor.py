@@ -98,7 +98,7 @@ class StatementNodeConstructorBase:
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:
         """Get the surrounding method obligation info."""
-        return self._ctx.actual_function.obligation_info
+        return self._ctx.current_function.obligation_info
 
     @property
     def _method_measure_map(self) -> MeasureMap:

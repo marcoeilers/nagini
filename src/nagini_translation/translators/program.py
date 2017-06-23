@@ -250,7 +250,7 @@ class ProgramTranslator(CommonTranslator):
         has_subtype = None
         if method.cls and method.method_type == MethodType.normal:
             self_arg = method.overrides.args[next(iter(method.overrides.args))]
-            not_null = self.viper.NeCmp(next(iter(method.args.values())).ref(),
+            not_null = self.viper.NeCmp(next(iter(method.overrides.args.values())).ref(),
                                         self.viper.NullLit(
                                             self.no_position(ctx),
                                             self.no_info(ctx)),
@@ -261,7 +261,7 @@ class ProgramTranslator(CommonTranslator):
                                               pos,
                                               ctx, inhale_exhale=False)
         elif method.method_type == MethodType.class_method:
-            cls_arg = next(iter(method.args.values())).ref()
+            cls_arg = next(iter(method.overrides.args.values())).ref()
             has_subtype = self.type_factory.subtype_check(cls_arg, method.cls,
                                                           pos, ctx)
         if method.name == '__init__':
