@@ -1,6 +1,7 @@
 import ast
 
 from nagini_translation.lib.constants import BOOL_TYPE
+from nagini_translation.lib.program_nodes import PythonType
 from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.util import (
     flatten,
@@ -199,6 +200,13 @@ class SIFPureTranslator(PureTranslator):
         node = ast.Name(id=ctx.current_function.tl_var.name, ctx=ast.Load())
         tl_wrapper = TLAssignWrapper(tl_var.name, [], node, None, False)
         return [tl_wrapper] + super()._translate_to_wrappers(nodes, ctx)
+
+    def _get_wrapper_var_type(self, wrapper: AssignWrapper,
+                              function: SIFPythonMethod) -> PythonType:
+        result = super()._get_wrapper_var_type(wrapper, function)
+        if isinstance(wrapper, TLAssignWrapper):
+            result = result.try_unbox()
+        return result
 
     def _translate_assign_wrapper_expr(self, wrapper: Wrapper,
                                        function: SIFPythonMethod,

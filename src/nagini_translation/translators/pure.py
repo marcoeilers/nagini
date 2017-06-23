@@ -3,7 +3,7 @@ import ast
 from typing import Dict, List, Union
 
 from nagini_translation.lib.constants import BOOL_TYPE
-from nagini_translation.lib.program_nodes import PythonMethod, PythonVar
+from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
     Expr,
 )
@@ -249,11 +249,17 @@ class PureTranslator(CommonTranslator):
             added = {}
             if isinstance(wrapper, AssignWrapper):
                 name = wrapper.name
-                cls = function.get_variable(name).type
+                cls = self._get_wrapper_var_type(wrapper, function)
                 new_name = function.create_variable(name, cls, self.translator)
                 added[name] = new_name
                 wrapper.var = new_name
             previous = wrapper
+
+    def _get_wrapper_var_type(self, wrapper: AssignWrapper,
+                              function: PythonMethod) -> PythonType:
+        name = wrapper.name
+        cls = function.get_variable(name).type
+        return cls
 
     def translate_exprs(self, nodes: List[ast.AST],
                         function: PythonMethod, ctx: Context) -> Expr:
