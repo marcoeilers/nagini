@@ -154,11 +154,15 @@ class ObligationMethodNodeConstructor:
 
     def _add_aditional_returns(self) -> None:
         """Add current wait level ghost return."""
+        if obligation_config.disable_waitlevel_check:
+            return
         self._obligation_method.prepend_return(
             self._obligation_info.current_wait_level.decl)
 
     def _add_aditional_variables(self) -> None:
         """Add current wait level ghost target."""
+        if obligation_config.disable_waitlevel_check:
+            return
         self._obligation_method.add_local(
             self._obligation_info.current_wait_level_target)
 
@@ -191,6 +195,8 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_postconditions(self) -> None:
         """Initialize current wait level for the caller."""
+        if obligation_config.disable_waitlevel_check:
+            return
         postcondition = self._translator.initialize_current_wait_level(
             sil.PermVar(self._obligation_info.current_wait_level),
             sil.PermVar(self._obligation_info.residue_level),

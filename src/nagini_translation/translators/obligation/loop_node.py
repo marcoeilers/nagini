@@ -96,6 +96,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _add_current_wait_level(self) -> None:
         """Inhale assumptions about current wait-level variable."""
+        if obligation_config.disable_waitlevel_check:
+            return
         context_info = self._ctx.obligation_context.get_surrounding_loop_info()
         if context_info:
             context_residue_level = context_info.residue_level
@@ -189,6 +191,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _set_loop_check_before(self) -> None:
         """Set the variable indicating that we are before loop."""
+        if obligation_config.disable_all:
+            return
         assign = sil.Assign(
             self._loop_obligation_info.loop_check_before_var,
             sil.TrueLit())
@@ -197,6 +201,8 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _set_loop_check_after_body(self) -> None:
         """Set the variable indicating that we are after loop body."""
+        if obligation_config.disable_all:
+            return
         assign = sil.Assign(
             self._loop_obligation_info.loop_check_before_var,
             sil.FalseLit())
