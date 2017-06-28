@@ -891,7 +891,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         all necessary processing/initialization
         """
         sil_name = self.get_fresh_name(name)
-        result = self.node_factory.create_python_var(sil_name, None, cls)
+        result = self.node_factory.create_python_var(name, None, cls)
         result.process(sil_name, translator)
         if local:
             self.add_local(sil_name, result)

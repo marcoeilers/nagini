@@ -568,7 +568,17 @@ class ExpressionTranslator(CommonTranslator):
                     not var.is_defined()):
                 raise InvalidProgramException(
                     node, 'io_existential_var.use_of_undefined')
-            return [], var.ref(node, ctx)
+            result = var.ref(node, ctx)
+            if not (isinstance(node._parent, ast.Assign) and node in node._parent.targets) and var.name in ctx.actual_function.locals:
+                pos = self.to_position(node, ctx)
+                info = self.no_info(ctx)
+                id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+                var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+                id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
+                result = self.viper.FuncApp('_checkDefined', [result, id], pos, info,
+                                            self.viper.Ref, [var_param_decl,
+                                                             id_param_decl])
+            return [], result
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """

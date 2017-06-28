@@ -656,13 +656,19 @@ class StatementTranslator(CommonTranslator):
             getter_equal = self.viper.EqCmp(getter, rhs, position, info)
             return arg_stmt + call, [getter_equal]
         lhs_stmt, var = self.translate_expr(lhs, ctx)
+        define_statement = []
         if isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
+            id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
+            id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
+            is_defined = self.viper.FuncApp('_isDefined', [id], position, info,
+                                            self.viper.Bool, [id_param_decl])
+            define_statement.append(self.viper.Inhale(is_defined, position, info))
         else:
             assignment = self.viper.FieldAssign
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
-        return lhs_stmt + [assign_stmt], [assign_val]
+        return lhs_stmt + [assign_stmt] + define_statement, [assign_val]
 
     def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
                                ctx: Context) -> Tuple[List[Stmt], List[Expr]]:

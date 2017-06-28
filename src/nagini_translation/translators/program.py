@@ -544,6 +544,24 @@ class ProgramTranslator(CommonTranslator):
                                      self.to_position(func.node, ctx), self.no_info(ctx),
                                      FUNCTION_DOMAIN_NAME)
 
+    def create_definedness_function(self, ctx: Context):
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+        id_param = self.viper.LocalVar('id', self.viper.Int, pos, info)
+        is_defined_func = self.viper.Function('_isDefined', [id_param_decl],
+                                              self.viper.Bool, [], [], None, pos, info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
+        is_defined_pre = self.viper.FuncApp('_isDefined', [id_param], pos, info,
+                                            self.viper.Bool, [id_param_decl])
+        check_defined_func = self.viper.Function('_checkDefined',
+                                                 [var_param_decl, id_param_decl],
+                                                 self.viper.Ref, [is_defined_pre], [],
+                                                 var_param, pos, info)
+        may_set_pred = self.viper.Predicate('_MaySet', [id_param_decl], None, pos, info)
+        return [is_defined_func, check_defined_func], [may_set_pred]
+
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List, ctx: Context,
                           selected: Set[str] = None) -> 'silver.ast.Program':
@@ -560,6 +578,10 @@ class ProgramTranslator(CommonTranslator):
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)
         fields.extend(obl_fields)
+
+        d_functions, d_predicates = self.create_definedness_function(ctx)
+        predicates.extend(d_predicates)
+        functions.extend(d_functions)
 
         type_funcs = self.type_factory.get_default_functions(ctx)
         type_axioms = self.type_factory.get_default_axioms(ctx)
