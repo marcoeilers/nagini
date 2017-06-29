@@ -10,6 +10,7 @@ from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
     PythonExceptionHandler,
+    PythonField,
     PythonMethod,
     PythonTryBlock,
     PythonVar,
@@ -335,6 +336,18 @@ class MethodTranslator(CommonTranslator):
             accs.append(pred)
         return accs
 
+    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context) -> List:
+        result = []
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        full_perm = self.viper.FullPerm(pos, info)
+        for field in fields:
+            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
+            pred = self.viper.PredicateAccess([id], '_MaySet', pos, info)
+            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
+            result.append(pred_acc)
+        return result
+
     def _create_method_epilog(self, method: PythonMethod,
                               ctx: Context) -> List[Stmt]:
         """
@@ -350,10 +363,12 @@ class MethodTranslator(CommonTranslator):
         Generates preconditions specific to the '__init__' method.
         """
         self_var = method.args[next(iter(method.args))].ref()
-        fields = method.cls.all_sil_fields
-        accs = self.get_all_field_accs(fields, self_var,
-                                       self.to_position(method.node, ctx),
-                                       ctx)
+        sil_fields = method.cls.all_sil_fields
+        fields = method.cls.all_fields
+        accs = self.get_may_set_predicates(fields, ctx)
+        # accs = self.get_all_field_accs(sil_fields, self_var,
+        #                                self.to_position(method.node, ctx),
+        #                                ctx)
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
                                     self.no_info(ctx))

@@ -656,19 +656,42 @@ class StatementTranslator(CommonTranslator):
             getter_equal = self.viper.EqCmp(getter, rhs, position, info)
             return arg_stmt + call, [getter_equal]
         lhs_stmt, var = self.translate_expr(lhs, ctx)
-        define_statement = []
+        before_assign = []
+        after_assign = []
         if isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
             id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
             id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
             is_defined = self.viper.FuncApp('_isDefined', [id], position, info,
                                             self.viper.Bool, [id_param_decl])
-            define_statement.append(self.viper.Inhale(is_defined, position, info))
+            after_assign.append(self.viper.Inhale(is_defined, position, info))
         else:
             assignment = self.viper.FieldAssign
+            if ctx.actual_function.name == '__init__':
+                self_arg = next(iter(ctx.current_function.args.values())).ref()
+                receiver = var.rcv()
+                receiver_is_self = self.viper.EqCmp(receiver, self_arg, position, info)
+
+                no_perm = self.viper.NoPerm(position, info)
+                id = self.viper.IntLit(self._get_string_value(target.sil_name), position,
+                                       info)
+                may_set_pred = self.viper.PredicateAccess([id], '_MaySet', position, info)
+                may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
+                may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
+                full_perm = self.viper.FullPerm(position, info)
+                all_may_set = self.viper.PredicateAccessPredicate(may_set_pred, full_perm,
+                                                                  position, info)
+                field_perm = self.viper.FieldAccessPredicate(var, full_perm, position, info)
+                exhale = self.viper.Exhale(all_may_set, position, info)
+                inhale = self.viper.Inhale(field_perm, position, info)
+                in_ex = self.translate_block([exhale, inhale], position, info)
+                empty_block = self.translate_block([], position, info)
+                inner_if = self.viper.If(may_set, in_ex, empty_block, position, info)
+                outer_if = self.viper.If(receiver_is_self, inner_if, empty_block, position, info)
+                before_assign.append(outer_if)
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
-        return lhs_stmt + [assign_stmt] + define_statement, [assign_val]
+        return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
 
     def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
                                ctx: Context) -> Tuple[List[Stmt], List[Expr]]:

@@ -138,18 +138,17 @@ class CallTranslator(CommonTranslator):
         return self.type_factory.type_check(obj_var, type, position, ctx,
                                             concrete=True)
 
-    def inhale_field_type(self, f: PythonField, receiver: Expr,
-                          ctx: Context) -> Stmt:
-        """
-        Creates an inhale statement that inhales type information for the
-        given field.
-        """
-        position = self.no_position(ctx)
+    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context) -> List:
+        result = []
+        pos = self.no_position(ctx)
         info = self.no_info(ctx)
-        field_acc = self.viper.FieldAccess(receiver, f.sil_field, position,
-                                           info)
-        check = self.type_check(field_acc, f.type, position, ctx)
-        return self.viper.Inhale(check, position, info)
+        full_perm = self.viper.FullPerm(pos, info)
+        for field in fields:
+            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
+            pred = self.viper.PredicateAccess([id], '_MaySet', pos, info)
+            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
+            result.append(pred_acc)
+        return result
 
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
@@ -186,24 +185,22 @@ class CallTranslator(CommonTranslator):
                     ctx.bound_type_vars[key] = literal
             current_type = current_type.superclass
 
-        fields = list(target_class.all_sil_fields)
-        field_type_inhales = [self.inhale_field_type(field, res_var.ref(), ctx)
-                              for field in target_class.all_fields
-                              if field.type.name not in PRIMITIVES]
+        fields = list(target_class.all_fields)
+        may_set_inhales = [self.viper.Inhale(ms, pos, self.no_info(ctx))
+                           for ms in self.get_may_set_predicates(fields, ctx)]
 
         ctx.bound_type_vars = old_bound_type_vars
-        new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
+        new = self.viper.NewStmt(res_var.ref(), [], self.no_position(ctx),
                                  self.no_info(ctx))
 
-        result_has_type = self._var_concrete_type_check(
-            res_var.name, result_type, pos, ctx)
+        result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos, ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
-        stmts = [new, type_inhale] + field_type_inhales
+        stmts = [new, type_inhale] + may_set_inhales
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls
@@ -853,10 +850,13 @@ class CallTranslator(CommonTranslator):
                                                        target_class,
                                                        self.translator)
 
-        fields = target_class.all_sil_fields
-        new = self.viper.NewStmt(res_var.ref(), fields, self.no_position(ctx),
-                                 self.no_info(ctx))
         pos = self.to_position(node, ctx)
+        fields = list(target_class.all_fields)
+        may_set_inhales = [self.viper.Inhale(ms, pos, self.no_info(ctx))
+                           for ms in self.get_may_set_predicates(fields, ctx)]
+        new = self.viper.NewStmt(res_var.ref(), [], self.no_position(ctx),
+                                 self.no_info(ctx))
+
         type_stmt, dynamic_type = self.translate_expr(node.func, ctx)
         assert not type_stmt
         result_has_type = self.type_factory.dynamic_type_check(res_var.ref(),
@@ -866,7 +866,7 @@ class CallTranslator(CommonTranslator):
         type_inhale = self.viper.Inhale(result_has_type, pos,
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
-        stmts = [new, type_inhale]
+        stmts = [new, type_inhale] + may_set_inhales
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls

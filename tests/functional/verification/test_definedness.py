@@ -1,0 +1,20 @@
+from nagini_contracts.contracts import *
+
+class C:
+    def __init__(self, b: bool) -> None:
+        #:: ExpectedOutput(postcondition.violated:insufficient.permission)
+        Ensures(Acc(self.argh))  # type: ignore
+        self.urgh = 12
+        if b:
+            self.argh = object()
+
+
+def double(a: int) -> int:
+    if a > 0:
+        u = 14
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    uu = u
+    return -a
+
+def client() -> None:
+    a = C(True)
