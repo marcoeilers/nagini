@@ -16,6 +16,7 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     TUPLE_TYPE,
 )
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     PythonClass,
@@ -570,7 +571,7 @@ class ExpressionTranslator(CommonTranslator):
                     node, 'io_existential_var.use_of_undefined')
             result = var.ref(node, ctx)
             if not (ctx.current_function.pure or ctx.current_function.predicate) and not isinstance(node.ctx, ast.Store) and var.name in ctx.actual_function.locals:
-                pos = self.to_position(node, ctx)
+                pos = self.to_position(node, ctx, rules=rules.LOCAL_VARIABLE_NOT_DEFINED)
                 info = self.no_info(ctx)
                 id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
                 var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)

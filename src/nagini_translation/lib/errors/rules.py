@@ -57,6 +57,10 @@ OBLIGATION_LOOP_MEASURE_NON_POSITIVE = {
     ('not.wellformed', 'insufficient.permission'):
         ('not.wellformed', 'loop_condition.not_framed_for_obligation_use'),
 }
+LOCAL_VARIABLE_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'undefined.local.variable')
+}
 
 __all__ = (
     'Rules',
@@ -71,4 +75,5 @@ __all__ = (
     'OBLIGATION_LOOP_CONTEXT_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_MEASURE_NON_POSITIVE',
+    'LOCAL_VARIABLE_NOT_DEFINED',
 )

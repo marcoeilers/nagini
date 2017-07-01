@@ -12,9 +12,10 @@ class C:
 def double(a: int) -> int:
     if a > 0:
         u = 14
-    #:: ExpectedOutput(application.precondition:assertion.false)
+    #:: ExpectedOutput(expression.undefined:undefined.local.variable)
     uu = u
     return -a
+
 
 def client() -> None:
     a = C(True)
