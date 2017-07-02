@@ -4,7 +4,7 @@ from nagini_translation.lib.typedefs import (
     Stmt,
 )
 from nagini_translation.lib.util import (
-    get_body_start_index,
+    get_body_indices,
     InvalidProgramException,
 )
 from nagini_translation.sif.lib.context import SIFContext
@@ -205,9 +205,9 @@ class SIFMethodTranslator(MethodTranslator):
                                                  ctx))
         posts = return_type_posts + posts
         statements = func.node.body
-        body_index = get_body_start_index(statements)
+        start, end = get_body_indices(statements)
         # translate body
-        body = self.translate_exprs(statements[body_index:], func, ctx)
+        body = self.translate_exprs(statements[start:end], func, ctx)
         ctx.current_function = old_function
         return self.viper.Function(func.sil_name, args, type_, pres,
                                    posts, body, self.no_position(ctx),

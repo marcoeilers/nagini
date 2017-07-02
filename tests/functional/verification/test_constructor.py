@@ -3,24 +3,24 @@ from nagini_contracts.contracts import *
 
 class Super:
     def __init__(self, a: int) -> None:
-        Ensures(Acc(self.field)) # type: ignore
-        Ensures(Acc(self.field2)) # type: ignore
-        Ensures(self.field == a) # type: ignore
-        Ensures(self.field2 == 12) # type: ignore
         self.field = a
         self.field2 = 12
+        Ensures(Acc(self.field))
+        Ensures(Acc(self.field2))
+        Ensures(self.field == a)
+        Ensures(self.field2 == 12)
 
 
 class Sub(Super):
     def __init__(self, a: int, b: int) -> None:
-        Ensures(Acc(self.field)) # type: ignore
-        Ensures(Acc(self.field2)) # type: ignore
-        Ensures(self.field == a) # type: ignore
-        Ensures(self.field2 == 12) # type: ignore
-        Ensures(Acc(self.field3)) # type: ignore
-        Ensures(self.field3 == b) # type: ignore
         super().__init__(a)
         self.field3 = b
+        Ensures(Acc(self.field))
+        Ensures(Acc(self.field2))
+        Ensures(self.field == a)
+        Ensures(self.field2 == 12)
+        Ensures(Acc(self.field3))
+        Ensures(self.field3 == b)
 
 
 class Other:

@@ -4,7 +4,7 @@ from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.typedefs import Expr, StmtsAndExpr
 from nagini_translation.lib.util import (
     flatten,
-    get_body_start_index,
+    get_body_indices,
     InvalidProgramException,
     UnsupportedException,
 )
@@ -155,11 +155,11 @@ class SIFStatementTranslator(StatementTranslator):
                 invariant = self.translate_contract(expr, ctx)
                 invariants.append(invariant)
 
-        body_index = get_body_start_index(node.body)
-        var_types = self._get_havoced_var_type_info(node.body[body_index:], ctx)
+        start, end = get_body_indices(node.body)
+        var_types = self._get_havoced_var_type_info(node.body[start:end], ctx)
         invariants = var_types + invariants
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in
-                        node.body[body_index:]])
+                        node.body[start:end]])
         # Add timelevel statement at the end of the loop.
         body.extend(tl_stmts)
         loop_stmts = self.create_while_node(ctx, while_cond, invariants, [],
