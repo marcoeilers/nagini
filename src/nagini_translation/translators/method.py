@@ -336,18 +336,6 @@ class MethodTranslator(CommonTranslator):
             accs.append(pred)
         return accs
 
-    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context) -> List:
-        result = []
-        pos = self.no_position(ctx)
-        info = self.no_info(ctx)
-        full_perm = self.viper.FullPerm(pos, info)
-        for field in fields:
-            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
-            pred = self.viper.PredicateAccess([id], '_MaySet', pos, info)
-            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
-            result.append(pred_acc)
-        return result
-
     def _create_method_epilog(self, method: PythonMethod,
                               ctx: Context) -> List[Stmt]:
         """
@@ -699,27 +687,30 @@ class MethodTranslator(CommonTranslator):
                                  self.no_info(ctx))
         old_var_aliases = ctx.var_aliases
         ctx.var_aliases = handler.try_block.handler_aliases
+        no_position = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        body = []
         if handler.exception_name:
             err_var = handler.try_block.get_error_var(self.translator)
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             ctx.var_aliases[handler.exception_name] = err_var
             err_var.type = handler.exception
-        body = []
+
+            body.append(self.set_var_defined(err_var, no_position, no_info))
         for stmt in handler.body:
             body += self.translate_stmt(stmt, ctx)
         body_block = self.translate_block(body,
                                           self.to_position(handler.node, ctx),
-                                          self.no_info(ctx))
+                                          no_info)
         if handler.try_block.finally_block:
             next = handler.try_block.finally_name
             finally_var = handler.try_block.get_finally_var(self.translator)
             if finally_var.sil_name in ctx.var_aliases:
                 finally_var = ctx.var_aliases[finally_var.sil_name]
             lhs = finally_var.ref()
-            rhs = self.viper.IntLit(0, self.no_position(ctx), self.no_info(ctx))
-            var_set = self.viper.LocalVarAssign(lhs, rhs, self.no_position(ctx),
-                                                self.no_info(ctx))
+            rhs = self.viper.IntLit(0, no_position, no_info)
+            var_set = self.viper.LocalVarAssign(lhs, rhs, no_position, no_info)
             next_var_set = [var_set]
         else:
             next = 'post_' + handler.try_block.name
@@ -727,6 +718,6 @@ class MethodTranslator(CommonTranslator):
         label_name = ctx.get_label_name(next)
         goto_end = self.viper.Goto(label_name,
                                    self.to_position(handler.node, ctx),
-                                   self.no_info(ctx))
+                                   no_info)
         ctx.var_aliases = old_var_aliases
         return [label, body_block] + next_var_set + [goto_end]

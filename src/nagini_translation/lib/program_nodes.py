@@ -52,7 +52,7 @@ class PythonScope:
     """
     Represents a namespace/scope in Python
     """
-    def __init__(self, sil_names: List[str], superscope: 'PythonScope'):
+    def __init__(self, sil_names: Set[str], superscope: 'PythonScope'):
         self.sil_names = sil_names
         self.superscope = superscope
 
@@ -78,7 +78,7 @@ class PythonScope:
 
     def _add_name(self, new_name: str) -> None:
         if self.sil_names is not None:
-            self.sil_names.append(new_name)
+            self.sil_names.add(new_name)
         else:
             self.superscope._add_name(new_name)
 
@@ -102,7 +102,7 @@ class PythonModule(PythonScope, ContainerInterface):
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
                  global_module: 'PythonModule',
-                 sil_names: List[str] = None,
+                 sil_names: Set[str] = None,
                  file: str = None) -> None:
         """
         Represents a module, i.e. either a directory that only contains other
@@ -110,11 +110,11 @@ class PythonModule(PythonScope, ContainerInterface):
 
         :param type_prefix: The prefix identifying this module in TypeInfo.
         :param global_module: The module containing globally available elements.
-        :param sil_names: List of all used Silver names, shared between modules.
+        :param sil_names: Set of all used Silver names, shared between modules.
         """
         if sil_names is None:
-            sil_names = list(VIPER_KEYWORDS + INTERNAL_NAMES)
-            sil_names.extend([RESULT_NAME, ERROR_NAME, END_LABEL])
+            sil_names = set(VIPER_KEYWORDS + INTERNAL_NAMES)
+            sil_names |= set([RESULT_NAME, ERROR_NAME, END_LABEL])
         super().__init__(sil_names, None)
         self.classes = OrderedDict()
         self.functions = OrderedDict()
@@ -1490,6 +1490,13 @@ class PythonField(PythonNode):
 
     def is_mangled(self) -> bool:
         return self.name.startswith('__') and not self.name.endswith('__')
+
+    @property
+    def actual_field(self) -> 'PythonField':
+        result = self
+        while result.inherited is not None:
+            result = result.inherited
+        return result
 
 
 class ProgramNodeFactory:

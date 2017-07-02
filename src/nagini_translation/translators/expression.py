@@ -570,7 +570,10 @@ class ExpressionTranslator(CommonTranslator):
                 raise InvalidProgramException(
                     node, 'io_existential_var.use_of_undefined')
             result = var.ref(node, ctx)
-            if not (ctx.current_function.pure or ctx.current_function.predicate) and not isinstance(node.ctx, ast.Store) and var.name in ctx.actual_function.locals:
+            if (isinstance(ctx.actual_function, PythonMethod) and
+                    not (ctx.actual_function.pure or ctx.actual_function.predicate) and
+                    not isinstance(node.ctx, ast.Store) and
+                    self.is_local_variable(var, ctx)):
                 pos = self.to_position(node, ctx, rules=rules.LOCAL_VARIABLE_NOT_DEFINED)
                 info = self.no_info(ctx)
                 id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
@@ -596,8 +599,7 @@ class ExpressionTranslator(CommonTranslator):
                 return var
             raise InvalidProgramException(node, 'field.nonexistent')
         if isinstance(field, PythonField):
-            while field.inherited is not None:
-                field = field.inherited
+            field = field.actual_field
             if field.is_mangled() and (field.cls is not ctx.current_class and
                                        field.cls is not ctx.actual_function.cls):
                 raise InvalidProgramException(node, 'private.field.access')

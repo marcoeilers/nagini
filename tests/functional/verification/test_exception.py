@@ -464,14 +464,14 @@ class ExceptionClass:
             self.a_field = 12
             raise MyOtherException()
 
-
-#:: ExpectedOutput(postcondition.violated:assertion.false)
+#:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def class_client() -> ExceptionClass:
     Ensures(Result() is not None)
     try:
         res = ExceptionClass(False)
     except MyOtherException:
         pass
+    #:: ExpectedOutput(expression.undefined:undefined.local.variable)
     return res
 
 def join_paths(c: Container) -> Container:

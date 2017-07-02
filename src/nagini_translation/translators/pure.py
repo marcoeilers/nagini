@@ -90,9 +90,9 @@ class PureTranslator(CommonTranslator):
         cond = node.test
         cond_var = ctx.current_function.create_variable('cond',
             ctx.module.global_module.classes[BOOL_TYPE], self.translator)
-        cond_let = AssignWrapper(cond_var.name, conds, cond, node)
-        then_cond = conds + [cond_var.name]
-        else_cond = conds + [NotWrapper(cond_var.name)]
+        cond_let = AssignWrapper(cond_var.sil_name, conds, cond, node)
+        then_cond = conds + [cond_var.sil_name]
+        else_cond = conds + [NotWrapper(cond_var.sil_name)]
         then = [self.translate_pure(then_cond, stmt, ctx) for stmt in node.body]
         then = flatten(then)
         else_ = []

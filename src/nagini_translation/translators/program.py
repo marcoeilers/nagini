@@ -267,22 +267,25 @@ class ProgramTranslator(CommonTranslator):
         if method.name == '__init__':
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
-            for cls in [method.cls, method.cls.superclass]:
-                for name, field in cls.fields.items():
-                    if field.inherited:
-                        continue
-                    field = self.viper.Field(field.sil_name,
-                                             self.translate_type(field.type,
-                                                                 ctx),
-                                             self.no_position(ctx),
-                                             self.no_info(ctx))
-                    field_acc = self.viper.FieldAccess(self_arg.ref(), field,
-                                                       self.no_position(ctx),
-                                                       self.no_info(ctx))
-                    acc = self.viper.FieldAccessPredicate(field_acc, full_perm,
-                                                          self.no_position(ctx),
-                                                          self.no_info(ctx))
-                    pres.append(acc)
+            fields = method.cls.all_fields
+            pres.extend(self.get_may_set_predicates(fields, ctx))
+
+            # for cls in [method.cls, method.cls.superclass]:
+            #     for name, field in cls.fields.items():
+            #         if field.inherited:
+            #             continue
+            #         field = self.viper.Field(field.sil_name,
+            #                                  self.translate_type(field.type,
+            #                                                      ctx),
+            #                                  self.no_position(ctx),
+            #                                  self.no_info(ctx))
+            #         field_acc = self.viper.FieldAccess(self_arg.ref(), field,
+            #                                            self.no_position(ctx),
+            #                                            self.no_info(ctx))
+            #         acc = self.viper.FieldAccessPredicate(field_acc, full_perm,
+            #                                               self.no_position(ctx),
+            #                                               self.no_info(ctx))
+            #         pres.append(acc)
 
         called_name = method.sil_name
         ctx.position.pop()
