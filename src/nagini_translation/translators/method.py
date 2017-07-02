@@ -23,7 +23,7 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     flatten,
-    get_body_start_index,
+    get_body_indices,
     get_surrounding_try_blocks,
     InvalidProgramException
 )
@@ -256,9 +256,9 @@ class MethodTranslator(CommonTranslator):
             posts = [check] + posts
 
         statements = func.node.body
-        body_index = get_body_start_index(statements)
+        start, end = get_body_indices(statements)
         # Translate body
-        actual_body = statements[body_index:]
+        actual_body = statements[start:end]
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
                  isinstance(actual_body[0].value, ast.Ellipsis))):
@@ -470,7 +470,7 @@ class MethodTranslator(CommonTranslator):
             locals = []
         else:
             statements = method.node.body
-            body_index = get_body_start_index(statements)
+            body_start, body_end = get_body_indices(statements)
             if method.declared_exceptions:
                 body.append(self.viper.LocalVarAssign(error_var_ref,
                     self.viper.NullLit(self.no_position(ctx),
@@ -480,7 +480,7 @@ class MethodTranslator(CommonTranslator):
             body.extend(self._create_local_vars_for_params(method, ctx))
             body += flatten(
                 [self.translate_stmt(stmt, ctx) for stmt in
-                 method.node.body[body_index:]])
+                 method.node.body[body_start:body_end]])
             for arg in method.get_args():
                 ctx.remove_alias(arg.name)
             end_label = ctx.get_label_name(END_LABEL)
