@@ -98,6 +98,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def _add_additional_targets(self) -> None:
         """Add current wait level dummy target."""
+        if obligation_config.disable_waitlevel_check:
+            return
         self._obligation_method_call.prepend_target(
             self._obligation_info.current_wait_level_target.ref())
 
