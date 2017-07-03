@@ -6,6 +6,7 @@ from nagini_translation.lib.constants import (
     END_LABEL,
     INT_TYPE,
     LIST_TYPE,
+    MAY_SET_PRED,
     OBJECT_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
@@ -675,6 +676,13 @@ class StatementTranslator(CommonTranslator):
 
     def create_new_field_permission(self, field_acc: Expr, target: PythonField,
                                     position: Position, info: Info, ctx: Context) -> Stmt:
+        """
+        Creates a statement that checks if the receiver of the given field access is the
+        self-parameter of the current method and there is a permission to create the
+        given field. If this is the case, it will exhale the permission to create the
+        field, and inhale a write permission to the field instead.
+        To be used for field writes in constructors.
+        """
         self_arg = next(iter(ctx.current_function.args.values())).ref()
         receiver = field_acc.rcv()
         receiver_is_self = self.viper.EqCmp(receiver, self_arg, position, info)
@@ -682,7 +690,7 @@ class StatementTranslator(CommonTranslator):
         no_perm = self.viper.NoPerm(position, info)
         id_value = self._get_string_value(target.actual_field.sil_name)
         id = self.viper.IntLit(id_value, position, info)
-        may_set_pred = self.viper.PredicateAccess([id], '_MaySet', position, info)
+        may_set_pred = self.viper.PredicateAccess([id], MAY_SET_PRED, position, info)
         may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
         may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
         full_perm = self.viper.FullPerm(position, info)

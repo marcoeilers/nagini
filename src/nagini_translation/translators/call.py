@@ -126,30 +126,6 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
-    def _var_concrete_type_check(self, name: str, type: PythonClass, position,
-                                 ctx: Context) -> 'silver.ast.DomainFuncApp':
-        """
-        Creates an expression checking if the var with the given name
-        is of exactly the given type.
-        """
-        obj_var = self.viper.LocalVar(name, self.viper.Ref,
-                                      self.no_position(ctx),
-                                      self.no_info(ctx))
-        return self.type_factory.type_check(obj_var, type, position, ctx,
-                                            concrete=True)
-
-    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context) -> List:
-        result = []
-        pos = self.no_position(ctx)
-        info = self.no_info(ctx)
-        full_perm = self.viper.FullPerm(pos, info)
-        for field in fields:
-            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
-            pred = self.viper.PredicateAccess([id], '_MaySet', pos, info)
-            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
-            result.append(pred_acc)
-        return result
-
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:

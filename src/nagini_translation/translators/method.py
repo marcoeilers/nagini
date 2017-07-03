@@ -351,12 +351,8 @@ class MethodTranslator(CommonTranslator):
         Generates preconditions specific to the '__init__' method.
         """
         self_var = method.args[next(iter(method.args))].ref()
-        sil_fields = method.cls.all_sil_fields
         fields = method.cls.all_fields
         accs = self.get_may_set_predicates(fields, ctx)
-        # accs = self.get_all_field_accs(sil_fields, self_var,
-        #                                self.to_position(method.node, ctx),
-        #                                ctx)
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
                                     self.no_info(ctx))

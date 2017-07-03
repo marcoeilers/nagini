@@ -1493,6 +1493,10 @@ class PythonField(PythonNode):
 
     @property
     def actual_field(self) -> 'PythonField':
+        """
+        If this field is inherited from a superclass, it will not actually be used in the
+        translation; this function will return the field that is actually used.
+        """
         result = self
         while result.inherited is not None:
             result = result.inherited

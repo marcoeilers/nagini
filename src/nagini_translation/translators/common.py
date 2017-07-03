@@ -3,6 +3,8 @@ import ast
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
     INT_TYPE,
+    IS_DEFINED_FUNC,
+    MAY_SET_PRED,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     UNION_TYPE,
@@ -215,14 +217,21 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return typ
 
     def is_local_variable(self, var: PythonVar, ctx: Context) -> bool:
-        if not ctx.actual_function:
-            return False
+        """
+        Assuming we are currently inside an impure method, checks if the given variable is
+        a local variable in the Python program (i.e. not a parameter, not a variable that
+        is quantified over).
+        """
         if var.name in ctx.actual_function.args:
             return False
         return var in ctx.actual_function.locals.values()
 
     def get_may_set_predicates(self, fields: List[PythonField], ctx: Context,
-                               pos=None) -> List:
+                               pos: Position = None) -> List[Expr]:
+        """
+        Creates predicate instances representing the permissions to create the given
+        fields in a constructor.
+        """
         result = []
         if not pos:
             pos = self.no_position(ctx)
@@ -230,16 +239,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         full_perm = self.viper.FullPerm(pos, info)
         for field in fields:
             id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
-            pred = self.viper.PredicateAccess([id], '_MaySet', pos, info)
+            pred = self.viper.PredicateAccess([id], MAY_SET_PRED, pos, info)
             pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
             result.append(pred_acc)
         return result
 
     def set_var_defined(self, target: PythonVar, position: Position,
                         info: Info) -> Stmt:
+        """
+        Returns an inhale which assumes that the given local variable is now defined.
+        """
         id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
-        is_defined = self.viper.FuncApp('_isDefined', [id], position, info,
+        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
                                         self.viper.Bool, [id_param_decl])
         return self.viper.Inhale(is_defined, position, info)
 

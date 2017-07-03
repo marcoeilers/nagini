@@ -5,6 +5,7 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BOXED_PRIMITIVES,
     BYTES_TYPE,
+    CHECK_DEFINED_FUNC,
     DICT_TYPE,
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
@@ -569,20 +570,29 @@ class ExpressionTranslator(CommonTranslator):
                     not var.is_defined()):
                 raise InvalidProgramException(
                     node, 'io_existential_var.use_of_undefined')
-            result = var.ref(node, ctx)
+
             if (isinstance(ctx.actual_function, PythonMethod) and
                     not (ctx.actual_function.pure or ctx.actual_function.predicate) and
                     not isinstance(node.ctx, ast.Store) and
                     self.is_local_variable(var, ctx)):
-                pos = self.to_position(node, ctx, rules=rules.LOCAL_VARIABLE_NOT_DEFINED)
-                info = self.no_info(ctx)
-                id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
-                var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
-                id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
-                result = self.viper.FuncApp('_checkDefined', [result, id], pos, info,
-                                            self.viper.Ref, [var_param_decl,
-                                                             id_param_decl])
+                result = self.wrap_definedness_check(var, node, ctx)
+            else:
+                result = var.ref(node, ctx)
             return [], result
+
+    def wrap_definedness_check(self, var: PythonVar, node: ast.AST,
+                               ctx: Context) -> Expr:
+        """
+        Create an access to the given variable, wrapped into a function call which checks
+        if the variable has been defined.
+        """
+        pos = self.to_position(node, ctx, rules=rules.LOCAL_VARIABLE_NOT_DEFINED)
+        info = self.no_info(ctx)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
+        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [var.ref(node, ctx), id], pos, info,
+                                  self.viper.Ref, [var_param_decl, id_param_decl])
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
