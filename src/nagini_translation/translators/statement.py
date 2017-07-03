@@ -6,8 +6,8 @@ from nagini_translation.lib.constants import (
     END_LABEL,
     INT_TYPE,
     LIST_TYPE,
+    MAY_SET_PRED,
     OBJECT_TYPE,
-    PRIMITIVE_BOOL_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
     SET_TYPE,
@@ -15,27 +15,26 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
-    PythonClass,
+    PythonField,
     PythonMethod,
     PythonType,
     PythonVar,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
+    Info,
+    Position,
     Stmt,
-    StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
     AssignCollector,
     contains_stmt,
     flatten,
     get_body_indices,
-    get_func_name,
     get_parent_of_type,
     get_surrounding_try_blocks,
     InvalidProgramException,
     is_get_ghost_output,
-    is_invariant,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -470,6 +469,7 @@ class StatementTranslator(CommonTranslator):
                                           [with_ctx.ref()],
                                           [ctx_type],
                                           [enter_res.ref(node, ctx)], node, ctx)
+
         assign = self.viper.LocalVarAssign(code_var, zero,
                                            self.no_position(ctx),
                                            self.no_info(ctx))
@@ -481,7 +481,9 @@ class StatementTranslator(CommonTranslator):
                                                      self.to_position(as_expr,
                                                                       ctx),
                                                      self.no_info(ctx))
-            body = [enter_assign, assign]
+            define_var = self.set_var_defined(as_var, self.no_position(ctx),
+                                              self.no_info(ctx))
+            body = [enter_assign, define_var, assign]
         else:
             body = [assign]
         body += flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
@@ -656,13 +658,52 @@ class StatementTranslator(CommonTranslator):
             getter_equal = self.viper.EqCmp(getter, rhs, position, info)
             return arg_stmt + call, [getter_equal]
         lhs_stmt, var = self.translate_expr(lhs, ctx)
+        before_assign = []
+        after_assign = []
         if isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
+            if self.is_local_variable(target, ctx):
+                after_assign.append(self.set_var_defined(target, position, info))
         else:
             assignment = self.viper.FieldAssign
+            if ctx.actual_function.name == '__init__':
+                permission_inhale = self.create_new_field_permission(var, target,
+                                                                     position, info, ctx)
+                before_assign.append(permission_inhale)
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
-        return lhs_stmt + [assign_stmt], [assign_val]
+        return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
+
+    def create_new_field_permission(self, field_acc: Expr, target: PythonField,
+                                    position: Position, info: Info, ctx: Context) -> Stmt:
+        """
+        Creates a statement that checks if the receiver of the given field access is the
+        self-parameter of the current method and there is a permission to create the
+        given field. If this is the case, it will exhale the permission to create the
+        field, and inhale a write permission to the field instead.
+        To be used for field writes in constructors.
+        """
+        self_arg = next(iter(ctx.current_function.args.values())).ref()
+        receiver = field_acc.rcv()
+        receiver_is_self = self.viper.EqCmp(receiver, self_arg, position, info)
+
+        no_perm = self.viper.NoPerm(position, info)
+        id_value = self._get_string_value(target.actual_field.sil_name)
+        id = self.viper.IntLit(id_value, position, info)
+        may_set_pred = self.viper.PredicateAccess([id], MAY_SET_PRED, position, info)
+        may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
+        may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
+        full_perm = self.viper.FullPerm(position, info)
+        all_may_set = self.viper.PredicateAccessPredicate(may_set_pred, full_perm,
+                                                          position, info)
+        field_perm = self.viper.FieldAccessPredicate(field_acc, full_perm, position, info)
+        exhale = self.viper.Exhale(all_may_set, position, info)
+        inhale = self.viper.Inhale(field_perm, position, info)
+        in_ex = self.translate_block([exhale, inhale], position, info)
+        empty_block = self.translate_block([], position, info)
+        inner_if = self.viper.If(may_set, in_ex, empty_block, position, info)
+        outer_if = self.viper.If(receiver_is_self, inner_if, empty_block, position, info)
+        return outer_if
 
     def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
                                ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
@@ -732,7 +773,6 @@ class StatementTranslator(CommonTranslator):
         list_class = ctx.module.global_module.classes[LIST_TYPE]
         stmt, res_var = self.translate_expr(lhs.value, ctx)
 
-        targets = [res_var]
         # Create a new list and assign it to starred variable
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var], node, ctx)
@@ -766,9 +806,13 @@ class StatementTranslator(CommonTranslator):
         val.append(list_type)
         assign_stmt = self.viper.FieldAssign(list_field_acc, seq_from, position,
                                              info)
+        after_assign = []
+        target = self.get_target(lhs.value, ctx)
+        if self.is_local_variable(target, ctx):
+            after_assign.append(self.set_var_defined(target, position, info))
         # ... and information about the list contents
         assign_val = self.viper.EqCmp(list_field_acc, seq_from, position, info)
-        return stmt + [assign_stmt], val + [assign_val]
+        return stmt + [assign_stmt] + after_assign, val + [assign_val]
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:

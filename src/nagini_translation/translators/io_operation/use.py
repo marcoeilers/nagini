@@ -158,10 +158,11 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
 
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
+        set_defined = self.set_var_defined(target, position, info)
         assignment = self.viper.LocalVarAssign(target.ref(), getter,
                                                position, info)
 
-        return [assignment]
+        return [assignment, set_defined]
 
     def translate_io_contractfunc_call(self, node: ast.Call,
                                        ctx: Context) -> StmtsAndExpr:

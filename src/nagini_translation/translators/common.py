@@ -2,9 +2,9 @@ import ast
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
-    BOOL_TYPE,
-    BOXED_PRIMITIVES,
     INT_TYPE,
+    IS_DEFINED_FUNC,
+    MAY_SET_PRED,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     UNION_TYPE,
@@ -12,15 +12,11 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import Rules
 from nagini_translation.lib.program_nodes import (
-    GenericType,
     PythonClass,
-    PythonExceptionHandler,
     PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
-    PythonNode,
-    PythonTryBlock,
     PythonType,
     PythonVar,
 )
@@ -28,12 +24,11 @@ from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
     Expr,
     FuncApp,
+    Info,
     Position,
     Stmt,
-    StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
-    get_func_name,
     get_surrounding_try_blocks,
     InvalidProgramException,
     UnsupportedException
@@ -220,6 +215,45 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if typ is None:
             return ctx.module.global_module.classes['NoneType']
         return typ
+
+    def is_local_variable(self, var: PythonVar, ctx: Context) -> bool:
+        """
+        Assuming we are currently inside an impure method, checks if the given variable is
+        a local variable in the Python program (i.e. not a parameter, not a variable that
+        is quantified over).
+        """
+        if var.name in ctx.actual_function.args:
+            return False
+        return var in ctx.actual_function.locals.values()
+
+    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context,
+                               pos: Position = None) -> List[Expr]:
+        """
+        Creates predicate instances representing the permissions to create the given
+        fields in a constructor.
+        """
+        result = []
+        if not pos:
+            pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        full_perm = self.viper.FullPerm(pos, info)
+        for field in fields:
+            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
+            pred = self.viper.PredicateAccess([id], MAY_SET_PRED, pos, info)
+            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
+            result.append(pred_acc)
+        return result
+
+    def set_var_defined(self, target: PythonVar, position: Position,
+                        info: Info) -> Stmt:
+        """
+        Returns an inhale which assumes that the given local variable is now defined.
+        """
+        id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
+        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
+                                        self.viper.Bool, [id_param_decl])
+        return self.viper.Inhale(is_defined, position, info)
 
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
                            ctx: Context) -> Expr:

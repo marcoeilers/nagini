@@ -44,10 +44,10 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
         new_stmt = self.viper.NewStmt(res_var.ref(), fields,
                                       self.no_position(ctx),
                                       info)
-        result_has_type = self._var_concrete_type_check(res_var.name,
-                                                        target_class,
-                                                        self.no_position(ctx),
-                                                        ctx)
+        result_has_type = self.type_factory.type_check(res_var.ref(),
+                                                       target_class,
+                                                       self.no_position(ctx),
+                                                       ctx, concrete=True)
         # inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, self.no_position(ctx),

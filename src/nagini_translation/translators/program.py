@@ -2,8 +2,11 @@ import ast
 
 from collections import OrderedDict
 from nagini_translation.lib.constants import (
+    CHECK_DEFINED_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
+    IS_DEFINED_FUNC,
+    MAY_SET_PRED,
     PRIMITIVES,
     RESULT_NAME
 )
@@ -265,24 +268,8 @@ class ProgramTranslator(CommonTranslator):
             has_subtype = self.type_factory.subtype_check(cls_arg, method.cls,
                                                           pos, ctx)
         if method.name == '__init__':
-            full_perm = self.viper.FullPerm(self.no_position(ctx),
-                                            self.no_info(ctx))
-            for cls in [method.cls, method.cls.superclass]:
-                for name, field in cls.fields.items():
-                    if field.inherited:
-                        continue
-                    field = self.viper.Field(field.sil_name,
-                                             self.translate_type(field.type,
-                                                                 ctx),
-                                             self.no_position(ctx),
-                                             self.no_info(ctx))
-                    field_acc = self.viper.FieldAccess(self_arg.ref(), field,
-                                                       self.no_position(ctx),
-                                                       self.no_info(ctx))
-                    acc = self.viper.FieldAccessPredicate(field_acc, full_perm,
-                                                          self.no_position(ctx),
-                                                          self.no_info(ctx))
-                    pres.append(acc)
+            fields = method.cls.all_fields
+            pres.extend(self.get_may_set_predicates(fields, ctx))
 
         called_name = method.sil_name
         ctx.position.pop()
@@ -544,6 +531,32 @@ class ProgramTranslator(CommonTranslator):
                                      self.to_position(func.node, ctx), self.no_info(ctx),
                                      FUNCTION_DOMAIN_NAME)
 
+    def create_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+        id_param = self.viper.LocalVar('id', self.viper.Int, pos, info)
+        is_defined_func = self.viper.Function(IS_DEFINED_FUNC, [id_param_decl],
+                                              self.viper.Bool, [], [], None, pos, info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
+        is_defined_pre = self.viper.FuncApp(IS_DEFINED_FUNC, [id_param], pos, info,
+                                            self.viper.Bool, [id_param_decl])
+        check_defined_func = self.viper.Function(CHECK_DEFINED_FUNC,
+                                                 [var_param_decl, id_param_decl],
+                                                 self.viper.Ref, [is_defined_pre], [],
+                                                 var_param, pos, info)
+
+        return [is_defined_func, check_defined_func]
+
+    def create_may_set_predicate(self, ctx: Context) -> 'silver.ast.Predicate':
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+        may_set_pred = self.viper.Predicate(MAY_SET_PRED, [id_param_decl], None, pos,
+                                            info)
+        return may_set_pred
+
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: List, ctx: Context,
                           selected: Set[str] = None) -> 'silver.ast.Program':
@@ -560,6 +573,9 @@ class ProgramTranslator(CommonTranslator):
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)
         fields.extend(obl_fields)
+
+        functions.extend(self.create_definedness_functions(ctx))
+        predicates.append(self.create_may_set_predicate(ctx))
 
         type_funcs = self.type_factory.get_default_functions(ctx)
         type_axioms = self.type_factory.get_default_axioms(ctx)

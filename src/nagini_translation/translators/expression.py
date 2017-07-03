@@ -5,6 +5,7 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BOXED_PRIMITIVES,
     BYTES_TYPE,
+    CHECK_DEFINED_FUNC,
     DICT_TYPE,
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
@@ -16,6 +17,7 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     TUPLE_TYPE,
 )
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     PythonClass,
@@ -568,7 +570,29 @@ class ExpressionTranslator(CommonTranslator):
                     not var.is_defined()):
                 raise InvalidProgramException(
                     node, 'io_existential_var.use_of_undefined')
-            return [], var.ref(node, ctx)
+
+            if (isinstance(ctx.actual_function, PythonMethod) and
+                    not (ctx.actual_function.pure or ctx.actual_function.predicate) and
+                    not isinstance(node.ctx, ast.Store) and
+                    self.is_local_variable(var, ctx)):
+                result = self.wrap_definedness_check(var, node, ctx)
+            else:
+                result = var.ref(node, ctx)
+            return [], result
+
+    def wrap_definedness_check(self, var: PythonVar, node: ast.AST,
+                               ctx: Context) -> Expr:
+        """
+        Create an access to the given variable, wrapped into a function call which checks
+        if the variable has been defined.
+        """
+        pos = self.to_position(node, ctx, rules=rules.LOCAL_VARIABLE_NOT_DEFINED)
+        info = self.no_info(ctx)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
+        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [var.ref(node, ctx), id], pos, info,
+                                  self.viper.Ref, [var_param_decl, id_param_decl])
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
         """
@@ -585,8 +609,7 @@ class ExpressionTranslator(CommonTranslator):
                 return var
             raise InvalidProgramException(node, 'field.nonexistent')
         if isinstance(field, PythonField):
-            while field.inherited is not None:
-                field = field.inherited
+            field = field.actual_field
             if field.is_mangled() and (field.cls is not ctx.current_class and
                                        field.cls is not ctx.actual_function.cls):
                 raise InvalidProgramException(node, 'private.field.access')

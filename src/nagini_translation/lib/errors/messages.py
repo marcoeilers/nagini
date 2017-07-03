@@ -52,6 +52,10 @@ ERRORS = {
         lambda n: 'Operation might not terminate.',
     'leak_check.failed':
         lambda n: 'Obligation leak check failed.',
+    'internal':
+        lambda n: 'An internal error occurred.',
+    'expression.undefined':
+        lambda n: 'Expression {} may not be defined.'.format(pprint(n)),
 }
 
 REASONS = {
@@ -102,4 +106,6 @@ REASONS = {
     'loop_condition.not_framed_for_obligation_use':
         lambda n: ('Loop condition part {} is not framed at the point where '
                    'obligation is used.'.format(pprint(n))),
+    'undefined.local.variable':
+        lambda n: 'Local variable may not have been defined.'
 }

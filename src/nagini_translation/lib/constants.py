@@ -20,6 +20,12 @@ BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
+MAY_SET_PRED = '_MaySet'
+
+IS_DEFINED_FUNC = '_isDefined'
+
+CHECK_DEFINED_FUNC = '_checkDefined'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -44,6 +50,9 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    MAY_SET_PRED,
+    IS_DEFINED_FUNC,
+    CHECK_DEFINED_FUNC,
     FUNCTION_DOMAIN_NAME,
 ]
 
