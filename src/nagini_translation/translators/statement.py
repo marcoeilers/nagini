@@ -29,7 +29,7 @@ from nagini_translation.lib.util import (
     AssignCollector,
     contains_stmt,
     flatten,
-    get_body_start_index,
+    get_body_indices,
     get_parent_of_type,
     get_surrounding_try_blocks,
     InvalidProgramException,
@@ -391,10 +391,10 @@ class StatementTranslator(CommonTranslator):
                                                     err_var, iterable,
                                                     iterable_type, assign_expr,
                                                     node, ctx)
-        bodyindex = get_body_start_index(node.body)
+        start, end = get_body_indices(node.body)
 
         # Remember type information about havoced local variables.
-        invariant.extend(self._get_havoced_var_type_info(node.body[bodyindex:],
+        invariant.extend(self._get_havoced_var_type_info(node.body[start:end],
                                                          ctx))
 
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
@@ -402,7 +402,7 @@ class StatementTranslator(CommonTranslator):
                 invariant.append(self.translate_contract(expr, ctx))
 
         body = flatten(
-            [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
+            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         # Label for continue to jump to
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
@@ -833,11 +833,11 @@ class StatementTranslator(CommonTranslator):
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
-        bodyindex = get_body_start_index(node.body)
-        var_types = self._get_havoced_var_type_info(node.body[bodyindex:], ctx)
+        start, end = get_body_indices(node.body)
+        var_types = self._get_havoced_var_type_info(node.body[start:end], ctx)
         invariants = var_types + invariants
         body = flatten(
-            [self.translate_stmt(stmt, ctx) for stmt in node.body[bodyindex:]])
+            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         body.append(self.viper.Label(end_label, self.to_position(node, ctx),
                                      self.no_info(ctx)))
         loop = self.create_while_node(

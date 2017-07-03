@@ -66,6 +66,8 @@ CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
 BUILDOUT_DEPS=bin/buildout buildout.cfg
 BUILDOUT_CMD=bin/buildout -v
 
+.PHONY: docs
+
 test: bin/py.test
 	bin/py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
@@ -85,7 +87,7 @@ pylint_report: bin/pylint
 	bin/pylint --reports=y $(CHECKED_MODULES)
 
 docs: bin/sphinxbuilder
-	bin/sphinxbuilder
+	bash bin/sphinxbuilder
 
 docs_coverage: bin/python bin/sphinx-build
 	bin/python bin/sphinx-build -b coverage docs/source docs/build/coverage

@@ -184,34 +184,38 @@ def is_io_existential(stmt: ast.AST) -> bool:
         return False
 
 
-def get_body_start_index(statements: List[ast.AST]) -> int:
+def get_body_indices(statements: List[ast.AST]) -> Tuple[int, int]:
     """
     Returns the index of the first statement that is not a method
-    or loop contract.
+    or loop contract and the index after the last statement that is not a postcondition.
 
     .. note::
 
-        In the case when a method has only a contract, the returned
-        index is equal to ``len(statements)``.
+        In the case when a method has only a contract, both returned
+        indices are equal to ``len(statements)``.
     """
-    body_index = 0
+    start_index = 0
     try:
-        while is_docstring(statements[body_index]):
-            body_index += 1
-        while is_io_existential(statements[body_index]):
-            body_index += 1
-        while is_invariant(statements[body_index]):
-            body_index += 1
-        while is_pre(statements[body_index]):
-            body_index += 1
-        while is_post(statements[body_index]):
-            body_index += 1
-        while is_exception_decl(statements[body_index]):
-            body_index += 1
+        while is_docstring(statements[start_index]):
+            start_index += 1
+        while is_io_existential(statements[start_index]):
+            start_index += 1
+        while is_invariant(statements[start_index]):
+            start_index += 1
+        while is_pre(statements[start_index]):
+            start_index += 1
+        while is_post(statements[start_index]):
+            start_index += 1
+        while is_exception_decl(statements[start_index]):
+            start_index += 1
     except IndexError:
         # This exception means that the method/loop has only a contract.
         pass
-    return body_index
+    end_index = len(statements)
+    if start_index != end_index:
+        while end_index > 0 and is_post(statements[end_index - 1]):
+            end_index -= 1
+    return start_index, end_index
 
 
 def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:

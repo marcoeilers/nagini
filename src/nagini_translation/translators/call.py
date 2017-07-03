@@ -36,7 +36,7 @@ from nagini_translation.lib.typedefs import (
     StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
-    get_body_start_index,
+    get_body_indices,
     get_func_name,
     InvalidProgramException,
     UnsupportedException,
@@ -609,10 +609,10 @@ class CallTranslator(CommonTranslator):
         ctx.added_handlers.append((method, ctx.var_aliases, ctx.label_aliases))
 
         # Translate body
-        index = get_body_start_index(method.node.body)
+        start, end = get_body_indices(method.node.body)
         stmts = []
 
-        for stmt in method.node.body[index:]:
+        for stmt in method.node.body[start:end]:
             stmts += self.translate_stmt(stmt, ctx)
 
         ctx.inlined_calls.remove(method)

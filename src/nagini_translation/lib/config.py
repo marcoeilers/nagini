@@ -37,34 +37,45 @@ class ObligationConfig(SectionConfig):
         super().__init__(config, 'Obligations')
 
     @property
+    def disable_all(self):
+        """Disable all obligation related checks."""
+        return self._info.getboolean('disable_all', False)
+
+    @property
     def disable_measure_check(self):
         """Replace obligation measure checks with ``True``."""
-        return self._info.getboolean('disable_measure_check', False)
+        return self._info.getboolean(
+            'disable_measure_check', self.disable_all)
 
     @property
     def disable_measures(self):
         """Completely disable obligation measures."""
-        return self._info.getboolean('disable_measures', False)
+        return self._info.getboolean(
+            'disable_measures', self.disable_all)
 
     @property
     def disable_method_body_leak_check(self):
         """Disable leak check at the end of method body."""
-        return self._info.getboolean('disable_method_body_leak_check', False)
+        return self._info.getboolean(
+            'disable_method_body_leak_check', self.disable_all)
 
     @property
     def disable_loop_body_leak_check(self):
         """Disable leak check at the end of loop body."""
-        return self._info.getboolean('disable_loop_body_leak_check', False)
+        return self._info.getboolean(
+            'disable_loop_body_leak_check', self.disable_all)
 
     @property
     def disable_call_context_leak_check(self):
         """Disable leak check at the caller side."""
-        return self._info.getboolean('disable_call_context_leak_check', False)
+        return self._info.getboolean(
+            'disable_call_context_leak_check', self.disable_all)
 
     @property
     def disable_loop_context_leak_check(self):
         """Disable leak check at the loop surrounding context."""
-        return self._info.getboolean('disable_loop_context_leak_check', False)
+        return self._info.getboolean(
+            'disable_loop_context_leak_check', self.disable_all)
 
     @property
     def disable_termination_check(self):
@@ -72,12 +83,20 @@ class ObligationConfig(SectionConfig):
 
         Also replaces all ``MustTerminate`` with ``True``.
         """
-        return self._info.getboolean('disable_termination_check', False)
+        return self._info.getboolean(
+            'disable_termination_check', self.disable_all)
 
     @property
     def disable_must_invoke(self):
         """Replace all ``token`` with ``ctoken``."""
-        return self._info.getboolean('disable_must_invoke', False)
+        return self._info.getboolean(
+            'disable_must_invoke', self.disable_all)
+
+    @property
+    def disable_waitlevel_check(self):
+        """Disable all waitlevel checks."""
+        return self._info.getboolean(
+            'disable_waitlevel_check', self.disable_all)
 
 
 class TestConfig(SectionConfig):
