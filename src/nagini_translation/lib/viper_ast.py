@@ -134,9 +134,10 @@ class ViperAST:
 
     def Method(self, name, args, returns, pres, posts, locals, body, position,
                info):
+        body_with_locals = self.Seqn([body], position, info, locals)
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
-                               self.to_seq(locals), body, position, info, self.NoTrafos)
+                               body_with_locals, position, info, self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -225,8 +226,9 @@ class ViperAST:
     def Goto(self, name, position, info):
         return self.ast.Goto(name, position, info, self.NoTrafos)
 
-    def Seqn(self, body, position, info):
-        return self.ast.Seqn(self.to_seq(body), position, info, self.NoTrafos)
+    def Seqn(self, body, position, info, locals=[]):
+        return self.ast.Seqn(self.to_seq(body), self.to_seq(locals), position, info,
+                             self.NoTrafos)
 
     def LocalVarAssign(self, lhs, rhs, position, info):
         return self.ast.LocalVarAssign(lhs, rhs, position, info, self.NoTrafos)
@@ -406,7 +408,9 @@ class ViperAST:
         return self.ast.Or(left, right, position, info, self.NoTrafos)
 
     def If(self, cond, thn, els, position, info):
-        return self.ast.If(cond, thn, els, position, info, self.NoTrafos)
+        thn_seqn = self.Seqn([thn], position, info)
+        els_seqn = self.Seqn([els], position, info)
+        return self.ast.If(cond, thn_seqn, els_seqn, position, info, self.NoTrafos)
 
     def TrueLit(self, position, info):
         return self.ast.TrueLit(position, info, self.NoTrafos)
@@ -437,9 +441,9 @@ class ViperAST:
         return self.ast.Trigger(self.to_seq(exps), position, info, self.NoTrafos)
 
     def While(self, cond, invariants, locals, body, position, info):
+        body_with_locals = self.Seqn([body], position, info, locals)
         return self.ast.While(cond, self.to_seq(invariants),
-                              self.to_seq(locals),
-                              body, position, info, self.NoTrafos)
+                              body_with_locals, position, info, self.NoTrafos)
 
     def Let(self, variable, exp, body, position, info):
         return self.ast.Let(variable, exp, body, position, info, self.NoTrafos)

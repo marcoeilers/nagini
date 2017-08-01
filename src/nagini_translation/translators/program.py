@@ -468,7 +468,7 @@ class ProgramTranslator(CommonTranslator):
                         returns=self.viper.to_list(method.formalReturns()),
                         pres=self.viper.to_list(method.pres()),
                         posts=self.viper.to_list(method.posts()),
-                        locals=self.viper.to_list(method.locals()),
+                        locals=[],
                         body=method.body(),
                         position=method.pos(),
                         info=method.info(),
