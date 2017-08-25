@@ -774,6 +774,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.threading_id = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -782,6 +783,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
@@ -926,6 +928,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):

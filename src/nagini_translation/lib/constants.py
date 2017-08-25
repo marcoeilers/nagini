@@ -16,6 +16,8 @@ BUILTINS = ['cast',
             'range',
             'type']
 
+THREADING = ['Thread']
+
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
 FUNCTION_DOMAIN_NAME = 'Function'
@@ -50,6 +52,7 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    'Thread',
     MAY_SET_PRED,
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,

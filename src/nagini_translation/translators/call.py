@@ -7,18 +7,21 @@ from nagini_contracts.contracts import (
 )
 from nagini_contracts.io import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
+from nagini_translation.lib.silver_nodes.types import BoolType
 from nagini_translation.lib.constants import (
     BUILTINS,
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
     PRIMITIVES,
+    PRIMITIVE_BOOL_TYPE,
+    PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
-)
+    THREADING)
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
@@ -47,6 +50,7 @@ from typing import Dict, List, Tuple, Union
 
 
 class CallTranslator(CommonTranslator):
+
 
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -778,6 +782,7 @@ class CallTranslator(CommonTranslator):
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
         """
+
         is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)
         if is_name:
@@ -791,12 +796,202 @@ class CallTranslator(CommonTranslator):
                 return self.translate_obligation_contractfunc_call(node, ctx)
             elif func_name in BUILTINS:
                 return self._translate_builtin_func(node, ctx)
+            elif func_name == "Thread":
+                return self._translate_thread_creation(node,ctx)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
+        elif (isinstance(node.func,ast.Attribute) and self.get_type(node.func.value,ctx).name == "Thread"
+            and node.func.attr == "start") :
+            return self._translate_thread_start(node,ctx)
+        elif (isinstance(node.func,ast.Attribute) and self.get_type(node.func.value,ctx).name == "Thread"
+            and node.func.attr == "join"):
+                return self._translate_thread_join(node,ctx)
+
+
         else:
             return self.translate_normal_call_node(node, ctx, impure)
+
+    def _translate_thread_creation(self, node: ast.Call,
+                                       ctx: Context) -> StmtsAndExpr:
+        """Translates the instantiation of a Thread object."""
+        pos,infos = self.to_position(node,ctx),self.no_info(ctx)
+        assert len(node.args) == 2
+        target = self.get_target(node.args[0], ctx)
+        assert isinstance(target,PythonMethod)
+        meth_args = node.args[1].elts
+        thr_var = ctx.actual_function.create_variable("threadingVar",
+                                                       ctx.module.global_module.classes["Thread"],
+                                                       self.translator)
+        newstmt = self.viper.NewStmt(thr_var.ref(),
+                                     [self.viper.Field("state", self.viper.DomainType("State", {}, []),
+                                                          pos, infos)],
+                                     pos, infos)
+        #This should be t := new(state)
+        createdstmt = self.viper.FieldAssign(
+            self.viper.FieldAccess(thr_var.ref(),
+                                   self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,infos),pos,infos),
+                                                 self.viper.DomainFuncApp("CREATED", [],
+                                                                           self.viper.DomainType("State",{},[]),
+                                                                           pos,infos,
+                                                                          "State"),
+                                                 pos, infos)
+        #This should be t.state := CREATED()
+        my_args = []
+        assign_stmts = []
+        for i in meth_args:
+            stmts,expr = self.translate_expr(i,ctx,self.viper.Ref)
+            my_args.append(expr)
+            assign_stmts.extend(stmts)
+        argseq = self.viper.ExplicitSeq(my_args,pos,infos)
+        inhalestmt = self.viper.Inhale(
+            self.viper.And(self.viper.EqCmp(
+                self.viper.DomainFuncApp('getMethod',[thr_var.ref()],self.viper.DomainType("ThreadingID",{},[]),
+                                         pos,infos,"Thread"),
+                self.viper.DomainFuncApp(target.threading_id,[],self.viper.DomainType("ThreadingID",{},[]),pos,infos,
+                                         "ThreadingID"),pos,infos),
+                (self.viper.EqCmp(self.viper.DomainFuncApp('getArgs', [thr_var.ref()],
+                                                           self.viper.SeqType(self.viper.Ref),pos,infos,"Thread"),
+                                  argseq,pos,infos)),pos,infos),pos,infos)
+
+        """This is where we affect its MethodID and Arguments to the thread object"""
+        return [newstmt, createdstmt] + assign_stmts + [inhalestmt], thr_var.ref()
+
+    def _olds_collector(self, expr_list, ctx):
+        return [] #TODO : DFS every expr in expr_list and return the list of all the exprs in an old.
+    def _translate_thread_start(self, node: ast.Call,
+                                    ctx: Context):
+        pos, info = self.to_position(node, ctx), self.no_info(ctx)
+        assert isinstance(node.func, ast.Attribute)
+        my_thr = self.get_target(node.func.value, ctx)
+        my_methods = []
+        for i in range(0, len(node.args)):
+            my_methods.append(self.get_target(node.args[i], ctx))
+        to_stock_list = self._olds_collector(my_methods,ctx)
+        ref_list = []
+        decl_list = []
+        for exp in to_stock_list:
+            ref_list.append(self.to_ref(exp,ctx))
+        if ref_list :
+            oldsinhale = self.viper.Inhale(
+                self.viper.EqCmp(self.viper.DomainFuncApp(
+                    "getOlds",[my_thr.ref()],self.viper.SeqType(self.viper.Ref),pos,info,"Thread"),
+                    self.viper.ExplicitSeq(ref_list,pos,info),pos,info),pos,info)
+        else :
+            oldsinhale = self.viper.Inhale(
+                self.viper.EqCmp(self.viper.DomainFuncApp(
+                    "getOlds", [my_thr.ref()], self.viper.SeqType(self.viper.Ref), pos, info, "Thread"),
+                    self.viper.EmptySeq(self.viper.Ref,pos, info), pos, info), pos, info)
+        precond_to_exhale = self.viper.TrueLit(pos,info)
+        check_methods = self.viper.FalseLit(pos,info)
+        precond_renaming_stmt = []
+        for m in my_methods :
+            for index,param in enumerate(m._args):
+                my_temp_var = ctx.actual_function.create_variable(
+                    param+"_temp",m._args[param].type,self.translator,False)
+                decl_list.append(my_temp_var.decl)
+                precond_renaming_stmt.append(
+                    self.viper.LocalVarAssign(
+                        my_temp_var.ref(),
+                        self.viper.DomainFuncApp("getArg",[my_thr.ref(),self.viper.IntLit(index,pos,info)],
+                                                 self.viper.Ref,pos,info,"Thread"),pos,info))
+                ctx.set_alias(param,my_temp_var,None)
+            renamed_precond = self.viper.TrueLit(pos,info)
+            for i in range(0,len(m.precondition)):
+                stmt,expr = self.translate_expr(m.precondition[i][0],ctx,self.viper.Bool,True)
+                renamed_precond = self.viper.And(renamed_precond,expr,pos,info)
+            precond_to_exhale = self.viper.And(
+                precond_to_exhale,
+                self.viper.Implies(
+                    self.viper.EqCmp(
+                        self.viper.DomainFuncApp("getMethod",[my_thr.ref()],
+                                                 self.viper.DomainType("ThreadingID",{},[]),pos,info,"Thread"),
+                        self.viper.DomainFuncApp(m.threading_id,[],self.viper.DomainType("ThreadingID",{},[]),pos,info,
+                                                 "ThreadingID"),pos,info),
+                    renamed_precond,pos,info),pos,info)
+            for index,param in enumerate(m._args):
+                ctx.remove_alias(param)
+            check_methods = self.viper.Or(
+                check_methods,
+                self.viper.EqCmp(
+                    self.viper.DomainFuncApp("getMethod",[my_thr.ref()],
+                                             self.viper.DomainType("ThreadingID",{},[]),pos,info,"Thread"),
+                    self.viper.DomainFuncApp(m.threading_id,[],self.viper.DomainType("ThreadingID",{},[]),pos,info,
+                                             "ThreadingID"),pos,info),pos,info)
+        precond_exhaled = self.viper.Exhale(precond_to_exhale,pos,info)
+        check_methods = self.viper.Assert(check_methods,pos,info)
+        check_thr_created = self.viper.Assert(
+            self.viper.EqCmp(self.viper.FieldAccess(my_thr.ref(),
+                                                    self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,
+                                                                     info),
+                                                    pos,info),
+                             self.viper.DomainFuncApp("CREATED",[],self.viper.DomainType("State",{},[]),
+                                                      pos,info,"State"),pos,info),pos,info)
+        make_thr_started = self.viper.FieldAssign(
+            self.viper.FieldAccess(my_thr.ref(),self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
+                                   pos,info),
+            self.viper.DomainFuncApp("STARTED",[],self.viper.DomainType("State",{},[]),pos,info,"State"),pos,info)
+        return [self.viper.Seqn(precond_renaming_stmt+
+                                [oldsinhale,precond_exhaled,check_methods,check_thr_created,make_thr_started],
+                                pos,info,decl_list)],None
+
+
+    def _translate_thread_join(self, node: ast.Call,
+                                   ctx: Context):
+        pos,info = self.to_position(node,ctx),self.no_info(ctx)
+        assert isinstance(node.func, ast.Attribute)
+        my_thr = self.get_target(node.func.value, ctx)
+        my_bool = ctx.actual_function.create_variable("b",ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE],self.translator)
+
+        #Is "Bool" ok ?
+        myexpr = self.viper.TrueLit(self.to_position(node, ctx), self.no_info(ctx))
+        postcond_renaming_stmt_list = []
+        decl_list = []
+        for i in range(0, len(node.args)):
+            method = self.get_target(node.args[i],ctx)
+            for index,param in enumerate(method._args):
+                my_temp_var = ctx.actual_function.create_variable(
+                    param+"_temp",method._args[param].type,self.translator,False)
+                decl_list.append(my_temp_var.decl)
+                postcond_renaming_stmt_list.append(
+                    self.viper.LocalVarAssign(my_temp_var.ref(),
+                                              self.viper.DomainFuncApp("getArg", [my_thr.ref(),
+                                                                                  self.viper.IntLit(index, pos, info)],
+                                                                       self.viper.Ref,pos,info,"Thread"),pos,info))
+                ctx.set_alias(param,my_temp_var,None)
+            mypostcond = self.viper.TrueLit(pos,info)
+            for j in reversed(range(0, len(method.postcondition))):
+                stsms,expr = self.translate_expr(method.postcondition[j][0],ctx,self.viper.Bool,True)
+                mypostcond = self.viper.And(mypostcond,expr,pos,info)
+                myexpr = self.viper.And(
+                    myexpr,
+                    self.viper.Implies(self.viper.EqCmp(
+                        self.viper.DomainFuncApp('getMethod',
+                                                 [my_thr.ref()],self.viper.DomainType("ThreadingID",{},[])
+                                             ,pos,info,"Thread"),
+                        self.viper.DomainFuncApp(
+                            self.get_target(node.args[i],ctx).threading_id,[],self.viper.DomainType("ThreadingID",{},[]),
+                            pos,info,"ThreadingID"),pos,info),
+                        mypostcond,pos,info),pos,info)
+
+            for index,param in enumerate(method._args):
+                ctx.remove_alias(param)
+        joiningstmt = self.viper.MethodCall("Thread_joining",[my_thr.ref()],
+                                                                      [my_bool.ref()],pos,info)
+        inhalingstmt = self.viper.If(
+            my_bool.ref(),
+            self.viper.Inhale(
+                self.viper.Implies(self.viper.EqCmp(
+                    self.viper.FieldAccess(my_thr.ref(),
+                                           self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
+                                           pos,info),
+                    self.viper.DomainFuncApp("JOINED",[],self.viper.DomainType("State",{},[]),pos,info,"State"),
+                    pos,info),
+                    myexpr,pos,info),pos,info),self.viper.Seqn([],pos,info),pos,info)
+        return [self.viper.Seqn(postcond_renaming_stmt_list+[joiningstmt,inhalingstmt],pos,info,decl_list)],None
+
+
 
     def _is_cls_call(self, node: ast.Call, ctx: Context) -> bool:
         """
