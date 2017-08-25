@@ -26,16 +26,6 @@ def test() -> None:
     Assert(y.val == 4 and z.val == 4)
 
 
-
-
-
-
-
-
-
-
-
-"""
 def ThreadJoinerforIncrDecr(t : Thread, struct : DummyObj, v : int) -> None: 
     Requires(v == t.getOld(0) and struct == t.getArg(0))
     Requires(Acc(t.state) and t.hasStarted())
@@ -67,14 +57,13 @@ def test3() -> None:
     t.join(DummyObj.incr,DummyObj.decr)
     Assert(y.val == 2 and z.val == 2)
 
-"""
+
 """
 impl, getArg, getOld : we keep the method, the arguments, and the old values of heap-dependant
 variables of a thread somewhere. This gives us access to all of those as ghost variables.
 
 t.postcond(methods list) : this could be a "macro" which would generate exactly what would be
 inhaled during t.join(methods list) 
-"""
 
-"""Ideas : a method "maystart" "mayjoin"
+Ideas : a method "maystart" "mayjoin"
 """
