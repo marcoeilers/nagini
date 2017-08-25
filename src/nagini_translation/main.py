@@ -327,6 +327,8 @@ def translate_and_verify(python_file, jvm, args, print=print):
                     msg = parts['msg']
                     line = parts['line']
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
+                else:
+                    print(msg)
     except JavaException as e:
         print(e.stacktrace())
         raise e
