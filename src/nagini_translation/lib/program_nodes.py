@@ -1547,6 +1547,20 @@ class ProgramNodeFactory:
                             container_factory, interface, interface_dict,
                             method_type)
 
+    def create_call_slot(
+            self,
+            name: str,
+            node: ast.FunctionDef,
+            superscope: PythonScope,
+            container_factory: 'ProgramNodeFactory'
+    ) -> 'CallSlot':
+        return CallSlot(
+            name,
+            node,
+            superscope,
+            container_factory
+        )
+
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
                                    container_factory: 'ProgramNodeFactory',
@@ -1566,19 +1580,25 @@ class ProgramNodeFactory:
                            superclass, interface)
 
 
-class CallSlot(PythonScope, ContainerInterface):
+class CallSlot(PythonMethod):
 
-    def __init__(self, node: ast.FunctionDef) -> None:
-        self.node = node
-        self.name = node.name
-        # TODO: more precise types
-        self.precondition = []  # type: List
-        self.postcondition = []  # type: List
-        self.normal_variables = {}  # type: Dict[str, PythonVar]
+    def __init__(
+            self,
+            name: str,
+            node: ast.FunctionDef,
+            superscope: PythonScope,
+            node_factory: 'ProgramNodeFactory',
+    ) -> None:
+
+        PythonMethod.__init__(
+            self,
+            name,
+            node,
+            None,  # cls: PythonClass
+            superscope,
+            False,  # pure: bool
+            False,  # contract_only: bool
+            node_factory  # node_factory: 'ProgramNodeFactory'
+        )
         # universally quantified variables
-        self.uq_variables = None  # type: List[PythonVar]
-        # TODO: add call & return values
-
-    def get_contents(self, only_top: bool) -> Dict:
-        # TODO: implement
-        return {}
+        self.uq_variables = OrderedDict()  # type: dict[str, PythonVar]
