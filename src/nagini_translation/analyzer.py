@@ -52,6 +52,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.lib.views import PythonModuleView
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from nagini_translation import call_slot_analyzers
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -453,6 +454,10 @@ class Analyzer(ast.NodeVisitor):
         return False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if call_slot_analyzers.is_call_slot(node):
+            call_slot_analyzers.CallSlotAnalyzer(self).analyze(node)
+            # FIXME: store the call slot somewhere (current module?)
+            return
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
         name = node.name
@@ -1161,7 +1166,10 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)))
+                (('property' in decorators) and (len(decorators) != 1)) or
+                (('CallSlot' in decorators) and (len(decorators) != 1)) or
+                (('UniversallyQuantified' in decorators) and (len(decorators) != 1)) or
+                (('CallSlotProof' in decorators) and (len(decorators) != 1)))
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """
