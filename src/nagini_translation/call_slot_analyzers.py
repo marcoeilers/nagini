@@ -1,11 +1,15 @@
 import ast
-from nagini_translation import analyzer
+from nagini_translation import analyzer as analzyer_pkg
 from nagini_translation.lib.program_nodes import CallSlot
+from nagini_translation.lib.util import (
+    UnsupportedException,
+    InvalidProgramException,
+)
 
 
 class CallSlotAnalyzer(ast.NodeVisitor):
 
-    def __init__(self, analyzer: 'analyzer.Analyzer') -> None:
+    def __init__(self, analyzer: 'analyzer_pkg.Analyzer') -> None:
         self.analyzer = analyzer
         self.call_slot = None  # type: CallSlot
 
@@ -15,8 +19,33 @@ class CallSlotAnalyzer(ast.NodeVisitor):
         """
         assert is_call_slot(node)
 
-        self.call_slot = CallSlot(node)
-        self.__collect_normal_variables()
+        analyzer = self.analyzer
+        scope = analyzer.module
+
+        if analyzer.current_function:
+            raise UnsupportedException(node, 'nested call slots')
+        if analyzer.current_class:
+            raise UnsupportedException(node, 'call slot as class member')
+        if analyzer._is_illegal_magic_method_name(node.name):
+            raise InvalidProgramException(node, 'illegal.magic.method')
+
+        analyzer.define_new(scope, node.name, node)
+
+        self.call_slot = analyzer.node_factory.crreate_call_slot(
+            node.name,
+            node,
+            scope,
+            analyzer.node_factory
+        )
+
+        scope.methods[node.name] = self.call_slot
+
+        # TODO: set current_func (restore old current_func at the end)
+        # TODO: visit args
+        # self.__collect_normal_variables()
+        # TODO: set call_slot.type
+        # TODO: visit call slot body
+        # TODO: other call slot preprocessing/checks
 
     def __collect_normal_variables(self) -> None:
         assert self.call_slot
@@ -29,6 +58,7 @@ class CallSlotAnalyzer(ast.NodeVisitor):
         arg_type = self.analyzer.typeof(arg)
 
         arg_var = self.analyzer.node_factory.create_python_var(arg.arg, arg, arg_type)
+        # FIXME: has no get_alt_types
         arg_var.alt_types = self.get_alt_types(arg)
 
         self.call_slot.normal_variables[arg.arg] = arg_var
