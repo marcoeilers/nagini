@@ -1564,3 +1564,21 @@ class ProgramNodeFactory:
                             interface=False):
         return PythonClass(name, superscope, node_factory, node,
                            superclass, interface)
+
+
+class CallSlot(PythonScope, ContainerInterface):
+
+    def __init__(self, node: ast.FunctionDef) -> None:
+        self.node = node
+        self.name = node.name
+        # TODO: more precise types
+        self.precondition = []  # type: List
+        self.postcondition = []  # type: List
+        self.normal_variables = {}  # type: Dict[str, PythonVar]
+        # universally quantified variables
+        self.uq_variables = None  # type: List[PythonVar]
+        # TODO: add call & return values
+
+    def get_contents(self, only_top: bool) -> Dict:
+        # TODO: implement
+        return {}
