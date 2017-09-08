@@ -226,8 +226,11 @@ class ContractTranslator(CommonTranslator):
         normal_perm = self.viper.CurrentPerm(field_acc, pos, info)
         have_normal_perm = self.viper.PermGtCmp(normal_perm, self.viper.NoPerm(pos, info),
                                                 pos, info)
-        result = self.viper.CondExp(have_normal_perm, normal_acc, may_set_pred, pos, info)
-        return [], result
+        result_ex = self.viper.CondExp(have_normal_perm, normal_acc, may_set_pred, pos,
+                                       info)
+        unknown = self.get_unknown_bool(ctx)
+        result_in = self.viper.CondExp(unknown, normal_acc, may_set_pred, pos, info)
+        return [], self.viper.InhaleExhaleExp(result_in, result_ex, pos, info)
 
     def translate_may_create(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """

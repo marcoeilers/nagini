@@ -2,6 +2,7 @@ import ast
 
 from collections import OrderedDict
 from nagini_translation.lib.constants import (
+    ARBITRARY_BOOL_FUNC,
     CHECK_DEFINED_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
@@ -550,6 +551,13 @@ class ProgramTranslator(CommonTranslator):
 
         return [is_defined_func, check_defined_func]
 
+    def create_arbitrary_bool_func(self, ctx: Context) -> 'silver.ast.Function':
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        i_param_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        return self.viper.Function(ARBITRARY_BOOL_FUNC, [i_param_decl],
+                                   self.viper.Bool, [], [], None, pos, info)
+
     def create_may_set_predicate(self, ctx: Context) -> 'silver.ast.Predicate':
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
@@ -578,6 +586,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
+        functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
         type_funcs = self.type_factory.get_default_functions(ctx)

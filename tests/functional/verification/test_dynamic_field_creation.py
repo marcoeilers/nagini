@@ -5,7 +5,7 @@ class A:
     def __init__(self) -> None:
         self.a = 12
         Ensures(Acc(self.a))
-        Ensures(MaySet(self, 'b'))
+        Ensures(MayCreate(self, 'b'))
 
     def set(self, v: int) -> None:
         Requires(MaySet(self, 'b'))
@@ -39,32 +39,6 @@ class A:
         self.b = v
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
-
-    def del1(self) -> None:
-        Requires(Acc(self.b))
-        #:: ExpectedOutput(postcondition.violated:insufficient.permission)
-        Ensures(Acc(self.b))
-        del self.b
-
-    def del2(self) -> None:
-        Requires(Acc(self.b))
-        Ensures(MayCreate(self, 'b'))
-        del self.b
-
-    def del3(self) -> None:
-        Requires(Acc(self.b))
-        Ensures(MaySet(self, 'b'))
-        del self.b
-
-    def del4(self) -> None:
-        Requires(MaySet(self, 'b'))
-        #:: ExpectedOutput(exhale.failed:insufficient.permission)
-        del self.b
-
-    def del5(self) -> None:
-        Requires(MayCreate(self, 'b'))
-        #:: ExpectedOutput(exhale.failed:insufficient.permission)
-        del self.b
 
     def get(self) -> int:
         Requires(Acc(self.b))
@@ -106,8 +80,16 @@ def client_3_1() -> None:
 def client_3_2() -> None:
     a = A()
     a.set2(56)
-    #:: ExpectedOutput(call.failed:insufficient.permission)
     a.set(43)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
+
+
+def client_3_3() -> None:
+    a = A()
+    a.set2(56)
+    #:: ExpectedOutput(call.failed:insufficient.permission)
+    a.set3(43)
 
 
 def client_4() -> None:
@@ -135,16 +117,9 @@ def client_6() -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 
-def client_7_1() -> None:
-    a = A()
-    a.b = 15
-    a.del2()
-    #:: ExpectedOutput(assignment.failed:insufficient.permission)
-    c = a.b
 
-def client_7_2() -> None:
+def client_8() -> None:
     a = A()
-    a.b = 15
-    a.del3()
-    #:: ExpectedOutput(assignment.failed:insufficient.permission)
-    c = a.b
+    a.set3(23)
+    #:: ExpectedOutput(call.failed:insufficient.permission)
+    a.set2(1)

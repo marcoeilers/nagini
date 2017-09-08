@@ -2,6 +2,7 @@ import ast
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
+    ARBITRARY_BOOL_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
@@ -472,3 +473,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         return self.viper.IntLit(ctx.get_fresh_int(), self.no_position(ctx),
                                  self.no_info(ctx))
+
+    def get_unknown_bool(self, ctx: Context) -> Expr:
+        """
+        Returns an arbitrary but fixed boolean value.
+        """
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        fresh_int = self.get_fresh_int_lit(ctx)
+        param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int], pos, info,
+                                  self.viper.Bool, [param])
