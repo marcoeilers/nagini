@@ -269,7 +269,8 @@ class ProgramTranslator(CommonTranslator):
                                                           pos, ctx)
         if method.name == '__init__':
             fields = method.cls.all_fields
-            pres.extend(self.get_may_set_predicates(fields, ctx))
+            pres.extend([self.get_may_set_predicate(self_arg.ref(), f, ctx)
+                         for f in fields])
 
         called_name = method.sil_name
         ctx.position.pop()
@@ -552,9 +553,11 @@ class ProgramTranslator(CommonTranslator):
     def create_may_set_predicate(self, ctx: Context) -> 'silver.ast.Predicate':
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
+        receiver_param_decl = self.viper.LocalVarDecl('rec', self.viper.Ref, pos, info)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
-        may_set_pred = self.viper.Predicate(MAY_SET_PRED, [id_param_decl], None, pos,
-                                            info)
+        may_set_pred = self.viper.Predicate(MAY_SET_PRED,
+                                            [receiver_param_decl, id_param_decl], None,
+                                            pos, info)
         return may_set_pred
 
     def translate_program(self, modules: List[PythonModule],

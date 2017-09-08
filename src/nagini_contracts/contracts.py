@@ -19,7 +19,8 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'ToSeq']
+                  'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
+                  'MayCreate',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -182,6 +183,20 @@ def Acc(field, ratio=1) -> bool:
     pass
 
 
+def MayCreate(o: object, field_name: str) -> bool:
+    """
+    Permission to create a field called field_name on object o.
+    """
+    pass
+
+def MaySet(o: object, field_name: str) -> bool:
+    """
+    Permission to either create a field called field_name on object o or access the
+    existing field with that name.
+    """
+    pass
+
+
 def Rd(field) -> bool:
     """
     Read permission to a predicate or field, only to be used in pure contexts.
@@ -313,4 +328,6 @@ __all__ = [
         'set_pred',
         'Sequence',
         'ToSeq',
+        'MaySet',
+        'MayCreate',
         ]

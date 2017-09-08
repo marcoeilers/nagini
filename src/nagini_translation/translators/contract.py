@@ -12,10 +12,12 @@ from nagini_translation.lib.program_nodes import (
     PythonField,
     PythonMethod,
     PythonModule,
+    PythonType,
     PythonVar,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
+    Position,
     Stmt,
     StmtsAndExpr,
 )
@@ -180,21 +182,68 @@ class ContractTranslator(CommonTranslator):
         field = self.get_target(node.args[0], ctx)
         if not isinstance(field, PythonField):
             raise InvalidProgramException(node, 'invalid.acc')
-        stmt, fieldacc = self.translate_expr(node.args[0], ctx)
+        stmt, field_acc = self.translate_expr(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        pred = self.viper.FieldAccessPredicate(fieldacc, perm,
-                                               self.to_position(node, ctx),
-                                               self.no_info(ctx))
-        # Add field information
         field_type = self.get_type(node.args[0], ctx)
-        if field_type.name not in PRIMITIVES:
-            type_info = self.type_check(fieldacc, field_type,
-                                        self.no_position(ctx), ctx)
-            pred = self.viper.And(pred, type_info,
-                                  self.to_position(node, ctx),
-                                  self.no_info(ctx))
+        pred = self._translate_acc_field(field_acc, field_type, perm,
+                                         self.to_position(node, ctx), ctx)
         return [], pred
+
+    def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
+                             perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
+        pred = self.viper.FieldAccessPredicate(field_acc, perm,
+                                               pos, self.no_info(ctx))
+        # Add field information
+
+        if field_type.name not in PRIMITIVES:
+            type_info = self.type_check(field_acc, field_type,
+                                        self.no_position(ctx), ctx)
+            pred = self.viper.And(pred, type_info, pos, self.no_info(ctx))
+        return pred
+
+    def translate_may_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to MaySet().
+        """
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        stmt, rec = self.translate_expr(node.args[0], ctx)
+        rec_type = self.get_type(node.args[0], ctx)
+        if stmt:
+            raise InvalidProgramException(node.args[0], 'purity.violated')
+        if not isinstance(node.args[1], ast.Str):
+            raise InvalidProgramException(node.args[1], 'invalid.may.set')
+        field = rec_type.get_field(node.args[1].s)
+        if not field:
+            raise InvalidProgramException(node.args[1], 'invalid.may.set')
+        may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
+        sil_field = self.viper.Field(field.sil_name, self.translate_type(field.type, ctx),
+                                     pos, info)
+        field_acc = self.viper.FieldAccess(rec, sil_field, pos, info)
+        full_perm = self.viper.FullPerm(pos, info)
+        normal_acc = self._translate_acc_field(field_acc, field.type, full_perm, pos, ctx)
+        normal_perm = self.viper.CurrentPerm(field_acc, pos, info)
+        have_normal_perm = self.viper.PermGtCmp(normal_perm, self.viper.NoPerm(pos, info),
+                                                pos, info)
+        result = self.viper.CondExp(have_normal_perm, normal_acc, may_set_pred, pos, info)
+        return [], result
+
+    def translate_may_create(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to MayCreate().
+        """
+        pos = self.to_position(node, ctx)
+        stmt, rec = self.translate_expr(node.args[0], ctx)
+        rec_type = self.get_type(node.args[0], ctx)
+        if stmt:
+            raise InvalidProgramException(node.args[0], 'purity.violated')
+        if not isinstance(node.args[1], ast.Str):
+            raise InvalidProgramException(node.args[1], 'invalid.may.create')
+        field = rec_type.get_field(node.args[1].s)
+        if not field:
+            raise InvalidProgramException(node.args[1], 'invalid.may.create')
+        return [], self.get_may_set_predicate(rec, field, ctx, pos)
 
     def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -507,6 +556,10 @@ class ContractTranslator(CommonTranslator):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
                 return self.translate_acc_field(node, perm, ctx)
+        elif func_name == 'MaySet':
+            return self.translate_may_set(node, ctx)
+        elif func_name == 'MayCreate':
+            return self.translate_may_create(node, ctx)
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
         elif func_name == 'Implies':
