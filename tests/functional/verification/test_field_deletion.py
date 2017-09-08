@@ -7,6 +7,11 @@ class A:
         Ensures(Acc(self.a))
         Ensures(MayCreate(self, 'b'))
 
+    def set(self) -> None:
+        Requires(MayCreate(self, 'b'))
+        self.b = 1212
+        Ensures(Acc(self.b))
+
     def del1(self) -> None:
         Requires(Acc(self.b))
         #:: ExpectedOutput(postcondition.violated:insufficient.permission)

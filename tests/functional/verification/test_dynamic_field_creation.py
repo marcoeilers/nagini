@@ -64,7 +64,7 @@ def client_1_2() -> None:
 
 def client_2() -> None:
     a = A()
-    #:: ExpectedOutput(call.failed:insufficient.permission)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
     a.get()
 
 
@@ -88,7 +88,7 @@ def client_3_2() -> None:
 def client_3_3() -> None:
     a = A()
     a.set2(56)
-    #:: ExpectedOutput(call.failed:insufficient.permission)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
     a.set3(43)
 
 
@@ -121,5 +121,5 @@ def client_6() -> None:
 def client_8() -> None:
     a = A()
     a.set3(23)
-    #:: ExpectedOutput(call.failed:insufficient.permission)
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
     a.set2(1)
