@@ -26,6 +26,8 @@ IS_DEFINED_FUNC = '_isDefined'
 
 CHECK_DEFINED_FUNC = '_checkDefined'
 
+ARBITRARY_BOOL_FUNC = '_int_to_bool'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -54,6 +56,7 @@ INTERNAL_NAMES = [
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,
     FUNCTION_DOMAIN_NAME,
+    ARBITRARY_BOOL_FUNC,
 ]
 
 VIPER_KEYWORDS = [

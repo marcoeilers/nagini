@@ -708,8 +708,6 @@ class Analyzer(ast.NodeVisitor):
             var.reads.append(node)
         elif isinstance(node.ctx, ast.Store):
             var.writes.append(node)
-        else:
-            raise UnsupportedException(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         """

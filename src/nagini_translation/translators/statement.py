@@ -57,6 +57,33 @@ class StatementTranslator(CommonTranslator):
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node, ctx)
 
+    def translate_stmt_Delete(self, node: ast.Delete, ctx: Context) -> List[Stmt]:
+        result = []
+        info = self.no_info(ctx)
+        full_perm = self.viper.FullPerm(self.no_position(ctx), info)
+        for t in node.targets:
+            target = self.get_target(t, ctx)
+            if isinstance(target, PythonField):
+                pos = self.to_position(t, ctx)
+                # assume t is an ast.Attribute
+                stmts, receiver = self.translate_expr(t.value, ctx)
+                result.extend(stmts)
+                rec_type = self.get_type(t.value, ctx)
+                python_field = rec_type.get_field(t.attr)
+                field = self.viper.Field(python_field.sil_name,
+                                         self.translate_type(python_field.type, ctx),
+                                         pos, info)
+                field_acc = self.viper.FieldAccess(receiver, field, pos, info)
+                field_acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                                                                 pos, info)
+                result.append(self.viper.Exhale(field_acc_pred, pos, info))
+                may_set = self.get_may_set_predicate(receiver, python_field, ctx, pos)
+                result.append(self.viper.Inhale(may_set, pos, info))
+            else:
+                raise UnsupportedException(node)
+        return result
+
+
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
         left_stmt, left = self.translate_expr(node.target, ctx)
@@ -666,10 +693,9 @@ class StatementTranslator(CommonTranslator):
                 after_assign.append(self.set_var_defined(target, position, info))
         else:
             assignment = self.viper.FieldAssign
-            if ctx.actual_function.name == '__init__':
-                permission_inhale = self.create_new_field_permission(var, target,
-                                                                     position, info, ctx)
-                before_assign.append(permission_inhale)
+            permission_inhale = self.create_new_field_permission(var, target,
+                                                                 position, info, ctx)
+            before_assign.append(permission_inhale)
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
@@ -683,14 +709,13 @@ class StatementTranslator(CommonTranslator):
         field, and inhale a write permission to the field instead.
         To be used for field writes in constructors.
         """
-        self_arg = next(iter(ctx.current_function.args.values())).ref()
         receiver = field_acc.rcv()
-        receiver_is_self = self.viper.EqCmp(receiver, self_arg, position, info)
 
         no_perm = self.viper.NoPerm(position, info)
         id_value = self._get_string_value(target.actual_field.sil_name)
         id = self.viper.IntLit(id_value, position, info)
-        may_set_pred = self.viper.PredicateAccess([id], MAY_SET_PRED, position, info)
+        may_set_pred = self.viper.PredicateAccess([receiver, id], MAY_SET_PRED, position,
+                                                  info)
         may_set_perm = self.viper.CurrentPerm(may_set_pred, position, info)
         may_set = self.viper.PermGtCmp(may_set_perm, no_perm, position, info)
         full_perm = self.viper.FullPerm(position, info)
@@ -702,8 +727,7 @@ class StatementTranslator(CommonTranslator):
         in_ex = self.translate_block([exhale, inhale], position, info)
         empty_block = self.translate_block([], position, info)
         inner_if = self.viper.If(may_set, in_ex, empty_block, position, info)
-        outer_if = self.viper.If(receiver_is_self, inner_if, empty_block, position, info)
-        return outer_if
+        return inner_if
 
     def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
                                ctx: Context) -> Tuple[List[Stmt], List[Expr]]:

@@ -66,6 +66,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                           node.line, col(node))
         super().visit_member_expr(node)
 
+    def visit_del_stmt(self, node: mypy.nodes.DelStmt):
+        pass
+
     def visit_try_stmt(self, node: mypy.nodes.TryStmt):
         for var in node.vars:
             if var is not None:

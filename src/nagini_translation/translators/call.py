@@ -162,8 +162,10 @@ class CallTranslator(CommonTranslator):
             current_type = current_type.superclass
 
         fields = list(target_class.all_fields)
-        may_set_inhales = [self.viper.Inhale(ms, pos, self.no_info(ctx))
-                           for ms in self.get_may_set_predicates(fields, ctx)]
+        may_set_inhales = [self.viper.Inhale(self.get_may_set_predicate(res_var.ref(),
+                                                                        f, ctx),
+                                             pos, self.no_info(ctx))
+                           for f in fields]
 
         ctx.bound_type_vars = old_bound_type_vars
         new = self.viper.NewStmt(res_var.ref(), [], self.no_position(ctx),
@@ -829,8 +831,10 @@ class CallTranslator(CommonTranslator):
 
         pos = self.to_position(node, ctx)
         fields = list(target_class.all_fields)
-        may_set_inhales = [self.viper.Inhale(ms, pos, self.no_info(ctx))
-                           for ms in self.get_may_set_predicates(fields, ctx)]
+        may_set_inhales = [self.viper.Inhale(self.get_may_set_predicate(res_var.ref(),
+                                                                        f, ctx),
+                                             pos, self.no_info(ctx))
+                           for f in fields]
         new = self.viper.NewStmt(res_var.ref(), [], self.no_position(ctx),
                                  self.no_info(ctx))
 
