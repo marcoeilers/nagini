@@ -194,8 +194,7 @@ class ContractTranslator(CommonTranslator):
                              perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
                                                pos, self.no_info(ctx))
-        # Add field information
-
+        # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,
                                         self.no_position(ctx), ctx)

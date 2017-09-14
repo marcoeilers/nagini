@@ -214,7 +214,7 @@ def Unfold(predicate: bool) -> None:
 
 def Unfolding(predicate: bool, expr: T) -> T:
     """
-    Unfolds predicate in expr.
+    Evaluates expr in a state where predicate has been unfolded.
     """
     return expr
 

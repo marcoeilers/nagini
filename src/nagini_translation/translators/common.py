@@ -231,7 +231,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                               pos: Position = None) -> Expr:
         """
         Creates predicate instances representing the permissions to create the given
-        fields in a constructor.
+        field on the given receiver object.
         """
         if not pos:
             pos = self.no_position(ctx)
