@@ -10,29 +10,17 @@ Getting Started (Ubuntu Linux only)
 
         make test
 
-If fails with error::
+    If it fails with the error::
 
-    subprocess.CalledProcessError: Command '['curl', 'https://pypi.python.org/packages/source/s/setuptools/setuptools-20.2.2.zip', '--silent', '--output', '/tmp/bootstrap-mbuvyhif/setuptools-20.2.2.zip']' returned non-zero exit status 77
-    make: *** [bin/buildout] Error 1
+        subprocess.CalledProcessError: Command '['curl', 'https://pypi.python.org/packages/source/s/setuptools/setuptools-20.2.2.zip', '--silent', '--output', '/tmp/bootstrap-mbuvyhif/setuptools-20.2.2.zip']' returned non-zero exit status 77
+        make: *** [bin/buildout] Error 1
 
-Try to set::
+    Try to set::
 
-    export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+        export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
-Documentation
-=============
 
-To build HTML documentation, use::
-
-    make docs
-
-The documentation is outputted to ``docs/build/html/index.html``.
-
-To run doctests::
-
-    make doctest
-
-Running on Windows
+Getting Started on Windows
 ==================
 
 1.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit), s.t. java, hg, git and python are all available from the command line.
@@ -59,11 +47,66 @@ Running on Windows
 
         bin\py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
-7.  To verify a specific file, run e.g.::
 
-        bin\nagini.exe --verifier silicon tests\functional\verification\examples\test_student_enroll_preds.py
+Command Line Usage
+==================
 
-    To see more options (e.g. for supplying paths to Viper, Boogie and Z3 without using environment variables), invoke ``bin\nagini.exe`` without arguments.
+To verify a specific file, run e.g.
+
+    ./bin/nagini [OPTIONS] path-to-file.py
+
+The following command line options are available:
+
+    ``--verifier``      
+                    Possible options are ``silicon`` and ``carbon``. Selects the Viper backend
+                    to use for verification. Default: ``silicon``.
+
+    ``--select``        
+                    Select which functions/methods/classes to verify. Expects a comma-
+                    separated list of names.
+
+    ``--boogie``        
+                    Sets the path of the Boogie executable. Required if the Carbon backend
+                    is selected. Alternatively, the ``BOOGIE_EXE`` environment variable can be
+                    set.
+
+    ``--z3``            
+                    Sets the path of the Z3 executable. Always required. Alternatively, the
+                    ``Z3_EXE`` environment variable can be set.
+
+    ``--viper-jar-path``    
+                    Sets the path to the required Viper binaries (``silicon.jar`` or
+                    ``carbon.jar``). Only the binary for the selected backend is
+                    required. You can either use the provided binary packages
+                    (see above) or compile your own from source (see below).
+                    Expects either a single path or a colon- (Unix) or semicolon-
+                    (Windows) separated list of paths. Alternatively, the environment
+                    variables ``SILICONJAR``, ``CARBONJAR`` or ``VIPERJAR`` can be set.
+                        
+To see all possible command line options, invoke ``./bin/nagini`` without arguments.
+
+
+Alternative Viper Versions
+==========================
+
+To use a more recent or custom version of the Viper infrastructure, follow the
+`instructions here <https://bitbucket.org/viperproject/documentation/wiki/Home>`_. Look for
+``sbt assembly`` to find instructions for packaging the required JAR files. Use the
+parameters mentioned above to instruct Nagini to use your custom 
+
+
+Documentation
+=============
+
+To build HTML documentation, use::
+
+    make docs
+
+The documentation is outputted to ``docs/build/html/index.html``.
+
+To run doctests::
+
+    make doctest
 
 Windows Troubleshooting
 =======================
