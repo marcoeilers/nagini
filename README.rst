@@ -1,13 +1,28 @@
 Getting Started (Ubuntu Linux only)
 ===================================
 
-1.  `Install Viper <https://bitbucket.org/viperproject/documentation/wiki/Home#markdown-header-binary-packages-ubuntu-linux-only>`_.
-2.  Clone repository::
+0.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit) and the required
+    libraries::
+
+        sudo apt-get install python3-dev libzmq3-dev
+
+    For usage with the Carbon backend, you will also need to install the Mono runtime.
+
+1.  Clone repository::
 
         git clone https://github.com/marcoeilers/nagini.git
 
-3.  Install dependencies and run tests::
+2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_ to the nagini directory
+3.  Set paths to Viper (adjust paths if necessary)::
 
+        SILICONJAR=backends\silicon.jar
+        CARBONJAR=backends\carbon.jar
+        Z3_EXE=z3\bin\z3
+        BOOGIE_EXE=boogie\Binaries\Boogie.exe
+
+4.  Install dependencies and run tests::
+
+        cd nagini
         make test
 
     If it fails with the error::
@@ -29,7 +44,7 @@ Getting Started on Windows
 
 3.  In CMD, do the following::
 
-        git clone -b win-setup https://github.com/marcoeilers/nagini.git
+        git clone https://github.com/marcoeilers/nagini.git
         cd nagini
         python bootstrap.py
         bin\buildout.exe
@@ -51,11 +66,11 @@ Getting Started on Windows
 Command Line Usage
 ==================
 
-To verify a specific file, run e.g.
+To verify a specific file from the nagini directory, run e.g.::
 
     ./bin/nagini [OPTIONS] path-to-file.py
 
-The following command line options are available:
+The following command line options are available::
 
     ``--verifier``      
                     Possible options are ``silicon`` and ``carbon``. Selects the Viper backend
