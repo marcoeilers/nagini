@@ -242,6 +242,14 @@ def main() -> None:
     config.boogie_path = args.boogie
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
+
+    if not config.classpath:
+        parser.error('missing argument: --viper-jar-path')
+    if not config.z3_path:
+        parser.error('missing argument: --z3')
+    if args.verifier == 'carbon' and not config.classpath:
+        parser.error('missing argument: --boogie')
+
     logging.basicConfig(level=args.log)
 
     os.environ['MYPYPATH'] = config.mypy_path
