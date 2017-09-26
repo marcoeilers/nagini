@@ -99,9 +99,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 break
         if (node.name not in LITERALS and not is_alias):
             name_type = self.type_of(node)
-            if not isinstance(name_type, mypy.types.CallableType):
-                self.set_type(self.prefix + [node.name], name_type,
-                              node.line, col(node))
+            self.set_type(self.prefix + [node.name], name_type,
+                          node.line, col(node))
 
     def visit_star_expr(self, node: mypy.nodes.StarExpr):
         node.expr.accept(self)
