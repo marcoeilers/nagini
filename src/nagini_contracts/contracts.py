@@ -286,7 +286,7 @@ def CallSlotProof(call_slot: Callable[..., Any]) -> Callable[[Callable[..., None
     pass
 
 
-def ClosureCall(Any) -> Any:
+def ClosureCall(call: Any, justification: Any) -> Any:
     """
     Justifies a closure call by proving static dispatch (in contrast to using
     a call slot).
@@ -351,4 +351,8 @@ __all__ = [
         'set_pred',
         'Sequence',
         'ToSeq',
+        'CallSlot',
+        'UniversallyQuantified',
+        'CallSlotProof',
+        'ClosureCall',
         ]
