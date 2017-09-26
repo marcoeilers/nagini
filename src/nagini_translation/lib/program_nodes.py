@@ -119,6 +119,7 @@ class PythonModule(PythonScope, ContainerInterface):
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
+        self.call_slots = OrderedDict()  # type: Dict[str, CallSlot]
         self.predicates = OrderedDict()
         self.io_operations = OrderedDict()
         self.global_vars = OrderedDict()
@@ -1601,4 +1602,7 @@ class CallSlot(PythonMethod):
             node_factory  # node_factory: 'ProgramNodeFactory'
         )
         # universally quantified variables
-        self.uq_variables = OrderedDict()  # type: dict[str, PythonVar]
+        self.uq_variables = OrderedDict()  # type: Dict[str, PythonVar]
+
+        self.call = None  # type: ast.Call
+        self.return_variables = None  # type: List[ast.Name]

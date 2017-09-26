@@ -72,6 +72,7 @@ class Analyzer(ast.NodeVisitor):
                                    self.global_module,
                                    sil_names=self.global_module.sil_names)
         self.current_class = None
+        self.outer_functions = []  # type: List[PythonMethod]
         self.current_function = None
         self.current_scopes = []
         self.contract_only = False
@@ -111,7 +112,9 @@ class Analyzer(ast.NodeVisitor):
                 name in container.methods or
                 name in container.predicates or
                 (isinstance(container, PythonClass) and
-                 name in container.static_methods)):
+                 name in container.static_methods) or
+                (isinstance(container, PythonModule) and
+                name in container.call_slots)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
@@ -456,7 +459,9 @@ class Analyzer(ast.NodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if call_slot_analyzers.is_call_slot(node):
             call_slot_analyzers.CallSlotAnalyzer(self).analyze(node)
-            # FIXME: store the call slot somewhere (current module?)
+            return
+        if call_slot_analyzers.is_call_slot_proof(node):
+            call_slot_analyzers.CallSlotProofAnalyzer(self).analyze(node)
             return
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
@@ -1016,6 +1021,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             if self.current_function is not None:
                 context.append(self.current_function.name)
             name = node.id if isinstance(node, ast.Name) else node.arg
@@ -1040,6 +1046,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             if self.current_function is not None:
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
@@ -1068,6 +1075,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, _ = self.module.get_type(context, node.arg)
