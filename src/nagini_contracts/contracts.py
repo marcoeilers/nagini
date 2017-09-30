@@ -303,8 +303,9 @@ def CallSlotProof(call_slot: Callable[..., Any]) -> Callable[[Callable[..., None
 
 def ClosureCall(call: Any, justification: Any) -> Any:
     """
-    Justifies a closure call by proving static dispatch (in contrast to using
-    a call slot).
+    Justifies a closure call through either
+     * a CallSlot (justification == the callslot instance)
+     * proofing static dispatch (justification == the static method)
     """
     pass
 

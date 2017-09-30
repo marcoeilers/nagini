@@ -52,7 +52,12 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.lib.views import PythonModuleView
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-from nagini_translation import call_slot_analyzers
+from nagini_translation.call_slot_analyzers import (
+    CallSlotAnalyzer,
+    is_call_slot,
+    CallSlotProofAnalyzer,
+    is_call_slot_proof
+)
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -86,6 +91,8 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
+        self.call_slot_analyzer = CallSlotAnalyzer(self)
+        self.call_slot_proof_analyzer = CallSlotProofAnalyzer(self)
 
     @property
     def node_factory(self):
@@ -457,11 +464,11 @@ class Analyzer(ast.NodeVisitor):
         return False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        if call_slot_analyzers.is_call_slot(node):
-            call_slot_analyzers.CallSlotAnalyzer(self).analyze(node)
+        if is_call_slot(node):
+            self.call_slot_analyzer.analyze(node)
             return
-        if call_slot_analyzers.is_call_slot_proof(node):
-            call_slot_analyzers.CallSlotProofAnalyzer(self).analyze(node)
+        if is_call_slot_proof(node):
+            self.call_slot_proof_analyzer.analyze(node)
             return
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')

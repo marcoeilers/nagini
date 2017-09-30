@@ -1,10 +1,8 @@
 import ast
-from typing import Union
-from nagini_translation import analyzer as analyzer_pkg
+from typing import Union, List
 from nagini_translation.lib.program_nodes import (
     PythonModule,
-    PythonMethod,
-    CallSlot
+    PythonMethod
 )
 from nagini_translation.lib.util import (
     UnsupportedException,
@@ -14,7 +12,7 @@ from nagini_translation.lib.util import (
 
 class CallSlotAnalyzer:
 
-    def __init__(self, analyzer: 'analyzer_pkg.Analyzer') -> None:
+    def __init__(self, analyzer: 'Analyzer') -> None:
         self.analyzer = analyzer
         self.call_slot = None  # type: CallSlot
 
@@ -90,7 +88,7 @@ class CallSlotAnalyzer:
             analyzer.outer_functions.pop()
         analyzer.current_function = None
 
-    def _check_body(self, body):
+    def _check_body(self, body: List[ast.stmt]):
         self.has_call = False
         for child in body:
 
@@ -140,8 +138,17 @@ class CallSlotAnalyzer:
             if isinstance(node.targets[0], ast.Name):
                 self.call_slot.return_variables = [node.targets[0]]
             elif isinstance(node.targets[0], ast.Tuple):
-                # FIXME: doesn't work with nested destructuring
+
+                # NOTE: could add support for nested destructuring
                 # e.g., `a, (b, c), d = f(1, 2, 3)`
+                # currently we only support simple tuple assignments
+                for target in node.targets[0].elts:
+                    if not isinstance(target, ast.Name):
+                        raise UnsupportedException(
+                            target,
+                            "Callslots only support simple tuple assignments"
+                        )
+
                 self.call_slot.return_variables = node.targets[0].elts
             else:
                 raise UnsupportedException(
@@ -168,7 +175,7 @@ class CallSlotAnalyzer:
 
 class CallSlotProofAnalyzer:
 
-    def __init__(self, analyzer: 'analyzer_pkg.Analyzer') -> None:
+    def __init__(self, analyzer: 'Analyzer') -> None:
         self.analyzer = analyzer
 
     def analyze(self, node: ast.FunctionDef) -> None:
@@ -178,7 +185,26 @@ class CallSlotProofAnalyzer:
         pass  # FIXME: implement
 
 
-def _check_method_declaration(method: PythonMethod, analyzer: 'analyzer_pkg.Analyzer') -> None:
+class _LimitedVariablesChecker(ast.NodeVisitor):
+
+    def __init__(self, variables: List[str]) -> None:
+        self.variables = variables
+        self.offending_nodes = []  # type: List
+
+    def check_name(self, name: str) -> None:
+        if name.id not in self.variables:
+            self.offending_nodes.append(name)
+
+    def visit_Name(self, name: ast.Name) -> None:
+        self.check_name(name.id)
+        self.generic_visit(name)
+
+    # TODO: check other node types
+    # ast.Arg for lambdas
+    # ast.Call for calls (?)
+
+
+def _check_method_declaration(method: PythonMethod, analyzer: 'Analyzer') -> None:
     """
     Checks whether `node' is a method declaration valid for a call slot or
     universally quantified variables. If not raises an appropriate
@@ -204,6 +230,13 @@ def _check_method_declaration(method: PythonMethod, analyzer: 'analyzer_pkg.Anal
             "Method '%s' doesn't return 'None'" % method.node.name
         )
 
+    if 0 < len(method.node.args.defaults):
+        raise InvalidProgramException(
+            method.node.args.defaults[0],
+            'call_slots.parameters.default',
+            "Method '%s' has a default parameter" % method.node.name
+        )
+
     analyzer.visit(method.node.args, method.node)
 
     if method.var_arg is not None:
@@ -221,7 +254,6 @@ def _check_method_declaration(method: PythonMethod, analyzer: 'analyzer_pkg.Anal
             ("Method '%s' contains illegal keyword parameters"
                 % method.node.name)
         )
-    # TODO: what about defaults?
 
 
 def _is_uq_vars(body) -> bool:
