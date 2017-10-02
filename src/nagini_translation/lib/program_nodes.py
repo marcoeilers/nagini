@@ -1605,4 +1605,4 @@ class CallSlot(PythonMethod):
         self.uq_variables = OrderedDict()  # type: Dict[str, PythonVar]
 
         self.call = None  # type: ast.Call
-        self.return_variables = None  # type: List[ast.Name]
+        self.return_variables = []  # type: List[ast.Name]
