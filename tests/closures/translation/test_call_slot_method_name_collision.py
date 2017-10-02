@@ -1,5 +1,5 @@
 from typing import Callable
-from nagini_contracts.contracts import *
+from nagini_contracts.contracts import CallSlot
 
 
 def some_name() -> None:
