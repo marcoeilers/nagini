@@ -1,9 +1,12 @@
 from typing import Callable
 from nagini_contracts.contracts import CallSlot
 
-some_gloval_var = 5  # type: int
+
+def some_global_method() -> None:
+    pass
+
 
 @CallSlot
-def some_call_slot(f: Callable[[int], None]) -> None:
+def some_call_slot(f: Callable[[Callable[[], None]], None]) -> None:
     #:: ExpectedOutput(invalid.program:call_slot.names.non_local)
-    f(some_gloval_var)
+    f(some_global_method)
