@@ -1,13 +1,11 @@
 import ast
-from typing import Union, List, Dict, Set
+from typing import Union, List, Set
 from nagini_contracts.contracts import (
     CONTRACT_WRAPPER_FUNCS,
     CONTRACT_FUNCS
 )
 from nagini_translation.lib.program_nodes import (
-    PythonModule,
-    PythonMethod,
-    PythonVar
+    PythonModule
 )
 from nagini_translation.lib.util import (
     UnsupportedException,
@@ -15,106 +13,193 @@ from nagini_translation.lib.util import (
 )
 
 
-class CallSlotAnalyzer:
+class _CallSlotBaseAnalyzer:
+
+    # TODO: pure call slots
+
+    __ILLEGAL_VARIABLE_NAMES = set(CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS)
 
     def __init__(self, analyzer: 'Analyzer') -> None:
         self.analyzer = analyzer
-        self.call_slot = None  # type: CallSlot
-        self.allowed_variables_checker = _AllowedVariablesChecker()
+        self.call_slot = None  # type: CallSlotBase
+        self.allowed_variables_checker = _CallSlotBaseAnalyzer._AllowedVariablesChecker()
 
     def analyze(self, node: ast.FunctionDef) -> None:
         """
         Preprocess the call slot `node'.
         """
 
-        # FIXME: refactor this method
-        # preferably we can refactor it so that we can have a base class
-        # for both the CallSlotAnalyzer and CallSlotProofAnalyzer
-        # Basically, the CallSlotProofAnalyzer has to do almost the same as
-        # the CallSlotAnalyzer, except that more statements are allowed
-        # in its body
-        assert is_call_slot(node)
+        old_current_function = self.analyzer.current_function
+        if old_current_function is not None:
+            self.analyzer.outer_functions.append(old_current_function)
+        self._pre_process(node)
 
-        analyzer = self.analyzer
-        scope = analyzer.module
-        assert isinstance(scope, PythonModule)
-
-        if analyzer.current_function is not None:
-            raise InvalidProgramException(
-                node,
-                'call_slots.nested.declaration',
-                "Callslot '%s' occurs inside a method" % node.name
-            )
-        if analyzer.current_class is not None:
-            raise InvalidProgramException(
-                node,
-                'call_slots.nested.declaration',
-                "Callslot '%s' occurs inside a class" % node.name
-            )
-
-        analyzer.define_new(scope, node.name, node)
-
-        self.call_slot = analyzer.node_factory.create_call_slot(
-            node.name,
-            node,
-            scope,
-            analyzer.node_factory
-        )
-
-        scope.call_slots[node.name] = self.call_slot
-
-        analyzer.current_function = self.call_slot
-        _check_method_declaration(self.call_slot, analyzer)
+        self.analyzer.current_function = self.call_slot
+        self._check_method_declaration(self.call_slot)
 
         body_node = node
 
         has_uq_vars = _is_uq_vars(node.body)
         if has_uq_vars:
             body_node = node.body[0]
-            mock_call_slot = analyzer.node_factory.create_call_slot(
+            mock_call_slot = self.analyzer.node_factory.create_call_slot(
                 body_node.name,
                 body_node,
                 self.call_slot,
-                analyzer.node_factory
+                self.analyzer.node_factory
             )
 
-            analyzer.outer_functions.append(self.call_slot)
-            analyzer.current_function = mock_call_slot
+            self.analyzer.outer_functions.append(self.call_slot)
+            self.analyzer.current_function = mock_call_slot
 
-            _check_method_declaration(mock_call_slot, analyzer)
+            self._check_method_declaration(mock_call_slot)
             self.call_slot.uq_variables = mock_call_slot.args
 
             body_node._parent = node
 
-        # FIXME: disallow shadowing through return variables?
-        _check_variables(
-            self.call_slot.args,
-            self.call_slot.uq_variables,
-            ILLEGAL_VARIABLE_NAMES
-        )
-
         for child in body_node.body:
-            analyzer.visit(child, body_node)
-
-        # TODO: pure call slots
-        # TODO: other call slot preprocessing/checks
-        # - body consists only of
-        #   - Preconditions (done)
-        #   - Postconditions (done)
-        #   - One single call declaration
-        #     - check 'well-formedness' of call
-        # - gather return values (save in CallSlot?)
+            self.analyzer.visit(child, body_node)
 
         self._check_body(body_node.body)
 
-        valid_varible_uses = (
-            self.call_slot.args.keys() |
-            self.call_slot.uq_variables.keys() |
-            ILLEGAL_VARIABLE_NAMES |
-            set(map(lambda name: name.id, self.call_slot.return_variables))
+        self._check_variables()
+
+        # cleanup
+        if has_uq_vars:
+            self.call_slot.precondition = mock_call_slot.precondition
+            self.call_slot.postcondition = mock_call_slot.postcondition
+            self.analyzer.outer_functions.pop()
+        self.analyzer.current_function = old_current_function
+        if old_current_function is not None:
+            self.analyzer.outer_functions.pop()
+
+    def _check_method_declaration(self, call_slot: 'CallSlotBase') -> None:
+        """
+        Checks whether `node' is a method declaration valid for a call slot or
+        universally quantified variables. If not raises an appropriate
+        exception. Expects analyzer.{current_function, outer_functions} to be
+        set correctly.
+
+        * No magic name ('__...__')
+        * Return type = None
+        * No *args
+        * No **kwargs
+        """
+
+        analyzer = self.analyzer
+
+        if analyzer._is_illegal_magic_method_name(call_slot.node.name):
+            raise InvalidProgramException(call_slot.node, 'illegal.magic.method')
+
+        call_slot.type = analyzer.convert_type(
+            analyzer.module.get_func_type(call_slot.scope_prefix))
+
+        if call_slot.type is not None:
+            raise InvalidProgramException(
+                call_slot.node,
+                'call_slots.return.not_none',
+                "Method '%s' doesn't return 'None'" % call_slot.node.name
+            )
+
+        if 0 < len(call_slot.node.args.defaults):
+            raise InvalidProgramException(
+                call_slot.node.args.defaults[0],
+                'call_slots.parameters.default',
+                "Method '%s' has a default parameter" % call_slot.node.name
+            )
+
+        analyzer.visit(call_slot.node.args, call_slot.node)
+
+        if call_slot.var_arg is not None:
+            raise InvalidProgramException(
+                call_slot.node,
+                'call_slots.parameters.var_args',
+                ("Method '%s' contains illegal variadic parameters"
+                    % call_slot.node.name)
+            )
+
+        if call_slot.kw_arg is not None:
+            raise InvalidProgramException(
+                call_slot.node,
+                'call_slots.parameters.kw_args',
+                ("Method '%s' contains illegal keyword parameters"
+                    % call_slot.node.name)
+            )
+
+    def _pre_process(self, node: ast.FunctionDef) -> None:
+        """
+        Abstract method for pre processing.
+        Has to initialize self.call_slot
+        """
+        raise NotImplementedError()
+
+    def _check_body(self, body: List[ast.stmt]) -> None:
+        """
+        Abstract method to check whether the body is valid.
+        """
+        raise NotImplementedError()
+
+    def _check_variables(self) -> None:
+
+        # argument variables
+        argv = self.call_slot.args
+        # universally quantified variables
+        uqv = self.call_slot.uq_variables
+        # return variables
+        rtv = self.call_slot.return_variables
+
+        shadowed_variables = argv.keys() & uqv.keys()
+
+        if 0 < len(shadowed_variables):
+            shadowed_variable_name = next(iter(shadowed_variables))
+            raise InvalidProgramException(
+                uqv[shadowed_variable_name].node,
+                "call_slots.parameters.illegal_shadowing",
+                "UQ variable '%s' illegally shadows an outer variable" % shadowed_variable_name
+            )
+
+        all_variable_names = argv.keys() | uqv.keys()
+
+        assert rtv is not None
+        if 0 < len(rtv):
+
+            assert len(rtv) == 1
+            return_variable = rtv[0]
+            assert isinstance(return_variable, ast.Name)
+
+            if return_variable.id in all_variable_names:
+                raise InvalidProgramException(
+                    return_variable,
+                    "call_slots.parameters.illegal_shadowing",
+                    "return variable '%s' illegally shadows an outer variable" % return_variable.id
+                )
+
+            all_variable_names.add(return_variable.id)
+
+        invalid_variable_names = all_variable_names & _CallSlotBaseAnalyzer.__ILLEGAL_VARIABLE_NAMES
+
+        if 0 < len(invalid_variable_names):
+            illegal_variable_name = next(iter(invalid_variable_names))
+
+            if illegal_variable_name in argv:
+                illegal_variable = argv[illegal_variable_name].node
+            elif illegal_variable_name in uqv:
+                illegal_variable = uqv[illegal_variable_name].node
+            else:
+                illegal_variable = rtv[0]
+
+            raise InvalidProgramException(
+                illegal_variable,
+                "call_slots.parameters.illegal_name",
+                "Variable '%s' has an illegal name" % illegal_variable_name
+            )
+
+        valid_variable_uses = (
+            all_variable_names |
+            _CallSlotBaseAnalyzer.__ILLEGAL_VARIABLE_NAMES
         )
-        self.allowed_variables_checker.reset(valid_varible_uses)
-        illegal_variable_uses = self.allowed_variables_checker.check(node)
+        self.allowed_variables_checker.reset(valid_variable_uses)
+        illegal_variable_uses = self.allowed_variables_checker.check(self.call_slot.node)
         if 0 < len(illegal_variable_uses):
             raise InvalidProgramException(
                 illegal_variable_uses[0],
@@ -122,15 +207,86 @@ class CallSlotAnalyzer:
                 "Illegal reference to non-local name '%s'" % illegal_variable_uses[0].id
             )
 
-        # cleanup
-        if has_uq_vars:
-            self.call_slot.precondition = mock_call_slot.precondition
-            self.call_slot.postcondition = mock_call_slot.postcondition
-            analyzer.outer_functions.pop()
-        analyzer.current_function = None
+    class _AllowedVariablesChecker(ast.NodeVisitor):
 
-    def _check_body(self, body: List[ast.stmt]):
-        self.has_call = False
+        # NOTE: might wanna push this to the translation stage
+        # FIXME: we don't support refering to global methods as variables
+        # NOTE: technically global variables/names would be ok (they're constants atm)
+        # FIXME: support nested call slot proofs
+
+        def __init__(self, allowed_variables: Set[str] = set()) -> None:
+            self.reset(allowed_variables)
+
+        def reset(self, allowed_variables: Set[str]) -> None:
+            self.offending_nodes = []  # type: List[ast.Name]
+            self.allowed_variables = allowed_variables
+
+        def check(self, node: ast.AST) -> List[ast.Name]:
+            self.visit(node)
+            return self.offending_nodes
+
+        def visit_Name(self, name: ast.Name) -> None:
+            if name.id not in self.allowed_variables:
+                self.offending_nodes.append(name)
+
+        def visit_arg(self, arg: ast.arg) -> None:
+            return  # ignore annotations
+
+        def visit_Call(self, call: ast.Call) -> None:
+            # NOTE: what if call.func isn't an instance of ast.Name?
+            if isinstance(call.func, ast.Name):
+                if call.func.id == 'ClosureCall':
+                    # FIXME: remove if references to global methods are supported
+                    assert len(call.args) == 2  # should be guaranteed by type checker
+                    self.visit(call.args[0])
+                    # ignore second argument
+                    assert len(call.keywords) == 0
+                    for kw in call.keywords:
+                        self.visit(kw)
+                    return
+
+            # ignore call.func, because it could be a valid predicate or
+            # function (if it's an illegal method, we'll catch it during
+            # translation)
+            for arg in call.args:
+                self.visit(arg)
+            for kw in call.keywords:
+                self.visit(kw)
+
+
+class CallSlotAnalyzer(_CallSlotBaseAnalyzer):
+
+    def _pre_process(self, node: ast.FunctionDef) -> None:
+
+        assert is_call_slot(node)
+        scope = self.analyzer.module
+        assert isinstance(scope, PythonModule)
+
+        if self.analyzer.current_function is not None:
+            raise InvalidProgramException(
+                node,
+                'call_slots.nested.declaration',
+                "Callslot '%s' occurs inside a method" % node.name
+            )
+        if self.analyzer.current_class is not None:
+            raise InvalidProgramException(
+                node,
+                'call_slots.nested.declaration',
+                "Callslot '%s' occurs inside a class" % node.name
+            )
+
+        self.analyzer.define_new(scope, node.name, node)
+
+        self.call_slot = self.analyzer.node_factory.create_call_slot(
+            node.name,
+            node,
+            scope,
+            self.analyzer.node_factory
+        )
+
+        scope.call_slots[node.name] = self.call_slot
+
+    def _check_body(self, body: List[ast.stmt]) -> None:
         for child in body:
 
             if isinstance(child, ast.Expr) and isinstance(child.value, ast.Call):
@@ -148,7 +304,7 @@ class CallSlotAnalyzer:
                     'Callslot declarations must only consist of contracts and a single call'
                 )
 
-        if not self.has_call:
+        if self.call_slot.return_variables is None:
             raise InvalidProgramException(
                 self.call_slot.node,
                 'call_slots.no.call',
@@ -156,6 +312,13 @@ class CallSlotAnalyzer:
             )
 
     def _check_call_declaration(self, node: Union[ast.Call, ast.Assign]) -> None:
+
+        if self.call_slot.return_variables is not None:
+            raise InvalidProgramException(
+                node,
+                'call_slots.multiple.calls',
+                "Callslot '%s' declares more than one call" % self.call_slot.node.name
+            )
 
         if isinstance(node, ast.Assign):
 
@@ -177,171 +340,240 @@ class CallSlotAnalyzer:
 
             if isinstance(node.targets[0], ast.Name):
                 self.call_slot.return_variables = [node.targets[0]]
-            elif isinstance(node.targets[0], ast.Tuple):
-
-                # NOTE: could add support for nested destructuring
-                # e.g., `a, (b, c), d = f(1, 2, 3)`
-                # currently we only support simple tuple assignments
-                for target in node.targets[0].elts:
-                    if not isinstance(target, ast.Name):
-                        raise UnsupportedException(
-                            target,
-                            "Callslots only support simple tuple assignments"
-                        )
-
-                self.call_slot.return_variables = node.targets[0].elts
             else:
                 raise UnsupportedException(
                     node,
-                    "Callslot's call has an unsupported return target"
+                    "Callslot's call supports only a single variable as return target"
                 )
         else:
+            self.call_slot.return_variables = []
             call = node
 
         self._check_call(call)
 
-    def _check_call(self, node: ast.Call) -> None:
-        if self.has_call:
+    def _check_call(self, call: ast.Call) -> None:
+        self.call_slot.call = call
+
+        if not isinstance(call.func, ast.Name):
+            raise InvalidProgramException(
+                call.func,
+                'call_slots.call_declaration.invalid_target',
+                "Callslot '%s' has an invalid call target" % self.call_slot.node.name
+            )
+        if call.func.id not in self.call_slot.args:
+            raise InvalidProgramException(
+                call.func,
+                'call_slots.call_declaration.invalid_target',
+                ("Callslot '%s' has an invalid call target (target must be a normal variable)" %
+                    self.call_slot.node.name)
+            )
+
+
+class CallSlotProofAnalyzer(_CallSlotBaseAnalyzer):
+
+    def _pre_process(self, node: ast.FunctionDef) -> None:
+        assert is_call_slot_proof(node)
+
+        if self.analyzer.current_function is None:
             raise InvalidProgramException(
                 node,
-                'call_slots.multiple.calls',
-                "Callslot '%s' declares more than one call" % self.call_slot.node.name
+                'call_slots.proof.outside_method',
+                "Callslotproof '%s' occurs outside a method" % node.name
             )
-        self.has_call = True
-        self.call_slot.call = node
+
+        assert len(node.decorator_list) == 1
+        assert isinstance(node.decorator_list[0], ast.Call)
+        assert isinstance(node.decorator_list[0].func, ast.Name)
+        assert node.decorator_list[0].func.id == 'CallSlotProof'
+
+        proof_annotation = node.decorator_list[0]  # type: ast.Call
+
+        assert len(proof_annotation.args) == 1
+
+        call_slot_instantiation = proof_annotation.args[0]
+        if not isinstance(call_slot_instantiation, ast.Call):
+            raise InvalidProgramException(
+                proof_annotation,
+                'call_slots.proof_annotation.invalid_arg',
+                "Callslot proof '%s' doesn't have a valid call slot instantiation"
+            )
+
+        if not isinstance(call_slot_instantiation.func, ast.Name):
+            raise InvalidProgramException(
+                proof_annotation,
+                'call_slots.proof_annotation.invalid_arg',
+                "Callslot proof '%s' doesn't have a valid call slot instantiation"
+            )
+
+        self.call_slot = self.analyzer.node_factory.create_call_slot_proof(
+            node.name,
+            node,
+            self.analyzer.current_function,
+            self.analyzer.node_factory,
+            call_slot_instantiation
+        )
+
+    def _check_body(self, body: List[ast.stmt]) -> None:
+
+        # Possible extensions:
+        # - local variables with assignments
+        # - while loops
+        # - new statements (for local variables)
+        # - restricted method calls (only for 'local state')
+
+        for child in body:
+
+            if isinstance(child, ast.Expr) and isinstance(child.value, ast.Call):
+                if is_precondition(child.value) or is_postcondition(child.value):
+                    continue
+                if is_fold(child.value) or is_unfold(child.value):
+                    continue
+                if is_assume(child.value):
+                    continue
+                self._check_call_declaration(child.value)
+
+            elif isinstance(child, ast.Assign):
+                self._check_call_declaration(child)
+
+            elif isinstance(child, ast.Assert):
+                continue
+
+            elif isinstance(child, ast.FunctionDef):
+                if not is_call_slot_proof(child):
+                    # NOTE: dead code, Analyzer will throw before we can reach this
+                    raise InvalidProgramException(
+                        child,
+                        'call_slots.proof_body.invalid_stmt',
+                        "Illegal statement in call slot proof '%s'" % self.call_slot.node.name
+                    )
+                # other call slot proof checks are done elsewhere
+
+            elif isinstance(child, ast.If):
+                # check purity of condition later
+                self._check_body(child.body)
+                self._check_body(child.orelse)
+
+            else:
+                raise InvalidProgramException(
+                    child,
+                    'call_slots.proof_body.invalid_stmt',
+                    "Illegal statement in call slot proof '%s'" % self.call_slot.node.name
+                )
+
+    def _check_call_declaration(self, node: Union[ast.Call, ast.Assign]) -> None:
+
+        if isinstance(node, ast.Assign):
+
+            if not isinstance(node.value, ast.Call):
+                raise InvalidProgramException(
+                    node,
+                    'call_slots.proof_body.invalid_stmt',
+                    "Callslot proof '%s' contains an illegal assignment" % self.call_slot.node.name
+                )
+            call = node.value
+
+            if len(node.targets) > 1:
+                raise UnsupportedException(
+                    node,
+                    "Callslot proof's call can't have more than one return target"
+                )
+
+            assert len(node.targets) == 1
+
+            if isinstance(node.targets[0], ast.Name):
+                if self.call_slot.return_variables is None:
+                    self.call_slot.return_variables = [node.targets[0]]
+                elif (
+                    len(self.call_slot.return_variables) != 1 or
+                    self.call_slot.return_variables[0].id != node.targets[0].id
+                ):
+                    raise InvalidProgramException(
+                        node,
+                        'call_slots.proof_body.different_return_variables',
+                        "Callslot proof '%s' uses different return variables" % self.call_slot.node.name
+                    )
+            else:
+                raise UnsupportedException(
+                    node,
+                    "Callslot proof's call supports only a single variable as return target"
+                )
+        else:
+            if self.call_slot.return_variables is None:
+                self.call_slot.return_variables = []
+            elif len(self.call_slot.return_variables) != 0:
+                raise InvalidProgramException(
+                    node,
+                    'call_slots.proof_body.different_return_variables',
+                    "Callslot proof '%s' uses different return variables" % self.call_slot.node.name
+                )
+            call = node
+
+        self._check_closure_call(call)
+
+    def _check_closure_call(self, closureCall: ast.Call) -> None:
+
+        if not is_closure_call(closureCall):
+            raise InvalidProgramException(
+                closureCall,
+                'call_slots.proof_call.not_closure_call',
+                "Callslot proof '%s' has a call which is not a ClosureCall" % self.call_slot.node.name
+            )
+
+        assert len(closureCall.args) == 2  # guaranteed by type checker
+        assert isinstance(closureCall.args[0], ast.Call)
+
+        self._check_call(closureCall.args[0])
+
+    def _check_call(self, call: ast.Call) -> None:
+
+        if not isinstance(call.func, ast.Name):
+            raise InvalidProgramException(
+                call.func,
+                'call_slots.proof_call.invalid_target',
+                "Callslot proof '%s' has an invalid call target" % self.call_slot.node.name
+            )
+        if call.func.id not in self.call_slot.args:
+            raise InvalidProgramException(
+                call.func,
+                'call_slots.proof_call.invalid_target',
+                "Callslot '%s' has an invalid call target" % self.call_slot.node.name
+            )
 
 
-# FIXME: check call slot application
+def check_closure_call(closureCall: ast.Call) -> None:
+    assert is_closure_call(closureCall)
+    assert len(closureCall.args) == 2  # guaranteed by type checker
 
-
-class CallSlotProofAnalyzer:
-
-    # NOTE: we can probably reuse a lot from CallSlotAnalyzer
-
-    def __init__(self, analyzer: 'Analyzer') -> None:
-        self.analyzer = analyzer
-
-    def analyze(self, node: ast.FunctionDef) -> None:
-        """
-        Preprocess the call slot `node'.
-        """
-        pass  # FIXME: implement
-
-
-ILLEGAL_VARIABLE_NAMES = set(CONTRACT_FUNCS + CONTRACT_WRAPPER_FUNCS)
-
-
-def _check_variables(
-    normal_variables: Dict[str, PythonVar],
-    uq_variables: Dict[str, PythonVar],
-    illegal_variable_names: Set[str]
-) -> None:
-
-    shadowed_variables = normal_variables.keys() & uq_variables.keys()
-
-    if 0 < len(shadowed_variables):
-        shadowed_variable_name = next(iter(shadowed_variables))
+    if not isinstance(closureCall.args[0], ast.Call):
         raise InvalidProgramException(
-            uq_variables[shadowed_variable_name].node,
-            "call_slots.parameters.illegal_shadowing",
-            "UQ variable '%s' illegally shadows an outer variable" % shadowed_variable_name
+            closureCall.args[0],
+            'call_slots.closure_call.invalid_call',
+            "ClosureCall's first argument has to be a call of a closure"
         )
 
-    all_variable_names = normal_variables.keys() | uq_variables.keys()
-    illegal_variable_names = all_variable_names & illegal_variable_names
+    justification = closureCall.args[1]
 
-    if 0 < len(illegal_variable_names):
-        illegal_variable_name = next(iter(illegal_variable_names))
-
-        illegal_variable = (
-            normal_variables[illegal_variable_name] if
-            illegal_variable_name in normal_variables else
-            uq_variables[illegal_variable_name]
-        )
+    if not isinstance(justification, (ast.Name, ast.Call)):
         raise InvalidProgramException(
-            illegal_variable.node,
-            "call_slots.parameters.illegal_name",
-            "Variable '%s' has an illegal name" % illegal_variable_name
+            justification,
+            'call_slots.closure_call.invalid_justification',
+            "ClosureCall's justification has to be either a call slot or static dispatch"
         )
 
+    if isinstance(justification, ast.Call):
+        if not isinstance(justification.func, ast.Call):
+            raise InvalidProgramException(
+                justification,
+                'call_slots.closure_call.invalid_justification',
+                "ClosureCall's justification has to instatiate uq variables if it's a call slot"
+            )
 
-class _AllowedVariablesChecker(ast.NodeVisitor):
-
-    # NOTE: CallSlotProofAnalyzer will require adjustments:
-    # In callslot proofs there can be nested call slot proofs which introduce
-    # new valid variables.
-
-    def __init__(self, allowed_variables: Set[str] = set()) -> None:
-        self.reset(allowed_variables)
-
-    def reset(self, allowed_variables: Set[str]) -> None:
-        self.offending_nodes = []  # type: List[ast.Name]
-        self.allowed_variables = allowed_variables
-
-    def check(self, node: ast.AST) -> List[ast.Name]:
-        self.visit(node)
-        return self.offending_nodes
-
-    def visit_Name(self, name: ast.Name) -> None:
-        if name.id not in self.allowed_variables:
-            self.offending_nodes.append(name)
-
-    def visit_arg(self, arg: ast.arg) -> None:
-        return  # ignore annotations
-
-
-def _check_method_declaration(method: PythonMethod, analyzer: 'Analyzer') -> None:
-    """
-    Checks whether `node' is a method declaration valid for a call slot or
-    universally quantified variables. If not raises an appropriate
-    exception. Expects analyzer.{current_function, outer_functions} to be
-    set correctly.
-
-    * No magic name ('__...__')
-    * Return type = None
-    * No *args
-    * No **kwargs
-    """
-
-    # NOTE: needs tests
-
-    if analyzer._is_illegal_magic_method_name(method.node.name):
-        raise InvalidProgramException(method.node, 'illegal.magic.method')
-
-    method.type = analyzer.convert_type(
-        analyzer.module.get_func_type(method.scope_prefix))
-
-    if method.type is not None:
-        raise InvalidProgramException(
-            method.node,
-            'call_slots.return.not_none',
-            "Method '%s' doesn't return 'None'" % method.node.name
-        )
-
-    if 0 < len(method.node.args.defaults):
-        raise InvalidProgramException(
-            method.node.args.defaults[0],
-            'call_slots.parameters.default',
-            "Method '%s' has a default parameter" % method.node.name
-        )
-
-    analyzer.visit(method.node.args, method.node)
-
-    if method.var_arg is not None:
-        raise InvalidProgramException(
-            method.node,
-            'call_slots.parameters.var_args',
-            ("Method '%s' contains illegal variadic parameters"
-                % method.node.name)
-        )
-
-    if method.kw_arg is not None:
-        raise InvalidProgramException(
-            method.node,
-            'call_slots.parameters.kw_args',
-            ("Method '%s' contains illegal keyword parameters"
-                % method.node.name)
-        )
+        if not isinstance(justification.func.func, ast.Name):
+            raise InvalidProgramException(
+                justification,
+                'call_slots.closure_call.invalid_justification',
+                "ClosureCall's justification has to be a named if it's a call slot"
+            )
 
 
 def _is_uq_vars(body) -> bool:
@@ -356,45 +588,74 @@ def is_call_slot(node: ast.FunctionDef) -> bool:
     """
     Whether node is a call slot declaration.
     """
-    return _has_single_decorator(node, 'CallSlot')
+    return _has_single_decorator_name(node, 'CallSlot')
 
 
 def is_universally_quantified(node: ast.FunctionDef) -> bool:
     """
     Whether a function introduces universally quantified variables
     """
-    return _has_single_decorator(node, 'UniversallyQuantified')
+    return _has_single_decorator_name(node, 'UniversallyQuantified')
 
 
 def is_call_slot_proof(node: ast.FunctionDef) -> bool:
     """
     Whether a function introduces universally quantified variables
     """
-    return _has_single_decorator(node, 'CallSlotProof')
+    return _has_single_decorator_call(node, 'CallSlotProof')
 
 
-def _has_single_decorator(node: ast.FunctionDef, decorator_name: str) -> bool:
+def _has_single_decorator_name(node: ast.FunctionDef, decorator_name: str) -> bool:
     """
     Whether `node' has only one decorator that equals to `decorator'
     """
-    # NOTE: could be refactored out into a nagini 'util' package
+    if len(node.decorator_list) != 1:
+        return False
+
+    decorator = node.decorator_list[0]
+    if not isinstance(decorator, ast.Name):
+        return False
+
+    return decorator.id == decorator_name
+
+
+def _has_single_decorator_call(node: ast.FunctionDef, decorator_name: str) -> bool:
+    """
+    Whether `node' has only one decorator that equals to `decorator'
+    """
     if len(node.decorator_list) != 1:
         return False
     decorator = node.decorator_list[0]
 
-    if isinstance(decorator, ast.Name):
-        return decorator.id == decorator_name
+    if not isinstance(decorator, ast.Call):
+        return False
 
-    if isinstance(decorator, ast.Call):
-        return decorator.func.id == decorator_name
+    return isinstance(decorator.func, ast.Name) and decorator.func.id == decorator_name
 
-    # FIXME: should probably raise instead
-    return False
+
+def is_closure_call(call: ast.Call) -> bool:
+    return is_named_call(call, 'ClosureCall')
 
 
 def is_precondition(call: ast.Call) -> bool:
-    return call.func.id == 'Requires'
+    return is_named_call(call, 'Requires')
 
 
 def is_postcondition(call: ast.Call) -> bool:
-    return call.func.id == 'Ensures'
+    return is_named_call(call, 'Ensures')
+
+
+def is_fold(call: ast.Call) -> bool:
+    return is_named_call(call, 'Unfold')
+
+
+def is_unfold(call: ast.Call) -> bool:
+    return is_named_call(call, 'Fold')
+
+
+def is_assume(call: ast.Call) -> bool:
+    return is_named_call(call, 'Assume')
+
+
+def is_named_call(call: ast.Call, name: str) -> bool:
+    return isinstance(call.func, ast.Name) and call.func.id == name

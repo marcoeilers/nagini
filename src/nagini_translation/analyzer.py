@@ -56,7 +56,9 @@ from nagini_translation.call_slot_analyzers import (
     CallSlotAnalyzer,
     is_call_slot,
     CallSlotProofAnalyzer,
-    is_call_slot_proof
+    is_call_slot_proof,
+    is_closure_call,
+    check_closure_call
 )
 
 
@@ -731,6 +733,8 @@ class Analyzer(ast.NodeVisitor):
         Collects preconditions, postconditions, raised exceptions and
         invariants.
         """
+        if is_closure_call(node):
+            check_closure_call(node)
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
             if not self.current_function or self.current_function.predicate:
@@ -843,8 +847,15 @@ class Analyzer(ast.NodeVisitor):
                         raise UnsupportedException(assign, msg)
                     var.value = assign.value
                     self.module.global_vars[node.id] = var
-                var = self.module.global_vars[node.id]
-                self.track_access(node, var)
+                if node.id in self.module.global_vars:
+                    var = self.module.global_vars[node.id]
+                    self.track_access(node, var)
+                elif not node.id in self.module.methods:
+                    # Node is neither a global variable nor a global method
+                    raise UnsupportedException(
+                        node,
+                        "Unsupported reference '%s'" % node.id
+                    )
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
@@ -868,7 +879,7 @@ class Analyzer(ast.NodeVisitor):
                     # again now that we now it's actually static.
                     del self.current_class.fields[node.id]
                 return
-        if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+        if not isinstance(self.get_target(node, self.module), (PythonGlobalVar, PythonMethod)):
             # Node is a local variable, lambda argument, or a global variable
             # that hasn't been encountered yet
             var = None

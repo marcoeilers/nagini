@@ -1562,6 +1562,22 @@ class ProgramNodeFactory:
             container_factory
         )
 
+    def create_call_slot_proof(
+            self,
+            name: str,
+            node: ast.FunctionDef,
+            superscope: PythonScope,
+            container_factory: 'ProgramNodeFactory',
+            call_slot_instantiation: ast.Call
+    ) -> 'CallSlotProof':
+        return CallSlotProof(
+            name,
+            node,
+            superscope,
+            container_factory,
+            call_slot_instantiation
+        )
+
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
                                    container_factory: 'ProgramNodeFactory',
@@ -1581,14 +1597,14 @@ class ProgramNodeFactory:
                            superclass, interface)
 
 
-class CallSlot(PythonMethod):
+class CallSlotBase(PythonMethod):
 
     def __init__(
-            self,
-            name: str,
-            node: ast.FunctionDef,
-            superscope: PythonScope,
-            node_factory: 'ProgramNodeFactory',
+        self,
+        name: str,
+        node: ast.FunctionDef,
+        superscope: PythonScope,
+        node_factory: 'ProgramNodeFactory',
     ) -> None:
 
         PythonMethod.__init__(
@@ -1601,8 +1617,51 @@ class CallSlot(PythonMethod):
             False,  # contract_only: bool
             node_factory  # node_factory: 'ProgramNodeFactory'
         )
+
         # universally quantified variables
         self.uq_variables = OrderedDict()  # type: Dict[str, PythonVar]
+        # NOTE: currently we only support one single return variable
+        self.return_variables = None  # type: List[ast.Name]
+
+
+class CallSlot(CallSlotBase):
+
+    def __init__(
+        self,
+        name: str,
+        node: ast.FunctionDef,
+        superscope: PythonScope,
+        node_factory: 'ProgramNodeFactory',
+    ) -> None:
+
+        CallSlotBase.__init__(
+            self,
+            name,
+            node,
+            superscope,
+            node_factory,
+        )
 
         self.call = None  # type: ast.Call
-        self.return_variables = []  # type: List[ast.Name]
+
+
+class CallSlotProof(CallSlotBase):
+
+    def __init__(
+        self,
+        name: str,
+        node: ast.FunctionDef,
+        superscope: PythonScope,
+        node_factory: 'ProgramNodeFactory',
+        call_slot_instantiation: ast.Call
+    ) -> None:
+
+        CallSlotBase.__init__(
+            self,
+            name,
+            node,
+            superscope,
+            node_factory,
+        )
+
+        self.call_slot_instantiation = call_slot_instantiation
