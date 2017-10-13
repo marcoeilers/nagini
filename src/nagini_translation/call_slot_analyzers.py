@@ -22,7 +22,6 @@ class _CallSlotBaseAnalyzer:
     def __init__(self, analyzer: 'Analyzer') -> None:
         self.analyzer = analyzer
         self.call_slot = None  # type: CallSlotBase
-        self.allowed_variables_checker = _CallSlotBaseAnalyzer._AllowedVariablesChecker()
 
     def analyze(self, node: ast.FunctionDef) -> None:
         """
@@ -193,65 +192,6 @@ class _CallSlotBaseAnalyzer:
                 "call_slots.parameters.illegal_name",
                 "Variable '%s' has an illegal name" % illegal_variable_name
             )
-
-        valid_variable_uses = (
-            all_variable_names |
-            _CallSlotBaseAnalyzer.__ILLEGAL_VARIABLE_NAMES
-        )
-        self.allowed_variables_checker.reset(valid_variable_uses)
-        illegal_variable_uses = self.allowed_variables_checker.check(self.call_slot.node)
-        if 0 < len(illegal_variable_uses):
-            raise InvalidProgramException(
-                illegal_variable_uses[0],
-                'call_slot.names.non_local',
-                "Illegal reference to non-local name '%s'" % illegal_variable_uses[0].id
-            )
-
-    class _AllowedVariablesChecker(ast.NodeVisitor):
-
-        # NOTE: might wanna push this to the translation stage
-        # FIXME: we don't support refering to global methods as variables
-        # NOTE: technically global variables/names would be ok (they're constants atm)
-        # FIXME: support nested call slot proofs
-
-        def __init__(self, allowed_variables: Set[str] = set()) -> None:
-            self.reset(allowed_variables)
-
-        def reset(self, allowed_variables: Set[str]) -> None:
-            self.offending_nodes = []  # type: List[ast.Name]
-            self.allowed_variables = allowed_variables
-
-        def check(self, node: ast.AST) -> List[ast.Name]:
-            self.visit(node)
-            return self.offending_nodes
-
-        def visit_Name(self, name: ast.Name) -> None:
-            if name.id not in self.allowed_variables:
-                self.offending_nodes.append(name)
-
-        def visit_arg(self, arg: ast.arg) -> None:
-            return  # ignore annotations
-
-        def visit_Call(self, call: ast.Call) -> None:
-            # NOTE: what if call.func isn't an instance of ast.Name?
-            if isinstance(call.func, ast.Name):
-                if call.func.id == 'ClosureCall':
-                    # FIXME: remove if references to global methods are supported
-                    assert len(call.args) == 2  # should be guaranteed by type checker
-                    self.visit(call.args[0])
-                    # ignore second argument
-                    assert len(call.keywords) == 0
-                    for kw in call.keywords:
-                        self.visit(kw)
-                    return
-
-            # ignore call.func, because it could be a valid predicate or
-            # function (if it's an illegal method, we'll catch it during
-            # translation)
-            for arg in call.args:
-                self.visit(arg)
-            for kw in call.keywords:
-                self.visit(kw)
 
 
 class CallSlotAnalyzer(_CallSlotBaseAnalyzer):
