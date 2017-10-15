@@ -34,7 +34,7 @@ def call_slot(f: F_Type, x: int) -> None:
 class A:
 
     def __init__(self) -> None:
-        self.call_slot = call_slot  # type: Callable
+        self.call_slot = call_slot  # type: Callable[[F_Type, int], Callable[[int], int]]
         Ensures(Acc(self.call_slot))
 
 
