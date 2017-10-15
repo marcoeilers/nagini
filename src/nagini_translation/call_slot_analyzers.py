@@ -65,6 +65,7 @@ class _CallSlotBaseAnalyzer:
 
         # cleanup
         if has_uq_vars:
+            self.call_slot._locals = mock_call_slot._locals
             self.call_slot.precondition = mock_call_slot.precondition
             self.call_slot.postcondition = mock_call_slot.postcondition
             self.analyzer.outer_functions.pop()
@@ -280,6 +281,7 @@ class CallSlotAnalyzer(_CallSlotBaseAnalyzer):
 
             if isinstance(node.targets[0], ast.Name):
                 self.call_slot.return_variables = [node.targets[0]]
+                self.call_slot.return_type = self.analyzer.typeof(node.targets[0])
             else:
                 raise UnsupportedException(
                     node,
@@ -345,6 +347,12 @@ class CallSlotProofAnalyzer(_CallSlotBaseAnalyzer):
                 "Callslot proof '%s' doesn't have a valid call slot instantiation"
             )
 
+        if len(call_slot_instantiation.args) != len(node.args.args):
+            raise InvalidProgramException(
+                proof_annotation,
+                'call_slots.proof_annotation.invalid_arg',
+            )
+
         self.call_slot = self.analyzer.node_factory.create_call_slot_proof(
             node.name,
             node,
@@ -352,6 +360,8 @@ class CallSlotProofAnalyzer(_CallSlotBaseAnalyzer):
             self.analyzer.node_factory,
             call_slot_instantiation
         )
+
+        self.analyzer.current_function.call_slot_proofs[node] = self.call_slot
 
     def _check_body(self, body: List[ast.stmt]) -> None:
 

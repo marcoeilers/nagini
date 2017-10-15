@@ -16,6 +16,7 @@ from nagini_translation.translators.abstract import (
     TranslatorConfig,
 )
 from nagini_translation.translators.call import CallTranslator
+from nagini_translation.translators.call_slots.call_slot_translator import CallSlotTranslator
 from nagini_translation.translators.contract import ContractTranslator
 from nagini_translation.translators.expression import ExpressionTranslator
 from nagini_translation.translators.io_operation import (
@@ -52,6 +53,8 @@ class Translator:
         config.pure_translator = PureTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
         config.call_translator = CallTranslator(config, jvm, source_file,
+                                                type_info, viper_ast)
+        config.call_slot_translator = CallSlotTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
         config.contract_translator = ContractTranslator(config, jvm,
                                                         source_file,

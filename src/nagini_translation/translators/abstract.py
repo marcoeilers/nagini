@@ -43,6 +43,7 @@ class TranslatorConfig:
         self.expr_translator = None
         self.stmt_translator = None
         self.call_translator = None
+        self.call_slot_translator = None
         self.contract_translator = None
         self.perm_translator = None
         self.pure_translator = None
@@ -333,3 +334,16 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                           keywords, node, ctx,
                                                           implicit_receiver)
 
+    def translate_call_slot_check(self, target: PythonMethod, args: List[Expr],
+                                 formal_args: List[Expr], arg_stmts: List[Stmt],
+                                 position: 'silver.ast.Position', node: ast.AST,
+                                 ctx: Context) -> StmtsAndExpr:
+        return self.config.call_slot_translator.translate_call_slot_check(
+            target, args, formal_args, arg_stmts, position, node, ctx
+        )
+
+    def translate_call_slot_application(self, call: ast.Call, ctx: Context) -> StmtsAndExpr:
+        return self.config.call_slot_translator.translate_call_slot_application(call, ctx)
+
+    def translate_call_slot_proof(self, proof: ast.FunctionDef, ctx: Context) -> List[Stmt]:
+        return self.config.call_slot_translator.translate_call_slot_proof(proof, ctx)

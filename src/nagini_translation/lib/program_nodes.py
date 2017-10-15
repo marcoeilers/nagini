@@ -220,7 +220,8 @@ class PythonModule(PythonScope, ContainerInterface):
         elements that can be accessed without a receiver.
         """
         dicts = [self.classes,  self.functions, self.global_vars, self.methods,
-                 self.predicates, self.io_operations, self.namespaces]
+                 self.predicates, self.io_operations, self.namespaces,
+                 self.call_slots]
         return CombinedDict([], dicts)
 
 
@@ -775,6 +776,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.call_slot_proofs: Dict[ast.FunctionDef, CallSlotProof] = {}
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1643,6 +1645,7 @@ class CallSlot(CallSlotBase):
         )
 
         self.call = None  # type: ast.Call
+        self.return_type: PythonType = None
 
 
 class CallSlotProof(CallSlotBase):
