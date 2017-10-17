@@ -122,7 +122,7 @@ def client() -> None:
     def func_call_slot_proof(concrete_g: G_Type, b: int, c: int) -> None:
 
         @UniversallyQuantified
-        def uq(a: Argument, d: int, e: int) -> None:
+        def uq(a: Argument) -> None:
 
             Requires(Acc(a.parameter, 1 / 2) and Acc(a.result))
             Requires(a.parameter >= b + c)
