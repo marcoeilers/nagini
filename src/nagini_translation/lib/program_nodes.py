@@ -146,6 +146,8 @@ class PythonModule(PythonScope, ContainerInterface):
             function.process(self.get_fresh_name(name), translator)
         for name, method in self.methods.items():
             method.process(self.get_fresh_name(name), translator)
+        for name, call_slot in self.call_slots.items():
+            call_slot.process(self.get_fresh_name(name), translator)
         for name, predicate in self.predicates.items():
             predicate.process(self.get_fresh_name(name), translator)
         for name, var in self.global_vars.items():
@@ -187,7 +189,7 @@ class PythonModule(PythonScope, ContainerInterface):
                 return module_result
         return None
 
-    def get_func_type(self, path: List[str]):
+    def get_func_type(self, path: List[str], callable=False):
         """
         Returns the type of the function identified by the given path in the
         current module (including imported other modules). It is assumed that
@@ -196,11 +198,11 @@ class PythonModule(PythonScope, ContainerInterface):
         """
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(path)
-        local_result = self.types.get_func_type(actual_prefix)
+        local_result = self.types.get_func_type(actual_prefix, callable)
         if local_result is not None:
             return local_result
         for module in self.from_imports:
-            module_result = module.get_func_type(prefix)
+            module_result = module.get_func_type(prefix, callable)
             if module_result is not None:
                 return module_result
         return None
@@ -755,6 +757,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
         self.type = None  # infer
+        self.callable_type: PythonType = None
         self.generic_type = -1
         self.result = None  # infer
         self.error_var = None  # infer
@@ -785,8 +788,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
-        if self.pure:
-            self.func_constant = self.superscope.get_fresh_name(self.name)
+        self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
             arg.process(self.get_fresh_name(name), translator)
         if self.var_arg:
@@ -1624,6 +1626,7 @@ class CallSlotBase(PythonMethod):
         self.uq_variables = OrderedDict()  # type: Dict[str, PythonVar]
         # NOTE: currently we only support one single return variable
         self.return_variables = None  # type: List[ast.Name]
+        self.body: List[ast.stmt] = None
 
 
 class CallSlot(CallSlotBase):
@@ -1645,7 +1648,57 @@ class CallSlot(CallSlotBase):
         )
 
         self.call = None  # type: ast.Call
-        self.return_type: PythonType = None
+
+    def process(self, sil_name: str, translator: 'Translator') -> None:
+        """
+        Creates fresh Silver names for all parameters and initializes them,
+        same for local variables. Also sets the method type and
+        checks if this method overrides one from a superclass,
+        """
+        self.sil_name = sil_name
+        for name, arg in self.args.items():
+            arg.process(self.get_fresh_name(name), translator)
+        for name, uq_var in self.uq_variables.items():
+            uq_var.process(self.get_fresh_name(name), translator)
+        for local in self.locals:
+            self.locals[local].process(self.get_fresh_name(local), translator)
+        self.obligation_info = translator.create_obligation_info(self)
+        if self.type is not None:
+            self.result = self.node_factory.create_python_var(RESULT_NAME, None,
+                                                              self.type)
+            self.result.process(RESULT_NAME, translator)
+
+    def get_contents(self, only_top: bool) -> Dict:
+        """
+        Returns the elements that can be accessed from this container (to be
+        used by get_target). If 'only_top' is true, returns only top level
+        elements that can be accessed without a receiver.
+        """
+        dicts = [super().get_contents(only_top), self.uq_variables]
+        return CombinedDict([], dicts)
+
+    def get_variable(self, name: str) -> Optional['PythonVar']:
+        """
+        Returns the variable (local variable or method parameter) with the
+        given name.
+        """
+
+        if name in self.locals:
+            return self.locals[name]
+        elif name in self.args:
+            return self.args[name]
+        elif name in self.uq_variables:
+            return self.uq_variables[name]
+        elif name in self.special_vars:
+            return self.special_vars[name]
+        elif name in self.io_existential_vars:
+            return self.io_existential_vars[name]
+        elif self.var_arg and self.var_arg.name == name:
+            return self.var_arg
+        elif self.kw_arg and self.kw_arg.name == name:
+            return self.kw_arg
+        else:
+            return self.module.global_vars.get(name)
 
 
 class CallSlotProof(CallSlotBase):

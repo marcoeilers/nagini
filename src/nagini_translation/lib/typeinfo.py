@@ -109,7 +109,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         oldprefix = self.prefix
         self.prefix = self.prefix + [node.name()]
         functype = self.type_of(node)
-        self.set_type(self.prefix, functype, node.line, col(node), True)
+        self.set_type(self.prefix, functype, node.line, col(node))
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name()],
                           arg.variable.type, arg.line, col(arg))
@@ -132,9 +132,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_class_def(node)
         self.prefix = oldprefix
 
-    def set_type(self, fqn, type, line, col, return_type=False):
-        if return_type and isinstance(type, mypy.types.CallableType):
-            type = type.ret_type
+    def set_type(self, fqn, type, line, col):
         if not type or isinstance(type, mypy.types.AnyType):
             if line in self.ignored_lines:
                 return
@@ -301,7 +299,7 @@ class TypeInfo:
         else:
             return result, alts
 
-    def get_func_type(self, prefix: List[str]):
+    def get_func_type(self, prefix: List[str], callable=False):
         """
         Looks up the type of the function which creates the given context
         """
@@ -310,9 +308,9 @@ class TypeInfo:
             if len(prefix) == 0:
                 return None
             else:
-                return self.get_func_type(prefix[:len(prefix) - 1])
+                return self.get_func_type(prefix[:len(prefix) - 1], callable)
         else:
-            if isinstance(result, mypy.types.FunctionLike):
+            if not callable and isinstance(result, mypy.types.FunctionLike):
                 result = result.ret_type
             return result
 

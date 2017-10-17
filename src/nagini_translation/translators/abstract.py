@@ -347,3 +347,7 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_call_slot_proof(self, proof: ast.FunctionDef, ctx: Context) -> List[Stmt]:
         return self.config.call_slot_translator.translate_call_slot_proof(proof, ctx)
+
+    def translate_call_slot(self, call_slot: 'CallSlot', ctx: Context
+    ) -> Tuple['silver.ast.Function', 'silver.ast.Method']:
+        return self.config.call_slot_translator.translate_call_slot(call_slot, ctx)

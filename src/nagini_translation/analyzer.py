@@ -537,6 +537,8 @@ class Analyzer(ast.NodeVisitor):
 
         if not is_property_setter:
             func.type = self.convert_type(functype)
+            func.callable_type = self.convert_type(
+                self.module.get_func_type(func.scope_prefix, callable=True))
 
         for child in node.body:
             if is_io_existential(child):

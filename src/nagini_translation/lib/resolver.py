@@ -174,6 +174,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
                         return rectype.type_args[target.generic_type]
+            if isinstance(node, ast.Name) and not isinstance(node._parent, ast.Call):
+                return target.callable_type
             return target.type
         if isinstance(target, PythonField):
             result = target.type

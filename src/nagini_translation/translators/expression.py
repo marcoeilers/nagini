@@ -10,6 +10,7 @@ from nagini_translation.lib.constants import (
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
     INT_TYPE,
+    CALLABLE_TYPE,
     LIST_TYPE,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
@@ -574,7 +575,8 @@ class ExpressionTranslator(CommonTranslator):
             if (isinstance(ctx.actual_function, PythonMethod) and
                     not (ctx.actual_function.pure or ctx.actual_function.predicate) and
                     not isinstance(node.ctx, ast.Store) and
-                    self.is_local_variable(var, ctx)):
+                    self.is_local_variable(var, ctx) and
+                    var.type.name != 'Callable'):
                 result = self.wrap_definedness_check(var, node, ctx)
             else:
                 result = var.ref(node, ctx)
@@ -760,6 +762,8 @@ class ExpressionTranslator(CommonTranslator):
         op = self._primitive_operations[type(op)]
         if op_type.python_class.try_box().name == INT_TYPE:
             wrap = self.to_int
+        elif op_type.python_class.try_box().name == CALLABLE_TYPE:
+            wrap = lambda node, ctx: node
         else:
             wrap = self.to_bool
         result = op(wrap(left, ctx), wrap(right, ctx), pos, self.no_info(ctx))

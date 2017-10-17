@@ -56,6 +56,7 @@ class _CallSlotBaseAnalyzer:
 
             body_node._parent = node
 
+        self.call_slot.body = body_node.body
         for child in body_node.body:
             self.analyzer.visit(child, body_node)
 
@@ -69,6 +70,8 @@ class _CallSlotBaseAnalyzer:
             self.call_slot.precondition = mock_call_slot.precondition
             self.call_slot.postcondition = mock_call_slot.postcondition
             self.analyzer.outer_functions.pop()
+
+        self.call_slot.type = self.call_slot.locals[self.call_slot.return_variables[0].id].type
         self.analyzer.current_function = old_current_function
         if old_current_function is not None:
             self.analyzer.outer_functions.pop()
@@ -91,10 +94,10 @@ class _CallSlotBaseAnalyzer:
         if analyzer._is_illegal_magic_method_name(call_slot.node.name):
             raise InvalidProgramException(call_slot.node, 'illegal.magic.method')
 
-        call_slot.type = analyzer.convert_type(
+        _type = analyzer.convert_type(
             analyzer.module.get_func_type(call_slot.scope_prefix))
 
-        if call_slot.type is not None:
+        if _type is not None:
             raise InvalidProgramException(
                 call_slot.node,
                 'call_slots.return.not_none',
@@ -281,7 +284,6 @@ class CallSlotAnalyzer(_CallSlotBaseAnalyzer):
 
             if isinstance(node.targets[0], ast.Name):
                 self.call_slot.return_variables = [node.targets[0]]
-                self.call_slot.return_type = self.analyzer.typeof(node.targets[0])
             else:
                 raise UnsupportedException(
                     node,
