@@ -241,6 +241,9 @@ class CallSlotTranslator(CommonTranslator):
         assert is_call_slot_proof(proof_node)
 
         proof = ctx.current_function.call_slot_proofs[proof_node]
+        old_proof = ctx.current_call_slot_proof
+        ctx.current_call_slot_proof = proof
+
         call_slot = self._get_call_slot(proof, ctx)
         cl_map = self._get_cl_map(proof, call_slot)
 
@@ -262,6 +265,8 @@ class CallSlotTranslator(CommonTranslator):
         instantiation_stmt = self.viper.Inhale(
             instantiation_expr, self.to_position(instantiation, ctx), self.no_info(ctx)
         )
+
+        ctx.current_call_slot_proof = old_proof
 
         return vars_stmts + [while_loop] + [instantiation_stmt]
 
@@ -400,6 +405,8 @@ class CallSlotTranslator(CommonTranslator):
             info
         ))
 
+        stmts.append(self.viper.Label(proof.old_label, position, info))
+
         call_counter = ctx.current_function.create_variable(
             '__proof_call_counter', ctx.module.global_module.classes['int'].try_unbox(), self.translator
         )
@@ -491,7 +498,7 @@ class CallSlotTranslator(CommonTranslator):
 
         return reduce(
             lambda left, right: self.viper.And(left, right, position, info),
-            contract
+            contract, self.viper.TrueLit(position, info)
         )
 
     def _proof_translate_body_only(

@@ -245,6 +245,9 @@ class ViperAST:
     def Old(self, expr, position, info):
         return self.ast.Old(expr, position, info, self.NoTrafos)
 
+    def LabelledOld(self, expr, label, position, info):
+        return self.ast.LabelledOld(expr, label, position, info, self.NoTrafos)
+
     def Inhale(self, expr, position, info):
         return self.ast.Inhale(expr, position, info, self.NoTrafos)
 

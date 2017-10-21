@@ -6,6 +6,7 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonVar,
     PythonVarBase,
+    CallSlotProof,
 )
 from nagini_translation.lib.typedefs import Expr
 from typing import Dict, List
@@ -36,6 +37,7 @@ class Context:
         self._current_alias_context = []
         self.bound_type_vars = {}
         self._global_counter = 0
+        self.current_call_slot_proof: CallSlotProof = None
 
     def get_fresh_int(self) -> int:
         """

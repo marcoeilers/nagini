@@ -59,6 +59,8 @@ class _CallSlotBaseAnalyzer:
         self.call_slot.body = body_node.body
         for child in body_node.body:
             self.analyzer.visit(child, body_node)
+        for decorator in node.decorator_list:
+            self.analyzer.visit(decorator, node)
 
         self._check_body(body_node.body)
 
@@ -71,7 +73,8 @@ class _CallSlotBaseAnalyzer:
             self.call_slot.postcondition = mock_call_slot.postcondition
             self.analyzer.outer_functions.pop()
 
-        self.call_slot.type = self.call_slot.locals[self.call_slot.return_variables[0].id].type
+        if self.call_slot.return_variables:
+            self.call_slot.type = self.call_slot.locals[self.call_slot.return_variables[0].id].type
         self.analyzer.current_function = old_current_function
         if old_current_function is not None:
             self.analyzer.outer_functions.pop()
@@ -360,7 +363,8 @@ class CallSlotProofAnalyzer(_CallSlotBaseAnalyzer):
             node,
             self.analyzer.current_function,
             self.analyzer.node_factory,
-            call_slot_instantiation
+            call_slot_instantiation,
+            self.analyzer.current_function.get_fresh_name('__proof_old_label')
         )
 
         self.analyzer.current_function.call_slot_proofs[node] = self.call_slot

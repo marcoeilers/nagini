@@ -1572,14 +1572,16 @@ class ProgramNodeFactory:
             node: ast.FunctionDef,
             superscope: PythonScope,
             container_factory: 'ProgramNodeFactory',
-            call_slot_instantiation: ast.Call
+            call_slot_instantiation: ast.Call,
+            old_label: str
     ) -> 'CallSlotProof':
         return CallSlotProof(
             name,
             node,
             superscope,
             container_factory,
-            call_slot_instantiation
+            call_slot_instantiation,
+            old_label
         )
 
     def create_python_io_operation(self, name: str, node: ast.AST,
@@ -1709,7 +1711,8 @@ class CallSlotProof(CallSlotBase):
         node: ast.FunctionDef,
         superscope: PythonScope,
         node_factory: 'ProgramNodeFactory',
-        call_slot_instantiation: ast.Call
+        call_slot_instantiation: ast.Call,
+        old_label: str
     ) -> None:
 
         CallSlotBase.__init__(
@@ -1721,3 +1724,4 @@ class CallSlotProof(CallSlotBase):
         )
 
         self.call_slot_instantiation = call_slot_instantiation
+        self.old_label: str = old_label
