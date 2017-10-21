@@ -128,7 +128,7 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_Return(self, node: ast.Return, ctx: Context,
                          impure=False) -> StmtsAndExpr:
-        return self.translate_expr(node.value, ctx, impure=impure)
+        return self.translate_expr(node.value, ctx, impure=impure, target_type=self._target_type)
 
     def translate_ListComp(self, node: ast.ListComp, ctx: Context) -> StmtsAndExpr:
         if len(node.generators) != 1:
