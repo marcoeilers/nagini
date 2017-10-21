@@ -3,6 +3,7 @@ from copy import deepcopy
 from functools import reduce
 from itertools import chain
 from typing import Dict, List, Tuple
+from nagini_translation.lib.constants import ERROR_NAME, PRIMITIVES
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     CallSlot,
@@ -22,6 +23,7 @@ from nagini_translation.lib.util import InvalidProgramException
 from nagini_translation.translators.common import CommonTranslator
 from nagini_translation.call_slot_analyzers import (
     is_call_slot_proof,
+    is_closure_call,
     is_precondition,
     is_postcondition,
     is_fold,
@@ -46,7 +48,7 @@ class CallSlotTranslator(CommonTranslator):
         info = self.no_info(ctx)
 
         call_slot_holds = self.viper.Function(
-            call_slot.name,
+            call_slot.sil_name,
             [arg.decl for arg in call_slot.get_args()],
             self.viper.Bool,
             [],
@@ -56,15 +58,14 @@ class CallSlotTranslator(CommonTranslator):
             info
         )
 
+        pres, posts = self.extract_contract(call_slot, ERROR_NAME, False, ctx)
         call_slot_apply = self.create_method_node(
             ctx,
-            call_slot.name + '_apply',
+            call_slot.sil_application_name,
             [arg.decl for arg in chain(call_slot.get_args(), call_slot.uq_variables.values())],
-            [call_slot.locals[ret.id].decl for ret in call_slot.return_variables],
-            [self._translate_pure_expr(pre[0], ctx, impure=True, target_type=self.viper.Bool)
-                for pre in call_slot.precondition],
-            [self._translate_pure_expr(post[0], ctx, impure=True, target_type=self.viper.Bool)
-                for post in call_slot.postcondition],
+            [res.decl for res in call_slot.get_results()],
+            pres,
+            posts,
             [],
             [self.viper.Inhale(self.viper.FalseLit(position, info), position, info)],
             position,
@@ -109,7 +110,7 @@ class CallSlotTranslator(CommonTranslator):
 
         call_slot = ctx.module.call_slots[justification.func.func.id]
 
-        stmts = self._application_call_slot_justification(justification, ctx)
+        stmts = [self._application_call_slot_justification(call_slot, justification, ctx)]
 
         assert len(call_slot.get_args()) == len(justification.func.args)
         arg_map = {
@@ -119,50 +120,67 @@ class CallSlotTranslator(CommonTranslator):
 
         assert len(call.args) == len(call_slot.call.args)
         for arg_call, arg_slot in zip(call.args, call_slot.call.args):
-            stmts.extend(self._application_call_slot_arg_match(
+            stmts.append(self._application_call_slot_arg_match(
                 arg_call, arg_slot, arg_map, ctx))
 
-        stmts.extend(self._application_call_slot_arg_match(
+        stmts.append(self._application_call_slot_arg_match(
             call.func, call_slot.call.func, arg_map, ctx))
 
         call_stmts, call_expr = self._translate_normal_call(
-            call_slot, justification.func.args + justification.args, ctx
+            call_slot.sil_application_name, call_slot,
+            justification.func.args + justification.args, ctx, pure_args=True
         )
 
         return stmts + call_stmts, call_expr
 
-    def _application_call_slot_justification(self, justification: ast.Call, ctx: Context) -> List[Stmt]:
+    def _application_call_slot_justification(
+        self,
+        call_slot: CallSlot,
+        justification: ast.Call,
+        ctx: Context
+    ) -> Stmt:
 
         assert isinstance(justification.func, ast.Call)  # uq vars
-        stmts, expr = self.translate_expr(justification.func, ctx, self.viper.Bool)
-        return stmts + [
-            self.viper.Assert(expr, self.to_position(justification.func, ctx), self.no_info(ctx))
-        ]
+        justification = deepcopy(justification)
 
-    def _application_call_slot_arg_match(self, call_arg: ast.expr,
-                                         slot_arg: ast.expr, arg_map: Dict[str, ast.expr],
-                                         ctx: Context) -> List[Stmt]:
+        justification.func.id = call_slot.sil_name
+        expr = self._translate_pure_expr(justification.func, ctx, target_type=self.viper.Bool)
+        return self.viper.Assert(expr, self.to_position(justification.func, ctx), self.no_info(ctx))
+
+    def _application_call_slot_arg_match(
+        self,
+        call_arg: ast.expr,
+        slot_arg: ast.expr,
+        arg_map: Dict[str, ast.expr],
+        ctx: Context
+    ) -> Stmt:
+
         slot_arg = deepcopy(slot_arg)
         slot_arg = self._var_replacer.replace(slot_arg, arg_map)
 
-        call_arg_stmts, viper_call_arg = self.translate_expr(call_arg, ctx)
+        viper_call_arg = self._translate_pure_expr(call_arg, ctx)
 
-        slot_arg_stmts, viper_slot_arg = self.translate_expr(slot_arg, ctx)
+        viper_slot_arg = self._translate_pure_expr(slot_arg, ctx)
 
-        return call_arg_stmts + slot_arg_stmts + [
-            self.viper.Assert(
-                self.viper.EqCmp(
-                    viper_call_arg,
-                    viper_slot_arg,
-                    self.to_position(call_arg, ctx),
-                    self.no_info(ctx)
-                ),
+        return self.viper.Assert(
+            self.viper.EqCmp(
+                viper_call_arg,
+                viper_slot_arg,
                 self.to_position(call_arg, ctx),
                 self.no_info(ctx)
-            )
-        ]
+            ),
+            self.to_position(call_arg, ctx),
+            self.no_info(ctx)
+        )
 
-    def _translate_normal_call(self, target: PythonMethod, args: List[ast.expr], ctx: Context) -> StmtsAndExpr:
+    def _translate_normal_call(
+        self,
+        name,
+        target: PythonMethod,
+        args: List[ast.expr],
+        ctx: Context,
+        pure_args=False
+    ) -> StmtsAndExpr:
 
         result_var = None
         if target.type is not None:
@@ -173,20 +191,51 @@ class CallSlotTranslator(CommonTranslator):
         arg_exprs: List[Expr] = []
 
         for arg in args:
-            stmts, expr = self.translate_expr(arg, ctx)
-            arg_stmts.extend(stmts)
-            arg_exprs.append(expr)
+            if pure_args:
+                expr = self._translate_pure_expr(arg, ctx)
+                arg_exprs.append(expr)
+            else:
+                stmts, expr = self.translate_expr(arg, ctx)
+                arg_stmts.extend(stmts)
+                arg_exprs.append(expr)
+
 
         call = self.create_method_call_node(
-            ctx, target.name + '_apply', arg_exprs, [result_var] if result_var else [],
+            ctx, name, arg_exprs, [result_var] if result_var else [],
             self.to_position(target.node, ctx), self.no_info(ctx), target_method=target
         )
 
         return arg_stmts + call, result_var
 
     def _application_static_dispatch(self, call: ast.Call, justification: ast.Name, ctx: Context) -> StmtsAndExpr:
-        # TODO: implement
-        assert False
+
+        stmts: List[Stmt] = []
+        position = self.to_position(call, ctx)
+        info = self.no_info(ctx)
+
+        closure_expr = self._translate_pure_expr(call.func, ctx)
+
+        justification_expr = self._translate_pure_expr(justification, ctx)
+
+        stmts.append(self.viper.Assert(
+            self.viper.EqCmp(
+                closure_expr,
+                justification_expr,
+                position,
+                info
+            ),
+            position,
+            info
+        ))
+
+        method = ctx.module.get_func_or_method(justification.id)
+
+        call_stmts, call_expr = self._translate_normal_call(
+            method.sil_name, method, call.args, ctx, pure_args=True
+        )
+        stmts.extend(call_stmts)
+
+        return stmts, call_expr
 
     def translate_call_slot_proof(self, proof_node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
         assert is_call_slot_proof(proof_node)
@@ -203,9 +252,18 @@ class CallSlotTranslator(CommonTranslator):
         while_loop = self._proof_create_non_deterministic_while_loop(
             proof, body_stmts, ctx
         )
-        # TODO: assume call slot holds
 
-        return vars_stmts + [while_loop]
+        instantiation = deepcopy(proof.call_slot_instantiation)
+        instantiation.func.id = call_slot.sil_name
+
+        instantiation_expr = self._translate_pure_expr(
+            instantiation, ctx, target_type=self.viper.Bool)
+
+        instantiation_stmt = self.viper.Inhale(
+            instantiation_expr, self.to_position(instantiation, ctx), self.no_info(ctx)
+        )
+
+        return vars_stmts + [while_loop] + [instantiation_stmt]
 
     def _proof_extract_vars(self, proof: CallSlotProof, ctx: Context) -> List[Stmt]:
 
@@ -269,12 +327,29 @@ class CallSlotTranslator(CommonTranslator):
             )
         }
 
-    def _proof_extract_var(self, var: PythonVar, val: ast.expr, ctx: Context) -> List[Stmt]:
-        stmts, viper_val = self.translate_expr(val, ctx)
+    def _proof_extract_var(self, var: PythonVar, val: ast.expr, ctx: Context) -> Stmt:
+        viper_val = self._translate_pure_expr(val, ctx)
 
         proof_var = ctx.current_function.create_variable(
             '__proof_' + var.name, var.type, self.config.translator
         )
+
+        stmts: List[Stmt] = []
+        position = self.to_position(val, ctx)
+        info = self.no_info(ctx)
+        stmts.append(self.set_var_defined(
+            proof_var, position, info))
+
+        if proof_var.type.name not in PRIMITIVES:
+            stmts.append(self.viper.Inhale(
+                self.var_type_check(
+                    proof_var.name, proof_var.type, position, ctx
+                ),
+                position,
+                info
+            ))
+
+        ctx.set_alias(var.name, proof_var, var)
 
         stmts.append(self.viper.LocalVarAssign(
             proof_var.ref(proof_var.node, ctx),
@@ -282,8 +357,6 @@ class CallSlotTranslator(CommonTranslator):
             self.to_position(proof_var.node, ctx),
             self.no_info(ctx)
         ))
-
-        ctx.set_alias(var.name, proof_var, var)
 
         return stmts
 
@@ -315,45 +388,89 @@ class CallSlotTranslator(CommonTranslator):
         ctx: Context
     ) -> List[Stmt]:
 
-        self._proof_introduce_uq_ret_vars(proof, ctx)
-
         stmts: List[Stmt] = []
+        position = self.to_position(proof.node, ctx)
+        info = self.no_info(ctx)
+
+        stmts.extend(self._proof_introduce_uq_ret_vars(proof, ctx))
 
         stmts.append(self.viper.Inhale(
             self._proof_translate_contract(proof, call_slot.precondition, cl_map, ctx),
-            self.to_position(proof.node, ctx),
-            self.no_info(ctx)
+            position,
+            info
+        ))
+
+        call_counter = ctx.current_function.create_variable(
+            '__proof_call_counter', ctx.module.global_module.classes['int'].try_unbox(), self.translator
+        )
+
+        stmts.append(self.viper.LocalVarAssign(
+            call_counter.ref(),
+            self.viper.IntLit(0, position, info),
+            position,
+            info
         ))
 
         stmts.extend(self._proof_translate_body_only(
             proof.body,
             proof,
             call_slot,
+            call_counter,
+            cl_map,
             ctx
         ))
 
         stmts.append(self.viper.Exhale(
             self._proof_translate_contract(proof, call_slot.postcondition, cl_map, ctx),
-            self.to_position(proof.node, ctx),
-            self.no_info(ctx)
+            position,
+            info
         ))
-        # TODO: check call counter == 1
+
+        stmts.append(self.viper.Assert(
+            self.viper.EqCmp(
+                call_counter.ref(),
+                self.viper.IntLit(1, position, info),
+                position,
+                info
+            ),
+            position,
+            info
+        ))
 
         return stmts
 
-    def _proof_introduce_uq_ret_vars(self, proof: CallSlotProof, ctx: Context) -> None:
+    def _proof_introduce_uq_ret_vars(self, proof: CallSlotProof, ctx: Context) -> List[Stmt]:
+        stmts: List[Stmt] = []
+
         for var in proof.uq_variables.values():
             proof_var = ctx.current_function.create_variable(
-                '__proof_' + var.name, var.type, self.config.translator
+                '__proof_' + var.name, var.type, self.translator
             )
+
+            position = self.to_position(proof_var.node, ctx)
+            info = self.no_info(ctx)
+
+            stmts.append(self.set_var_defined(proof_var, position, info))
+
+            if proof_var.type.name not in PRIMITIVES:
+                stmts.append(self.viper.Inhale(
+                    self.var_type_check(
+                        proof_var.name, proof_var.type, position, ctx
+                    ),
+                    position,
+                    info
+                ))
+
             ctx.set_alias(var.name, proof_var, var)
 
         if proof.return_variables:
             ret_var = proof.locals[proof.return_variables[0].id]
             proof_var = ctx.current_function.create_variable(
-                '__proof_' + ret_var.name, ret_var.type, self.config.translator
+                '__proof_' + ret_var.name, ret_var.type, self.translator
             )
             ctx.set_alias(ret_var.name, proof_var, ret_var)
+
+        return stmts
 
     def _proof_translate_contract(
         self,
@@ -382,6 +499,8 @@ class CallSlotTranslator(CommonTranslator):
         body: List[ast.stmt],
         proof: CallSlotProof,
         call_slot: CallSlot,
+        call_counter: PythonVar,
+        cl_map: Dict[str, ast.expr],
         ctx: Context
     ) -> List[Stmt]:
 
@@ -389,25 +508,66 @@ class CallSlotTranslator(CommonTranslator):
 
         for stmt in body:
 
-            # NOTE: for ClosureCall and nested proofs we could add a
-            # call_slot_proof & call_slot field to the Context class
-            # then we can add additional checks where they're handled
-
             if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
                 if is_precondition(stmt.value) or is_postcondition(stmt.value):
                     continue  # ignore
                 if is_fold(stmt.value) or is_unfold(stmt.value) or is_assume(stmt.value):
                     viper_stmts.extend(self.translate_stmt(stmt, ctx))
 
-                # TODO: ClosureCall
-                # TODO: check purity of closure call arguments
-                # TODO: check proof call matches call slot call
-                # TODO: update 'call counter'
+                assert is_closure_call(stmt.value)
+
+                for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
+                    viper_stmts.append(self._application_call_slot_arg_match(
+                        arg_call, arg_slot, cl_map, ctx
+                    ))
+                viper_stmts.append(self._application_call_slot_arg_match(
+                    stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
+                ))
+
+                viper_stmts.extend(self.translate_stmt(stmt, ctx))
+
+                position = self.to_position(stmt, ctx)
+                info = self.no_info(ctx)
+                viper_stmts.append(self.viper.LocalVarAssign(
+                    call_counter.ref(),
+                    self.viper.Add(
+                        call_counter.ref(),
+                        self.viper.IntLit(1, position, info),
+                        position,
+                        info
+                    ),
+                    position,
+                    info
+                ))
+
             elif isinstance(stmt, ast.Assign):
-                # TODO: ClosureCall
-                # TODO: check purity of closure call arguments
-                # TODO: check proof call matches call slot call
-                # TODO: update 'call counter'
+
+                assert is_closure_call(stmt.value)
+
+                for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
+                    viper_stmts.append(self._application_call_slot_arg_match(
+                        arg_call, arg_slot, cl_map, ctx
+                    ))
+                viper_stmts.append(self._application_call_slot_arg_match(
+                    stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
+                ))
+
+                viper_stmts.extend(self.translate_stmt(stmt, ctx))
+
+                position = self.to_position(stmt, ctx)
+                info = self.no_info(ctx)
+                viper_stmts.append(self.viper.LocalVarAssign(
+                    call_counter.ref(),
+                    self.viper.Add(
+                        call_counter.ref(),
+                        self.viper.IntLit(1, position, info),
+                        position,
+                        info
+                    ),
+                    position,
+                    info
+                ))
+
                 continue
 
             elif isinstance(stmt, ast.Assert):
@@ -415,8 +575,7 @@ class CallSlotTranslator(CommonTranslator):
 
             elif isinstance(stmt, ast.FunctionDef):
                 assert is_call_slot_proof(stmt)
-                # TODO: nested call slot proof
-                # TODO: check purity of call slot instantiation
+                viper_stmts.extend(self.translate_stmt(stmt, ctx))
 
             elif isinstance(stmt, ast.If):
                 position = self.to_position(stmt, ctx)
@@ -427,12 +586,12 @@ class CallSlotTranslator(CommonTranslator):
                 )
 
                 then_body = self._proof_translate_body_only(
-                    stmt.body, proof, call_slot, ctx
+                    stmt.body, proof, call_slot, call_counter, cl_map, ctx
                 )
                 then_block = self.translate_block(then_body, position, info)
 
                 else_body = self._proof_translate_body_only(
-                    stmt.orelse, proof, call_slot, ctx
+                    stmt.orelse, proof, call_slot, call_counter, cl_map, ctx
                 )
                 else_block = self.translate_block(else_body, position, info)
 

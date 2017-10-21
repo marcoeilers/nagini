@@ -31,7 +31,7 @@ def log(x: int) -> int:
 
 
 def choice() -> bool:
-    pass
+    return True
 
 
 class Argument:

@@ -20,6 +20,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonType,
     PythonVar,
+    CallSlot,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -224,6 +225,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         is quantified over).
         """
         if var.name in ctx.actual_function.args:
+            return False
+        if (
+            isinstance(ctx.actual_function, CallSlot) and
+            ctx.actual_function.result and
+            var.name == ctx.actual_function.result.name
+        ):
             return False
         return var in ctx.actual_function.locals.values()
 

@@ -1648,6 +1648,7 @@ class CallSlot(CallSlotBase):
         )
 
         self.call = None  # type: ast.Call
+        self.sil_application_name: str = None
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1656,6 +1657,7 @@ class CallSlot(CallSlotBase):
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        self.sil_application_name = self.get_fresh_name(self.name + '_apply')
         for name, arg in self.args.items():
             arg.process(self.get_fresh_name(name), translator)
         for name, uq_var in self.uq_variables.items():
@@ -1663,10 +1665,8 @@ class CallSlot(CallSlotBase):
         for local in self.locals:
             self.locals[local].process(self.get_fresh_name(local), translator)
         self.obligation_info = translator.create_obligation_info(self)
-        if self.type is not None:
-            self.result = self.node_factory.create_python_var(RESULT_NAME, None,
-                                                              self.type)
-            self.result.process(RESULT_NAME, translator)
+        if self.type is not None and self.return_variables:
+            self.result = self.locals[self.return_variables[0].id]
 
     def get_contents(self, only_top: bool) -> Dict:
         """

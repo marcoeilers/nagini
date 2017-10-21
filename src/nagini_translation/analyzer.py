@@ -992,10 +992,10 @@ class Analyzer(ast.NodeVisitor):
     def _convert_callable_type(self, mypy_type, node) -> PythonType:
         return GenericType(
             self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module),
-            [
-                [self.convert_type(arg_type, node) for arg_type in mypy_type.arg_types],
-                self.convert_type(mypy_type.ret_type, node)
-            ]
+            (
+                [self.convert_type(arg_type, node) for arg_type in mypy_type.arg_types] +
+                [self.convert_type(mypy_type.ret_type, node)]
+            )
         )
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
