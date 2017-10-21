@@ -14,8 +14,6 @@ def call_slot(f: Callable[[int, int], int], arg: 'Arg') -> None:
 
     @UniversallyQuantified
     def uq(y: int) -> None:
-        #:: IgnoreFile(42)
-        # will be supported during translation
         #:: ExpectedOutput(invalid.program:purity.violated)
         Requires(is_arg(arg) and y > 0)
         z = f(arg.val, y)

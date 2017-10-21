@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 from nagini_contracts.contracts import (
     CallSlot,
     CallSlotProof,
@@ -13,11 +13,11 @@ def add(x: int, y: int) -> int:
     return x + y
 
 
-def mul(x: int, y: int) -> int:
+def mul(x: int, y: int) -> Optional[int]:
     return x * y
 
 
-F_Type = Callable[[int, int], None]
+F_Type = Callable[[int, int], Optional[int]]
 
 
 @CallSlot
@@ -34,8 +34,6 @@ def method() -> None:
     x = 1
     f = add
 
-    #:: IgnoreFile(42)
-    # Implementation not far enough yet
     @CallSlotProof(call_slot(f, x))
     def call_slot_proof1(f: F_Type, x: int) -> None:
 

@@ -2,7 +2,6 @@ from typing import Callable
 from nagini_contracts.contracts import (
     CallSlot,
     CallSlotProof,
-    UniversallyQuantified,
     ClosureCall,
     Requires,
     Ensures
@@ -18,10 +17,6 @@ def twice(x: int) -> int:
 
 
 F_Type = Callable[[int], int]
-
-
-#:: IgnoreFile(42)
-# Call slot proof support isn't implemented enough at the moment.
 
 
 @CallSlot

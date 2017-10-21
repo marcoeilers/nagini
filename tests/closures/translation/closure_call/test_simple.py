@@ -20,10 +20,6 @@ def mul(x: int, y: int) -> int:
 F_Type = Callable[[int, int], int]
 
 
-#:: IgnoreFile(42)
-# Call slot proof support isn't implemented enough at the moment.
-
-
 @CallSlot
 def call_slot(f: F_Type, x: int) -> None:
 

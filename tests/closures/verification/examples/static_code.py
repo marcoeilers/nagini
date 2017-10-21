@@ -12,8 +12,6 @@ from nagini_contracts.contracts import (
     ClosureCall,
 )
 
-#:: IgnoreFile(42)
-# Call slot support isn't implemented enough at the moment.
 
 @Pure
 def idiv(x: int, y: int) -> int:
