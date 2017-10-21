@@ -1199,7 +1199,10 @@ class Analyzer(ast.NodeVisitor):
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
                 (('property' in decorators) and (len(decorators) != 1)) or
-                (('CallSlot' in decorators) and (len(decorators) != 1)) or
+                (
+                    (('CallSlot' in decorators) and (len(decorators) != 1)) and
+                    (('Pure' in decorators) and ('CallSlot' in decorators) and (len(decorators) != 2))
+                ) or
                 (('UniversallyQuantified' in decorators) and (len(decorators) != 1)) or
                 (('CallSlotProof' in decorators) and (len(decorators) != 1)))
 

@@ -231,6 +231,10 @@ class CallSlotAnalyzer(_CallSlotBaseAnalyzer):
             self.analyzer.node_factory
         )
 
+
+        if _has_double_decorator_name(node, 'Pure', 'CallSlot'):
+            self.call_slot.pure = True
+
         scope.call_slots[node.name] = self.call_slot
 
     def _check_body(self, body: List[ast.stmt]) -> None:
@@ -544,7 +548,10 @@ def is_call_slot(node: ast.FunctionDef) -> bool:
     """
     Whether node is a call slot declaration.
     """
-    return _has_single_decorator_name(node, 'CallSlot')
+    return (
+        _has_single_decorator_name(node, 'CallSlot') or
+        _has_double_decorator_name(node, 'Pure', 'CallSlot')
+    )
 
 
 def is_universally_quantified(node: ast.FunctionDef) -> bool:
@@ -573,6 +580,30 @@ def _has_single_decorator_name(node: ast.FunctionDef, decorator_name: str) -> bo
         return False
 
     return decorator.id == decorator_name
+
+
+def _has_double_decorator_name(
+    node: ast.FunctionDef,
+    decorator_name1: str,
+    decorator_name2: str
+) -> bool:
+    """
+    Whether `node' has only one decorator that equals to `decorator'
+    """
+    if len(node.decorator_list) != 2:
+        return False
+
+    decorator1, decorator2 = node.decorator_list
+    if not isinstance(decorator1, ast.Name):
+        return False
+
+    if not isinstance(decorator2, ast.Name):
+        return False
+
+    if decorator1 == decorator_name2:
+        decorator1, decorator2 = decorator2, decorator1
+
+    return decorator1.id == decorator_name1 and decorator2.id == decorator_name2
 
 
 def _has_single_decorator_call(node: ast.FunctionDef, decorator_name: str) -> bool:

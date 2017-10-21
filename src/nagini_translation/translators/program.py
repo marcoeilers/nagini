@@ -662,7 +662,10 @@ class ProgramTranslator(CommonTranslator):
             for call_slot in module.call_slots.values():
                 call_slot_holds, call_slot_apply = self.translate_call_slot(call_slot, ctx)
                 functions.append(call_slot_holds)
-                methods.append(call_slot_apply)
+                if call_slot.pure:
+                    functions.append(call_slot_apply)
+                else:
+                    methods.append(call_slot_apply)
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives and type variable entries.

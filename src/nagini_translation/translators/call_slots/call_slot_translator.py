@@ -2,7 +2,7 @@ import ast
 from copy import deepcopy
 from functools import reduce
 from itertools import chain
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 from nagini_translation.lib.constants import ERROR_NAME, PRIMITIVES
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
@@ -17,7 +17,8 @@ from nagini_translation.lib.typedefs import (
     Stmt,
     StmtsAndExpr,
     Function,
-    Method
+    Method,
+    Position
 )
 from nagini_translation.lib.util import InvalidProgramException
 from nagini_translation.translators.common import CommonTranslator
@@ -39,7 +40,7 @@ class CallSlotTranslator(CommonTranslator):
         super().__init__(config, jvm, source_file, type_info, viper_ast)
         self._var_replacer = _VarReplacer()
 
-    def translate_call_slot(self, call_slot: CallSlot, ctx: Context) -> Tuple[Function, Method]:
+    def translate_call_slot(self, call_slot: CallSlot, ctx: Context) -> Tuple[Function, Union[Method, Function]]:
 
         old_function = ctx.current_function
         ctx.current_function = call_slot
@@ -58,20 +59,68 @@ class CallSlotTranslator(CommonTranslator):
             info
         )
 
-        pres, posts = self.extract_contract(call_slot, ERROR_NAME, False, ctx)
-        call_slot_apply = self.create_method_node(
-            ctx,
-            call_slot.sil_application_name,
-            [arg.decl for arg in chain(call_slot.get_args(), call_slot.uq_variables.values())],
-            [res.decl for res in call_slot.get_results()],
-            pres,
-            posts,
-            [],
-            [self.viper.Inhale(self.viper.FalseLit(position, info), position, info)],
-            position,
-            info,
-            method=call_slot
-        )
+        args = [arg.decl for arg in chain(call_slot.get_args(), call_slot.uq_variables.values())]
+
+        if call_slot.pure:
+
+            pres = []
+            for arg in chain(call_slot.get_args(), call_slot.uq_variables.values()):
+                if arg.type.name in PRIMITIVES:
+                    continue
+                pres.append(self.type_check(arg.ref(), arg.type, position, ctx))
+            for pre, _ in call_slot.precondition:
+                pres.append(self._translate_pure_expr(
+                    pre, ctx, target_type=self.viper.Bool, impure=True))
+
+            if call_slot.pure and call_slot.type is not None:
+                old_posts = call_slot.postcondition
+                call_slot.postcondition = [
+                    (
+                        self._var_replacer.replace(deepcopy(post), {
+                            call_slot.return_variables[0].id:
+                                ast.Call(ast.Name('Result', ast.Load), [], [])
+                        }),
+                        aliases
+                    )
+                    for post, aliases in old_posts
+                ]
+            posts = []
+
+            if call_slot.type is not None and call_slot.type.name not in PRIMITIVES:
+                viper_type = self.translate_type(call_slot.type, ctx)
+                posts.append(self.type_check(
+                    self.viper.Result(viper_type, position, info),
+                    call_slot.type, position, ctx
+                ))
+
+            for post, _ in call_slot.postcondition:
+                posts.append(self._translate_pure_expr(
+                    post, ctx, target_type=self.viper.Bool, impure=True))
+
+            if call_slot.pure and call_slot.type is not None:
+                call_slot.postcondition = old_posts
+
+            _type = self.translate_type(call_slot.type, ctx)
+            call_slot_apply = self.viper.Function(
+                call_slot.sil_application_name, args, _type, pres, posts,
+                None, position, info
+            )
+
+        else:
+            pres, posts = self.extract_contract(call_slot, ERROR_NAME, False, ctx)
+            call_slot_apply = self.create_method_node(
+                ctx,
+                call_slot.sil_application_name,
+                args,
+                [res.decl for res in call_slot.get_results()],
+                pres,
+                posts,
+                [],
+                [self.viper.Inhale(self.viper.FalseLit(position, info), position, info)],
+                position,
+                info,
+                method=call_slot
+            )
 
         ctx.current_function = old_function
 
@@ -115,7 +164,10 @@ class CallSlotTranslator(CommonTranslator):
         assert len(call_slot.get_args()) == len(justification.func.args)
         arg_map = {
             py_var.name: arg
-            for py_var, arg in zip(call_slot.get_args(), justification.func.args)
+            for py_var, arg in zip(
+                chain(call_slot.get_args(), call_slot.uq_variables.values()),
+                chain(justification.func.args, justification.args)
+            )
         }
 
         assert len(call.args) == len(call_slot.call.args)
@@ -126,9 +178,16 @@ class CallSlotTranslator(CommonTranslator):
         stmts.append(self._application_call_slot_arg_match(
             call.func, call_slot.call.func, arg_map, ctx))
 
+        formal_args = []
+        if call_slot.pure:
+            for arg in call_slot.get_args():
+                formal_args.append(arg.decl)
+            for arg in call_slot.uq_variables.values():
+                formal_args.append(arg.decl)
+
         call_stmts, call_expr = self._translate_normal_call(
-            call_slot.sil_application_name, call_slot,
-            justification.func.args + justification.args, ctx, pure_args=True
+            call_slot.sil_application_name, call_slot, justification.func.args + justification.args,
+            self.to_position(call, ctx), ctx, pure_call=call_slot.pure, formal_args=formal_args
         )
 
         return stmts + call_stmts, call_expr
@@ -175,43 +234,48 @@ class CallSlotTranslator(CommonTranslator):
 
     def _translate_normal_call(
         self,
-        name,
+        name: str,
         target: PythonMethod,
         args: List[ast.expr],
+        position: Position,
         ctx: Context,
-        pure_args=False
+        pure_call: bool = False,
+        formal_args: List[Expr] = []
     ) -> StmtsAndExpr:
 
         result_var = None
-        if target.type is not None:
+        if target.type is not None and not pure_call:
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator).ref()
 
-        arg_stmts: List[Stmt] = []
+        stmts: List[Stmt] = []
         arg_exprs: List[Expr] = []
 
         for arg in args:
-            if pure_args:
-                expr = self._translate_pure_expr(arg, ctx)
-                arg_exprs.append(expr)
-            else:
-                stmts, expr = self.translate_expr(arg, ctx)
-                arg_stmts.extend(stmts)
-                arg_exprs.append(expr)
+            expr = self._translate_pure_expr(arg, ctx)
+            arg_exprs.append(expr)
 
+        if pure_call:
+            _type = self.translate_type(target.type, ctx)
+            expr = self.viper.FuncApp(
+                name, arg_exprs, position, self.no_info(ctx), _type, formal_args
+            )
+        else:
+            stmts = self.create_method_call_node(
+                ctx, name, arg_exprs, [result_var] if result_var else [],
+                position, self.no_info(ctx), target_method=target
+            )
+            expr = result_var
 
-        call = self.create_method_call_node(
-            ctx, name, arg_exprs, [result_var] if result_var else [],
-            self.to_position(target.node, ctx), self.no_info(ctx), target_method=target
-        )
-
-        return arg_stmts + call, result_var
+        return stmts, expr
 
     def _application_static_dispatch(self, call: ast.Call, justification: ast.Name, ctx: Context) -> StmtsAndExpr:
 
         stmts: List[Stmt] = []
         position = self.to_position(call, ctx)
         info = self.no_info(ctx)
+        target = self.get_target(justification, ctx)
+        assert isinstance(target, PythonMethod)
 
         closure_expr = self._translate_pure_expr(call.func, ctx)
 
@@ -230,8 +294,14 @@ class CallSlotTranslator(CommonTranslator):
 
         method = ctx.module.get_func_or_method(justification.id)
 
+        formal_args = []
+        if target.pure:
+            for arg in target.get_args():
+                formal_args.append(arg.decl)
+
         call_stmts, call_expr = self._translate_normal_call(
-            method.sil_name, method, call.args, ctx, pure_args=True
+            method.sil_name, method, call.args, self.to_position(call, ctx),
+            ctx, pure_call=target.pure, formal_args=formal_args
         )
         stmts.extend(call_stmts)
 
@@ -491,7 +561,7 @@ class CallSlotTranslator(CommonTranslator):
         info = self.no_info(ctx)
 
         contract = [
-            self._translate_pure_expr(self._var_replacer.replace(pre[0], cl_map),
+            self._translate_pure_expr(self._var_replacer.replace(deepcopy(pre[0]), cl_map),
                 ctx, impure=True, target_type=self.viper.Bool)
             for pre in contract
         ]
@@ -520,6 +590,7 @@ class CallSlotTranslator(CommonTranslator):
                     continue  # ignore
                 if is_fold(stmt.value) or is_unfold(stmt.value) or is_assume(stmt.value):
                     viper_stmts.extend(self.translate_stmt(stmt, ctx))
+                    continue
 
                 assert is_closure_call(stmt.value)
 
@@ -530,6 +601,18 @@ class CallSlotTranslator(CommonTranslator):
                 viper_stmts.append(self._application_call_slot_arg_match(
                     stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
                 ))
+
+                if call_slot.pure:
+                    if isinstance(stmt.value.args[1], ast.Name):
+                        target = self.get_target(stmt.value.args[1].id, ctx)
+                    else:
+                        target = self.get_target(stmt.value.args[1].func.func.id)
+
+                    if not target.pure:
+                        raise InvalidProgramException(
+                            stmt.value,
+                            'call_slots.impure_closure_call.inside_pure_proof'
+                        )
 
                 viper_stmts.extend(self.translate_stmt(stmt, ctx))
 
