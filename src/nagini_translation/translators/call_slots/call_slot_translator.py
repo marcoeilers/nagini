@@ -29,7 +29,8 @@ from nagini_translation.call_slot_analyzers import (
     is_postcondition,
     is_fold,
     is_unfold,
-    is_assume
+    is_assume,
+    is_assert,
 )
 
 
@@ -418,7 +419,7 @@ class CallSlotTranslator(CommonTranslator):
         if proof_var.type.name not in PRIMITIVES:
             stmts.append(self.viper.Inhale(
                 self.var_type_check(
-                    proof_var.name, proof_var.type, position, ctx
+                    proof_var.sil_name, proof_var.type, position, ctx
                 ),
                 position,
                 info
@@ -532,7 +533,7 @@ class CallSlotTranslator(CommonTranslator):
             if proof_var.type.name not in PRIMITIVES:
                 stmts.append(self.viper.Inhale(
                     self.var_type_check(
-                        proof_var.name, proof_var.type, position, ctx
+                        proof_var.sil_name, proof_var.type, position, ctx
                     ),
                     position,
                     info
@@ -588,77 +589,26 @@ class CallSlotTranslator(CommonTranslator):
             if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
                 if is_precondition(stmt.value) or is_postcondition(stmt.value):
                     continue  # ignore
-                if is_fold(stmt.value) or is_unfold(stmt.value) or is_assume(stmt.value):
+                if is_fold(stmt.value) or is_unfold(stmt.value):
+                    viper_stmts.extend(self.translate_stmt(stmt, ctx))
+                    continue
+                if is_assume(stmt.value) or is_assert(stmt.value):
                     viper_stmts.extend(self.translate_stmt(stmt, ctx))
                     continue
 
                 assert is_closure_call(stmt.value)
 
-                for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
-                    viper_stmts.append(self._application_call_slot_arg_match(
-                        arg_call, arg_slot, cl_map, ctx
-                    ))
-                viper_stmts.append(self._application_call_slot_arg_match(
-                    stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
-                ))
-
-                if call_slot.pure:
-                    if isinstance(stmt.value.args[1], ast.Name):
-                        target = self.get_target(stmt.value.args[1].id, ctx)
-                    else:
-                        target = self.get_target(stmt.value.args[1].func.func.id)
-
-                    if not target.pure:
-                        raise InvalidProgramException(
-                            stmt.value,
-                            'call_slots.impure_closure_call.inside_pure_proof'
-                        )
-
-                viper_stmts.extend(self.translate_stmt(stmt, ctx))
-
-                position = self.to_position(stmt, ctx)
-                info = self.no_info(ctx)
-                viper_stmts.append(self.viper.LocalVarAssign(
-                    call_counter.ref(),
-                    self.viper.Add(
-                        call_counter.ref(),
-                        self.viper.IntLit(1, position, info),
-                        position,
-                        info
-                    ),
-                    position,
-                    info
+                viper_stmts.extend(self._proof_translate_application(
+                    stmt, call_slot, call_counter, cl_map, ctx
                 ))
 
             elif isinstance(stmt, ast.Assign):
 
                 assert is_closure_call(stmt.value)
 
-                for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
-                    viper_stmts.append(self._application_call_slot_arg_match(
-                        arg_call, arg_slot, cl_map, ctx
-                    ))
-                viper_stmts.append(self._application_call_slot_arg_match(
-                    stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
+                viper_stmts.extend(self._proof_translate_application(
+                    stmt, call_slot, call_counter, cl_map, ctx
                 ))
-
-                viper_stmts.extend(self.translate_stmt(stmt, ctx))
-
-                position = self.to_position(stmt, ctx)
-                info = self.no_info(ctx)
-                viper_stmts.append(self.viper.LocalVarAssign(
-                    call_counter.ref(),
-                    self.viper.Add(
-                        call_counter.ref(),
-                        self.viper.IntLit(1, position, info),
-                        position,
-                        info
-                    ),
-                    position,
-                    info
-                ))
-
-                continue
 
             elif isinstance(stmt, ast.Assert):
                 viper_stmts.extend(self.translate_stmt(stmt, ctx))
@@ -693,6 +643,55 @@ class CallSlotTranslator(CommonTranslator):
                 assert False
 
         return viper_stmts
+
+    def _proof_translate_application(
+        self,
+        stmt: Union[ast.Assign, ast.Expr],
+        call_slot: CallSlot,
+        call_counter: PythonVar,
+        cl_map: Dict[str, ast.expr],
+        ctx: Context
+    ) -> List[Stmt]:
+
+        stmts: List[Stmt] = []
+
+        for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
+            stmts.append(self._application_call_slot_arg_match(
+                arg_call, arg_slot, cl_map, ctx
+            ))
+        stmts.append(self._application_call_slot_arg_match(
+            stmt.value.args[0].func, call_slot.call.func, cl_map, ctx
+        ))
+
+        if call_slot.pure:
+            if isinstance(stmt.value.args[1], ast.Name):
+                target = self.get_target(stmt.value.args[1], ctx)
+            else:
+                target = self.get_target(stmt.value.args[1].func.func, ctx)
+
+            if not target.pure:
+                raise InvalidProgramException(
+                    stmt.value,
+                    'call_slots.impure_closure_call.inside_pure_proof'
+                )
+
+        stmts.extend(self.translate_stmt(stmt, ctx))
+
+        position = self.to_position(stmt, ctx)
+        info = self.no_info(ctx)
+        stmts.append(self.viper.LocalVarAssign(
+            call_counter.ref(),
+            self.viper.Add(
+                call_counter.ref(),
+                self.viper.IntLit(1, position, info),
+                position,
+                info
+            ),
+            position,
+            info
+        ))
+
+        return stmts
 
     def _translate_pure_expr(
         self,

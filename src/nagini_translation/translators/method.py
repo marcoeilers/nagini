@@ -7,6 +7,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVES,
 )
 from nagini_translation.lib.program_nodes import (
+    CallSlot,
     GenericType,
     MethodType,
     PythonExceptionHandler,
@@ -160,7 +161,11 @@ class MethodTranslator(CommonTranslator):
         """
         Creates 'typeof' preconditions for function arguments.
         """
-        args = func.get_args()
+        if isinstance(func, CallSlot):
+            args = func.get_args()
+            args.extend(func.uq_variables.values())
+        else:
+            args = func.get_args()
         pres = []
         for i, arg in enumerate(args):
             if not (arg.type.name in PRIMITIVES):

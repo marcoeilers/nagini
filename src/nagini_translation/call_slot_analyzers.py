@@ -388,7 +388,7 @@ class CallSlotProofAnalyzer(_CallSlotBaseAnalyzer):
                     continue
                 if is_fold(child.value) or is_unfold(child.value):
                     continue
-                if is_assume(child.value):
+                if is_assume(child.value) or is_assert(child.value):
                     continue
                 self._check_call_declaration(child.value)
 
@@ -642,6 +642,10 @@ def is_unfold(call: ast.Call) -> bool:
 
 def is_assume(call: ast.Call) -> bool:
     return is_named_call(call, 'Assume')
+
+
+def is_assert(call: ast.Call) -> bool:
+    return is_named_call(call, 'Assert')
 
 
 def is_named_call(call: ast.Call, name: str) -> bool:
