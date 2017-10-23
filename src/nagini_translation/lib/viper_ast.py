@@ -453,7 +453,7 @@ class ViperAST:
         return self.ast.Let(variable, exp, body, position, info, self.NoTrafos)
 
     def from_option(self, option):
-        if option is self.none:
+        if option == self.none:
             return None
         else:
             return option.get()
