@@ -463,6 +463,7 @@ class ProgramTranslator(CommonTranslator):
         for sil_prog in sil_progs:
             for method in self.viper.to_list(sil_prog.methods()):
                 if method.name() in used_names:
+                    body = self.viper.from_option(method.body())
                     converted_method = self.create_method_node(
                         ctx=ctx,
                         name=method.name(),
@@ -471,7 +472,7 @@ class ProgramTranslator(CommonTranslator):
                         pres=self.viper.to_list(method.pres()),
                         posts=self.viper.to_list(method.posts()),
                         locals=[],
-                        body=method.body(),
+                        body=body,
                         position=method.pos(),
                         info=method.info(),
                     )
