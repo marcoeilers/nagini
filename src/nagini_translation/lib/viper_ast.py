@@ -137,7 +137,8 @@ class ViperAST:
         body_with_locals = self.Seqn([body], position, info, locals)
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info, self.NoTrafos)
+                               self.scala.Some(body_with_locals), position, info,
+                               self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
