@@ -65,10 +65,10 @@ class Analyzer(ast.NodeVisitor):
     def __init__(self, types: TypeInfo, path: str, selected: Set[str]):
         self._node_factory = None
         self.types = types
-        self.global_module = PythonModule(types, self.node_factory, None, None)
+        self.global_module = PythonModule(types, self.node_factory, None, None, None)
         self.global_module.global_module = self.global_module
         self.module = PythonModule(types, self.node_factory, '__main__',
-                                   self.global_module,
+                                   self.global_module, None,
                                    sil_names=self.global_module.sil_names)
         self.current_class = None
         self.current_function = None
@@ -104,7 +104,8 @@ class Analyzer(ast.NodeVisitor):
                 if cls.defined:
                     raise InvalidProgramException(node, 'multiple.definitions')
             if (name in container.global_vars and
-                    hasattr(container.global_vars[name], 'value')):
+                    hasattr(container.global_vars[name], 'value') and
+                    isinstance(node, (ast.FunctionDef, ast.ClassDef))):
                 raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
                 name in container.methods or
@@ -113,7 +114,7 @@ class Analyzer(ast.NodeVisitor):
                  name in container.static_methods)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
-    def collect_imports(self, abs_path: str) -> None:
+    def collect_imports(self, abs_path: str, main_module=False) -> None:
         """
         Parses the file at the given location, puts the result into self.asts.
         Scans the parsed file for Import-statements and adds all imported paths
@@ -131,6 +132,8 @@ class Analyzer(ast.NodeVisitor):
         except Exception:
             # Ignore
             pass
+        if main_module:
+            self.module.node = parse_result
         self.asts[abs_path] = parse_result
         logger.debug(nagini_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
@@ -145,7 +148,7 @@ class Analyzer(ast.NodeVisitor):
                         redefined_name = module_name
                     assert module_name in self.types.files
                     path = self.types.files[module_name]
-                    self.add_module(path, abs_path, redefined_name)
+                    self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
                 module_name = stmt.module
                 if module_name in IGNORED_IMPORTS:
@@ -162,11 +165,11 @@ class Analyzer(ast.NodeVisitor):
                 else:
                     names = [(name.name, name.asname if name.asname else None)
                              for name in stmt.names] # TODO rename?
-                self.add_module(path, abs_path, None, names)
+                self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
     def add_module(self, abs_path: str, into: str, as_name: Optional[str],
-                   names: List[Tuple[str, str]] = None) -> None:
+                   node: ast.Module, names: List[Tuple[str, str]] = None) -> None:
         """
         Adds the module with the given 'abs_path' into the the module with
         path 'into'. If it's a from-import, 'as_name' should be None and
@@ -183,9 +186,9 @@ class Analyzer(ast.NodeVisitor):
             # correspond to a directory, so it has no contents of its own,
             # and we just create a dummy module (indicated by the path starting
             # with 'mod$') that's just there to contain the following module(s).
-            self.add_module('mod$' + first, into, first)
+            self.add_module('mod$' + first, into, first, node)
             # Add next part(s) into first part recursively
-            self.add_module(abs_path, 'mod$' + first, rest)
+            self.add_module(abs_path, 'mod$' + first, rest, node)
             return
         if abs_path not in self.module_paths:
             # Module has not been imported yet
@@ -198,7 +201,7 @@ class Analyzer(ast.NodeVisitor):
             else:
                 file = None
             new_module = PythonModule(self.module.types, self.node_factory,
-                                      type_prefix, self.module.global_module,
+                                      type_prefix, self.module.global_module, node,
                                       self.module.sil_names, file)
             self.modules[abs_path] = new_module
             self.collect_imports(abs_path)
@@ -313,7 +316,6 @@ class Analyzer(ast.NodeVisitor):
                 continue
             if get_func_name(stmt) in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(stmt, 'invalid.contract.position')
-            raise InvalidProgramException(stmt, 'global.statement')
         self.visit_default(node)
 
     def visit_default(self, node: ast.AST) -> None:

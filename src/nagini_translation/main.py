@@ -98,6 +98,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     for si in sil_interface:
         analyzer.add_native_silver_builtins(json.loads(si))
 
+    main_module.initialize()
     collect_modules(analyzer, path)
     if sif:
         translator = SIFTranslator(jvm, path, types, viperast)
@@ -120,7 +121,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     """
     main_module = analyzer.module
     analyzer.module_index = 0
-    analyzer.collect_imports(path)
+    analyzer.collect_imports(path, main_module=True)
 
     for module in analyzer.module_paths:
         if module.startswith('mod$'):

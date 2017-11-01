@@ -3,6 +3,7 @@ import ast
 from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
+    GLOBAL_VAR_FIELD,
     OBJECT_TYPE,
     PRIMITIVES,
 )
@@ -12,6 +13,7 @@ from nagini_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonField,
     PythonMethod,
+    PythonModule,
     PythonTryBlock,
     PythonVar,
 )
@@ -717,3 +719,68 @@ class MethodTranslator(CommonTranslator):
                                    no_info)
         ctx.var_aliases = old_var_aliases
         return [label, body_block] + next_var_set + [goto_end]
+
+    def _initialize_module(self, module: PythonModule, ctx: Context) -> None:
+        if isinstance(module.names_var, str):
+            names_decl = self.viper.LocalVarDecl(module.names_var,
+                                                 self.viper.SetType(self.viper.Int),
+                                                 self.no_position(ctx), self.no_info(ctx))
+            names_ref = self.viper.LocalVar(module.names_var,
+                                            self.viper.SetType(self.viper.Int),
+                                            self.no_position(ctx), self.no_info(ctx))
+            def_decl = self.viper.LocalVarDecl(module.defined_var, self.viper.Bool,
+                                               self.no_position(ctx), self.no_info(ctx))
+            def_ref = self.viper.LocalVar(module.defined_var, self.viper.Bool,
+                                          self.no_position(ctx), self.no_info(ctx))
+            module.names_var = (names_decl, names_ref)
+            module.defined_var = (def_decl, def_ref)
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List['silver.ast.Method']:
+        main = [m for m in modules if m.type_prefix == '__main__'][0]
+        stmts = []
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        false_lit = self.viper.FalseLit(no_pos, no_info)
+        empty_set = self.viper.EmptySeq(self.viper.Int, no_pos, no_info)
+        locals = []
+        global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
+        full_perm = self.viper.FullPerm(no_pos, no_info)
+        for module in modules:
+            if module.global_module is module:
+                continue
+            self._initialize_module(module, ctx)
+            stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
+                                                   false_lit, no_pos, no_info))
+            stmts.append(self.viper.LocalVarAssign(module.names_var[1],
+                                                   empty_set, no_pos, no_info))
+            locals.append(module.defined_var[0])
+            locals.append(module.names_var[0])
+            for var in module.global_vars.values():
+                if var.is_final:
+                    continue
+                var_type = self.translate_type(var.type, ctx)
+                var_func = self.viper.FuncApp(var.sil_name, [], no_pos,
+                                              no_info, var_type, [])
+                field_access = self.viper.FieldAccess(var_func, global_field, no_pos,
+                                                      no_info)
+                field_pred = self.viper.FieldAccessPredicate(field_access, full_perm,
+                                                             no_pos, no_info)
+                stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
+
+        ctx.current_class = None
+        method_name = ctx.module.get_fresh_name('main')
+        ctx.current_function = PythonMethod('__main__', main, None, main, False, False,
+                                            main.node_factory)
+        ctx.current_function.process(method_name, self.translator)
+        for stmt in main.node.body:
+            stmts.extend(self.translate_stmt(stmt, ctx))
+
+
+        body = stmts
+        res = self.create_method_node(ctx, method_name, [], [], [], [], locals, body, no_pos,
+                                      no_info, method=ctx.current_function)
+        ctx.current_function = None
+        return res
+
+

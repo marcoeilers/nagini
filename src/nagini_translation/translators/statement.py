@@ -4,6 +4,7 @@ from nagini_translation.lib.constants import (
     BYTES_TYPE,
     DICT_TYPE,
     END_LABEL,
+    GLOBAL_VAR_FIELD,
     INT_TYPE,
     LIST_TYPE,
     MAY_SET_PRED,
@@ -16,6 +17,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.program_nodes import (
     GenericType,
     PythonField,
+    PythonGlobalVar,
     PythonMethod,
     PythonType,
     PythonVar,
@@ -56,6 +58,22 @@ class StatementTranslator(CommonTranslator):
         method = 'translate_stmt_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node, ctx)
+
+    def _execute_module_statements(self, path, ctx: Context):
+        pass
+
+    def translate_stmt_ImportFrom(self, node: ast.ImportFrom, ctx: Context) -> List[Stmt]:
+        path = ...
+
+
+    def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
+        pass
+
+    def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
+        pass
+
+    def translate_stmt_ClassDef(self, node: ast.ClassDef, ctx: Context) -> List[Stmt]:
+        pass
 
     def translate_stmt_Delete(self, node: ast.Delete, ctx: Context) -> List[Stmt]:
         result = []
@@ -687,7 +705,18 @@ class StatementTranslator(CommonTranslator):
         lhs_stmt, var = self.translate_expr(lhs, ctx)
         before_assign = []
         after_assign = []
-        if isinstance(lhs, ast.Name):
+        if isinstance(target, PythonGlobalVar):
+            if target.is_final:
+                def assignment(lhs, rhs, pos, info):
+                    eq = self.viper.EqCmp(lhs, rhs, position, info)
+                    return self.viper.Inhale(eq, position, info)
+                after_assign.append(self.set_var_defined(target, position, info))
+            else:
+                global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref,
+                                                position, info)
+                var = self.viper.FieldAccess(var, global_field, position, info)
+                assignment = self.viper.FieldAssign
+        elif isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
             if self.is_local_variable(target, ctx):
                 after_assign.append(self.set_var_defined(target, position, info))

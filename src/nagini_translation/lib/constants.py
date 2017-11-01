@@ -28,6 +28,8 @@ CHECK_DEFINED_FUNC = '_checkDefined'
 
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
 
+GLOBAL_VAR_FIELD = '_val'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -57,6 +59,7 @@ INTERNAL_NAMES = [
     CHECK_DEFINED_FUNC,
     FUNCTION_DOMAIN_NAME,
     ARBITRARY_BOOL_FUNC,
+    GLOBAL_VAR_FIELD,
 ]
 
 VIPER_KEYWORDS = [

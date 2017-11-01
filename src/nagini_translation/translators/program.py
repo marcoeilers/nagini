@@ -9,7 +9,8 @@ from nagini_translation.lib.constants import (
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
     PRIMITIVES,
-    RESULT_NAME
+    RESULT_NAME,
+    STRING_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     MethodType,
@@ -140,12 +141,30 @@ class ProgramTranslator(CommonTranslator):
         if var.type.name not in PRIMITIVES:
             posts.append(self.type_check(result, var.type, position, ctx))
         if hasattr(var, 'value'):
-            stmt, value = self.translate_expr(var.value, ctx)
-            if stmt:
-                raise InvalidProgramException('purity.violated', var.node)
-            body = value
-            posts.append(self.viper.EqCmp(result, value, position,
-                                          self.no_info(ctx)))
+            if isinstance(var.value, str):
+                main_str = self.translate_string('__main__', var.node, ctx)
+                result = self.viper.Result(self.viper.Ref, self.no_position(ctx),
+                                           self.no_info(ctx))
+                str_type = ctx.module.global_module.classes[STRING_TYPE]
+                func_name = '__eq__'
+                call = self.get_function_call(str_type, func_name, [main_str, result], [None, None],
+                                              var.node, ctx)
+                if var.value == '__main__':
+                    posts.append(call)
+                else:
+                    posts.append(self.viper.Not(call, position, self.no_info(ctx)))
+                body = None
+            else:
+                body = None
+                try:
+                    stmt, value = self.translate_expr(var.value, ctx)
+                    if not stmt:
+                        body = value
+                        posts.append(self.viper.EqCmp(result, value, position,
+                                                      self.no_info(ctx)))
+                except AttributeError:
+                    # The translation (probably) tried to access ctx.current_function
+                    pass
         else:
             body = None
         return self.viper.Function(var.sil_name, [], type, [], posts, body,
@@ -718,6 +737,8 @@ class ProgramTranslator(CommonTranslator):
                     else:
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
+
+        methods.append(self.translate_main_method(modules, ctx))
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.

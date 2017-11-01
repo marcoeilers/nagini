@@ -290,10 +290,13 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
-        length = len(node.s)
+        return [], self.translate_string(node.s, node, ctx)
+
+    def translate_string(self, s: str, node: ast.AST, ctx: Context) -> Expr:
+        length = len(s)
         length_arg = self.viper.IntLit(length, self.no_position(ctx),
                                        self.no_info(ctx))
-        val_arg = self.viper.IntLit(self._get_string_value(node.s),
+        val_arg = self.viper.IntLit(self._get_string_value(s),
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
@@ -301,7 +304,8 @@ class ExpressionTranslator(CommonTranslator):
         func_name = '__create__'
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
-        return [], call
+        return call
+
 
     def translate_Bytes(self, node: ast.Bytes, ctx: Context) -> StmtsAndExpr:
         elems = []

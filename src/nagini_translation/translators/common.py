@@ -223,6 +223,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         a local variable in the Python program (i.e. not a parameter, not a variable that
         is quantified over).
         """
+        if not ctx.actual_function:
+            return False
         if var.name in ctx.actual_function.args:
             return False
         return var in ctx.actual_function.locals.values()

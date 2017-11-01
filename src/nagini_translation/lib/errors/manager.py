@@ -97,6 +97,7 @@ class ErrorManager:
     def _convert_error(
             self, error: 'AbstractVerificationError',
             jvm: Optional[JVM]) -> Error:
+        print(error)
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
         position = error.pos()

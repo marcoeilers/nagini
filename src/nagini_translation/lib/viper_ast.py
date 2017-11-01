@@ -357,6 +357,9 @@ class ViperAST:
     def EmptySeq(self, type, position, info):
         return self.ast.EmptySeq(type, position, info, self.NoTrafos)
 
+    def EmptySet(self, type, position, info):
+        return self.ast.EmptySet(type, position, info, self.NoTrafos)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info, self.NoTrafos)
 

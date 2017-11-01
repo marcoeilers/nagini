@@ -102,6 +102,7 @@ class PythonModule(PythonScope, ContainerInterface):
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
                  global_module: 'PythonModule',
+                 node: ast.Module,
                  sil_names: Set[str] = None,
                  file: str = None) -> None:
         """
@@ -116,6 +117,7 @@ class PythonModule(PythonScope, ContainerInterface):
             sil_names = set(VIPER_KEYWORDS + INTERNAL_NAMES)
             sil_names |= set([RESULT_NAME, ERROR_NAME, END_LABEL])
         super().__init__(sil_names, None)
+        self.node = node
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -130,13 +132,31 @@ class PythonModule(PythonScope, ContainerInterface):
         self.types = types
         self.type_vars = OrderedDict()
         self.file = file
+        self.defined_var = None
+        self.names_var = None
+        if global_module and type_prefix != '__main__':
+            self.initialize()
+
+
+    def initialize(self):
+        file_var = PythonGlobalVar('__file__', None,
+                                   self.global_module.classes[STRING_TYPE])
+        self.global_vars['__file__'] = file_var
+        name_var = PythonGlobalVar('__name__', None,
+                                   self.global_module.classes[STRING_TYPE])
+        if not self.type_prefix:
+            name_var.value = '__main__'
+        else:
+            name_var.value = self.type_prefix
+        self.global_vars['__name__'] = name_var
+
 
     def process(self, translator: 'Translator') -> None:
-        if self.type_prefix:
-            # If this is not the global module, add a __file__ variable
-            file_var = PythonGlobalVar('__file__', None,
-                                       self.global_module.classes[STRING_TYPE])
-            self.global_vars['__file__'] = file_var
+        defined_var_name = self.get_fresh_name('module_defined')
+        self.defined_var = defined_var_name
+        names_var_name = self.get_fresh_name('module_names')
+        self.names_var = names_var_name
+
         for name, cls in self.classes.items():
             if name == cls.name:
                 # if this is not a type alias
@@ -1312,6 +1332,10 @@ class PythonGlobalVar(PythonVarBase):
         super().__init__(name, node, type)
         self.cls = cls
         self.overrides = None
+
+    @property
+    def is_final(self) -> bool:
+        return not self.writes
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)
