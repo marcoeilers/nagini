@@ -637,7 +637,7 @@ class StatementTranslator(CommonTranslator):
         ast.Starred).
 
         In addition to assignment statements, returns a list of assertions
-        which are known to hold after the asignment, to be used in loop
+        which are known to hold after the assignment, to be used in loop
         invariants.
         """
         position = self.to_position(node, ctx)

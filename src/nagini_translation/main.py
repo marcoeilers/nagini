@@ -80,23 +80,20 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    builtins = []
-    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
-        sil_interface = [file.read()]
 
-    modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    type_correct = types.check(os.path.abspath(path))
+    type_correct = types.check(path)
     if not type_correct:
         return None
+
     if sif:
         analyzer = SIFAnalyzer(types, path, selected)
     else:
         analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    for si in sil_interface:
-        analyzer.add_native_silver_builtins(json.loads(si))
+    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
+        analyzer.add_native_silver_builtins(json.loads(file.read()))
 
     collect_modules(analyzer, path)
     if sif:
