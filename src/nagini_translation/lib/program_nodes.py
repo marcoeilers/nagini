@@ -766,6 +766,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.cls = cls
         self.overrides = None  # infer
         self._locals = OrderedDict()  # direct
+        self.globals = set()
         self._args = OrderedDict()  # direct
         self._special_vars = OrderedDict()  # direct
         self._io_existential_vars = OrderedDict()

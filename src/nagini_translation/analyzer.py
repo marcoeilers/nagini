@@ -823,13 +823,16 @@ class Analyzer(ast.NodeVisitor):
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
-                        msg = ('only simple assignments and reads allowed for '
-                               'global variables')
-                        raise UnsupportedException(assign, msg)
-                    var.value = assign.value
+                        pass
+                        # msg = ('only simple assignments and reads allowed for '
+                        #        'global variables')
+                        # raise UnsupportedException(assign, msg)
+                    else:
+                        var.value = assign.value
                     self.module.global_vars[node.id] = var
                 var = self.module.global_vars[node.id]
                 self.track_access(node, var)
+                return
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
@@ -853,7 +856,8 @@ class Analyzer(ast.NodeVisitor):
                     # again now that we now it's actually static.
                     del self.current_class.fields[node.id]
                 return
-        if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+        # We're in a function
+        if isinstance(node.ctx, ast.Store):
             # Node is a local variable, lambda argument, or a global variable
             # that hasn't been encountered yet
             var = None
@@ -879,8 +883,8 @@ class Analyzer(ast.NodeVisitor):
                 return
             else:
                 # We don't know this identifier yet, so it must be something
-                # new
-                if isinstance(node.ctx, ast.Store):
+                # new.
+                if node.id not in self.current_function.globals:
                     # Assume it's the first write to a local variable
                     var = self.node_factory.create_python_var(node.id,
                                                               node,
@@ -889,13 +893,14 @@ class Analyzer(ast.NodeVisitor):
                     var.alt_types = alts
                     self.current_function.locals[node.id] = var
                 else:
-                    # This is a read of a variable we don't know, so it must
-                    # be a global variable whose definition comes after the
-                    # current method. Any local variable would first be accessed
-                    # with a write.
-                    var = self.node_factory.create_python_global_var(
-                        node.id, node, self.typeof(node))
-                    self.module.global_vars[node.id] = var
+                    if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+                        # Assume it's the first write to a local variable
+                        var = self.node_factory.create_python_global_var(
+                            node.id, node, self.typeof(node))
+                        alts = self.get_alt_types(node)
+                        var.alt_types = alts
+                        self.module.global_vars[node.id] = var
+
             self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
@@ -916,6 +921,15 @@ class Analyzer(ast.NodeVisitor):
             field = receiver.add_field(node.attr, node, self.typeof(node))
             if isinstance(field, PythonField):
                 self.track_access(node, field)
+
+    def visit_Global(self, node: ast.Global) -> None:
+        for name in node.names:
+            if name in self.current_function.locals:
+                raise InvalidProgramException('invalid.global.statement')
+            self.current_function.globals.add(name)
+
+    def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+        raise UnsupportedException(node)
 
     def convert_type(self, mypy_type, node=None) -> PythonType:
         """

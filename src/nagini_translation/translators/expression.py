@@ -9,6 +9,7 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
+    GLOBAL_VAR_FIELD,
     INT_TYPE,
     LIST_TYPE,
     OPERATOR_FUNCTIONS,
@@ -553,9 +554,20 @@ class ExpressionTranslator(CommonTranslator):
                 return [], field_func
             var = target
             type = self.translate_type(var.type, ctx)
-            func_app = self.viper.FuncApp(var.sil_name, [], position,
-                                          self.no_info(ctx), type, [])
-            return [], func_app
+
+            if not target.is_final:
+                func_app = self.viper.FuncApp(var.sil_name, [], position,
+                                              self.no_info(ctx), self.viper.Ref, [])
+                global_field = self.viper.Field(GLOBAL_VAR_FIELD, type, position,
+                                                self.no_info(ctx))
+                res = self.viper.FieldAccess(func_app, global_field, position,
+                                             self.no_info(ctx))
+            else:
+                res = self.viper.FuncApp(var.sil_name, [], position,
+                                              self.no_info(ctx), type, [])
+            if not isinstance(node.ctx, ast.Store):
+                res = self.wrap_definedness_check(res, target, node, ctx)
+            return [], res
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],
                                             self.viper.function_domain_type(),
@@ -579,12 +591,12 @@ class ExpressionTranslator(CommonTranslator):
                     not (ctx.actual_function.pure or ctx.actual_function.predicate) and
                     not isinstance(node.ctx, ast.Store) and
                     self.is_local_variable(var, ctx)):
-                result = self.wrap_definedness_check(var, node, ctx)
+                result = self.wrap_definedness_check(var.ref(node, ctx), var, node, ctx)
             else:
                 result = var.ref(node, ctx)
             return [], result
 
-    def wrap_definedness_check(self, var: PythonVar, node: ast.AST,
+    def wrap_definedness_check(self, e: Expr, var: PythonVar, node: ast.AST,
                                ctx: Context) -> Expr:
         """
         Create an access to the given variable, wrapped into a function call which checks
@@ -595,7 +607,7 @@ class ExpressionTranslator(CommonTranslator):
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
         id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
-        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [var.ref(node, ctx), id], pos, info,
+        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [e, id], pos, info,
                                   self.viper.Ref, [var_param_decl, id_param_decl])
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:

@@ -757,6 +757,9 @@ class MethodTranslator(CommonTranslator):
             locals.append(module.defined_var[0])
             locals.append(module.names_var[0])
             for var in module.global_vars.values():
+                if var.name in ('__name__', '__file__'):
+                    stmts.append(self.set_var_defined(var, no_pos, no_info))
+                    continue
                 if var.is_final:
                     continue
                 var_type = self.translate_type(var.type, ctx)
