@@ -107,5 +107,9 @@ REASONS = {
         lambda n: ('Loop condition part {} is not framed at the point where '
                    'obligation is used.'.format(pprint(n))),
     'undefined.local.variable':
-        lambda n: 'Local variable may not have been defined.'
+        lambda n: 'Local variable may not have been defined.',
+    'undefined.global.name':
+        lambda n: 'Global name may not have been defined.',
+    'missing.dependencies':
+        lambda n: 'Global dependencies may not be defined.'
 }

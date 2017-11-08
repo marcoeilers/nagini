@@ -3,6 +3,7 @@ import ast
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    ASSERTING_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
@@ -11,13 +12,14 @@ from nagini_translation.lib.constants import (
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
-from nagini_translation.lib.errors import Rules
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
+    PythonNode,
     PythonType,
     PythonVar,
 )
@@ -181,7 +183,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
-            rules: Rules=None) -> 'silver.ast.Position':
+            rules: rules.Rules=None) -> 'silver.ast.Position':
         """
         Extracts the position from a node, assigns an ID to the node and stores
         the node and the position in the context for it.
@@ -190,7 +192,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                       ctx.module.file)
 
     def no_position(self, ctx: Context, error_string: str=None,
-            rules: Rules=None) -> 'silver.ast.Position':
+            rules: rules.Rules=None) -> 'silver.ast.Position':
         return self.to_position(None, ctx, error_string, rules)
 
     def to_info(self, comments: List[str], ctx: Context) -> 'silver.ast.Info':
@@ -254,6 +256,90 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
                                         self.viper.Bool, [id_param_decl])
         return self.viper.Inhale(is_defined, position, info)
+
+    def set_global_defined(self, declaration: PythonNode, module: PythonModule,
+                           node: ast.AST, ctx: Context):
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        module_set = module.names_var[1]
+        decl_id = self.viper.IntLit(self._get_string_value(declaration.sil_name), pos,
+                                    info)
+        contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+        return self.viper.Inhale(contains, pos, info)
+
+    def _get_global_definedness_conditions(self, declaration: PythonNode,
+                                           module: PythonModule, ref_node: ast.AST,
+                                           ctx: Context):
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        info = self.no_info(ctx)
+        module_set = module.names_var[1]
+        decl_id = self.viper.IntLit(self._get_string_value(declaration.sil_name), pos,
+                                    info)
+        contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+
+        deps = set()
+        if isinstance(declaration, (PythonMethod, PythonClass)):
+            declaration.add_all_call_deps(deps)
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        deps_defined = self.viper.TrueLit(pos, info)
+        for decl, mod, *cond in deps:
+            module_set = mod.names_var[1]
+            decl_id = self.viper.IntLit(self._get_string_value(decl.sil_name), pos,
+                                        info)
+            contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+            if cond:
+                module_set = cond[0].module.names_var[1]
+                decl_id = self.viper.IntLit(self._get_string_value(cond[0].sil_name), pos,
+                                            info)
+                cond_contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+                contains = self.viper.Implies(cond_contains, contains, pos, info)
+            deps_defined = self.viper.And(deps_defined, contains, pos, info)
+
+        return [contains, deps_defined]
+
+    def assert_global_defined(self, declaration: PythonNode, module: PythonModule,
+                              ref_node: ast.AST, ctx: Context):
+        info = self.no_info(ctx)
+        name, deps = self._get_global_definedness_conditions(declaration, module,
+                                                             ref_node, ctx)
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        assert_name = self.viper.Assert(name, pos, info)
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        assert_deps = self.viper.Assert(deps, pos, info)
+        return [assert_name, assert_deps]
+
+    def wrap_global_defined_check(self, val: Expr, declaration: PythonNode,
+                                  module: PythonModule, ref_node: ast.AST,
+                                  ctx: Context):
+        info = self.no_info(ctx)
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg,
+                               rules=rules.GLOBAL_NAME_NOT_DEFINED)
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        deps_pos = self.to_position(ref_node, ctx, error_string=msg,
+                                    rules=rules.DEPENDENCIES_NOT_DEFINED)
+        name, deps = self._get_global_definedness_conditions(declaration, module,
+                                                             ref_node, ctx)
+        assertion_param_decl = self.viper.LocalVarDecl('ass',
+                                                       self.viper.Bool, pos,
+                                                       info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        deps_func = self.viper.FuncApp(ASSERTING_FUNC, [val, deps], deps_pos, info,
+                                       self.viper.Ref, [var_param_decl,
+                                                        assertion_param_decl])
+        name_func = self.viper.FuncApp(ASSERTING_FUNC, [deps_func, name], pos, info,
+                                       self.viper.Ref, [var_param_decl,
+                                                        assertion_param_decl])
+        return name_func
+
+    def _is_main_method(self, ctx: Context) -> bool:
+        if not ctx.current_function:
+            return False
+        return ctx.current_function.name == '__main__'
 
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
                            ctx: Context) -> Expr:

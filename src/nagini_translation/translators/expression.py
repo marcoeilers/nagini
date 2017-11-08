@@ -564,9 +564,10 @@ class ExpressionTranslator(CommonTranslator):
                                              self.no_info(ctx))
             else:
                 res = self.viper.FuncApp(var.sil_name, [], position,
-                                              self.no_info(ctx), type, [])
-            if not isinstance(node.ctx, ast.Store):
-                res = self.wrap_definedness_check(res, target, node, ctx)
+                                         self.no_info(ctx), type, [])
+            if not isinstance(node.ctx, ast.Store) and self._is_main_method(ctx):
+                res = self.wrap_global_defined_check(res, target, ctx.module, node,
+                                                     ctx)
             return [], res
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],

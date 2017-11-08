@@ -742,7 +742,7 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         false_lit = self.viper.FalseLit(no_pos, no_info)
-        empty_set = self.viper.EmptySeq(self.viper.Int, no_pos, no_info)
+        # empty_set = self.viper.EmptySeq(self.viper.Int, no_pos, no_info)
         locals = []
         global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
         full_perm = self.viper.FullPerm(no_pos, no_info)
@@ -752,13 +752,13 @@ class MethodTranslator(CommonTranslator):
             self._initialize_module(module, ctx)
             stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
                                                    false_lit, no_pos, no_info))
-            stmts.append(self.viper.LocalVarAssign(module.names_var[1],
-                                                   empty_set, no_pos, no_info))
+            # stmts.append(self.viper.LocalVarAssign(module.names_var[1],
+            #                                        empty_set, no_pos, no_info))
             locals.append(module.defined_var[0])
             locals.append(module.names_var[0])
             for var in module.global_vars.values():
                 if var.name in ('__name__', '__file__'):
-                    stmts.append(self.set_var_defined(var, no_pos, no_info))
+                    stmts.append(self.set_global_defined(var, module, None, ctx))
                     continue
                 if var.is_final:
                     continue
@@ -775,6 +775,11 @@ class MethodTranslator(CommonTranslator):
         method_name = ctx.module.get_fresh_name('main')
         ctx.current_function = PythonMethod('__main__', main, None, main, False, False,
                                             main.node_factory)
+        ctx.current_function.try_blocks = main.try_blocks
+        ctx.current_function.labels = main.labels
+        ctx.current_function.precondition = main.precondition
+        ctx.current_function.postcondition = main.postcondition
+        ctx.current_function.loop_invariants = main.loop_invariants
         ctx.current_function.process(method_name, self.translator)
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))

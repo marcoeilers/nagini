@@ -18,6 +18,7 @@ from nagini_translation.lib.program_nodes import (
     PythonField,
     PythonGlobalVar,
     PythonMethod,
+    PythonNode,
     PythonType,
     PythonVar,
 )
@@ -59,19 +60,32 @@ class StatementTranslator(CommonTranslator):
         return visitor(node, ctx)
 
     def _execute_module_statements(self, path, ctx: Context):
+        # set current module
+        # set stmtcontainer attributes
+        # translate statements
+        # revert state
         pass
 
     def translate_stmt_ImportFrom(self, node: ast.ImportFrom, ctx: Context) -> List[Stmt]:
+        # ignore builtin ones
         path = ...
-
-    def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
-        pass
-
-    def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
         return []
 
+    def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
+        # ignore builtin ones
+        path = ...
+        return []
+
+    def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
+        assert self._is_main_method(ctx)
+        method = ctx.module.get_func_or_method(node.name)
+        return [self.set_global_defined(method, ctx.module, node, ctx)]
+
     def translate_stmt_ClassDef(self, node: ast.ClassDef, ctx: Context) -> List[Stmt]:
-        pass
+        assert self._is_main_method(ctx)
+        # static field definitions
+        cls = ctx.module.classes[node.name]
+        return [self.set_global_defined(cls, ctx.module, node, ctx)]
 
     def translate_stmt_Global(self, node: ast.Global, ctx: Context) -> List[Stmt]:
         return []
@@ -711,10 +725,10 @@ class StatementTranslator(CommonTranslator):
                 def assignment(lhs, rhs, pos, info):
                     eq = self.viper.EqCmp(lhs, rhs, pos, info)
                     return self.viper.Inhale(eq, position, info)
-                after_assign.append(self.set_var_defined(target, position, info))
             else:
                 assignment = self.viper.FieldAssign
-                after_assign.append(self.set_var_defined(target, position, info))
+            if self._is_main_method(ctx):
+                after_assign.append(self.set_global_defined(target, ctx.module, node, ctx))
         elif isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
             if self.is_local_variable(target, ctx):

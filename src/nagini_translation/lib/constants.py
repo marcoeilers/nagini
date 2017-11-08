@@ -24,7 +24,13 @@ MAY_SET_PRED = '_MaySet'
 
 IS_DEFINED_FUNC = '_isDefined'
 
+ASSERTING_FUNC = '_asserting'
+
+GLOBAL_IS_DEFINED_FUNC = '_isDefinedG'
+
 CHECK_DEFINED_FUNC = '_checkDefined'
+
+GLOBAL_CHECK_DEFINED_FUNC = '_checkDefinedG'
 
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
 

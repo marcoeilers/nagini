@@ -97,7 +97,16 @@ class PythonScope:
             return self
 
 
-class PythonModule(PythonScope, ContainerInterface):
+class PythonStatementContainer:
+    def __init__(self):
+        self.labels = [END_LABEL]
+        self.precondition = []
+        self.postcondition = []
+        self.try_blocks = []  # direct
+        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
+
+
+class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
@@ -116,7 +125,8 @@ class PythonModule(PythonScope, ContainerInterface):
         if sil_names is None:
             sil_names = set(VIPER_KEYWORDS + INTERNAL_NAMES)
             sil_names |= set([RESULT_NAME, ERROR_NAME, END_LABEL])
-        super().__init__(sil_names, None)
+        PythonScope.__init__(self, sil_names, None)
+        PythonStatementContainer.__init__(self)
         self.node = node
         self.classes = OrderedDict()
         self.functions = OrderedDict()
@@ -317,8 +327,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
+        self.direct_subclasses = []
         self.node_factory = node_factory
         self.superclass = superclass
+        if superclass:
+            superclass.direct_subclasses.append(self)
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.static_methods = OrderedDict()
@@ -330,6 +343,21 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
+        self.definition_deps = set()
+
+    @property
+    def all_subclasses(self):
+        res = [self]
+        for sub in self.direct_subclasses:
+            res.extend(sub.all_subclasses)
+        return res
+
+    @property
+    def call_deps(self):
+        constructor = self.get_method('__init__')
+        if constructor:
+            return constructor.call_deps
+        return set()
 
     @property
     def all_methods(self) -> Set[str]:
@@ -735,8 +763,7 @@ class MethodType(Enum):
     static_method = 1
     class_method = 2
 
-
-class PythonMethod(PythonNode, PythonScope, ContainerInterface):
+class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementContainer):
     """
     Represents a Python function which may be pure or impure, belong
     to a class or not
@@ -760,6 +787,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
+        PythonStatementContainer.__init__(self)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
@@ -778,23 +806,26 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.result = None  # infer
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
-        self.precondition = []
-        self.postcondition = []
-        self.try_blocks = []  # direct
         self.pure = pure
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
         self.interface_dict = interface_dict
         self.node_factory = node_factory
-        self.labels = [END_LABEL]
         self.method_type = method_type
         self.obligation_info = None
-        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
         self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.definition_deps = set()
+        self.call_deps = set()
+
+    def add_all_call_deps(self, res):
+        for dep in self.call_deps:
+            if dep not in res:
+                res.add(dep)
+                dep[0].add_all_call_deps(res)
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1187,7 +1218,7 @@ class PythonTryBlock(PythonNode):
 
     def __init__(self, node: ast.AST, try_name: str,
                  node_factory: 'ProgramNodeFactory',
-                 method: PythonMethod,
+                 method: PythonStatementContainer,
                  protected_region: ast.AST):
         """
         :param node_factory: Factory to create PythonVar objects.
@@ -1227,7 +1258,7 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
-        self.method.locals[sil_name] = result
+        # self.method.locals[sil_name] = result
         self.finally_var = result
         return result
 
@@ -1243,7 +1274,7 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
-        self.method.locals[sil_name] = result
+        # self.method.locals[sil_name] = result
         self.error_var = result
         return result
 

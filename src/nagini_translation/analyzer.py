@@ -86,6 +86,13 @@ class Analyzer(ast.NodeVisitor):
         self.selected = selected
 
     @property
+    def stmt_container(self):
+        if self.current_function is not None:
+            return self.current_function
+        else:
+            return self.module
+
+    @property
     def node_factory(self):
         if not self._node_factory:
             self._node_factory = ProgramNodeFactory()
@@ -302,8 +309,6 @@ class Analyzer(ast.NodeVisitor):
         self.visit(self.asts[module], None)
 
     def visit_Module(self, node: ast.Module) -> None:
-        # Top level elements may only be imports, classes, functions, or global
-        # var assignments.
         for stmt in node.body:
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
                                  ast.ImportFrom, ast.Assign)):
@@ -530,11 +535,9 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = None
 
     def visit_loop(self, node: Union[ast.While, ast.For]) -> None:
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level loop')
         old_loop_invariant = self.current_loop_invariant
-        self.current_function.loop_invariants[node] = []
-        self.current_loop_invariant = self.current_function.loop_invariants[
+        self.stmt_container.loop_invariants[node] = []
+        self.current_loop_invariant = self.stmt_container.loop_invariants[
             node]
         if isinstance(node, ast.While):
             self.visit(node.test, node)
@@ -721,10 +724,10 @@ class Analyzer(ast.NodeVisitor):
             if not self.current_function or self.current_function.predicate:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
-                self.current_function.precondition.append(
+                self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Ensures':
-                self.current_function.postcondition.append(
+                self.stmt_container.postcondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
@@ -1111,41 +1114,37 @@ class Analyzer(ast.NodeVisitor):
         With-blocks get translated to try-finally-blocks, so we create a
         PythonTryBlock here.
         """
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level with statement')
         self.visit_default(node)
-        try_name = self.current_function.get_fresh_name('with')
+        try_name = self.stmt_container.get_fresh_name('with')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
         try_block.sil_name = try_name
-        self.current_function.labels.append(try_name)
-        post_name = self.current_function.get_fresh_name('post_with')
+        self.stmt_container.labels.append(try_name)
+        post_name = self.stmt_container.get_fresh_name('post_with')
         try_block.post_name = post_name
-        self.current_function.labels.append(post_name)
-        finally_name = self.current_function.get_fresh_name('with_finally')
+        self.stmt_container.labels.append(post_name)
+        finally_name = self.stmt_container.get_fresh_name('with_finally')
         if len(node.items) != 1:
             msg = 'with block may only have one item'
             raise UnsupportedException(node, msg)
         try_block.with_item = node.items[0]
         try_block.finally_name = finally_name
-        self.current_function.labels.append(finally_name)
-        self.current_function.try_blocks.append(try_block)
+        self.stmt_container.labels.append(finally_name)
+        self.stmt_container.try_blocks.append(try_block)
 
     def visit_Try(self, node: ast.Try) -> None:
         """
         Creates PythonTryBlocks and PythonExceptionHandlers.
         """
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level try statement')
-        try_name = self.current_function.get_fresh_name('try')
+        try_name = self.stmt_container.get_fresh_name('try')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
-                                   self.current_function, node.body)
+                                   self.stmt_container, node.body)
         try_block.sil_name = try_name
-        self.current_function.labels.append(try_name)
-        post_name = self.current_function.get_fresh_name('post_try')
+        self.stmt_container.labels.append(try_name)
+        post_name = self.stmt_container.get_fresh_name('post_try')
         try_block.post_name = post_name
-        self.current_function.labels.append(post_name)
-        self.current_function.try_blocks.append(try_block)
+        self.stmt_container.labels.append(post_name)
+        self.stmt_container.try_blocks.append(try_block)
         for handler in node.handlers:
             if handler.type:
                 handler_type = self.find_or_create_target_class(handler.type)
@@ -1153,23 +1152,23 @@ class Analyzer(ast.NodeVisitor):
                 # Handler has no explicit type, therefore catches any kind
                 # of exception.
                 handler_type = self.module.global_module.classes['Exception']
-            handler_name = self.current_function.get_fresh_name(
+            handler_name = self.stmt_container.get_fresh_name(
                 'handler' + handler_type.name)
             py_handler = PythonExceptionHandler(handler, handler_type,
                                                 try_block, handler_name,
                                                 handler.body, handler.name)
-            self.current_function.labels.append(handler_name)
+            self.stmt_container.labels.append(handler_name)
             try_block.handlers.append(py_handler)
         if node.orelse:
-            handler_name = self.current_function.get_fresh_name('try_else')
+            handler_name = self.stmt_container.get_fresh_name('try_else')
             py_handler = PythonExceptionHandler(node, None, try_block,
                                                 handler_name, node.orelse, None)
             try_block.else_block = py_handler
         if node.finalbody:
-            finally_name = self.current_function.get_fresh_name('try_finally')
+            finally_name = self.stmt_container.get_fresh_name('try_finally')
             try_block.finally_block = node.finalbody
             try_block.finally_name = finally_name
-            self.current_function.labels.append(finally_name)
+            self.stmt_container.labels.append(finally_name)
         self.visit_default(node)
 
     def _incompatible_decorators(self, decorators) -> bool:
