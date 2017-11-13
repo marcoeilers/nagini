@@ -781,6 +781,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function.postcondition = main.postcondition
         ctx.current_function.loop_invariants = main.loop_invariants
         ctx.current_function.process(method_name, self.translator)
+        ctx.module = main
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
 

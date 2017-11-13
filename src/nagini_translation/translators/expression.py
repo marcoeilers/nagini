@@ -660,8 +660,14 @@ class ExpressionTranslator(CommonTranslator):
         param = self.viper.LocalVarDecl('receiver',
                                         self.type_factory.type_type(), position,
                                         info)
-        return self.viper.FuncApp(field.sil_name, [type_arg], position, info,
-                                  field_type, [param])
+        res = self.viper.FuncApp(field.sil_name, [type_arg], position, info,
+                                 field_type, [param])
+        if not field.is_final:
+            global_field = self.viper.Field(GLOBAL_VAR_FIELD, field_type, position,
+                                            self.no_info(ctx))
+            res = self.viper.FieldAccess(res, global_field, position,
+                                         self.no_info(ctx))
+        return res
 
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:

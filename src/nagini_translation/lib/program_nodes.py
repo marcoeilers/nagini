@@ -122,6 +122,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         :param global_module: The module containing globally available elements.
         :param sil_names: Set of all used Silver names, shared between modules.
         """
+        print("creating new " + str(type_prefix))
         if sil_names is None:
             sil_names = set(VIPER_KEYWORDS + INTERNAL_NAMES)
             sil_names |= set([RESULT_NAME, ERROR_NAME, END_LABEL])
@@ -162,7 +163,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
 
 
     def process(self, translator: 'Translator') -> None:
+        self.sil_name = self.get_fresh_name('module')
         defined_var_name = self.get_fresh_name('module_defined')
+        print("processing " + str(self.type_prefix))
         self.defined_var = defined_var_name
         names_var_name = self.get_fresh_name('module_names')
         self.names_var = names_var_name
@@ -234,11 +237,12 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
                 return module_result
         return None
 
-    def get_included_modules(
-            self, include_global: bool = True) -> List['PythonModule']:
+    def get_included_modules(self, already_there: Set['PythonModule'] = (),
+                             include_global: bool = True) -> List['PythonModule']:
         result = [self]
         for p in self.from_imports:
-            result.extend(p.get_included_modules(include_global=False))
+            result.extend(p.get_included_modules(already_there + (self,),
+                                                 include_global=False))
         result.append(self.global_module)
         return result
 
@@ -825,7 +829,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         for dep in self.call_deps:
             if dep not in res:
                 res.add(dep)
-                dep[0].add_all_call_deps(res)
+                dep[1].add_all_call_deps(res)
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

@@ -6,6 +6,7 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
+    PythonGlobalVar,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
@@ -116,6 +117,12 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_predicate(self, pred: PythonMethod,
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
+
+    def translate_static_field_access(self, field: PythonGlobalVar,
+                                      receiver: Union[Expr, PythonType],
+                                      position, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_static_field_access(field, receiver,
+                                                                         position, ctx)
 
     def translate_io_operation(
             self,

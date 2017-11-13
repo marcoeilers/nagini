@@ -67,9 +67,10 @@ class Analyzer(ast.NodeVisitor):
         self.types = types
         self.global_module = PythonModule(types, self.node_factory, None, None, None)
         self.global_module.global_module = self.global_module
+        file = path.split(os.sep)[-1]
         self.module = PythonModule(types, self.node_factory, '__main__',
                                    self.global_module, None,
-                                   sil_names=self.global_module.sil_names)
+                                   sil_names=self.global_module.sil_names, file=file)
         self.current_class = None
         self.current_function = None
         self.current_scopes = []
@@ -121,7 +122,7 @@ class Analyzer(ast.NodeVisitor):
                  name in container.static_methods)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
-    def collect_imports(self, abs_path: str, main_module=False) -> None:
+    def collect_imports(self, abs_path: str) -> None:
         """
         Parses the file at the given location, puts the result into self.asts.
         Scans the parsed file for Import-statements and adds all imported paths
@@ -139,8 +140,7 @@ class Analyzer(ast.NodeVisitor):
         except Exception:
             # Ignore
             pass
-        if main_module:
-            self.module.node = parse_result
+        self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
         logger.debug(nagini_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
@@ -350,7 +350,7 @@ class Analyzer(ast.NodeVisitor):
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.extend(container.module.get_included_modules())
         else:
-            containers.extend(container.get_included_modules())
+            containers.extend(container.get_included_modules(()))
         return do_get_target(node, containers, container)
 
     def find_or_create_class(self, name: str, module=None) -> PythonClass:
@@ -372,7 +372,7 @@ class Analyzer(ast.NodeVisitor):
         if not module:
             module = self.module
         # Check all imported modules for the class.
-        for visible_module in module.get_included_modules(True):
+        for visible_module in module.get_included_modules((), True):
             if name in visible_module.classes:
                 cls = visible_module.classes[name]
                 break
@@ -919,11 +919,14 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript)):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
-                return
-            receiver = self.typeof(node.value)
-            field = receiver.add_field(node.attr, node, self.typeof(node))
-            if isinstance(field, PythonField):
-                self.track_access(node, field)
+                real_target = self.get_target(node, self.module)
+                if isinstance(real_target, PythonGlobalVar):
+                    self.track_access(node, real_target)
+            else:
+                receiver = self.typeof(node.value)
+                field = receiver.add_field(node.attr, node, self.typeof(node))
+                if isinstance(field, PythonField):
+                    self.track_access(node, field)
 
     def visit_Global(self, node: ast.Global) -> None:
         for name in node.names:

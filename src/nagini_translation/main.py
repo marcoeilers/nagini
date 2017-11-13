@@ -121,7 +121,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     """
     main_module = analyzer.module
     analyzer.module_index = 0
-    analyzer.collect_imports(path, main_module=True)
+    analyzer.collect_imports(path)
 
     for module in analyzer.module_paths:
         if module.startswith('mod$'):

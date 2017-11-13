@@ -174,7 +174,7 @@ class CallTranslator(CommonTranslator):
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
 
-        self._add_dependencies(target_class, ctx)
+        self._add_dependencies(node.func, target_class, ctx)
         defined_check = []
         if self._is_main_method(ctx):
             defined_check = self.assert_global_defined(target_class, ctx.module, node,
@@ -292,7 +292,7 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        self._add_dependencies(target, ctx)
+        self._add_dependencies(node.func, target, ctx)
         defined_check = []
         if self._is_main_method(ctx) and not target.cls:
             defined_check = self.assert_global_defined(target, ctx.module, node, ctx)
@@ -305,17 +305,17 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + defined_check + call,
                 result_var.ref() if result_var else None)
 
-    def _add_dependencies(self, target: PythonMethod, ctx: Context):
+    def _add_dependencies(self, reference: ast.AST, target: PythonMethod, ctx: Context):
         if not self._is_main_method(ctx):
             if ctx.current_function:
                 current_container = ctx.current_function.call_deps
             else:
                 current_container = ctx.current_class.definition_deps
-            if target.cls and target.method_type == MethodType.normal:
+            if isinstance(target, PythonMethod) and target.cls and target.method_type == MethodType.normal:
                 for subclass in target.cls.all_subclasses:
-                    current_container.add((target, ctx.module, subclass))
+                    current_container.add((reference, target, ctx.module, subclass))
             else:
-                current_container.add((target, ctx.module))
+                current_container.add((reference, target, ctx.module))
 
     def _translate_function_call(self, target: PythonMethod, args: List[Expr],
                                  formal_args: List[Expr], arg_stmts: List[Stmt],
@@ -325,7 +325,7 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        self._add_dependencies(target, ctx)
+        self._add_dependencies(node.func, target, ctx)
         if not target.cls and self._is_main_method(ctx):
             call = self.wrap_global_defined_check(call, target, ctx.module, node, ctx)
         return arg_stmts, call

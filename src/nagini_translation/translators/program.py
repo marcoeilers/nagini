@@ -5,6 +5,7 @@ from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     CHECK_DEFINED_FUNC,
+    COMBINE_NAME_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
     GLOBAL_CHECK_DEFINED_FUNC,
@@ -396,14 +397,23 @@ class ProgramTranslator(CommonTranslator):
 
     def translate_default_args(self, method: PythonMethod,
                                ctx: Context) -> None:
+        definition_deps = method.definition_deps
+        if method.cls:
+            definition_deps = method.cls.definition_deps
         for arg in method.args.values():
+            if arg.node and arg.node.annotation and not isinstance(arg.node.annotation, ast.Str):
+                type = self.get_target(arg.node.annotation, ctx)
+                if not type.interface:
+                    definition_deps.add((arg.node.annotation, type, method.module))
             if arg.default:
                 stmt, expr = self.translate_expr(arg.default, ctx)
-                if stmt:
-                    raise InvalidProgramException(arg.default,
-                                                  'purity.violated')
-                assert expr
-                arg.default_expr = expr
+                if not stmt and expr:
+                    arg.default_expr = expr
+        if method.node and method.node.returns and not isinstance(method.node.returns, ast.Str):
+            type = self.get_target(method.node.returns, ctx)
+            if not type.interface:
+                definition_deps.add((method.node.returns, type, method.module))
+
 
     def _create_predefined_fields(self,
                                   ctx: Context) -> List[Field]:
@@ -574,8 +584,10 @@ class ProgramTranslator(CommonTranslator):
                                                  [var_param_decl, id_param_decl],
                                                  self.viper.Ref, [is_defined_pre], [],
                                                  var_param, pos, info)
+        cont_param_decl = self.viper.LocalVarDecl('cont', self.viper.Int, pos, info)
+        combine_func = self.viper.Function(COMBINE_NAME_FUNC, [cont_param_decl, id_param_decl], self.viper.Int, [], [], None, pos, info)
 
-        return [is_defined_func, check_defined_func]
+        return [is_defined_func, check_defined_func, combine_func]
 
     def create_global_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)

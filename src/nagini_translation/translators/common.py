@@ -4,6 +4,7 @@ from abc import ABCMeta
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
+    COMBINE_NAME_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
@@ -267,6 +268,24 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
         return self.viper.Inhale(contains, pos, info)
 
+    def reference_identifier(self, ref, pos, info):
+        decl_id = None
+        for name in reversed(self._get_name_parts(ref)):
+            current = self.viper.IntLit(self._get_string_value(name), pos,
+                                        info)
+            if decl_id is None:
+                decl_id = current
+            else:
+                name_var_decl = self.viper.LocalVarDecl('id',
+                                                        self.viper.Int, pos, info)
+                module_name_decl = self.viper.LocalVarDecl('name', self.viper.Int,
+                                                           pos, info)
+                decl_id = self.viper.FuncApp(COMBINE_NAME_FUNC, [current,
+                                                                 decl_id],
+                                             pos, info, self.viper.Int,
+                                             [module_name_decl, name_var_decl])
+        return decl_id
+
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
                                            ctx: Context):
@@ -284,10 +303,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         msg = 'all dependencies of "' + declaration.name + '" are defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
-        for decl, mod, *cond in deps:
+        for ref, decl, mod, *cond in deps:
             module_set = mod.names_var[1]
-            decl_id = self.viper.IntLit(self._get_string_value(decl.sil_name), pos,
-                                        info)
+            decl_id = self.reference_identifier(ref, pos, info)
             contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
             if cond:
                 module_set = cond[0].module.names_var[1]
@@ -298,6 +316,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             deps_defined = self.viper.And(deps_defined, contains, pos, info)
 
         return [contains, deps_defined]
+
+    def _get_name_parts(self, node: ast.AST):
+        if isinstance(node, ast.Name):
+            return [node.id]
+        if isinstance(node, ast.Attribute):
+            pref = self._get_name(node.value)
+            return pref + [node.attr]
+        return [node.name]
+
+    def _get_name(self, node: ast.AST):
+        return '.'.join(self._get_name_parts(node))
 
     def assert_global_defined(self, declaration: PythonNode, module: PythonModule,
                               ref_node: ast.AST, ctx: Context):
@@ -551,7 +580,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             containers.extend(container.module.get_included_modules())
         else:
             # Assume module
-            containers.extend(container.get_included_modules())
+            containers.extend(container.get_included_modules(()))
         result = do_get_target(node, containers, container)
         return result
 

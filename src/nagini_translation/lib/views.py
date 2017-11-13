@@ -1,6 +1,6 @@
 import copy
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 
 class CombinedDict:
@@ -30,12 +30,17 @@ class CombinedDict:
         raise KeyError(item)
 
     def __contains__(self, item):
+        return self.contains(item, None)
+
+    def contains(self, item, caller_module):
         key = item
         if self.names:
             if not key in self.names:
                 return False
             key = self.names[key]
         for d in self.dicts:
+            if d is caller_module:
+                continue
             if key in d:
                 return True
         return False
@@ -76,14 +81,14 @@ class ModuleDictView:
         We do this lazily because included module information may not be
         complete when we create this object.
         """
-        modules = self.module.get_included_modules(include_global=False)
+        modules = self.module.get_included_modules((), include_global=False)
         dicts = [getattr(m, self.field) for m in modules]
         self._dict = CombinedDict(self.names, dicts)
 
     def __contains__(self, item):
         if self._dict is None:
             self.initialize()
-        return item in self._dict
+        return self._dict.contains(item, self)
 
     def __getitem__(self, item):
         if self._dict is None:
@@ -98,6 +103,7 @@ class PythonModuleView:
     """
     def __init__(self, module: 'PythonModule', names: List[Tuple[str, str]]):
         self.module = copy.copy(module)
+        self.original_module = module
         for field in ['functions', 'methods', 'static_methods', 'namespaces',
                       'predicates', 'classes', 'global_vars', 'io_operations']:
             lazy_dict = ModuleDictView(names, module, field)
@@ -106,8 +112,11 @@ class PythonModuleView:
     def get_contents(self, only_top: bool):
         return self.module.get_contents(only_top)
 
-    def get_included_modules(self, include_global: bool=True):
-        return self.module.get_included_modules(include_global)
+    def get_included_modules(self, already_there: Set['PythonModule'],
+                             include_global: bool=True):
+        if self.module in already_there:
+            return []
+        return self.module.get_included_modules(already_there, include_global)
 
     def get_type(self, prefixes, name):
         return self.module.get_type(prefixes, name)
