@@ -896,13 +896,16 @@ class Analyzer(ast.NodeVisitor):
                     var.alt_types = alts
                     self.current_function.locals[node.id] = var
                 else:
-                    if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+                    var = self.get_target(node, self.module)
+                    if not isinstance(var, PythonGlobalVar):
                         # Assume it's the first write to a local variable
                         var = self.node_factory.create_python_global_var(
                             node.id, node, self.typeof(node))
                         alts = self.get_alt_types(node)
                         var.alt_types = alts
                         self.module.global_vars[node.id] = var
+                    self.track_access(node, var)
+
 
             self.track_access(node, var)
 

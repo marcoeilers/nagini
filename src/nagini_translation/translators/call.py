@@ -579,7 +579,7 @@ class CallTranslator(CommonTranslator):
         the values of the arguments. Saves the result in result_var and any
         uncaught exceptions in error_var.
         """
-        old_label_aliases = ctx.label_aliases
+        old_label_aliases = ctx.label_aliases.copy()
         old_var_aliases = ctx.var_aliases
         var_aliases = {}
 

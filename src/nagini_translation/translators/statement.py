@@ -91,8 +91,18 @@ class StatementTranslator(CommonTranslator):
         ctx.module = module
         self.imported_modules.add(module)
 
+        old_label_aliases = ctx.label_aliases.copy()
+        # Create label aliases
+        for label in module.labels:
+            new_label = ctx.current_function.get_fresh_name(label)
+            ctx.label_aliases[label] = new_label
+
+        ctx.added_handlers.append((module, ctx.var_aliases, ctx.label_aliases))
+
         for stmt in module.node.body:
             cond_stmts.extend(self.translate_stmt(stmt, ctx))
+
+        ctx.label_aliases = old_label_aliases
 
         self.imported_modules.remove(module)
         ctx.module = old_module

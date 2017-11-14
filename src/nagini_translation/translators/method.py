@@ -742,6 +742,7 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         false_lit = self.viper.FalseLit(no_pos, no_info)
+        true_lit = self.viper.TrueLit(no_pos, no_info)
         # empty_set = self.viper.EmptySeq(self.viper.Int, no_pos, no_info)
         locals = []
         global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
@@ -750,8 +751,12 @@ class MethodTranslator(CommonTranslator):
             if module.global_module is module:
                 continue
             self._initialize_module(module, ctx)
-            stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
-                                                   false_lit, no_pos, no_info))
+            if module is main:
+                stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
+                                                       true_lit, no_pos, no_info))
+            else:
+                stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
+                                                       false_lit, no_pos, no_info))
             # stmts.append(self.viper.LocalVarAssign(module.names_var[1],
             #                                        empty_set, no_pos, no_info))
             locals.append(module.defined_var[0])
@@ -773,8 +778,9 @@ class MethodTranslator(CommonTranslator):
 
         ctx.current_class = None
         method_name = ctx.module.get_fresh_name('main')
-        ctx.current_function = PythonMethod('__main__', main, None, main, False, False,
-                                            main.node_factory)
+        main_method = PythonMethod('__main__', main, None, main, False, False,
+                                   main.node_factory)
+        ctx.current_function = main_method
         ctx.current_function.try_blocks = main.try_blocks
         ctx.current_function.labels = main.labels
         ctx.current_function.precondition = main.precondition
@@ -785,9 +791,28 @@ class MethodTranslator(CommonTranslator):
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
 
+        end_label = ctx.get_label_name(END_LABEL)
+        stmts.append(self.viper.Goto(end_label, self.no_position(ctx),
+                                    self.no_info(ctx)))
+        assert not ctx.var_aliases
+        for block in main_method.try_blocks:
+            for handler in block.handlers:
+                stmts += self.translate_handler(handler, ctx)
+            if block.else_block:
+                stmts += self.translate_handler(block.else_block, ctx)
+            if block.finally_block or block.with_item:
+                stmts += self.translate_finally(block, ctx)
+        stmts += self.add_handlers_for_inlines(ctx)
 
+        stmts += self._create_method_epilog(main_method, ctx)
+
+        main_locals = [local.decl for local in main_method.get_locals()
+                       if not local.name.startswith('lambda')]
+        for tb in main_method.try_blocks:
+            main_locals.append(tb.error_var.decl)
+            main_locals.append(tb.finally_var.decl)
         body = stmts
-        res = self.create_method_node(ctx, method_name, [], [], [], [], locals, body, no_pos,
+        res = self.create_method_node(ctx, method_name, [], [], [], [], main_locals + locals, body, no_pos,
                                       no_info, method=ctx.current_function)
         ctx.current_function = None
         return res
