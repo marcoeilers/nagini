@@ -88,6 +88,7 @@ class StatementTranslator(CommonTranslator):
         ctx.current_function.precondition = module.precondition
         ctx.current_function.postcondition = module.postcondition
         ctx.current_function.loop_invariants = module.loop_invariants
+        ctx.current_function._module = module
         ctx.module = module
         self.imported_modules.add(module)
 
@@ -106,6 +107,7 @@ class StatementTranslator(CommonTranslator):
 
         self.imported_modules.remove(module)
         ctx.module = old_module
+        ctx.current_function._module = old_module
         ctx.current_function.try_blocks = old_try_blocks
         ctx.current_function.labels = old_try_labels
         ctx.current_function.precondition = old_try_precondition
@@ -158,6 +160,8 @@ class StatementTranslator(CommonTranslator):
         else:
             for alias in node.names:
                 name = alias.name
+                if name == 'schneido':
+                    print("qwe")
                 as_name = alias.asname if alias.asname else alias.name
                 msg = 'name "' + name + '" is defined in imported module'
                 pos = self.to_position(node, ctx, error_string=msg)
@@ -177,18 +181,24 @@ class StatementTranslator(CommonTranslator):
         for name in node.names:
             if name.name in IGNORED_IMPORTS:
                 continue
-            imported_name = self._get_name(name)
-            mod = ctx.module.namespaces[imported_name]
+            imported_name = name.asname if name.asname else name.name
+            name_parts = imported_name.split('.')
+            mod = ctx.module
+            for part in name_parts:
+                mod = mod.namespaces[part]
             stmts.append(self._execute_module_statements(mod, node, ctx))
             name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.viper.Int, pos, info)
             name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.viper.Int, pos, info)
             name_in_imported = self.viper.AnySetContains(name_var_ref, mod.names_var[1], pos, info)
             module_name_decl = self.viper.LocalVarDecl('name', self.viper.Int, pos, info)
-            module_int = self.viper.IntLit(self._get_string_value(mod.sil_name), pos, info)
-            combined_name = self.viper.FuncApp(COMBINE_NAME_FUNC, [module_int,
-                                                                   name_var_ref],
-                                               pos, info, self.viper.Int,
-                                               [module_name_decl, name_var_decl])
+
+            combined_name = name_var_ref
+            for name in reversed(name_parts):
+                name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
+                combined_name = self.viper.FuncApp(COMBINE_NAME_FUNC, [name_int,
+                                                                       combined_name],
+                                                   pos, info, self.viper.Int,
+                                                   [module_name_decl, name_var_decl])
             combined_in_current = self.viper.AnySetContains(combined_name, ctx.module.names_var[1], pos, info)
             impl = self.viper.Implies(name_in_imported, combined_in_current, pos, info)
             assertion = self.viper.Forall([name_var_decl], [], impl, pos, info)
@@ -201,6 +211,8 @@ class StatementTranslator(CommonTranslator):
             method = ctx.current_class.get_func_or_method(node.name)
         else:
             method = ctx.module.get_func_or_method(node.name)
+        if not method:
+            return []
         dep_check = self._check_dependencies_defined(method, node, ctx)
         return dep_check + [self.set_global_defined(method, ctx.module, node, ctx)]
 
@@ -237,9 +249,10 @@ class StatementTranslator(CommonTranslator):
         deps_defined = self.viper.TrueLit(dep_pos, info)
         for ref, decl, mod in py_node.definition_deps:
             module_set = mod.names_var[1]
-            decl_id = self.reference_identifier(ref, dep_pos, info)
-            contains = self.viper.AnySetContains(decl_id, module_set, dep_pos, info)
-            deps_defined = self.viper.And(deps_defined, contains, dep_pos, info)
+            decl_ids = self.reference_identifiers(ref, dep_pos, info)
+            for decl_id in decl_ids:
+                contains = self.viper.AnySetContains(decl_id, module_set, dep_pos, info)
+                deps_defined = self.viper.And(deps_defined, contains, dep_pos, info)
         return [self.viper.Assert(deps_defined, dep_pos, info)]
 
     def translate_stmt_Global(self, node: ast.Global, ctx: Context) -> List[Stmt]:
@@ -286,11 +299,8 @@ class StatementTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         stmt += op_stmt
         result = self.to_ref(result, ctx)
-        if isinstance(node.target, ast.Name):
-            assign = self.viper.LocalVarAssign(left, result, position, info)
-        elif isinstance(node.target, ast.Attribute):
-            assign = self.viper.FieldAssign(left, result, position, info)
-        return stmt + [assign]
+        ass_stmts, _ = self.assign_to(node.target, result, None, None, right_type, node, ctx)
+        return stmt + ass_stmts
 
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
@@ -858,6 +868,9 @@ class StatementTranslator(CommonTranslator):
             return self._assign_with_subscript(lhs, rhs, node, ctx)
 
         target = self.get_target(lhs, ctx)
+        if isinstance(target, PythonType):
+            # We're assigning a type alias
+            return [], []
         if isinstance(target, PythonMethod):
             # We're assigning to a property, so we have to call the method representing
             # the property setter.
@@ -893,6 +906,7 @@ class StatementTranslator(CommonTranslator):
             permission_inhale = self.create_new_field_permission(var, target,
                                                                  position, info, ctx)
             before_assign.append(permission_inhale)
+
         assign_stmt = assignment(var, rhs, position, info)
         assign_val = self.viper.EqCmp(var, rhs, position, info)
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
@@ -1037,6 +1051,13 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            if node.targets[0].id in ctx.module.type_vars:
+                # this is a type var assignment
+                return []
+            if node.targets[0].id in ctx.module.classes:
+                # this is a type alias assignment
+                return []
         if is_get_ghost_output(node):
             return self.translate_get_ghost_output(node, ctx)
         rhs_type = self.get_type(node.value, ctx)

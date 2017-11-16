@@ -55,6 +55,7 @@ class PythonScope:
     def __init__(self, sil_names: Set[str], superscope: 'PythonScope'):
         self.sil_names = sil_names
         self.superscope = superscope
+        self._module = None
 
     def contains_name(self, name: str) -> bool:
         if self.sil_names is not None:
@@ -91,6 +92,8 @@ class PythonScope:
 
     @property
     def module(self) -> 'PythonModule':
+        if self._module is not None:
+            return self._module
         if self.superscope is not None:
             return self.superscope.module
         else:
@@ -150,10 +153,10 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
 
     def initialize(self):
         file_var = PythonGlobalVar('__file__', None,
-                                   self.global_module.classes[STRING_TYPE])
+                                   self.global_module.classes[STRING_TYPE], self)
         self.global_vars['__file__'] = file_var
         name_var = PythonGlobalVar('__name__', None,
-                                   self.global_module.classes[STRING_TYPE])
+                                   self.global_module.classes[STRING_TYPE], self)
         if not self.type_prefix:
             name_var.value = '__main__'
         else:
@@ -1260,7 +1263,8 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
-        # self.method.locals[sil_name] = result
+        if isinstance(self.method, PythonMethod):
+            self.method.locals[sil_name] = result
         self.finally_var = result
         return result
 
@@ -1276,7 +1280,8 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
-        # self.method.locals[sil_name] = result
+        if isinstance(self.method, PythonMethod):
+            self.method.locals[sil_name] = result
         self.error_var = result
         return result
 
@@ -1361,15 +1366,18 @@ class PythonGlobalVar(PythonVarBase):
     Represents a global variable in Python.
     """
 
-    def __init__(self, name: str, node: ast.AST, type: PythonClass,
+    def __init__(self, name: str, node: ast.AST, type: PythonClass, module: PythonModule,
                  cls: PythonClass = None):
         super().__init__(name, node, type)
+        if name == 'a':
+            print("123")
+        self.module = module
         self.cls = cls
         self.overrides = None
 
     @property
     def is_final(self) -> bool:
-        return len(self.writes) <= 1
+        return len(self.writes) <= 1 and self.name not in ('__name__', '__file__')
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)
@@ -1574,14 +1582,14 @@ class ProgramNodeFactory:
         return PythonVar(name, node, type_)
 
     def create_python_global_var(
-            self, name: str, node: ast.AST,
-            type_: PythonClass) -> PythonGlobalVar:
-        return PythonGlobalVar(name, node, type_)
+            self, name: str, node: ast.AST, type_: PythonClass,
+            module: PythonModule) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_, module)
 
     def create_static_field(
-            self, name: str, node: ast.AST, type_: PythonClass,
+            self, name: str, node: ast.AST, type_: PythonClass, module: PythonModule,
             cls: PythonClass) -> PythonGlobalVar:
-        return PythonGlobalVar(name, node, type_, cls)
+        return PythonGlobalVar(name, node, type_, module, cls)
 
     def create_python_io_existential_var(
             self, name: str, node: ast.AST,

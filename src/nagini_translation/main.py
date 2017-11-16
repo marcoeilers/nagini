@@ -123,17 +123,21 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     analyzer.module_index = 0
     analyzer.collect_imports(path)
 
-    for module in analyzer.module_paths:
-        if module.startswith('mod$'):
-            continue
-        if module != os.path.abspath(path):
-            analyzer.contract_only = True
-            analyzer.module = analyzer.modules[module]
-            analyzer.visit_module(module)
-        else:
-            analyzer.module = main_module
-            analyzer.contract_only = False
-            analyzer.visit_module(module)
+    analyzer.analyze()
+
+    # for module in analyzer.module_paths:
+    #     if module.startswith('mod$'):
+    #         continue
+    #     if module != os.path.abspath(path):
+    #         analyzer.contract_only = True
+    #         analyzer.module = analyzer.modules[module]
+    #         analyzer.visit_module(module)
+    #     else:
+    #         analyzer.module = main_module
+    #         analyzer.contract_only = False
+    #         analyzer.visit_module(module)
+    for todo in analyzer.todos:
+        todo()
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,

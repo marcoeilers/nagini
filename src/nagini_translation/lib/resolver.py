@@ -110,16 +110,29 @@ def get_target(node: ast.AST,
                 type_class = module.global_module.classes[LIST_TYPE]
             if node.value.id == 'Tuple':
                 type_class = module.global_module.classes[TUPLE_TYPE]
+            if not type_class:
+                possible_class = get_target(node.value, containers, container)
+                if isinstance(possible_class, PythonType):
+                    type_class = possible_class
             if type_class:
                 args = []
                 if isinstance(node.slice.value, ast.Tuple):
                     args = [get_target(arg, containers, container)
                             for arg in node.slice.value.elts]
-                elif isinstance(node.slice.value, ast.Name):
-                    args = [get_target(node.slice.value, containers, container)]
                 else:
-                    assert False
+                    args = [get_target(node.slice.value, containers, container)]
                 return GenericType(type_class, args)
+            if node.value.id == 'Optional':
+                option = get_target(node.slice.value, containers, container)
+                return OptionalType(option)
+            if node.value.id == 'Union':
+                if isinstance(node.slice.value, ast.Tuple):
+                    elts = [get_target(e, containers, container)
+                            for e in node.slice.value.elts]
+                    return UnionType(elts)
+                else:
+                    return get_target(node.slice.value)
+
     else:
         return None
 

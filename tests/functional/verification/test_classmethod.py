@@ -3,7 +3,7 @@ from nagini_contracts.contracts import *
 
 class A:
     @classmethod
-    def construct(cls) -> A:
+    def construct(cls) -> 'A':
         Ensures(isinstance(Result(), cls))
         return cls()
 
@@ -39,7 +39,7 @@ class D:
         return Acc(self.val1) and self.val1 == 1
 
     @classmethod
-    def construct(cls) -> D:
+    def construct(cls) -> 'D':
         Ensures(type(Result()) is cls)
         Ensures(Result().state())
         d = cls()

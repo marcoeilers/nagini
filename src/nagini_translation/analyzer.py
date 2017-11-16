@@ -85,6 +85,7 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
+        self.todos = []
 
     @property
     def stmt_container(self):
@@ -223,6 +224,11 @@ class Analyzer(ast.NodeVisitor):
                 new_module = PythonModuleView(new_module, names)
             into_mod.from_imports.append(new_module)
 
+
+    def analyze(self) -> None:
+        self.visited_modules = [self.module]
+        self.visit_module(self.module)
+
     def process(self, translator: 'Translator') -> None:
         """
         Performs preprocessing on the result of the analysis, which infers some
@@ -305,8 +311,8 @@ class Analyzer(ast.NodeVisitor):
         else:
             cls.methods[method_name] = method
 
-    def visit_module(self, module: str) -> None:
-        self.visit(self.asts[module], None)
+    def visit_module(self, module) -> None:
+        self.visit(module.node, None)
 
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
@@ -459,6 +465,36 @@ class Analyzer(ast.NodeVisitor):
                 return True
         return False
 
+    def analyze_import(self, module_name):
+        if module_name in IGNORED_IMPORTS:
+            return
+        for mod in self.modules.values():
+            if mod.type_prefix == module_name:
+                module = mod
+                break
+            if mod.type_prefix == '__main__':
+                main_module = mod
+        else:
+            module = main_module
+
+        if module in self.visited_modules:
+            return
+        self.visited_modules.append(module)
+        old_contract_only = self.contract_only
+        self.contract_only = True
+        old_module = self.module
+        self.module = module
+        self.visit_module(module)
+        self.module = old_module
+        self.contract_only = old_contract_only
+
+    def visit_Import(self, node: ast.Import):
+        for name in node.names:
+            self.analyze_import(name.name)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        self.analyze_import(node.module)
+
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
@@ -576,7 +612,7 @@ class Analyzer(ast.NodeVisitor):
                 aliased_type = self.convert_type(type_name)
                 self.module.classes[node.targets[0].id] = aliased_type
                 is_alias = True
-            # If it's a type variable markes by mypy
+            # If it's a type variable marked by mypy
             elif lhs_name in self.types.type_vars:
                 var = self.types.type_vars[lhs_name]
                 self.module.type_vars[node.targets[0].id] = var
@@ -822,7 +858,7 @@ class Analyzer(ast.NodeVisitor):
                         var = existing_var
                     else:
                         var = self.node_factory.create_python_global_var(
-                            node.id, node, cls)
+                            node.id, node, cls, self.module)
                     assign = node._parent
                     if (not isinstance(assign, ast.Assign)
                             or len(assign.targets) != 1):
@@ -833,8 +869,12 @@ class Analyzer(ast.NodeVisitor):
                     else:
                         var.value = assign.value
                     self.module.global_vars[node.id] = var
-                var = self.module.global_vars[node.id]
-                self.track_access(node, var)
+                current_module = self.module
+                def todo():
+                    var = self.get_target(node, current_module)
+                    if isinstance(var, PythonGlobalVar):
+                        self.track_access(node, var)
+                self.todos.append(todo)
                 return
             else:
                 # Node is a static field.
@@ -843,6 +883,7 @@ class Analyzer(ast.NodeVisitor):
                 cls = self.typeof(node)
                 self.define_new(self.current_class, node.id, node)
                 var = self.node_factory.create_static_field(node.id, node, cls,
+                                                            self.module,
                                                             self.current_class)
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
@@ -900,7 +941,7 @@ class Analyzer(ast.NodeVisitor):
                     if not isinstance(var, PythonGlobalVar):
                         # Assume it's the first write to a local variable
                         var = self.node_factory.create_python_global_var(
-                            node.id, node, self.typeof(node))
+                            node.id, node, self.typeof(node), self.module)
                         alts = self.get_alt_types(node)
                         var.alt_types = alts
                         self.module.global_vars[node.id] = var

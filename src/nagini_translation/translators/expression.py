@@ -543,32 +543,40 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
+    def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
+                                       ctx: Context) -> Expr:
+        position = self.to_position(node, ctx)
+        if target.cls:
+            # This is a static field
+            field_func = self.translate_static_field_access(target,
+                                                            ctx.current_class, position,
+                                                            ctx)
+            return [], field_func
+        var = target
+        type = self.translate_type(var.type, ctx)
+
+        if not target.is_final:
+            func_app = self.viper.FuncApp(var.sil_name, [], position,
+                                          self.no_info(ctx), self.viper.Ref, [])
+            global_field = self.viper.Field(GLOBAL_VAR_FIELD, type, position,
+                                            self.no_info(ctx))
+            res = self.viper.FieldAccess(func_app, global_field, position,
+                                         self.no_info(ctx))
+        else:
+            res = self.viper.FuncApp(var.sil_name, [], position,
+                                     self.no_info(ctx), type, [])
+        if not isinstance(node.ctx, ast.Store) and self._is_main_method(ctx):
+            res = self.wrap_global_defined_check(res, target, ctx.module, node,
+                                                 ctx)
+        return [], res
+
+
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
+        if node.id == 'test_import_execution':
+            print("12")
         target = self.get_target(node, ctx)
         if isinstance(target, PythonGlobalVar):
-            position = self.to_position(node, ctx)
-            if target.cls:
-                # This is a static field
-                field_func = self.translate_static_field_access(target,
-                    ctx.current_class, position, ctx)
-                return [], field_func
-            var = target
-            type = self.translate_type(var.type, ctx)
-
-            if not target.is_final:
-                func_app = self.viper.FuncApp(var.sil_name, [], position,
-                                              self.no_info(ctx), self.viper.Ref, [])
-                global_field = self.viper.Field(GLOBAL_VAR_FIELD, type, position,
-                                                self.no_info(ctx))
-                res = self.viper.FieldAccess(func_app, global_field, position,
-                                             self.no_info(ctx))
-            else:
-                res = self.viper.FuncApp(var.sil_name, [], position,
-                                         self.no_info(ctx), type, [])
-            if not isinstance(node.ctx, ast.Store) and self._is_main_method(ctx):
-                res = self.wrap_global_defined_check(res, target, ctx.module, node,
-                                                     ctx)
-            return [], res
+            return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],
                                             self.viper.function_domain_type(),
@@ -677,11 +685,7 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
-                # Global var
-                info = self.no_info(ctx)
-                var_type = self.translate_type(target.type, ctx)
-                return [], self.viper.FuncApp(target.sil_name, [], position,
-                                              info, var_type, [])
+                return self.translate_global_var_reference(target, node, ctx)
             else:
                 raise UnsupportedException(node)
         elif isinstance(target, PythonClass) and func_name != 'Result':

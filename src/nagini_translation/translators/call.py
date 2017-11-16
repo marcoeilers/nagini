@@ -135,9 +135,6 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
-        if ctx.current_function is None:
-            raise UnsupportedException(node, 'Global constructor calls are not '
-                                             'supported.')
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
@@ -173,11 +170,11 @@ class CallTranslator(CommonTranslator):
 
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
-
-        self._add_dependencies(node.func, target_class, ctx)
+        func_node = node.func if isinstance(node, ast.Call) else node
+        self._add_dependencies(func_node, target_class, ctx)
         defined_check = []
         if self._is_main_method(ctx):
-            defined_check = self.assert_global_defined(target_class, ctx.module, node,
+            defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
                                                        ctx)
 
         # Inhale the type information about the newly created object
@@ -277,14 +274,6 @@ class CallTranslator(CommonTranslator):
         """
         targets = []
         result_var = None
-        if ctx.current_function is None:
-            if ctx.current_class is None:
-                # Global variable
-                raise UnsupportedException(node, 'Global method call '
-                                           'not supported.')
-            else:
-                # Static field
-                raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
@@ -295,7 +284,7 @@ class CallTranslator(CommonTranslator):
         self._add_dependencies(node.func, target, ctx)
         defined_check = []
         if self._is_main_method(ctx) and not target.cls:
-            defined_check = self.assert_global_defined(target, ctx.module, node, ctx)
+            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -306,7 +295,7 @@ class CallTranslator(CommonTranslator):
                 result_var.ref() if result_var else None)
 
     def _add_dependencies(self, reference: ast.AST, target: PythonMethod, ctx: Context):
-        if not self._is_main_method(ctx):
+        if ctx.current_function and not self._is_main_method(ctx):
             if ctx.current_function:
                 current_container = ctx.current_function.call_deps
             else:
@@ -327,7 +316,7 @@ class CallTranslator(CommonTranslator):
                                   self.no_info(ctx), type, formal_args)
         self._add_dependencies(node.func, target, ctx)
         if not target.cls and self._is_main_method(ctx):
-            call = self.wrap_global_defined_check(call, target, ctx.module, node, ctx)
+            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,

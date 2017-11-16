@@ -263,12 +263,21 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.sil_name), pos,
+        decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
                                     info)
         contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
         return self.viper.Inhale(contains, pos, info)
 
-    def reference_identifier(self, ref, pos, info):
+    def reference_identifiers(self, ref, pos, info):
+        res = []
+        if isinstance(ref, ast.Subscript):
+            if isinstance(ref.value, ast.Name) and ref.value.id in ('Optional', 'Union'):
+                if not isinstance(ref.slice.value, ast.Tuple):
+                    return self.reference_identifiers(ref.slice.value, pos, info)
+                for e in ref.slice.value.elts:
+                    res.extend(self.reference_identifiers(e, pos, info))
+                return res
+
         decl_id = None
         for name in reversed(self._get_name_parts(ref)):
             current = self.viper.IntLit(self._get_string_value(name), pos,
@@ -284,7 +293,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                                  decl_id],
                                              pos, info, self.viper.Int,
                                              [module_name_decl, name_var_decl])
-        return decl_id
+        return [decl_id]
 
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
@@ -293,35 +302,43 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(ref_node, ctx, error_string=msg)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_id = self.viper.IntLit(self._get_string_value(declaration.sil_name), pos,
-                                    info)
-        contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+        decl_ids = self.reference_identifiers(ref_node, pos, info)
+        contains = self.viper.TrueLit(pos, info)
+        for decl_id in decl_ids:
+            contains = self.viper.And(contains, self.viper.AnySetContains(decl_id, module_set, pos, info), pos, info)
 
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
-            declaration.add_all_call_deps(deps)
+            called = declaration
+            if isinstance(called, PythonClass):
+                called = called.get_method('__init__')
+            if called:
+                called.add_all_call_deps(deps)
         msg = 'all dependencies of "' + declaration.name + '" are defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
         for ref, decl, mod, *cond in deps:
             module_set = mod.names_var[1]
-            decl_id = self.reference_identifier(ref, pos, info)
-            contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
-            if cond:
-                module_set = cond[0].module.names_var[1]
-                decl_id = self.viper.IntLit(self._get_string_value(cond[0].sil_name), pos,
-                                            info)
-                cond_contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
-                contains = self.viper.Implies(cond_contains, contains, pos, info)
-            deps_defined = self.viper.And(deps_defined, contains, pos, info)
+            decl_ids = self.reference_identifiers(ref, pos, info)
+            for decl_id in decl_ids:
+                contains_dep = self.viper.AnySetContains(decl_id, module_set, pos, info)
+                if cond:
+                    module_set = cond[0].module.names_var[1]
+                    decl_id = self.viper.IntLit(self._get_string_value(cond[0].sil_name), pos,
+                                                info)
+                    cond_contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+                    contains_dep = self.viper.Implies(cond_contains, contains_dep, pos, info)
+                deps_defined = self.viper.And(deps_defined, contains_dep, pos, info)
 
         return [contains, deps_defined]
 
     def _get_name_parts(self, node: ast.AST):
+        while isinstance(node, ast.Subscript):
+            node = node.value
         if isinstance(node, ast.Name):
             return [node.id]
         if isinstance(node, ast.Attribute):
-            pref = self._get_name(node.value)
+            pref = self._get_name_parts(node.value)
             return pref + [node.attr]
         return [node.name]
 

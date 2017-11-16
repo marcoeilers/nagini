@@ -6,6 +6,7 @@ from nagini_translation.lib.constants import (
     GLOBAL_VAR_FIELD,
     OBJECT_TYPE,
     PRIMITIVES,
+    STRING_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -747,6 +748,9 @@ class MethodTranslator(CommonTranslator):
         locals = []
         global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
         full_perm = self.viper.FullPerm(no_pos, no_info)
+        one = self.viper.IntLit(1, no_pos, no_info)
+        two = self.viper.IntLit(2, no_pos, no_info)
+        half_perm = self.viper.FractionalPerm(one, two, no_pos, no_info)
         for module in modules:
             if module.global_module is module:
                 continue
@@ -762,24 +766,39 @@ class MethodTranslator(CommonTranslator):
             locals.append(module.defined_var[0])
             locals.append(module.names_var[0])
             for var in module.global_vars.values():
-                if var.name in ('__name__', '__file__'):
-                    stmts.append(self.set_global_defined(var, module, None, ctx))
+                if var.module is not module:
                     continue
                 if var.is_final:
                     continue
+                perm = full_perm
+                if var.name in ('__name__', '__file__'):
+                    stmts.append(self.set_global_defined(var, module, None, ctx))
+                    perm = half_perm
                 var_type = self.translate_type(var.type, ctx)
                 var_func = self.viper.FuncApp(var.sil_name, [], no_pos,
                                               no_info, var_type, [])
                 field_access = self.viper.FieldAccess(var_func, global_field, no_pos,
                                                       no_info)
-                field_pred = self.viper.FieldAccessPredicate(field_access, full_perm,
+                field_pred = self.viper.FieldAccessPredicate(field_access, perm,
                                                              no_pos, no_info)
+                if var.name in ('__file__', '__name__'):
+                    var_type = self.type_check(field_access, var.type, no_pos, ctx, False)
+                    field_pred = self.viper.And(field_pred, var_type, no_pos, no_info)
+                if var.name == '__name__':
+                    main_str = self.translate_string('__main__', None, ctx)
+                    str_type = ctx.module.global_module.classes[STRING_TYPE]
+                    func_name = '__eq__'
+                    call = self.get_function_call(str_type, func_name, [main_str, field_access],
+                                                  [None, None],
+                                                  var.node, ctx)
+                    field_pred = self.viper.And(field_pred, call, no_pos, no_info)
                 stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
 
         ctx.current_class = None
         method_name = ctx.module.get_fresh_name('main')
         main_method = PythonMethod('__main__', main, None, main, False, False,
                                    main.node_factory)
+        main_method._module = main
         ctx.current_function = main_method
         ctx.current_function.try_blocks = main.try_blocks
         ctx.current_function.labels = main.labels

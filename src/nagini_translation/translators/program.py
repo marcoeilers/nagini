@@ -163,9 +163,10 @@ class ProgramTranslator(CommonTranslator):
                 try:
                     stmt, value = self.translate_expr(var.value, ctx)
                     if not stmt:
-                        body = value
-                        posts.append(self.viper.EqCmp(result, value, position,
-                                                      self.no_info(ctx)))
+                        if not self.viper.is_heap_dependent(value):
+                            body = value
+                            posts.append(self.viper.EqCmp(result, value, position,
+                                                          self.no_info(ctx)))
                 except AttributeError:
                     # The translation (probably) tried to access ctx.current_function
                     pass
@@ -401,18 +402,18 @@ class ProgramTranslator(CommonTranslator):
         if method.cls:
             definition_deps = method.cls.definition_deps
         for arg in method.args.values():
-            if arg.node and arg.node.annotation and not isinstance(arg.node.annotation, ast.Str):
+            if arg.node and arg.node.annotation and not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant)):
                 type = self.get_target(arg.node.annotation, ctx)
-                if not type.interface:
-                    definition_deps.add((arg.node.annotation, type, method.module))
+                if type and not type.python_class.interface:
+                    definition_deps.add((arg.node.annotation, type.python_class, method.module))
             if arg.default:
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if not stmt and expr:
                     arg.default_expr = expr
-        if method.node and method.node.returns and not isinstance(method.node.returns, ast.Str):
+        if method.node and method.node.returns and not isinstance(method.node.returns, (ast.Str, ast.NameConstant)):
             type = self.get_target(method.node.returns, ctx)
-            if not type.interface:
-                definition_deps.add((method.node.returns, type, method.module))
+            if type and not type.python_class.interface:
+                definition_deps.add((method.node.returns, type.python_class, method.module))
 
 
     def _create_predefined_fields(self,
@@ -666,6 +667,8 @@ class ProgramTranslator(CommonTranslator):
         for module in modules:
             ctx.module = module
             for var in module.global_vars.values():
+                if not var.module is module:
+                    continue
                 self.track_dependencies(selected_names, selected, var, ctx)
                 functions.append(
                     self.create_global_var_function(var, ctx))
