@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     TUPLE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
+    CallSlot,
     GenericType,
     MethodType,
     PythonClass,
@@ -766,6 +767,9 @@ class CallTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'invalid.contract.position')
             return arg_stmts, self.create_predicate_access(target_name, args,
                                                            perm, node, ctx)
+        elif isinstance(target, CallSlot):
+            return self.translate_call_slot_check(target, args, formal_args,
+                                                  arg_stmts, position, node, ctx)
         elif target.pure:
             return self._translate_function_call(target, args, formal_args,
                                                  arg_stmts, position, node, ctx)
@@ -785,6 +789,8 @@ class CallTranslator(CommonTranslator):
         if is_name:
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
+            elif func_name == 'ClosureCall':
+                return self.translate_call_slot_application(node, ctx)
             elif func_name in CONTRACT_FUNCS:
                 return self.translate_contractfunc_call(node, ctx, impure)
             elif func_name in IO_CONTRACT_FUNCS:

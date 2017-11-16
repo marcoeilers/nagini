@@ -20,7 +20,8 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
-                  'MayCreate',]
+                  'MayCreate', 'CallSlot', 'CallSlotProof',
+                  'UniversallyQuantified', 'ClosureCall', ]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -254,7 +255,7 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
-    
+
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
     Decorator for functions which specifies which return values are ghost
@@ -269,6 +270,45 @@ def GhostReturns(start_index: int) -> Callable[[T], T]:
     def wrap(func: T) -> T:
         return func
     return wrap
+
+
+def CallSlot(call_slot: Callable[..., None]) -> Callable[..., Any]:
+    """
+    Decorator to mark a method as a call slot declaration.
+    """
+
+    def call_slot_handler(*args, **kwargs) -> Any:
+
+        def uq_handler(*args, **kwargs) -> None:
+            pass
+
+        return uq_handler
+
+    return call_slot_handler
+
+
+def UniversallyQuantified(uq: Callable[..., None]) -> None:
+    """
+    Decorator to mark a method as introducing universally quantified
+    variables inside a call slot.
+    """
+    pass
+
+
+def CallSlotProof(call_slot: Callable[..., Any]) -> Callable[[Callable[..., None]], None]:
+    """
+    Decorator to mark a method as a proof for a call slot.
+    """
+    pass
+
+
+def ClosureCall(call: Any, justification: Any) -> Any:
+    """
+    Justifies a closure call through either
+     * a CallSlot (justification == the callslot instance)
+     * proofing static dispatch (justification == the static method)
+    """
+    pass
 
 
 def list_pred(l: List[T]) -> bool:
@@ -328,6 +368,10 @@ __all__ = [
         'set_pred',
         'Sequence',
         'ToSeq',
+        'CallSlot',
+        'UniversallyQuantified',
+        'CallSlotProof',
+        'ClosureCall',
         'MaySet',
         'MayCreate',
         ]

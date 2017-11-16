@@ -174,6 +174,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
                         return rectype.type_args[target.generic_type]
+            if isinstance(node, ast.Name) and not isinstance(node._parent, ast.Call):
+                return target.callable_type
             return target.type
         if isinstance(target, PythonField):
             result = target.type
@@ -355,6 +357,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
                 return GenericType(list_class, [arg_type])
+            elif node.func.id == 'ClosureCall':
+                 return get_type(node.args[0], containers, container).type_args[-1]
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:

@@ -280,8 +280,15 @@ class ContractTranslator(CommonTranslator):
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
         stmt, exp = self.translate_expr(node.args[0], ctx)
-        res = self.viper.Old(exp, self.to_position(node, ctx),
-                             self.no_info(ctx))
+
+        if not ctx.current_call_slot_proof:
+            res = self.viper.Old(exp, self.to_position(node, ctx),
+                                 self.no_info(ctx))
+        else:
+            res = self.viper.LabelledOld(
+                exp, ctx.current_call_slot_proof.old_label,
+                self.to_position(node, ctx), self.no_info(ctx)
+            )
         return stmt, res
 
     def translate_fold(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:

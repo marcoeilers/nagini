@@ -52,6 +52,14 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.lib.views import PythonModuleView
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from nagini_translation.call_slot_analyzers import (
+    CallSlotAnalyzer,
+    is_call_slot,
+    CallSlotProofAnalyzer,
+    is_call_slot_proof,
+    is_closure_call,
+    check_closure_call
+)
 
 
 logger = logging.getLogger('nagini_translation.analyzer')
@@ -71,6 +79,7 @@ class Analyzer(ast.NodeVisitor):
                                    self.global_module,
                                    sil_names=self.global_module.sil_names)
         self.current_class = None
+        self.outer_functions = []  # type: List[PythonMethod]
         self.current_function = None
         self.current_scopes = []
         self.contract_only = False
@@ -84,6 +93,8 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
+        self.call_slot_analyzer = CallSlotAnalyzer(self)
+        self.call_slot_proof_analyzer = CallSlotProofAnalyzer(self)
 
     @property
     def node_factory(self):
@@ -110,7 +121,9 @@ class Analyzer(ast.NodeVisitor):
                 name in container.methods or
                 name in container.predicates or
                 (isinstance(container, PythonClass) and
-                 name in container.static_methods)):
+                 name in container.static_methods) or
+                (isinstance(container, PythonModule) and
+                name in container.call_slots)):
             raise InvalidProgramException(node, 'multiple.definitions')
 
     def collect_imports(self, abs_path: str) -> None:
@@ -453,6 +466,12 @@ class Analyzer(ast.NodeVisitor):
         return False
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if is_call_slot(node):
+            self.call_slot_analyzer.analyze(node)
+            return
+        if is_call_slot_proof(node):
+            self.call_slot_proof_analyzer.analyze(node)
+            return
         if self.current_function:
             raise UnsupportedException(node, 'nested function declaration')
         name = node.name
@@ -518,6 +537,8 @@ class Analyzer(ast.NodeVisitor):
 
         if not is_property_setter:
             func.type = self.convert_type(functype)
+            func.callable_type = self.convert_type(
+                self.module.get_func_type(func.scope_prefix, callable=True))
 
         for child in node.body:
             if is_io_existential(child):
@@ -714,6 +735,8 @@ class Analyzer(ast.NodeVisitor):
         Collects preconditions, postconditions, raised exceptions and
         invariants.
         """
+        if is_closure_call(node):
+            check_closure_call(node)
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
             if not self.current_function or self.current_function.predicate:
@@ -826,8 +849,15 @@ class Analyzer(ast.NodeVisitor):
                         raise UnsupportedException(assign, msg)
                     var.value = assign.value
                     self.module.global_vars[node.id] = var
-                var = self.module.global_vars[node.id]
-                self.track_access(node, var)
+                if node.id in self.module.global_vars:
+                    var = self.module.global_vars[node.id]
+                    self.track_access(node, var)
+                elif not node.id in self.module.methods:
+                    # Node is neither a global variable nor a global method
+                    raise UnsupportedException(
+                        node,
+                        "Unsupported reference '%s'" % node.id
+                    )
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
@@ -851,7 +881,7 @@ class Analyzer(ast.NodeVisitor):
                     # again now that we now it's actually static.
                     del self.current_class.fields[node.id]
                 return
-        if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+        if not isinstance(self.get_target(node, self.module), (PythonGlobalVar, PythonMethod)):
             # Node is a local variable, lambda argument, or a global variable
             # that hasn't been encountered yet
             var = None
@@ -960,7 +990,13 @@ class Analyzer(ast.NodeVisitor):
         return result
 
     def _convert_callable_type(self, mypy_type, node) -> PythonType:
-        return self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module)
+        return GenericType(
+            self.find_or_create_class(CALLABLE_TYPE, module=self.module.global_module),
+            (
+                [self.convert_type(arg_type, node) for arg_type in mypy_type.arg_types] +
+                [self.convert_type(mypy_type.ret_type, node)]
+            )
+        )
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
         args = [self.convert_type(arg_type, node)
@@ -1009,6 +1045,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             if self.current_function is not None:
                 context.append(self.current_function.name)
             name = node.id if isinstance(node, ast.Name) else node.arg
@@ -1033,6 +1070,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             if self.current_function is not None:
                 context.append(self.current_function.name)
             context.extend(self.current_scopes)
@@ -1061,6 +1099,7 @@ class Analyzer(ast.NodeVisitor):
             context = []
             if self.current_class is not None:
                 context.append(self.current_class.name)
+            context.extend(map(lambda method: method.name, self.outer_functions))
             context.append(self.current_function.name)
             context.extend(self.current_scopes)
             type, _ = self.module.get_type(context, node.arg)
@@ -1159,7 +1198,13 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)))
+                (('property' in decorators) and (len(decorators) != 1)) or
+                (
+                    (('CallSlot' in decorators) and (len(decorators) != 1)) and
+                    (('Pure' in decorators) and ('CallSlot' in decorators) and (len(decorators) != 2))
+                ) or
+                (('UniversallyQuantified' in decorators) and (len(decorators) != 1)) or
+                (('CallSlotProof' in decorators) and (len(decorators) != 1)))
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """

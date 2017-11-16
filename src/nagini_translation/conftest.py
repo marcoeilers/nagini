@@ -20,6 +20,7 @@ _FUNCTIONAL_TESTS_DIR = 'tests/functional/'
 _SIF_TESTS_DIR = 'tests/sif/'
 _IO_TESTS_DIR = 'tests/io/'
 _OBLIGATIONS_TESTS_DIR = 'tests/obligations/'
+_CLOSURES_TESTS_DIR = 'tests/closures/'
 
 
 class PyTestConfig:
@@ -49,6 +50,8 @@ class PyTestConfig:
             self._add_test_dir(_IO_TESTS_DIR)
         elif test == 'obligations':
             self._add_test_dir(_OBLIGATIONS_TESTS_DIR)
+        elif test == 'closures':
+            self._add_test_dir(_CLOSURES_TESTS_DIR)
         else:
             print('Unrecognized test set.')
 
@@ -108,6 +111,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--sif', dest='sif', action='store_true')
     parser.addoption('--io', dest='io', action='store_true')
     parser.addoption('--obligations', dest='obligations', action='store_true')
+    parser.addoption('--closures', dest='closures', action='store_true')
     parser.addoption('--all-verifiers', dest='all_verifiers',
                      action='store_true')
     parser.addoption('--silicon', dest='silicon', action='store_true')
@@ -119,7 +123,7 @@ def pytest_configure(config: 'pytest.config.Config'):
     # Setup tests.
     tests = []
     if config.option.all_tests:
-        tests = ['functional', 'sif', 'io', 'obligations']
+        tests = ['functional', 'sif', 'io', 'obligations', 'closures']
     else:
         if config.option.functional:
             tests.append('functional')
@@ -129,6 +133,8 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('io')
         if config.option.obligations:
             tests.append('obligations')
+        if config.option.closures:
+            tests.append('closures')
     if tests:
         # Overwrite config file options.
         _pytest_config.clear_tests()

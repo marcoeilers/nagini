@@ -119,7 +119,7 @@ class TestConfig(SectionConfig):
 
         tests_value = self._info.get('tests')
         if not tests_value:
-            self.tests = ['functional', 'sif', 'io', 'obligations']
+            self.tests = ['functional', 'sif', 'io', 'obligations', 'closures']
         else:
             self.tests = tests_value.strip().split()
 

@@ -656,9 +656,17 @@ class ProgramTranslator(CommonTranslator):
             for method in module.methods.values():
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
+                func_constants.append(self.translate_function_constant(method, ctx))
             for pred in module.predicates.values():
                 self.track_dependencies(selected_names, selected, pred, ctx)
                 predicates.append(self.translate_predicate(pred, ctx))
+            for call_slot in module.call_slots.values():
+                call_slot_holds, call_slot_apply = self.translate_call_slot(call_slot, ctx)
+                functions.append(call_slot_holds)
+                if call_slot.pure:
+                    functions.append(call_slot_apply)
+                else:
+                    methods.append(call_slot_apply)
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives and type variable entries.

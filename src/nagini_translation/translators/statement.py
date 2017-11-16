@@ -39,6 +39,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
+from nagini_translation.call_slot_analyzers import is_call_slot_proof
 from typing import List, Optional, Tuple, Union
 
 
@@ -624,6 +625,12 @@ class StatementTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         return cond_stmt + [self.viper.If(cond, then_block, else_block,
                                           position, self.no_info(ctx))]
+
+    def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
+        if is_call_slot_proof(node):
+            return self.translate_call_slot_proof(node, ctx)
+
+        return self.translate_generic(node, ctx)
 
     def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
                   rhs_end: Optional[Expr],
