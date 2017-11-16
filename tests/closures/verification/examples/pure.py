@@ -46,26 +46,26 @@ def mul(arg: Argument, x: int) -> int:
 @CallSlot
 def add_or_mul(f: f_type) -> None:
 
-        @UniversallyQuantified
-        def uq(arg: Argument, x: int) -> None:
-            Requires(Acc(arg.value_a) and Acc(arg.value_b))
+    @UniversallyQuantified
+    def uq(arg: Argument, x: int) -> None:
+        Requires(Acc(arg.value_a) and Acc(arg.value_b))
 
-            y = f(arg, x)
+        y = f(arg, x)
 
-            Ensures(y == arg.value_a + x or y == arg.value_b * x)
+        Ensures(y == arg.value_a + x or y == arg.value_b * x)
 
 
 @CallSlot
 def hof_slot(f: f_type) -> None:
 
-        @UniversallyQuantified
-        def uq(arg: Argument, x: int) -> None:
-            Requires(Acc(arg.value_a, 1 / 2) and Acc(arg.value_b, 1 / 3))
+    @UniversallyQuantified
+    def uq(arg: Argument, x: int) -> None:
+        Requires(Acc(arg.value_a, 1 / 2) and Acc(arg.value_b, 1 / 3))
 
-            y = f(arg, x)
+        y = f(arg, x)
 
-            Ensures(Acc(arg.value_a, 1 / 2) and Acc(arg.value_b, 1 / 3))
-            Ensures(y <= arg.value_a + x or y >= arg.value_b * x)
+        Ensures(Acc(arg.value_a, 1 / 2) and Acc(arg.value_b, 1 / 3))
+        Ensures(y <= arg.value_a + x or y >= arg.value_b * x)
 
 
 def hof(f: f_type, arg: Argument) -> int:
@@ -104,35 +104,38 @@ def client() -> None:
     @CallSlotProof(add_or_mul(f))
     def add_or_mul_proof(f: f_type) -> None:
 
-            @UniversallyQuantified
-            def uq(arg: Argument, x: int) -> None:
-                Requires(Acc(arg.value_a) and Acc(arg.value_b))
+        @UniversallyQuantified
+        def uq(arg: Argument, x: int) -> None:
+            Requires(Acc(arg.value_a) and Acc(arg.value_b))
 
-                if f == add:
-                    y = ClosureCall(f(arg, x), add)  # type: int
-                else:
-                    y = ClosureCall(f(arg, x), mul)
+            if f == add:
+                y = ClosureCall(f(arg, x), add)  # type: int
+            else:
+                y = ClosureCall(f(arg, x), mul)
 
-                Ensures(y == arg.value_a + x or y == arg.value_b * x)
+            Ensures(y == arg.value_a + x or y == arg.value_b * x)
 
-    y = ClosureCall(f(arg, 3), add_or_mul(f)(arg, 3))
-    assert y == 4 or y == 6
+    y1 = ClosureCall(f(arg, 3), add_or_mul(f)(arg, 3))  # type: int
+    y2 = ClosureCall(f(arg, 3), add_or_mul(f)(arg, 3))  # type: int
+    assert y1 == 4 or y2 == 6
+    assert y1 == y2
     assert arg.value_a == 1
     assert arg.value_b == 2
+    assert y1 == ClosureCall(f(arg, 3), add_or_mul(f)(arg, 3))
 
     @CallSlotProof(hof_slot(f))
     def hof_slot_proof(f: f_type) -> None:
 
-            @UniversallyQuantified
-            def uq(arg: Argument, x: int) -> None:
-                Requires(Acc(arg.value_a) and Acc(arg.value_b))
+        @UniversallyQuantified
+        def uq(arg: Argument, x: int) -> None:
+            Requires(Acc(arg.value_a) and Acc(arg.value_b))
 
-                if f == add:
-                    y = ClosureCall(f(arg, x), add)  # type: int
-                else:
-                    y = ClosureCall(f(arg, x), mul)
+            if f == add:
+                y = ClosureCall(f(arg, x), add)  # type: int
+            else:
+                y = ClosureCall(f(arg, x), mul)
 
-                Ensures(y <= arg.value_a + x or y >= arg.value_b * x)
+            Ensures(y <= arg.value_a + x or y >= arg.value_b * x)
 
     h = hof
     y = ClosureCall(h(f, arg), hof)

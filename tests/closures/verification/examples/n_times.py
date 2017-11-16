@@ -73,7 +73,7 @@ def n_times(f: f_type, n: int, s: State, n_inv_token: int) -> None:
 
     i = 0
     while i < n:
-        Invariant(i <= n)
+        Invariant(0 <= i and i <= n)
         Invariant(n_inv(s, i, n_inv_token))
 
         ClosureCall(f(s), n_times_slot(f, n_inv_token)(s, i))
