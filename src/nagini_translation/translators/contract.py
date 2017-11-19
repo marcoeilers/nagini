@@ -585,7 +585,8 @@ class ContractTranslator(CommonTranslator):
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)
                 else:
-                    assert isinstance(target, PythonGlobalVar)
+                    if not isinstance(target, PythonGlobalVar):
+                        raise InvalidProgramException(node, 'invalid.acc')
                     return self.translate_acc_global(node, perm, ctx)
         elif func_name == 'MaySet':
             return self.translate_may_set(node, ctx)

@@ -553,7 +553,7 @@ class ExpressionTranslator(CommonTranslator):
         if target.cls:
             # This is a static field
             field_func = self.translate_static_field_access(target,
-                                                            ctx.current_class, position,
+                                                            ctx.current_class, node,
                                                             ctx)
             return [], field_func
         var = target
@@ -651,13 +651,14 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_static_field_access(self, field: PythonGlobalVar,
                                       receiver: Union[Expr, PythonType],
-                                      position, ctx: Context) -> Expr:
+                                      node, ctx: Context) -> Expr:
         """
         Translates an access to the given field via the given receiver. The
         receiver can either be the type literal via which the field is
         accessed, an expression of type 'type' (e.g. cls in classmethods) or
         a normal object.
         """
+        position = self.to_position(node, ctx)
         while field.overrides:
             field = field.overrides
         field_type = self.translate_type(field.type, ctx)
@@ -683,6 +684,13 @@ class ExpressionTranslator(CommonTranslator):
                                             self.no_info(ctx))
             res = self.viper.FieldAccess(res, global_field, position,
                                          self.no_info(ctx))
+        if isinstance(node, ast.Attribute):
+            node = node.value
+        if isinstance(receiver, PythonType) and not isinstance(node.ctx, ast.Store):
+            if self._is_main_method(ctx):
+                res = self.wrap_global_defined_check(res, receiver, ctx.module, node, ctx)
+            elif ctx.current_function:
+                ctx.current_function.call_deps.add((node, receiver, ctx.module))
         return res
 
     def translate_Attribute(self, node: ast.Attribute,
@@ -699,7 +707,7 @@ class ExpressionTranslator(CommonTranslator):
         elif isinstance(target, PythonClass) and func_name != 'Result':
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
-                                                            position, ctx)
+                                                            node, ctx)
             return [], field_func
         else:
             stmt, receiver = self.translate_expr(node.value, ctx,
@@ -707,7 +715,7 @@ class ExpressionTranslator(CommonTranslator):
             field = self._lookup_field(node, ctx)
             if isinstance(field, PythonGlobalVar):
                 field_func = self.translate_static_field_access(field, receiver,
-                                                                position, ctx)
+                                                                node, ctx)
                 return [], field_func
             if isinstance(field, PythonMethod):
                 # This is a reference to a property, so we translate it to a call of

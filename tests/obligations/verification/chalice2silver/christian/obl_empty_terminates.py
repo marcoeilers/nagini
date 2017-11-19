@@ -15,7 +15,7 @@ from nagini_contracts.obligations import *
 
 class A:
 
-    def __init__(self, x: A, y: int) -> None:
+    def __init__(self, x: 'A', y: int) -> None:
         self.x = x
         self.y = y
 

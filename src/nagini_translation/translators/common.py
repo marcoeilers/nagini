@@ -323,7 +323,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 decl_id = current
             else:
                 decl_id = self._combine(current, decl_id, pos, info)
-        return [decl_id]
+        if decl_id:
+            return [decl_id]
+        return []
 
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
@@ -370,19 +372,23 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(node, ast.Attribute):
             pref = self._get_name_parts(node.value)
             return pref + [node.attr]
+        if isinstance(node, ast.Str):
+            return []
         return [node.name]
 
     def _get_name(self, node: ast.AST):
         return '.'.join(self._get_name_parts(node))
 
     def assert_global_defined(self, declaration: PythonNode, module: PythonModule,
-                              ref_node: ast.AST, ctx: Context):
+                              ref_node: ast.AST, ctx: Context, call_deps=True):
         info = self.no_info(ctx)
         name, deps = self._get_global_definedness_conditions(declaration, module,
                                                              ref_node, ctx)
         msg = 'Name "' + declaration.name + '" is defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         assert_name = self.viper.Assert(name, pos, info)
+        if not call_deps:
+            return [assert_name]
         msg = 'all dependencies of "' + declaration.name + '" are defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         assert_deps = self.viper.Assert(deps, pos, info)

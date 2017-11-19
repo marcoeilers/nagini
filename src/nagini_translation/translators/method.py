@@ -836,6 +836,6 @@ class MethodTranslator(CommonTranslator):
         res = self.create_method_node(ctx, method_name, [], [], [], [], main_locals + locals, body, no_pos,
                                       no_info, method=ctx.current_function)
         ctx.current_function = None
-        return res
+        return main_method, res
 
 

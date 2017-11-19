@@ -771,7 +771,9 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
 
-        methods.append(self.translate_main_method(modules, ctx))
+        main_py_method, main_method = self.translate_main_method(modules, ctx)
+        methods.append(main_method)
+        self.track_dependencies(selected_names, selected, main_py_method, ctx)
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.

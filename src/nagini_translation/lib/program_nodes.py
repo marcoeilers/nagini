@@ -1024,6 +1024,20 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self._body = None
         self._io_existentials = None
         self.func_args = []
+        self.definition_deps = set()
+        self.call_deps = set()
+
+    def add_all_call_deps(self, res, prefix=()):
+        for dep in self.call_deps:
+            if dep not in res:
+                c_prefix = prefix
+                if len(dep) > 3:
+                    c_prefix = prefix + dep[3:]
+                else:
+                    res.add(dep + c_prefix)
+
+                if hasattr(dep[1], 'add_all_call_deps'):
+                    dep[1].add_all_call_deps(res, c_prefix)
 
     @property
     def is_builtin(self) -> bool:

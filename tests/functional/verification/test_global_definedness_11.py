@@ -1,15 +1,12 @@
-class A:
-    bar = 12
+a_bar = 12
 
 
 class C:
-    baz = A.bar
+    baz = a_bar
 
 
-# undefined
-#:: ExpectedOutput(assert.failed:assertion.false)
 class D:
-    baz = B.bar
+    #:: ExpectedOutput(expression.undefined:undefined.global.name)
+    baz = b_bar
 
-class B:
-    bar = 12
+b_bar = 12

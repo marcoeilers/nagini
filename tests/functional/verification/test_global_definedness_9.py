@@ -1,15 +1,12 @@
-class B:
-    bar = 12
+b_bar = 12
 
 
-def baz(b: object = B.bar) -> int:
+def baz(b: object = b_bar) -> int:
     return 12
 
 
-# undefined A
-#:: ExpectedOutput(assert.failed:assertion.false)
-def foo(a: object = A.bar) -> int:
+#:: ExpectedOutput(expression.undefined:undefined.global.name)|MissingOutput(expression.undefined:undefined.global.name, 95)
+def foo(a: object = a_bar) -> int:
     return 12
 
-class A:
-    bar = 12
+a_bar = 12

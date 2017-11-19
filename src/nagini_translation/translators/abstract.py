@@ -121,9 +121,9 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_static_field_access(self, field: PythonGlobalVar,
                                       receiver: Union[Expr, PythonType],
-                                      position, ctx: Context) -> Expr:
+                                      node, ctx: Context) -> Expr:
         return self.config.expr_translator.translate_static_field_access(field, receiver,
-                                                                         position, ctx)
+                                                                         node, ctx)
 
     def translate_io_operation(
             self,

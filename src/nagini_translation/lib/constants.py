@@ -221,6 +221,19 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'typing',
                    }
 
+IGNORED_MODULE_NAMES = {
+    '_importlib_modulespec': [],
+    'abc': [],
+    'builtins': [],
+    'nagini_contracts': [],
+    'nagini_contracts.contracts': [],
+    'nagini_contracts.io': [],
+    'nagini_contracts.obligations': ['BaseLock'],
+    'sys': [],
+    'types': [],
+    'typing': [],
+}
+
 OPERATOR_FUNCTIONS = {
     ast.Add: '__add__',
     ast.Sub: '__sub__',
