@@ -194,6 +194,9 @@ class ContractTranslator(CommonTranslator):
 
     def translate_acc_global(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
+        """
+        Translates an access permission to a global variable.
+        """
         var = self.get_target(node.args[0], ctx)
         if not isinstance(var, PythonGlobalVar):
             raise InvalidProgramException(node, 'invalid.acc')

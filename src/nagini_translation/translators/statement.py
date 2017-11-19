@@ -2,16 +2,16 @@ import ast
 
 from nagini_translation.lib.constants import (
     BYTES_TYPE,
-    COMBINE_NAME_FUNC,
+    COMBINED_NAME_ACCESSOR_2,
     DICT_TYPE,
     END_LABEL,
-    GLOBAL_VAR_FIELD,
     IGNORED_IMPORTS,
     IGNORED_MODULE_NAMES,
     INT_TYPE,
     LIST_TYPE,
     MAY_SET_PRED,
     NAME_QUANTIFIER_VAR,
+    NAME_DOMAIN,
     OBJECT_TYPE,
     PRIMITIVES,
     RANGE_TYPE,
@@ -68,7 +68,12 @@ class StatementTranslator(CommonTranslator):
         return visitor(node, ctx)
 
     def _execute_module_statements(self, module: PythonModule, import_stmt: ast.AST,
-                                   ctx: Context):
+                                   ctx: Context) -> Stmt:
+        """
+        Creates a single statement that represents the execution of all global statements
+        in the given module (including those of other imported modules), if said module
+        has not been imported before.
+        """
         pos = self.to_position(import_stmt, ctx)
         info = self.no_info(ctx)
         cond_stmts = []
@@ -117,7 +122,8 @@ class StatementTranslator(CommonTranslator):
         ctx.current_function.loop_invariants = old_try_loop_invariants
 
         not_defined = self.viper.Not(module.defined_var[1], pos, info)
-        cond = self.viper.If(not_defined, self.translate_block(cond_stmts, pos, info), self.translate_block([], pos, info), pos, info)
+        cond = self.viper.If(not_defined, self.translate_block(cond_stmts, pos, info),
+                             self.translate_block([], pos, info), pos, info)
         return cond
 
     def translate_stmt_ImportFrom(self, node: ast.ImportFrom, ctx: Context) -> List[Stmt]:
@@ -125,13 +131,11 @@ class StatementTranslator(CommonTranslator):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        # if node.module in IGNORED_IMPORTS:
-        #     return stmts
-
         for imported in ctx.module.from_imports:
             if not isinstance(imported, PythonModule):
                 imported = imported.original_module
-            if imported.type_prefix == node.module or imported.file.startswith(node.module):
+            if (imported.type_prefix == node.module or
+                    imported.file.startswith(node.module)):
                 mod = imported
                 break
         else:
@@ -150,7 +154,8 @@ class StatementTranslator(CommonTranslator):
                 imported_names.extend([(n, n) for n in IGNORED_MODULE_NAMES[node.module]])
 
         else:
-            imported_names.extend([(n.name, n.asname if n.asname else n.name) for n in node.names])
+            imported_names.extend([(n.name, n.asname if n.asname else n.name)
+                                   for n in node.names])
 
         if import_all:
             new_set_var = ctx.current_function.create_variable('new_set', SilverType(
@@ -182,14 +187,16 @@ class StatementTranslator(CommonTranslator):
                     exists_in_other = self._is_defined(name_int, imported.names_var[1],
                                                        pos, info)
                     stmts.append(self.viper.Assert(exists_in_other, pos, info))
-                as_name_int = self.viper.IntLit(self._get_string_value(as_name), pos, info)
-                stmts.append(self._set_global_defined(as_name_int, ctx.module.names_var[1], pos, info))
+                as_name_int = self.viper.IntLit(self._get_string_value(as_name), pos,
+                                                info)
+                stmts.append(self._set_global_defined(as_name_int,
+                                                      ctx.module.names_var[1], pos, info))
 
         return stmts
 
     def _get_second(self, e, pos, info):
-        NAME_DOMAIN = '_Name'
-        return self.viper.DomainFuncApp('_get_combined_2', [e], self.name_type(), pos, info, NAME_DOMAIN)
+        return self.viper.DomainFuncApp(COMBINED_NAME_ACCESSOR_2, [e], self.name_type(),
+                                        pos, info, NAME_DOMAIN)
 
     def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
         stmts = []
@@ -203,13 +210,15 @@ class StatementTranslator(CommonTranslator):
             mod = ctx.module
             for part in name_parts:
                 mod = mod.namespaces[part]
+            module_set_type = SilverType(self.viper.SetType(self.name_type()), ctx.module)
             new_set_var = ctx.current_function.create_variable('new_set',
-                                                               SilverType(self.viper.SetType(
-                                                                   self.name_type()), ctx.module),
+                                                               module_set_type,
                                                                self.translator)
             stmts.append(self._execute_module_statements(mod, node, ctx))
-            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(), pos, info)
-            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos, info)
+            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(),
+                                                    pos, info)
+            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos,
+                                               info)
             name_in_imported = self._is_defined(name_var_ref, mod.names_var[1], pos, info)
 
 
@@ -224,22 +233,20 @@ class StatementTranslator(CommonTranslator):
             combined_part = last_part
             for name_int in name_ints:
                 combined_part = self._combine(name_int, combined_part, pos, info)
-            combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos, info)
+            combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos,
+                                               info)
             impl = self.viper.EqCmp(name_in_imported, combined_in_new, pos, info)
             trigger = self.viper.Trigger([combined_in_new], pos, info)
             assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
             stmts.append(self.viper.Inhale(assertion, pos, info))
-            is_combined = self.viper.EqCmp(name_var_ref, combined_part, pos, info)
-            all_combined = self.viper.Forall([name_var_decl], [], self.viper.Implies(self.viper.AnySetContains(name_var_ref, new_set_var.ref(), pos, info), is_combined, pos, info), pos, info)
-            # stmts.append(self.viper.Inhale(all_combined, pos, info))
-            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(), pos, info)
-            stmts.append(
-                self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos, info))
+            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(),
+                                           pos, info)
+            stmts.append(self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos,
+                                                   info))
         return stmts
 
-    def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
-        if node.name =='no_op_io':
-            print("12")
+    def translate_stmt_FunctionDef(self, node: ast.FunctionDef,
+                                   ctx: Context) -> List[Stmt]:
         assert self._is_main_method(ctx)
         if ctx.current_class:
             method = ctx.current_class.get_func_or_method(node.name)
@@ -265,23 +272,32 @@ class StatementTranslator(CommonTranslator):
         stmts.extend(self._check_dependencies_defined(cls, node, ctx))
         for base in node.bases:
             decl = self.get_target(base, ctx)
-            if isinstance(decl, PythonType) and decl.python_class.module is not ctx.module.global_module:
-                stmts.extend(self.assert_global_defined(decl, ctx.module, base, ctx, call_deps=False))
+            if (isinstance(decl, PythonType) and
+                        decl.python_class.module is not ctx.module.global_module):
+                stmts.extend(self.assert_global_defined(decl, ctx.module, base, ctx,
+                                                        call_deps=False))
 
         ctx.current_class = cls
         full_perm = self.viper.FullPerm(pos, info)
         for field in cls.static_fields.values():
             if not field.is_final:
-                field_acc = self.translate_static_field_access(field, cls, field.node, ctx)
-                acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm, pos, info)
+                field_acc = self.translate_static_field_access(field, cls, field.node,
+                                                               ctx)
+                acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm, pos,
+                                                           info)
                 stmts.append(self.viper.Inhale(acc_pred, pos, info))
-        # TODO: check declaration dependencies
+
         for stmt in node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
         ctx.current_class = None
         return stmts + [self.set_global_defined(cls, ctx.module, node, ctx)]
 
-    def _check_dependencies_defined(self, py_node: PythonNode, node: ast.AST, ctx: Context):
+    def _check_dependencies_defined(self, py_node: PythonNode, node: ast.AST,
+                                    ctx: Context) -> List[Stmt]:
+        """
+        Returns statements that assert that all dependencies needed for the declaration
+        of the given PythonNode are currently defined.
+        """
         if ctx.current_class:
             return []
         msg = 'all dependencies of "' + node.name + '" are defined'

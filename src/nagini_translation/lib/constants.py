@@ -40,6 +40,12 @@ ARBITRARY_BOOL_FUNC = '_int_to_bool'
 
 GLOBAL_VAR_FIELD = '_val'
 
+NAME_DOMAIN = '_Name'
+
+COMBINED_NAME_ACCESSOR_2 = '_get_combined_2'
+
+SINGLE_NAME = '_single'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -72,6 +78,9 @@ INTERNAL_NAMES = [
     GLOBAL_VAR_FIELD,
     NAME_QUANTIFIER_VAR,
     COMBINE_NAME_FUNC,
+    NAME_DOMAIN,
+    COMBINED_NAME_ACCESSOR_2,
+    SINGLE_NAME,
 ]
 
 VIPER_KEYWORDS = [

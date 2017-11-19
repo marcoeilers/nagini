@@ -227,6 +227,9 @@ class Analyzer(ast.NodeVisitor):
 
 
     def analyze(self) -> None:
+        """
+        Recursively analyzes the main module and all imported modules.
+        """
         self.visited_modules = [self.module]
         self.visit_module(self.module)
 
@@ -415,7 +418,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.current_function or self.current_class:
-            raise UnsupportedException(node, 'nested class declaration')
+            raise InvalidProgramException(node, 'nested.class.declaration')
         name = node.name
         self.define_new(self.module, name, node)
         cls = self.find_or_create_class(name)
@@ -468,7 +471,10 @@ class Analyzer(ast.NodeVisitor):
                 return True
         return False
 
-    def analyze_import(self, module_name):
+    def analyze_import(self, module_name: str) -> None:
+        """
+        Visits the given module if it hasn't already been visited.
+        """
         if module_name in IGNORED_IMPORTS:
             return
         for mod in self.modules.values():
@@ -478,6 +484,7 @@ class Analyzer(ast.NodeVisitor):
             if mod.type_prefix == '__main__':
                 main_module = mod
         else:
+            # type prefix of the main module is __main__, therefore isn't found.
             module = main_module
 
         if module in self.visited_modules:
@@ -500,7 +507,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
-            raise UnsupportedException(node, 'nested function declaration')
+            raise InvalidProgramException(node, 'nested.function.declaration')
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
@@ -863,16 +870,11 @@ class Analyzer(ast.NodeVisitor):
                         var = self.node_factory.create_python_global_var(
                             node.id, node, cls, self.module)
                     assign = node._parent
-                    if (not isinstance(assign, ast.Assign)
-                            or len(assign.targets) != 1):
-                        pass
-                        # msg = ('only simple assignments and reads allowed for '
-                        #        'global variables')
-                        # raise UnsupportedException(assign, msg)
-                    else:
+                    if isinstance(assign, ast.Assign) and len(assign.targets) == 1:
                         var.value = assign.value
                     self.module.global_vars[node.id] = var
                 current_module = self.module
+                # track access later
                 def todo():
                     var = self.get_target(node, current_module)
                     if isinstance(var, PythonGlobalVar):

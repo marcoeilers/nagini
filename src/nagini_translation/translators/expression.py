@@ -95,6 +95,9 @@ class ExpressionTranslator(CommonTranslator):
             Indicates if ``node`` may be translated to an impure assertion. If False,
             translating a predicate or field permission will result in an
             InvalidProgramException.
+        :param as_read:
+            Indicates if ``node`` should be translated as if it was being read (as
+            opposed to assigned to) independently of the actual context of the AST node.
         """
         old_as_read = self._as_read
         self._as_read = as_read
@@ -574,14 +577,12 @@ class ExpressionTranslator(CommonTranslator):
                 res = self.wrap_global_defined_check(res, target, ctx.module, node,
                                                      ctx)
             elif ctx.current_function:
-                ctx.current_function.call_deps.add((node, target, ctx.current_function.module))
+                ctx.current_function.call_deps.add((node, target,
+                                                    ctx.current_function.module))
 
         return [], res
 
-
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
-        if node.id == 'test_import_execution':
-            print("12")
         target = self.get_target(node, ctx)
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)

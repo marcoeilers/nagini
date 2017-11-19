@@ -12,7 +12,6 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
-    PRIMITIVES,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -23,7 +22,6 @@ from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
     PythonClass,
-    PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
@@ -294,13 +292,19 @@ class CallTranslator(CommonTranslator):
         return (arg_stmts + defined_check + call,
                 result_var.ref() if result_var else None)
 
-    def _add_dependencies(self, reference: ast.AST, target: PythonMethod, ctx: Context):
+    def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
+                          ctx: Context) -> None:
+        """
+        Tracks that the current container (method or class) depends on the given target,
+        referring to it via the given reference.
+        """
         if ctx.current_function and not self._is_main_method(ctx):
             if ctx.current_function:
                 current_container = ctx.current_function.call_deps
             else:
                 current_container = ctx.current_class.definition_deps
-            if isinstance(target, PythonMethod) and target.cls and target.method_type == MethodType.normal:
+            if (isinstance(target, PythonMethod) and target.cls and
+                        target.method_type == MethodType.normal):
                 for subclass in target.cls.all_subclasses:
                     current = subclass.get_method(target.name)
                     current_container.add((reference, current, ctx.module, subclass))

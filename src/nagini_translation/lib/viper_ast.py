@@ -126,8 +126,6 @@ class ViperAST:
                                 self.to_seq(methods), position, info, self.NoTrafos)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
-        if (name == "holger_0"):
-            print("12")
         body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
@@ -496,7 +494,10 @@ class ViperAST:
             end = self.none
         return self.ast.IdentifierPosition(path, start, end, id)
 
-    def is_heap_dependent(self, expr):
+    def is_heap_dependent(self, expr) -> bool:
+        """
+        Checks if the given expression contains an access to a heap location.
+        """
         for n in [expr] + self.to_list(expr.subnodes()):
             if isinstance(n, self.ast.LocationAccess):
                 return True

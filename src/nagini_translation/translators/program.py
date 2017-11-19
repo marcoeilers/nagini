@@ -579,27 +579,19 @@ class ProgramTranslator(CommonTranslator):
                                                  var_param, pos, info)
         return [is_defined_func, check_defined_func]
 
-    def create_global_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
+    def create_global_definedness_functions(self,
+                                            ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
-        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
-        id_param = self.viper.LocalVar('id', self.viper.Int, pos, info)
-        set_param_decl = self.viper.LocalVarDecl('module', self.viper.SetType(self.name_type()), pos, info)
-        set_param = self.viper.LocalVar('module', self.viper.SetType(self.name_type()), pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
         var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
-        is_defined_pre = self._is_defined(id_param, set_param, pos, info)
-        check_defined_func = self.viper.Function(GLOBAL_CHECK_DEFINED_FUNC,
-                                                 [var_param_decl, id_param_decl, set_param_decl],
-                                                 self.viper.Ref, [is_defined_pre], [],
-                                                 var_param, pos, info)
         assertion_param_decl = self.viper.LocalVarDecl('ass', self.viper.Bool, pos, info)
         assertion_param = self.viper.LocalVar('ass', self.viper.Bool, pos, info)
         asserting_func = self.viper.Function(ASSERTING_FUNC,
                                              [var_param_decl, assertion_param_decl],
                                              self.viper.Ref, [assertion_param], [],
                                              var_param, pos, info)
-        return [check_defined_func, asserting_func]
+        return [asserting_func]
 
     def create_arbitrary_bool_func(self, ctx: Context) -> 'silver.ast.Function':
         pos = self.no_position(ctx)

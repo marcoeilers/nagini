@@ -148,19 +148,17 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         self.defined_var = None
         self.names_var = None
         if global_module and type_prefix != '__main__':
-            self.initialize()
+            self.add_builtin_vars()
 
-
-    def initialize(self):
+    def add_builtin_vars(self) -> None:
+        """
+        Adds builtin variables that are defined in every module.
+        """
         file_var = PythonGlobalVar('__file__', None,
                                    self.global_module.classes[STRING_TYPE], self)
         self.global_vars['__file__'] = file_var
         name_var = PythonGlobalVar('__name__', None,
                                    self.global_module.classes[STRING_TYPE], self)
-        if not self.type_prefix:
-            name_var.value = '__main__'
-        else:
-            name_var.value = self.type_prefix
         self.global_vars['__name__'] = name_var
 
 
@@ -244,7 +242,8 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         for p in self.from_imports:
             result.extend(p.get_included_modules(already_there + (self,),
                                                  include_global=False))
-        result.append(self.global_module)
+        if include_global:
+            result.append(self.global_module)
         return result
 
     def get_contents(self, only_top: bool) -> Dict:
@@ -288,6 +287,10 @@ class PythonType(metaclass=ABCMeta):
 
 
 class SilverType(PythonType):
+    """
+    Wrapper around a Silver type. Only used for creating local variables with types not
+    present in Python.
+    """
     def __init__(self, type, module):
         self.type = type
         self.module = module
@@ -358,6 +361,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
 
     @property
     def all_subclasses(self):
+        """
+        Returns all direct or indirect subclasses of this class.
+        """
         res = [self]
         for sub in self.direct_subclasses:
             res.extend(sub.all_subclasses)
@@ -365,6 +371,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
 
     @property
     def call_deps(self):
+        """
+        Returns the dependencies which need to be defined when calling this class, i.e.,
+        its constructor.
+        """
         constructor = self.get_method('__init__')
         if constructor:
             return constructor.call_deps
@@ -832,7 +842,17 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.definition_deps = set()
         self.call_deps = set()
 
-    def add_all_call_deps(self, res, prefix=()):
+    def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                          prefix: Tuple[PythonNode, ...]=()) -> None:
+        """
+        Adds all dependencies needed when this method is called to the given set.
+        The set will contain tuples of length at least 3, where the first element is
+        the Python AST node representing the access, the second the PythonNode accessed,
+        the third the PythonModule in which the first name needs to be defined.
+        All further elements are PythonNodes which represent conditions, i.e., the name
+        needs to be defined in the module IF all the conditional PythonNodes have been
+        defined in their respective modules.
+        """
         for dep in self.call_deps:
             if dep not in res:
                 c_prefix = prefix
@@ -1395,8 +1415,6 @@ class PythonGlobalVar(PythonVarBase):
     def __init__(self, name: str, node: ast.AST, type: PythonClass, module: PythonModule,
                  cls: PythonClass = None):
         super().__init__(name, node, type)
-        if name == 'a':
-            print("123")
         self.module = module
         self.cls = cls
         self.overrides = None

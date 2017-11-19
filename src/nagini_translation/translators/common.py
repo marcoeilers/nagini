@@ -8,8 +8,10 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
+    NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    SINGLE_NAME,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
@@ -259,7 +261,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.viper.Inhale(is_defined, position, info)
 
     def set_global_defined(self, declaration: PythonNode, module: PythonModule,
-                           node: ast.AST, ctx: Context):
+                           node: ast.AST, ctx: Context) -> Stmt:
+        """
+        Returns a statement that sets the name of the given declaration to be defined.
+        """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
@@ -267,35 +272,44 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                     info)
         return self._set_global_defined(decl_id, module_set, pos, info)
 
-    def _set_global_defined(self, decl_int: Expr, module_var, pos, info):
+    def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
+                            info: Info) -> Stmt:
         if decl_int.typ() == self.viper.Int:
-            SINGLE_NAME = '_single'
-            NAME_DOMAIN = '_Name'
-            decl_int = self.viper.DomainFuncApp(SINGLE_NAME, [decl_int], self.name_type(), pos, info, NAME_DOMAIN)
+            decl_int = self.viper.DomainFuncApp(SINGLE_NAME, [decl_int], self.name_type(),
+                                                pos, info, NAME_DOMAIN)
         new_set = self.viper.ExplicitSet([decl_int], pos, info)
         union = self.viper.AnySetUnion(module_var, new_set, pos, info)
         return self.viper.LocalVarAssign(module_var, union, pos, info)
 
-    def name_type(self):
-        NAME_DOMAIN = '_Name'
+    def name_type(self) -> 'silver.ast.DomainType':
+        """
+        The Silver type of global names, for which one can check if they are defined or
+        not.
+        """
         return self.viper.DomainType(NAME_DOMAIN, {}, [])
 
-    def _is_defined(self, name: Expr, module: Expr, pos, info) -> Expr:
-        SINGLE_NAME = '_single'
-        NAME_DOMAIN = '_Name'
+    def _is_defined(self, name: Expr, module: Expr, pos: Position, info: Info) -> Expr:
+        """
+        Returns an expression that is true iff the name represented by the given
+        expression is defined in the module represented by the other expression.
+        """
         name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
         if name.typ() == self.viper.Int:
-            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos, info, NAME_DOMAIN)
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos,
+                                                  info, NAME_DOMAIN)
         else:
             boxed_name = name
         return self.viper.AnySetContains(boxed_name, module, pos, info)
 
-    def _combine(self, prefix: Expr, name: Expr, pos, info) -> Expr:
-        NAME_DOMAIN = '_Name'
-        SINGLE_NAME = '_single'
+    def _combine(self, prefix: Expr, name: Expr, pos: Position, info: Info) -> Expr:
+        """
+        Returns an expression that combines the prefix-name and the name to a new name
+        that represents 'prefix.name'.
+        """
         name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
         if name.typ() == self.viper.Int:
-            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos, info, NAME_DOMAIN)
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos,
+                                                  info, NAME_DOMAIN)
         else:
             boxed_name = name
         if prefix.typ() == self.viper.Int:
@@ -303,9 +317,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                     info, NAME_DOMAIN)
         else:
             boxed_prefix = prefix
-        return self.viper.DomainFuncApp(COMBINE_NAME_FUNC, [boxed_prefix, boxed_name], name_type, pos, info, NAME_DOMAIN)
+        return self.viper.DomainFuncApp(COMBINE_NAME_FUNC, [boxed_prefix, boxed_name],
+                                        name_type, pos, info, NAME_DOMAIN)
 
-    def reference_identifiers(self, ref, pos, info):
+    def reference_identifiers(self, ref: ast.AST, pos: Position,
+                              info: Info) -> List[Expr]:
+        """
+        Returns a list containing all names contained by the given reference.
+        """
         res = []
         if isinstance(ref, ast.Subscript):
             if isinstance(ref.value, ast.Name) and ref.value.id in ('Optional', 'Union'):
@@ -329,7 +348,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
-                                           ctx: Context):
+                                           ctx: Context) -> List[Expr]:
+        """
+        Returns two boolean expressions that represent 1) if the name of the given
+        declaration is defined in the given module, and 2) if all dependencies of the
+        given declaration are currently defined.
+        """
         msg = 'Name "' + declaration.name + '" is defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         info = self.no_info(ctx)
@@ -337,8 +361,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         decl_ids = self.reference_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
         for decl_id in decl_ids:
-            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos, info), pos, info)
-
+            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
+                                                                 info), pos, info)
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
             called = declaration
@@ -359,12 +383,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     decl_id = self.viper.IntLit(self._get_string_value(cond.name), pos,
                                                 info)
                     cond_contains = self._is_defined(decl_id, module_set, pos, info)
-                    contains_dep = self.viper.Implies(cond_contains, contains_dep, pos, info)
+                    contains_dep = self.viper.Implies(cond_contains, contains_dep, pos,
+                                                      info)
                 deps_defined = self.viper.And(deps_defined, contains_dep, pos, info)
 
         return [contains, deps_defined]
 
-    def _get_name_parts(self, node: ast.AST):
+    def _get_name_parts(self, node: ast.AST) -> List[str]:
+        """
+        Converts an AST node representing some kind of reference to a list of strings.
+        """
         while isinstance(node, ast.Subscript):
             node = node.value
         if isinstance(node, ast.Name):
@@ -376,11 +404,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return []
         return [node.name]
 
-    def _get_name(self, node: ast.AST):
-        return '.'.join(self._get_name_parts(node))
-
     def assert_global_defined(self, declaration: PythonNode, module: PythonModule,
-                              ref_node: ast.AST, ctx: Context, call_deps=True):
+                              ref_node: ast.AST, ctx: Context,
+                              call_deps=True) -> List[Stmt]:
+        """
+        Creates assertions that check that the given declaration and all its dependencies
+        are currently defined in the given module.
+        """
         info = self.no_info(ctx)
         name, deps = self._get_global_definedness_conditions(declaration, module,
                                                              ref_node, ctx)
@@ -396,7 +426,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def wrap_global_defined_check(self, val: Expr, declaration: PythonNode,
                                   module: PythonModule, ref_node: ast.AST,
-                                  ctx: Context):
+                                  ctx: Context) -> Expr:
+        """
+        Wraps the given expression into a new expression that checks that the given
+        declaration and all its dependencies are currently defined in the given module.
+        """
         info = self.no_info(ctx)
         msg = 'Name "' + declaration.name + '" is defined'
         pos = self.to_position(ref_node, ctx, error_string=msg,
@@ -419,6 +453,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return name_func
 
     def _is_main_method(self, ctx: Context) -> bool:
+        """
+        Checks if we are currently translating the 'main method', i.e., the global
+        statements of the program.
+        """
         if not ctx.current_function:
             return False
         return ctx.current_function.name == '__main__'

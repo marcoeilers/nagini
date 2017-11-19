@@ -722,6 +722,10 @@ class MethodTranslator(CommonTranslator):
         return [label, body_block] + next_var_set + [goto_end]
 
     def _initialize_module(self, module: PythonModule, ctx: Context) -> None:
+        """
+        Creates the variables representing the built-in global variables that exist
+        in each module.
+        """
         if isinstance(module.names_var, str):
             names_decl = self.viper.LocalVarDecl(module.names_var,
                                                  self.viper.SetType(self.name_type()),
@@ -738,6 +742,9 @@ class MethodTranslator(CommonTranslator):
 
     def translate_main_method(self, modules: List[PythonModule],
                               ctx: Context) -> List['silver.ast.Method']:
+        """
+        Translates the global statements of the program to a single method.
+        """
         main = [m for m in modules if m.type_prefix == '__main__'][0]
         stmts = []
         no_pos = self.no_position(ctx)
@@ -788,9 +795,9 @@ class MethodTranslator(CommonTranslator):
                     main_str = self.translate_string('__main__', None, ctx)
                     str_type = ctx.module.global_module.classes[STRING_TYPE]
                     func_name = '__eq__'
-                    call = self.get_function_call(str_type, func_name, [main_str, field_access],
-                                                  [None, None],
-                                                  var.node, ctx)
+                    call = self.get_function_call(str_type, func_name,
+                                                  [main_str, field_access],
+                                                  [None, None], var.node, ctx)
                     if module is not main:
                         call = self.viper.Not(call, no_pos, no_info)
                     field_pred = self.viper.And(field_pred, call, no_pos, no_info)
@@ -833,7 +840,8 @@ class MethodTranslator(CommonTranslator):
             main_locals.append(tb.error_var.decl)
             main_locals.append(tb.finally_var.decl)
         body = stmts
-        res = self.create_method_node(ctx, method_name, [], [], [], [], main_locals + locals, body, no_pos,
+        res = self.create_method_node(ctx, method_name, [], [], [], [],
+                                      main_locals + locals, body, no_pos,
                                       no_info, method=ctx.current_function)
         ctx.current_function = None
         return main_method, res
