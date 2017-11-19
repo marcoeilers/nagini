@@ -64,6 +64,7 @@ class ExpressionTranslator(CommonTranslator):
         # TODO: Update all code to use this flag.
         self._is_expression = False
         self._target_type = None
+        self._as_read = False
         self._primitive_operations = {
             ast.Add: self.viper.Add,
             ast.Sub: self.viper.Sub,
@@ -82,7 +83,8 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type = None,
-                       impure: bool = False) -> StmtsAndExpr:
+                       impure: bool = False,
+                       as_read: bool = False) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression.
 
@@ -94,7 +96,8 @@ class ExpressionTranslator(CommonTranslator):
             translating a predicate or field permission will result in an
             InvalidProgramException.
         """
-
+        old_as_read = self._as_read
+        self._as_read = as_read
         if not target_type:
             target_type = self.viper.Ref
         old_target = self._target_type
@@ -105,6 +108,7 @@ class ExpressionTranslator(CommonTranslator):
             result = self.convert_to_type(result, target_type, ctx, node)
 
         self._target_type = old_target
+        self._as_read = old_as_read
         return stmt, result
 
     def _translate_only(self, node: ast.AST, ctx: Context, impure=False):
@@ -565,9 +569,13 @@ class ExpressionTranslator(CommonTranslator):
         else:
             res = self.viper.FuncApp(var.sil_name, [], position,
                                      self.no_info(ctx), type, [])
-        if not isinstance(node.ctx, ast.Store) and self._is_main_method(ctx):
-            res = self.wrap_global_defined_check(res, target, ctx.module, node,
-                                                 ctx)
+        if not isinstance(node.ctx, ast.Store) or self._as_read:
+            if self._is_main_method(ctx):
+                res = self.wrap_global_defined_check(res, target, ctx.module, node,
+                                                     ctx)
+            elif ctx.current_function:
+                ctx.current_function.call_deps.add((node, target, ctx.current_function.module))
+
         return [], res
 
 

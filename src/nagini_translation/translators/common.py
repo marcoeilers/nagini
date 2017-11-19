@@ -265,8 +265,45 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         module_set = module.names_var[1]
         decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
                                     info)
-        contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
-        return self.viper.Inhale(contains, pos, info)
+        return self._set_global_defined(decl_id, module_set, pos, info)
+
+    def _set_global_defined(self, decl_int: Expr, module_var, pos, info):
+        if decl_int.typ() == self.viper.Int:
+            SINGLE_NAME = '_single'
+            NAME_DOMAIN = '_Name'
+            decl_int = self.viper.DomainFuncApp(SINGLE_NAME, [decl_int], self.name_type(), pos, info, NAME_DOMAIN)
+        new_set = self.viper.ExplicitSet([decl_int], pos, info)
+        union = self.viper.AnySetUnion(module_var, new_set, pos, info)
+        return self.viper.LocalVarAssign(module_var, union, pos, info)
+
+    def name_type(self):
+        NAME_DOMAIN = '_Name'
+        return self.viper.DomainType(NAME_DOMAIN, {}, [])
+
+    def _is_defined(self, name: Expr, module: Expr, pos, info) -> Expr:
+        SINGLE_NAME = '_single'
+        NAME_DOMAIN = '_Name'
+        name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
+        if name.typ() == self.viper.Int:
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos, info, NAME_DOMAIN)
+        else:
+            boxed_name = name
+        return self.viper.AnySetContains(boxed_name, module, pos, info)
+
+    def _combine(self, prefix: Expr, name: Expr, pos, info) -> Expr:
+        NAME_DOMAIN = '_Name'
+        SINGLE_NAME = '_single'
+        name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
+        if name.typ() == self.viper.Int:
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos, info, NAME_DOMAIN)
+        else:
+            boxed_name = name
+        if prefix.typ() == self.viper.Int:
+            boxed_prefix = self.viper.DomainFuncApp(SINGLE_NAME, [prefix], name_type, pos,
+                                                    info, NAME_DOMAIN)
+        else:
+            boxed_prefix = prefix
+        return self.viper.DomainFuncApp(COMBINE_NAME_FUNC, [boxed_prefix, boxed_name], name_type, pos, info, NAME_DOMAIN)
 
     def reference_identifiers(self, ref, pos, info):
         res = []
@@ -285,14 +322,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if decl_id is None:
                 decl_id = current
             else:
-                name_var_decl = self.viper.LocalVarDecl('id',
-                                                        self.viper.Int, pos, info)
-                module_name_decl = self.viper.LocalVarDecl('name', self.viper.Int,
-                                                           pos, info)
-                decl_id = self.viper.FuncApp(COMBINE_NAME_FUNC, [current,
-                                                                 decl_id],
-                                             pos, info, self.viper.Int,
-                                             [module_name_decl, name_var_decl])
+                decl_id = self._combine(current, decl_id, pos, info)
         return [decl_id]
 
     def _get_global_definedness_conditions(self, declaration: PythonNode,
@@ -305,7 +335,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         decl_ids = self.reference_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
         for decl_id in decl_ids:
-            contains = self.viper.And(contains, self.viper.AnySetContains(decl_id, module_set, pos, info), pos, info)
+            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos, info), pos, info)
 
         deps = set()
         if isinstance(declaration, (PythonMethod, PythonClass)):
@@ -317,16 +347,16 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         msg = 'all dependencies of "' + declaration.name + '" are defined'
         pos = self.to_position(ref_node, ctx, error_string=msg)
         deps_defined = self.viper.TrueLit(pos, info)
-        for ref, decl, mod, *cond in deps:
+        for ref, decl, mod, *conds in deps:
             module_set = mod.names_var[1]
             decl_ids = self.reference_identifiers(ref, pos, info)
             for decl_id in decl_ids:
-                contains_dep = self.viper.AnySetContains(decl_id, module_set, pos, info)
-                if cond:
-                    module_set = cond[0].module.names_var[1]
-                    decl_id = self.viper.IntLit(self._get_string_value(cond[0].sil_name), pos,
+                contains_dep = self._is_defined(decl_id, module_set, pos, info)
+                for cond in conds:
+                    module_set = cond.module.names_var[1]
+                    decl_id = self.viper.IntLit(self._get_string_value(cond.name), pos,
                                                 info)
-                    cond_contains = self.viper.AnySetContains(decl_id, module_set, pos, info)
+                    cond_contains = self._is_defined(decl_id, module_set, pos, info)
                     contains_dep = self.viper.Implies(cond_contains, contains_dep, pos, info)
                 deps_defined = self.viper.And(deps_defined, contains_dep, pos, info)
 

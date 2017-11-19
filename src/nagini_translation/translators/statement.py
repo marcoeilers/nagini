@@ -26,6 +26,7 @@ from nagini_translation.lib.program_nodes import (
     PythonNode,
     PythonType,
     PythonVar,
+    SilverType,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -138,41 +139,38 @@ class StatementTranslator(CommonTranslator):
         stmts.append(self._execute_module_statements(mod, node, ctx))
 
         if len(node.names) == 1 and node.names[0].name == '*':
-            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.viper.Int,
+            new_set_var = ctx.current_function.create_variable('new_set', SilverType(self.viper.SetType(self.name_type()), ctx.module), self.translator)
+
+            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(),
                                                     pos, info)
-            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.viper.Int, pos,
+            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos,
                                                info)
-            name_in_imported = self.viper.AnySetContains(name_var_ref, mod.names_var[1],
+            name_in_imported = self._is_defined(name_var_ref, mod.names_var[1],
                                                          pos, info)
-            module_name_decl = self.viper.LocalVarDecl('name', self.viper.Int, pos, info)
-            module_int = self.viper.IntLit(self._get_string_value(mod.sil_name), pos,
-                                           info)
-            combined_name = self.viper.FuncApp(COMBINE_NAME_FUNC, [module_int,
-                                                                   name_var_ref],
-                                               pos, info, self.viper.Int,
-                                               [module_name_decl, name_var_decl])
-            combined_in_current = self.viper.AnySetContains(combined_name,
-                                                            ctx.module.names_var[1], pos,
-                                                            info)
-            impl = self.viper.Implies(name_in_imported, combined_in_current, pos, info)
-            assertion = self.viper.Forall([name_var_decl], [], impl, pos, info)
+            name_in_new = self._is_defined(name_var_ref, new_set_var.ref(), pos, info)
+            impl = self.viper.EqCmp(name_in_imported, name_in_new, pos, info)
+            trigger = self.viper.Trigger([name_in_new], pos, info)
+            assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
             stmts.append(self.viper.Inhale(assertion, pos, info))
+            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(), pos, info)
+            stmts.append(self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos, info))
         else:
             for alias in node.names:
                 name = alias.name
-                if name == 'schneido':
-                    print("qwe")
                 as_name = alias.asname if alias.asname else alias.name
                 msg = 'name "' + name + '" is defined in imported module'
                 pos = self.to_position(node, ctx, error_string=msg)
                 name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
-                exists_in_other = self.viper.AnySetContains(name_int, imported.names_var[1], pos, info)
+                exists_in_other = self._is_defined(name_int, imported.names_var[1], pos, info)
                 stmts.append(self.viper.Assert(exists_in_other, pos, info))
                 as_name_int = self.viper.IntLit(self._get_string_value(as_name), pos, info)
-                exists_in_new = self.viper.AnySetContains(as_name_int, ctx.module.names_var[1], pos, info)
-                stmts.append(self.viper.Inhale(exists_in_new, pos, info))
+                stmts.append(self._set_global_defined(as_name_int, ctx.module.names_var[1], pos, info))
 
         return stmts
+
+    def _get_second(self, e, pos, info):
+        NAME_DOMAIN = '_Name'
+        return self.viper.DomainFuncApp('_get_combined_2', [e], self.name_type(), pos, info, NAME_DOMAIN)
 
     def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
         stmts = []
@@ -186,23 +184,38 @@ class StatementTranslator(CommonTranslator):
             mod = ctx.module
             for part in name_parts:
                 mod = mod.namespaces[part]
+            new_set_var = ctx.current_function.create_variable('new_set',
+                                                               SilverType(self.viper.SetType(
+                                                                   self.name_type()), ctx.module),
+                                                               self.translator)
             stmts.append(self._execute_module_statements(mod, node, ctx))
-            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.viper.Int, pos, info)
-            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.viper.Int, pos, info)
-            name_in_imported = self.viper.AnySetContains(name_var_ref, mod.names_var[1], pos, info)
-            module_name_decl = self.viper.LocalVarDecl('name', self.viper.Int, pos, info)
+            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(), pos, info)
+            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos, info)
+            name_in_imported = self._is_defined(name_var_ref, mod.names_var[1], pos, info)
+
 
             combined_name = name_var_ref
+            last_part = name_var_ref
+            name_ints = []
             for name in reversed(name_parts):
                 name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
-                combined_name = self.viper.FuncApp(COMBINE_NAME_FUNC, [name_int,
-                                                                       combined_name],
-                                                   pos, info, self.viper.Int,
-                                                   [module_name_decl, name_var_decl])
-            combined_in_current = self.viper.AnySetContains(combined_name, ctx.module.names_var[1], pos, info)
-            impl = self.viper.Implies(name_in_imported, combined_in_current, pos, info)
-            assertion = self.viper.Forall([name_var_decl], [], impl, pos, info)
+                combined_name = self._combine(name_int, combined_name, pos, info)
+                last_part = self._get_second(last_part, pos, info)
+                name_ints.append(name_int)
+            combined_part = last_part
+            for name_int in name_ints:
+                combined_part = self._combine(name_int, combined_part, pos, info)
+            combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos, info)
+            impl = self.viper.EqCmp(name_in_imported, combined_in_new, pos, info)
+            trigger = self.viper.Trigger([combined_in_new], pos, info)
+            assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
             stmts.append(self.viper.Inhale(assertion, pos, info))
+            is_combined = self.viper.EqCmp(name_var_ref, combined_part, pos, info)
+            all_combined = self.viper.Forall([name_var_decl], [], self.viper.Implies(self.viper.AnySetContains(name_var_ref, new_set_var.ref(), pos, info), is_combined, pos, info), pos, info)
+            # stmts.append(self.viper.Inhale(all_combined, pos, info))
+            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(), pos, info)
+            stmts.append(
+                self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos, info))
         return stmts
 
     def translate_stmt_FunctionDef(self, node: ast.FunctionDef, ctx: Context) -> List[Stmt]:
@@ -211,6 +224,8 @@ class StatementTranslator(CommonTranslator):
             method = ctx.current_class.get_func_or_method(node.name)
         else:
             method = ctx.module.get_func_or_method(node.name)
+        if not method:
+            method = ctx.module.predicates.get(node.name)
         if not method:
             return []
         dep_check = self._check_dependencies_defined(method, node, ctx)
@@ -251,7 +266,7 @@ class StatementTranslator(CommonTranslator):
             module_set = mod.names_var[1]
             decl_ids = self.reference_identifiers(ref, dep_pos, info)
             for decl_id in decl_ids:
-                contains = self.viper.AnySetContains(decl_id, module_set, dep_pos, info)
+                contains = self._is_defined(decl_id, module_set, dep_pos, info)
                 deps_defined = self.viper.And(deps_defined, contains, dep_pos, info)
         return [self.viper.Assert(deps_defined, dep_pos, info)]
 
@@ -287,7 +302,7 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
-        left_stmt, left = self.translate_expr(node.target, ctx)
+        left_stmt, left = self.translate_expr(node.target, ctx, as_read=True)
         if left_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         stmt, right = self.translate_expr(node.value, ctx)

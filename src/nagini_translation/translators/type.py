@@ -9,6 +9,7 @@ from nagini_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonMethod,
     PythonType,
+    SilverType,
 )
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.resolver import get_type as do_get_type
@@ -43,7 +44,9 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name == CALLABLE_TYPE:
+        if isinstance(cls, SilverType):
+            return cls.type
+        elif cls.name == CALLABLE_TYPE:
             return self.viper.function_domain_type()
         elif cls.name in PRIMITIVES:
             cls = cls.try_box()

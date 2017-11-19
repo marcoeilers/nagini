@@ -374,14 +374,14 @@ class ViperAST:
     def AnySetContains(self, elem, s, position, info):
         return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
+    def AnySetUnion(self, left, right, position, info):
+        return self.ast.AnySetUnion(left, right, position, info, self.NoTrafos)
+
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)
 
     def SeqContains(self, elem, s, position, info):
         return self.ast.SeqContains(elem, s, position, info, self.NoTrafos)
-
-    def SetContains(self, elem, s, position, info):
-        return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
     def SeqLength(self, s, position, info):
         return self.ast.SeqLength(s, position, info, self.NoTrafos)

@@ -14,7 +14,7 @@ def get_a2() -> int:
 
 def foo_4() -> int:
     Requires(Acc(a2, 1/2))
-    Requires(a2_perm() and get_a2() <= 3)
+    Requires(a2_perm() and get_a2() <= 2)
     Ensures(a2_perm())
     Ensures(Acc(a2, 1/2) and a2 == Old(a2) + 1)
     global a2

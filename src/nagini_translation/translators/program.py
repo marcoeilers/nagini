@@ -142,34 +142,26 @@ class ProgramTranslator(CommonTranslator):
         position = self.to_position(var.node, ctx)
         posts = []
         result = self.viper.Result(type, position, self.no_info(ctx))
-        if var.type.name not in PRIMITIVES:
-            posts.append(self.type_check(result, var.type, position, ctx))
-        if hasattr(var, 'value'):
-            if isinstance(var.value, str):
-                main_str = self.translate_string('__main__', var.node, ctx)
-                result = self.viper.Result(self.viper.Ref, self.no_position(ctx),
-                                           self.no_info(ctx))
-                str_type = ctx.module.global_module.classes[STRING_TYPE]
-                func_name = '__eq__'
-                call = self.get_function_call(str_type, func_name, [main_str, result], [None, None],
-                                              var.node, ctx)
-                if var.value == '__main__':
-                    posts.append(call)
+        if var.is_final:
+            if var.type.name not in PRIMITIVES:
+                posts.append(self.type_check(result, var.type, position, ctx))
+            if hasattr(var, 'value'):
+                if isinstance(var.value, str):
+                    body = None
                 else:
-                    posts.append(self.viper.Not(call, position, self.no_info(ctx)))
-                body = None
+                    body = None
+                    try:
+                        stmt, value = self.translate_expr(var.value, ctx)
+                        if not stmt:
+                            if not self.viper.is_heap_dependent(value):
+                                body = value
+                                posts.append(self.viper.EqCmp(result, value, position,
+                                                              self.no_info(ctx)))
+                    except AttributeError:
+                        # The translation (probably) tried to access ctx.current_function
+                        pass
             else:
                 body = None
-                try:
-                    stmt, value = self.translate_expr(var.value, ctx)
-                    if not stmt:
-                        if not self.viper.is_heap_dependent(value):
-                            body = value
-                            posts.append(self.viper.EqCmp(result, value, position,
-                                                          self.no_info(ctx)))
-                except AttributeError:
-                    # The translation (probably) tried to access ctx.current_function
-                    pass
         else:
             body = None
         return self.viper.Function(var.sil_name, [], type, [], posts, body,
@@ -585,21 +577,18 @@ class ProgramTranslator(CommonTranslator):
                                                  [var_param_decl, id_param_decl],
                                                  self.viper.Ref, [is_defined_pre], [],
                                                  var_param, pos, info)
-        cont_param_decl = self.viper.LocalVarDecl('cont', self.viper.Int, pos, info)
-        combine_func = self.viper.Function(COMBINE_NAME_FUNC, [cont_param_decl, id_param_decl], self.viper.Int, [], [], None, pos, info)
-
-        return [is_defined_func, check_defined_func, combine_func]
+        return [is_defined_func, check_defined_func]
 
     def create_global_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
         id_param = self.viper.LocalVar('id', self.viper.Int, pos, info)
-        set_param_decl = self.viper.LocalVarDecl('module', self.viper.SetType(self.viper.Int), pos, info)
-        set_param = self.viper.LocalVar('module', self.viper.SetType(self.viper.Int), pos, info)
+        set_param_decl = self.viper.LocalVarDecl('module', self.viper.SetType(self.name_type()), pos, info)
+        set_param = self.viper.LocalVar('module', self.viper.SetType(self.name_type()), pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
         var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
-        is_defined_pre = self.viper.AnySetContains(id_param, set_param, pos, info)
+        is_defined_pre = self._is_defined(id_param, set_param, pos, info)
         check_defined_func = self.viper.Function(GLOBAL_CHECK_DEFINED_FUNC,
                                                  [var_param_decl, id_param_decl, set_param_decl],
                                                  self.viper.Ref, [is_defined_pre], [],

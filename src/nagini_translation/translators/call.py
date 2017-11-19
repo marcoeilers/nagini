@@ -302,7 +302,8 @@ class CallTranslator(CommonTranslator):
                 current_container = ctx.current_class.definition_deps
             if isinstance(target, PythonMethod) and target.cls and target.method_type == MethodType.normal:
                 for subclass in target.cls.all_subclasses:
-                    current_container.add((reference, target, ctx.module, subclass))
+                    current = subclass.get_method(target.name)
+                    current_container.add((reference, current, ctx.module, subclass))
             else:
                 current_container.add((reference, target, ctx.module))
 

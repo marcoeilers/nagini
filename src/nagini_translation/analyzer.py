@@ -155,7 +155,7 @@ class Analyzer(ast.NodeVisitor):
                     if not redefined_name:
                         redefined_name = module_name
                     assert module_name in self.types.files
-                    path = self.types.files[module_name]
+                    path = os.path.abspath(self.types.files[module_name])
                     self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
                 module_name = stmt.module
@@ -168,6 +168,7 @@ class Analyzer(ast.NodeVisitor):
                 else:
                     assert module_name in self.types.files
                     path = self.types.files[module_name]
+                path = os.path.abspath(path)
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
@@ -449,6 +450,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
+        if cls.python_class not in cls.superclass.python_class.direct_subclasses:
+            cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
         for member in node.body:
             self.visit(member, node)

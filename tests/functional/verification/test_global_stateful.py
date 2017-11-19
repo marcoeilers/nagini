@@ -6,7 +6,7 @@ a = [b]  # type: List[int]
 
 
 def foo() -> None:
-    Requires(Acc(list_pred(a)) and len(a) <= 2)
+    Requires(Acc(list_pred(a)) and len(a) < 2)
     Ensures(Acc(list_pred(a)))
     Ensures(len(a) == Old(len(a)) + 1)
     a.append(1)
@@ -14,5 +14,5 @@ def foo() -> None:
 
 foo()
 
-#:: ExpectedOutput(assert.failed:assertion.false)
+#:: ExpectedOutput(call.precondition:assertion.false)
 foo()

@@ -724,10 +724,10 @@ class MethodTranslator(CommonTranslator):
     def _initialize_module(self, module: PythonModule, ctx: Context) -> None:
         if isinstance(module.names_var, str):
             names_decl = self.viper.LocalVarDecl(module.names_var,
-                                                 self.viper.SetType(self.viper.Int),
+                                                 self.viper.SetType(self.name_type()),
                                                  self.no_position(ctx), self.no_info(ctx))
             names_ref = self.viper.LocalVar(module.names_var,
-                                            self.viper.SetType(self.viper.Int),
+                                            self.viper.SetType(self.name_type()),
                                             self.no_position(ctx), self.no_info(ctx))
             def_decl = self.viper.LocalVarDecl(module.defined_var, self.viper.Bool,
                                                self.no_position(ctx), self.no_info(ctx))
@@ -744,7 +744,7 @@ class MethodTranslator(CommonTranslator):
         no_info = self.no_info(ctx)
         false_lit = self.viper.FalseLit(no_pos, no_info)
         true_lit = self.viper.TrueLit(no_pos, no_info)
-        # empty_set = self.viper.EmptySeq(self.viper.Int, no_pos, no_info)
+        empty_set = self.viper.EmptySet(self.name_type(), no_pos, no_info)
         locals = []
         global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
         full_perm = self.viper.FullPerm(no_pos, no_info)
@@ -761,8 +761,8 @@ class MethodTranslator(CommonTranslator):
             else:
                 stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
                                                        false_lit, no_pos, no_info))
-            # stmts.append(self.viper.LocalVarAssign(module.names_var[1],
-            #                                        empty_set, no_pos, no_info))
+            stmts.append(self.viper.LocalVarAssign(module.names_var[1],
+                                                   empty_set, no_pos, no_info))
             locals.append(module.defined_var[0])
             locals.append(module.names_var[0])
             for var in module.global_vars.values():
@@ -791,6 +791,8 @@ class MethodTranslator(CommonTranslator):
                     call = self.get_function_call(str_type, func_name, [main_str, field_access],
                                                   [None, None],
                                                   var.node, ctx)
+                    if module is not main:
+                        call = self.viper.Not(call, no_pos, no_info)
                     field_pred = self.viper.And(field_pred, call, no_pos, no_info)
                 stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
 

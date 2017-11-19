@@ -81,9 +81,10 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type: object = None,
-                       impure: bool = False) -> StmtsAndExpr:
+                       impure: bool = False,
+                       as_read: bool = False) -> StmtsAndExpr:
         return self.config.expr_translator.translate_expr(
-            node, ctx, target_type, impure)
+            node, ctx, target_type, impure, as_read)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)

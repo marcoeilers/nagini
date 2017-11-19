@@ -287,6 +287,12 @@ class PythonType(metaclass=ABCMeta):
         return self
 
 
+class SilverType(PythonType):
+    def __init__(self, type, module):
+        self.type = type
+        self.module = module
+
+
 class TypeVar(PythonType, ContainerInterface):
     """
     Represents a type variable.
@@ -826,11 +832,17 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.definition_deps = set()
         self.call_deps = set()
 
-    def add_all_call_deps(self, res):
+    def add_all_call_deps(self, res, prefix=()):
         for dep in self.call_deps:
             if dep not in res:
-                res.add(dep)
-                dep[1].add_all_call_deps(res)
+                c_prefix = prefix
+                if len(dep) > 3:
+                    c_prefix = prefix + dep[3:]
+                else:
+                    res.add(dep + c_prefix)
+
+                if hasattr(dep[1], 'add_all_call_deps'):
+                    dep[1].add_all_call_deps(res, c_prefix)
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
