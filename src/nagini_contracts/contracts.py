@@ -302,7 +302,7 @@ def CallSlotProof(call_slot: Callable[..., Any]) -> Callable[[Callable[..., None
     pass
 
 
-def ClosureCall(call: Any, justification: Any) -> Any:
+def ClosureCall(call: T, justification: Any) -> T:
     """
     Justifies a closure call through either
      * a CallSlot (justification == the callslot instance)
