@@ -689,7 +689,7 @@ class CallTranslator(CommonTranslator):
                     info = self.no_info(ctx)
                     # For each class in union
                     guarded_blocks = []
-                    for type in rectype.type_args:
+                    for type in rectype.get_types():
                         # If receiver is an instance of this particular class
                         method_call_guard = self.var_type_check(node.func.value.id,
                                                                 type, position, ctx)

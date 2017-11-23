@@ -692,6 +692,18 @@ class UnionType(GenericType):
     def python_class(self) -> PythonClass:
         return self.cls
 
+    def get_types(self) -> Set[PythonClass]:
+        """
+        Returns a flattened set of types contained in the union
+        """
+        result = set()
+        for type in self.type_args:
+            if not isinstance(type, UnionType):
+                result.add(type)
+            else:
+                result |= type.get_types()
+        return result
+
 
 class OptionalType(UnionType):
     """

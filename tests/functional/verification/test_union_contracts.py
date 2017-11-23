@@ -65,3 +65,6 @@ def j(o: Union[A, B], i: int) -> int:
     Requires(i > 0)
     Ensures(Result() == 4 or Result() == 6)
     return o.foo(i)
+
+def k(o: Union[A, Union[B, C]]) -> None:
+    x = o.foo(5)

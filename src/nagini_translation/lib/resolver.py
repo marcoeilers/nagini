@@ -374,12 +374,13 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         rectype = get_type(node.func.value, containers, container)
         if (isinstance(node.func.value, ast.Name) and
             isinstance(rectype, UnionType)):
-            set_of_types = {type.get_func_or_method(node.func.attr).type
-                for type in rectype.type_args}
-            if len(set_of_types) == 1:
-                return set_of_types.pop()
+            set_of_classes = rectype.get_types()
+            set_of_return_types = {type.get_func_or_method(node.func.attr).type
+                for type in set_of_classes}
+            if len(set_of_return_types) == 1:
+                return set_of_return_types.pop()
             else:
-                return UnionType(list(set_of_types))
+                return UnionType(list(set_of_return_types))
         elif isinstance(rectype, PythonType):
             target = rectype.get_func_or_method(node.func.attr)
             if target.generic_type != -1:
