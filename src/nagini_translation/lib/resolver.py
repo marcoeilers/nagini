@@ -372,11 +372,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             return target.type
     elif isinstance(node.func, ast.Attribute):
         rectype = get_type(node.func.value, containers, container)
-        if (isinstance(node.func.value, ast.Name) and
-            isinstance(rectype, UnionType)):
+        if isinstance(rectype, UnionType):
             set_of_classes = rectype.get_types()
             set_of_return_types = {type.get_func_or_method(node.func.attr).type
-                for type in set_of_classes}
+                                   for type in set_of_classes}
             if len(set_of_return_types) == 1:
                 return set_of_return_types.pop()
             else:
@@ -387,6 +386,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return rectype.type_args[target.generic_type]
             else:
                 return target.type
+    else:
+        raise UnsupportedException(node)
 
 
 def _get_subscript_type(node: ast.Subscript, module: PythonModule,
