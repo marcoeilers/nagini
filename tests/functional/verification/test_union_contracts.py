@@ -68,3 +68,9 @@ def j(o: Union[A, B], i: int) -> int:
 
 def k(o: Union[A, Union[B, C]]) -> None:
     x = o.foo(5)
+
+def l(o: Union[Union[B, C]]) -> None:
+    x = o.foo(5)
+
+def m(o: Union[A]) -> None:
+    x = o.foo(5)

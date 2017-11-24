@@ -680,11 +680,9 @@ class CallTranslator(CommonTranslator):
         target = self._get_call_target(node, ctx)
         if not target:
             # Handle method calls when receiver's type is union
-            if (isinstance(node.func, ast.Attribute) and
-                isinstance(node.func.value, ast.Name)):
+            if isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
                 if isinstance(rectype, UnionType):
-                    assert(len(rectype.type_args) >= 2)
                     position = self.to_position(node, ctx)
                     info = self.no_info(ctx)
                     # For each class in union
@@ -705,8 +703,8 @@ class CallTranslator(CommonTranslator):
                         method_call_block = self.translate_block(method_call, position,
                                                                  info)
                         guarded_blocks.append((method_call_guard, method_call_block))
-                    return [self.chain_if_stmts(guarded_blocks, position, info, ctx)],\
-                           final_return_var
+                    return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
+                           final_return_var)
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
