@@ -59,9 +59,6 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-sil_programs = []
-
-
 def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
@@ -100,9 +97,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    if not sil_programs or reload_resources:
-        del sil_programs[:]
-        sil_programs.append(load_sil_files(jvm, sif))
+    if 'sil_programs' not in globals() or reload_resources:
+        global sil_programs
+        sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected)
     return prog
@@ -254,7 +251,8 @@ def main() -> None:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
-        sil_programs.append(load_sil_files(jvm, args.sif))
+        global sil_programs
+        sil_programs = load_sil_files(jvm, args.sif)
 
         while True:
             file = socket.recv_string()
