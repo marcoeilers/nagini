@@ -12,5 +12,5 @@ except Exception as e:
     c = [False]
 
 assert c
-#:: ExpectedOutput(assertion.failed:assertion.false)
+#:: ExpectedOutput(assert.failed:assertion.false)
 assert False
