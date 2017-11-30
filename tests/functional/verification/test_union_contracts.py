@@ -19,12 +19,6 @@ class C:
         Ensures(Result() == '5')
         return '5'
 
-class D(A):
-    def foo(self, i: int) -> int:
-        Requires(True)
-        Ensures(Result() == 8)
-        return 8
-
 def test_1(o: Union[A, B]) -> None:
     x = o.foo(5)
 
