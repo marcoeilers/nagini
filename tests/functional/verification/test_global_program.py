@@ -1,7 +1,16 @@
-
+from nagini_contracts.contracts import Invariant, Acc
 
 c = [True]
 try:
-    c = [c[0]]
+    cur = 10
+    while cur > 0:
+        Invariant(Acc(cur))
+        Invariant(cur >= 0 and cur >= 0)
+        cur-= 1
+    c = [c[cur]]
 except Exception as e:
     c = [False]
+
+assert c
+#:: ExpectedOutput(assertion.failed:assertion.false)
+assert False

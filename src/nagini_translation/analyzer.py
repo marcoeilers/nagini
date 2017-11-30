@@ -85,7 +85,7 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
-        self.todos = []
+        self.deferred_tasks = []
 
     @property
     def stmt_container(self):
@@ -767,8 +767,6 @@ class Analyzer(ast.NodeVisitor):
         """
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
-            if not self.current_function or self.current_function.predicate:
-                raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
                 self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))
@@ -879,7 +877,7 @@ class Analyzer(ast.NodeVisitor):
                     var = self.get_target(node, current_module)
                     if isinstance(var, PythonGlobalVar):
                         self.track_access(node, var)
-                self.todos.append(todo)
+                self.deferred_tasks.append(todo)
                 return
             else:
                 # Node is a static field.

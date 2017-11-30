@@ -7,6 +7,7 @@ from nagini_translation.lib.constants import (
     COMBINE_NAME_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
@@ -263,7 +264,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def set_global_defined(self, declaration: PythonNode, module: PythonModule,
                            node: ast.AST, ctx: Context) -> Stmt:
         """
-        Returns a statement that sets the name of the given declaration to be defined.
+        Returns a statement that sets the name of the given declaration to be defined
+        in the given module.
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -274,6 +276,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
                             info: Info) -> Stmt:
+        """
+        Returns a statement that sets the name of represented by the integer decl_int to
+        be defined in the given set of names.
+        """
         if decl_int.typ() == self.viper.Int:
             decl_int = self.viper.DomainFuncApp(SINGLE_NAME, [decl_int], self.name_type(),
                                                 pos, info, NAME_DOMAIN)
@@ -301,7 +307,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             boxed_name = name
         return self.viper.AnySetContains(boxed_name, module, pos, info)
 
-    def _combine(self, prefix: Expr, name: Expr, pos: Position, info: Info) -> Expr:
+    def _combine_names(self, prefix: Expr, name: Expr, pos: Position, info: Info) -> Expr:
         """
         Returns an expression that combines the prefix-name and the name to a new name
         that represents 'prefix.name'.
@@ -320,8 +326,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.viper.DomainFuncApp(COMBINE_NAME_FUNC, [boxed_prefix, boxed_name],
                                         name_type, pos, info, NAME_DOMAIN)
 
-    def reference_identifiers(self, ref: ast.AST, pos: Position,
-                              info: Info) -> List[Expr]:
+    def extract_identifiers(self, ref: ast.AST, pos: Position,
+                            info: Info) -> List[Expr]:
         """
         Returns a list containing all names contained by the given reference.
         """
@@ -329,9 +335,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(ref, ast.Subscript):
             if isinstance(ref.value, ast.Name) and ref.value.id in ('Optional', 'Union'):
                 if not isinstance(ref.slice.value, ast.Tuple):
-                    return self.reference_identifiers(ref.slice.value, pos, info)
+                    return self.extract_identifiers(ref.slice.value, pos, info)
                 for e in ref.slice.value.elts:
-                    res.extend(self.reference_identifiers(e, pos, info))
+                    res.extend(self.extract_identifiers(e, pos, info))
                 return res
 
         decl_id = None
@@ -341,14 +347,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if decl_id is None:
                 decl_id = current
             else:
-                decl_id = self._combine(current, decl_id, pos, info)
+                decl_id = self._combine_names(current, decl_id, pos, info)
         if decl_id:
             return [decl_id]
         return []
 
     def _get_global_definedness_conditions(self, declaration: PythonNode,
                                            module: PythonModule, ref_node: ast.AST,
-                                           ctx: Context) -> List[Expr]:
+                                           ctx: Context) -> Tuple[Expr, Expr]:
         """
         Returns two boolean expressions that represent 1) if the name of the given
         declaration is defined in the given module, and 2) if all dependencies of the
@@ -358,7 +364,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pos = self.to_position(ref_node, ctx, error_string=msg)
         info = self.no_info(ctx)
         module_set = module.names_var[1]
-        decl_ids = self.reference_identifiers(ref_node, pos, info)
+        decl_ids = self.extract_identifiers(ref_node, pos, info)
         contains = self.viper.TrueLit(pos, info)
         for decl_id in decl_ids:
             contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
@@ -375,10 +381,13 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         deps_defined = self.viper.TrueLit(pos, info)
         for ref, decl, mod, *conds in deps:
             module_set = mod.names_var[1]
-            decl_ids = self.reference_identifiers(ref, pos, info)
+            decl_ids = self.extract_identifiers(ref, pos, info)
             for decl_id in decl_ids:
                 contains_dep = self._is_defined(decl_id, module_set, pos, info)
                 for cond in conds:
+                    # Iterate over conditions (PythonNodes); the dependency must be
+                    # defined if all such PythonNodes are currently defined in their
+                    # respective modules.
                     module_set = cond.module.names_var[1]
                     decl_id = self.viper.IntLit(self._get_string_value(cond.name), pos,
                                                 info)
@@ -387,7 +396,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                       info)
                 deps_defined = self.viper.And(deps_defined, contains_dep, pos, info)
 
-        return [contains, deps_defined]
+        return contains, deps_defined
 
     def _get_name_parts(self, node: ast.AST) -> List[str]:
         """
@@ -452,14 +461,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                         assertion_param_decl])
         return name_func
 
-    def _is_main_method(self, ctx: Context) -> bool:
+    def is_main_method(self, ctx: Context) -> bool:
         """
         Checks if we are currently translating the 'main method', i.e., the global
         statements of the program.
         """
         if not ctx.current_function:
             return False
-        return ctx.current_function.name == '__main__'
+        return ctx.current_function.name == MAIN_METHOD_NAME
 
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
                            ctx: Context) -> Expr:

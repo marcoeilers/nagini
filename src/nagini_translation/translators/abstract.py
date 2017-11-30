@@ -125,6 +125,11 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.expr_translator.translate_static_field_access(field, receiver,
                                                                          node, ctx)
 
+    def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
+                                       ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_global_var_reference(target, node,
+                                                                          ctx)
+
     def translate_io_operation(
             self,
             operation: PythonIOOperation,

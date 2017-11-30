@@ -33,6 +33,11 @@ class CombinedDict:
         return self.contains(item, None)
 
     def contains(self, item, caller_module):
+        """
+        Checks if the given item is contained anywhere in this view, excluding anything
+        represented by ``caller_module`` (to prevent infinite recursion in case of cyclic
+        imports).
+        """
         key = item
         if self.names:
             if not key in self.names:
@@ -112,11 +117,11 @@ class PythonModuleView:
     def get_contents(self, only_top: bool):
         return self.module.get_contents(only_top)
 
-    def get_included_modules(self, already_there: Set['PythonModule'],
-                             include_global: bool=True):
-        if self.module in already_there:
+    def get_included_modules(self, exclude: Set['PythonModule'],
+                             include_global: bool=True) -> List['PythonModule']:
+        if self.module in exclude:
             return []
-        return self.module.get_included_modules(already_there, include_global)
+        return self.module.get_included_modules(exclude, include_global)
 
     def get_type(self, prefixes, name):
         return self.module.get_type(prefixes, name)

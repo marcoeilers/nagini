@@ -375,6 +375,9 @@ class ViperAST:
     def AnySetUnion(self, left, right, position, info):
         return self.ast.AnySetUnion(left, right, position, info, self.NoTrafos)
 
+    def AnySetSubset(self, left, right, position, info):
+        return self.ast.AnySetSubset(left, right, position, info, self.NoTrafos)
+
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)
 

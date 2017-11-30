@@ -552,6 +552,10 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
                                        ctx: Context) -> Expr:
+        """
+        Translates a reference to the given PythonGlobalVar (which could represent either
+        an actual global variable or a static field).
+        """
         position = self.to_position(node, ctx)
         if target.cls:
             # This is a static field
@@ -572,8 +576,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             res = self.viper.FuncApp(var.sil_name, [], position,
                                      self.no_info(ctx), type, [])
-        if not isinstance(node.ctx, ast.Store) or self._as_read:
-            if self._is_main_method(ctx):
+        if node and not isinstance(node.ctx, ast.Store) or self._as_read:
+            if self.is_main_method(ctx):
                 res = self.wrap_global_defined_check(res, target, ctx.module, node,
                                                      ctx)
             elif ctx.current_function:
@@ -688,7 +692,7 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(node, ast.Attribute):
             node = node.value
         if isinstance(receiver, PythonType) and not isinstance(node.ctx, ast.Store):
-            if self._is_main_method(ctx):
+            if self.is_main_method(ctx):
                 res = self.wrap_global_defined_check(res, receiver, ctx.module, node, ctx)
             elif ctx.current_function:
                 ctx.current_function.call_deps.add((node, receiver, ctx.module))

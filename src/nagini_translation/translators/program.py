@@ -146,20 +146,17 @@ class ProgramTranslator(CommonTranslator):
             if var.type.name not in PRIMITIVES:
                 posts.append(self.type_check(result, var.type, position, ctx))
             if hasattr(var, 'value'):
-                if isinstance(var.value, str):
-                    body = None
-                else:
-                    body = None
-                    try:
-                        stmt, value = self.translate_expr(var.value, ctx)
-                        if not stmt:
-                            if not self.viper.is_heap_dependent(value):
-                                body = value
-                                posts.append(self.viper.EqCmp(result, value, position,
-                                                              self.no_info(ctx)))
-                    except AttributeError:
-                        # The translation (probably) tried to access ctx.current_function
-                        pass
+                body = None
+                try:
+                    stmt, value = self.translate_expr(var.value, ctx)
+                    if not stmt:
+                        if not self.viper.is_heap_dependent(value):
+                            body = value
+                            posts.append(self.viper.EqCmp(result, value, position,
+                                                          self.no_info(ctx)))
+                except AttributeError:
+                    # The translation (probably) tried to access ctx.current_function
+                    pass
             else:
                 body = None
         else:
@@ -394,18 +391,22 @@ class ProgramTranslator(CommonTranslator):
         if method.cls:
             definition_deps = method.cls.definition_deps
         for arg in method.args.values():
-            if arg.node and arg.node.annotation and not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant)):
+            if (arg.node and arg.node.annotation and
+                    not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant))):
                 type = self.get_target(arg.node.annotation, ctx)
                 if type and not type.python_class.interface:
-                    definition_deps.add((arg.node.annotation, type.python_class, method.module))
+                    definition_deps.add((arg.node.annotation, type.python_class,
+                                         method.module))
             if arg.default:
                 stmt, expr = self.translate_expr(arg.default, ctx)
                 if not stmt and expr:
                     arg.default_expr = expr
-        if method.node and method.node.returns and not isinstance(method.node.returns, (ast.Str, ast.NameConstant)):
+        if (method.node and method.node.returns and
+                not isinstance(method.node.returns, (ast.Str, ast.NameConstant))):
             type = self.get_target(method.node.returns, ctx)
             if type and not type.python_class.interface:
-                definition_deps.add((method.node.returns, type.python_class, method.module))
+                definition_deps.add((method.node.returns, type.python_class,
+                                     method.module))
 
 
     def _create_predefined_fields(self,
@@ -579,7 +580,7 @@ class ProgramTranslator(CommonTranslator):
                                                  var_param, pos, info)
         return [is_defined_func, check_defined_func]
 
-    def create_global_definedness_functions(self,
+    def create_asserting_function(self,
                                             ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
@@ -628,7 +629,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
-        functions.extend(self.create_global_definedness_functions(ctx))
+        functions.extend(self.create_asserting_function(ctx))
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 

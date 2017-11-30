@@ -11,6 +11,7 @@ from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     INTERNAL_NAMES,
+    MODULE_VARS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
@@ -101,6 +102,10 @@ class PythonScope:
 
 
 class PythonStatementContainer:
+    """
+    Class to be mixed into any node that contains executable statements (currently methods
+    and modules). Stores the analyzer information related to those statements.
+    """
     def __init__(self):
         self.labels = [END_LABEL]
         self.precondition = []
@@ -236,11 +241,16 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
                 return module_result
         return None
 
-    def get_included_modules(self, already_there: Set['PythonModule'] = (),
+    def get_included_modules(self, exclude: Set['PythonModule'] = (),
                              include_global: bool = True) -> List['PythonModule']:
+        """
+        Returns a list of modules whose contents are (transitively) available in the this
+        module, optionally including the global module, but excluding the modules in the
+        given set (to prevent infinite recursion in case of cyclic imports).
+        """
         result = [self]
         for p in self.from_imports:
-            result.extend(p.get_included_modules(already_there + (self,),
+            result.extend(p.get_included_modules(exclude + (self,),
                                                  include_global=False))
         if include_global:
             result.append(self.global_module)
@@ -784,6 +794,34 @@ class MethodType(Enum):
     static_method = 1
     class_method = 2
 
+
+def add_all_call_deps(call_deps: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                      res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                      prefix: Tuple[PythonNode, ...]=()) -> None:
+    """
+    Adds all dependencies represented by call_deps to the given set.
+    The set will contain tuples of length at least 3, where the first element is
+    the Python AST node representing the access, the second the PythonNode accessed,
+    the third the PythonModule in which the first name needs to be defined.
+    All further elements are PythonNodes which represent conditions, i.e., the name
+    needs to be defined in the module IF all the conditional PythonNodes have been
+    defined in their respective modules.
+    """
+    for dep in call_deps:
+        if dep not in res:
+            c_prefix = prefix
+            if len(dep) > 3:
+                # this is a conditional dependency; its dependencies are to be in-
+                # cluded under this condition.
+                c_prefix = prefix + dep[3:]
+            else:
+                # this is a direct dependency, add it to the result
+                res.add(dep + c_prefix)
+
+            if hasattr(dep[1], 'add_all_call_deps'):
+                dep[1].add_all_call_deps(res, c_prefix)
+
+
 class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementContainer):
     """
     Represents a Python function which may be pure or impure, belong
@@ -846,23 +884,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                           prefix: Tuple[PythonNode, ...]=()) -> None:
         """
         Adds all dependencies needed when this method is called to the given set.
-        The set will contain tuples of length at least 3, where the first element is
-        the Python AST node representing the access, the second the PythonNode accessed,
-        the third the PythonModule in which the first name needs to be defined.
-        All further elements are PythonNodes which represent conditions, i.e., the name
-        needs to be defined in the module IF all the conditional PythonNodes have been
-        defined in their respective modules.
         """
-        for dep in self.call_deps:
-            if dep not in res:
-                c_prefix = prefix
-                if len(dep) > 3:
-                    c_prefix = prefix + dep[3:]
-                else:
-                    res.add(dep + c_prefix)
+        add_all_call_deps(self.call_deps, res, prefix)
 
-                if hasattr(dep[1], 'add_all_call_deps'):
-                    dep[1].add_all_call_deps(res, c_prefix)
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1047,17 +1071,9 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self.definition_deps = set()
         self.call_deps = set()
 
-    def add_all_call_deps(self, res, prefix=()):
-        for dep in self.call_deps:
-            if dep not in res:
-                c_prefix = prefix
-                if len(dep) > 3:
-                    c_prefix = prefix + dep[3:]
-                else:
-                    res.add(dep + c_prefix)
-
-                if hasattr(dep[1], 'add_all_call_deps'):
-                    dep[1].add_all_call_deps(res, c_prefix)
+    def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                          prefix: Tuple[PythonNode, ...]=()) -> None:
+        add_all_call_deps(self.call_deps, res, prefix)
 
     @property
     def is_builtin(self) -> bool:
@@ -1421,7 +1437,11 @@ class PythonGlobalVar(PythonVarBase):
 
     @property
     def is_final(self) -> bool:
-        return len(self.writes) <= 1 and self.name not in ('__name__', '__file__')
+        """
+        A variable is final if it is written to only once (globally). Built-in module
+        variables like __name__ are not considered final.
+        """
+        return len(self.writes) <= 1 and self.name not in MODULE_VARS
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)

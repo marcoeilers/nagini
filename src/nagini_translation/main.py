@@ -125,8 +125,8 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     analyzer.analyze()
 
     # Carry out all tasks that were deferred to the end of the analysis.
-    for todo in analyzer.todos:
-        todo()
+    for task in analyzer.deferred_tasks:
+        task()
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,

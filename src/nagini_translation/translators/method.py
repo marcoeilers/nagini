@@ -3,7 +3,11 @@ import ast
 from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
+    FILE_VAR,
     GLOBAL_VAR_FIELD,
+    MAIN_METHOD_NAME,
+    MODULE_VARS,
+    NAME_VAR,
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
@@ -740,24 +744,29 @@ class MethodTranslator(CommonTranslator):
             module.names_var = (names_decl, names_ref)
             module.defined_var = (def_decl, def_ref)
 
-    def translate_main_method(self, modules: List[PythonModule],
-                              ctx: Context) -> List['silver.ast.Method']:
+    def _initialize_main_state(self, modules: List[PythonModule], main: PythonModule,
+                               ctx: Context) -> Tuple[List['silver.ast.LocalVarDecl'],
+                                                      List[Stmt]]:
         """
-        Translates the global statements of the program to a single method.
+        Generates a list of statements that initialize the local state used in the main
+        method. This includes inhaling permissions to mutable global variables and setting
+        up the set of known names for each module.
         """
-        main = [m for m in modules if m.type_prefix == '__main__'][0]
         stmts = []
+        locals = []
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         false_lit = self.viper.FalseLit(no_pos, no_info)
         true_lit = self.viper.TrueLit(no_pos, no_info)
         empty_set = self.viper.EmptySet(self.name_type(), no_pos, no_info)
-        locals = []
         global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
         full_perm = self.viper.FullPerm(no_pos, no_info)
-        one = self.viper.IntLit(1, no_pos, no_info)
-        two = self.viper.IntLit(2, no_pos, no_info)
-        half_perm = self.viper.FractionalPerm(one, two, no_pos, no_info)
+        ninety_nine = self.viper.IntLit(99, no_pos, no_info)
+        hundred = self.viper.IntLit(100, no_pos, no_info)
+        # For module variables like __file__, a (rather arbitrary) permission amount of
+        # 99% is available. The intention is that they should not be changed, and the
+        # natural way to enforce this is to give users less than a full permission.
+        part_perm = self.viper.FractionalPerm(ninety_nine, hundred, no_pos, no_info)
         for module in modules:
             if module.global_module is module:
                 continue
@@ -778,9 +787,9 @@ class MethodTranslator(CommonTranslator):
                 if var.is_final:
                     continue
                 perm = full_perm
-                if var.name in ('__name__', '__file__'):
+                if var.name in MODULE_VARS:
                     stmts.append(self.set_global_defined(var, module, None, ctx))
-                    perm = half_perm
+                    perm = part_perm
                 var_type = self.translate_type(var.type, ctx)
                 var_func = self.viper.FuncApp(var.sil_name, [], no_pos,
                                               no_info, var_type, [])
@@ -788,10 +797,12 @@ class MethodTranslator(CommonTranslator):
                                                       no_info)
                 field_pred = self.viper.FieldAccessPredicate(field_access, perm,
                                                              no_pos, no_info)
-                if var.name in ('__file__', '__name__'):
+                field_type_check = self.type_check(field_access, var.type, no_pos, ctx)
+                field_pred = self.viper.And(field_pred, field_type_check, no_pos, no_info)
+                if var.name in MODULE_VARS:
                     var_type = self.type_check(field_access, var.type, no_pos, ctx, False)
                     field_pred = self.viper.And(field_pred, var_type, no_pos, no_info)
-                if var.name == '__name__':
+                if var.name == NAME_VAR:
                     main_str = self.translate_string('__main__', None, ctx)
                     str_type = ctx.module.global_module.classes[STRING_TYPE]
                     func_name = '__eq__'
@@ -802,10 +813,26 @@ class MethodTranslator(CommonTranslator):
                         call = self.viper.Not(call, no_pos, no_info)
                     field_pred = self.viper.And(field_pred, call, no_pos, no_info)
                 stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
+        return locals, stmts
 
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List['silver.ast.Method']:
+        """
+        Translates the global statements of the program to a single method.
+        """
+        main = [m for m in modules if m.type_prefix == '__main__'][0]
+        stmts = []
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
+
+        stmts.extend(init_stmts)
+
+        # Create artificial main PythonMethod that contains the execution of global
+        # statements.
         ctx.current_class = None
         method_name = ctx.module.get_fresh_name('main')
-        main_method = PythonMethod('__main__', main, None, main, False, False,
+        main_method = PythonMethod(MAIN_METHOD_NAME, main, None, main, False, False,
                                    main.node_factory)
         main_method._module = main
         ctx.current_function = main_method
@@ -816,12 +843,17 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function.loop_invariants = main.loop_invariants
         ctx.current_function.process(method_name, self.translator)
         ctx.module = main
+
+        # Translate statements in main module. When an import statement is encountered,
+        # the translation will include executing the statements in the imported module.
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
 
         end_label = ctx.get_label_name(END_LABEL)
         stmts.append(self.viper.Goto(end_label, self.no_position(ctx),
                                     self.no_info(ctx)))
+
+        # Append blocks for exception handling etc.
         assert not ctx.var_aliases
         for block in main_method.try_blocks:
             for handler in block.handlers:

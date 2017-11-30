@@ -47,6 +47,8 @@ def get_target(node: ast.AST,
     or a PythonVar, if the immediate container (e.g. a PythonMethod) of the node
     is ``container``, by looking in the given ``containers`` (can be e.g.
     PythonMethods, the Context, PythonModules, etc).
+    If the ``type`` parameter is set, will also consider string literals as potential
+    references.
     """
     if isinstance(node, ast.Name):
         return find_entry(node.id, True, containers)
@@ -117,7 +119,7 @@ def get_target(node: ast.AST,
                 if isinstance(possible_class, PythonType):
                     type_class = possible_class
             if type_class:
-                args = []
+                # Look up the type arguments. Also consider string arguments.
                 if isinstance(node.slice.value, ast.Tuple):
                     args = [get_target(arg, containers, container, True)
                             for arg in node.slice.value.elts]

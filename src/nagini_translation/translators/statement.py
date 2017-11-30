@@ -34,6 +34,7 @@ from nagini_translation.lib.typedefs import (
     Info,
     Position,
     Stmt,
+    StmtsAndExpr
 )
 from nagini_translation.lib.util import (
     AssignCollector,
@@ -127,6 +128,15 @@ class StatementTranslator(CommonTranslator):
         return cond
 
     def translate_stmt_ImportFrom(self, node: ast.ImportFrom, ctx: Context) -> List[Stmt]:
+        """
+        A global ImportFrom is translated to statements that 1) execute the statements
+        in the imported module if the module has not been imported before, 2a) if a list
+        of specific names are imported, assert they are available in the specified module
+        and then add them to the current module, 2b) if all names are imported, the names
+        in the imported module are simply added to the current module.
+        """
+        if not self.is_main_method(ctx):
+            raise InvalidProgramException(node, 'local.import')
         stmts = []
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -158,21 +168,7 @@ class StatementTranslator(CommonTranslator):
                                    for n in node.names])
 
         if import_all:
-            new_set_var = ctx.current_function.create_variable('new_set', SilverType(
-                self.viper.SetType(self.name_type()), ctx.module), self.translator)
-
-            name_var_decl = self.viper.LocalVarDecl(NAME_QUANTIFIER_VAR, self.name_type(),
-                                                    pos, info)
-            name_var_ref = self.viper.LocalVar(NAME_QUANTIFIER_VAR, self.name_type(), pos,
-                                               info)
-            name_in_imported = self._is_defined(name_var_ref, mod.names_var[1],
-                                                pos, info)
-            name_in_new = self._is_defined(name_var_ref, new_set_var.ref(), pos, info)
-            impl = self.viper.EqCmp(name_in_imported, name_in_new, pos, info)
-            trigger = self.viper.Trigger([name_in_new], pos, info)
-            assertion = self.viper.Forall([name_var_decl], [trigger], impl, pos, info)
-            stmts.append(self.viper.Inhale(assertion, pos, info))
-            union = self.viper.AnySetUnion(ctx.module.names_var[1], new_set_var.ref(),
+            union = self.viper.AnySetUnion(ctx.module.names_var[1], mod.names_var[1],
                                            pos, info)
             stmts.append(
                 self.viper.LocalVarAssign(ctx.module.names_var[1], union, pos, info))
@@ -186,6 +182,7 @@ class StatementTranslator(CommonTranslator):
                     name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
                     exists_in_other = self._is_defined(name_int, imported.names_var[1],
                                                        pos, info)
+                    # Make sure the name is actually defined.
                     stmts.append(self.viper.Assert(exists_in_other, pos, info))
                 as_name_int = self.viper.IntLit(self._get_string_value(as_name), pos,
                                                 info)
@@ -199,6 +196,21 @@ class StatementTranslator(CommonTranslator):
                                         pos, info, NAME_DOMAIN)
 
     def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
+        """
+        A global Import is translated to statements that 1) execute the statements
+        in the imported module if the module has not been imported before, 2) add all
+        names in the imported module, combined with the module name as a prefix, to the
+        current module.
+        """
+        # TODO: What we're doing here does not take into account names that are added to
+        # a module after it's imported; they will not be available from the module that
+        # contains the import. This should be okay since a) if anything, it would be
+        # incomplete, not unsound, and b) for non-cyclic imports, all names should be
+        # defined in the imported module after its statements have been executed, and
+        # for cyclic imports, more names may be added, but only after all statements that
+        # might use them have been executed, so it should no longer be relevant.
+        if not self.is_main_method(ctx):
+            raise InvalidProgramException(node, 'local.import')
         stmts = []
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -227,12 +239,12 @@ class StatementTranslator(CommonTranslator):
             name_ints = []
             for name in reversed(name_parts):
                 name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
-                combined_name = self._combine(name_int, combined_name, pos, info)
+                combined_name = self._combine_names(name_int, combined_name, pos, info)
                 last_part = self._get_second(last_part, pos, info)
                 name_ints.append(name_int)
             combined_part = last_part
             for name_int in name_ints:
-                combined_part = self._combine(name_int, combined_part, pos, info)
+                combined_part = self._combine_names(name_int, combined_part, pos, info)
             combined_in_new = self._is_defined(combined_name, new_set_var.ref(), pos,
                                                info)
             impl = self.viper.EqCmp(name_in_imported, combined_in_new, pos, info)
@@ -247,7 +259,12 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_FunctionDef(self, node: ast.FunctionDef,
                                    ctx: Context) -> List[Stmt]:
-        assert self._is_main_method(ctx)
+        """
+        Function definitions in the global method are translated to a check that all
+        dependencies of the declaration are defined, and subsequently an assignment
+        that sets the function name to be defined.
+        """
+        assert self.is_main_method(ctx)
         if ctx.current_class:
             method = ctx.current_class.get_func_or_method(node.name)
         else:
@@ -262,7 +279,12 @@ class StatementTranslator(CommonTranslator):
         return dep_check + [self.set_global_defined(method, ctx.module, node, ctx)]
 
     def translate_stmt_ClassDef(self, node: ast.ClassDef, ctx: Context) -> List[Stmt]:
-        assert self._is_main_method(ctx)
+        """
+        Class definitions in the global method are translated to 1) a check that
+        the dependencies are defined, 2) translations of static field assignments and 3)
+        an assignment that sets the class name to be defined.
+        """
+        assert self.is_main_method(ctx)
         # static field definitions
         cls = ctx.module.classes[node.name]
         stmts = []
@@ -307,7 +329,7 @@ class StatementTranslator(CommonTranslator):
         deps_defined = self.viper.TrueLit(dep_pos, info)
         for ref, decl, mod in py_node.definition_deps:
             module_set = mod.names_var[1]
-            decl_ids = self.reference_identifiers(ref, dep_pos, info)
+            decl_ids = self.extract_identifiers(ref, dep_pos, info)
             for decl_id in decl_ids:
                 contains = self._is_defined(decl_id, module_set, dep_pos, info)
                 deps_defined = self.viper.And(deps_defined, contains, dep_pos, info)
@@ -616,6 +638,24 @@ class StatementTranslator(CommonTranslator):
                 result.append(var)
         return result
 
+    def _get_havoced_module_var_info(self, ctx: Context) -> StmtsAndExpr:
+        """
+        For global loops, saves the information which names are defined.
+        """
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        if not self.is_main_method(ctx):
+            return [], self.viper.TrueLit(no_pos, no_info)
+        set_type = SilverType(self.viper.SetType(self.name_type()), ctx.module)
+        tmp_var = ctx.current_function.create_variable('current_names', set_type,
+                                                       self.translator)
+        assign = self.viper.LocalVarAssign(tmp_var.ref(), ctx.module.names_var[1], no_pos,
+                                           no_info)
+        subset = self.viper.AnySetSubset(tmp_var.ref(), ctx.module.names_var[1], no_pos,
+                                         no_info)
+        return [assign], subset
+
+
     def _get_havoced_var_type_info(self, nodes: List[ast.AST],
                                    ctx: Context) -> List[Expr]:
         """
@@ -626,9 +666,12 @@ class StatementTranslator(CommonTranslator):
         which are assigned to in loops and therefore havoced.
         """
         result = []
+        if self.is_main_method(ctx):
+            return result
         vars = self._get_havoced_vars(nodes, ctx)
         for var in vars:
-            result.append(self.type_check(var.ref(), var.type,
+            ref = var.ref()
+            result.append(self.type_check(ref, var.type,
                                           self.no_position(ctx), ctx))
         return result
 
@@ -677,9 +720,12 @@ class StatementTranslator(CommonTranslator):
                                                     node, ctx)
         start, end = get_body_indices(node.body)
 
+        global_stmts, global_inv = self._get_havoced_module_var_info(ctx)
+        invariant.append(global_inv)
         # Remember type information about havoced local variables.
         invariant.extend(self._get_havoced_var_type_info(node.body[start:end],
                                                          ctx))
+
 
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
@@ -694,7 +740,7 @@ class StatementTranslator(CommonTranslator):
         cond = self.viper.EqCmp(err_var.ref(),
                                 self.viper.NullLit(position, info),
                                 position, info)
-        loop = self.create_while_node(
+        loop = global_stmts + self.create_while_node(
             ctx, cond, invariant, [], body, node)
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
@@ -948,12 +994,17 @@ class StatementTranslator(CommonTranslator):
         after_assign = []
         if isinstance(target, PythonGlobalVar):
             if target.is_final:
+                # For final variables, we assume that the function representing the
+                # variable is equal to the RHS of the assignment. For pure values,
+                # this will do nothing, since the postcondition will already say the same;
+                # for impure stuff, it will connect the function to the stuff that was
+                # created.
                 def assignment(lhs, rhs, pos, info):
                     eq = self.viper.EqCmp(lhs, rhs, pos, info)
                     return self.viper.Inhale(eq, position, info)
             else:
                 assignment = self.viper.FieldAssign
-            if self._is_main_method(ctx):
+            if self.is_main_method(ctx):
                 after_assign.append(self.set_global_defined(target, ctx.module, node, ctx))
         elif isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
@@ -1143,12 +1194,13 @@ class StatementTranslator(CommonTranslator):
                 invariants.append(self.translate_contract(expr, ctx))
         start, end = get_body_indices(node.body)
         var_types = self._get_havoced_var_type_info(node.body[start:end], ctx)
-        invariants = var_types + invariants
+        global_stmts, global_inv = self._get_havoced_module_var_info(ctx)
+        invariants = [global_inv] + var_types + invariants
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         body.append(self.viper.Label(end_label, self.to_position(node, ctx),
                                      self.no_info(ctx)))
-        loop = self.create_while_node(
+        loop = global_stmts + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
         loop += self._set_result_none(ctx)
