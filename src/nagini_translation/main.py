@@ -67,8 +67,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
     resources_path = os.path.join(current_path, 'resources')
     if sif:
         resources_path = os.path.join(current_path, 'sif/resources')
-    sil_programs.append(parse_sil_file(
-        os.path.join(resources_path, 'all.sil'), jvm))
+    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
@@ -80,23 +79,20 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    builtins = []
-    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
-        sil_interface = [file.read()]
 
-    modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    type_correct = types.check(os.path.abspath(path))
+    type_correct = types.check(path)
     if not type_correct:
         return None
+
     if sif:
         analyzer = SIFAnalyzer(types, path, selected)
     else:
         analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    for si in sil_interface:
-        analyzer.add_native_silver_builtins(json.loads(si))
+    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
+        analyzer.add_native_silver_builtins(json.loads(file.read()))
 
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
@@ -105,10 +101,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    global sil_programs
     if not sil_programs or reload_resources:
-        sil_programs = []
-        load_sil_files(jvm, sif)
+        del sil_programs[:]
+        sil_programs.append(load_sil_files(jvm, sif))
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected)
     return prog
@@ -253,7 +248,7 @@ def main() -> None:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
-        load_sil_files(jvm, args.sif)
+        sil_programs.append(load_sil_files(jvm, args.sif))
 
         while True:
             file = socket.recv_string()

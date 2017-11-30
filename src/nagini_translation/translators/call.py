@@ -26,7 +26,8 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonType,
-    PythonVar
+    PythonVar,
+    UnionType
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -682,6 +683,20 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
+    def chain_if_stmts(self, guarded_blocks: List[Tuple[Expr, Stmt]],
+                       position, info, ctx) -> Stmt:
+        """
+        Receives a list of tuples each one containing a guard and a guarded
+        block and produces an equivalent chain of if statements.
+        """
+        assert(guarded_blocks)
+        guard, then_block = guarded_blocks[0]
+        if len(guarded_blocks) == 1:
+            else_block = self.translate_block([], self.no_position(ctx), info)
+        else:
+            else_block = self.chain_if_stmts(guarded_blocks[1:], position, info, ctx)
+        return self.viper.If(guard, then_block, else_block, position, info)
+
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
         """
@@ -690,6 +705,33 @@ class CallTranslator(CommonTranslator):
         arg_stmts, args, arg_types = self._translate_call_args(node, ctx)
         target = self._get_call_target(node, ctx)
         if not target:
+            # Handle method calls when receiver's type is union
+            if isinstance(node.func, ast.Attribute):
+                rectype = self.get_type(node.func.value, ctx)
+                if isinstance(rectype, UnionType):
+                    position = self.to_position(node, ctx)
+                    info = self.no_info(ctx)
+                    # For each class in union
+                    guarded_blocks = []
+                    for type in rectype.get_types():
+                        # If receiver is an instance of this particular class
+                        method_call_guard = self.var_type_check(node.func.value.id,
+                                                                type, position, ctx)
+                        # Call its respective method
+                        method_call, return_var = self.translate_normal_call(
+                            type.get_func_or_method(node.func.attr), arg_stmts,
+                            args, arg_types, node, ctx, impure)
+                        if 'final_return_var' not in locals():
+                            final_return_var = return_var
+                        else:
+                            method_call.append(self.viper.LocalVarAssign(
+                                final_return_var, return_var, position, info))
+                        method_call_block = self.translate_block(method_call, position,
+                                                                 info)
+                        guarded_blocks.append((method_call_guard, method_call_block))
+                    return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
+                           final_return_var)
+
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
             msg = 'Unsupported builtin function'

@@ -63,67 +63,62 @@ CHECKED_FILES=$(CHECKED_TRANSLATOR_FILES) $(CHECKED_CONTRACT_FILES)
 
 CHECKED_MODULES:=$(subst /,.,$(CHECKED_FILES:src/%.py=%))
 
-BUILDOUT_DEPS=bin/buildout buildout.cfg
-BUILDOUT_CMD=bin/buildout -v
+DEPS=env
+CMD=env
 
 .PHONY: docs
 
-test: bin/py.test
-	bin/py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
+test: env/bin/py.test
+	env/bin/pytest --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
-mypy: bin/mypy
-	MYPYPATH=stubs:src bin/mypy --fast-parser -s $(CHECKED_FILES)
+freeze: env
+	env/bin/pip freeze > requirements.txt
 
-flake8: bin/flake8
-	bin/flake8 --ignore=F401,F403,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
+mypy: env/bin/mypy
+	MYPYPATH=stubs:src env/bin/mypy --fast-parser -s $(CHECKED_FILES)
 
-pylint: bin/pylint
-	bin/pylint $(CHECKED_MODULES)
+flake8: env/bin/flake8
+	env/bin/flake8 --ignore=F401,F403,E501,D102,D105 --max-complexity 12 $(CHECKED_FILES)
 
-pylint_silent: bin/pylint
-	bin/pylint --disable=I $(CHECKED_MODULES)
+pylint: env/bin/pylint
+	env/bin/pylint $(CHECKED_MODULES)
 
-pylint_report: bin/pylint
-	bin/pylint --reports=y $(CHECKED_MODULES)
+pylint_silent: env/bin/pylint
+	env/bin/pylint --disable=I $(CHECKED_MODULES)
 
-docs: bin/sphinxbuilder
-	bash bin/sphinxbuilder
+pylint_report: env/bin/pylint
+	env/bin/pylint --reports=y $(CHECKED_MODULES)
 
-docs_coverage: bin/python bin/sphinx-build
-	bin/python bin/sphinx-build -b coverage docs/source docs/build/coverage
+# TODO: Fix.
+docs: env/bin/sphinxbuilder
+	bash env/bin/sphinxbuilder
 
-doctest: bin/python bin/sphinx-build
-	bin/python bin/sphinx-build -b doctest docs/source docs/build/doctest
+# TODO: Fix.
+docs_coverage: env/bin/python env/bin/sphinx-build
+	env/bin/python env/bin/sphinx-build -b coverage docs/source docs/build/coverage
 
-bin/py.test: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+# TODO: Fix.
+doctest: env/bin/python env/bin/sphinx-build
+	env/bin/python env/bin/sphinx-build -b doctest docs/source docs/build/doctest
 
-bin/mypy: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/py.test: $(DEPS)
 
-bin/flake8: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/mypy: $(DEPS)
 
-bin/pylint: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/flake8: $(DEPS)
 
-bin/sphinxbuilder: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/pylint: $(DEPS)
 
-bin/sphinx-build: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/sphinxbuilder: $(DEPS)
 
-bin/python: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
+env/bin/sphinx-build: $(DEPS)
 
-buildout: $(BUILDOUT_DEPS)
-	$(BUILDOUT_CMD)
-
-bin/buildout: bootstrap.py env
-	env/bin/python bootstrap.py
+env/bin/python: $(DEPS)
 
 env: .virtualenv
 	python3 .virtualenv/source/virtualenv.py env
+	env/bin/pip install -r requirements.txt
+	env/bin/pip install -e .
 
 .virtualenv:
 	mkdir -p .virtualenv
