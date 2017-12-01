@@ -2,7 +2,7 @@ import ast
 
 from nagini_translation.lib.constants import (
     BYTES_TYPE,
-    COMBINED_NAME_ACCESSOR_2,
+    COMBINED_NAME_ACCESSOR,
     DICT_TYPE,
     END_LABEL,
     IGNORED_IMPORTS,
@@ -191,8 +191,12 @@ class StatementTranslator(CommonTranslator):
 
         return stmts
 
-    def _get_second(self, e, pos, info):
-        return self.viper.DomainFuncApp(COMBINED_NAME_ACCESSOR_2, [e], self.name_type(),
+    def _get_name_from_combined(self, e: Expr, pos: Position, info: Info) -> Expr:
+        """
+        Assuming that the given expression represents a name that is a combination of
+        some prefix and a local name, returns the local name.
+        """
+        return self.viper.DomainFuncApp(COMBINED_NAME_ACCESSOR, [e], self.name_type(),
                                         pos, info, NAME_DOMAIN)
 
     def translate_stmt_Import(self, node: ast.Import, ctx: Context) -> List[Stmt]:
@@ -240,7 +244,7 @@ class StatementTranslator(CommonTranslator):
             for name in reversed(name_parts):
                 name_int = self.viper.IntLit(self._get_string_value(name), pos, info)
                 combined_name = self._combine_names(name_int, combined_name, pos, info)
-                last_part = self._get_second(last_part, pos, info)
+                last_part = self._get_name_from_combined(last_part, pos, info)
                 name_ints.append(name_int)
             combined_part = last_part
             for name_int in name_ints:
@@ -336,6 +340,7 @@ class StatementTranslator(CommonTranslator):
         return [self.viper.Assert(deps_defined, dep_pos, info)]
 
     def translate_stmt_Global(self, node: ast.Global, ctx: Context) -> List[Stmt]:
+        # No need to do anything, this just signals what variables refer to.
         return []
 
     def translate_stmt_Delete(self, node: ast.Delete, ctx: Context) -> List[Stmt]:
@@ -364,7 +369,6 @@ class StatementTranslator(CommonTranslator):
                 raise UnsupportedException(node)
         return result
 
-
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
         left_stmt, left = self.translate_expr(node.target, ctx, as_read=True)
@@ -373,14 +377,13 @@ class StatementTranslator(CommonTranslator):
         stmt, right = self.translate_expr(node.value, ctx)
         left_type = self.get_type(node.target, ctx)
         right_type = self.get_type(node.value, ctx)
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         op_stmt, result = self.translate_operator(left, right, left_type,
                                                   right_type, node, ctx)
         stmt += op_stmt
         result = self.to_ref(result, ctx)
-        ass_stmts, _ = self.assign_to(node.target, result, None, None, right_type, node, ctx)
-        return stmt + ass_stmts
+        assign_stmts, _ = self.assign_to(node.target, result, None, None, right_type,
+                                         node, ctx)
+        return stmt + assign_stmts
 
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
@@ -618,8 +621,8 @@ class StatementTranslator(CommonTranslator):
                                         [], node, ctx)
         return iter_del
 
-    def _get_havoced_vars(self, nodes: List[ast.AST],
-                          ctx: Context) -> List[PythonVar]:
+    def _get_havocked_vars(self, nodes: List[ast.AST],
+                           ctx: Context) -> List[PythonVar]:
         """
         Finds all local variables written to within the given partial ASTs which
         already existed before.
@@ -638,7 +641,7 @@ class StatementTranslator(CommonTranslator):
                 result.append(var)
         return result
 
-    def _get_havoced_module_var_info(self, ctx: Context) -> StmtsAndExpr:
+    def _get_havocked_module_var_info(self, ctx: Context) -> StmtsAndExpr:
         """
         For global loops, saves the information which names are defined.
         """
@@ -656,19 +659,19 @@ class StatementTranslator(CommonTranslator):
         return [assign], subset
 
 
-    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
-                                   ctx: Context) -> List[Expr]:
+    def _get_havocked_var_type_info(self, nodes: List[ast.AST],
+                                    ctx: Context) -> List[Expr]:
         """
         Creates a list of assertions containing type information for all local
         variables written to within the given partial ASTs which already
         existed before.
         To be used to remember type information about arguments/local variables
-        which are assigned to in loops and therefore havoced.
+        which are assigned to in loops and therefore havocked.
         """
         result = []
         if self.is_main_method(ctx):
             return result
-        vars = self._get_havoced_vars(nodes, ctx)
+        vars = self._get_havocked_vars(nodes, ctx)
         for var in vars:
             ref = var.ref()
             result.append(self.type_check(ref, var.type,
@@ -720,11 +723,11 @@ class StatementTranslator(CommonTranslator):
                                                     node, ctx)
         start, end = get_body_indices(node.body)
 
-        global_stmts, global_inv = self._get_havoced_module_var_info(ctx)
+        global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariant.append(global_inv)
-        # Remember type information about havoced local variables.
-        invariant.extend(self._get_havoced_var_type_info(node.body[start:end],
-                                                         ctx))
+        # Remember type information about havocked local variables.
+        invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
+                                                          ctx))
 
 
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
@@ -1193,8 +1196,8 @@ class StatementTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
         start, end = get_body_indices(node.body)
-        var_types = self._get_havoced_var_type_info(node.body[start:end], ctx)
-        global_stmts, global_inv = self._get_havoced_module_var_info(ctx)
+        var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
+        global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariants = [global_inv] + var_types + invariants
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])

@@ -7,20 +7,20 @@ domain _Name {
     function _combine(n1: _Name, n2: _Name): _Name
     function _single(n: Int): _Name
 
-    function _get_combined_1(n: _Name): _Name
-    function _get_combined_2(n: _Name): _Name
+    function _get_combined_prefix(n: _Name): _Name
+    function _get_combined_name(n: _Name): _Name
     function _get_value(n: _Name): Int
     function _is_single(n: _Name): Bool
 
     axiom all_single_or_combined {
-        forall n: _Name :: n == _single(_get_value(n)) || n == _combine(_get_combined_1(n), _get_combined_2(n))
+        forall n: _Name :: n == _single(_get_value(n)) || n == _combine(_get_combined_prefix(n), _get_combined_name(n))
     }
 
-    axiom single_combined_distinct_1 {
+    axiom single_is_single {
         forall i: Int :: {_single(i)} _is_single(_single(i))
     }
 
-    axiom single_combined_distinct_2 {
+    axiom combined_is_not_single {
         forall n1: _Name, n2: _Name :: {_combine(n1, n2)} !_is_single(_combine(n1, n2))
     }
 
@@ -28,12 +28,12 @@ domain _Name {
         forall i: Int :: {_single(i)} _get_value(_single(i)) == i
     }
 
-    axiom decompose_combined_1 {
-        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_1(_combine(n1, n2)) == n1
+    axiom decompose_combined_prefix {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_prefix(_combine(n1, n2)) == n1
     }
 
-    axiom decompose_combined_2 {
-        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_2(_combine(n1, n2)) == n2
+    axiom decompose_combined_name {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_name(_combine(n1, n2)) == n2
     }
 
 }

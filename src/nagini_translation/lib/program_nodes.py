@@ -370,7 +370,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.definition_deps = set()
 
     @property
-    def all_subclasses(self):
+    def all_subclasses(self) -> List['PythonClass']:
         """
         Returns all direct or indirect subclasses of this class.
         """

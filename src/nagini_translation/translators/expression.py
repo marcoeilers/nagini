@@ -656,7 +656,7 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_static_field_access(self, field: PythonGlobalVar,
                                       receiver: Union[Expr, PythonType],
-                                      node, ctx: Context) -> Expr:
+                                      node: ast.AST, ctx: Context) -> Expr:
         """
         Translates an access to the given field via the given receiver. The
         receiver can either be the type literal via which the field is

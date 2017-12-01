@@ -315,7 +315,7 @@ class Analyzer(ast.NodeVisitor):
         else:
             cls.methods[method_name] = method
 
-    def visit_module(self, module) -> None:
+    def visit_module(self, module: PythonModule) -> None:
         self.visit(module.node, None)
 
     def visit_Module(self, node: ast.Module) -> None:
