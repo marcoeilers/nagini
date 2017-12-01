@@ -4,12 +4,14 @@ from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
     INT_TYPE,
+    GLOBAL_VAR_FIELD,
     PRIMITIVES,
     RANGE_TYPE,
     SEQ_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
+    PythonGlobalVar,
     PythonMethod,
     PythonModule,
     PythonType,
@@ -188,6 +190,31 @@ class ContractTranslator(CommonTranslator):
         field_type = self.get_type(node.args[0], ctx)
         pred = self._translate_acc_field(field_acc, field_type, perm,
                                          self.to_position(node, ctx), ctx)
+        return [], pred
+
+    def translate_acc_global(self, node: ast.Call, perm: Expr,
+                            ctx: Context) -> StmtsAndExpr:
+        """
+        Translates an access permission to a global variable.
+        """
+        var = self.get_target(node.args[0], ctx)
+        if not isinstance(var, PythonGlobalVar):
+            raise InvalidProgramException(node, 'invalid.acc')
+        if var.is_final:
+            raise InvalidProgramException(node, 'permission.to.final.var')
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        var_func = self.viper.FuncApp(var.sil_name, [], pos, info, self.viper.Ref, [])
+        var_type = self.translate_type(var.type, ctx)
+        field = self.viper.Field(GLOBAL_VAR_FIELD, var_type, pos, info)
+        field_acc = self.viper.FieldAccess(var_func, field, pos, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
+
+        # Add type information
+        if var.type.name not in PRIMITIVES:
+            type_info = self.type_check(field_acc, var.type,
+                                        self.no_position(ctx), ctx)
+            pred = self.viper.And(pred, type_info, pos, info)
         return [], pred
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
@@ -557,7 +584,13 @@ class ContractTranslator(CommonTranslator):
             if isinstance(node.args[0], ast.Call):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
-                return self.translate_acc_field(node, perm, ctx)
+                target = self.get_target(node.args[0], ctx)
+                if isinstance(target, PythonField):
+                    return self.translate_acc_field(node, perm, ctx)
+                else:
+                    if not isinstance(target, PythonGlobalVar):
+                        raise InvalidProgramException(node, 'invalid.acc')
+                    return self.translate_acc_global(node, perm, ctx)
         elif func_name == 'MaySet':
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':

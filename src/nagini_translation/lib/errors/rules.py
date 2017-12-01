@@ -61,6 +61,14 @@ LOCAL_VARIABLE_NOT_DEFINED = {
     ('application.precondition', 'assertion.false'):
         ('expression.undefined', 'undefined.local.variable')
 }
+GLOBAL_NAME_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'undefined.global.name')
+}
+DEPENDENCIES_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'missing.dependencies')
+}
 
 __all__ = (
     'Rules',
@@ -76,4 +84,6 @@ __all__ = (
     'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_MEASURE_NON_POSITIVE',
     'LOCAL_VARIABLE_NOT_DEFINED',
+    'GLOBAL_NAME_NOT_DEFINED',
+    'DEPENDENCIES_NOT_DEFINED',
 )

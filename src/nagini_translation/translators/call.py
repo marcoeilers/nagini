@@ -12,7 +12,6 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
-    PRIMITIVES,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -23,7 +22,6 @@ from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
     PythonClass,
-    PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
@@ -136,9 +134,6 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
-        if ctx.current_function is None:
-            raise UnsupportedException(node, 'Global constructor calls are not '
-                                             'supported.')
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
@@ -174,6 +169,14 @@ class CallTranslator(CommonTranslator):
 
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
+        # Mark the current function as depending on the called class. If we're in
+        # a global context, assert that the called class and its dependencies are defined.
+        func_node = node.func if isinstance(node, ast.Call) else node
+        self._add_dependencies(func_node, target_class, ctx)
+        defined_check = []
+        if self.is_main_method(ctx):
+            defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
+                                                       ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -197,7 +200,7 @@ class CallTranslator(CommonTranslator):
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
                 stmts = stmts + catchers
-        return arg_stmts + stmts, res_var.ref()
+        return arg_stmts + defined_check + stmts, res_var.ref()
 
     def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if node.args:
@@ -272,14 +275,6 @@ class CallTranslator(CommonTranslator):
         """
         targets = []
         result_var = None
-        if ctx.current_function is None:
-            if ctx.current_class is None:
-                # Global variable
-                raise UnsupportedException(node, 'Global method call '
-                                           'not supported.')
-            else:
-                # Static field
-                raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
@@ -287,14 +282,40 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
+        # Mark the current function as depending on the called method. If we're in
+        # a global context, assert that the called method and its dependencies are
+        # defined.
+        self._add_dependencies(node.func, target, ctx)
+        defined_check = []
+        if self.is_main_method(ctx) and not target.cls:
+            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
-        return (arg_stmts + call,
+        return (arg_stmts + defined_check + call,
                 result_var.ref() if result_var else None)
+
+    def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
+                          ctx: Context) -> None:
+        """
+        Tracks that the current container (method or class) depends on the given target,
+        referring to it via the given reference.
+        """
+        if ctx.current_function and not self.is_main_method(ctx):
+            if ctx.current_function:
+                current_container = ctx.current_function.call_deps
+            else:
+                current_container = ctx.current_class.definition_deps
+            if (isinstance(target, PythonMethod) and target.cls and
+                        target.method_type == MethodType.normal):
+                for subclass in target.cls.all_subclasses:
+                    current = subclass.get_method(target.name)
+                    current_container.add((reference, current, ctx.module, subclass))
+            else:
+                current_container.add((reference, target, ctx.module))
 
     def _translate_function_call(self, target: PythonMethod, args: List[Expr],
                                  formal_args: List[Expr], arg_stmts: List[Stmt],
@@ -304,7 +325,12 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        call_type = self.get_type(node, ctx)
+        # Mark the current function as depending on the called function. If we're in
+        # a global context, wrap the result into a check that the called function and its
+        # dependencies are defined.
+        self._add_dependencies(node.func, target, ctx)
+        if not target.cls and self.is_main_method(ctx):
+            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -556,7 +582,7 @@ class CallTranslator(CommonTranslator):
         the values of the arguments. Saves the result in result_var and any
         uncaught exceptions in error_var.
         """
-        old_label_aliases = ctx.label_aliases
+        old_label_aliases = ctx.label_aliases.copy()
         old_var_aliases = ctx.var_aliases
         var_aliases = {}
 

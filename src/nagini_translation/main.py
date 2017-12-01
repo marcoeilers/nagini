@@ -94,6 +94,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
+    main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
         translator = SIFTranslator(jvm, path, types, viperast)
@@ -113,21 +114,14 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     Starting from the main module, finds all imports and sets up all modules
     for them.
     """
-    main_module = analyzer.module
     analyzer.module_index = 0
     analyzer.collect_imports(path)
 
-    for module in analyzer.module_paths:
-        if module.startswith('mod$'):
-            continue
-        if module != os.path.abspath(path):
-            analyzer.contract_only = True
-            analyzer.module = analyzer.modules[module]
-            analyzer.visit_module(module)
-        else:
-            analyzer.module = main_module
-            analyzer.contract_only = False
-            analyzer.visit_module(module)
+    analyzer.analyze()
+
+    # Carry out all tasks that were deferred to the end of the analysis.
+    for task in analyzer.deferred_tasks:
+        task()
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
