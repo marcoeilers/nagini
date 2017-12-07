@@ -359,6 +359,10 @@ class CallTranslator(CommonTranslator):
                     return target_class.get_func_or_method(node.func.attr)
             # Method called on an object
             receiver_class = self.get_type(node.func.value, ctx)
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            if isinstance(receiver_class, UnionType):
+                return None
             target = receiver_class.get_predicate(node.func.attr)
             if not target:
                 target = receiver_class.get_func_or_method(node.func.attr)

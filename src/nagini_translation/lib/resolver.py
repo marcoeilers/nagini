@@ -75,9 +75,9 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # Try to access the member on the common supertype of all union
-            # elements.
-            lhs = lhs.cls
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            return None
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
