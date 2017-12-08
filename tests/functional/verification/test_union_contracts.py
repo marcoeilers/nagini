@@ -77,3 +77,42 @@ def test_13(o: Union[Union[A, B], C]) -> None:
 
 def test_14(o: Union[A]) -> None:
     x = o.foo(5)
+
+class Base:
+    def foo(self, i: int) -> int:
+        Requires(i > 3)
+        Ensures(Result() > 3)
+        return 4
+
+class DerivedLeft (Base):
+    def foo(self, i: int) -> int:
+        Requires(i > 2)
+        Ensures(Result() > 5)
+        return 6
+
+class DerivedRight (Base):
+    def foo(self, i: int) -> int:
+        Requires(i > 2)
+        Ensures(Result() > 5)
+        return 6
+
+class SingleInheritanceLeft(DerivedRight):
+    def foo(self, i: int) -> int:
+        Requires(i > 1)
+        Ensures(Result() > 6)
+        return 7
+
+class SingleInheritanceRight(DerivedRight):
+    def foo(self, i: int) -> int:
+        Requires(i > 1)
+        Ensures(Result() > 6)
+        return 7
+
+def test_15(o: Union[Base, DerivedLeft]) -> None:
+    x = o.foo(5)
+ 
+def test_16(o: Union[DerivedLeft, Base]) -> None:
+    x = o.foo(5)
+ 
+def test_17(o: Union[DerivedLeft, DerivedRight, Base, SingleInheritanceLeft]) -> None:
+    x = o.foo(5)

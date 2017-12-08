@@ -42,7 +42,8 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import Dict, List, Tuple, Union
+from toposort import toposort_flatten
+from typing import Dict, List, Tuple, Union, Set
 
 
 class CallTranslator(CommonTranslator):
@@ -687,6 +688,18 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
+    def toposort_classes(self, class_set: Set[PythonClass]) -> List[PythonClass]:
+        """
+        Topological sorting of classes in a set, ensuring that derived classes
+        precede their base classes in the returned list
+        """
+        map = {}
+
+        for type in class_set:
+            map[type] = set(type.all_subclasses) & class_set
+
+        return list(toposort_flatten(map, False))
+
     def chain_if_stmts(self, guarded_blocks: List[Tuple[Expr, Stmt]],
                        position, info, ctx) -> Stmt:
         """
@@ -701,6 +714,37 @@ class CallTranslator(CommonTranslator):
             else_block = self.chain_if_stmts(guarded_blocks[1:], position, info, ctx)
         return self.viper.If(guard, then_block, else_block, position, info)
 
+    def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
+                                       arg_types: List[PythonType], rectype: UnionType,
+                                       node: ast.Call, ctx: Context,
+                                       impure) -> StmtsAndExpr:
+        """
+        Translate a method call, when the receiver is of type union, into an if-then-else
+        chain of method calls, one for each class in the union according to receiver's
+        type.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        guarded_blocks = []
+        # For each class in union
+        for type in self.toposort_classes(rectype.get_types()):
+            # If receiver is an instance of this particular class
+            method_call_guard = self.var_type_check(node.func.value.id, type, position,
+                                                    ctx)
+            # Call its respective method
+            method_call, return_var = self.translate_normal_call(
+                type.get_func_or_method(node.func.attr), arg_stmts,
+                args, arg_types, node, ctx, impure)
+            if 'final_return_var' not in locals():
+                final_return_var = return_var
+            else:
+                method_call.append(self.viper.LocalVarAssign(final_return_var,
+                                   return_var, position, info))
+            method_call_block = self.translate_block(method_call, position, info)
+            guarded_blocks.append((method_call_guard, method_call_block))
+        return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
+                final_return_var)
+
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
         """
@@ -713,28 +757,8 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
                 if isinstance(rectype, UnionType):
-                    position = self.to_position(node, ctx)
-                    info = self.no_info(ctx)
-                    # For each class in union
-                    guarded_blocks = []
-                    for type in rectype.get_types():
-                        # If receiver is an instance of this particular class
-                        method_call_guard = self.var_type_check(node.func.value.id,
-                                                                type, position, ctx)
-                        # Call its respective method
-                        method_call, return_var = self.translate_normal_call(
-                            type.get_func_or_method(node.func.attr), arg_stmts,
-                            args, arg_types, node, ctx, impure)
-                        if 'final_return_var' not in locals():
-                            final_return_var = return_var
-                        else:
-                            method_call.append(self.viper.LocalVarAssign(
-                                final_return_var, return_var, position, info))
-                        method_call_block = self.translate_block(method_call, position,
-                                                                 info)
-                        guarded_blocks.append((method_call_guard, method_call_block))
-                    return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
-                           final_return_var)
+                    return self.translate_method_call_in_union(arg_stmts, args, arg_types,
+                                                               rectype, node, ctx, impure)
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
