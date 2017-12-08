@@ -24,9 +24,29 @@ MAY_SET_PRED = '_MaySet'
 
 IS_DEFINED_FUNC = '_isDefined'
 
+ASSERTING_FUNC = '_asserting'
+
+NAME_QUANTIFIER_VAR = '_name'
+
+COMBINE_NAME_FUNC = '_combine'
+
+GLOBAL_IS_DEFINED_FUNC = '_isDefinedG'
+
 CHECK_DEFINED_FUNC = '_checkDefined'
 
+GLOBAL_CHECK_DEFINED_FUNC = '_checkDefinedG'
+
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
+
+GLOBAL_VAR_FIELD = '_val'
+
+NAME_DOMAIN = '_Name'
+
+COMBINED_NAME_ACCESSOR = '_get_combined_name'
+
+COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
+
+SINGLE_NAME = '_single'
 
 INTERNAL_NAMES = [
     'FuncTriple',
@@ -57,6 +77,13 @@ INTERNAL_NAMES = [
     CHECK_DEFINED_FUNC,
     FUNCTION_DOMAIN_NAME,
     ARBITRARY_BOOL_FUNC,
+    GLOBAL_VAR_FIELD,
+    NAME_QUANTIFIER_VAR,
+    COMBINE_NAME_FUNC,
+    NAME_DOMAIN,
+    COMBINED_NAME_ACCESSOR,
+    COMBINED_PREFIX_ACCESSOR,
+    SINGLE_NAME,
 ]
 
 VIPER_KEYWORDS = [
@@ -188,6 +215,14 @@ PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE, CALLA
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 
+NAME_VAR = '__name__'
+
+FILE_VAR = '__file__'
+
+MODULE_VARS = (NAME_VAR, FILE_VAR)
+
+MAIN_METHOD_NAME = '__main__'
+
 MYPY_SUPERCLASSES = {
     'Sized',
 }
@@ -205,6 +240,19 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'types',
                    'typing',
                    }
+
+IGNORED_MODULE_NAMES = {
+    '_importlib_modulespec': [],
+    'abc': [],
+    'builtins': [],
+    'nagini_contracts': [],
+    'nagini_contracts.contracts': [],
+    'nagini_contracts.io': [],
+    'nagini_contracts.obligations': ['BaseLock'],
+    'sys': [],
+    'types': [],
+    'typing': [],
+}
 
 OPERATOR_FUNCTIONS = {
     ast.Add: '__add__',

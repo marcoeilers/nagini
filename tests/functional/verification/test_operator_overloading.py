@@ -6,7 +6,7 @@ class Container:
         Ensures(Acc(self.value) and self.value == v)  # type: ignore
         self.value = v
 
-    def __add__(self, other: Container) -> Container:
+    def __add__(self, other: 'Container') -> 'Container':
         Requires(Acc(self.value, 1/100))
         Requires(Acc(other.value, 1/100))
         Ensures(Acc(self.value, 1 / 100))
@@ -17,7 +17,7 @@ class Container:
         return res
 
     @Pure
-    def __mul__(self, other: Container) -> int:
+    def __mul__(self, other: 'Container') -> int:
         Requires(Acc(self.value, 1 / 100))
         Requires(Acc(other.value, 1 / 100))
         Ensures(Result() == self.value * other.value)

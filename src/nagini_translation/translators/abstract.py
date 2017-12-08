@@ -6,8 +6,10 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
+    PythonGlobalVar,
     PythonIOOperation,
     PythonMethod,
+    PythonModule,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -79,9 +81,10 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type: object = None,
-                       impure: bool = False) -> StmtsAndExpr:
+                       impure: bool = False,
+                       as_read: bool = False) -> StmtsAndExpr:
         return self.config.expr_translator.translate_expr(
-            node, ctx, target_type, impure)
+            node, ctx, target_type, impure, as_read)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
@@ -116,6 +119,17 @@ class AbstractTranslator(metaclass=ABCMeta):
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
 
+    def translate_static_field_access(self, field: PythonGlobalVar,
+                                      receiver: Union[Expr, PythonType],
+                                      node, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_static_field_access(field, receiver,
+                                                                         node, ctx)
+
+    def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
+                                       ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_global_var_reference(target, node,
+                                                                          ctx)
+
     def translate_io_operation(
             self,
             operation: PythonIOOperation,
@@ -132,6 +146,10 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         return self.config.method_translator.translate_method(method, ctx)
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> 'silver.ast.Method':
+        return self.config.method_translator.translate_main_method(modules, ctx)
 
     def translate_function(self, func: PythonMethod,
                            ctx: Context) -> 'silver.ast.Function':
@@ -324,6 +342,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                      node: ast.AST, ctx: Context) -> Expr:
         return self.config.expr_translator.create_tuple(vals, val_types, node,
                                                         ctx)
+
+    def translate_string(self, s: str, node: ast.AST, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_string(s, node, ctx)
 
     def translate_args(self, target: PythonMethod, arg_nodes: List,
                        keywords: List, node: ast.AST, ctx: Context,

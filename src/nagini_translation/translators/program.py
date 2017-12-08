@@ -3,13 +3,18 @@ import ast
 from collections import OrderedDict
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    ASSERTING_FUNC,
     CHECK_DEFINED_FUNC,
+    COMBINE_NAME_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
+    GLOBAL_CHECK_DEFINED_FUNC,
+    GLOBAL_VAR_FIELD,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
     PRIMITIVES,
-    RESULT_NAME
+    RESULT_NAME,
+    STRING_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     MethodType,
@@ -137,15 +142,23 @@ class ProgramTranslator(CommonTranslator):
         position = self.to_position(var.node, ctx)
         posts = []
         result = self.viper.Result(type, position, self.no_info(ctx))
-        if var.type.name not in PRIMITIVES:
-            posts.append(self.type_check(result, var.type, position, ctx))
-        if hasattr(var, 'value'):
-            stmt, value = self.translate_expr(var.value, ctx)
-            if stmt:
-                raise InvalidProgramException('purity.violated', var.node)
-            body = value
-            posts.append(self.viper.EqCmp(result, value, position,
-                                          self.no_info(ctx)))
+        if var.is_final:
+            if var.type.name not in PRIMITIVES:
+                posts.append(self.type_check(result, var.type, position, ctx))
+            if hasattr(var, 'value'):
+                body = None
+                try:
+                    stmt, value = self.translate_expr(var.value, ctx)
+                    if not stmt:
+                        if not self.viper.is_heap_dependent(value):
+                            body = value
+                            posts.append(self.viper.EqCmp(result, value, position,
+                                                          self.no_info(ctx)))
+                except AttributeError:
+                    # The translation (probably) tried to access ctx.current_function
+                    pass
+            else:
+                body = None
         else:
             body = None
         return self.viper.Function(var.sil_name, [], type, [], posts, body,
@@ -374,14 +387,27 @@ class ProgramTranslator(CommonTranslator):
 
     def translate_default_args(self, method: PythonMethod,
                                ctx: Context) -> None:
+        definition_deps = method.definition_deps
+        if method.cls:
+            definition_deps = method.cls.definition_deps
         for arg in method.args.values():
+            if (arg.node and arg.node.annotation and
+                    not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant))):
+                type = self.get_target(arg.node.annotation, ctx)
+                if type and not type.python_class.interface:
+                    definition_deps.add((arg.node.annotation, type.python_class,
+                                         method.module))
             if arg.default:
                 stmt, expr = self.translate_expr(arg.default, ctx)
-                if stmt:
-                    raise InvalidProgramException(arg.default,
-                                                  'purity.violated')
-                assert expr
-                arg.default_expr = expr
+                if not stmt and expr:
+                    arg.default_expr = expr
+        if (method.node and method.node.returns and
+                not isinstance(method.node.returns, (ast.Str, ast.NameConstant))):
+            type = self.get_target(method.node.returns, ctx)
+            if type and not type.python_class.interface:
+                definition_deps.add((method.node.returns, type.python_class,
+                                     method.module))
+
 
     def _create_predefined_fields(self,
                                   ctx: Context) -> List[Field]:
@@ -390,6 +416,9 @@ class ProgramTranslator(CommonTranslator):
         features, e.g. collections, measures and iterators.
         """
         fields = []
+        fields.append(self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
         fields.append(self.viper.Field('__container', self.viper.Ref,
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
@@ -547,8 +576,21 @@ class ProgramTranslator(CommonTranslator):
                                                  [var_param_decl, id_param_decl],
                                                  self.viper.Ref, [is_defined_pre], [],
                                                  var_param, pos, info)
-
         return [is_defined_func, check_defined_func]
+
+    def create_asserting_function(self,
+                                            ctx: Context) -> List['silver.ast.Function']:
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        var_param = self.viper.LocalVar('val', self.viper.Ref, pos, info)
+        assertion_param_decl = self.viper.LocalVarDecl('ass', self.viper.Bool, pos, info)
+        assertion_param = self.viper.LocalVar('ass', self.viper.Bool, pos, info)
+        asserting_func = self.viper.Function(ASSERTING_FUNC,
+                                             [var_param_decl, assertion_param_decl],
+                                             self.viper.Ref, [assertion_param], [],
+                                             var_param, pos, info)
+        return [asserting_func]
 
     def create_arbitrary_bool_func(self, ctx: Context) -> 'silver.ast.Function':
         pos = self.no_position(ctx)
@@ -585,6 +627,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
+        functions.extend(self.create_asserting_function(ctx))
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
@@ -604,6 +647,8 @@ class ProgramTranslator(CommonTranslator):
         for module in modules:
             ctx.module = module
             for var in module.global_vars.values():
+                if not var.module is module:
+                    continue
                 self.track_dependencies(selected_names, selected, var, ctx)
                 functions.append(
                     self.create_global_var_function(var, ctx))
@@ -716,6 +761,10 @@ class ProgramTranslator(CommonTranslator):
                     else:
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
+
+        main_py_method, main_method = self.translate_main_method(modules, ctx)
+        methods.append(main_method)
+        self.track_dependencies(selected_names, selected, main_py_method, ctx)
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.
