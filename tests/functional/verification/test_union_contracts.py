@@ -116,3 +116,11 @@ def test_16(o: Union[DerivedLeft, Base]) -> None:
  
 def test_17(o: Union[DerivedLeft, DerivedRight, Base, SingleInheritanceLeft]) -> None:
     x = o.foo(5)
+
+class DataStructure:
+    def append(self, item: int) -> None:
+        pass
+
+def test_18(o: Union[DataStructure, List[int]]) -> None:
+    Requires(Implies(not isinstance(o, DataStructure), Acc(list_pred(o))))
+    o.append(5)

@@ -778,7 +778,7 @@ class UnionType(GenericType):
         result = set()
         for type in self.type_args:
             if not isinstance(type, UnionType):
-                result.add(type)
+                result.add(type.python_class)
             else:
                 result |= type.get_types()
         return result

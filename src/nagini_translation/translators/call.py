@@ -738,8 +738,9 @@ class CallTranslator(CommonTranslator):
             if 'final_return_var' not in locals():
                 final_return_var = return_var
             else:
-                method_call.append(self.viper.LocalVarAssign(final_return_var,
-                                   return_var, position, info))
+                if return_var:
+                    method_call.append(self.viper.LocalVarAssign(final_return_var,
+                                       return_var, position, info))
             method_call_block = self.translate_block(method_call, position, info)
             guarded_blocks.append((method_call_guard, method_call_block))
         return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
