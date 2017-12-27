@@ -358,7 +358,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists'):
+            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)

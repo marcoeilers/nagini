@@ -48,6 +48,23 @@ class Failure(VerificationResult):
             all_errors)
 
 
+class ARPPlugin:
+    """
+    Provides access to the ARPPlugin
+    """
+
+    def __init__(self, jvm: JVM):
+        self._jvm = jvm
+        self.silver = jvm.viper.silver
+        self.arpplugin = jvm.viper.silver.plugin.ARPPlugin()
+
+    def beforeVerify(self, prog: 'silver.ast.Program') -> 'silver.ast.Program':
+        return self.arpplugin.beforeVerify(prog)
+
+    def mapVerificationResult(self, result: 'silver.verifier.VerificationResult') -> 'silver.verifier.VerificationResult':
+        return self.arpplugin.mapVerificationResult(result)
+
+
 class Silicon:
     """
     Provides access to the Silicon verifier
@@ -63,6 +80,7 @@ class Silicon:
         args.update(2, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
+        self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
     def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
@@ -71,7 +89,7 @@ class Silicon:
         """
         if not self.ready:
             self.silicon.restart()
-        result = self.silicon.verify(prog)
+        result = self.arpplugin.mapVerificationResult(self.silicon.verify(self.arpplugin.beforeVerify(prog)))
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
@@ -102,6 +120,7 @@ class Carbon:
         args.update(4, filename)
         self.carbon.parseCommandLine(args)
         self.carbon.start()
+        self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
     def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
@@ -110,7 +129,7 @@ class Carbon:
         """
         if not self.ready:
             self.carbon.restart()
-        result = self.carbon.verify(prog)
+        result = self.arpplugin.mapVerificationResult(self.carbon.verify(self.arpplugin.beforeVerify(prog)))
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
