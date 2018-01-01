@@ -145,13 +145,14 @@ def _construct_classpath():
     viper_java_path = os.environ.get('VIPERJAVAPATH')
     silicon_jar = os.environ.get('SILICONJAR')
     carbon_jar = os.environ.get('CARBONJAR')
+    arpplugin_jar = os.environ.get('ARPPLUGINJAR')
 
     if viper_java_path:
         return viper_java_path
 
     if silicon_jar or carbon_jar:
         return os.pathsep.join(
-            jar for jar in (silicon_jar, carbon_jar) if jar)
+            jar for jar in (silicon_jar, carbon_jar, arpplugin_jar) if jar)
 
     if sys.platform.startswith('linux'):
         if os.path.isdir('/usr/lib/viper'):

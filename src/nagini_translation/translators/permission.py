@@ -8,6 +8,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     InvalidProgramException,
     UnsupportedException,
+    get_func_name
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -40,4 +41,39 @@ class PermTranslator(CommonTranslator):
             return self.viper.FractionalPerm(left, right,
                                              self.to_position(node, ctx),
                                              self.no_info(ctx))
+
+        if isinstance(node.op, ast.Mult):
+            func, other = None, None
+            if isinstance(node.left, ast.Call):
+                func, other = node.left, node.right
+            elif isinstance(node.right, ast.Call):
+                func, other = node.right, node.left
+            left_stmt, left = self.translate_expr(other, ctx, self.viper.Int)
+            right = self.translate_perm(func, ctx)
+            if left_stmt:
+                raise InvalidProgramException(node, 'purity.violated')
+            return self.viper.IntPermMul(left, right,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+
+
+        newnode = None
+        if isinstance(node.op, ast.Add):
+            newnode = self.viper.PermAdd
+        elif isinstance(node.op, ast.Sub):
+            newnode = self.viper.PermSub
+
+        if newnode:
+            left = self.translate_perm(node.left, ctx)
+            right = self.translate_perm(node.right, ctx)
+            return newnode(left, right,
+                           self.to_position(node, ctx),
+                           self.no_info(ctx))
+        raise UnsupportedException(node)
+
+    def translate_perm_Call(self, node: ast.Call, ctx: Context) -> Expr:
+        func_name = get_func_name(node)
+        if func_name == 'ARP':
+            return self.viper.FuncApp('rd', {}, self.to_position(node, ctx),
+                                      self.no_info(ctx), self.viper.Ref, {})
         raise UnsupportedException(node)

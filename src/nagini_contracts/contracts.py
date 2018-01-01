@@ -211,6 +211,13 @@ def Read(field) -> bool:
     pass
 
 
+def ARP() -> float:
+    """
+    Abstract read permission, only to be used in Acc(f, ...).
+    """
+    pass
+
+
 def Fold(predicate: bool) -> None:
     pass
 
@@ -322,6 +329,7 @@ __all__ = [
         'Acc',
         'Rd',
         'Read',
+        'ARP',
         'Fold',
         'Unfold',
         'Unfolding',

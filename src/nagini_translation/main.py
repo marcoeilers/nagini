@@ -125,7 +125,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=True) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -134,7 +134,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        vresult = verifier.verify(prog)
+        vresult = verifier.verify(prog, arp=arp)
         return vresult
     except JavaException as je:
         print(je.stacktrace())
@@ -291,7 +291,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 print("RUN,{},{},{},{},{}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend)
+            vresult = verify(prog, python_file, jvm, backend=backend, arp=True)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode))

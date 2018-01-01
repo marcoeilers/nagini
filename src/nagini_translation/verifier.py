@@ -83,13 +83,18 @@ class Silicon:
         self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=True) -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
         if not self.ready:
             self.silicon.restart()
-        result = self.arpplugin.mapVerificationResult(self.silicon.verify(self.arpplugin.beforeVerify(prog)))
+        if arp:
+            arp_prog = self.arpplugin.beforeVerify(prog)
+            arp_result = self.silicon.verify(arp_prog)
+            result = self.arpplugin.mapVerificationResult(arp_result)
+        else:
+            result = self.silicon.verify(prog)
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
@@ -123,13 +128,18 @@ class Carbon:
         self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=True) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """
         if not self.ready:
             self.carbon.restart()
-        result = self.arpplugin.mapVerificationResult(self.carbon.verify(self.arpplugin.beforeVerify(prog)))
+        if arp:
+            arp_prog = self.arpplugin.beforeVerify(prog)
+            arp_result = self.carbon.verify(arp_prog)
+            result = self.arpplugin.mapVerificationResult(arp_result)
+        else:
+            result = self.carbon.verify(prog)
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
