@@ -4,6 +4,7 @@ from nagini_translation.lib.io_context import IOOpenContext
 from nagini_translation.lib.obligation_context import ObligationContext
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
+    PythonType,
     PythonVar,
     PythonVarBase,
 )
@@ -169,3 +170,4 @@ class Context:
         elements that can be accessed without a receiver.
         """
         return self.var_aliases
+

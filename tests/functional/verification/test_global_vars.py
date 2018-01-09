@@ -20,3 +20,9 @@ SO_MANY_GLOBAL_VARS = OTHER_GLOBAL_VAR if ANOTHER_GLOBAL_VAR else 44
 def m2() -> int:
     Ensures(Result() == 56 + 57)
     return GLOBAL_VAR + SO_MANY_GLOBAL_VARS
+
+
+def impure() -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Result() == 55)
+    return GLOBAL_VAR

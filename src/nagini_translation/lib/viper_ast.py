@@ -357,6 +357,9 @@ class ViperAST:
     def EmptySeq(self, type, position, info):
         return self.ast.EmptySeq(type, position, info, self.NoTrafos)
 
+    def EmptySet(self, type, position, info):
+        return self.ast.EmptySet(type, position, info, self.NoTrafos)
+
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info, self.NoTrafos)
 
@@ -369,14 +372,17 @@ class ViperAST:
     def AnySetContains(self, elem, s, position, info):
         return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
+    def AnySetUnion(self, left, right, position, info):
+        return self.ast.AnySetUnion(left, right, position, info, self.NoTrafos)
+
+    def AnySetSubset(self, left, right, position, info):
+        return self.ast.AnySetSubset(left, right, position, info, self.NoTrafos)
+
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)
 
     def SeqContains(self, elem, s, position, info):
         return self.ast.SeqContains(elem, s, position, info, self.NoTrafos)
-
-    def SetContains(self, elem, s, position, info):
-        return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
     def SeqLength(self, s, position, info):
         return self.ast.SeqLength(s, position, info, self.NoTrafos)
@@ -490,3 +496,13 @@ class ViperAST:
         else:
             end = self.none
         return self.ast.IdentifierPosition(path, start, end, id)
+
+    def is_heap_dependent(self, expr) -> bool:
+        """
+        Checks if the given expression contains an access to a heap location.
+        """
+        for n in [expr] + self.to_list(expr.subnodes()):
+            if isinstance(n, self.ast.LocationAccess):
+                return True
+        return False
+

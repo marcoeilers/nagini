@@ -29,13 +29,13 @@ class A:
         Ensures(Acc(self.x))
         self.x.release()
 
-    def mr(self, other: A) -> None:
+    def mr(self, other: 'A') -> None:
         Requires(Acc(other.x) and MustRelease(other.x, 2))
         Ensures(Acc(other.x))
         other.x.release()
 
     #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-    def mnor(self, other: A) -> None:
+    def mnor(self, other: 'A') -> None:
         Requires(Acc(other.x) and MustRelease(other.x, 2))
         Ensures(Acc(other.x))
         other.x = None

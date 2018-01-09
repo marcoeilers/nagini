@@ -65,11 +65,12 @@ class Analyzer(ast.NodeVisitor):
     def __init__(self, types: TypeInfo, path: str, selected: Set[str]):
         self._node_factory = None
         self.types = types
-        self.global_module = PythonModule(types, self.node_factory, None, None)
+        self.global_module = PythonModule(types, self.node_factory, None, None, None)
         self.global_module.global_module = self.global_module
+        file = path.split(os.sep)[-1]
         self.module = PythonModule(types, self.node_factory, '__main__',
-                                   self.global_module,
-                                   sil_names=self.global_module.sil_names)
+                                   self.global_module, None,
+                                   sil_names=self.global_module.sil_names, file=file)
         self.current_class = None
         self.current_function = None
         self.current_scopes = []
@@ -84,6 +85,14 @@ class Analyzer(ast.NodeVisitor):
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
+        self.deferred_tasks = []
+
+    @property
+    def stmt_container(self):
+        if self.current_function is not None:
+            return self.current_function
+        else:
+            return self.module
 
     @property
     def node_factory(self):
@@ -104,7 +113,8 @@ class Analyzer(ast.NodeVisitor):
                 if cls.defined:
                     raise InvalidProgramException(node, 'multiple.definitions')
             if (name in container.global_vars and
-                    hasattr(container.global_vars[name], 'value')):
+                    hasattr(container.global_vars[name], 'value') and
+                    isinstance(node, (ast.FunctionDef, ast.ClassDef))):
                 raise InvalidProgramException(node, 'multiple.definitions')
         if (name in container.functions or
                 name in container.methods or
@@ -131,6 +141,7 @@ class Analyzer(ast.NodeVisitor):
         except Exception:
             # Ignore
             pass
+        self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
         logger.debug(nagini_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
@@ -144,8 +155,8 @@ class Analyzer(ast.NodeVisitor):
                     if not redefined_name:
                         redefined_name = module_name
                     assert module_name in self.types.files
-                    path = self.types.files[module_name]
-                    self.add_module(path, abs_path, redefined_name)
+                    path = os.path.abspath(self.types.files[module_name])
+                    self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
                 module_name = stmt.module
                 if module_name in IGNORED_IMPORTS:
@@ -157,16 +168,17 @@ class Analyzer(ast.NodeVisitor):
                 else:
                     assert module_name in self.types.files
                     path = self.types.files[module_name]
+                path = os.path.abspath(path)
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
                 else:
                     names = [(name.name, name.asname if name.asname else None)
                              for name in stmt.names] # TODO rename?
-                self.add_module(path, abs_path, None, names)
+                self.add_module(path, abs_path, None, parse_result, names)
         self.module_index = self.module_paths.index(abs_path) + 1
 
     def add_module(self, abs_path: str, into: str, as_name: Optional[str],
-                   names: List[Tuple[str, str]] = None) -> None:
+                   node: ast.Module, names: List[Tuple[str, str]] = None) -> None:
         """
         Adds the module with the given 'abs_path' into the the module with
         path 'into'. If it's a from-import, 'as_name' should be None and
@@ -183,9 +195,9 @@ class Analyzer(ast.NodeVisitor):
             # correspond to a directory, so it has no contents of its own,
             # and we just create a dummy module (indicated by the path starting
             # with 'mod$') that's just there to contain the following module(s).
-            self.add_module('mod$' + first, into, first)
+            self.add_module('mod$' + first, into, first, node)
             # Add next part(s) into first part recursively
-            self.add_module(abs_path, 'mod$' + first, rest)
+            self.add_module(abs_path, 'mod$' + first, rest, node)
             return
         if abs_path not in self.module_paths:
             # Module has not been imported yet
@@ -198,7 +210,7 @@ class Analyzer(ast.NodeVisitor):
             else:
                 file = None
             new_module = PythonModule(self.module.types, self.node_factory,
-                                      type_prefix, self.module.global_module,
+                                      type_prefix, self.module.global_module, node,
                                       self.module.sil_names, file)
             self.modules[abs_path] = new_module
             self.collect_imports(abs_path)
@@ -212,6 +224,14 @@ class Analyzer(ast.NodeVisitor):
             if names:
                 new_module = PythonModuleView(new_module, names)
             into_mod.from_imports.append(new_module)
+
+
+    def analyze(self) -> None:
+        """
+        Recursively analyzes the main module and all imported modules.
+        """
+        self.visited_modules = [self.module]
+        self.visit_module(self.module)
 
     def process(self, translator: 'Translator') -> None:
         """
@@ -304,12 +324,10 @@ class Analyzer(ast.NodeVisitor):
         else:
             cont.methods[method_name] = method
 
-    def visit_module(self, module: str) -> None:
-        self.visit(self.asts[module], None)
+    def visit_module(self, module: PythonModule) -> None:
+        self.visit(module.node, None)
 
     def visit_Module(self, node: ast.Module) -> None:
-        # Top level elements may only be imports, classes, functions, or global
-        # var assignments.
         for stmt in node.body:
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
                                  ast.ImportFrom, ast.Assign)):
@@ -322,7 +340,6 @@ class Analyzer(ast.NodeVisitor):
                 continue
             if get_func_name(stmt) in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(stmt, 'invalid.contract.position')
-            raise InvalidProgramException(stmt, 'global.statement')
         self.visit_default(node)
 
     def visit_default(self, node: ast.AST) -> None:
@@ -352,7 +369,7 @@ class Analyzer(ast.NodeVisitor):
         if isinstance(container, (PythonMethod, PythonIOOperation)):
             containers.extend(container.module.get_included_modules())
         else:
-            containers.extend(container.get_included_modules())
+            containers.extend(container.get_included_modules(()))
         return do_get_target(node, containers, container)
 
     def find_or_create_class(self, name: str, module=None) -> PythonClass:
@@ -374,7 +391,7 @@ class Analyzer(ast.NodeVisitor):
         if not module:
             module = self.module
         # Check all imported modules for the class.
-        for visible_module in module.get_included_modules(True):
+        for visible_module in module.get_included_modules((), True):
             if name in visible_module.classes:
                 cls = visible_module.classes[name]
                 break
@@ -410,7 +427,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.current_function or self.current_class:
-            raise UnsupportedException(node, 'nested class declaration')
+            raise InvalidProgramException(node, 'nested.class.declaration')
         name = node.name
         self.define_new(self.module, name, node)
         cls = self.find_or_create_class(name)
@@ -445,6 +462,8 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
         else:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
+        if cls.python_class not in cls.superclass.python_class.direct_subclasses:
+            cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
         for member in node.body:
             self.visit(member, node)
@@ -461,9 +480,43 @@ class Analyzer(ast.NodeVisitor):
                 return True
         return False
 
+    def analyze_import(self, module_name: str) -> None:
+        """
+        Visits the given module if it hasn't already been visited.
+        """
+        if module_name in IGNORED_IMPORTS:
+            return
+        for mod in self.modules.values():
+            if mod.type_prefix == module_name:
+                module = mod
+                break
+            if mod.type_prefix == '__main__':
+                main_module = mod
+        else:
+            # type prefix of the main module is __main__, therefore isn't found.
+            module = main_module
+
+        if module in self.visited_modules:
+            return
+        self.visited_modules.append(module)
+        old_contract_only = self.contract_only
+        self.contract_only = True
+        old_module = self.module
+        self.module = module
+        self.visit_module(module)
+        self.module = old_module
+        self.contract_only = old_contract_only
+
+    def visit_Import(self, node: ast.Import):
+        for name in node.names:
+            self.analyze_import(name.name)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom):
+        self.analyze_import(node.module)
+
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if self.current_function:
-            raise UnsupportedException(node, 'nested function declaration')
+            raise InvalidProgramException(node, 'nested.function.declaration')
         name = node.name
         if self._is_illegal_magic_method_name(name):
             raise InvalidProgramException(node, 'illegal.magic.method')
@@ -537,11 +590,9 @@ class Analyzer(ast.NodeVisitor):
         self.current_function = None
 
     def visit_loop(self, node: Union[ast.While, ast.For]) -> None:
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level loop')
         old_loop_invariant = self.current_loop_invariant
-        self.current_function.loop_invariants[node] = []
-        self.current_loop_invariant = self.current_function.loop_invariants[
+        self.stmt_container.loop_invariants[node] = []
+        self.current_loop_invariant = self.stmt_container.loop_invariants[
             node]
         if isinstance(node, ast.While):
             self.visit(node.test, node)
@@ -580,7 +631,7 @@ class Analyzer(ast.NodeVisitor):
                 aliased_type = self.convert_type(type_name)
                 self.module.classes[node.targets[0].id] = aliased_type
                 is_alias = True
-            # If it's a type variable markes by mypy
+            # If it's a type variable marked by mypy
             elif lhs_name in self.types.type_vars:
                 var = self.types.type_vars[lhs_name]
                 self.module.type_vars[node.targets[0].id] = var
@@ -725,13 +776,11 @@ class Analyzer(ast.NodeVisitor):
         """
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
-            if not self.current_function or self.current_function.predicate:
-                raise InvalidProgramException(node, 'invalid.contract.position')
             if node.func.id == 'Requires':
-                self.current_function.precondition.append(
+                self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Ensures':
-                self.current_function.postcondition.append(
+                self.stmt_container.postcondition.append(
                     (node.args[0], self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
@@ -826,17 +875,19 @@ class Analyzer(ast.NodeVisitor):
                         var = existing_var
                     else:
                         var = self.node_factory.create_python_global_var(
-                            node.id, node, cls)
+                            node.id, node, cls, self.module)
                     assign = node._parent
-                    if (not isinstance(assign, ast.Assign)
-                            or len(assign.targets) != 1):
-                        msg = ('only simple assignments and reads allowed for '
-                               'global variables')
-                        raise UnsupportedException(assign, msg)
-                    var.value = assign.value
+                    if isinstance(assign, ast.Assign) and len(assign.targets) == 1:
+                        var.value = assign.value
                     self.module.global_vars[node.id] = var
-                var = self.module.global_vars[node.id]
-                self.track_access(node, var)
+                current_module = self.module
+                # track access later
+                def todo():
+                    var = self.get_target(node, current_module)
+                    if isinstance(var, PythonGlobalVar):
+                        self.track_access(node, var)
+                self.deferred_tasks.append(todo)
+                return
             else:
                 # Node is a static field.
                 if isinstance(node.ctx, ast.Load):
@@ -844,6 +895,7 @@ class Analyzer(ast.NodeVisitor):
                 cls = self.typeof(node)
                 self.define_new(self.current_class, node.id, node)
                 var = self.node_factory.create_static_field(node.id, node, cls,
+                                                            self.module,
                                                             self.current_class)
                 assign = node._parent
                 if (not isinstance(assign, ast.Assign)
@@ -860,7 +912,8 @@ class Analyzer(ast.NodeVisitor):
                     # again now that we now it's actually static.
                     del self.current_class.fields[node.id]
                 return
-        if not isinstance(self.get_target(node, self.module), PythonGlobalVar):
+        # We're in a function
+        if isinstance(node.ctx, ast.Store):
             # Node is a local variable, lambda argument, or a global variable
             # that hasn't been encountered yet
             var = None
@@ -886,8 +939,8 @@ class Analyzer(ast.NodeVisitor):
                 return
             else:
                 # We don't know this identifier yet, so it must be something
-                # new
-                if isinstance(node.ctx, ast.Store):
+                # new.
+                if node.id not in self.current_function.globals:
                     # Assume it's the first write to a local variable
                     var = self.node_factory.create_python_var(node.id,
                                                               node,
@@ -896,13 +949,17 @@ class Analyzer(ast.NodeVisitor):
                     var.alt_types = alts
                     self.current_function.locals[node.id] = var
                 else:
-                    # This is a read of a variable we don't know, so it must
-                    # be a global variable whose definition comes after the
-                    # current method. Any local variable would first be accessed
-                    # with a write.
-                    var = self.node_factory.create_python_global_var(
-                        node.id, node, self.typeof(node))
-                    self.module.global_vars[node.id] = var
+                    var = self.get_target(node, self.module)
+                    if not isinstance(var, PythonGlobalVar):
+                        # Assume it's the first write to a local variable
+                        var = self.node_factory.create_python_global_var(
+                            node.id, node, self.typeof(node), self.module)
+                        alts = self.get_alt_types(node)
+                        var.alt_types = alts
+                        self.module.global_vars[node.id] = var
+                    self.track_access(node, var)
+
+
             self.track_access(node, var)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
@@ -918,11 +975,23 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript)):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
-                return
-            receiver = self.typeof(node.value)
-            field = receiver.add_field(node.attr, node, self.typeof(node))
-            if isinstance(field, PythonField):
-                self.track_access(node, field)
+                real_target = self.get_target(node, self.module)
+                if isinstance(real_target, PythonGlobalVar):
+                    self.track_access(node, real_target)
+            else:
+                receiver = self.typeof(node.value)
+                field = receiver.add_field(node.attr, node, self.typeof(node))
+                if isinstance(field, PythonField):
+                    self.track_access(node, field)
+
+    def visit_Global(self, node: ast.Global) -> None:
+        for name in node.names:
+            if name in self.current_function.locals:
+                raise InvalidProgramException('invalid.global.statement')
+            self.current_function.globals.add(name)
+
+    def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
+        raise UnsupportedException(node)
 
     def convert_type(self, mypy_type, node=None) -> PythonType:
         """
@@ -1104,41 +1173,37 @@ class Analyzer(ast.NodeVisitor):
         With-blocks get translated to try-finally-blocks, so we create a
         PythonTryBlock here.
         """
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level with statement')
         self.visit_default(node)
-        try_name = self.current_function.get_fresh_name('with')
+        try_name = self.stmt_container.get_fresh_name('with')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
                                    self.current_function, node.body)
         try_block.sil_name = try_name
-        self.current_function.labels.append(try_name)
-        post_name = self.current_function.get_fresh_name('post_with')
+        self.stmt_container.labels.append(try_name)
+        post_name = self.stmt_container.get_fresh_name('post_with')
         try_block.post_name = post_name
-        self.current_function.labels.append(post_name)
-        finally_name = self.current_function.get_fresh_name('with_finally')
+        self.stmt_container.labels.append(post_name)
+        finally_name = self.stmt_container.get_fresh_name('with_finally')
         if len(node.items) != 1:
             msg = 'with block may only have one item'
             raise UnsupportedException(node, msg)
         try_block.with_item = node.items[0]
         try_block.finally_name = finally_name
-        self.current_function.labels.append(finally_name)
-        self.current_function.try_blocks.append(try_block)
+        self.stmt_container.labels.append(finally_name)
+        self.stmt_container.try_blocks.append(try_block)
 
     def visit_Try(self, node: ast.Try) -> None:
         """
         Creates PythonTryBlocks and PythonExceptionHandlers.
         """
-        if not self.current_function:
-            raise UnsupportedException(node, 'top level try statement')
-        try_name = self.current_function.get_fresh_name('try')
+        try_name = self.stmt_container.get_fresh_name('try')
         try_block = PythonTryBlock(node, try_name, self.node_factory,
-                                   self.current_function, node.body)
+                                   self.stmt_container, node.body)
         try_block.sil_name = try_name
-        self.current_function.labels.append(try_name)
-        post_name = self.current_function.get_fresh_name('post_try')
+        self.stmt_container.labels.append(try_name)
+        post_name = self.stmt_container.get_fresh_name('post_try')
         try_block.post_name = post_name
-        self.current_function.labels.append(post_name)
-        self.current_function.try_blocks.append(try_block)
+        self.stmt_container.labels.append(post_name)
+        self.stmt_container.try_blocks.append(try_block)
         for handler in node.handlers:
             if handler.type:
                 handler_type = self.find_or_create_target_class(handler.type)
@@ -1146,23 +1211,23 @@ class Analyzer(ast.NodeVisitor):
                 # Handler has no explicit type, therefore catches any kind
                 # of exception.
                 handler_type = self.module.global_module.classes['Exception']
-            handler_name = self.current_function.get_fresh_name(
+            handler_name = self.stmt_container.get_fresh_name(
                 'handler' + handler_type.name)
             py_handler = PythonExceptionHandler(handler, handler_type,
                                                 try_block, handler_name,
                                                 handler.body, handler.name)
-            self.current_function.labels.append(handler_name)
+            self.stmt_container.labels.append(handler_name)
             try_block.handlers.append(py_handler)
         if node.orelse:
-            handler_name = self.current_function.get_fresh_name('try_else')
+            handler_name = self.stmt_container.get_fresh_name('try_else')
             py_handler = PythonExceptionHandler(node, None, try_block,
                                                 handler_name, node.orelse, None)
             try_block.else_block = py_handler
         if node.finalbody:
-            finally_name = self.current_function.get_fresh_name('try_finally')
+            finally_name = self.stmt_container.get_fresh_name('try_finally')
             try_block.finally_block = node.finalbody
             try_block.finally_name = finally_name
-            self.current_function.labels.append(finally_name)
+            self.stmt_container.labels.append(finally_name)
         self.visit_default(node)
 
     def _incompatible_decorators(self, decorators) -> bool:

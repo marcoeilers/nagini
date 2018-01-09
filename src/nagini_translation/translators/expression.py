@@ -9,6 +9,7 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
+    GLOBAL_VAR_FIELD,
     INT_TYPE,
     LIST_TYPE,
     OPERATOR_FUNCTIONS,
@@ -63,6 +64,7 @@ class ExpressionTranslator(CommonTranslator):
         # TODO: Update all code to use this flag.
         self._is_expression = False
         self._target_type = None
+        self._as_read = False
         self._primitive_operations = {
             ast.Add: self.viper.Add,
             ast.Sub: self.viper.Sub,
@@ -81,7 +83,8 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type = None,
-                       impure: bool = False) -> StmtsAndExpr:
+                       impure: bool = False,
+                       as_read: bool = False) -> StmtsAndExpr:
         """
         Generic visitor function for translating an expression.
 
@@ -92,8 +95,12 @@ class ExpressionTranslator(CommonTranslator):
             Indicates if ``node`` may be translated to an impure assertion. If False,
             translating a predicate or field permission will result in an
             InvalidProgramException.
+        :param as_read:
+            Indicates if ``node`` should be translated as if it was being read (as
+            opposed to assigned to) independently of the actual context of the AST node.
         """
-
+        old_as_read = self._as_read
+        self._as_read = as_read
         if not target_type:
             target_type = self.viper.Ref
         old_target = self._target_type
@@ -104,6 +111,7 @@ class ExpressionTranslator(CommonTranslator):
             result = self.convert_to_type(result, target_type, ctx, node)
 
         self._target_type = old_target
+        self._as_read = old_as_read
         return stmt, result
 
     def _translate_only(self, node: ast.AST, ctx: Context, impure=False):
@@ -290,10 +298,13 @@ class ExpressionTranslator(CommonTranslator):
         return stmt, res_var.ref(node, ctx)
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
-        length = len(node.s)
+        return [], self.translate_string(node.s, node, ctx)
+
+    def translate_string(self, s: str, node: ast.AST, ctx: Context) -> Expr:
+        length = len(s)
         length_arg = self.viper.IntLit(length, self.no_position(ctx),
                                        self.no_info(ctx))
-        val_arg = self.viper.IntLit(self._get_string_value(node.s),
+        val_arg = self.viper.IntLit(self._get_string_value(s),
                                     self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
@@ -301,7 +312,8 @@ class ExpressionTranslator(CommonTranslator):
         func_name = '__create__'
         call = self.get_function_call(str_type, func_name, args, arg_types,
                                       node, ctx)
-        return [], call
+        return call
+
 
     def translate_Bytes(self, node: ast.Bytes, ctx: Context) -> StmtsAndExpr:
         elems = []
@@ -538,20 +550,46 @@ class ExpressionTranslator(CommonTranslator):
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
+    def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
+                                       ctx: Context) -> Expr:
+        """
+        Translates a reference to the given PythonGlobalVar (which could represent either
+        an actual global variable or a static field).
+        """
+        position = self.to_position(node, ctx)
+        if target.cls:
+            # This is a static field
+            field_func = self.translate_static_field_access(target,
+                                                            ctx.current_class, node,
+                                                            ctx)
+            return [], field_func
+        var = target
+        type = self.translate_type(var.type, ctx)
+
+        if not target.is_final:
+            func_app = self.viper.FuncApp(var.sil_name, [], position,
+                                          self.no_info(ctx), self.viper.Ref, [])
+            global_field = self.viper.Field(GLOBAL_VAR_FIELD, type, position,
+                                            self.no_info(ctx))
+            res = self.viper.FieldAccess(func_app, global_field, position,
+                                         self.no_info(ctx))
+        else:
+            res = self.viper.FuncApp(var.sil_name, [], position,
+                                     self.no_info(ctx), type, [])
+        if node and not isinstance(node.ctx, ast.Store) or self._as_read:
+            if self.is_main_method(ctx):
+                res = self.wrap_global_defined_check(res, target, ctx.module, node,
+                                                     ctx)
+            elif ctx.current_function:
+                ctx.current_function.call_deps.add((node, target,
+                                                    ctx.current_function.module))
+
+        return [], res
+
     def translate_Name(self, node: ast.Name, ctx: Context) -> StmtsAndExpr:
         target = self.get_target(node, ctx)
         if isinstance(target, PythonGlobalVar):
-            position = self.to_position(node, ctx)
-            if target.cls:
-                # This is a static field
-                field_func = self.translate_static_field_access(target,
-                    ctx.current_class, position, ctx)
-                return [], field_func
-            var = target
-            type = self.translate_type(var.type, ctx)
-            func_app = self.viper.FuncApp(var.sil_name, [], position,
-                                          self.no_info(ctx), type, [])
-            return [], func_app
+            return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
             func = self.viper.DomainFuncApp(target.func_constant, [],
                                             self.viper.function_domain_type(),
@@ -575,12 +613,12 @@ class ExpressionTranslator(CommonTranslator):
                     not (ctx.actual_function.pure or ctx.actual_function.predicate) and
                     not isinstance(node.ctx, ast.Store) and
                     self.is_local_variable(var, ctx)):
-                result = self.wrap_definedness_check(var, node, ctx)
+                result = self.wrap_definedness_check(var.ref(node, ctx), var, node, ctx)
             else:
                 result = var.ref(node, ctx)
             return [], result
 
-    def wrap_definedness_check(self, var: PythonVar, node: ast.AST,
+    def wrap_definedness_check(self, e: Expr, var: PythonVar, node: ast.AST,
                                ctx: Context) -> Expr:
         """
         Create an access to the given variable, wrapped into a function call which checks
@@ -591,7 +629,7 @@ class ExpressionTranslator(CommonTranslator):
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
         var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
         id = self.viper.IntLit(self._get_string_value(var.sil_name), pos, info)
-        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [var.ref(node, ctx), id], pos, info,
+        return self.viper.FuncApp(CHECK_DEFINED_FUNC, [e, id], pos, info,
                                   self.viper.Ref, [var_param_decl, id_param_decl])
 
     def _lookup_field(self, node: ast.Attribute, ctx: Context) -> PythonField:
@@ -618,13 +656,14 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_static_field_access(self, field: PythonGlobalVar,
                                       receiver: Union[Expr, PythonType],
-                                      position, ctx: Context) -> Expr:
+                                      node: ast.AST, ctx: Context) -> Expr:
         """
         Translates an access to the given field via the given receiver. The
         receiver can either be the type literal via which the field is
         accessed, an expression of type 'type' (e.g. cls in classmethods) or
         a normal object.
         """
+        position = self.to_position(node, ctx)
         while field.overrides:
             field = field.overrides
         field_type = self.translate_type(field.type, ctx)
@@ -643,8 +682,21 @@ class ExpressionTranslator(CommonTranslator):
         param = self.viper.LocalVarDecl('receiver',
                                         self.type_factory.type_type(), position,
                                         info)
-        return self.viper.FuncApp(field.sil_name, [type_arg], position, info,
-                                  field_type, [param])
+        res = self.viper.FuncApp(field.sil_name, [type_arg], position, info,
+                                 field_type, [param])
+        if not field.is_final:
+            global_field = self.viper.Field(GLOBAL_VAR_FIELD, field_type, position,
+                                            self.no_info(ctx))
+            res = self.viper.FieldAccess(res, global_field, position,
+                                         self.no_info(ctx))
+        if isinstance(node, ast.Attribute):
+            node = node.value
+        if isinstance(receiver, PythonType) and not isinstance(node.ctx, ast.Store):
+            if self.is_main_method(ctx):
+                res = self.wrap_global_defined_check(res, receiver, ctx.module, node, ctx)
+            elif ctx.current_function:
+                ctx.current_function.call_deps.add((node, receiver, ctx.module))
+        return res
 
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
@@ -654,17 +706,13 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(target, PythonModule):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
-                # Global var
-                info = self.no_info(ctx)
-                var_type = self.translate_type(target.type, ctx)
-                return [], self.viper.FuncApp(target.sil_name, [], position,
-                                              info, var_type, [])
+                return self.translate_global_var_reference(target, node, ctx)
             else:
                 raise UnsupportedException(node)
         elif isinstance(target, PythonClass) and func_name != 'Result':
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
-                                                            position, ctx)
+                                                            node, ctx)
             return [], field_func
         else:
             stmt, receiver = self.translate_expr(node.value, ctx,
@@ -672,7 +720,7 @@ class ExpressionTranslator(CommonTranslator):
             field = self._lookup_field(node, ctx)
             if isinstance(field, PythonGlobalVar):
                 field_func = self.translate_static_field_access(field, receiver,
-                                                                position, ctx)
+                                                                node, ctx)
                 return [], field_func
             if isinstance(field, PythonMethod):
                 # This is a reference to a property, so we translate it to a call of
