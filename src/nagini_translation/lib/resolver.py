@@ -292,7 +292,7 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
     for a dict), returns the type of the collection.
     """
-    if node._parent and isinstance(node._parent, ast.Assign):
+    if hasattr(node, '_parent') and isinstance(node._parent, ast.Assign):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.

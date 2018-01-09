@@ -11,6 +11,11 @@
             "type": null,
             "MustTerminate": true
         },
+        "reverse": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true
+        },
         "__setitem__": {
             "args": ["list", "__prim__int", "object"],
             "type": null,
@@ -63,6 +68,11 @@
             "MustTerminate": true
         },
         "add": {
+            "args": ["set", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "remove": {
             "args": ["set", "object"],
             "type": null,
             "MustTerminate": true
@@ -661,5 +671,21 @@
         }
     },
     "extends": "object"
+},
+"global": {
+    "functions": {
+        "max": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "min": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "abs": {
+            "args": ["__prim__int"],
+            "type": "__prim__int"
+        }
+    }
 }
 }

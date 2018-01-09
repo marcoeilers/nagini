@@ -650,10 +650,14 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = module
 
             for function in module.functions.values():
+                if function.interface:
+                    continue
                 self.track_dependencies(selected_names, selected, function, ctx)
                 functions.append(self.translate_function(function, ctx))
                 func_constants.append(self.translate_function_constant(function, ctx))
             for method in module.methods.values():
+                if method.interface:
+                    continue
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
             for pred in module.predicates.values():

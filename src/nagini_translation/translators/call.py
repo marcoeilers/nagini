@@ -200,26 +200,34 @@ class CallTranslator(CommonTranslator):
         return arg_stmts + stmts, res_var.ref()
 
     def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        contents = None
+        stmts = []
         if node.args:
-            raise UnsupportedException(node)
-        args = []
+            assert len(node.args) == 1
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
         set_class = ctx.module.global_module.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
         targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        stmt = constr_call
+        stmts.extend(constr_call)
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
         if (node._parent and isinstance(node._parent, ast.Assign) and
                 len(node._parent.targets) == 1):
             set_type = self.get_type(node._parent.targets[0], ctx)
         position = self.to_position(node, ctx)
-        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      set_type, position, ctx),
-                                      position, self.no_info(ctx)))
-        return stmt, res_var.ref()
+        result_var = res_var.ref(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var,
+                                                       set_type, position, ctx),
+                                       position, self.no_info(ctx)))
+        if contents:
+            # TODO: set contents.
+            pass
+        return stmts, result_var
 
     def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:

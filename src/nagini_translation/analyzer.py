@@ -231,6 +231,8 @@ class Analyzer(ast.NodeVisitor):
         """
         # Create global classes first
         for class_name in interface:
+            if class_name == 'global':
+                continue
             cls = self.find_or_create_class(class_name,
                                             module=self.module.global_module)
             cls.interface = True
@@ -240,19 +242,23 @@ class Analyzer(ast.NodeVisitor):
 
     def _process_interface_class(self, class_name: str, if_cls: Dict,
                                  node_factory: ProgramNodeFactory = None):
-        cls = self.find_or_create_class(class_name)
-        object_class = self.find_or_create_class(OBJECT_TYPE,
-                                                 self.module.global_module)
-        if 'type_vars' in if_cls:
-            for i in range(if_cls['type_vars']):
-                name = 'var' + str(i)
-                cls.type_vars[name] = TypeVar(
-                    name, object_class, self.module.global_module,
-                    target_type=cls, index=i)
-        if 'extends' in if_cls:
-            superclass = self.find_or_create_class(
-                if_cls['extends'], module=self.module.global_module)
-            cls.superclass = superclass
+        if class_name == 'global':
+            cls = None
+        else:
+            cls = self.find_or_create_class(class_name)
+            object_class = self.find_or_create_class(OBJECT_TYPE,
+                                                     self.module.global_module)
+            if 'type_vars' in if_cls:
+                for i in range(if_cls['type_vars']):
+                    name = 'var' + str(i)
+                    cls.type_vars[name] = TypeVar(
+                        name, object_class, self.module.global_module,
+                        target_type=cls, index=i)
+            if 'extends' in if_cls:
+                superclass = self.find_or_create_class(
+                    if_cls['extends'], module=self.module.global_module)
+                cls.superclass = superclass
+
         for method_name in if_cls.get('methods', []):
             if_method = if_cls['methods'][method_name]
             self._add_native_silver_method(
@@ -273,27 +279,30 @@ class Analyzer(ast.NodeVisitor):
         if not node_factory:
             node_factory = self.node_factory
         method = node_factory.create_python_method(
-            method_name, None, cls, self.module, pure, False, node_factory,
+            method_name, None, cls, self.module.global_module, pure, False, node_factory,
             interface=True, interface_dict=if_method)
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
             arg = node_factory.create_python_var(
-                name, None, self.find_or_create_class(arg_type))
+                name, None, self.find_or_create_class(arg_type,
+                                                      self.module.global_module))
             ctr += 1
             method.add_arg(name, arg)
         if if_method['type']:
-            method.type = self.find_or_create_class(if_method['type'])
+            method.type = self.find_or_create_class(if_method['type'],
+                                                    self.module.global_module)
         if if_method.get('generic_type'):
             method.generic_type = if_method['generic_type']
         if if_method.get('requires'):
             method.requires = if_method['requires']
+        cont = cls if cls else self.module.global_module
         if predicate:
-            cls.predicates[method_name] = method
+            cont.predicates[method_name] = method
         elif pure:
-            cls.functions[method_name] = method
+            cont.functions[method_name] = method
         else:
-            cls.methods[method_name] = method
+            cont.methods[method_name] = method
 
     def visit_module(self, module: str) -> None:
         self.visit(self.asts[module], None)

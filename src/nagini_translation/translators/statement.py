@@ -950,12 +950,17 @@ class StatementTranslator(CommonTranslator):
             return []
         type_ = ctx.actual_function.type
         rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         if not ctx.result_var:
-            raise InvalidProgramException(node, 'invalid.return')
-        assign = self.viper.LocalVarAssign(
-            ctx.result_var.ref(node, ctx),
-            rhs, self.to_position(node, ctx),
-            self.no_info(ctx))
+            null = self.viper.NullLit(pos, info)
+            assert_pos = self.to_position(node, ctx, error_string="Valid return")
+            assign = self.viper.Assert(self.viper.EqCmp(rhs, null, assert_pos, info),
+                                       assert_pos, info)
+        else:
+            assign = self.viper.LocalVarAssign(
+                ctx.result_var.ref(node, ctx),
+                rhs, pos, info)
 
         return rhs_stmt + [assign]
 

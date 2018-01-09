@@ -109,3 +109,12 @@ function object___cast__(typ: PyType, obj: Ref): Ref
     requires issubtype(typeof(obj), typ)
     ensures result == obj
     ensures issubtype(typeof(obj), typ)
+
+function max(a: Int, b: Int): Int
+    ensures result == ((a > b) ? a : b)
+
+function min(a: Int, b: Int): Int
+    ensures result == ((a < b) ? a : b)
+
+function abs(a: Int): Int
+    ensures result == (a >= 0 ? a : -a)
