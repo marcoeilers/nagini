@@ -1,38 +1,41 @@
 Getting Started (Ubuntu Linux only)
 ===================================
 
-1.  `Install Viper <https://bitbucket.org/viperproject/documentation/wiki/Home#markdown-header-binary-packages-ubuntu-linux-only>`_.
-2.  Clone repository::
+0.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit) and the required
+    libraries::
+
+        sudo apt-get install python3-dev libzmq3-dev
+
+    For usage with the Carbon backend, you will also need to install the Mono runtime.
+
+1.  Clone repository::
 
         git clone https://github.com/marcoeilers/nagini.git
 
-3.  Install dependencies and run tests::
+2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_ to the nagini directory
+3.  Set paths to Viper (adjust paths if necessary)::
 
+        SILICONJAR=backends\silicon.jar
+        CARBONJAR=backends\carbon.jar
+        Z3_EXE=z3\bin\z3
+        BOOGIE_EXE=boogie\Binaries\Boogie.exe
+
+4.  Install dependencies and run tests::
+
+        cd nagini
         make test
 
-If fails with error::
+    If it fails with the error::
 
-    subprocess.CalledProcessError: Command '['curl', 'https://pypi.python.org/packages/source/s/setuptools/setuptools-20.2.2.zip', '--silent', '--output', '/tmp/bootstrap-mbuvyhif/setuptools-20.2.2.zip']' returned non-zero exit status 77
-    make: *** [bin/buildout] Error 1
+        subprocess.CalledProcessError: Command '['curl', 'https://pypi.python.org/packages/source/s/setuptools/setuptools-20.2.2.zip', '--silent', '--output', '/tmp/bootstrap-mbuvyhif/setuptools-20.2.2.zip']' returned non-zero exit status 77
+        make: *** [bin/buildout] Error 1
 
-Try to set::
+    Try to set::
 
-    export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+        export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
-Documentation
-=============
 
-To build HTML documentation, use::
-
-    make docs
-
-The documentation is outputted to ``docs/build/html/index.html``.
-
-To run doctests::
-
-    make doctest
-
-Running on Windows
+Getting Started on Windows
 ==================
 
 1.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit), s.t. java, hg, git and python are all available from the command line.
@@ -41,7 +44,7 @@ Running on Windows
 
 3.  In CMD, do the following::
 
-        git clone -b win-setup https://github.com/marcoeilers/nagini.git
+        git clone https://github.com/marcoeilers/nagini.git
         cd nagini
         python bootstrap.py
         bin\buildout.exe
@@ -59,11 +62,66 @@ Running on Windows
 
         bin\py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
 
-7.  To verify a specific file, run e.g.::
 
-        bin\nagini.exe --verifier silicon tests\functional\verification\examples\test_student_enroll_preds.py
+Command Line Usage
+==================
 
-    To see more options (e.g. for supplying paths to Viper, Boogie and Z3 without using environment variables), invoke ``bin\nagini.exe`` without arguments.
+To verify a specific file from the nagini directory, run e.g.::
+
+    ./bin/nagini [OPTIONS] path-to-file.py
+
+The following command line options are available::
+
+    ``--verifier``      
+                    Possible options are ``silicon`` and ``carbon``. Selects the Viper backend
+                    to use for verification. Default: ``silicon``.
+
+    ``--select``        
+                    Select which functions/methods/classes to verify. Expects a comma-
+                    separated list of names.
+
+    ``--boogie``        
+                    Sets the path of the Boogie executable. Required if the Carbon backend
+                    is selected. Alternatively, the ``BOOGIE_EXE`` environment variable can be
+                    set.
+
+    ``--z3``            
+                    Sets the path of the Z3 executable. Always required. Alternatively, the
+                    ``Z3_EXE`` environment variable can be set.
+
+    ``--viper-jar-path``    
+                    Sets the path to the required Viper binaries (``silicon.jar`` or
+                    ``carbon.jar``). Only the binary for the selected backend is
+                    required. You can either use the provided binary packages
+                    (see above) or compile your own from source (see below).
+                    Expects either a single path or a colon- (Unix) or semicolon-
+                    (Windows) separated list of paths. Alternatively, the environment
+                    variables ``SILICONJAR``, ``CARBONJAR`` or ``VIPERJAR`` can be set.
+                        
+To see all possible command line options, invoke ``./bin/nagini`` without arguments.
+
+
+Alternative Viper Versions
+==========================
+
+To use a more recent or custom version of the Viper infrastructure, follow the
+`instructions here <https://bitbucket.org/viperproject/documentation/wiki/Home>`_. Look for
+``sbt assembly`` to find instructions for packaging the required JAR files. Use the
+parameters mentioned above to instruct Nagini to use your custom 
+
+
+Documentation
+=============
+
+To build HTML documentation, use::
+
+    make docs
+
+The documentation is outputted to ``docs/build/html/index.html``.
+
+To run doctests::
+
+    make doctest
 
 Windows Troubleshooting
 =======================

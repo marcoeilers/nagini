@@ -2,6 +2,7 @@ import ast
 
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
+    ARBITRARY_BOOL_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
     MAY_SET_PRED,
@@ -226,23 +227,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return False
         return var in ctx.actual_function.locals.values()
 
-    def get_may_set_predicates(self, fields: List[PythonField], ctx: Context,
-                               pos: Position = None) -> List[Expr]:
+    def get_may_set_predicate(self, rec: Expr, field: PythonField, ctx: Context,
+                              pos: Position = None) -> Expr:
         """
         Creates predicate instances representing the permissions to create the given
-        fields in a constructor.
+        field on the given receiver object.
         """
-        result = []
         if not pos:
             pos = self.no_position(ctx)
         info = self.no_info(ctx)
         full_perm = self.viper.FullPerm(pos, info)
-        for field in fields:
-            id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
-            pred = self.viper.PredicateAccess([id], MAY_SET_PRED, pos, info)
-            pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
-            result.append(pred_acc)
-        return result
+        id = self.viper.IntLit(self._get_string_value(field.sil_name), pos, info)
+        pred = self.viper.PredicateAccess([rec, id], MAY_SET_PRED, pos, info)
+        pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
+        return pred_acc
 
     def set_var_defined(self, target: PythonVar, position: Position,
                         info: Info) -> Stmt:
@@ -475,3 +473,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         return self.viper.IntLit(ctx.get_fresh_int(), self.no_position(ctx),
                                  self.no_info(ctx))
+
+    def get_unknown_bool(self, ctx: Context) -> Expr:
+        """
+        Returns an arbitrary but fixed boolean value.
+        """
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        fresh_int = self.get_fresh_int_lit(ctx)
+        param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int], pos, info,
+                                  self.viper.Bool, [param])

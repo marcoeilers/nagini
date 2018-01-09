@@ -58,7 +58,8 @@ class ObligationMethod:
 
     def prepend_body(self, statements: List[Stmt]) -> None:
         """Prepend ``statements`` to body."""
-        self.body[0:0] = statements
+        if self.body is not None:
+            self.body[0:0] = statements
 
     def prepend_precondition(self, preconditions: List[Expr]) -> None:
         """Prepend ``preconditions`` to precondition list."""
@@ -132,9 +133,9 @@ class ObligationMethodNodeConstructor:
 
     def _is_body_native_silver(self) -> bool:
         """Check if body is already in Silver."""
-        return isinstance(
+        return (self._obligation_method.body is None or isinstance(
             self._obligation_method.body,
-            self._translator.jvm.viper.silver.ast.Seqn)
+            self._translator.jvm.viper.silver.ast.Seqn))
 
     def _need_skip_body(self) -> bool:
         """Check if altering body should not be done."""

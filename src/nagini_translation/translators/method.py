@@ -352,7 +352,7 @@ class MethodTranslator(CommonTranslator):
         """
         self_var = method.args[next(iter(method.args))].ref()
         fields = method.cls.all_fields
-        accs = self.get_may_set_predicates(fields, ctx)
+        accs = [self.get_may_set_predicate(self_var, f, ctx) for f in fields]
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
                                     self.no_info(ctx))

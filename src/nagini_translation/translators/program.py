@@ -2,6 +2,7 @@ import ast
 
 from collections import OrderedDict
 from nagini_translation.lib.constants import (
+    ARBITRARY_BOOL_FUNC,
     CHECK_DEFINED_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
@@ -269,7 +270,8 @@ class ProgramTranslator(CommonTranslator):
                                                           pos, ctx)
         if method.name == '__init__':
             fields = method.cls.all_fields
-            pres.extend(self.get_may_set_predicates(fields, ctx))
+            pres.extend([self.get_may_set_predicate(self_arg.ref(), f, ctx)
+                         for f in fields])
 
         called_name = method.sil_name
         ctx.position.pop()
@@ -465,6 +467,7 @@ class ProgramTranslator(CommonTranslator):
         for sil_prog in sil_progs:
             for method in self.viper.to_list(sil_prog.methods()):
                 if method.name() in used_names:
+                    body = self.viper.from_option(method.body())
                     converted_method = self.create_method_node(
                         ctx=ctx,
                         name=method.name(),
@@ -473,7 +476,7 @@ class ProgramTranslator(CommonTranslator):
                         pres=self.viper.to_list(method.pres()),
                         posts=self.viper.to_list(method.posts()),
                         locals=[],
-                        body=method.body(),
+                        body=body,
                         position=method.pos(),
                         info=method.info(),
                     )
@@ -756,12 +759,21 @@ class ProgramTranslator(CommonTranslator):
 
         return [is_defined_func, check_defined_func]
 
+    def create_arbitrary_bool_func(self, ctx: Context) -> 'silver.ast.Function':
+        pos = self.no_position(ctx)
+        info = self.no_info(ctx)
+        i_param_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        return self.viper.Function(ARBITRARY_BOOL_FUNC, [i_param_decl],
+                                   self.viper.Bool, [], [], None, pos, info)
+
     def create_may_set_predicate(self, ctx: Context) -> 'silver.ast.Predicate':
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
+        receiver_param_decl = self.viper.LocalVarDecl('rec', self.viper.Ref, pos, info)
         id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, pos, info)
-        may_set_pred = self.viper.Predicate(MAY_SET_PRED, [id_param_decl], None, pos,
-                                            info)
+        may_set_pred = self.viper.Predicate(MAY_SET_PRED,
+                                            [receiver_param_decl, id_param_decl], None,
+                                            pos, info)
         return may_set_pred
 
     def translate_program(self, modules: List[PythonModule],
@@ -782,6 +794,7 @@ class ProgramTranslator(CommonTranslator):
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
+        functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
         type_funcs = self.type_factory.get_default_functions(ctx)

@@ -1,4 +1,7 @@
 from nagini_contracts.contracts import *
+from nagini_contracts.thread import Thread
+
+
 class DummyObj :
     def __init__(self, value : int) -> None :
         Ensures(Acc(self.val) and (self.val == value)) # type: ignore
@@ -14,6 +17,7 @@ class DummyObj :
         Ensures(Acc(self.val) and (self.val == n - 1))
         self.val = self.val - 1
 
+
 def test() -> None:
     x = DummyObj(1)
     t = Thread(DummyObj.incr,(x,1,1))
@@ -21,5 +25,5 @@ def test() -> None:
     t.start(DummyObj.incr,DummyObj.decr)
     y = x
     t.join(DummyObj.incr,DummyObj.decr)
-    Assert(y.val == 2 and z.val == 2)
+    Assert(y.val == 3 and z.val == 2)
 

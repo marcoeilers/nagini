@@ -129,15 +129,19 @@ class ViperAST:
         body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
-                                 self.to_seq(posts),
+                                 self.to_seq(posts), self.none,
                                  body, position, info, self.NoTrafos)
 
     def Method(self, name, args, returns, pres, posts, locals, body, position,
                info):
-        body_with_locals = self.Seqn([body], position, info, locals)
+        if body is None:
+            body_with_locals = self.none
+        else:
+            body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info, self.NoTrafos)
+                               body_with_locals, position, info,
+                               self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -447,6 +451,12 @@ class ViperAST:
 
     def Let(self, variable, exp, body, position, info):
         return self.ast.Let(variable, exp, body, position, info, self.NoTrafos)
+
+    def from_option(self, option):
+        if option == self.none:
+            return None
+        else:
+            return option.get()
 
     def to_function0(self, func):
         func0 = Function0()

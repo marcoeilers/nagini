@@ -1,4 +1,5 @@
 from nagini_contracts.contracts import *
+from nagini_contracts.thread import Thread, STARTED
 class DummyObj :
     def __init__(self, value : int) -> None :
         Ensures(Acc(self.val) and (self.val == value)) # type: ignore
