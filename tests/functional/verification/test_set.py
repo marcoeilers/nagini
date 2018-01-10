@@ -13,6 +13,14 @@ def test_constr() -> None:
     empty_set = set() # type: Set[Super]
 
 
+def test_constr_arg() -> None:
+    l = [1,2,3]
+    s = set(l)
+    assert 3 in s
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert 5 in s
+
+
 def test_in() -> None:
     super1 = Super()
     super5 = Super()

@@ -14,7 +14,8 @@ BUILTINS = ['cast',
             'set',
             'super',
             'range',
-            'type']
+            'type',
+            'list']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
@@ -169,6 +170,7 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
+    '__getitem__'
 }
 
 RESULT_NAME = '_res'

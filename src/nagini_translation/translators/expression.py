@@ -354,7 +354,6 @@ class ExpressionTranslator(CommonTranslator):
         Creates a tuple containing the given values.
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
-        type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
@@ -382,11 +381,9 @@ class ExpressionTranslator(CommonTranslator):
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
-        call = self.get_function_call(target_type, '__getitem__', args,
-                                      arg_types, node, ctx)
-        result = call
-        result_type = self.get_type(node, ctx)
-        return target_stmt + index_stmt, result
+        call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,
+                                                       arg_types, node, ctx)
+        return target_stmt + index_stmt + call_stmt, call
 
     def _translate_slice_subscript(self, node: ast.Subscript, target: Expr,
                                    target_type: PythonType,
@@ -822,31 +819,17 @@ class ExpressionTranslator(CommonTranslator):
         function or method call.
         """
         position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         stmt = []
         if self._is_primitive_operation(left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
         func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        called_method = left_type.get_func_or_method(func_name)
-        if called_method.pure:
-            result = self.get_function_call(left_type, func_name,
-                                            [left, right],
-                                            [left_type, right_type],
-                                            node, ctx)
-        else:
-            result_type = called_method.type
-            res_var = ctx.actual_function.create_variable('op_res',
-                                                          result_type,
-                                                          self.translator)
-            stmt += self.get_method_call(left_type, func_name,
-                                         [left, right],
-                                         [left_type, right_type],
-                                         [res_var.ref(node, ctx)], node,
-                                         ctx)
-            result = res_var.ref(node, ctx)
-        return stmt, result
+        call_stmt, call = self.get_func_or_method_call(left_type, func_name,
+                                                       [left, right],
+                                                       [left_type, right_type],
+                                                       node, ctx)
+        return stmt + call_stmt, call
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
@@ -925,12 +908,12 @@ class ExpressionTranslator(CommonTranslator):
             ctx: Context) -> StmtsAndExpr:
         args = [right, left]
         arg_types = [right_type, left_type]
-        app = self.get_function_call(
+        app_stmt, app = self.get_func_or_method_call(
             right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
             app = self.viper.Not(
                 app, self.to_position(node, ctx), self.no_info(ctx))
-        return [], app
+        return app_stmt, app
 
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:

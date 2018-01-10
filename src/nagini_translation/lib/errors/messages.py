@@ -1,6 +1,6 @@
 """Conversion of errors to human readable messages."""
 
-
+import ast
 from nagini_translation.lib.util import (
     get_containing_member,
     get_target_name,
@@ -17,10 +17,14 @@ ERRORS = {
         lambda n: 'Contract might not be well-formed.',
     'call.precondition':
         lambda n: ('The precondition of method {} might not '
-                   'hold.').format(get_target_name(n)),
+                   'hold.'.format(get_target_name(n))
+                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'The precondition of {} might not hold.'.format(pprint(n))),
     'application.precondition':
-        lambda n: ('Precondition of function {} might not '
-                   'hold.').format(get_target_name(n)),
+        lambda n: ('The precondition of function {} might not '
+                   'hold.'.format(get_target_name(n))
+                   if isinstance(n, (ast.Call, ast.FunctionDef)) else
+                   'The precondition of {} might not hold.'.format(pprint(n))),
     'exhale.failed':
         lambda n: 'Exhale might fail.',
     'inhale.failed':
@@ -111,5 +115,27 @@ REASONS = {
     'undefined.global.name':
         lambda n: 'Global name may not have been defined.',
     'missing.dependencies':
-        lambda n: 'Global dependencies may not be defined.'
+        lambda n: 'Global dependencies may not be defined.',
+    'internal': lambda n: 'Internal Viper error.'
+}
+
+VAGUE_REASONS = {
+    'assertion.false': '',
+    'receiver.null': 'Receiver might be null.',
+    'division.by.zero': 'Divisor might be zero.',
+    'negative.permission': 'Fraction might be negative.',
+    'insufficient.permission': 'There might be insufficient permission.',
+    'termination_measure.non_positive': 'Termination measure might be non-positive.',
+    'measure.non_decreasing': 'Termination measure might not be smaller.',
+    'gap.enabled': 'Gap might be enabled in terminating IO operation.',
+    'child_termination.not_implied': ('Parent IO operation termination condition does '
+                                      'not imply termination condition.'),
+    'obligation_measure.non_positive': 'Obligation measure might be non-positive.',
+    'must_terminate.not_taken': 'Callee might not take MustTerminate obligation.',
+    'caller.has_unsatisfied_obligations': ('Callee might not take all unsatisfied '
+                                           'obligations from the caller.'),
+    'method_body.leaks_obligations': 'Method body might leak obligations.',
+    'loop_condition.not_framed_for_obligation_use': ('Loop condition part is not framed '
+                                                     'at the point where obligation is '
+                                                     'used.'),
 }
