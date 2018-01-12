@@ -118,9 +118,9 @@ class ObligationMethodNodeConstructor:
 
     def add_obligations(self) -> None:
         """Add obligation stuff to Method."""
-        self._add_aditional_parameters()
-        self._add_aditional_returns()
-        self._add_aditional_variables()
+        self._add_additional_parameters()
+        self._add_additional_returns()
+        self._add_additional_variables()
         self._add_additional_preconditions()
         self._add_additional_postconditions()
         if not self._need_skip_body():
@@ -143,7 +143,7 @@ class ObligationMethodNodeConstructor:
                 (self._python_method.contract_only and
                  not self._overriding_check))
 
-    def _add_aditional_parameters(self) -> None:
+    def _add_additional_parameters(self) -> None:
         """Add current thread, caller measures, and residue parameters."""
         self._obligation_method.prepend_arg(
             self._obligation_info.residue_level.decl)
@@ -153,14 +153,14 @@ class ObligationMethodNodeConstructor:
         self._obligation_method.prepend_arg(
             self._obligation_info.current_thread_var.decl)
 
-    def _add_aditional_returns(self) -> None:
+    def _add_additional_returns(self) -> None:
         """Add current wait level ghost return."""
         if obligation_config.disable_waitlevel_check:
             return
         self._obligation_method.prepend_return(
             self._obligation_info.current_wait_level.decl)
 
-    def _add_aditional_variables(self) -> None:
+    def _add_additional_variables(self) -> None:
         """Add current wait level ghost target."""
         if obligation_config.disable_waitlevel_check:
             return

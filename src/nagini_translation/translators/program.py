@@ -7,9 +7,12 @@ from nagini_translation.lib.constants import (
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
     IS_DEFINED_FUNC,
+    JOINABLE_FUNC,
     MAY_SET_PRED,
     PRIMITIVES,
-    RESULT_NAME
+    RESULT_NAME,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     MethodType,
@@ -537,6 +540,25 @@ class ProgramTranslator(CommonTranslator):
         return self.viper.DomainFunc(func.func_constant, [], func_type, True,
                                      self.to_position(func.node, ctx), self.no_info(ctx),
                                      FUNCTION_DOMAIN_NAME)
+
+    def create_joinable_function(self, ctx: Context) -> Function:
+        thread_arg_decl = self.viper.LocalVarDecl('t', self.viper.Ref,
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx))
+        return self.viper.Function(JOINABLE_FUNC, [thread_arg_decl], self.viper.Bool,
+                                   [], [], None, self.no_position(ctx), self.no_info(ctx))
+
+    def create_thread_predicates(self, ctx: Context) -> Function:
+        thread_arg_decl = self.viper.LocalVarDecl('t', self.viper.Ref,
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx))
+        post_pred =  self.viper.Predicate(THREAD_POST_PRED, [thread_arg_decl], None,
+                                          self.no_position(ctx), self.no_info(ctx))
+        start_pred = self.viper.Predicate(THREAD_START_PRED, [thread_arg_decl], None,
+                                          self.no_position(ctx), self.no_info(ctx))
+        return [start_pred, post_pred]
+
+
     def create_thread_joining_method(self, ctx):
         pos,info = self.no_position(ctx),self.no_info(ctx)
         joining_body = [
@@ -676,68 +698,8 @@ class ProgramTranslator(CommonTranslator):
                                                  self.viper.LocalVarDecl("i",self.viper.Int,pos,
                                                                          infos)],
                                          self.viper.Ref, False, pos, infos,"Thread")
-        getargs = self.viper.DomainFunc("getArgs",[self.viper.LocalVarDecl("t",self.viper.Ref,
-                                                                             pos,infos)],
-                                        self.viper.SeqType(self.viper.Ref), False, pos,
-                                        infos,"Thread")
-        getolds = self.viper.DomainFunc("getOlds",
-                                        [self.viper.LocalVarDecl("t", self.viper.Ref,
-                                                                 pos, infos)],
-                                        self.viper.SeqType(self.viper.Ref), False, pos,
-                                        infos, "Thread")
 
-        axiomArg = self.viper.DomainAxiom("Arg",
-            self.viper.Forall([self.viper.LocalVarDecl("t", self.viper.Ref,pos,infos),
-                               self.viper.LocalVarDecl("i", self.viper.Int,pos,infos)],
-                              [],self.viper.Implies(self.viper.And(
-                    self.viper.LeCmp(self.viper.IntLit(0,pos,infos),
-                                     self.viper.LocalVar("i",self.viper.Int, pos,infos),pos,infos),
-                    self.viper.LtCmp(self.viper.LocalVar("i",self.viper.Int,pos,infos),
-                                     self.viper.SeqLength(
-                                         self.viper.DomainFuncApp(
-                                             "getArgs",
-                                             [self.viper.LocalVar("t",self.viper.Ref,pos,infos)],
-                                             self.viper.SeqType(self.viper.Ref),pos,infos,"Thread"),
-                                         pos,infos),pos,infos),pos,infos),
-                    self.viper.EqCmp(
-                        self.viper.DomainFuncApp("getArg",[self.viper.LocalVar("t",self.viper.Ref,pos,infos),
-                                                           self.viper.LocalVar("i",self.viper.Int,pos,infos)],
-                                                 self.viper.Ref,pos,infos,"Thread"),
-                        self.viper.SeqIndex(
-                            self.viper.DomainFuncApp("getArgs",[self.viper.LocalVar("t",self.viper.Ref,pos,infos)],
-                                                     self.viper.SeqType(self.viper.Ref),pos,infos,"Thread"),
-                            self.viper.LocalVar("i",self.viper.Int,pos,infos),pos,infos),pos,infos),pos,infos),
-                              pos,infos),pos,infos,"Thread")
-        axiomOld = self.viper.DomainAxiom("Old",
-                                          self.viper.Forall([self.viper.LocalVarDecl("t", self.viper.Ref, pos, infos),
-                                                             self.viper.LocalVarDecl("i", self.viper.Int, pos, infos)],
-                                                            [], self.viper.Implies(self.viper.And(
-                                                  self.viper.LeCmp(self.viper.IntLit(0, pos, infos),
-                                                                   self.viper.LocalVar("i", self.viper.Int, pos, infos),
-                                                                   pos, infos),
-                                                  self.viper.LtCmp(self.viper.LocalVar("i", self.viper.Int, pos, infos),
-                                                                   self.viper.SeqLength(
-                                                                       self.viper.DomainFuncApp(
-                                                                           "getOlds",
-                                                                           [self.viper.LocalVar("t", self.viper.Ref,
-                                                                                                pos, infos)],
-                                                                           self.viper.SeqType(self.viper.Ref), pos,
-                                                                           infos, "Thread"),
-                                                                       pos, infos), pos, infos), pos, infos),
-                                                  self.viper.EqCmp(
-                                                      self.viper.DomainFuncApp("getOld", [
-                                                          self.viper.LocalVar("t", self.viper.Ref, pos, infos),
-                                                          self.viper.LocalVar("i", self.viper.Int, pos, infos)],
-                                                                               self.viper.Ref, pos, infos, "Thread"),
-                                                      self.viper.SeqIndex(
-                                                          self.viper.DomainFuncApp("getOlds", [
-                                                              self.viper.LocalVar("t", self.viper.Ref, pos, infos)],
-                                                                                   self.viper.SeqType(self.viper.Ref),
-                                                                                   pos, infos, "Thread"),
-                                                          self.viper.LocalVar("i", self.viper.Int, pos, infos), pos,
-                                                          infos), pos, infos), pos, infos),
-                                                            pos, infos), pos, infos, "Thread")
-        return self.viper.Domain("Thread",[getmethod,getarg,getargs,getold,getolds],[axiomArg,axiomOld],[],pos,infos)
+        return self.viper.Domain("Thread",[getmethod,getarg,getold],[],[],pos,infos)
 
 
 
@@ -791,6 +753,8 @@ class ProgramTranslator(CommonTranslator):
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)
+        predicates.extend(self.create_thread_predicates(ctx))
+        functions.append(self.create_joinable_function(ctx))
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))

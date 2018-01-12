@@ -36,6 +36,8 @@ class Context:
         self._current_alias_context = []
         self.bound_type_vars = {}
         self._global_counter = 0
+        self.perm_factor = None
+        self._old_aliases = {}
 
     def get_fresh_int(self) -> int:
         """
@@ -161,6 +163,16 @@ class Context:
             self.var_aliases[name] = old
         elif name in self.var_aliases:
             del self.var_aliases[name]
+
+    def set_old_expr_alias(self, key: str, val: Expr) -> None:
+        self._old_aliases[key] = val
+
+    def clear_old_expr_aliases(self) -> None:
+        self._old_aliases.clear()
+
+    @property
+    def old_expr_aliases(self):
+        return self._old_aliases
 
     def get_contents(self, only_top: bool) -> Dict:
         """

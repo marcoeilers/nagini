@@ -1,26 +1,9 @@
-from typing import Callable, Tuple
-
-
-class State :
-    def __init__(self) -> None:
-        pass
-
-
-def CREATED() -> State :
-    pass
-
-
-def STARTED() -> State :
-    pass
-
-
-def JOINED() -> State :
-    pass
+from typing import Callable, Tuple, Any
 
 
 class Thread :
     def __init__(self, m : Callable, args : Tuple) -> None :
-        self.state = CREATED()
+        pass
 
     def start(self, *methodlist : Callable) -> None :
         pass
@@ -28,14 +11,12 @@ class Thread :
     def join(self, *methodlist : Callable) -> None:
         pass
 
-    def impl(self, method : Callable) -> bool:
-        pass
 
-    def getOld(self, i : int) -> object :
-        pass
+def getArg(t: Thread, i: int) -> object:
+    pass
 
-    def getArg(self, i : int) -> object :
-        pass
+def getOld(t: Thread, o: object) -> object:
+    pass
 
-    def hasStarted(self) -> bool :
-        pass
+def arg(i: int) -> Any:
+    pass

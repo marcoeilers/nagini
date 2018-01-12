@@ -1,4 +1,5 @@
 import ast
+import copy
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
@@ -26,6 +27,8 @@ from nagini_translation.lib.util import (
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
+    OldExpressionNormalizer,
+    pprint,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -123,9 +126,11 @@ class ContractTranslator(CommonTranslator):
         field_acc = self.viper.FieldAccess(args[0], field,
                                            self.to_position(node, ctx),
                                            self.no_info(ctx))
-        pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               self.to_position(node, ctx),
-                                               self.no_info(ctx))
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if ctx.perm_factor:
+            perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
         return pred
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
@@ -192,13 +197,16 @@ class ContractTranslator(CommonTranslator):
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
                              perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
+        info = self.no_info(ctx)
+        if ctx.perm_factor:
+            perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               pos, self.no_info(ctx))
+                                               pos, info)
         # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,
                                         self.no_position(ctx), ctx)
-            pred = self.viper.And(pred, type_info, pos, self.no_info(ctx))
+            pred = self.viper.And(pred, type_info, pos, info)
         return pred
 
     def translate_may_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -279,6 +287,16 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
+
+        if ctx.old_expr_aliases:
+            normalizer = OldExpressionNormalizer()
+            normalizer.arg_names = [a for a in ctx.actual_function._args]
+
+            normalized = normalizer.visit(copy.deepcopy(node.args[0]))
+            key = pprint(normalized)
+            if key in ctx.old_expr_aliases:
+                return [], ctx.old_expr_aliases[key]
+
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx),
                              self.no_info(ctx))

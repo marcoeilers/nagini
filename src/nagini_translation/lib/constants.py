@@ -30,6 +30,12 @@ CHECK_DEFINED_FUNC = '_checkDefined'
 
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
 
+JOINABLE_FUNC = '_joinable'
+
+THREAD_POST_PRED = '_thread_post'
+
+THREAD_START_PRED = '_thread_start'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
