@@ -14,15 +14,17 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
+    GET_ARG_FUNC,
+    GET_METHOD_FUNC,
+    GET_OLD_FUNC,
     JOINABLE_FUNC,
+    METHOD_ID_DOMAIN,
     OBJECT_TYPE,
-    PRIMITIVES,
-    PRIMITIVE_BOOL_TYPE,
-    PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
     STRING_TYPE,
+    THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
     TUPLE_TYPE,
@@ -873,15 +875,18 @@ class CallTranslator(CommonTranslator):
         target = self.get_target(node.args[0], ctx)
         assert isinstance(target,PythonMethod)
         meth_args = node.args[1].elts
-        thread_class = ctx.module.global_module.classes["Thread"]
-        thr_var = ctx.actual_function.create_variable("threadingVar",
-                                                       thread_class,
-                                                       self.translator)
-        newstmt = self.viper.NewStmt(thr_var.ref(), [], pos, info)
+        thread_class = ctx.module.global_module.classes['Thread']
+        thread_var = ctx.actual_function.create_variable('threadingVar',
+                                                      thread_class,
+                                                      self.translator)
+        thread = thread_var.ref(node, ctx)
+        newstmt = self.viper.NewStmt(thread, [], pos, info)
 
-        start_pred_acc = self.viper.PredicateAccess([thr_var.ref()], THREAD_START_PRED, pos, info)
+        start_pred_acc = self.viper.PredicateAccess([thread], THREAD_START_PRED,
+                                                    pos, info)
         full_perm = self.viper.FullPerm(pos, info)
-        start_pred = self.viper.PredicateAccessPredicate(start_pred_acc, full_perm, pos, info)
+        start_pred = self.viper.PredicateAccessPredicate(start_pred_acc, full_perm, pos,
+                                                         info)
         inhale_start_perm = self.viper.Inhale(start_pred, pos, info)
         arg_stmts = []
         arg_assumptions = self.viper.TrueLit(pos, info)
@@ -889,19 +894,22 @@ class CallTranslator(CommonTranslator):
             arg_stmt, arg_val = self.translate_expr(arg, ctx, self.viper.Ref)
             arg_stmts.extend(arg_stmt)
             index = self.viper.IntLit(i, pos, info)
-            arg_func = self.viper.DomainFuncApp('getArg', [thr_var.ref(), index], self.viper.Ref,pos,info,"Thread")
+            arg_func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, index],
+                                                self.viper.Ref, pos, info, THREAD_DOMAIN)
             func_equal = self.viper.EqCmp(arg_func, arg_val, pos, info)
             arg_assumptions = self.viper.And(arg_assumptions, func_equal, pos, info)
 
-        inhale_method = self.viper.Inhale(self.viper.EqCmp(
-                self.viper.DomainFuncApp('getMethod',[thr_var.ref()],self.viper.DomainType("ThreadingID",{},[]),
-                                         pos,info,"Thread"),
-                self.viper.DomainFuncApp(target.threading_id,[],self.viper.DomainType("ThreadingID",{},[]),pos,info,
-                                         "ThreadingID"),pos,info), pos,info)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
+        actual_method = self.viper.DomainFuncApp(target.threading_id, [], method_id_type,
+                                                 pos, info, METHOD_ID_DOMAIN)
+        inhale_method = self.viper.Inhale(self.viper.EqCmp(thread_method, actual_method,
+                                                           pos, info),
+                                          pos,info)
         inhale_args = self.viper.Inhale(arg_assumptions, pos, info)
-
-        """This is where we affect its MethodID and Arguments to the thread object"""
-        return arg_stmts + [newstmt, inhale_method, inhale_args, inhale_start_perm], thr_var.ref()
+        stmts = arg_stmts + [newstmt, inhale_method, inhale_args, inhale_start_perm]
+        return stmts, thread
 
     def _translate_thread_start(self, node: ast.Call,
                                     ctx: Context):
@@ -926,11 +934,15 @@ class CallTranslator(CommonTranslator):
         stmts.append(self.viper.Exhale(start_pred, pos, info))
         # exhale method in options
         correct_method = self.viper.FalseLit(pos, info)
-        method_id_type = self.viper.DomainType("ThreadingID", {}, [])
-        actual_method = self.viper.DomainFuncApp("getMethod", [thread], method_id_type, pos, info, "Thread")
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        actual_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
         for method in method_options:
-            this_method = self.viper.DomainFuncApp(method.threading_id, [], method_id_type, pos, info, "ThreadingID")
-            correct_method = self.viper.Or(correct_method, self.viper.EqCmp(actual_method, this_method, pos, info), pos, info)
+            this_method = self.viper.DomainFuncApp(method.threading_id, [],
+                                                   method_id_type, pos, info,
+                                                   METHOD_ID_DOMAIN)
+            this_option = self.viper.EqCmp(actual_method, this_method, pos, info)
+            correct_method = self.viper.Or(correct_method, this_option, pos, info)
         stmts.append(self.viper.Assert(correct_method, pos, info))
         stmts.extend(self.create_method_fork(ctx, method_options, thread, pos, info, node))
         return thread_stmt + stmts, None
@@ -970,9 +982,9 @@ class CallTranslator(CommonTranslator):
             method_options.append(target)
 
         else_block = self.translate_block([], pos, info)
-        method_id_type = self.viper.DomainType("ThreadingID", {}, [])
-        actual_method = self.viper.DomainFuncApp('getMethod', [thread], method_id_type,
-                                                 pos, info, "Thread")
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        actual_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
 
         for method in method_options:
             method_stmts = []
@@ -983,8 +995,9 @@ class CallTranslator(CommonTranslator):
                                                               self.translator)
                 ctx.set_alias(arg.name, arg_var)
                 id = self.viper.IntLit(index, pos, info)
-                arg_func = self.viper.DomainFuncApp('getArg', [thread, id],
-                                                    self.viper.Ref, pos, info, "Thread")
+                arg_func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, id],
+                                                    self.viper.Ref, pos, info,
+                                                    THREAD_DOMAIN)
                 method_stmts.append(self.viper.LocalVarAssign(arg_var.ref(), arg_func,
                                                               pos, info))
                 method_stmts.append(self.viper.Inhale(self.type_check(arg_var.ref(),
@@ -1005,8 +1018,9 @@ class CallTranslator(CommonTranslator):
                 print_old = normalizer.visit(copy.deepcopy(old))
                 key = pprint(print_old)
                 id = self.viper.IntLit(self._get_string_value(key), pos, info)
-                old_func = self.viper.DomainFuncApp('getOld', [thread, id],
-                                                    self.viper.Ref, pos, info, "Thread")
+                old_func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, id],
+                                                    self.viper.Ref, pos, info,
+                                                    THREAD_DOMAIN)
                 ctx.set_old_expr_alias(key, old_func)
 
             post_assertion = self.viper.TrueLit(pos, info)
@@ -1025,7 +1039,7 @@ class CallTranslator(CommonTranslator):
             then_block = self.translate_block(method_stmts, pos, info)
             this_method = self.viper.DomainFuncApp(method.threading_id, [],
                                                    method_id_type, pos, info,
-                                                   "ThreadingID")
+                                                   METHOD_ID_DOMAIN)
             correct_method = self.viper.EqCmp(actual_method, this_method, pos, info)
             cond = self.viper.And(any_perm, correct_method, pos, info)
             stmts.append(self.viper.If(cond, then_block, else_block, pos, info))

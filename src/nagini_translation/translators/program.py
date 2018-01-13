@@ -6,11 +6,16 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
+    GET_ARG_FUNC,
+    GET_METHOD_FUNC,
+    GET_OLD_FUNC,
     IS_DEFINED_FUNC,
     JOINABLE_FUNC,
     MAY_SET_PRED,
+    METHOD_ID_DOMAIN,
     PRIMITIVES,
     RESULT_NAME,
+    THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
 )
@@ -418,10 +423,6 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
-        fields.append(self.viper.Field('state',
-                                       self.viper.DomainType("State",{},[]),
-                                       self.no_position(ctx),
-                                       self.no_info(ctx)))
         return fields
 
     def _add_all_used_names(self, initial: Set[str]) -> None:
@@ -558,150 +559,32 @@ class ProgramTranslator(CommonTranslator):
                                           self.no_position(ctx), self.no_info(ctx))
         return [start_pred, post_pred]
 
+    def create_method_id_domain(self, constants: List['silver.ast.DomainFunc'],
+                                ctx: Context) -> 'silver.ast.Domain':
+        return self.viper.Domain(METHOD_ID_DOMAIN, constants, [], [],
+                                 self.no_position(ctx), self.no_info(ctx))
 
-    def create_thread_joining_method(self, ctx):
-        pos,info = self.no_position(ctx),self.no_info(ctx)
-        joining_body = [
-            self.viper.Assert(
-                self.viper.EqCmp(
-                    self.viper.FieldAccess(self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                           self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                           pos,info),
-                    self.viper.DomainFuncApp("cons",[
-                        self.viper.FieldAccess(self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                               self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                               pos,info)],self.viper.DomainType("State",{},[]),pos,info,"State"),
-                    pos,info),pos,info),
-            self.viper.If(
-                self.viper.EqCmp(self.viper.FieldAccess(self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                           self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                           pos,info),
-                                 self.viper.DomainFuncApp("JOINED",[],self.viper.DomainType("State",{},[]),pos,info,
-                                                          "State"),pos,info),
-                self.viper.Seqn([self.viper.LocalVarAssign(self.viper.LocalVar("b",self.viper.Bool,pos,info),
-                                          self.viper.FalseLit(pos,info),pos,info)],pos,info),
-                self.viper.Seqn([self.viper.If(
-                    self.viper.EqCmp(self.viper.FieldAccess(self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                           self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                           pos,info),
-                                     self.viper.DomainFuncApp("STARTED",[],self.viper.DomainType("State",{},[]),
-                                                              pos,info,"State"),pos,info),
-                    self.viper.Seqn([self.viper.FieldAssign(self.viper.FieldAccess(self.viper.LocalVar(
-                        "thrref",self.viper.Ref,pos,info),self.viper.Field(
-                        "state",self.viper.DomainType("State",{},[]),pos,info),pos,info),
-                        self.viper.DomainFuncApp("JOINED",[],self.viper.DomainType("State",{},[]),pos,info,"State"),
-                        pos,info),
-                     self.viper.LocalVarAssign(self.viper.LocalVar("b",self.viper.Bool,pos,info),
-                                               self.viper.TrueLit(pos,info),pos,info)],pos,info),
-                    self.viper.Seqn([],pos,info),pos,info)],pos,info),pos,info)]
-
-        return self.viper.Method("Thread_joining",[self.viper.LocalVarDecl("thrref",self.viper.Ref,pos,info)],
-                                 [self.viper.LocalVarDecl("b",self.viper.Bool,pos,info)],
-                                 [self.viper.FieldAccessPredicate(self.viper.FieldAccess(
-                                     self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                     self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),pos,info),
-                                     self.viper.FullPerm(pos,info),pos,info),
-                                  self.viper.NeCmp(self.viper.FieldAccess(
-                                      self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                      self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),pos,info),
-                                      self.viper.DomainFuncApp("CREATED",[],self.viper.DomainType("State",{},[]),
-                                                               pos,info,"State"),pos,info)],
-                                 [self.viper.FieldAccessPredicate(self.viper.FieldAccess(
-                                     self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                     self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),pos,info),
-                                     self.viper.FullPerm(pos,info),pos,info),
-                                  self.viper.EqCmp(self.viper.FieldAccess(
-                                      self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                      self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),pos,info),
-                                    self.viper.DomainFuncApp("JOINED",[],self.viper.DomainType("State",{},[]),
-                                                             pos,info,"State"),pos,info),
-                                  self.viper.EqCmp(
-                                      self.viper.LocalVar("b",self.viper.Bool,pos,info),
-                                      self.viper.EqCmp(
-                                          self.viper.Old(self.viper.FieldAccess(
-                                              self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                              self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                              pos,info),pos,info),
-                                          self.viper.DomainFuncApp("STARTED",[],self.viper.DomainType("State",{},[]),
-                                                                   pos,info,"State"),pos,info),pos,info)],
-                                 [],
-                                 self.viper.Seqn(joining_body,pos,info),pos,info)
-
-    def create_threading_is_alive(self, ctx):
-        pos,info = self.no_position(ctx),self.no_info(ctx)
-        return self.viper.Method("isAlive",[self.viper.LocalVarDecl("thrref",self.viper.Ref,pos,info)],
-                                 [self.viper.LocalVarDecl("b",self.viper.Bool,pos,info)],
-                                 [self.viper.FieldAccessPredicate(
-                                         self.viper.FieldAccess(
-                                             self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                             self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                             pos,info),
-                                         self.viper.FullPerm(pos,info),pos,info)],
-                                 [self.viper.FieldAccessPredicate(
-                                         self.viper.FieldAccess(
-                                            self.viper.LocalVar("thrref", self.viper.Ref, pos, info),
-                                            self.viper.Field("state",self.viper.DomainType("State",{},[]),pos,info),
-                                                             pos,info),
-                                         self.viper.FullPerm(pos, info), pos, info),
-                                 self.viper.EqCmp(
-                                         self.viper.FieldAccess(
-                                             self.viper.LocalVar("thrref",self.viper.Ref,pos,info),
-                                             self.viper.Field("state",self.viper.DomainType("State",{},[]),
-                                                              pos,info),pos,info),
-                                         self.viper.Old(
-                                             self.viper.FieldAccess(
-                                                 self.viper.LocalVar("thrref", self.viper.Ref, pos, info),
-                                                 self.viper.Field("state",
-                                                                  self.viper.DomainType("State", {}, []),
-                                                                  pos, info), pos, info),pos,info),pos,info),
-                                 self.viper.Implies(
-                                         self.viper.NeCmp(
-                                             self.viper.FieldAccess(self.viper.LocalVar("thrref",
-                                                                                        self.viper.Ref,pos,info),
-                                                                    self.viper.Field("state",
-                                                                                     self.viper.DomainType("State",
-                                                                                                           {},[]),
-                                                                                     pos,info),pos,info),
-                                             self.viper.DomainFuncApp("STARTED",[],self.viper.DomainType("State",
-                                                                                                         {},[]),
-                                                                      pos,info,"State"),pos,info),
-                                         self.viper.Not(self.viper.LocalVar("b",self.viper.Bool,pos,info),pos,info),
-                                         pos,info)
-                                 ],[],self.viper.Seqn([self.viper.Inhale(self.viper.FalseLit(pos,info),pos,info)]
-                                                      ,pos,info),pos,info)
-
-
-
-    def create_threadingIDs_domain(self, constants: List, ctx):
-        return self.viper.Domain("ThreadingID", constants, [],[],self.no_position(ctx), self.no_info(ctx))
-
-    def translate_method_id_to_constant(self, method, ctx):
-        func_type = self.viper.DomainType("ThreadingID", {}, [])
+    def translate_method_id_to_constant(self, method, ctx) -> 'silver.ast.DomainFunc':
+        func_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
         return self.viper.DomainFunc(method.threading_id,[],func_type, True,
                                      self.to_position(method.node,ctx), self.no_info(ctx),
-                                     "ThreadingID")
+                                     METHOD_ID_DOMAIN)
 
-    def create_thread_domain(self,ctx):
-        pos,infos = self.no_position(ctx),self.no_info(ctx)
-        getmethod =self.viper.DomainFunc("getMethod",[self.viper.LocalVarDecl("t",self.viper.Ref,
-                                                                             pos,infos)],
-                                         self.viper.DomainType("ThreadingID",{},[]), False, pos,
-                                         infos,"Thread")
-        getarg = self.viper.DomainFunc("getArg",[self.viper.LocalVarDecl("t",self.viper.Ref,
-                                                                             pos,infos),
-                                                 self.viper.LocalVarDecl("i",self.viper.Int,pos,
-                                                                            infos)],
-                                         self.viper.Ref, False, pos,
-                                         infos,"Thread")
-        getold = self.viper.DomainFunc("getOld",[self.viper.LocalVarDecl("t",self.viper.Ref,
-                                                                             pos,infos),
-                                                 self.viper.LocalVarDecl("i",self.viper.Int,pos,
-                                                                         infos)],
-                                         self.viper.Ref, False, pos, infos,"Thread")
-
-        return self.viper.Domain("Thread",[getmethod,getarg,getold],[],[],pos,infos)
-
-
+    def create_thread_domain(self, ctx: Context) -> 'silver.ast.Domain':
+        pos, info = self.no_position(ctx), self.no_info(ctx)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_param = self.viper.LocalVarDecl('t', self.viper.Ref, pos, info)
+        index_param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        get_method = self.viper.DomainFunc(GET_METHOD_FUNC, [thread_param],
+                                           method_id_type, False, pos, info,
+                                           THREAD_DOMAIN)
+        get_arg = self.viper.DomainFunc(GET_ARG_FUNC, [thread_param, index_param],
+                                        self.viper.Ref, False, pos, info, THREAD_DOMAIN)
+        get_old = self.viper.DomainFunc(GET_OLD_FUNC, [thread_param, index_param],
+                                       self.viper.Ref, False, pos, info, THREAD_DOMAIN)
+        domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
+                                   pos, info)
+        return domain
 
     def create_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
@@ -937,9 +820,7 @@ class ProgramTranslator(CommonTranslator):
                                                             type_axioms, ctx))
         domains.append(self.create_thread_domain(ctx))
         domains.append(self.create_functions_domain(func_constants, ctx))
-        domains.append(self.create_threadingIDs_domain(threading_ids_constants,ctx))
-        methods.append(self.create_thread_joining_method(ctx))
-        methods.append(self.create_threading_is_alive(ctx))
+        domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
         converted_sil_progs = self._convert_silver_elements(sil_progs,
                                                             all_used_names, ctx)
         s_domains, s_predicates, s_functions, s_methods = converted_sil_progs

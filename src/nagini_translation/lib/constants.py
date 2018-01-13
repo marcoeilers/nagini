@@ -18,7 +18,7 @@ BUILTINS = ['cast',
 
 THREADING = ['Thread']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
@@ -35,6 +35,16 @@ JOINABLE_FUNC = '_joinable'
 THREAD_POST_PRED = '_thread_post'
 
 THREAD_START_PRED = '_thread_start'
+
+THREAD_DOMAIN = 'Thread'
+
+METHOD_ID_DOMAIN = 'ThreadingID'
+
+GET_ARG_FUNC = 'getArg'
+
+GET_OLD_FUNC = 'getOld'
+
+GET_METHOD_FUNC = 'getMethod'
 
 INTERNAL_NAMES = [
     'FuncTriple',

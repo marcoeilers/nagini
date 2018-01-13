@@ -20,7 +20,7 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
-                  'MayCreate',]
+                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'MayJoin']
 
 T = TypeVar('T')
 V = TypeVar('V')
