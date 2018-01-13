@@ -11,8 +11,8 @@ class Clazz:
 
     def m1(self) -> None:
         Requires(self != None)
-        Requires(Acc(self.y) and Read(self.x))
-        Ensures(Acc(self.y) and Read(self.x) and self.y == self.x + 1)
+        Requires(Acc(self.y) and Rd(self.x))
+        Ensures(Acc(self.y) and Rd(self.x) and self.y == self.x + 1)
         self.y = self.x + 1
 
     def m1_1(self) -> None:
@@ -40,6 +40,12 @@ class Clazz:
         Ensures(Acc(self.y) and Acc(self.x, 2 * ARP()) and self.y == self.x + 1)
         self.y = self.x + 1
 
+    def m1_5(self) -> None:
+        Requires(self != None)
+        Requires(Acc(self.y) and Acc(self.x, ARP(2) + 1/2))
+        Ensures(Acc(self.y) and Acc(self.x, ARP(2) + 1/2) and self.y == self.x + 1)
+        self.y = self.x + 1
+
     def m2(self) -> None:
         Requires(self != None)
         Requires(Acc(self.y) and Acc(self.x) and self.x == 5)
@@ -58,4 +64,7 @@ class Clazz:
         Assert(self.y == 6 and self.x == 5)
         self.y = 1
         self.m1_4()
+        Assert(self.y == 6 and self.x == 5)
+        self.y = 1
+        self.m1_5()
         Assert(self.y == 6 and self.x == 5)

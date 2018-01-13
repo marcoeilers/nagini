@@ -204,14 +204,7 @@ def Rd(field) -> bool:
     pass
 
 
-def Read(field) -> bool:
-    """
-    Abstract read permission to a predicate or field, only to be used in pure contexts.
-    """
-    pass
-
-
-def ARP() -> float:
+def ARP(counting: int = None) -> float:
     """
     Abstract read permission, only to be used in Acc(f, ...).
     """
@@ -328,7 +321,6 @@ __all__ = [
         'Low',
         'Acc',
         'Rd',
-        'Read',
         'ARP',
         'Fold',
         'Unfold',

@@ -83,7 +83,7 @@ class Silicon:
         self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program', arp=True) -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
@@ -128,7 +128,7 @@ class Carbon:
         self.arpplugin = ARPPlugin(jvm)
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program', arp=True) -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """

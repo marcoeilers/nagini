@@ -125,7 +125,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon, arp=True) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -201,6 +201,10 @@ def main() -> None:
         action='store_true',
         help='Verify secure information flow')
     parser.add_argument(
+        '--arp',
+        action='store_true',
+        help='Use Abstract Read Permissions')
+    parser.add_argument(
         '--log',
         type=_parse_log_level,
         help='log level',
@@ -257,13 +261,13 @@ def main() -> None:
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response)
+            translate_and_verify(file, jvm, args, add_response, arp=args.arp)
             socket.send_string(response[0])
     else:
-        translate_and_verify(args.python_file, jvm, args)
+        translate_and_verify(args.python_file, jvm, args, arp=args.arp)
 
 
-def translate_and_verify(python_file, jvm, args, print=print):
+def translate_and_verify(python_file, jvm, args, print=print, arp=False):
     try:
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif)
@@ -291,7 +295,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 print("RUN,{},{},{},{},{}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend, arp=True)
+            vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode))

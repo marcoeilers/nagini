@@ -573,15 +573,15 @@ class ContractTranslator(CommonTranslator):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
-        elif func_name in ('Acc', 'Rd', 'Read'):
+        elif func_name in ('Acc', 'Rd'):
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
-                perm = self.viper.WildcardPerm(self.to_position(node, ctx),
-                                               self.no_info(ctx))
-            elif func_name == 'Read':
-                perm = self.viper.FuncApp('rd', {}, self.to_position(node, ctx),
-                                          self.no_info(ctx), self.viper.Ref, {})
+                if ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and ctx.actual_function.pure:
+                    perm = self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
+                else:
+                    perm = self.viper.FuncApp('rd', {}, self.to_position(node, ctx),
+                                              self.no_info(ctx), self.viper.Ref, {})
             else:
                 perm = self._get_perm(node, ctx)
             if isinstance(node.args[0], ast.Call):
