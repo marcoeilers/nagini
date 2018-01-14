@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from typing import Tuple
+from typing import List, Tuple
 
 
 def main() -> None:
@@ -35,7 +35,7 @@ bla45 = ('bla', 45)
 
 
 def append_bla_45(l: List[Tuple[str, int]]) -> None:
-    Requires(Acc(list_pred(l)))
+    Requires(list_pred(l))
     Requires(len(l) > 1)
     Ensures(Acc(list_pred(l)))
     Ensures(len(l) == Old(len(l)) + 1)

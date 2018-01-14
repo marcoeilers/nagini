@@ -76,9 +76,15 @@ method list_extend(self: Ref, other: Ref) returns ()
     ensures acc(self.list_acc)
     ensures acc(other.list_acc, 1/100)
     ensures self.list_acc == old(self.list_acc) ++ other.list_acc
-{
-    assume false
-}
+
+method list_reverse(self: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, 1/100)
+    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures |res.list_acc| == |self.list_acc|
+    ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
 
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

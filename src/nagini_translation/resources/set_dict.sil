@@ -50,6 +50,17 @@ method set_add(self: Ref, item: Ref) returns ()
     assume false
 }
 
+method set_remove(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(item), set_arg(typeof(self), 0))
+    requires item in self.set_acc
+    ensures acc(self.set_acc)
+    ensures self.set_acc == old(self.set_acc) setminus Set(item)
+{
+    assume false
+}
+
 method set_clear(self: Ref) returns ()
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc)

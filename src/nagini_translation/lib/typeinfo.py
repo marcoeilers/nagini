@@ -1,14 +1,12 @@
 import logging
 import mypy.build
 import os
-import sys
 
 from mypy.build import BuildSource
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
-    InvalidProgramException,
 )
 from typing import List, Optional
 

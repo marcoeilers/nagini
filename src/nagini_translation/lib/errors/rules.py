@@ -61,6 +61,14 @@ LOCAL_VARIABLE_NOT_DEFINED = {
     ('application.precondition', 'assertion.false'):
         ('expression.undefined', 'undefined.local.variable')
 }
+GLOBAL_NAME_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'undefined.global.name')
+}
+DEPENDENCIES_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'missing.dependencies')
+}
 THREAD_CREATION_ARG_TYPE = {
     ('assert.failed', 'assertion.false'):
         ('thread.creation.failed', 'invalid.argument.type')
@@ -108,4 +116,6 @@ __all__ = (
     'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_MEASURE_NON_POSITIVE',
     'LOCAL_VARIABLE_NOT_DEFINED',
+    'GLOBAL_NAME_NOT_DEFINED',
+    'DEPENDENCIES_NOT_DEFINED',
 )

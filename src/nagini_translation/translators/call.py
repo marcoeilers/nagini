@@ -10,6 +10,7 @@ from nagini_contracts.io import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     BUILTINS,
     DICT_TYPE,
     END_LABEL,
@@ -18,6 +19,7 @@ from nagini_translation.lib.constants import (
     GET_METHOD_FUNC,
     GET_OLD_FUNC,
     JOINABLE_FUNC,
+    LIST_TYPE,
     METHOD_ID_DOMAIN,
     OBJECT_TYPE,
     RANGE_TYPE,
@@ -39,6 +41,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonType,
     PythonVar,
+    SilverType,
     UnionType
 )
 from nagini_translation.lib.typedefs import (
@@ -92,7 +95,6 @@ class CallTranslator(CommonTranslator):
         arg_pos = self.to_position(node.args[0], ctx)
         type_arg = self.type_factory.translate_type_literal(cast_type,
                                                             arg_pos, ctx)
-        pos = self.to_position(node, ctx)
         object_class = ctx.module.global_module.classes['object']
         result = self.get_function_call(object_class, '__cast__',
                                         [type_arg, object_arg], [None, None],
@@ -102,29 +104,26 @@ class CallTranslator(CommonTranslator):
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__len__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
+                                                         [None], node, ctx)
+        return stmt + len_stmt, len_val
 
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__str__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        str_stmt, str_val = self.get_func_or_method_call(arg_type, '__str__', [target],
+                                                         [None], node, ctx)
+        return stmt + str_stmt, str_val
 
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__bool__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        bool_stmt, bool_val = self.get_func_or_method_call(arg_type, '__bool__', [target],
+                                                           [None], node, ctx)
+        return stmt + bool_stmt, bool_val
 
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
@@ -150,9 +149,6 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
-        if ctx.current_function is None:
-            raise UnsupportedException(node, 'Global constructor calls are not '
-                                             'supported.')
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
@@ -188,6 +184,14 @@ class CallTranslator(CommonTranslator):
 
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
+        # Mark the current function as depending on the called class. If we're in
+        # a global context, assert that the called class and its dependencies are defined.
+        func_node = node.func if isinstance(node, ast.Call) else node
+        self._add_dependencies(func_node, target_class, ctx)
+        defined_check = []
+        if self.is_main_method(ctx):
+            defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
+                                                       ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -211,29 +215,95 @@ class CallTranslator(CommonTranslator):
                 catchers = self.create_exception_catchers(error_var,
                     ctx.actual_function.try_blocks, node, ctx)
                 stmts = stmts + catchers
-        return arg_stmts + stmts, res_var.ref()
+        return arg_stmts + defined_check + stmts, res_var.ref()
+
+    def _translate_list(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        contents = None
+        stmts = []
+        if node.args:
+            assert len(node.args) == 1
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
+        res_var = ctx.current_function.create_variable('list',
+                                                       list_class, self.translator)
+        targets = [res_var.ref()]
+        constr_call = self.get_method_call(list_class, '__init__', [],
+                                           [], targets, node, ctx)
+        stmts.extend(constr_call)
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
+        if (node._parent and isinstance(node._parent, ast.Assign) and
+                    len(node._parent.targets) == 1):
+            set_type = self.get_type(node._parent.targets[0], ctx)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        result_var = res_var.ref(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var,
+                                                       set_type, position, ctx),
+                                       position, self.no_info(ctx)))
+        if contents:
+            sil_ref_seq = self.viper.SeqType(self.viper.Ref)
+            ref_seq = SilverType(sil_ref_seq, ctx.module)
+            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq, self.translator)
+            seq_field = self.viper.Field('list_acc', sil_ref_seq, position, info)
+            content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
+            stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
+                                                info))
+            arg_type = self.get_type(node.args[0], ctx)
+            arg_seq = self.get_function_call(arg_type, '__sil_seq__', [contents], [None], node, ctx)
+            res_seq = self.get_function_call(set_type, '__sil_seq__', [result_var], [None], node, ctx)
+            seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
+            stmts.append(self.viper.Inhale(seq_equal, position, info))
+        return stmts, result_var
 
     def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        contents = None
+        stmts = []
         if node.args:
-            raise UnsupportedException(node)
-        args = []
+            assert len(node.args) == 1
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
         set_class = ctx.module.global_module.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
         targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        stmt = constr_call
+        stmts.extend(constr_call)
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
         if (node._parent and isinstance(node._parent, ast.Assign) and
                 len(node._parent.targets) == 1):
             set_type = self.get_type(node._parent.targets[0], ctx)
         position = self.to_position(node, ctx)
-        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      set_type, position, ctx),
-                                      position, self.no_info(ctx)))
-        return stmt, res_var.ref()
+        info = self.no_info(ctx)
+        result_var = res_var.ref(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var,
+                                                       set_type, position, ctx),
+                                       position, self.no_info(ctx)))
+        if contents:
+            sil_ref_set = self.viper.SetType(self.viper.Ref)
+            ref_set = SilverType(sil_ref_set, ctx.module)
+            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set, self.translator)
+            set_field = self.viper.Field('set_acc', sil_ref_set, position, info)
+            content_field = self.viper.FieldAccess(result_var, set_field, position, info)
+            stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
+                                                info))
+            arg_type = self.get_type(node.args[0], ctx)
+            quant_var_name = ctx.actual_function.get_fresh_name('item')
+            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position, info)
+            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref, position,
+                                                     info)
+            arg_contains = self.get_function_call(arg_type, '__contains__', [contents, quant_var], [None, None], node, ctx)
+            res_contains = self.get_function_call(set_type, '__contains__', [result_var, quant_var], [None, None], node, ctx)
+            contain_equal = self.viper.EqCmp(arg_contains, res_contains, position, info)
+            trigger = self.viper.Trigger([res_contains], position, info)
+            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal, position, info)
+            stmts.append(self.viper.Inhale(quantifier, position, info))
+        return stmts, result_var
 
     def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
@@ -268,6 +338,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_bool(node, ctx)
         elif func_name == 'set':
             return self._translate_set(node, ctx)
+        elif func_name == 'list':
+            return self._translate_list(node, ctx)
         elif func_name == 'range':
             return self._translate_range(node, ctx)
         elif func_name == 'type':
@@ -286,14 +358,6 @@ class CallTranslator(CommonTranslator):
         """
         targets = []
         result_var = None
-        if ctx.current_function is None:
-            if ctx.current_class is None:
-                # Global variable
-                raise UnsupportedException(node, 'Global method call '
-                                           'not supported.')
-            else:
-                # Static field
-                raise UnsupportedException(node, 'Static fields not supported')
         if target.type is not None:
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator)
@@ -301,14 +365,40 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
+        # Mark the current function as depending on the called method. If we're in
+        # a global context, assert that the called method and its dependencies are
+        # defined.
+        self._add_dependencies(node.func, target, ctx)
+        defined_check = []
+        if self.is_main_method(ctx) and not target.cls:
+            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
-        return (arg_stmts + call,
+        return (arg_stmts + defined_check + call,
                 result_var.ref() if result_var else None)
+
+    def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
+                          ctx: Context) -> None:
+        """
+        Tracks that the current container (method or class) depends on the given target,
+        referring to it via the given reference.
+        """
+        if ctx.current_function and not self.is_main_method(ctx):
+            if ctx.current_function:
+                current_container = ctx.current_function.call_deps
+            else:
+                current_container = ctx.current_class.definition_deps
+            if (isinstance(target, PythonMethod) and target.cls and
+                        target.method_type == MethodType.normal):
+                for subclass in target.cls.all_subclasses:
+                    current = subclass.get_method(target.name)
+                    current_container.add((reference, current, ctx.module, subclass))
+            else:
+                current_container.add((reference, target, ctx.module))
 
     def _translate_function_call(self, target: PythonMethod, args: List[Expr],
                                  formal_args: List[Expr], arg_stmts: List[Stmt],
@@ -318,7 +408,12 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        call_type = self.get_type(node, ctx)
+        # Mark the current function as depending on the called function. If we're in
+        # a global context, wrap the result into a check that the called function and its
+        # dependencies are defined.
+        self._add_dependencies(node.func, target, ctx)
+        if not target.cls and self.is_main_method(ctx):
+            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -414,8 +509,6 @@ class CallTranslator(CommonTranslator):
         created and all arguments not bound to any other parameter are put in
         there.
         """
-        args = []
-        arg_types = []
         arg_stmts = []
 
         unpacked_args = []
@@ -530,7 +623,6 @@ class CallTranslator(CommonTranslator):
         res_var = ctx.current_function.create_variable('kw_args',
             ctx.module.global_module.classes[DICT_TYPE], self.translator)
         dict_class = ctx.module.global_module.classes[DICT_TYPE]
-        arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
         position = self.to_position(node, ctx)
@@ -570,7 +662,7 @@ class CallTranslator(CommonTranslator):
         the values of the arguments. Saves the result in result_var and any
         uncaught exceptions in error_var.
         """
-        old_label_aliases = ctx.label_aliases
+        old_label_aliases = ctx.label_aliases.copy()
         old_var_aliases = ctx.var_aliases
         var_aliases = {}
 
@@ -851,19 +943,21 @@ class CallTranslator(CommonTranslator):
             elif func_name in BUILTINS:
                 return self._translate_builtin_func(node, ctx)
             elif func_name == "Thread":
-                return self._translate_thread_creation(node,ctx)
+                return self._translate_thread_creation(node, ctx)
+            elif func_name in BUILTIN_PREDICATES:
+                return [], self.translate_contractfunc_call(node, ctx, impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
-        elif (isinstance(node.func,ast.Attribute) and self.get_type(node.func.value,ctx).name == "Thread"
-            and node.func.attr == "start") :
+        elif (isinstance(node.func,ast.Attribute) and
+                      self.get_type(node.func.value,ctx).name == "Thread" and
+                      node.func.attr == "start") :
             return self._translate_thread_start(node,ctx)
-        elif (isinstance(node.func,ast.Attribute) and self.get_type(node.func.value,ctx).name == "Thread"
-            and node.func.attr == "join"):
+        elif (isinstance(node.func,ast.Attribute) and
+                      self.get_type(node.func.value,ctx).name == "Thread" and
+                      node.func.attr == "join"):
                 return self._translate_thread_join(node,ctx)
-
-
         else:
             return self.translate_normal_call_node(node, ctx, impure)
 

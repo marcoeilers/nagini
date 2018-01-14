@@ -8,7 +8,7 @@ class A:
         self.val = 16
 
     @classmethod
-    def construct(cls) -> A:
+    def construct(cls) -> 'A':
         Ensures(isinstance(Result(), cls))
         return cls()
 
@@ -32,7 +32,7 @@ class D:
         self.val = 14
 
     @classmethod
-    def construct(cls) -> D:
+    def construct(cls) -> 'D':
         Ensures(isinstance(Result(), cls))
         #:: ExpectedOutput(postcondition.violated:assertion.false, L2)
         Ensures(Acc(Result().val) and Result().val > 7)

@@ -3,10 +3,12 @@ import copy
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
+    BOOL_TYPE,
     BUILTIN_PREDICATES,
     GET_ARG_FUNC,
     GET_METHOD_FUNC,
     GET_OLD_FUNC,
+    GLOBAL_VAR_FIELD,
     INT_TYPE,
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
@@ -19,6 +21,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
+    PythonGlobalVar,
     PythonMethod,
     PythonModule,
     PythonType,
@@ -162,6 +165,14 @@ class ContractTranslator(CommonTranslator):
         conjunction = self.viper.And(access_pred, func, pos, info)
         return conjunction
 
+    def translate_unwrapped_builtin_predicate(self, node: ast.Call, ctx: Context) -> Expr:
+        args = []
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        if stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        perm = self.viper.FullPerm(self.no_position(ctx), self.no_info(ctx))
+        return self.translate_builtin_predicate(node, perm, [arg], ctx)
+
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -222,6 +233,31 @@ class ContractTranslator(CommonTranslator):
         field_type = self.get_type(node.args[0], ctx)
         pred = self._translate_acc_field(field_acc, field_type, perm,
                                          self.to_position(node, ctx), ctx)
+        return [], pred
+
+    def translate_acc_global(self, node: ast.Call, perm: Expr,
+                            ctx: Context) -> StmtsAndExpr:
+        """
+        Translates an access permission to a global variable.
+        """
+        var = self.get_target(node.args[0], ctx)
+        if not isinstance(var, PythonGlobalVar):
+            raise InvalidProgramException(node, 'invalid.acc')
+        if var.is_final:
+            raise InvalidProgramException(node, 'permission.to.final.var')
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        var_func = self.viper.FuncApp(var.sil_name, [], pos, info, self.viper.Ref, [])
+        var_type = self.translate_type(var.type, ctx)
+        field = self.viper.Field(GLOBAL_VAR_FIELD, var_type, pos, info)
+        field_acc = self.viper.FieldAccess(var_func, field, pos, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
+
+        # Add type information
+        if var.type.name not in PRIMITIVES:
+            type_info = self.type_check(field_acc, var.type,
+                                        self.no_position(ctx), ctx)
+            pred = self.viper.And(pred, type_info, pos, info)
         return [], pred
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
@@ -584,10 +620,20 @@ class ContractTranslator(CommonTranslator):
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
-                                             self.viper.Bool, impure)
+        if isinstance(lambda_.body, ast.Tuple):
+            if not len(lambda_.body.elts) == 2:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                                 self.viper.Bool, impure)
 
-        triggers = self._translate_triggers(lambda_.body, node, ctx)
+            triggers = self._translate_triggers(lambda_.body, node, ctx)
+        else:
+            body_type = self.get_type(lambda_.body, ctx)
+            if not body_type or body_type.name != BOOL_TYPE:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body, ctx,
+                                                 self.viper.Bool, impure)
+            triggers = []
 
         ctx.remove_alias(arg.arg)
         if body_stmt:
@@ -643,7 +689,15 @@ class ContractTranslator(CommonTranslator):
             if isinstance(node.args[0], ast.Call):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
-                return self.translate_acc_field(node, perm, ctx)
+                target = self.get_target(node.args[0], ctx)
+                if isinstance(target, PythonField):
+                    return self.translate_acc_field(node, perm, ctx)
+                else:
+                    if not isinstance(target, PythonGlobalVar):
+                        raise InvalidProgramException(node, 'invalid.acc')
+                    return self.translate_acc_global(node, perm, ctx)
+        elif func_name in BUILTIN_PREDICATES:
+            return self.translate_unwrapped_builtin_predicate(node, ctx)
         elif func_name == 'MaySet':
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':

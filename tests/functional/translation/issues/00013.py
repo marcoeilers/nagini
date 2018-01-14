@@ -1,8 +1,8 @@
 from nagini_contracts.contracts import *
 
 
+#:: ExpectedOutput(invalid.program:invalid.predicate)
 @Predicate
 def foo(x: int) -> bool:
-    #:: ExpectedOutput(invalid.program:invalid.contract.position)
     Requires(x == 5)
     return True

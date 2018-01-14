@@ -3,8 +3,14 @@ import ast
 from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
+    FILE_VAR,
+    GLOBAL_VAR_FIELD,
+    MAIN_METHOD_NAME,
+    MODULE_VARS,
+    NAME_VAR,
     OBJECT_TYPE,
     PRIMITIVES,
+    STRING_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -12,6 +18,7 @@ from nagini_translation.lib.program_nodes import (
     PythonExceptionHandler,
     PythonField,
     PythonMethod,
+    PythonModule,
     PythonTryBlock,
     PythonVar,
 )
@@ -717,3 +724,158 @@ class MethodTranslator(CommonTranslator):
                                    no_info)
         ctx.var_aliases = old_var_aliases
         return [label, body_block] + next_var_set + [goto_end]
+
+    def _initialize_module(self, module: PythonModule, ctx: Context) -> None:
+        """
+        Creates the variables representing the built-in global variables that exist
+        in each module.
+        """
+        if isinstance(module.names_var, str):
+            names_decl = self.viper.LocalVarDecl(module.names_var,
+                                                 self.viper.SetType(self.name_type()),
+                                                 self.no_position(ctx), self.no_info(ctx))
+            names_ref = self.viper.LocalVar(module.names_var,
+                                            self.viper.SetType(self.name_type()),
+                                            self.no_position(ctx), self.no_info(ctx))
+            def_decl = self.viper.LocalVarDecl(module.defined_var, self.viper.Bool,
+                                               self.no_position(ctx), self.no_info(ctx))
+            def_ref = self.viper.LocalVar(module.defined_var, self.viper.Bool,
+                                          self.no_position(ctx), self.no_info(ctx))
+            module.names_var = (names_decl, names_ref)
+            module.defined_var = (def_decl, def_ref)
+
+    def _initialize_main_state(self, modules: List[PythonModule], main: PythonModule,
+                               ctx: Context) -> Tuple[List['silver.ast.LocalVarDecl'],
+                                                      List[Stmt]]:
+        """
+        Generates a list of statements that initialize the local state used in the main
+        method. This includes inhaling permissions to mutable global variables and setting
+        up the set of known names for each module.
+        """
+        stmts = []
+        locals = []
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        false_lit = self.viper.FalseLit(no_pos, no_info)
+        true_lit = self.viper.TrueLit(no_pos, no_info)
+        empty_set = self.viper.EmptySet(self.name_type(), no_pos, no_info)
+        global_field = self.viper.Field(GLOBAL_VAR_FIELD, self.viper.Ref, no_pos, no_info)
+        full_perm = self.viper.FullPerm(no_pos, no_info)
+        ninety_nine = self.viper.IntLit(99, no_pos, no_info)
+        hundred = self.viper.IntLit(100, no_pos, no_info)
+        # For module variables like __file__, a (rather arbitrary) permission amount of
+        # 99% is available. The intention is that they should not be changed, and the
+        # natural way to enforce this is to give users less than a full permission.
+        part_perm = self.viper.FractionalPerm(ninety_nine, hundred, no_pos, no_info)
+        for module in modules:
+            if module.global_module is module:
+                continue
+            self._initialize_module(module, ctx)
+            if module is main:
+                stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
+                                                       true_lit, no_pos, no_info))
+            else:
+                stmts.append(self.viper.LocalVarAssign(module.defined_var[1],
+                                                       false_lit, no_pos, no_info))
+            stmts.append(self.viper.LocalVarAssign(module.names_var[1],
+                                                   empty_set, no_pos, no_info))
+            locals.append(module.defined_var[0])
+            locals.append(module.names_var[0])
+            for var in module.global_vars.values():
+                if var.module is not module:
+                    continue
+                if var.is_final:
+                    continue
+                perm = full_perm
+                if var.name in MODULE_VARS:
+                    stmts.append(self.set_global_defined(var, module, None, ctx))
+                    perm = part_perm
+                var_type = self.translate_type(var.type, ctx)
+                var_func = self.viper.FuncApp(var.sil_name, [], no_pos,
+                                              no_info, var_type, [])
+                field_access = self.viper.FieldAccess(var_func, global_field, no_pos,
+                                                      no_info)
+                field_pred = self.viper.FieldAccessPredicate(field_access, perm,
+                                                             no_pos, no_info)
+                field_type_check = self.type_check(field_access, var.type, no_pos, ctx)
+                field_pred = self.viper.And(field_pred, field_type_check, no_pos, no_info)
+                if var.name in MODULE_VARS:
+                    var_type = self.type_check(field_access, var.type, no_pos, ctx, False)
+                    field_pred = self.viper.And(field_pred, var_type, no_pos, no_info)
+                if var.name == NAME_VAR:
+                    main_str = self.translate_string('__main__', None, ctx)
+                    str_type = ctx.module.global_module.classes[STRING_TYPE]
+                    func_name = '__eq__'
+                    call = self.get_function_call(str_type, func_name,
+                                                  [main_str, field_access],
+                                                  [None, None], var.node, ctx)
+                    if module is not main:
+                        call = self.viper.Not(call, no_pos, no_info)
+                    field_pred = self.viper.And(field_pred, call, no_pos, no_info)
+                stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
+        return locals, stmts
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List['silver.ast.Method']:
+        """
+        Translates the global statements of the program to a single method.
+        """
+        main = [m for m in modules if m.type_prefix == '__main__'][0]
+        stmts = []
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
+
+        stmts.extend(init_stmts)
+
+        # Create artificial main PythonMethod that contains the execution of global
+        # statements.
+        ctx.current_class = None
+        method_name = ctx.module.get_fresh_name('main')
+        main_method = PythonMethod(MAIN_METHOD_NAME, main, None, main, False, False,
+                                   main.node_factory)
+        main_method._module = main
+        ctx.current_function = main_method
+        ctx.current_function.try_blocks = main.try_blocks
+        ctx.current_function.labels = main.labels
+        ctx.current_function.precondition = main.precondition
+        ctx.current_function.postcondition = main.postcondition
+        ctx.current_function.loop_invariants = main.loop_invariants
+        ctx.current_function.process(method_name, self.translator)
+        ctx.module = main
+
+        # Translate statements in main module. When an import statement is encountered,
+        # the translation will include executing the statements in the imported module.
+        for stmt in main.node.body:
+            stmts.extend(self.translate_stmt(stmt, ctx))
+
+        end_label = ctx.get_label_name(END_LABEL)
+        stmts.append(self.viper.Goto(end_label, self.no_position(ctx),
+                                    self.no_info(ctx)))
+
+        # Append blocks for exception handling etc.
+        assert not ctx.var_aliases
+        for block in main_method.try_blocks:
+            for handler in block.handlers:
+                stmts += self.translate_handler(handler, ctx)
+            if block.else_block:
+                stmts += self.translate_handler(block.else_block, ctx)
+            if block.finally_block or block.with_item:
+                stmts += self.translate_finally(block, ctx)
+        stmts += self.add_handlers_for_inlines(ctx)
+
+        stmts += self._create_method_epilog(main_method, ctx)
+
+        main_locals = [local.decl for local in main_method.get_locals()
+                       if not local.name.startswith('lambda')]
+        for tb in main_method.try_blocks:
+            main_locals.append(tb.error_var.decl)
+            main_locals.append(tb.finally_var.decl)
+        body = stmts
+        res = self.create_method_node(ctx, method_name, [], [], [], [],
+                                      main_locals + locals, body, no_pos,
+                                      no_info, method=ctx.current_function)
+        ctx.current_function = None
+        return main_method, res
+
+

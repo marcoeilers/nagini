@@ -3,21 +3,27 @@ import ast
 from abc import ABCMeta
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
+    ASSERTING_FUNC,
+    COMBINE_NAME_FUNC,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    MAIN_METHOD_NAME,
     MAY_SET_PRED,
+    NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    SINGLE_NAME,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
-from nagini_translation.lib.errors import Rules
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     PythonClass,
     PythonField,
     PythonIOOperation,
     PythonMethod,
     PythonModule,
+    PythonNode,
     PythonType,
     PythonVar,
 )
@@ -28,6 +34,7 @@ from nagini_translation.lib.typedefs import (
     Info,
     Position,
     Stmt,
+    StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
@@ -181,7 +188,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
     def to_position(
             self, node: ast.AST, ctx: Context, error_string: str=None,
-            rules: Rules=None) -> 'silver.ast.Position':
+            rules: rules.Rules=None) -> 'silver.ast.Position':
         """
         Extracts the position from a node, assigns an ID to the node and stores
         the node and the position in the context for it.
@@ -190,7 +197,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                       ctx.module.file)
 
     def no_position(self, ctx: Context, error_string: str=None,
-            rules: Rules=None) -> 'silver.ast.Position':
+            rules: rules.Rules=None) -> 'silver.ast.Position':
         return self.to_position(None, ctx, error_string, rules)
 
     def to_info(self, comments: List[str], ctx: Context) -> 'silver.ast.Info':
@@ -223,6 +230,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         a local variable in the Python program (i.e. not a parameter, not a variable that
         is quantified over).
         """
+        if not ctx.actual_function:
+            return False
         if var.name in ctx.actual_function.args:
             return False
         return var in ctx.actual_function.locals.values()
@@ -253,6 +262,215 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                         self.viper.Bool, [id_param_decl])
         return self.viper.Inhale(is_defined, position, info)
 
+    def set_global_defined(self, declaration: PythonNode, module: PythonModule,
+                           node: ast.AST, ctx: Context) -> Stmt:
+        """
+        Returns a statement that sets the name of the given declaration to be defined
+        in the given module.
+        """
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        module_set = module.names_var[1]
+        decl_id = self.viper.IntLit(self._get_string_value(declaration.name), pos,
+                                    info)
+        return self._set_global_defined(decl_id, module_set, pos, info)
+
+    def _set_global_defined(self, decl_int: Expr, module_var: Expr, pos: Position,
+                            info: Info) -> Stmt:
+        """
+        Returns a statement that sets the name of represented by the integer decl_int to
+        be defined in the given set of names.
+        """
+        if decl_int.typ() == self.viper.Int:
+            decl_int = self.viper.DomainFuncApp(SINGLE_NAME, [decl_int], self.name_type(),
+                                                pos, info, NAME_DOMAIN)
+        new_set = self.viper.ExplicitSet([decl_int], pos, info)
+        union = self.viper.AnySetUnion(module_var, new_set, pos, info)
+        return self.viper.LocalVarAssign(module_var, union, pos, info)
+
+    def name_type(self) -> 'silver.ast.DomainType':
+        """
+        The Silver type of global names, for which one can check if they are defined or
+        not.
+        """
+        return self.viper.DomainType(NAME_DOMAIN, {}, [])
+
+    def _is_defined(self, name: Expr, module: Expr, pos: Position, info: Info) -> Expr:
+        """
+        Returns an expression that is true iff the name represented by the given
+        expression is defined in the module represented by the other expression.
+        """
+        name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
+        if name.typ() == self.viper.Int:
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos,
+                                                  info, NAME_DOMAIN)
+        else:
+            boxed_name = name
+        return self.viper.AnySetContains(boxed_name, module, pos, info)
+
+    def _combine_names(self, prefix: Expr, name: Expr, pos: Position, info: Info) -> Expr:
+        """
+        Returns an expression that combines the prefix-name and the name to a new name
+        that represents 'prefix.name'.
+        """
+        name_type = self.viper.DomainType(NAME_DOMAIN, {}, [])
+        if name.typ() == self.viper.Int:
+            boxed_name = self.viper.DomainFuncApp(SINGLE_NAME, [name], name_type, pos,
+                                                  info, NAME_DOMAIN)
+        else:
+            boxed_name = name
+        if prefix.typ() == self.viper.Int:
+            boxed_prefix = self.viper.DomainFuncApp(SINGLE_NAME, [prefix], name_type, pos,
+                                                    info, NAME_DOMAIN)
+        else:
+            boxed_prefix = prefix
+        return self.viper.DomainFuncApp(COMBINE_NAME_FUNC, [boxed_prefix, boxed_name],
+                                        name_type, pos, info, NAME_DOMAIN)
+
+    def extract_identifiers(self, ref: ast.AST, pos: Position,
+                            info: Info) -> List[Expr]:
+        """
+        Returns a list containing all names contained by the given reference.
+        """
+        res = []
+        if isinstance(ref, ast.Subscript):
+            if isinstance(ref.value, ast.Name) and ref.value.id in ('Optional', 'Union'):
+                if not isinstance(ref.slice.value, ast.Tuple):
+                    return self.extract_identifiers(ref.slice.value, pos, info)
+                for e in ref.slice.value.elts:
+                    res.extend(self.extract_identifiers(e, pos, info))
+                return res
+
+        decl_id = None
+        for name in reversed(self._get_name_parts(ref)):
+            current = self.viper.IntLit(self._get_string_value(name), pos,
+                                        info)
+            if decl_id is None:
+                decl_id = current
+            else:
+                decl_id = self._combine_names(current, decl_id, pos, info)
+        if decl_id:
+            return [decl_id]
+        return []
+
+    def _get_global_definedness_conditions(self, declaration: PythonNode,
+                                           module: PythonModule, ref_node: ast.AST,
+                                           ctx: Context) -> Tuple[Expr, Expr]:
+        """
+        Returns two boolean expressions that represent 1) if the name of the given
+        declaration is defined in the given module, and 2) if all dependencies of the
+        given declaration are currently defined.
+        """
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        info = self.no_info(ctx)
+        module_set = module.names_var[1]
+        decl_ids = self.extract_identifiers(ref_node, pos, info)
+        contains = self.viper.TrueLit(pos, info)
+        for decl_id in decl_ids:
+            contains = self.viper.And(contains, self._is_defined(decl_id, module_set, pos,
+                                                                 info), pos, info)
+        deps = set()
+        if isinstance(declaration, (PythonMethod, PythonClass)):
+            called = declaration
+            if isinstance(called, PythonClass):
+                called = called.get_method('__init__')
+            if called:
+                called.add_all_call_deps(deps)
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        deps_defined = self.viper.TrueLit(pos, info)
+        for ref, decl, mod, *conds in deps:
+            module_set = mod.names_var[1]
+            decl_ids = self.extract_identifiers(ref, pos, info)
+            for decl_id in decl_ids:
+                contains_dep = self._is_defined(decl_id, module_set, pos, info)
+                for cond in conds:
+                    # Iterate over conditions (PythonNodes); the dependency must be
+                    # defined if all such PythonNodes are currently defined in their
+                    # respective modules.
+                    module_set = cond.module.names_var[1]
+                    decl_id = self.viper.IntLit(self._get_string_value(cond.name), pos,
+                                                info)
+                    cond_contains = self._is_defined(decl_id, module_set, pos, info)
+                    contains_dep = self.viper.Implies(cond_contains, contains_dep, pos,
+                                                      info)
+                deps_defined = self.viper.And(deps_defined, contains_dep, pos, info)
+
+        return contains, deps_defined
+
+    def _get_name_parts(self, node: ast.AST) -> List[str]:
+        """
+        Converts an AST node representing some kind of reference to a list of strings.
+        """
+        while isinstance(node, ast.Subscript):
+            node = node.value
+        if isinstance(node, ast.Name):
+            return [node.id]
+        if isinstance(node, ast.Attribute):
+            pref = self._get_name_parts(node.value)
+            return pref + [node.attr]
+        if isinstance(node, ast.Str):
+            return []
+        return [node.name]
+
+    def assert_global_defined(self, declaration: PythonNode, module: PythonModule,
+                              ref_node: ast.AST, ctx: Context,
+                              call_deps=True) -> List[Stmt]:
+        """
+        Creates assertions that check that the given declaration and all its dependencies
+        are currently defined in the given module.
+        """
+        info = self.no_info(ctx)
+        name, deps = self._get_global_definedness_conditions(declaration, module,
+                                                             ref_node, ctx)
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        assert_name = self.viper.Assert(name, pos, info)
+        if not call_deps:
+            return [assert_name]
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg)
+        assert_deps = self.viper.Assert(deps, pos, info)
+        return [assert_name, assert_deps]
+
+    def wrap_global_defined_check(self, val: Expr, declaration: PythonNode,
+                                  module: PythonModule, ref_node: ast.AST,
+                                  ctx: Context) -> Expr:
+        """
+        Wraps the given expression into a new expression that checks that the given
+        declaration and all its dependencies are currently defined in the given module.
+        """
+        info = self.no_info(ctx)
+        msg = 'Name "' + declaration.name + '" is defined'
+        pos = self.to_position(ref_node, ctx, error_string=msg,
+                               rules=rules.GLOBAL_NAME_NOT_DEFINED)
+        msg = 'all dependencies of "' + declaration.name + '" are defined'
+        deps_pos = self.to_position(ref_node, ctx, error_string=msg,
+                                    rules=rules.DEPENDENCIES_NOT_DEFINED)
+        name, deps = self._get_global_definedness_conditions(declaration, module,
+                                                             ref_node, ctx)
+        assertion_param_decl = self.viper.LocalVarDecl('ass',
+                                                       self.viper.Bool, pos,
+                                                       info)
+        var_param_decl = self.viper.LocalVarDecl('val', self.viper.Ref, pos, info)
+        deps_func = self.viper.FuncApp(ASSERTING_FUNC, [val, deps], deps_pos, info,
+                                       self.viper.Ref, [var_param_decl,
+                                                        assertion_param_decl])
+        name_func = self.viper.FuncApp(ASSERTING_FUNC, [deps_func, name], pos, info,
+                                       self.viper.Ref, [var_param_decl,
+                                                        assertion_param_decl])
+        return name_func
+
+    def is_main_method(self, ctx: Context) -> bool:
+        """
+        Checks if we are currently translating the 'main method', i.e., the global
+        statements of the program.
+        """
+        if not ctx.current_function:
+            return False
+        return ctx.current_function.name == MAIN_METHOD_NAME
+
     def get_tuple_type_arg(self, arg: Expr, arg_type: PythonType, node: ast.AST,
                            ctx: Context) -> Expr:
         """
@@ -282,6 +500,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                             position, ctx)
         return type_lit
 
+    def get_func_or_method_call(self, receiver: PythonType, func_name: str,
+                                args: List[Expr], arg_types: List[Expr],
+                                node: ast.AST, ctx: Context) -> StmtsAndExpr:
+        if receiver.get_function(func_name):
+            call = self.get_function_call(receiver, func_name, args, arg_types, node, ctx)
+            return [], call
+        method = receiver.get_method(func_name)
+        if method:
+            assert method.type
+            target_var = ctx.actual_function.create_variable('target', method.type,
+                                                             self.translator)
+            val = target_var.ref(node, ctx)
+            call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
+                                        ctx)
+            return call, val
+
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
@@ -301,6 +535,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     func = container.functions[func_name]
                     break
         if not func:
+            if receiver and target_cls.get_method(func_name):
+                msg = 'Called method is expected to be pure: ' + func_name
+                raise UnsupportedException(node, msg)
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
         actual_args = []
@@ -467,7 +704,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             containers.extend(container.module.get_included_modules())
         else:
             # Assume module
-            containers.extend(container.get_included_modules())
+            containers.extend(container.get_included_modules(()))
         result = do_get_target(node, containers, container)
         return result
 
