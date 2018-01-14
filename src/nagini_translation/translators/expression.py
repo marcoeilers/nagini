@@ -9,12 +9,15 @@ from nagini_translation.lib.constants import (
     DICT_TYPE,
     END_LABEL,
     FUNCTION_DOMAIN_NAME,
+    GET_METHOD_FUNC,
     INT_TYPE,
     LIST_TYPE,
+    METHOD_ID_DOMAIN,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     SET_TYPE,
     STRING_TYPE,
+    THREAD_DOMAIN,
     TUPLE_TYPE,
 )
 from nagini_translation.lib.errors import rules
@@ -800,6 +803,42 @@ class ExpressionTranslator(CommonTranslator):
             result = res_var.ref(node, ctx)
         return stmt, result
 
+    def is_thread_method_definition(self, node: ast.Compare,
+                                    ctx: Context) -> bool:
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            return False
+        if not isinstance(node.ops[0], (ast.Eq, ast.Is)):
+            return False
+        for arg in (node.left, node.comparators[0]):
+            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and
+                        arg.func.id == 'getMethod'):
+                return True
+        return False
+
+    def translate_thread_method_definition(self, node: ast.Compare,
+                                           ctx: Context) -> StmtsAndExpr:
+        if (isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name) and
+                    node.left.func.id == 'getMethod'):
+            get_call = node.left
+            method_literal = node.comparators[0]
+        else:
+            get_call = node.comparators[0]
+            method_literal = node.left
+        target_method = self.get_target(method_literal, ctx)
+        if not isinstance(target_method, PythonMethod):
+            raise InvalidProgramException(node, 'invalid.get.method')
+        thread_stmt, thread = self.translate_expr(get_call.args[0], ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
+        method_literal = self.viper.DomainFuncApp(target_method.threading_id, [],
+                                                  method_id_type,
+                                                  pos, info, METHOD_ID_DOMAIN)
+        comparison = self.viper.EqCmp(thread_method, method_literal, pos, info)
+        return thread_stmt, comparison
+
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
         if self.is_io_existential_defining_equality(node, ctx):
@@ -808,6 +847,8 @@ class ExpressionTranslator(CommonTranslator):
                                            self.no_info(ctx)))
         if self.is_wait_level_comparison(node, ctx):
             return self.translate_wait_level_comparison(node, ctx)
+        if self.is_thread_method_definition(node, ctx):
+            return self.translate_thread_method_definition(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

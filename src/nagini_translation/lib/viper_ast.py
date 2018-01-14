@@ -347,8 +347,9 @@ class ViperAST:
         self.used_names.add(name)
         if formalargs is None:
             formalargs = []
-            for a in args:
-                formalargs.append(self.LocalVarDecl(a.funcname(), a.typ(), a.pos(), a.info()))
+            for i, a in enumerate(args):
+                formalargs.append(self.LocalVarDecl('p' + str(i), a.typ(), a.pos(),
+                                                    a.info()))
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.to_seq(formalargs), self.NoTrafos)
 

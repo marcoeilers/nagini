@@ -2,7 +2,8 @@ from typing import Callable, Tuple, Any
 
 
 class Thread :
-    def __init__(self, m: Callable, args: Tuple) -> None :
+    def __init__(self, group: object=None, target: Callable=None, name: str=None,
+                 args: Tuple=None, kwargs: object=None, daemon: bool=None) -> None :
         pass
 
     def start(self, *method_list : Callable) -> None :

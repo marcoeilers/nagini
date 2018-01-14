@@ -537,7 +537,7 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
-        func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, index], method_id_type,
+        func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, index], self.viper.Ref,
                                         pos, info, THREAD_DOMAIN)
         return thread_stmt + index_stmt, func
 
@@ -549,7 +549,7 @@ class ContractTranslator(CommonTranslator):
         index = self._get_string_value(old_string)
         index = self.viper.IntLit(index, pos, info)
         method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
-        func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, index], method_id_type,
+        func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, index], self.viper.Ref,
                                         pos, info, THREAD_DOMAIN)
         return stmt, func
 

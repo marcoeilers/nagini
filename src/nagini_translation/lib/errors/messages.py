@@ -56,6 +56,12 @@ ERRORS = {
         lambda n: 'An internal error occurred.',
     'expression.undefined':
         lambda n: 'Expression {} may not be defined.'.format(pprint(n)),
+    'thread.creation.failed':
+        lambda n: 'Thread creation may fail.',
+    'thread.start.failed':
+        lambda n: 'Thread start may fail.',
+    'thread.join.failed':
+        lambda n: 'Thread join may fail.',
 }
 
 REASONS = {
@@ -107,5 +113,15 @@ REASONS = {
         lambda n: ('Loop condition part {} is not framed at the point where '
                    'obligation is used.'.format(pprint(n))),
     'undefined.local.variable':
-        lambda n: 'Local variable may not have been defined.'
+        lambda n: 'Local variable may not have been defined.',
+    'wait.level.invalid':
+        lambda n: 'Thread level may not be lower than current thread.',
+    'thread.not.joinable':
+        lambda n: 'Thread may not be joinable.',
+    'invalid.argument.type':
+        lambda n: 'Thread argument may not fit target method parameter type.',
+    'method.not.listed':
+        lambda n: "Thread's target method may not be listed in start statement.",
+    'missing.start.permission':
+        lambda n: 'May not have permission to start thread.'
 }

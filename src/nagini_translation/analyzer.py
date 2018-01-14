@@ -737,6 +737,10 @@ class Analyzer(ast.NodeVisitor):
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
                 node, 'invalid.io_operation.misplaced_property')
+        if isinstance(node.func, ast.Name) and node.func.id == 'Thread':
+            return
+        if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
+            return
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:

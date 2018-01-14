@@ -62,7 +62,8 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         for method in self._targets:
             for instances in method.obligation_info._postcondition_instances.values():
                 if instances:
-                    raise InvalidProgramException(self._node, 'invalid.thread.start')
+                    raise InvalidProgramException(self._target_node,
+                                                  'invalid.thread.start')
             collector = OldExpressionCollector()
             for post, _ in method.postcondition:
                 collector.visit(post)
