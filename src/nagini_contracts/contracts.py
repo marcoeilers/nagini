@@ -8,8 +8,8 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
-    Type,
     TypeVar,
+    Union,
 )
 
 
@@ -78,7 +78,7 @@ def Implies(p: bool, q: bool) -> bool:
 
 
 def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Tuple[bool, List[List[Any]]]]) -> bool:
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """

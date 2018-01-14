@@ -1,5 +1,6 @@
 import ast
 import astunparse
+import struct
 
 from typing import (
     Any,

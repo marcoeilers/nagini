@@ -199,6 +199,8 @@ BYTES_TYPE = 'bytes'
 
 INT_TYPE = 'int'
 
+FLOAT_TYPE = 'float'
+
 BOOL_TYPE = 'bool'
 
 PRIMITIVE_PREFIX = '__prim__'
@@ -261,5 +263,6 @@ OPERATOR_FUNCTIONS = {
     ast.Sub: '__sub__',
     ast.Mult: '__mul__',
     ast.FloorDiv: '__floordiv__',
+    ast.Div: '__div__',
     ast.Mod: '__mod__',
 }

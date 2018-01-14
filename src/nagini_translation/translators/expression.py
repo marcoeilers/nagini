@@ -8,6 +8,7 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
     END_LABEL,
+    FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
@@ -213,14 +214,22 @@ class ExpressionTranslator(CommonTranslator):
         inhale = self.viper.Inhale(all, position, info)
         return iter_stmt + [inhale]
 
-
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
-        lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
-                                self.no_info(ctx))
-        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
-        boxed_lit = self.get_function_call(int_class, '__box__', [lit],
-                                           [None], node, ctx)
-        return ([], boxed_lit)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if isinstance(node.n, int):
+            lit = self.viper.IntLit(node.n, pos, info)
+            int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+            boxed_lit = self.get_function_call(int_class, '__box__', [lit],
+                                               [None], node, ctx)
+            return [], boxed_lit
+        if isinstance(node.n, float):
+            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
+            index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
+            float_val = self.get_function_call(float_class, '__create__', [index_lit],
+                                               [None], node, ctx, pos)
+            return [], float_val
+        raise UnsupportedException(node, 'Unsupported number literal')
 
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
@@ -783,13 +792,15 @@ class ExpressionTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
 
-    def _is_primitive_operation(self, left_type: PythonType,
+    def _is_primitive_operation(self, op: ast.operator, left_type: PythonType,
                                 right_type: PythonType) -> bool:
         """
         Determines if a binary operation with the given operand types can be
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
+        if op not in self._primitive_operations:
+            return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
@@ -820,7 +831,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         position = self.to_position(node, ctx)
         stmt = []
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
@@ -849,7 +860,7 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.ops[0], left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.ops[0], position,
                                                          ctx)

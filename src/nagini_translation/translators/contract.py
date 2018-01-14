@@ -2,6 +2,7 @@ import ast
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
+    BOOL_TYPE,
     BUILTIN_PREDICATES,
     INT_TYPE,
     GLOBAL_VAR_FIELD,
@@ -533,10 +534,20 @@ class ContractTranslator(CommonTranslator):
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
-                                             self.viper.Bool, impure)
+        if isinstance(lambda_.body, ast.Tuple):
+            if not len(lambda_.body.elts) == 2:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                                 self.viper.Bool, impure)
 
-        triggers = self._translate_triggers(lambda_.body, node, ctx)
+            triggers = self._translate_triggers(lambda_.body, node, ctx)
+        else:
+            body_type = self.get_type(lambda_.body, ctx)
+            if not body_type or body_type.name != BOOL_TYPE:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body, ctx,
+                                                 self.viper.Bool, impure)
+            triggers = []
 
         ctx.remove_alias(arg.arg)
         if body_stmt:

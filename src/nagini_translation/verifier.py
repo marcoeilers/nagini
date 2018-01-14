@@ -49,8 +49,7 @@ class Failure(VerificationResult):
         for e in all_errors:
             if e not in unique_errors:
                 unique_errors.append(e)
-        return "Verification failed\nErrors:\n" + '\n'.join(
-            all_errors)
+        return "Verification failed\nErrors:\n" + '\n'.join(unique_errors)
 
 
 class Silicon:
