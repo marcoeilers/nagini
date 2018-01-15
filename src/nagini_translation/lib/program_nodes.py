@@ -221,7 +221,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             module_result = module.get_type(prefixes, name)
             if module_result is not None:
                 return module_result
-        return None
+        return None, None
 
     def get_func_type(self, path: List[str]):
         """
@@ -406,6 +406,22 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
+    def field_type_match(self, typeA: 'PythonType', typeB: 'PythonType') -> bool:
+        """
+        Checks if types are either the same or, if one of them is an union, checks
+        if the other type belongs to the set of types in the union. Finally, if
+        both types are unions, this function returns true if they have elements
+        in common.
+        """
+        if isinstance(typeA, UnionType) and not isinstance(typeB, UnionType):
+            return typeB in typeA.get_types()
+        if isinstance(typeB, UnionType) and not isinstance(typeA, UnionType):
+            return typeA in typeB.get_types()
+        if isinstance(typeA, UnionType) and isinstance(typeB, UnionType):
+            return len(typeA.get_types() & typeB.get_types()) > 0
+        else:
+            return typeA == typeB
+
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonType') -> 'PythonField':
         """
@@ -414,10 +430,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert field.type == type
+            assert self.field_type_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert field.type == type
+            assert self.field_type_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
