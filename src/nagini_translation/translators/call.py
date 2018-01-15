@@ -163,7 +163,7 @@ class CallTranslator(CommonTranslator):
         current_type = result_type
         while current_type:
             if isinstance(current_type, GenericType):
-                vars_args = zip(current_type.cls.type_vars.items(),
+                vars_args = zip(current_type.python_class.type_vars.items(),
                                 current_type.type_args)
                 for (name, var), arg in vars_args:
                     literal = self.type_factory.translate_type_literal(arg, pos,
@@ -921,6 +921,15 @@ class CallTranslator(CommonTranslator):
             return self._translate_method_call(target, args, arg_stmts,
                                                position, node, ctx)
 
+    def _is_thread_method_call(self, node: ast.Call, name: str, ctx: Context) -> bool:
+        if isinstance(node.func, ast.Attribute):
+            val_type = self.get_type(node.func.value, ctx)
+            if (isinstance(val_type, PythonClass) and
+                        val_type.name == "Thread" and
+                        node.func.attr == name):
+                return True
+            return False
+
     def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
@@ -950,13 +959,9 @@ class CallTranslator(CommonTranslator):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
-        elif (isinstance(node.func,ast.Attribute) and
-                      self.get_type(node.func.value,ctx).name == "Thread" and
-                      node.func.attr == "start") :
+        elif self._is_thread_method_call(node, 'start', ctx):
             return self._translate_thread_start(node,ctx)
-        elif (isinstance(node.func,ast.Attribute) and
-                      self.get_type(node.func.value,ctx).name == "Thread" and
-                      node.func.attr == "join"):
+        elif self._is_thread_method_call(node, 'join', ctx):
                 return self._translate_thread_join(node,ctx)
         else:
             return self.translate_normal_call_node(node, ctx, impure)

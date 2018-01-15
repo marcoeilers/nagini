@@ -21,7 +21,7 @@ class A:
 
     def __init__(self) -> None:
         Ensures(Acc(self.a) and Acc(self.b))
-        self.a = None   # type: Optional[Lock]
+        self.a = None   # type: Optional[Lock[A]]
         self.b = 0      # type: int
 
     def d3(self) -> None:
@@ -61,14 +61,14 @@ class A:
 
     def timed_release_unbounded(self) -> None:
         x = A()
-        x.a = Lock()
+        x.a = Lock(x)
         x.a.acquire()
         x.b = 15
         self.quick_release(x)
 
     def timed_release_unbounded_subzero(self) -> None:
         x = A()
-        x.a = Lock()
+        x.a = Lock(x)
         x.a.acquire()
         x.b = -1
         #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)

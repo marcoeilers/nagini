@@ -72,7 +72,7 @@ def release_3(l: Lock) -> None:
 
 def terminating_1() -> None:
     Requires(MustTerminate(2))
-    l = Lock()
+    l = Lock(object())
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
@@ -100,7 +100,7 @@ def over_in_minus_one(l: Lock) -> None:
 
 
 def check_over_in_minus_one() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one(l)
@@ -117,13 +117,13 @@ def over_in_minus_one_conditional(l: Lock, b: bool) -> None:
 
 
 def check_over_in_minus_one_conditional_1() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     over_in_minus_one_conditional(l, True)
 
 
 def check_over_in_minus_one_conditional_2() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one_conditional(l, False)
@@ -133,7 +133,7 @@ def check_over_in_minus_one_conditional_2() -> None:
 
 
 def test_measures_1() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     while True:
         #:: ExpectedOutput(invariant.not.established:obligation_measure.non_positive)
@@ -142,7 +142,7 @@ def test_measures_1() -> None:
 
 
 def test_measures_2() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     while False:
         # Negative measure is ok because loop is never executed.
@@ -152,7 +152,7 @@ def test_measures_2() -> None:
 
 
 def test_measures_3() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while i > 0:
@@ -162,7 +162,7 @@ def test_measures_3() -> None:
 
 
 def test_measures_4() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while i > -1:
@@ -184,7 +184,7 @@ class A:
 
 def test_loop_condition_framing_1() -> None:
     a = A()
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     #:: UnexpectedOutput(carbon)(application.precondition:assertion.false, 70)
@@ -200,7 +200,7 @@ def test_loop_condition_framing_1() -> None:
 
 def test_loop_condition_framing_2() -> None:
     a = A()
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while a.steps < 5:

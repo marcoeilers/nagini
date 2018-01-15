@@ -769,7 +769,7 @@ class UnionType(GenericType):
 
     @property
     def python_class(self) -> PythonClass:
-        return self.cls
+        return self.cls.python_class
 
     def get_types(self) -> Set[PythonClass]:
         """

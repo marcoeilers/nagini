@@ -43,7 +43,7 @@ def thread_join_wrong_level(t: Thread, cl: Cell) -> None:
     Requires(getArg(t, 1) is 7)
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t)))
-    #:: ExpectedOutput(thread.join.failed:assertion.false)
+    #:: ExpectedOutput(thread.join.failed:wait.level.invalid)
     t.join(Cell.incr, decr)
 
 
@@ -55,7 +55,7 @@ def thread_join_wrong_method(t: Thread, cl: Cell) -> None:
     Requires(Acc(ThreadPost(t)))
     Requires(WaitLevel() < Level(t))
     t.join(decr)
-    #:: ExpectedOutput(assertion.failed:insufficient.permission)
+    #:: ExpectedOutput(assertion.failed:insufficient.permission)|ExpectedOutput(carbon)(assertion.failed:assertion.false)
     assert cl.val == 116
 
 
@@ -63,7 +63,7 @@ def thread_join_minimal(t: Thread, cl: Cell) -> None:
     Requires(MayJoin(t))
     Requires(WaitLevel() < Level(t))
     t.join(Cell.incr, decr)
-    #:: ExpectedOutput(assertion.failed:insufficient.permission)
+    #:: ExpectedOutput(assertion.failed:insufficient.permission)|ExpectedOutput(carbon)(assertion.failed:assertion.false)
     assert cl.val == 116
 
 
@@ -75,7 +75,7 @@ def thread_join_no_post_perm(t: Thread, cl: Cell) -> None:
     Requires(MayJoin(t))
     Requires(WaitLevel() < Level(t))
     t.join(Cell.incr, decr)
-    #:: ExpectedOutput(assertion.failed:insufficient.permission)
+    #:: ExpectedOutput(assertion.failed:insufficient.permission)|ExpectedOutput(carbon)(assertion.failed:assertion.false)
     assert cl.val == 116
 
 
