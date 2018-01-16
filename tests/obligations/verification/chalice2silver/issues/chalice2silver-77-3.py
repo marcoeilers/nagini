@@ -14,7 +14,7 @@ from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def test1(l: Lock) -> None:
+def test1(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
@@ -24,7 +24,7 @@ def test1(l: Lock) -> None:
     l.release()
 
 
-def test2(l: Lock) -> None:
+def test2(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     i = 0
@@ -35,7 +35,7 @@ def test2(l: Lock) -> None:
     l.release()
 
 
-def test3(l: Lock) -> None:
+def test3(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     i = 0

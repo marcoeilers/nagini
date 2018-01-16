@@ -191,6 +191,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
                         return rectype.type_args[target.generic_type]
+                    if isinstance(target.type, TypeVar):
+                        while rectype.python_class is not target.cls:
+                            rectype = rectype.superclass
+                        name_list = list(rectype.python_class.type_vars.keys())
+                        index = name_list.index(target.type.name)
+                        return rectype.type_args[index]
             return target.type
         if isinstance(target, PythonField):
             result = target.type

@@ -21,7 +21,7 @@ from typing import Optional
 class A:
 
     def __init__(self) -> None:
-        self.x = None   # type: Optional[Lock]
+        self.x = None   # type: Optional[Lock[A]]
         self.y = 0
 
     def unbounded_transfer(self) -> None:
@@ -29,15 +29,17 @@ class A:
         r.acquire()
         self.does_release(r)
 
-    def does_release(self, r: Lock) -> None:
+    def does_release(self, r: Lock['A']) -> None:
         Requires(MustRelease(r, 2))
+        Requires(r.invariant())
         r.release()
 
-    def quick_release(self, r: Lock) -> None:
+    def quick_release(self, r: Lock['A']) -> None:
         Requires(MustTerminate(2) and MustRelease(r, 2))
+        Requires(r.invariant())
         r.release()
 
-    def diverge(self, r: Lock) -> None:
+    def diverge(self, r: Lock['A']) -> None:
         Requires(r is not None)
 
     def unbounded_transfer_diverge(self) -> None:
@@ -49,7 +51,7 @@ class A:
 
         r.release()
 
-    def skip(self, r: Lock) -> None:
+    def skip(self, r: Lock[A]) -> None:
         Requires(MustTerminate(1))
 
     def unbounded_skip(self) -> None:

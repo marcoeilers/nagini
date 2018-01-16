@@ -113,19 +113,20 @@ def create_lock_between_3() -> None:
 # Methods.
 
 
-def release(l: Lock) -> None:
+def release(l: Lock[object]) -> None:
     Requires(MustRelease(l, 2))
+    Requires(l.invariant())
     l.release()
 
 
 #:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
-def acquire(l: Lock) -> None:
+def acquire(l: Lock[object]) -> None:
     Requires(l is not None)
     #:: ExpectedOutput(call.precondition:assertion.false)
     l.acquire()
 
 
-def double_acquire(l: Lock) -> None:
+def double_acquire(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
@@ -133,10 +134,11 @@ def double_acquire(l: Lock) -> None:
     l.acquire()
 
 
-def acquire_release_multiple(l: Lock) -> None:
+def acquire_release_multiple(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
+    Ensures(l.invariant())
     l.acquire()
     l.release()
     l.acquire()
@@ -151,13 +153,13 @@ def acquire_release_multiple_caller_1() -> None:
 
 
 #:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
-def acquire_release_multiple_caller_2(l: Lock) -> None:
+def acquire_release_multiple_caller_2(l: Lock[object]) -> None:
     Requires(l is not None)
     #:: ExpectedOutput(call.precondition:assertion.false)
     acquire_release_multiple(l)
 
 
-def change_level(l: Lock) -> None:
+def change_level(l: Lock[object]) -> None:
     Requires(l is not None)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(WaitLevel() < Level(l))
@@ -166,7 +168,7 @@ def change_level(l: Lock) -> None:
 # Loops.
 
 
-def locks_creating_loop() -> Lock:
+def locks_creating_loop() -> Lock[object]:
     Ensures(WaitLevel() < Level(Result()))
     l = Lock(object())
     i = 0
@@ -179,7 +181,7 @@ def locks_creating_loop() -> Lock:
         i += 1
     return l
 
-def locks_creating_loop_nested() -> Lock:
+def locks_creating_loop_nested() -> Lock[object]:
     Ensures(WaitLevel() < Level(Result()))
     l = Lock(object())
     i = 0

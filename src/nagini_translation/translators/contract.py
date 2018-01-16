@@ -584,17 +584,7 @@ class ContractTranslator(CommonTranslator):
         old_string = pprint(node.args[1])
         index = self._get_string_value(old_string)
         index = self.viper.IntLit(index, pos, info)
-        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
         func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, index], self.viper.Ref,
-                                        pos, info, THREAD_DOMAIN)
-        return stmt, func
-
-    def translate_get_method(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        stmt, thread = self.translate_expr(node.args[0], ctx)
-        pos = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
-        func = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread], method_id_type,
                                         pos, info, THREAD_DOMAIN)
         return stmt, func
 
@@ -731,7 +721,7 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'getOld':
             return self.translate_get_old(node, ctx)
         elif func_name == 'getMethod':
-            return self.translate_get_method(node, ctx)
+            raise InvalidProgramException(node, 'invalid.get.method.use')
         elif func_name == 'arg':
             raise InvalidProgramException(node, 'invalid.arg.use')
         else:

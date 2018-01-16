@@ -51,13 +51,15 @@ class Lock(BaseLock, Generic[T]):
     def invariant(self) -> bool:
         return True
 
+    @ContractOnly
     def acquire(self) -> None:
         """Acquire the lock."""
         Requires(MustTerminate(1))
         Requires(WaitLevel() < Level(self))
-        Ensures(MustRelease(self))
         Ensures(self.invariant())
+        Ensures(MustRelease(self))
 
+    @ContractOnly
     def release(self) -> None:
         """Release the lock."""
         Requires(MustTerminate(1))

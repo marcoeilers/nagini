@@ -140,6 +140,13 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def _is_lock_subtype(self, cls: PythonClass) -> bool:
+        if cls is None:
+            return False
+        if cls.name == 'Lock':
+            return cls
+        return self._is_lock_subtype(cls.superclass)
+
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -155,6 +162,7 @@ class CallTranslator(CommonTranslator):
                                                        self.translator)
         result_type = self.get_type(node, ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
         # the concrete type arguments.
@@ -199,6 +207,20 @@ class CallTranslator(CommonTranslator):
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
         stmts = [new, type_inhale] + may_set_inhales
+
+        if self._is_lock_subtype(target_class):
+            lock_class = self._is_lock_subtype(target_class)
+            locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
+                                                [None], node, ctx, pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+            invariant_pred = lock_class.get_predicate('invariant')
+            full_perm = self.viper.FullPerm(pos, info)
+            pred_acc = self.viper.PredicateAccess([res_var.ref()],
+                                                  invariant_pred.sil_name, pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
+            stmts.append(self.viper.Fold(acc_pred, pos, info))
+
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls
@@ -1018,6 +1040,8 @@ class CallTranslator(CommonTranslator):
         target = self.get_target(target_arg, ctx)
         if not isinstance(target, PythonMethod):
             raise InvalidProgramException(node, 'invalid.thread.creation')
+        if target.pure or target.predicate:
+            raise InvalidProgramException(node, 'invalid.thread.creation')
         if not isinstance(args_arg, ast.Tuple):
             raise InvalidProgramException(node, 'invalid.thread.creation')
         meth_args = args_arg.elts if args_arg is not None else []
@@ -1092,7 +1116,7 @@ class CallTranslator(CommonTranslator):
             target = self.get_target(arg, ctx)
             if not (isinstance(target, PythonMethod) and not target.pure and
                         not target.predicate):
-                raise InvalidProgramException(node, 'invalid.join')
+                raise InvalidProgramException(node, 'invalid.thread.start')
             method_options.append(target)
 
         stmts = []
@@ -1158,7 +1182,7 @@ class CallTranslator(CommonTranslator):
             target = self.get_target(arg, ctx)
             if not (isinstance(target, PythonMethod) and not target.pure and
                         not target.predicate):
-                raise InvalidProgramException(node, 'invalid.join')
+                raise InvalidProgramException(node, 'invalid.thread.join')
             method_options.append(target)
 
         else_block = self.translate_block([], pos, info)
