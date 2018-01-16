@@ -406,7 +406,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
-    def field_type_match(self, typeA: 'PythonType', typeB: 'PythonType') -> bool:
+    def type_match(self, typeA: 'PythonType', typeB: 'PythonType') -> bool:
         """
         Checks if types are either the same or, if one of them is an union, checks
         if the other type belongs to the set of types in the union. Finally, if
@@ -430,10 +430,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.field_type_match(field.type, type)
+            assert self.type_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.field_type_match(field.type, type)
+            assert self.type_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)

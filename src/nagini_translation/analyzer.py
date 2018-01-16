@@ -1127,7 +1127,7 @@ class Analyzer(ast.NodeVisitor):
                         context = [type_in_union.name]
                     type, _ = self.module.get_type(context, node.attr)
                     set_of_types.add(self.convert_type(type))
-                return UnionType(list(set_of_types))
+                return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:
