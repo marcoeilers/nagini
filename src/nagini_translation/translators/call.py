@@ -29,6 +29,7 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     UnionType,
     toposort_classes,
+    chain_if_stmts,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -688,20 +689,6 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def chain_if_stmts(self, guarded_blocks: List[Tuple[Expr, Stmt]],
-                       position, info, ctx) -> Stmt:
-        """
-        Receives a list of tuples each one containing a guard and a guarded
-        block and produces an equivalent chain of if statements.
-        """
-        assert(guarded_blocks)
-        guard, then_block = guarded_blocks[0]
-        if len(guarded_blocks) == 1:
-            else_block = self.translate_block([], self.no_position(ctx), info)
-        else:
-            else_block = self.chain_if_stmts(guarded_blocks[1:], position, info, ctx)
-        return self.viper.If(guard, then_block, else_block, position, info)
-
     def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
                                        arg_types: List[PythonType], rectype: UnionType,
                                        node: ast.Call, ctx: Context,
@@ -731,7 +718,7 @@ class CallTranslator(CommonTranslator):
                                        return_var, position, info))
             method_call_block = self.translate_block(method_call, position, info)
             guarded_blocks.append((method_call_guard, method_call_block))
-        return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
+        return ([chain_if_stmts(guarded_blocks, self.viper, position, info, ctx)],
                 final_return_var)
 
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,

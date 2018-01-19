@@ -21,7 +21,7 @@ from nagini_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
-from nagini_translation.lib.typedefs import Expr
+from nagini_translation.lib.typedefs import Expr, Stmt
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
@@ -1736,6 +1736,19 @@ def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
 
     return list(toposort_flatten(map, False))
 
+def chain_if_stmts(guarded_blocks: List[Tuple[Expr, Stmt]],
+                   viper, position, info, ctx) -> Stmt:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    block and produces an equivalent chain of if statements.
+    """
+    assert(guarded_blocks)
+    guard, then_block = guarded_blocks[0]
+    if len(guarded_blocks) == 1:
+        else_block = viper.Seqn([], position, info) # Empty block
+    else:
+        else_block = chain_if_stmts(guarded_blocks[1:], viper, position, info, ctx)
+    return viper.If(guard, then_block, else_block, position, info)
 
 def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
                    viper, position, info, ctx) -> Expr:
