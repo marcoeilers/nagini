@@ -27,7 +27,8 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonType,
     PythonVar,
-    UnionType
+    UnionType,
+    toposort_classes,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -42,7 +43,6 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from toposort import toposort_flatten
 from typing import Dict, List, Tuple, Union, Set
 
 
@@ -688,18 +688,6 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def toposort_classes(self, class_set: Set[PythonClass]) -> List[PythonClass]:
-        """
-        Topological sorting of classes in a set, ensuring that derived classes
-        precede their base classes in the returned list
-        """
-        map = {}
-
-        for type in class_set:
-            map[type] = set(type.all_subclasses) & class_set
-
-        return list(toposort_flatten(map, False))
-
     def chain_if_stmts(self, guarded_blocks: List[Tuple[Expr, Stmt]],
                        position, info, ctx) -> Stmt:
         """
@@ -727,7 +715,7 @@ class CallTranslator(CommonTranslator):
         info = self.no_info(ctx)
         guarded_blocks = []
         # For each class in union
-        for type in self.toposort_classes(rectype.get_types()):
+        for type in toposort_classes(rectype.get_types()):
             # If receiver is an instance of this particular class
             method_call_guard = self.var_type_check(node.func.value.id, type, position,
                                                     ctx)

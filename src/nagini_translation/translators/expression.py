@@ -30,6 +30,9 @@ from nagini_translation.lib.program_nodes import (
     PythonTryBlock,
     PythonType,
     PythonVar,
+    UnionType,
+    toposort_classes,
+    chain_cond_exp,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -48,7 +51,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 
 # Maps function names to bools; caches which functions take an additonal argument
@@ -714,6 +717,23 @@ class ExpressionTranslator(CommonTranslator):
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
             return [], field_func
+        elif isinstance(target.type, UnionType):
+            stmt, receiver = self.translate_expr(node.value, ctx,
+                                                 target_type=self.viper.Ref)
+            guarded_field_access = []
+            for recv_type in toposort_classes(target.type.get_types()):
+                # Create a guard for accessing the field according to receiver's type
+                field_guard = self.var_type_check(target.sil_name, recv_type, position, ctx)
+
+                # Access the field of the specific type
+                field = recv_type.get_field(node.attr).actual_field
+                field_access = self.viper.FieldAccess(receiver, field.sil_field,
+                                                      position, self.no_info(ctx))
+
+                guarded_field_access.append((field_guard, field_access))
+            
+            return (stmt, chain_cond_exp(guarded_field_access, self.viper,
+                                         position, self.no_info(ctx), ctx))
         else:
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)

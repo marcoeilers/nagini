@@ -32,6 +32,7 @@ from nagini_translation.lib.views import (
     IOOperationContentDict,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple
+from toposort import toposort_flatten
 
 
 class ContainerInterface(metaclass=ABCMeta):
@@ -1722,3 +1723,30 @@ class ProgramNodeFactory:
                             interface=False):
         return PythonClass(name, superscope, node_factory, node,
                            superclass, interface)
+
+def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
+    """
+    Topological sorting of classes in a set, ensuring that derived classes
+    precede their base classes in the returned list
+    """
+    map = {}
+
+    for type in class_set:
+        map[type] = set(type.all_subclasses) & class_set
+
+    return list(toposort_flatten(map, False))
+
+
+def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
+                   viper, position, info, ctx) -> Expr:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    expression and produces an equivalent chain of conditional expressions.
+    """
+    assert(len(guarded_expr) >= 2)
+    guard, then_exp = guarded_expr[0]
+    if len(guarded_expr) == 2:
+        _, else_exp = guarded_expr[1]
+    else:
+        else_exp = chain_cond_exp(guarded_expr[1:], viper, position, info, ctx)
+    return viper.CondExp(guard, then_exp, else_exp, position, info)
