@@ -15,6 +15,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
+    PRIMITIVE_SET_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
@@ -611,8 +612,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         otherwise just return the type itself.
         """
         if self.name in PRIMITIVES and self.name not in (PRIMITIVE_SEQ_TYPE + '_type',
+                                                         PRIMITIVE_SET_TYPE + '_type',
                                                          CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
+            if boxed_name == 'Set':
+                boxed_name = 'PSet'
             return self.module.classes[boxed_name]
         return self
 

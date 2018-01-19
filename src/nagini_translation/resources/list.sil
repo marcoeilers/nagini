@@ -77,6 +77,18 @@ method list_extend(self: Ref, other: Ref) returns ()
     ensures acc(other.list_acc, 1/100)
     ensures self.list_acc == old(self.list_acc) ++ other.list_acc
 
+method list___add__(self: Ref, other: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), list(list_arg(typeof(other), 0)))
+    requires issubtype(list_arg(typeof(other), 0), list_arg(typeof(self), 0))
+    requires acc(self.list_acc, 1/100)
+    requires acc(other.list_acc, 1/100)
+    ensures typeof(res) == typeof(self)
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(other.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures res.list_acc == self.list_acc ++ other.list_acc
+
 method list_reverse(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, 1/100)

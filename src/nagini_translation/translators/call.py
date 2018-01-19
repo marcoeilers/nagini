@@ -494,7 +494,7 @@ class CallTranslator(CommonTranslator):
         if called_func.method_type == MethodType.normal:
             if isinstance(node.func, ast.Attribute):
                 called_name = get_func_name(node.func.value)
-                if called_name == 'Result':
+                if called_name in ('Result', 'TypedResult'):
                     return True
                 rec_target = self.get_target(node.func.value, ctx)
                 if isinstance(rec_target, PythonModule):

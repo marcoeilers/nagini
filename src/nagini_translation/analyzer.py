@@ -1150,7 +1150,7 @@ class Analyzer(ast.NodeVisitor):
         elif (isinstance(node, ast.Call) and
               isinstance(node.func, ast.Name) and
               node.func.id in CONTRACT_FUNCS):
-            if node.func.id == 'Result':
+            if node.func.id in ('Result', 'TypedResult'):
                 return self.current_function.type
             else:
                 raise UnsupportedException(node)
