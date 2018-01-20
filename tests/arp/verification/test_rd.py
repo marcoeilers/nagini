@@ -33,7 +33,7 @@ class Clazz:
         Ensures(Acc(self.y) and Acc(self.x, 1/2 - ARP()) and self.y == self.x + 1)
         self.y = self.x + 1
 
-    # this method sometimes fails to verify, sometimes it works. Depends on phase of moon or something...
+    # this method sometimes fails to verify, sometimes it works. Silicon probably runs into a timeout
     def m1_4(self) -> None:
         Requires(self != None)
         Requires(Acc(self.y) and Acc(self.x, 2 * ARP()))

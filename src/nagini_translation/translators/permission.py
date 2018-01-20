@@ -76,9 +76,12 @@ class PermTranslator(CommonTranslator):
             if len(node.args) == 0:
                 return self.viper.FuncApp('rd', [], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Ref, {})
-            elif len(node.args) == 1 and isinstance(node.args[0], ast.Num):
-                arg = self.viper.IntLit(node.args[0].n, self.to_position(node, ctx), self.no_info(ctx))
+            elif len(node.args) == 1:
+                arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Int)
+                if arg0_stmt:
+                    raise InvalidProgramException(node, 'purity.violated')
+                # arg = self.viper.IntLit(node.args[0].n, self.to_position(node, ctx), self.no_info(ctx))
                 formal_arg = self.viper.LocalVarDecl('count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
-                return self.viper.FuncApp('rdc', [arg], self.to_position(node, ctx),
+                return self.viper.FuncApp('rdc', [arg0], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Perm, [formal_arg])
         raise UnsupportedException(node)

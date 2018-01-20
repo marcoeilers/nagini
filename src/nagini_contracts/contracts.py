@@ -18,7 +18,7 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Rd', 'Read', 'Fold', 'Unfold', 'Unfolding',
+                  'Exists', 'Low', 'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
                   'MayCreate',]
 
@@ -211,6 +211,13 @@ def ARP(counting: int = None) -> float:
     pass
 
 
+def Wildcard(field) -> bool:
+    """
+    Wildcard permission to a predicate or field, only to be used in pure contexts.
+    """
+    pass
+
+
 def Fold(predicate: bool) -> None:
     pass
 
@@ -322,6 +329,7 @@ __all__ = [
         'Acc',
         'Rd',
         'ARP',
+        'Wildcard',
         'Fold',
         'Unfold',
         'Unfolding',
