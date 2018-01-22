@@ -769,7 +769,7 @@ class UnionType(GenericType):
 
     @property
     def python_class(self) -> PythonClass:
-        return self.cls
+        return self.cls.python_class
 
     def get_types(self) -> Set[PythonClass]:
         """
@@ -889,6 +889,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.threading_id = None
         self.definition_deps = set()
         self.call_deps = set()
 
@@ -899,7 +900,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         add_all_call_deps(self.call_deps, res, prefix)
 
-
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
         Creates fresh Silver names for all parameters and initializes them,
@@ -907,6 +907,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
@@ -1051,6 +1052,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):

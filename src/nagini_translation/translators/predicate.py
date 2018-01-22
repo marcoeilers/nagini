@@ -63,6 +63,7 @@ class PredicateTranslator(CommonTranslator):
         args = []
         self_var_ref = root.args[next(iter(root.args))].ref()
         arg_types = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        self.bind_type_vars(root, ctx)
         for arg in root.args.values():
             args.append(arg.decl)
             arg_type = self.type_check(arg.ref(), arg.type,
@@ -79,6 +80,7 @@ class PredicateTranslator(CommonTranslator):
                                               'invalid.predicate')
             ctx.current_function = instance
             ctx.module = instance.module
+            self.bind_type_vars(instance, ctx)
             # Replace variables in instance by variables in root, since we use the
             # parameter names from root.
             for root_name, current_name in zip(root.args.keys(),

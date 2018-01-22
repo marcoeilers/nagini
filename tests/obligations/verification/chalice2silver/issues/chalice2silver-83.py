@@ -13,12 +13,12 @@ from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def foo(l: Lock) -> None:
+def foo(l: Lock[object]) -> None:
     Requires(MustRelease(l, 2))
     Ensures(MustRelease(l, 2))
 
 
-def caller(l: Lock) -> None:
+def caller(l: Lock[object]) -> None:
     Requires(MustRelease(l, 3))
     Ensures(False)
 

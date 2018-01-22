@@ -8,14 +8,18 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
     END_LABEL,
+    FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
+    GET_METHOD_FUNC,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
     LIST_TYPE,
+    METHOD_ID_DOMAIN,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     SET_TYPE,
     STRING_TYPE,
+    THREAD_DOMAIN,
     TUPLE_TYPE,
 )
 from nagini_translation.lib.errors import rules
@@ -213,14 +217,22 @@ class ExpressionTranslator(CommonTranslator):
         inhale = self.viper.Inhale(all, position, info)
         return iter_stmt + [inhale]
 
-
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
-        lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
-                                self.no_info(ctx))
-        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
-        boxed_lit = self.get_function_call(int_class, '__box__', [lit],
-                                           [None], node, ctx)
-        return ([], boxed_lit)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if isinstance(node.n, int):
+            lit = self.viper.IntLit(node.n, pos, info)
+            int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+            boxed_lit = self.get_function_call(int_class, '__box__', [lit],
+                                               [None], node, ctx)
+            return [], boxed_lit
+        if isinstance(node.n, float):
+            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
+            index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
+            float_val = self.get_function_call(float_class, '__create__', [index_lit],
+                                               [None], node, ctx, pos)
+            return [], float_val
+        raise UnsupportedException(node, 'Unsupported number literal')
 
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
@@ -354,7 +366,6 @@ class ExpressionTranslator(CommonTranslator):
         Creates a tuple containing the given values.
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
-        type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
@@ -382,11 +393,9 @@ class ExpressionTranslator(CommonTranslator):
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
-        call = self.get_function_call(target_type, '__getitem__', args,
-                                      arg_types, node, ctx)
-        result = call
-        result_type = self.get_type(node, ctx)
-        return target_stmt + index_stmt, result
+        call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,
+                                                       arg_types, node, ctx)
+        return target_stmt + index_stmt + call_stmt, call
 
     def _translate_slice_subscript(self, node: ast.Subscript, target: Expr,
                                    target_type: PythonType,
@@ -786,13 +795,15 @@ class ExpressionTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
 
-    def _is_primitive_operation(self, left_type: PythonType,
+    def _is_primitive_operation(self, op: ast.operator, left_type: PythonType,
                                 right_type: PythonType) -> bool:
         """
         Determines if a binary operation with the given operand types can be
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
+        if op not in self._primitive_operations:
+            return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
@@ -822,31 +833,91 @@ class ExpressionTranslator(CommonTranslator):
         function or method call.
         """
         position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         stmt = []
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
         func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        called_method = left_type.get_func_or_method(func_name)
-        if called_method.pure:
-            result = self.get_function_call(left_type, func_name,
-                                            [left, right],
-                                            [left_type, right_type],
-                                            node, ctx)
+        call_stmt, call = self.get_func_or_method_call(left_type, func_name,
+                                                       [left, right],
+                                                       [left_type, right_type],
+                                                       node, ctx)
+        return stmt + call_stmt, call
+
+    def is_thread_method_definition(self, node: ast.Compare,
+                                    ctx: Context) -> bool:
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            return False
+        if not isinstance(node.ops[0], (ast.Eq, ast.Is)):
+            return False
+        for arg in (node.left, node.comparators[0]):
+            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and
+                        arg.func.id == 'getMethod'):
+                return True
+        return False
+
+    def is_type_equality(self, node: ast.Compare, ctx: Context) -> bool:
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            return False
+        if not isinstance(node.ops[0], (ast.Eq, ast.Is, ast.NotEq, ast.IsNot)):
+            return False
+        for arg in (node.left, node.comparators[0]):
+            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and
+                        arg.func.id == 'type'):
+                for other in (node.left, node.comparators[0]):
+                    if other is not arg:
+                        other_target = self.get_target(other, ctx)
+                        if isinstance(other_target, PythonType):
+                            return True
+        return False
+
+    def translate_type_equality(self, node: ast.Compare, ctx: Context) -> StmtsAndExpr:
+        if (isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name) and
+                    node.left.func.id == 'type'):
+            type_call = node.left
+            type_literal = node.comparators[0]
         else:
-            result_type = called_method.type
-            res_var = ctx.actual_function.create_variable('op_res',
-                                                          result_type,
-                                                          self.translator)
-            stmt += self.get_method_call(left_type, func_name,
-                                         [left, right],
-                                         [left_type, right_type],
-                                         [res_var.ref(node, ctx)], node,
-                                         ctx)
-            result = res_var.ref(node, ctx)
-        return stmt, result
+            type_call = node.comparators[0]
+            type_literal = node.left
+        target = self.get_target(type_literal, ctx)
+        assert isinstance(target, PythonType)
+        call_stmt, call = self.translate_expr(type_call, ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        type_literal = self.type_factory.translate_type_literal(target.python_class, pos, ctx,
+                                                                alias=call)
+        if isinstance(node.ops[0], (ast.Is, ast.Eq)):
+            func = self.viper.EqCmp
+        else:
+            func = self.viper.NeCmp
+        comp = func(type_literal, call, pos, info)
+        return [], comp
+
+
+    def translate_thread_method_definition(self, node: ast.Compare,
+                                           ctx: Context) -> StmtsAndExpr:
+        if (isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name) and
+                    node.left.func.id == 'getMethod'):
+            get_call = node.left
+            method_literal = node.comparators[0]
+        else:
+            get_call = node.comparators[0]
+            method_literal = node.left
+        target_method = self.get_target(method_literal, ctx)
+        if not isinstance(target_method, PythonMethod):
+            raise InvalidProgramException(node, 'invalid.get.method')
+        thread_stmt, thread = self.translate_expr(get_call.args[0], ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
+        method_literal = self.viper.DomainFuncApp(target_method.threading_id, [],
+                                                  method_id_type,
+                                                  pos, info, METHOD_ID_DOMAIN)
+        comparison = self.viper.EqCmp(thread_method, method_literal, pos, info)
+        return thread_stmt, comparison
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
@@ -856,6 +927,10 @@ class ExpressionTranslator(CommonTranslator):
                                            self.no_info(ctx)))
         if self.is_wait_level_comparison(node, ctx):
             return self.translate_wait_level_comparison(node, ctx)
+        if self.is_thread_method_definition(node, ctx):
+            return self.translate_thread_method_definition(node, ctx)
+        if self.is_type_equality(node, ctx):
+            return self.translate_type_equality(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)
@@ -866,7 +941,7 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.ops[0], left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.ops[0], position,
                                                          ctx)
@@ -925,12 +1000,12 @@ class ExpressionTranslator(CommonTranslator):
             ctx: Context) -> StmtsAndExpr:
         args = [right, left]
         arg_types = [right_type, left_type]
-        app = self.get_function_call(
+        app_stmt, app = self.get_func_or_method_call(
             right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
             app = self.viper.Not(
                 app, self.to_position(node, ctx), self.no_info(ctx))
-        return [], app
+        return app_stmt, app
 
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:

@@ -14,9 +14,12 @@ BUILTINS = ['cast',
             'set',
             'super',
             'range',
-            'type']
+            'type',
+            'list']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
+THREADING = ['Thread']
+
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
@@ -37,6 +40,22 @@ CHECK_DEFINED_FUNC = '_checkDefined'
 GLOBAL_CHECK_DEFINED_FUNC = '_checkDefinedG'
 
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
+
+JOINABLE_FUNC = '_joinable'
+
+THREAD_POST_PRED = '_thread_post'
+
+THREAD_START_PRED = '_thread_start'
+
+THREAD_DOMAIN = 'Thread'
+
+METHOD_ID_DOMAIN = 'ThreadingID'
+
+GET_ARG_FUNC = 'getArg'
+
+GET_OLD_FUNC = 'getOld'
+
+GET_METHOD_FUNC = 'getMethod'
 
 GLOBAL_VAR_FIELD = '_val'
 
@@ -72,6 +91,7 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    'Thread',
     MAY_SET_PRED,
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,
@@ -169,6 +189,7 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
+    '__getitem__'
 }
 
 RESULT_NAME = '_res'
@@ -196,6 +217,8 @@ STRING_TYPE = 'str'
 BYTES_TYPE = 'bytes'
 
 INT_TYPE = 'int'
+
+FLOAT_TYPE = 'float'
 
 BOOL_TYPE = 'bool'
 
@@ -236,6 +259,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'nagini_contracts.contracts',
                    'nagini_contracts.io',
                    'nagini_contracts.obligations',
+                   'nagini_contracts.thread',
                    'sys',
                    'types',
                    'typing',
@@ -259,5 +283,6 @@ OPERATOR_FUNCTIONS = {
     ast.Sub: '__sub__',
     ast.Mult: '__mul__',
     ast.FloorDiv: '__floordiv__',
+    ast.Div: '__div__',
     ast.Mod: '__mod__',
 }

@@ -302,6 +302,13 @@ class AbstractTranslator(metaclass=ABCMeta):
             ctx, methodname, args, targets, position, info, target_method,
             target_node)
 
+    def create_method_fork(self, ctx: Context, targets, thread: Expr,
+                           position: Position, info: Info,
+                           target_node: ast.Call = None) -> List[Stmt]:
+        translator = self.config.obligation_translator
+        return translator.create_method_fork(ctx, targets, thread, position, info,
+            target_node)
+
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], ctx: Context,
             err_var: PythonVar = None) -> None:

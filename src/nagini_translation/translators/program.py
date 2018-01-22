@@ -8,13 +8,21 @@ from nagini_translation.lib.constants import (
     COMBINE_NAME_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
+    GET_ARG_FUNC,
+    GET_METHOD_FUNC,
+    GET_OLD_FUNC,
     GLOBAL_CHECK_DEFINED_FUNC,
     GLOBAL_VAR_FIELD,
     IS_DEFINED_FUNC,
+    JOINABLE_FUNC,
     MAY_SET_PRED,
+    METHOD_ID_DOMAIN,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
+    THREAD_DOMAIN,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     MethodType,
@@ -563,6 +571,50 @@ class ProgramTranslator(CommonTranslator):
                                      self.to_position(func.node, ctx), self.no_info(ctx),
                                      FUNCTION_DOMAIN_NAME)
 
+    def create_joinable_function(self, ctx: Context) -> Function:
+        thread_arg_decl = self.viper.LocalVarDecl('t', self.viper.Ref,
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx))
+        return self.viper.Function(JOINABLE_FUNC, [thread_arg_decl], self.viper.Bool,
+                                   [], [], None, self.no_position(ctx), self.no_info(ctx))
+
+    def create_thread_predicates(self, ctx: Context) -> Function:
+        thread_arg_decl = self.viper.LocalVarDecl('t', self.viper.Ref,
+                                                  self.no_position(ctx),
+                                                  self.no_info(ctx))
+        post_pred =  self.viper.Predicate(THREAD_POST_PRED, [thread_arg_decl], None,
+                                          self.no_position(ctx), self.no_info(ctx))
+        start_pred = self.viper.Predicate(THREAD_START_PRED, [thread_arg_decl], None,
+                                          self.no_position(ctx), self.no_info(ctx))
+        return [start_pred, post_pred]
+
+    def create_method_id_domain(self, constants: List['silver.ast.DomainFunc'],
+                                ctx: Context) -> 'silver.ast.Domain':
+        return self.viper.Domain(METHOD_ID_DOMAIN, constants, [], [],
+                                 self.no_position(ctx), self.no_info(ctx))
+
+    def translate_method_id_to_constant(self, method, ctx) -> 'silver.ast.DomainFunc':
+        func_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        return self.viper.DomainFunc(method.threading_id,[],func_type, True,
+                                     self.to_position(method.node,ctx), self.no_info(ctx),
+                                     METHOD_ID_DOMAIN)
+
+    def create_thread_domain(self, ctx: Context) -> 'silver.ast.Domain':
+        pos, info = self.no_position(ctx), self.no_info(ctx)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_param = self.viper.LocalVarDecl('t', self.viper.Ref, pos, info)
+        index_param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
+        get_method = self.viper.DomainFunc(GET_METHOD_FUNC, [thread_param],
+                                           method_id_type, False, pos, info,
+                                           THREAD_DOMAIN)
+        get_arg = self.viper.DomainFunc(GET_ARG_FUNC, [thread_param, index_param],
+                                        self.viper.Ref, False, pos, info, THREAD_DOMAIN)
+        get_old = self.viper.DomainFunc(GET_OLD_FUNC, [thread_param, index_param],
+                                       self.viper.Ref, False, pos, info, THREAD_DOMAIN)
+        domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
+                                   pos, info)
+        return domain
+
     def create_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
@@ -626,6 +678,8 @@ class ProgramTranslator(CommonTranslator):
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
         predicates.extend(obl_predicates)
+        predicates.extend(self.create_thread_predicates(ctx))
+        functions.append(self.create_joinable_function(ctx))
         fields.extend(obl_fields)
 
         functions.extend(self.create_definedness_functions(ctx))
@@ -639,7 +693,7 @@ class ProgramTranslator(CommonTranslator):
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
         func_constants = []
-
+        threading_ids_constants = []
         # Silver names of the set of nodes which have been selected by the user
         # to be verified (if any).
         selected_names = []
@@ -695,10 +749,16 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = module
 
             for function in module.functions.values():
+                if function.interface:
+                    continue
                 self.track_dependencies(selected_names, selected, function, ctx)
                 functions.append(self.translate_function(function, ctx))
                 func_constants.append(self.translate_function_constant(function, ctx))
             for method in module.methods.values():
+                id_constant = self.translate_method_id_to_constant(method, ctx)
+                threading_ids_constants.append(id_constant)
+                if method.interface:
+                    continue
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
             for pred in module.predicates.values():
@@ -729,6 +789,7 @@ class ProgramTranslator(CommonTranslator):
                                                       'invalid.override')
                 for method_name in cls.methods:
                     method = cls.methods[method_name]
+                    threading_ids_constants.append(self.translate_method_id_to_constant(method, ctx))
                     if method.interface:
                         continue
                     self.track_dependencies(selected_names, selected, method, ctx)
@@ -740,6 +801,7 @@ class ProgramTranslator(CommonTranslator):
                         methods.append(self.create_override_check(method, ctx))
                 for method_name in cls.static_methods:
                     method = cls.static_methods[method_name]
+                    threading_ids_constants.append(self.translate_method_id_to_constant(method, ctx))
                     self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))
                     if method.overrides:
@@ -749,7 +811,8 @@ class ProgramTranslator(CommonTranslator):
                     if (method.cls and method.cls != cls and
                             method_name != '__init__' and
                             method.method_type == MethodType.normal and
-                            not method.interface):
+                            not method.interface and
+                            not method.contract_only):
                         # Inherited
                         methods.append(self.create_inherit_check(method, cls,
                                                                  ctx))
@@ -810,8 +873,9 @@ class ProgramTranslator(CommonTranslator):
 
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))
+        domains.append(self.create_thread_domain(ctx))
         domains.append(self.create_functions_domain(func_constants, ctx))
-
+        domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
         converted_sil_progs = self._convert_silver_elements(sil_progs,
                                                             all_used_names, ctx)
         s_domains, s_predicates, s_functions, s_methods = converted_sil_progs

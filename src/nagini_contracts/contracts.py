@@ -8,8 +8,8 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
-    Type,
     TypeVar,
+    Union,
 )
 
 
@@ -20,7 +20,8 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
-                  'MayCreate',]
+                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'MayJoin',
+                  'MayStart']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -78,7 +79,7 @@ def Implies(p: bool, q: bool) -> bool:
 
 
 def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Tuple[bool, List[List[Any]]]]) -> bool:
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """

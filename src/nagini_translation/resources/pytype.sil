@@ -16,6 +16,7 @@ domain PyType {
     function Sequence_arg(t: PyType, i: Int): PyType
 
     unique function int(): PyType
+    unique function float(): PyType
     unique function bool(): PyType
     unique function bytes(): PyType
     unique function bytearray(): PyType

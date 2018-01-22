@@ -15,33 +15,33 @@ from typing import Optional
 
 
 #:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
-def acquire_1(l: Optional[Lock]) -> None:
+def acquire_1(l: Optional[Lock[object]]) -> None:
     #:: ExpectedOutput(call.precondition:assertion.false)|UnexpectedOutput(carbon)(call.precondition:assertion.false, 168)
     l.acquire()
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def acquire_2(l: Lock) -> None:
+def acquire_2(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
 
 
-def acquire_3(l: Lock) -> None:
+def acquire_3(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
     l.release()
 
 
-def acquire_4(l: Lock) -> None:
+def acquire_4(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
     l.acquire()
 
 
-def acquire_5(l: Lock) -> None:
+def acquire_5(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l, 10))
@@ -51,18 +51,21 @@ def acquire_5(l: Lock) -> None:
 # Check releasing a lock.
 
 
-def release_1(l: Lock) -> None:
+def release_1(l: Lock[object]) -> None:
     Requires(MustRelease(l, 2))
+    Requires(l.invariant())
     l.release()
 
 
-def release_2(l: Lock) -> None:
+def release_2(l: Lock[object]) -> None:
+    Requires(l.invariant())
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     l.release()
 
 
-def release_3(l: Lock) -> None:
+def release_3(l: Lock[object]) -> None:
     Requires(l is not None)
+    Requires(l.invariant())
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     l.release()
 
@@ -72,27 +75,28 @@ def release_3(l: Lock) -> None:
 
 def terminating_1() -> None:
     Requires(MustTerminate(2))
-    l = Lock()
+    l = Lock(object())
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def terminating_2(l: Lock) -> None:
+def terminating_2(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Requires(MustTerminate(2))
     l.acquire()
 
 
-def terminating_3(l: Lock) -> None:
+def terminating_3(l: Lock[object]) -> None:
     Requires(MustRelease(l, 2))
     Requires(MustTerminate(2))
+    Requires(l.invariant())
     l.release()
 
 
 # Check that measures are positive in methods.
 
 
-def over_in_minus_one(l: Lock) -> None:
+def over_in_minus_one(l: Lock[object]) -> None:
     #:: Label(over_in_minus_one__MustRelease)
     Requires(MustRelease(l, -1))
     # Negative measure is equivalent to False.
@@ -100,13 +104,13 @@ def over_in_minus_one(l: Lock) -> None:
 
 
 def check_over_in_minus_one() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one(l)
 
 
-def over_in_minus_one_conditional(l: Lock, b: bool) -> None:
+def over_in_minus_one_conditional(l: Lock[object], b: bool) -> None:
     Requires(Implies(b, MustRelease(l, 1)))
     #:: Label(over_in_minus_one_conditional__MustRelease__False)
     Requires(Implies(not b, MustRelease(l, -1)))
@@ -117,13 +121,13 @@ def over_in_minus_one_conditional(l: Lock, b: bool) -> None:
 
 
 def check_over_in_minus_one_conditional_1() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     over_in_minus_one_conditional(l, True)
 
 
 def check_over_in_minus_one_conditional_2() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
     over_in_minus_one_conditional(l, False)
@@ -133,7 +137,7 @@ def check_over_in_minus_one_conditional_2() -> None:
 
 
 def test_measures_1() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     while True:
         #:: ExpectedOutput(invariant.not.established:obligation_measure.non_positive)
@@ -142,7 +146,7 @@ def test_measures_1() -> None:
 
 
 def test_measures_2() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     while False:
         # Negative measure is ok because loop is never executed.
@@ -152,7 +156,7 @@ def test_measures_2() -> None:
 
 
 def test_measures_3() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while i > 0:
@@ -162,7 +166,7 @@ def test_measures_3() -> None:
 
 
 def test_measures_4() -> None:
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while i > -1:
@@ -184,7 +188,7 @@ class A:
 
 def test_loop_condition_framing_1() -> None:
     a = A()
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     #:: UnexpectedOutput(carbon)(application.precondition:assertion.false, 70)
@@ -200,7 +204,7 @@ def test_loop_condition_framing_1() -> None:
 
 def test_loop_condition_framing_2() -> None:
     a = A()
-    l = Lock()
+    l = Lock(object())
     l.acquire()
     i = 5
     while a.steps < 5:

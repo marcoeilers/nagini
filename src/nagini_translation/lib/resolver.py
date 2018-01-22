@@ -191,6 +191,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
                         return rectype.type_args[target.generic_type]
+                    if isinstance(target.type, TypeVar):
+                        while rectype.python_class is not target.cls:
+                            rectype = rectype.superclass
+                        name_list = list(rectype.python_class.type_vars.keys())
+                        index = name_list.index(target.type.name)
+                        return rectype.type_args[index]
             return target.type
         if isinstance(target, PythonField):
             result = target.type
@@ -309,7 +315,7 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
     for a dict), returns the type of the collection.
     """
-    if node._parent and isinstance(node._parent, ast.Assign):
+    if hasattr(node, '_parent') and isinstance(node._parent, ast.Assign):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.
@@ -372,6 +378,15 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
                 return GenericType(list_class, [arg_type])
+            elif node.func.id == 'getArg':
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
+            elif node.func.id == 'getOld':
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
+            elif node.func.id == 'getMethod':
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
