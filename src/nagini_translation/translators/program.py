@@ -464,7 +464,7 @@ class ProgramTranslator(CommonTranslator):
             index = index + 1
 
     def _convert_silver_elements(
-            self, sil_progs: List[Program], all_used: List[str],
+            self, sil_progs: Program, all_used: List[str],
             ctx: Context) -> Tuple[List[Domain],
                                    List[Predicate],
                                    List[Function],
@@ -489,23 +489,22 @@ class ProgramTranslator(CommonTranslator):
         # Reset used names set, we only need the additional ones used by the
         # upcoming method transformation.
         self.viper.used_names = set()
-        for sil_prog in sil_progs:
-            for method in self.viper.to_list(sil_prog.methods()):
-                if method.name() in used_names:
-                    body = self.viper.from_option(method.body())
-                    converted_method = self.create_method_node(
-                        ctx=ctx,
-                        name=method.name(),
-                        args=self.viper.to_list(method.formalArgs()),
-                        returns=self.viper.to_list(method.formalReturns()),
-                        pres=self.viper.to_list(method.pres()),
-                        posts=self.viper.to_list(method.posts()),
-                        locals=[],
-                        body=body,
-                        position=method.pos(),
-                        info=method.info(),
-                    )
-                    methods.append(converted_method)
+        for method in self.viper.to_list(sil_progs.methods()):
+            if method.name() in used_names:
+                body = self.viper.from_option(method.body())
+                converted_method = self.create_method_node(
+                    ctx=ctx,
+                    name=method.name(),
+                    args=self.viper.to_list(method.formalArgs()),
+                    returns=self.viper.to_list(method.formalReturns()),
+                    pres=self.viper.to_list(method.pres()),
+                    posts=self.viper.to_list(method.posts()),
+                    locals=[],
+                    body=body,
+                    position=method.pos(),
+                    info=method.info(),
+                )
+                methods.append(converted_method)
 
         # Some obligation-related functions may only be used by the code added
         # by the method conversion we just performed, so we have to add
@@ -514,16 +513,15 @@ class ProgramTranslator(CommonTranslator):
         # requirements (which should never be the case).
         self._add_all_used_names(used_names)
 
-        for sil_prog in sil_progs:
-            domains += [
-                domain for domain in self.viper.to_list(sil_prog.domains())
-                if domain.name() != 'PyType']
+        domains += [
+            domain for domain in self.viper.to_list(sil_progs.domains())
+            if domain.name() != 'PyType']
 
-            functions += [
-                function
-                for function in self.viper.to_list(sil_prog.functions())
-                if function.name() in used_names]
-            predicates += self.viper.to_list(sil_prog.predicates())
+        functions += [
+            function
+            for function in self.viper.to_list(sil_progs.functions())
+            if function.name() in used_names]
+        predicates += self.viper.to_list(sil_progs.predicates())
 
         return domains, predicates, functions, methods
 
@@ -612,7 +610,7 @@ class ProgramTranslator(CommonTranslator):
         return may_set_pred
 
     def translate_program(self, modules: List[PythonModule],
-                          sil_progs: List, ctx: Context,
+                          sil_progs: Program, ctx: Context,
                           selected: Set[str] = None) -> 'silver.ast.Program':
         """
         Translates the PythonModules created by the analyzer to a Viper program.
