@@ -717,11 +717,11 @@ class ExpressionTranslator(CommonTranslator):
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
             return [], field_func
-        elif isinstance(target.type, UnionType):
+        elif target is not None and isinstance(target.type, UnionType):
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             guarded_field_access = []
-            for recv_type in toposort_classes(target.type.get_types()):
+            for recv_type in toposort_classes(target.type.get_types() - {None}):
                 # Create a guard for accessing the field according to receiver's type
                 field_guard = self.var_type_check(target.sil_name, recv_type, position, ctx)
 
@@ -731,9 +731,12 @@ class ExpressionTranslator(CommonTranslator):
                                                       position, self.no_info(ctx))
 
                 guarded_field_access.append((field_guard, field_access))
-            
-            return (stmt, chain_cond_exp(guarded_field_access, self.viper,
-                                         position, self.no_info(ctx), ctx))
+            if len(guarded_field_access) == 1:
+                _, field_access = guarded_field_access[0]
+                return stmt, field_access
+            else:
+                return (stmt, chain_cond_exp(guarded_field_access, self.viper,
+                                             position, self.no_info(ctx), ctx))
         else:
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)

@@ -592,7 +592,7 @@ class ContractTranslator(CommonTranslator):
                     if isinstance(type, UnionType):
                         guarded_field_access = []
                         stmt, receiver = self.translate_expr(node.args[0].value, ctx)
-                        for recv_type in toposort_classes(type.get_types()):
+                        for recv_type in toposort_classes(type.get_types() - {None}):
                             field_guard = self.var_type_check(node.args[0].value.id,
                                                               recv_type,
                                                               self.to_position(node, ctx),
@@ -606,9 +606,13 @@ class ContractTranslator(CommonTranslator):
                                                                   self.to_position(node, ctx),
                                                                   ctx)
                             guarded_field_access.append((field_guard, field_acc))
-                        return (stmt, chain_cond_exp(guarded_field_access, self.viper,
-                                                     self.to_position(node, ctx),
-                                                     self.no_info(ctx), ctx))
+                        if len(guarded_field_access) == 1:
+                            _, field_acc = guarded_field_access[0]
+                            return stmt, field_acc
+                        else:
+                            return (stmt, chain_cond_exp(guarded_field_access, self.viper,
+                                                         self.to_position(node, ctx),
+                                                         self.no_info(ctx), ctx))
                 target = self.get_target(node.args[0], ctx)
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)

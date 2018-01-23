@@ -1000,7 +1000,7 @@ class StatementTranslator(CommonTranslator):
             if isinstance(type, UnionType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []
-                for recv_type in toposort_classes(type.get_types()):
+                for recv_type in toposort_classes(type.get_types() - {None}):
                     assign_guard = self.var_type_check(lhs.value.id, recv_type, position,
                                                        ctx)
                     field = recv_type.get_field(lhs.attr).actual_field
