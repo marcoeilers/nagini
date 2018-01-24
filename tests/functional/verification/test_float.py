@@ -44,5 +44,5 @@ def int_div() -> None:
 
 
 def float_div(a: float, b: float) -> None:
-    #:: ExpectedOutput(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:assertion.false)|ExpectedOutput(carbon)(application.precondition:assertion.false)
     c = a / b
