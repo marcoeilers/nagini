@@ -593,7 +593,8 @@ class ContractTranslator(CommonTranslator):
                         guarded_field_access = []
                         stmt, receiver = self.translate_expr(node.args[0].value, ctx)
                         for recv_type in toposort_classes(type.get_types() - {None}):
-                            field_guard = self.var_type_check(node.args[0].value.id,
+                            target = self.get_target(node.args[0].value, ctx)
+                            field_guard = self.var_type_check(target.sil_name,
                                                               recv_type,
                                                               self.to_position(node, ctx),
                                                               ctx)
