@@ -31,30 +31,47 @@ class PermTranslator(CommonTranslator):
         raise UnsupportedException(node)
 
     def translate_perm_BinOp(self, node: ast.BinOp, ctx: Context) -> Expr:
+        def translate_node(node):
+            if isinstance(node, ast.Num):
+                stmt, nodeprime = self.translate_expr(node, ctx, self.viper.Int)
+                if stmt:
+                    raise InvalidProgramException(node, 'purity.violated')
+                return nodeprime, True
+            else:
+                return self.translate_perm(node, ctx), False
+
         if isinstance(node.op, ast.Div):
-            left_stmt, left = self.translate_expr(node.left, ctx,
-                                                  self.viper.Int)
-            right_stmt, right = self.translate_expr(node.right, ctx,
-                                                    self.viper.Int)
-            if left_stmt or right_stmt:
-                raise InvalidProgramException(node, 'purity.violated')
-            return self.viper.FractionalPerm(left, right,
+            left, left_int = translate_node(node.left)
+            right, right_int = translate_node(node.right)
+
+            if left_int and right_int:
+                return self.viper.FractionalPerm(left, right,
+                                                 self.to_position(node, ctx),
+                                                 self.no_info(ctx))
+
+            return self.viper.PermDiv(left, right,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
+
+        if isinstance(node.op, ast.Mult):
+            left, left_int = translate_node(node.left)
+            right, right_int = translate_node(node.right)
+
+            if left_int != right_int and right_int:
+                left, left_int, right, right_int = right, right_int, left, left_int
+
+            if left_int and right_int:
+                return self.viper.Mul(left, right,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
+            if left_int or right_int:
+                return self.viper.IntPermMul(left, right,
                                              self.to_position(node, ctx),
                                              self.no_info(ctx))
 
-        if isinstance(node.op, ast.Mult):
-            func, other = None, None
-            if isinstance(node.left, ast.Call):
-                func, other = node.left, node.right
-            elif isinstance(node.right, ast.Call):
-                func, other = node.right, node.left
-            left_stmt, left = self.translate_expr(other, ctx, self.viper.Int)
-            right = self.translate_perm(func, ctx)
-            if left_stmt:
-                raise InvalidProgramException(node, 'purity.violated')
-            return self.viper.IntPermMul(left, right,
-                                         self.to_position(node, ctx),
-                                         self.no_info(ctx))
+            return self.viper.PermMul(left, right,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
 
         newnode = None
         if isinstance(node.op, ast.Add):
@@ -84,4 +101,14 @@ class PermTranslator(CommonTranslator):
                 formal_arg = self.viper.LocalVarDecl('count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
                 return self.viper.FuncApp('rdc', [arg0], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Perm, [formal_arg])
-        raise UnsupportedException(node)
+
+        call_stmt, call = self.translate_expr(node, ctx, self.viper.Int)
+        if not call_stmt:
+            return call
+        raise InvalidProgramException(node, 'purity.violated')
+
+    def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
+        stmt, expr = self.translate_expr(node, ctx, self.viper.Int)
+        if not stmt:
+            return expr
+        raise InvalidProgramException(node, 'purity.violated')
