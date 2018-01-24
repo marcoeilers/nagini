@@ -227,6 +227,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
+                elif (target.name in ('PSet', 'Sequence') and
+                          isinstance(node, ast.Call) and node.args):
+                    arg_type = get_type(node.args[0], containers, container)
+                    return GenericType(target, [arg_type])
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
