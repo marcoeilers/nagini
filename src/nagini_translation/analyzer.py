@@ -976,7 +976,8 @@ class Analyzer(ast.NodeVisitor):
         # is also accessed in a simpler expression elsewhere, we just do
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
-                not isinstance(node.value, ast.Subscript)):
+                not isinstance(node.value, ast.Subscript) and
+                not (isinstance(node.value, ast.Call) and isinstance(node.ctx, ast.Load))):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)

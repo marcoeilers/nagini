@@ -99,3 +99,15 @@ def client_1() -> None:
 def client_2() -> None:
     twc = ThingWithCell()
     twc.do_a_thing()
+
+
+class NCell:
+    def __init__(self, val: int) -> None:
+        Ensures(Acc(self.n) and self.n == 0)
+        self.n = 0  # type: int
+
+
+class NCellLock(Lock[NCell]):
+    @Predicate
+    def invariant(self) -> bool:
+        return Acc(self.get_locked().n) and self.get_locked().n >= 0
