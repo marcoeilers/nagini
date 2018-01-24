@@ -63,6 +63,7 @@ class Clazz:
         self.m1_3()
         Assert(self.y == 6 and self.x == 5)
         self.y = 1
+        #:: UnexpectedOutput(silicon)(application.precondition:insufficient.permission, 0)
         self.m1_4()
         Assert(self.y == 6 and self.x == 5)
         self.y = 1

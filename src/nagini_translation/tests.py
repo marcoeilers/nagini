@@ -553,7 +553,7 @@ class VerificationTest(AnnotatedTest):
 
     def test_file(
             self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-            sif: bool, reload_resources: bool):
+            sif: bool, reload_resources: bool, arp: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if annotation_manager.ignore_file():
@@ -561,7 +561,7 @@ class VerificationTest(AnnotatedTest):
         path = os.path.abspath(path)
         prog = translate(path, jvm, sif=sif, reload_resources=reload_resources)
         assert prog is not None
-        vresult = verify(prog, path, jvm, verifier)
+        vresult = verify(prog, path, jvm, verifier, arp=arp)
         self._evaluate_result(vresult, annotation_manager, jvm)
 
     def _evaluate_result(
@@ -584,9 +584,9 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, verifier, sif, reload_resources):
+def test_verification(path, verifier, sif, reload_resources, arp):
     """Execute provided verification test."""
-    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources)
+    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources, arp)
 
 
 class TranslationTest(AnnotatedTest):

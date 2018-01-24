@@ -38,7 +38,8 @@ class PermTranslator(CommonTranslator):
                     raise InvalidProgramException(node, 'purity.violated')
                 return nodeprime, True
             else:
-                return self.translate_perm(node, ctx), False
+                perm = self.translate_perm(node, ctx)
+                return perm, perm.typ() == self.viper.Int
 
         if isinstance(node.op, ast.Div):
             left, left_int = translate_node(node.left)
