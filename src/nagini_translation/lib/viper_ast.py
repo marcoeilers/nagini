@@ -298,6 +298,9 @@ class ViperAST:
     def IntPermMul(self, left, right, position, info):
         return self.ast.IntPermMul(left, right, position, info, self.NoTrafos)
 
+    def PermDiv(self, left, right, position, info):
+        return self.ast.PermDiv(left, right, position, info, self.NoTrafos)
+
     def PermLtCmp(self, left, right, position, info):
         return self.ast.PermLtCmp(left, right, position, info, self.NoTrafos)
 
