@@ -390,7 +390,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     elif isinstance(node.func, ast.Attribute):
         rectype = get_type(node.func.value, containers, container)
         if isinstance(rectype, UnionType):
-            set_of_classes = rectype.get_types()
+            set_of_classes = rectype.get_types() - {None}
             set_of_return_types = {type.get_func_or_method(node.func.attr).type
                                    for type in set_of_classes}
             if len(set_of_return_types) == 1:
