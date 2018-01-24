@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 domain FuncTriple[T, S ,R] {
 	function ft_get1(t: FuncTriple[T, S, R]) : T
 	function ft_get2(t: FuncTriple[T, S, R]) : S

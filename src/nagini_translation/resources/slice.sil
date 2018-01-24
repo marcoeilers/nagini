@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 function slice___create__(start: Ref, stop: Ref): Ref
     requires start == null || issubtype(typeof(start), int())
     requires stop == null || issubtype(typeof(stop), int())

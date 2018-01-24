@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import imp
 import os
@@ -5,7 +11,7 @@ import sys
 import types
 
 from astor import to_source
-from contracts.transformer import transform_ast
+from nagini_contracts.transformer import transform_ast
 
 class ContractsImporter(object):
     """
