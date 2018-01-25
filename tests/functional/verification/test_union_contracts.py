@@ -2,12 +2,18 @@ from nagini_contracts.contracts import *
 from typing import Union
 
 class A:
+    def __init__(self) -> None:
+        self.field = 5
+
     def foo(self, i: int) -> int:
         Requires(True)
         Ensures(Result() == 4)
         return 4
  
 class B:
+    def __init__(self) -> None:
+        self.field = 'B'
+
     def foo(self, i: int) -> int:
         Requires(i > 0)
         Ensures(Result() == 6)
@@ -18,6 +24,8 @@ class C:
         Requires(True)
         Ensures(Result() == '5')
         return '5'
+
+# Method calls
 
 def test_1(o: Union[A, B]) -> None:
     x = o.foo(5)
@@ -78,6 +86,8 @@ def test_13(o: Union[Union[A, B], C]) -> None:
 def test_14(o: Union[A]) -> None:
     x = o.foo(5)
 
+# Method calls when classes belong to an hierarchy
+
 class Base:
     def foo(self, i: int) -> int:
         Requires(i > 3)
@@ -121,6 +131,18 @@ class DataStructure:
     def append(self, item: int) -> None:
         pass
 
+# Mixing native types with user defined ones
+
 def test_18(o: Union[DataStructure, List[int]]) -> None:
     Requires(Implies(not isinstance(o, DataStructure), Acc(list_pred(o))))
     o.append(5)
+
+# Accessing fields for reading and writing
+
+def test_19(o: Union[A, B]) -> None:
+    Requires(Acc(o.field))
+    x = o.field
+
+def test_20(o: Union[A, B]) -> None:
+    Requires(Acc(o.field))
+    o.field = 5

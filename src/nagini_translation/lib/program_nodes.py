@@ -407,20 +407,18 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
-    def type_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
+    def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
         """
         Checks if types are either the same or, if one of them is an union, checks
         if the other type belongs to the set of types in the union. Finally, if
         both types are unions, this function returns true if they have elements
         in common.
         """
-        if type_a == type_b:
-            return True
-        if isinstance(type_a, UnionType) and not isinstance(type_b, UnionType):
-            return type_b in type_a.get_types()
-        if isinstance(type_b, UnionType) and not isinstance(type_a, UnionType):
+        if not isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
             return type_a in type_b.get_types()
-        if isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
+        elif not isinstance(type_b, UnionType) and isinstance(type_a, UnionType):
+            return type_b in type_a.get_types()
+        elif isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
             return len(type_a.get_types() & type_b.get_types()) > 0
         else:
             return type_a == type_b
@@ -433,10 +431,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.type_match(field.type, type)
+            assert self.types_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.type_match(field.type, type)
+            assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -792,7 +790,7 @@ class UnionType(GenericType):
 
     def get_types(self) -> Set[PythonClass]:
         """
-        Returns a flattened set of types contained in the union
+        Returns a flattened set of types contained in Union
         """
         result = set()
         for type in self.type_args:
@@ -824,7 +822,7 @@ class OptionalType(UnionType):
 
     def get_types(self) -> Set[PythonClass]:
         """
-        Returns a flattened set of types contained in the optional
+        Returns a flattened set of types contained in Optional
         """
         if isinstance(self.optional_type, UnionType):
             return {None} | self.optional_type.get_types()

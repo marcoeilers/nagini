@@ -68,6 +68,16 @@ def field_access(o1: Optional[Cont1], b: bool) -> None:
     c = o1.v
 
 
+def field_reading(o1: Optional[Cont1]) -> None:
+    Requires(Acc(o1.v))
+    x = o1.v
+
+
+def field_writing(o1: Optional[Cont1]) -> None:
+    Requires(Acc(o1.v))
+    o1.v = 4
+
+
 def method_access(o1: Optional[Cont1], b: bool) -> None:
     Requires(Implies(b, o1 is not None))
     if b:
