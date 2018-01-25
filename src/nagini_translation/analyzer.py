@@ -976,7 +976,7 @@ class Analyzer(ast.NodeVisitor):
         # is also accessed in a simpler expression elsewhere, we just do
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
-                not isinstance(node.value, ast.Subscript)):
+            not isinstance(node.value, ast.Subscript)):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
@@ -984,9 +984,15 @@ class Analyzer(ast.NodeVisitor):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
-                field = receiver.add_field(node.attr, node, self.typeof(node))
-                if isinstance(field, PythonField):
-                    self.track_access(node, field)
+                if isinstance(receiver, UnionType):
+                    for type in receiver.get_types() - {None}:
+                        field = type.add_field(node.attr, node, self.typeof(node))
+                        if isinstance(field, PythonField):
+                            self.track_access(node, field)
+                else:
+                    field = receiver.add_field(node.attr, node, self.typeof(node))
+                    if isinstance(field, PythonField):
+                        self.track_access(node, field)
 
     def visit_Global(self, node: ast.Global) -> None:
         for name in node.names:
@@ -1125,6 +1131,16 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
+            if isinstance(receiver, UnionType):
+                set_of_types = set() 
+                for type_in_union in receiver.get_types() - {None}:
+                    if isinstance(type_in_union, OptionalType):
+                        context = [type_in_union.optional_type.name]
+                    else:
+                        context = [type_in_union.name]
+                    type, _ = self.module.get_type(context, node.attr)
+                    set_of_types.add(self.convert_type(type))
+                return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:

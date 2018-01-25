@@ -34,6 +34,9 @@ from nagini_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
     SilverType,
+    UnionType,
+    toposort_classes,
+    chain_if_stmts,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -998,6 +1001,25 @@ class StatementTranslator(CommonTranslator):
                                         getter_type, [self_arg])
             getter_equal = self.viper.EqCmp(getter, rhs, position, info)
             return arg_stmt + call, [getter_equal]
+        if isinstance(lhs, ast.Attribute):
+            type = self.get_type(lhs.value, ctx)
+            if isinstance(type, UnionType):
+                stmt, receiver = self.translate_expr(lhs.value, ctx)
+                guarded_field_assign = []
+                for recv_type in toposort_classes(type.get_types() - {None}):
+                    assign_guard = self.var_type_check(lhs.value.id, recv_type, position,
+                                                       ctx)
+                    field = recv_type.get_field(lhs.attr).actual_field
+                    field_access = self.viper.FieldAccess(receiver, field.sil_field,
+                                                          position, info)
+                    permission = self.create_new_field_permission(field_access, field,
+                                                                  position, info, ctx)
+                    assign_stmt = self.viper.FieldAssign(field_access, rhs, position, info)
+                    block = self.translate_block([permission, assign_stmt], position, info)
+                    guarded_field_assign.append((assign_guard, block))
+                chainned_field_assign = chain_if_stmts(guarded_field_assign, self.viper,
+                                                       position, info, ctx)
+                return stmt + [chainned_field_assign], None
         lhs_stmt, var = self.translate_expr(lhs, ctx)
         before_assign = []
         after_assign = []
