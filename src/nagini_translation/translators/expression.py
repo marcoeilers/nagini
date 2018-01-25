@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import inspect
 
@@ -8,6 +14,7 @@ from nagini_translation.lib.constants import (
     CHECK_DEFINED_FUNC,
     DICT_TYPE,
     END_LABEL,
+    FLOAT_TYPE,
     FUNCTION_DOMAIN_NAME,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
@@ -216,14 +223,22 @@ class ExpressionTranslator(CommonTranslator):
         inhale = self.viper.Inhale(all, position, info)
         return iter_stmt + [inhale]
 
-
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
-        lit = self.viper.IntLit(node.n, self.to_position(node, ctx),
-                                self.no_info(ctx))
-        int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
-        boxed_lit = self.get_function_call(int_class, '__box__', [lit],
-                                           [None], node, ctx)
-        return ([], boxed_lit)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if isinstance(node.n, int):
+            lit = self.viper.IntLit(node.n, pos, info)
+            int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+            boxed_lit = self.get_function_call(int_class, '__box__', [lit],
+                                               [None], node, ctx)
+            return [], boxed_lit
+        if isinstance(node.n, float):
+            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
+            index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
+            float_val = self.get_function_call(float_class, '__create__', [index_lit],
+                                               [None], node, ctx, pos)
+            return [], float_val
+        raise UnsupportedException(node, 'Unsupported number literal')
 
     def translate_Dict(self, node: ast.Dict, ctx: Context) -> StmtsAndExpr:
         args = []
@@ -357,7 +372,6 @@ class ExpressionTranslator(CommonTranslator):
         Creates a tuple containing the given values.
         """
         tuple_class = ctx.module.global_module.classes[TUPLE_TYPE]
-        type_class = ctx.module.global_module.classes['type']
         func_name = '__create' + str(len(vals)) + '__'
         types = [self.get_tuple_type_arg(v, t, node, ctx)
                  for (t, v) in zip(val_types, vals)]
@@ -385,11 +399,9 @@ class ExpressionTranslator(CommonTranslator):
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
-        call = self.get_function_call(target_type, '__getitem__', args,
-                                      arg_types, node, ctx)
-        result = call
-        result_type = self.get_type(node, ctx)
-        return target_stmt + index_stmt, result
+        call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,
+                                                       arg_types, node, ctx)
+        return target_stmt + index_stmt + call_stmt, call
 
     def _translate_slice_subscript(self, node: ast.Subscript, target: Expr,
                                    target_type: PythonType,
@@ -809,13 +821,15 @@ class ExpressionTranslator(CommonTranslator):
                                                   right_type, node, ctx)
         return stmt + op_stmt, result
 
-    def _is_primitive_operation(self, left_type: PythonType,
+    def _is_primitive_operation(self, op: ast.operator, left_type: PythonType,
                                 right_type: PythonType) -> bool:
         """
         Determines if a binary operation with the given operand types can be
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
+        if op not in self._primitive_operations:
+            return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
         return (right_type_boxed.name in BOXED_PRIMITIVES and
@@ -845,31 +859,17 @@ class ExpressionTranslator(CommonTranslator):
         function or method call.
         """
         position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
         stmt = []
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
         func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        called_method = left_type.get_func_or_method(func_name)
-        if called_method.pure:
-            result = self.get_function_call(left_type, func_name,
-                                            [left, right],
-                                            [left_type, right_type],
-                                            node, ctx)
-        else:
-            result_type = called_method.type
-            res_var = ctx.actual_function.create_variable('op_res',
-                                                          result_type,
-                                                          self.translator)
-            stmt += self.get_method_call(left_type, func_name,
-                                         [left, right],
-                                         [left_type, right_type],
-                                         [res_var.ref(node, ctx)], node,
-                                         ctx)
-            result = res_var.ref(node, ctx)
-        return stmt, result
+        call_stmt, call = self.get_func_or_method_call(left_type, func_name,
+                                                       [left, right],
+                                                       [left_type, right_type],
+                                                       node, ctx)
+        return stmt + call_stmt, call
 
     def translate_Compare(self, node: ast.Compare,
                           ctx: Context) -> StmtsAndExpr:
@@ -889,7 +889,7 @@ class ExpressionTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        if self._is_primitive_operation(left_type, right_type):
+        if self._is_primitive_operation(node.ops[0], left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.ops[0], position,
                                                          ctx)
@@ -948,12 +948,12 @@ class ExpressionTranslator(CommonTranslator):
             ctx: Context) -> StmtsAndExpr:
         args = [right, left]
         arg_types = [right_type, left_type]
-        app = self.get_function_call(
+        app_stmt, app = self.get_func_or_method_call(
             right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
             app = self.viper.Not(
                 app, self.to_position(node, ctx), self.no_info(ctx))
-        return [], app
+        return app_stmt, app
 
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:

@@ -1,14 +1,18 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import logging
 import mypy.build
 import os
-import sys
 
 from mypy.build import BuildSource
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
-    InvalidProgramException,
 )
 from typing import List, Optional
 

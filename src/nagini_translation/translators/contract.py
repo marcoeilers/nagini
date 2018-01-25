@@ -1,7 +1,14 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
+    BOOL_TYPE,
     BUILTIN_PREDICATES,
     INT_TYPE,
     GLOBAL_VAR_FIELD,
@@ -132,6 +139,14 @@ class ContractTranslator(CommonTranslator):
                                                self.to_position(node, ctx),
                                                self.no_info(ctx))
         return pred
+
+    def translate_unwrapped_builtin_predicate(self, node: ast.Call, ctx: Context) -> Expr:
+        args = []
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        if stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        perm = self.viper.FullPerm(self.no_position(ctx), self.no_info(ctx))
+        return self.translate_builtin_predicate(node, perm, [arg], ctx)
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: Context) -> StmtsAndExpr:
@@ -528,10 +543,20 @@ class ContractTranslator(CommonTranslator):
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
-        body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
-                                             self.viper.Bool, impure)
+        if isinstance(lambda_.body, ast.Tuple):
+            if not len(lambda_.body.elts) == 2:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                                 self.viper.Bool, impure)
 
-        triggers = self._translate_triggers(lambda_.body, node, ctx)
+            triggers = self._translate_triggers(lambda_.body, node, ctx)
+        else:
+            body_type = self.get_type(lambda_.body, ctx)
+            if not body_type or body_type.name != BOOL_TYPE:
+                raise InvalidProgramException(node, 'invalid.forall')
+            body_stmt, rhs = self.translate_expr(lambda_.body, ctx,
+                                                 self.viper.Bool, impure)
+            triggers = []
 
         ctx.remove_alias(arg.arg)
         if body_stmt:
@@ -621,6 +646,8 @@ class ContractTranslator(CommonTranslator):
                     if not isinstance(target, PythonGlobalVar):
                         raise InvalidProgramException(node, 'invalid.acc')
                     return self.translate_acc_global(node, perm, ctx)
+        elif func_name in BUILTIN_PREDICATES:
+            return self.translate_unwrapped_builtin_predicate(node, ctx)
         elif func_name == 'MaySet':
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':

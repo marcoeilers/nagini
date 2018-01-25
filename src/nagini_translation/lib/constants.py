@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
@@ -14,7 +20,8 @@ BUILTINS = ['cast',
             'set',
             'super',
             'range',
-            'type']
+            'type',
+            'list']
 
 BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
 
@@ -169,6 +176,7 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
+    '__getitem__'
 }
 
 RESULT_NAME = '_res'
@@ -196,6 +204,8 @@ STRING_TYPE = 'str'
 BYTES_TYPE = 'bytes'
 
 INT_TYPE = 'int'
+
+FLOAT_TYPE = 'float'
 
 BOOL_TYPE = 'bool'
 
@@ -259,5 +269,6 @@ OPERATOR_FUNCTIONS = {
     ast.Sub: '__sub__',
     ast.Mult: '__mul__',
     ast.FloorDiv: '__floordiv__',
+    ast.Div: '__div__',
     ast.Mod: '__mod__',
 }

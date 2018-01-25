@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from abc import ABCMeta
@@ -34,6 +40,7 @@ from nagini_translation.lib.typedefs import (
     Info,
     Position,
     Stmt,
+    StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
@@ -499,6 +506,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                             position, ctx)
         return type_lit
 
+    def get_func_or_method_call(self, receiver: PythonType, func_name: str,
+                                args: List[Expr], arg_types: List[Expr],
+                                node: ast.AST, ctx: Context) -> StmtsAndExpr:
+        if receiver.get_function(func_name):
+            call = self.get_function_call(receiver, func_name, args, arg_types, node, ctx)
+            return [], call
+        method = receiver.get_method(func_name)
+        if method:
+            assert method.type
+            target_var = ctx.actual_function.create_variable('target', method.type,
+                                                             self.translator)
+            val = target_var.ref(node, ctx)
+            call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
+                                        ctx)
+            return call, val
+
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
@@ -518,6 +541,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     func = container.functions[func_name]
                     break
         if not func:
+            if receiver and target_cls.get_method(func_name):
+                msg = 'Called method is expected to be pure: ' + func_name
+                raise UnsupportedException(node, msg)
             raise InvalidProgramException(node, 'unknown.function.called')
         formal_args = []
         actual_args = []

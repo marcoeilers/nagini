@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from collections import OrderedDict
@@ -8,10 +14,12 @@ from nagini_contracts.contracts import (
 from nagini_contracts.io import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.lib.constants import (
+    BUILTIN_PREDICATES,
     BUILTINS,
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
+    LIST_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -30,6 +38,7 @@ from nagini_translation.lib.program_nodes import (
     UnionType,
     toposort_classes,
     chain_if_stmts,
+    SilverType,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -78,7 +87,6 @@ class CallTranslator(CommonTranslator):
         arg_pos = self.to_position(node.args[0], ctx)
         type_arg = self.type_factory.translate_type_literal(cast_type,
                                                             arg_pos, ctx)
-        pos = self.to_position(node, ctx)
         object_class = ctx.module.global_module.classes['object']
         result = self.get_function_call(object_class, '__cast__',
                                         [type_arg, object_arg], [None, None],
@@ -88,29 +96,26 @@ class CallTranslator(CommonTranslator):
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__len__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
+                                                         [None], node, ctx)
+        return stmt + len_stmt, len_val
 
     def _translate_str(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__str__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        str_stmt, str_val = self.get_func_or_method_call(arg_type, '__str__', [target],
+                                                         [None], node, ctx)
+        return stmt + str_stmt, str_val
 
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        args = [target]
         arg_type = self.get_type(node.args[0], ctx)
-        call = self.get_function_call(arg_type, '__bool__', [target], [None],
-                                      node, ctx)
-        return stmt, call
+        bool_stmt, bool_val = self.get_func_or_method_call(arg_type, '__bool__', [target],
+                                                           [None], node, ctx)
+        return stmt + bool_stmt, bool_val
 
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) == 2:
@@ -204,27 +209,93 @@ class CallTranslator(CommonTranslator):
                 stmts = stmts + catchers
         return arg_stmts + defined_check + stmts, res_var.ref()
 
-    def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def _translate_list(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        contents = None
+        stmts = []
         if node.args:
-            raise UnsupportedException(node)
-        args = []
+            assert len(node.args) == 1
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
+        list_class = ctx.module.global_module.classes[LIST_TYPE]
+        res_var = ctx.current_function.create_variable('list',
+                                                       list_class, self.translator)
+        targets = [res_var.ref()]
+        constr_call = self.get_method_call(list_class, '__init__', [],
+                                           [], targets, node, ctx)
+        stmts.extend(constr_call)
+        # Inhale the type of the newly created set (including type arguments)
+        set_type = self.get_type(node, ctx)
+        if (node._parent and isinstance(node._parent, ast.Assign) and
+                    len(node._parent.targets) == 1):
+            set_type = self.get_type(node._parent.targets[0], ctx)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        result_var = res_var.ref(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var,
+                                                       set_type, position, ctx),
+                                       position, self.no_info(ctx)))
+        if contents:
+            sil_ref_seq = self.viper.SeqType(self.viper.Ref)
+            ref_seq = SilverType(sil_ref_seq, ctx.module)
+            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq, self.translator)
+            seq_field = self.viper.Field('list_acc', sil_ref_seq, position, info)
+            content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
+            stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
+                                                info))
+            arg_type = self.get_type(node.args[0], ctx)
+            arg_seq = self.get_function_call(arg_type, '__sil_seq__', [contents], [None], node, ctx)
+            res_seq = self.get_function_call(set_type, '__sil_seq__', [result_var], [None], node, ctx)
+            seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
+            stmts.append(self.viper.Inhale(seq_equal, position, info))
+        return stmts, result_var
+
+    def _translate_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        contents = None
+        stmts = []
+        if node.args:
+            assert len(node.args) == 1
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
         set_class = ctx.module.global_module.classes[SET_TYPE]
         res_var = ctx.current_function.create_variable('set',
             set_class, self.translator)
         targets = [res_var.ref()]
         constr_call = self.get_method_call(set_class, '__init__', [],
                                            [], targets, node, ctx)
-        stmt = constr_call
+        stmts.extend(constr_call)
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
         if (node._parent and isinstance(node._parent, ast.Assign) and
                 len(node._parent.targets) == 1):
             set_type = self.get_type(node._parent.targets[0], ctx)
         position = self.to_position(node, ctx)
-        stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
-                                                      set_type, position, ctx),
-                                      position, self.no_info(ctx)))
-        return stmt, res_var.ref()
+        info = self.no_info(ctx)
+        result_var = res_var.ref(node, ctx)
+        stmts.append(self.viper.Inhale(self.type_check(result_var,
+                                                       set_type, position, ctx),
+                                       position, self.no_info(ctx)))
+        if contents:
+            sil_ref_set = self.viper.SetType(self.viper.Ref)
+            ref_set = SilverType(sil_ref_set, ctx.module)
+            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set, self.translator)
+            set_field = self.viper.Field('set_acc', sil_ref_set, position, info)
+            content_field = self.viper.FieldAccess(result_var, set_field, position, info)
+            stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
+                                                info))
+            arg_type = self.get_type(node.args[0], ctx)
+            quant_var_name = ctx.actual_function.get_fresh_name('item')
+            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position, info)
+            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref, position,
+                                                     info)
+            arg_contains = self.get_function_call(arg_type, '__contains__', [contents, quant_var], [None, None], node, ctx)
+            res_contains = self.get_function_call(set_type, '__contains__', [result_var, quant_var], [None, None], node, ctx)
+            contain_equal = self.viper.EqCmp(arg_contains, res_contains, position, info)
+            trigger = self.viper.Trigger([res_contains], position, info)
+            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal, position, info)
+            stmts.append(self.viper.Inhale(quantifier, position, info))
+        return stmts, result_var
 
     def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         if len(node.args) != 2:
@@ -259,6 +330,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_bool(node, ctx)
         elif func_name == 'set':
             return self._translate_set(node, ctx)
+        elif func_name == 'list':
+            return self._translate_list(node, ctx)
         elif func_name == 'range':
             return self._translate_range(node, ctx)
         elif func_name == 'type':
@@ -432,8 +505,6 @@ class CallTranslator(CommonTranslator):
         created and all arguments not bound to any other parameter are put in
         there.
         """
-        args = []
-        arg_types = []
         arg_stmts = []
 
         unpacked_args = []
@@ -548,7 +619,6 @@ class CallTranslator(CommonTranslator):
         res_var = ctx.current_function.create_variable('kw_args',
             ctx.module.global_module.classes[DICT_TYPE], self.translator)
         dict_class = ctx.module.global_module.classes[DICT_TYPE]
-        arg_types = []
         constr_call = self.get_method_call(dict_class, '__init__', [],
                                            [], [res_var.ref()], node, ctx)
         position = self.to_position(node, ctx)
@@ -865,6 +935,8 @@ class CallTranslator(CommonTranslator):
                 return self.translate_obligation_contractfunc_call(node, ctx)
             elif func_name in BUILTINS:
                 return self._translate_builtin_func(node, ctx)
+            elif func_name in BUILTIN_PREDICATES:
+                return [], self.translate_contractfunc_call(node, ctx, impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):

@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from typing import (
     Any,
     Callable,
@@ -8,8 +14,8 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
-    Type,
     TypeVar,
+    Union,
 )
 
 
@@ -78,7 +84,7 @@ def Implies(p: bool, q: bool) -> bool:
 
 
 def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Tuple[bool, List[List[Any]]]]) -> bool:
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """

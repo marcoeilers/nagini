@@ -1,9 +1,15 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 """Wrappers for Scala error objects."""
 
 
 from typing import Any, List
 
-from nagini_translation.lib.errors.messages import ERRORS, REASONS
+from nagini_translation.lib.errors.messages import ERRORS, REASONS, VAGUE_REASONS
 from nagini_translation.lib.errors.rules import Rules
 
 
@@ -51,7 +57,9 @@ class Reason:
         self.position = Position(self.offending_node.pos())
 
     def __str__(self) -> str:
-        reason = self._reason_string or self._node or str(self.offending_node)
+        reason = self._reason_string or self._node
+        if reason is None and self.identifier in VAGUE_REASONS:
+            return VAGUE_REASONS[self.identifier]
         return REASONS[self.identifier](reason)
 
 

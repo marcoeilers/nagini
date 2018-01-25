@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 field list_acc : Seq[Ref]
 
 method list___init__() returns (res: Ref)
@@ -66,6 +72,16 @@ method list_append(self: Ref, item: Ref) returns ()
 {
     assume false
 }
+
+method list_reverse(self: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, 1/100)
+    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures |res.list_acc| == |self.list_acc|
+    ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
+
 
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))

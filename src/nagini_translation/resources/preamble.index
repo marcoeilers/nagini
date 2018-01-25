@@ -11,6 +11,11 @@
             "type": null,
             "MustTerminate": true
         },
+        "reverse": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true
+        },
         "__setitem__": {
             "args": ["list", "__prim__int", "object"],
             "type": null,
@@ -63,6 +68,11 @@
             "MustTerminate": true
         },
         "add": {
+            "args": ["set", "object"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "remove": {
             "args": ["set", "object"],
             "type": null,
             "MustTerminate": true
@@ -211,6 +221,10 @@
             "args": ["__prim__int", "__prim__int"],
             "type": "__prim__int"
         },
+        "__div__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "float"
+        },
         "__floordiv__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "__prim__int"
@@ -234,6 +248,65 @@
         "__le__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "__prim__bool"
+        }
+    },
+    "extends": "float"
+},
+"float": {
+    "functions": {
+        "__create__": {
+            "args": ["__prim__int"],
+            "type": "float"
+        },
+        "__bool__": {
+            "args": ["float"],
+            "type": "__prim__bool",
+            "requires": ["int___bool__", "int___unbox__"]
+        },
+        "__eq__": {
+            "args": ["float", "object"],
+            "type": "__prim__bool",
+            "requires": ["int___eq__"]
+        },
+        "__add__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___add__", "int___unbox__"]
+        },
+        "__sub__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___sub__", "int___unbox__"]
+        },
+        "__mul__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___mul__", "int___unbox__"]
+        },
+        "__div__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___div__", "int___unbox__"]
+        },
+        "__ge__": {
+            "args": ["float", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___ge__", "int___unbox__"]
+        },
+        "__gt__": {
+            "args": ["float", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___gt__", "int___unbox__"]
+        },
+        "__lt__": {
+            "args": ["float", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___lt__", "int___unbox__"]
+        },
+        "__le__": {
+            "args": ["float", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___le__", "int___unbox__"]
         }
     },
     "extends": "object"
@@ -661,5 +734,21 @@
         }
     },
     "extends": "object"
+},
+"global": {
+    "functions": {
+        "max": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "min": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int"
+        },
+        "abs": {
+            "args": ["__prim__int"],
+            "type": "__prim__int"
+        }
+    }
 }
 }
