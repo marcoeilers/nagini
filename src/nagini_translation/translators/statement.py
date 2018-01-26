@@ -75,6 +75,8 @@ class StatementTranslator(CommonTranslator):
         in the given module (including those of other imported modules), if said module
         has not been imported before.
         """
+        if ctx.module not in self.imported_modules:
+            self.imported_modules.add(ctx.module)
         pos = self.to_position(import_stmt, ctx)
         info = self.no_info(ctx)
         cond_stmts = []

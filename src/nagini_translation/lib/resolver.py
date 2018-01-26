@@ -10,6 +10,8 @@ from nagini_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
+    PRIMITIVE_SEQ_TYPE,
+    PSET_TYPE,
     RANGE_TYPE,
     SEQ_TYPE,
     SET_TYPE,
@@ -57,7 +59,7 @@ def get_target(node: ast.AST,
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
-        if (container and func_name == 'Result' and
+        if (container and func_name in ('Result', 'TypedResult') and
                 isinstance(container, PythonMethod)):
             # In this case the immediate container must be a method, and we
             # return its result type
@@ -213,7 +215,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # If this is a Sequence(...) call, target will be the Sequence class
         # but won't have generic type information. So we don't return here
         # and let the code below take care of the call.
-        if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
+        if not isinstance(target, PythonType) or target.name != SEQ_TYPE or target.name != PSET_TYPE:
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
@@ -225,6 +227,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
+                elif (target.name in ('PSet', 'Sequence') and
+                          isinstance(node, ast.Call) and node.args):
+                    arg_type = get_type(node.args[0], containers, container)
+                    return GenericType(target, [arg_type])
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
@@ -353,9 +359,12 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     if func_name == 'Sequence':
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
                                             containers, container)
+    if func_name == 'PSet':
+        return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
+                                            containers, container)
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
-            if node.func.id == 'Result':
+            if node.func.id in ('Result', 'TypedResult'):
                 return current_function.type
             elif node.func.id == 'RaisedException':
                 ctxs = [cont for cont in containers if
@@ -460,6 +469,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
     elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == SEQ_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == PSET_TYPE:
         return value_type.type_args[0]
     else:
         raise UnsupportedException(node)

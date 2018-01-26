@@ -78,10 +78,11 @@ class Silicon:
         self._jvm = jvm
         self.silver = jvm.viper.silver
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(3)
+        args = jvm.scala.collection.mutable.ArraySeq(4)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
-        args.update(2, filename)
+        args.update(2, '--disableCatchingExceptions')
+        args.update(3, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.arpplugin = ARPPlugin(jvm)
