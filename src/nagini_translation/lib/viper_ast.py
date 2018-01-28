@@ -1,4 +1,9 @@
-import ast
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import types
 
 from nagini_translation.lib.constants import FUNCTION_DOMAIN_NAME

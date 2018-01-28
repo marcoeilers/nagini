@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from nagini_translation.lib.program_nodes import PythonClass
 from nagini_translation.lib.typedefs import Field
 from nagini_translation.sif.lib.context import SIFContext

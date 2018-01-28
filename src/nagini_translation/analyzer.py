@@ -1,9 +1,14 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import logging
 import os
 import nagini_contracts.io_builtins
 import nagini_contracts.lock
-import nagini_translation.external.astpp
 import tokenize
 
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -143,7 +148,6 @@ class Analyzer(ast.NodeVisitor):
             pass
         self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
-        logger.debug(nagini_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if isinstance(stmt, ast.Import):

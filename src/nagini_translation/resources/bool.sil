@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 function object___bool__(self: Ref) : Bool
     ensures self == null ==> !result
     // We can't actually say that the result is true if self is not None, because
