@@ -257,6 +257,12 @@ def ARP(counting: int = None) -> float:
     pass
 
 
+"""
+Permission used in predicates
+"""
+RD_PRED = 1  # type: float
+
+
 def Wildcard(field) -> bool:
     """
     Wildcard permission to a predicate or field, only to be used in pure contexts.
@@ -376,6 +382,7 @@ __all__ = [
         'Acc',
         'Rd',
         'ARP',
+        'RD_PRED',
         'Wildcard',
         'Fold',
         'Unfold',

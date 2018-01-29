@@ -108,6 +108,11 @@ class PermTranslator(CommonTranslator):
             return call
         raise InvalidProgramException(node, 'purity.violated')
 
+    def translate_perm_Name(self, node: ast.Name, ctx: Context) -> Expr:
+        if node.id == 'RD_PRED':
+            return self.viper.FuncApp('globalRd', [], self.to_position(node, ctx),
+                                      self.no_info(ctx), self.viper.Ref, {})
+
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)
         if not stmt:
