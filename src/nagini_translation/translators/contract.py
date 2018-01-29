@@ -523,7 +523,7 @@ class ContractTranslator(CommonTranslator):
             condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
                                        self.viper.LtCmp(int_var, arg2, pos, info),
                                        pos, info)
-            return arg1_stmt + arg2_stmt, condition
+            return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
@@ -534,7 +534,7 @@ class ContractTranslator(CommonTranslator):
         result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
             result = self.viper.Old(result, pos, info)
-        return dom_stmt, result
+        return dom_stmt, result, True
 
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -674,13 +674,14 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
-                                                              ctx)
+        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var,
+                                                                          domain_node,
+                                                                          ctx)
         lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if triggers:
+        if is_trigger and not triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
