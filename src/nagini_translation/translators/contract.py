@@ -86,6 +86,8 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.actual_function.type
         if not ctx.actual_function.pure:
+            if ctx.result_var is None:
+                raise InvalidProgramException('invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
@@ -504,23 +506,34 @@ class ContractTranslator(CommonTranslator):
                     get_func_name(domain_node) == 'Old'):
             domain_old = True
             domain_node = domain_node.args[0]
+
+        ref_var = self.to_ref(var.ref(), ctx)
+        pos = self.to_position(domain_node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
+            if not len(domain_node.args) == 2:
+                msg = 'range() is currently only supported with two args.'
+                raise UnsupportedException(domain_node, msg)
+            arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
+                                                  target_type=self.viper.Int)
+            arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
+                                                  target_type=self.viper.Int)
+            int_var = self.to_int(ref_var, ctx)
+            condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
+                                       self.viper.LtCmp(int_var, arg2, pos, info),
+                                       pos, info)
+            return arg1_stmt + arg2_stmt, condition
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
-        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))]
+        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain],
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx), seq_ref, formal_args)
-        ref_var = self.to_ref(var.ref(), ctx)
-        result = self.viper.SeqContains(ref_var, domain_set,
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx))
+                                        [domain], pos, info, seq_ref, formal_args)
+
+        result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
-            result = self.viper.Old(result, self.to_position(domain_node, ctx),
-                                    self.no_info(ctx))
+            result = self.viper.Old(result, pos, info)
         return dom_stmt, result
 
     def translate_to_sequence(self, node: ast.Call,

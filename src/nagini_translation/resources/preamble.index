@@ -188,10 +188,6 @@
             "args": ["object"],
             "type": "__prim__bool"
         },
-        "__str__": {
-            "args": ["object"],
-            "type": "str"
-        },
         "__eq__": {
             "args": ["object", "object"],
             "type": "__prim__bool"
