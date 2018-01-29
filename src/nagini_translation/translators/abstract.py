@@ -67,7 +67,7 @@ class TranslatorConfig:
 class AbstractTranslator(metaclass=ABCMeta):
     """
     Abstract class which all specialized translators extend. Provides a number
-    of interface methods through which spcialized translators can interact, and
+    of interface methods through which specialized translators can interact, and
     forwards calls to those methods to the respective translators.
     """
 

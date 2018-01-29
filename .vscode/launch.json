@@ -9,11 +9,11 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
+            "pythonPath": "${workspaceRoot}/env/bin/python3",
             "program": "${file}",
             "cwd": "${workspaceRoot}",
             "env": {
-                "PYTHONPATH": "${workspaceRoot}/nagini/src"
+                "PYTHONPATH": "${workspaceRoot}/src"
             },
             "envFile": "${workspaceRoot}/.env",
             "console": "integratedTerminal",
@@ -28,8 +28,8 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
-            "program": "${workspaceRoot}/nagini/bin/nagini",
+            "pythonPath": "${workspaceRoot}/env/bin/python3",
+            "program": "${workspaceRoot}/env/bin/nagini",
             "args": [
                 "${file}"
             ],
@@ -48,8 +48,8 @@
             "type": "python",
             "request": "launch",
             "stopOnEntry": true,
-            "pythonPath": "${config:python.pythonPath}",
-            "program": "${workspaceRoot}/nagini/bin/nagini",
+            "pythonPath": "${workspaceRoot}/env/bin/python3",
+            "program": "${workspaceRoot}/env/bin/nagini",
             "args": [
                 "${file}"
             ],

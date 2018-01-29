@@ -323,7 +323,7 @@ def GhostReturns(start_index: int) -> Callable[[T], T]:
     return wrap
 
 
-def list_pred(l: List[T]) -> bool:
+def list_pred(l: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a list. To be used like normal predicates, except it does not need to
@@ -332,7 +332,7 @@ def list_pred(l: List[T]) -> bool:
     pass
 
 
-def set_pred(s: Set[T]) -> bool:
+def set_pred(s: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a set. To be used like normal predicates, except it does not need to
@@ -341,7 +341,7 @@ def set_pred(s: Set[T]) -> bool:
     pass
 
 
-def dict_pred(d: Dict[T, V]) -> bool:
+def dict_pred(d: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a dict. To be used like normal predicates, except it does not need to

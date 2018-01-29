@@ -83,9 +83,9 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # Try to access the member on the common supertype of all union
-            # elements.
-            lhs = lhs.cls
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            return None
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
@@ -420,7 +420,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     elif isinstance(node.func, ast.Attribute):
         rectype = get_type(node.func.value, containers, container)
         if isinstance(rectype, UnionType):
-            set_of_classes = rectype.get_types()
+            set_of_classes = rectype.get_types() - {None}
             set_of_return_types = {type.get_func_or_method(node.func.attr).type
                                    for type in set_of_classes}
             if len(set_of_return_types) == 1:
