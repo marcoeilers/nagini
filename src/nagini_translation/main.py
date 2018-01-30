@@ -288,12 +288,13 @@ def translate_and_verify(python_file, jvm, args, print=print):
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark >= 1:
+            print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
                 assert vresult
-                print("RUN,{},{},{},{},{}".format(
+                print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend)
