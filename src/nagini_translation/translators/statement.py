@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
+    OptionalType,
     PythonField,
     PythonGlobalVar,
     PythonMethod,
@@ -1005,7 +1006,7 @@ class StatementTranslator(CommonTranslator):
             return arg_stmt + call, [getter_equal]
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
-            if isinstance(type, UnionType):
+            if isinstance(type, UnionType) and not isinstance(type, OptionalType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []
                 for recv_type in toposort_classes(type.get_types() - {None}):

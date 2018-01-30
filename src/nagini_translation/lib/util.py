@@ -68,6 +68,10 @@ class InvalidProgramException(Exception):
         self.message = message
 
 
+class NoTypeException(Exception):
+    pass
+
+
 class AssignCollector(ast.NodeVisitor):
     """
     Collects all assignment targets within a given (partial) AST.
@@ -237,6 +241,10 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     if isinstance(node, ast.For):
         if isinstance(node.target, ast.Name):
             if node.target.id == name:
+                return node
+        elif (isinstance(node.target, ast.Tuple) and node.target.elts and
+                  isinstance(node.target.elts[0], ast.Name)):
+            if node.target.elts[0].id == name:
                 return node
     if not hasattr(node, '_parent') or not node._parent:
         return None

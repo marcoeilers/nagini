@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -313,7 +314,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 if e.args[0]:
                     issue += e.args[0]
                 else:
-                    issue += str(e.node)
+                    issue += astunparse.unparse(e.node)
             line = str(e.node.lineno)
             col = str(e.node.col_offset)
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')

@@ -41,6 +41,11 @@
             "args": ["list", "list"],
             "type": "list",
             "MustTerminate": true
+        },
+        "__mul__": {
+            "args": ["list", "__prim__int"],
+             "type": "list",
+             "MustTerminate": true
         }
     },
     "functions": {
@@ -391,7 +396,8 @@
     "methods": {
         "split": {
             "args": ["str"],
-            "type": "list"
+            "type": "list",
+            "MustTerminate": true
         }
     },
     "extends": "object"
@@ -791,12 +797,14 @@
 "global": {
     "functions": {
         "max": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__int"
+            "args": ["object", "object"],
+            "type": "__prim__int",
+            "requires": ["int___unbox__", "list___len__"]
         },
         "min": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__int"
+            "args": ["object", "object"],
+            "type": "__prim__int",
+            "requires": ["int___unbox__", "list___len__"]
         },
         "abs": {
             "args": ["__prim__int"],

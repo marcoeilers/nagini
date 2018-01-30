@@ -959,6 +959,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
+            requires = set()
+            for requirement in self.requires:
+                requires.add(requirement)
+            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:

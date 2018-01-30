@@ -379,7 +379,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists'):
+            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
+                                  'MaySet'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)
@@ -388,7 +389,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
-                return GenericType(seq_class, [arg_type])
+                return GenericType(seq_class, [arg_type.type_args[0]])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
