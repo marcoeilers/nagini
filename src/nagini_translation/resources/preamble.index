@@ -9,6 +9,7 @@
         "append": {
             "args": ["list", "object"],
             "type": null,
+            "requires": ["__sil_seq__"],
             "MustTerminate": true
         },
         "extend": {
