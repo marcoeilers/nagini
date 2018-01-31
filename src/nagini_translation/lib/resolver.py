@@ -389,7 +389,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
-                return GenericType(seq_class, [arg_type.type_args[0]])
+                return GenericType(seq_class, [_get_content_type(arg_type, module, node)])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
@@ -473,6 +473,28 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         # FIXME: This is very unfortunate, but right now we cannot handle this
         # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[1]
+    elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
+        return module.global_module.classes[INT_TYPE]
+    elif value_type.name == SEQ_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == PSET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.python_class.get_func_or_method('__getitem__'):
+        return value_type.python_class.get_func_or_method('__getitem__').type
+    else:
+        raise UnsupportedException(node)
+
+
+def _get_content_type(value_type: PythonType, module: PythonModule,
+                      node: ast.AST) -> PythonType:
+    if value_type.name == LIST_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == SET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+        # FIXME: This is very unfortunate, but right now we cannot handle this
+        # generically, so we have to hard code these two cases for the moment.
+        return value_type.type_args[0]
     elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == SEQ_TYPE:

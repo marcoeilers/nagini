@@ -438,10 +438,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type, type)
+            # assert self.types_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.types_match(field.type, type)
+            # assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)

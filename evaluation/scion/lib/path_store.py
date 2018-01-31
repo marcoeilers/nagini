@@ -202,7 +202,9 @@ class PathPolicy(object):
 
         :param str policy_file: path to the path policy file
         """
-        return cls.from_dict(load_yaml_file(policy_file))
+        policy_dict = load_yaml_file(policy_file)
+        # Fails, because the validity of the loaded dict is not guaranteed.
+        return cls.from_dict(policy_dict)
 
     @classmethod
     def from_dict(cls, policy_dict: Dict[str, object]) -> 'PathPolicy':  # pragma: no cover
@@ -264,7 +266,7 @@ class PathPolicy(object):
                          'TotalBandwidth' in self.property_ranges
                          )
 
-    def __str__(self) -> str:
+    def to_str(self) -> str:  # Renamed to avoid incompatible override of object.__str__
         Requires(Acc(self.State(), 1/10))
         Ensures(Acc(self.State(), 1 / 10))
         path_policy_dict = self.get_path_policy_dict()
