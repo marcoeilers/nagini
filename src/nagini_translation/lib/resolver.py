@@ -479,6 +479,8 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.name == PSET_TYPE:
         return value_type.type_args[0]
+    elif value_type.python_class.get_func_or_method('__getitem__'):
+        return value_type.python_class.get_func_or_method('__getitem__').type
     else:
         raise UnsupportedException(node)
 

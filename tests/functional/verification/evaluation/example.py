@@ -6,7 +6,7 @@ from typing import List, Tuple
 @ContractOnly
 def get_seats(id: int, num: int) -> List[Tuple[int ,int]]:
     Requires(num > 0)
-    Re
+    Requires(MustTerminate(1))
     Ensures(list_pred(Result()))
     Ensures(len(Result()) == num)
 

@@ -291,9 +291,10 @@ def translate_and_verify(python_file, jvm, args, print=print):
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
+                prog = translate(python_file, jvm, selected, args.sif)
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
-                assert vresult
+                #assert vresult
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:

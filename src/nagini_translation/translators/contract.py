@@ -341,6 +341,16 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
+    def translate_assume(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Assume().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        assertion = self.viper.Inhale(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_implies(self, node: ast.Call, ctx: Context,
                           impure=False) -> StmtsAndExpr:
         """
@@ -684,7 +694,7 @@ class ContractTranslator(CommonTranslator):
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if is_trigger and not triggers:
+        if is_trigger and triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
@@ -770,6 +780,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_create(node, ctx)
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
+        elif func_name == 'Assume':
+            return self.translate_assume(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':
