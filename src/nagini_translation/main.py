@@ -296,7 +296,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
             for i in range(args.benchmark):
                 start = time.time()
                 prog = translate(python_file, jvm, selected, args.sif)
-                vresult = verify(prog, python_file, jvm, backend=backend)
+                vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
                 #assert vresult
                 print("{}, {}, {}, {}, {}".format(
