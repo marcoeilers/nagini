@@ -1,6 +1,7 @@
 # chaliceSuite/permission-model/basic.chalice
 
 from nagini_contracts.contracts import *
+from nagini_contracts.thread import Thread
 
 
 class Cell:
@@ -32,6 +33,25 @@ class Cell:
         #:: ExpectedOutput(postcondition.violated:insufficient.permission)
         Ensures(Rd(self.x))
         self.dispose_rd()
+
+    # forking and method calls of dispose_rd
+    def a3(self) -> None:
+        Requires(Rd(self.x))
+        Ensures(True)
+        t1 = Thread(None, self.dispose_rd, args=())
+        t1.start(self.dispose_rd)
+        self.dispose_rd()
+        t2 = Thread(None, self.dispose_rd, args=())
+        t2.start(self.dispose_rd)
+        self.dispose_rd()
+
+    # forking and method calls of dispose_rd
+    def a4(self) -> None:
+        Requires(Rd(self.x))
+        #:: ExpectedOutput(postcondition.violated:insufficient.permission)
+        Ensures(Rd(self.x))
+        t1 = Thread(None, self.dispose_rd, args=())
+        t1.start(self.dispose_rd)
 
     # We should retain some permission
     def a6(self) -> None:

@@ -45,24 +45,18 @@ class ThingWithCell:
         Fold(self.l.invariant())
         self.l.release()
         self.need_value()
+        t1 = Thread(None, self.need_value, args=())
+        t2 = Thread(None, self.need_value, args=())
+        t1.start(self.need_value)
+        t2.start(self.need_value)
+        t1.join(self.need_value)
+        t2.join(self.need_value)
+        self.need_value()
         self.l.acquire()
         Unfold(self.l.invariant())
         self.c.n -= 1
         Fold(self.l.invariant())
         self.l.release()
-
-    # def do_a_thing2(self) -> None:
-    #     Requires(Rd(self.l) and Rd(self.c) and self.l.get_locked() is self.c and Rd(self.c.n))
-    #     Requires(WaitLevel() < Level(self.l))
-    #     Ensures(Rd(self.l) and Rd(self.c))
-    #     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    #     Ensures(False)
-    #     self.l.acquire()
-    #     Unfold(self.l.invariant())
-    #     self.c.value -= 2
-    #     self.c.n -= 1
-    #     Fold(self.l.invariant())
-    #     self.l.release()
 
 
 def client_1() -> None:
