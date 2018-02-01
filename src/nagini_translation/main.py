@@ -1,4 +1,11 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -59,9 +66,6 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-sil_programs = []
-
-
 def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
@@ -101,9 +105,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    if not sil_programs or reload_resources:
-        del sil_programs[:]
-        sil_programs.append(load_sil_files(jvm, sif))
+    if 'sil_programs' not in globals() or reload_resources:
+        global sil_programs
+        sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected)
     return prog
@@ -252,7 +256,8 @@ def main() -> None:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
-        sil_programs.append(load_sil_files(jvm, args.sif))
+        global sil_programs
+        sil_programs = load_sil_files(jvm, args.sif)
 
         while True:
             file = socket.recv_string()
@@ -287,12 +292,14 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark >= 1:
+            print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
+                prog = translate(python_file, jvm, selected, args.sif)
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
-                assert vresult
-                print("RUN,{},{},{},{},{}".format(
+                #assert vresult
+                print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
@@ -313,7 +320,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
                 if e.args[0]:
                     issue += e.args[0]
                 else:
-                    issue += str(e.node)
+                    issue += astunparse.unparse(e.node)
             line = str(e.node.lineno)
             col = str(e.node.col_offset)
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')

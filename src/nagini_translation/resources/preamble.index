@@ -9,6 +9,7 @@
         "append": {
             "args": ["list", "object"],
             "type": null,
+            "requires": ["__sil_seq__"],
             "MustTerminate": true
         },
         "extend": {
@@ -41,6 +42,11 @@
             "args": ["list", "list"],
             "type": "list",
             "MustTerminate": true
+        },
+        "__mul__": {
+            "args": ["list", "__prim__int"],
+             "type": "list",
+             "MustTerminate": true
         }
     },
     "functions": {
@@ -188,13 +194,13 @@
             "args": ["object"],
             "type": "__prim__bool"
         },
-        "__str__": {
-            "args": ["object"],
-            "type": "str"
-        },
         "__eq__": {
             "args": ["object", "object"],
             "type": "__prim__bool"
+        },
+        "__str__": {
+            "args": ["object"],
+            "type": "str"
         },
         "__cast__": {
             "args": ["type", "object"],
@@ -395,7 +401,8 @@
     "methods": {
         "split": {
             "args": ["str"],
-            "type": "list"
+            "type": "list",
+            "MustTerminate": true
         }
     },
     "extends": "object"
@@ -795,12 +802,14 @@
 "global": {
     "functions": {
         "max": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__int"
+            "args": ["object", "object"],
+            "type": "__prim__int",
+            "requires": ["int___unbox__", "list___len__"]
         },
         "min": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__int"
+            "args": ["object", "object"],
+            "type": "__prim__int",
+            "requires": ["int___unbox__", "list___len__"]
         },
         "abs": {
             "args": ["__prim__int"],

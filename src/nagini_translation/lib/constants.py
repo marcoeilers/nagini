@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
@@ -189,7 +195,8 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
-    '__getitem__'
+    '__getitem__',
+    '__setitem__'
 }
 
 RESULT_NAME = '_res'

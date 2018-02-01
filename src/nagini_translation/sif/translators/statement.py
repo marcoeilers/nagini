@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_translation.lib.program_nodes import PythonMethod
@@ -102,7 +108,7 @@ class SIFStatementTranslator(StatementTranslator):
 
     def _assign_with_subscript(
             self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
-            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
+            ctx: SIFContext, allow_impure=False) -> Tuple[List[Stmt], List[Expr]]:
         if isinstance(node.targets[0].slice, ast.ExtSlice):
             raise UnsupportedException(
                 node, "assignment to slice not supported")

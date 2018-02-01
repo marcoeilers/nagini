@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 function object___bool__(self: Ref) : Bool
     ensures self == null ==> !result
     // We can't actually say that the result is true if self is not None, because
@@ -182,11 +188,17 @@ function object___cast__(typ: PyType, obj: Ref): Ref
     ensures result == obj
     ensures issubtype(typeof(obj), typ)
 
-function max(a: Int, b: Int): Int
-    ensures result == ((a > b) ? a : b)
+function max(a: Ref, b: Ref): Int
+    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
+             (issubtype(typeof(a), list(int())) && b == null)
+    requires issubtype(typeof(a), list(int())) ==> acc(a.list_acc, 1/100) && list___len__(a) > 0
+    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
 
-function min(a: Int, b: Int): Int
-    ensures result == ((a < b) ? a : b)
+function min(a: Ref, b: Ref): Int
+    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
+             (issubtype(typeof(a), list(int())) && b == null)
+    requires issubtype(typeof(a), list(int())) ==>  acc(a.list_acc, 1/100) && list___len__(a) > 0
+    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
 
 function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)

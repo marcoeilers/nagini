@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import copy
 
@@ -41,8 +47,10 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonType,
     PythonVar,
+    UnionType,
+    toposort_classes,
+    chain_if_stmts,
     SilverType,
-    UnionType
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -60,7 +68,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Set
 
 
 class CallTranslator(CommonTranslator):
@@ -387,13 +395,15 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        # Mark the current function as depending on the called method. If we're in
-        # a global context, assert that the called method and its dependencies are
-        # defined.
-        self._add_dependencies(node.func, target, ctx)
         defined_check = []
-        if self.is_main_method(ctx) and not target.cls:
-            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called method. If we're in
+            # a global context, assert that the called method and its dependencies are
+            # defined.
+            self._add_dependencies(node.func, target, ctx)
+            if self.is_main_method(ctx) and not target.cls:
+                defined_check = self.assert_global_defined(target, ctx.module, node.func,
+                                                           ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -430,12 +440,14 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        # Mark the current function as depending on the called function. If we're in
-        # a global context, wrap the result into a check that the called function and its
-        # dependencies are defined.
-        self._add_dependencies(node.func, target, ctx)
-        if not target.cls and self.is_main_method(ctx):
-            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called function. If we're in
+            # a global context, wrap the result into a check that the called function and
+            # its dependencies are defined.
+            self._add_dependencies(node.func, target, ctx)
+            if not target.cls and self.is_main_method(ctx):
+                call = self.wrap_global_defined_check(call, target, ctx.module, node.func,
+                                                      ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -464,6 +476,10 @@ class CallTranslator(CommonTranslator):
                     return target_class.get_func_or_method(node.func.attr)
             # Method called on an object
             receiver_class = self.get_type(node.func.value, ctx)
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            if isinstance(receiver_class, UnionType):
+                return None
             target = receiver_class.get_predicate(node.func.attr)
             if not target:
                 target = receiver_class.get_func_or_method(node.func.attr)
@@ -574,6 +590,20 @@ class CallTranslator(CommonTranslator):
 
         if implicit_receiver is None:
             implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
+
+        if target.interface:
+            if keywords:
+                raise UnsupportedException(node, desc='Keyword arguments in call to '
+                                                      'builtin function.')
+            diff = target.nargs - len(unpacked_args)
+            if diff < 0:
+                raise UnsupportedException(node, 'Unsupported version of builtin '
+                                                 'function.')
+            if diff > 0:
+                null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+                unpacked_args += [null] * diff
+                unpacked_arg_types += [None] * diff
+            return arg_stmts, unpacked_args, unpacked_arg_types
 
         nargs = target.nargs
         keys = list(target.args.keys())
@@ -785,19 +815,37 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def chain_if_stmts(self, guarded_blocks: List[Tuple[Expr, Stmt]],
-                       position, info, ctx) -> Stmt:
+    def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
+                                       arg_types: List[PythonType], rectype: UnionType,
+                                       node: ast.Call, ctx: Context,
+                                       impure) -> StmtsAndExpr:
         """
-        Receives a list of tuples each one containing a guard and a guarded
-        block and produces an equivalent chain of if statements.
+        Translate a method call, when the receiver is of type union, into an if-then-else
+        chain of method calls, one for each class in the union according to receiver's
+        type.
         """
-        assert(guarded_blocks)
-        guard, then_block = guarded_blocks[0]
-        if len(guarded_blocks) == 1:
-            else_block = self.translate_block([], self.no_position(ctx), info)
-        else:
-            else_block = self.chain_if_stmts(guarded_blocks[1:], position, info, ctx)
-        return self.viper.If(guard, then_block, else_block, position, info)
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        guarded_blocks = []
+        # For each class in union
+        for type in toposort_classes(rectype.get_types() - {None}):
+            # If receiver is an instance of this particular class
+            method_call_guard = self.var_type_check(node.func.value.id, type, position,
+                                                    ctx)
+            # Call its respective method
+            method_call, return_var = self.translate_normal_call(
+                type.get_func_or_method(node.func.attr), arg_stmts,
+                args, arg_types, node, ctx, impure)
+            if 'final_return_var' not in locals():
+                final_return_var = return_var
+            else:
+                if return_var:
+                    method_call.append(self.viper.LocalVarAssign(final_return_var,
+                                       return_var, position, info))
+            method_call_block = self.translate_block(method_call, position, info)
+            guarded_blocks.append((method_call_guard, method_call_block))
+        return ([chain_if_stmts(guarded_blocks, self.viper, position, info, ctx)],
+                final_return_var)
 
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
@@ -811,28 +859,8 @@ class CallTranslator(CommonTranslator):
             if isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
                 if isinstance(rectype, UnionType):
-                    position = self.to_position(node, ctx)
-                    info = self.no_info(ctx)
-                    # For each class in union
-                    guarded_blocks = []
-                    for type in rectype.get_types():
-                        # If receiver is an instance of this particular class
-                        method_call_guard = self.var_type_check(node.func.value.id,
-                                                                type, position, ctx)
-                        # Call its respective method
-                        method_call, return_var = self.translate_normal_call(
-                            type.get_func_or_method(node.func.attr), arg_stmts,
-                            args, arg_types, node, ctx, impure)
-                        if 'final_return_var' not in locals():
-                            final_return_var = return_var
-                        else:
-                            method_call.append(self.viper.LocalVarAssign(
-                                final_return_var, return_var, position, info))
-                        method_call_block = self.translate_block(method_call, position,
-                                                                 info)
-                        guarded_blocks.append((method_call_guard, method_call_block))
-                    return ([self.chain_if_stmts(guarded_blocks, position, info, ctx)],
-                           final_return_var)
+                    return self.translate_method_call_in_union(arg_stmts, args, arg_types,
+                                                               rectype, node, ctx, impure)
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.

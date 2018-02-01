@@ -1,12 +1,17 @@
+
+Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
+
+For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com/marcoeilers/nagini-pycharm>`_.
+
 Getting Started (Ubuntu Linux only)
 ===================================
 
-0.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit) and the required
+0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.5 (64 bit) and the required
     libraries::
 
         sudo apt-get install python3-dev libzmq3-dev
 
-    For usage with the Carbon backend, you will also need to install the Mono runtime.
+    For usage with the Viper's verification condition generation backend Carbon, you will also need to install the Mono runtime.
 
 1.  Clone repository::
 
@@ -70,7 +75,7 @@ Command Line Usage
 
 To verify a specific file from the nagini directory, run e.g.::
 
-    ./bin/nagini [OPTIONS] path-to-file.py
+    ./env/bin/nagini [OPTIONS] path-to-file.py
 
 The following command line options are available::
 
@@ -82,14 +87,14 @@ The following command line options are available::
                     Select which functions/methods/classes to verify. Expects a comma-
                     separated list of names.
 
+    ``--z3``            
+                    Sets the path of the Z3 executable. Always required. Alternatively, the
+                    ``Z3_EXE`` environment variable can be set.
+                    
     ``--boogie``        
                     Sets the path of the Boogie executable. Required if the Carbon backend
                     is selected. Alternatively, the ``BOOGIE_EXE`` environment variable can be
                     set.
-
-    ``--z3``            
-                    Sets the path of the Z3 executable. Always required. Alternatively, the
-                    ``Z3_EXE`` environment variable can be set.
 
     ``--viper-jar-path``    
                     Sets the path to the required Viper binaries (``silicon.jar`` or

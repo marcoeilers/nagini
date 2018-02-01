@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from abc import ABCMeta
@@ -61,7 +67,7 @@ class TranslatorConfig:
 class AbstractTranslator(metaclass=ABCMeta):
     """
     Abstract class which all specialized translators extend. Provides a number
-    of interface methods through which spcialized translators can interact, and
+    of interface methods through which specialized translators can interact, and
     forwards calls to those methods to the respective translators.
     """
 

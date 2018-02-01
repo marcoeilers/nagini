@@ -1,6 +1,11 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import astunparse
-import struct
 
 from typing import (
     Any,
@@ -61,6 +66,10 @@ class InvalidProgramException(Exception):
         self.node = node
         self.code = code
         self.message = message
+
+
+class NoTypeException(Exception):
+    pass
 
 
 class AssignCollector(ast.NodeVisitor):
@@ -232,6 +241,10 @@ def find_loop_for_previous(node: ast.AST, name: str) -> ast.For:
     if isinstance(node, ast.For):
         if isinstance(node.target, ast.Name):
             if node.target.id == name:
+                return node
+        elif (isinstance(node.target, ast.Tuple) and node.target.elts and
+                  isinstance(node.target.elts[0], ast.Name)):
+            if node.target.elts[0].id == name:
                 return node
     if not hasattr(node, '_parent') or not node._parent:
         return None

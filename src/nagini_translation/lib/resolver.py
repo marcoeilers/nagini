@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_contracts.contracts import CONTRACT_FUNCS
@@ -77,9 +83,9 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # Try to access the member on the common supertype of all union
-            # elements.
-            lhs = lhs.cls
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            return None
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
@@ -373,7 +379,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists'):
+            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists',
+                                  'MayCreate', 'MaySet'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)
@@ -382,7 +389,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
-                return GenericType(seq_class, [arg_type])
+                return GenericType(seq_class, [_get_content_type(arg_type, module, node)])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
@@ -414,7 +421,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     elif isinstance(node.func, ast.Attribute):
         rectype = get_type(node.func.value, containers, container)
         if isinstance(rectype, UnionType):
-            set_of_classes = rectype.get_types()
+            set_of_classes = rectype.get_types() - {None}
             set_of_return_types = {type.get_func_or_method(node.func.attr).type
                                    for type in set_of_classes}
             if len(set_of_return_types) == 1:
@@ -472,6 +479,30 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.name == PSET_TYPE:
         return value_type.type_args[0]
+    elif value_type.python_class.get_func_or_method('__getitem__'):
+        return value_type.python_class.get_func_or_method('__getitem__').type
+    else:
+        raise UnsupportedException(node)
+
+
+def _get_content_type(value_type: PythonType, module: PythonModule,
+                      node: ast.AST) -> PythonType:
+    if value_type.name == LIST_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == SET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+        # FIXME: This is very unfortunate, but right now we cannot handle this
+        # generically, so we have to hard code these two cases for the moment.
+        return value_type.type_args[0]
+    elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
+        return module.global_module.classes[INT_TYPE]
+    elif value_type.name == SEQ_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == PSET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.python_class.get_func_or_method('__getitem__'):
+        return value_type.python_class.get_func_or_method('__getitem__').type
     else:
         raise UnsupportedException(node)
 

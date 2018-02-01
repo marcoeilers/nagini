@@ -108,7 +108,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
 
             pre_assertion = self.viper.TrueLit(self._position, self._info)
             for pre, _ in method.precondition:
-                _, pre_val = self._translator.translate_expr(pre, self._ctx, impure=True)
+                _, pre_val = self._translator.translate_expr(pre, self._ctx, impure=True, target_type=self.viper.Bool)
                 pre_assertion = self.viper.And(pre_assertion, pre_val, self._position,
                                                self._info)
             stmts.append(self.viper.Exhale(pre_assertion.whenExhaling(), self._position,

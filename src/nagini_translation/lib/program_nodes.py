@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import abc
 import ast
 
@@ -22,7 +28,7 @@ from nagini_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
-from nagini_translation.lib.typedefs import Expr
+from nagini_translation.lib.typedefs import Expr, Stmt
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
@@ -33,6 +39,7 @@ from nagini_translation.lib.views import (
     IOOperationContentDict,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple
+from toposort import toposort_flatten
 
 
 class ContainerInterface(metaclass=ABCMeta):
@@ -222,7 +229,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             module_result = module.get_type(prefixes, name)
             if module_result is not None:
                 return module_result
-        return None
+        return None, None
 
     def get_func_type(self, path: List[str]):
         """
@@ -407,6 +414,22 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
+    def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
+        """
+        Checks if types are either the same or, if one of them is an union, checks
+        if the other type belongs to the set of types in the union. Finally, if
+        both types are unions, this function returns true if they have elements
+        in common.
+        """
+        if not isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
+            return type_a in type_b.get_types()
+        elif not isinstance(type_b, UnionType) and isinstance(type_a, UnionType):
+            return type_b in type_a.get_types()
+        elif isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
+            return len(type_a.get_types() & type_b.get_types()) > 0
+        else:
+            return type_a == type_b
+
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonType') -> 'PythonField':
         """
@@ -415,10 +438,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert field.type == type
+            # assert self.types_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert field.type == type
+            # assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -777,12 +800,15 @@ class UnionType(GenericType):
 
     def get_types(self) -> Set[PythonClass]:
         """
-        Returns a flattened set of types contained in the union
+        Returns a flattened set of types contained in Union
         """
         result = set()
         for type in self.type_args:
             if not isinstance(type, UnionType):
-                result.add(type)
+                if type is None:
+                    result.add(None)
+                else:
+                    result.add(type.python_class)
             else:
                 result |= type.get_types()
         return result
@@ -803,6 +829,15 @@ class OptionalType(UnionType):
     @property
     def cls(self):
         return self.optional_type
+
+    def get_types(self) -> Set[PythonClass]:
+        """
+        Returns a flattened set of types contained in Optional
+        """
+        if isinstance(self.optional_type, UnionType):
+            return {None} | self.optional_type.get_types()
+        else:
+            return {None} | {self.optional_type}
 
 
 class MethodType(Enum):
@@ -924,6 +959,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
+            requires = set()
+            for requirement in self.requires:
+                requires.add(requirement)
+            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1713,3 +1752,43 @@ class ProgramNodeFactory:
                             interface=False):
         return PythonClass(name, superscope, node_factory, node,
                            superclass, interface)
+
+def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
+    """
+    Topological sorting of classes in a set, ensuring that derived classes
+    precede their base classes in the returned list
+    """
+    map = {}
+
+    for type in class_set:
+        map[type] = set(type.all_subclasses) & class_set
+
+    return list(toposort_flatten(map, False))
+
+def chain_if_stmts(guarded_blocks: List[Tuple[Expr, Stmt]],
+                   viper, position, info, ctx) -> Stmt:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    block and produces an equivalent chain of if statements.
+    """
+    assert(guarded_blocks)
+    guard, then_block = guarded_blocks[0]
+    if len(guarded_blocks) == 1:
+        else_block = viper.Seqn([], position, info) # Empty block
+    else:
+        else_block = chain_if_stmts(guarded_blocks[1:], viper, position, info, ctx)
+    return viper.If(guard, then_block, else_block, position, info)
+
+def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
+                   viper, position, info, ctx) -> Expr:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    expression and produces an equivalent chain of conditional expressions.
+    """
+    assert(len(guarded_expr) >= 2)
+    guard, then_exp = guarded_expr[0]
+    if len(guarded_expr) == 2:
+        _, else_exp = guarded_expr[1]
+    else:
+        else_exp = chain_cond_exp(guarded_expr[1:], viper, position, info, ctx)
+    return viper.CondExp(guard, then_exp, else_exp, position, info)

@@ -1,9 +1,14 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import logging
 import os
 import nagini_contracts.io_builtins
 import nagini_contracts.lock
-import nagini_translation.external.astpp
 import tokenize
 
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
@@ -48,6 +53,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    NoTypeException,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -143,7 +149,6 @@ class Analyzer(ast.NodeVisitor):
             pass
         self.modules[abs_path].node = parse_result
         self.asts[abs_path] = parse_result
-        logger.debug(nagini_translation.external.astpp.dump(parse_result))
         assert isinstance(parse_result, ast.Module)
         for stmt in parse_result.body:
             if isinstance(stmt, ast.Import):
@@ -985,9 +990,19 @@ class Analyzer(ast.NodeVisitor):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
-                field = receiver.add_field(node.attr, node, self.typeof(node))
-                if isinstance(field, PythonField):
-                    self.track_access(node, field)
+                if isinstance(receiver, UnionType):
+                    for type in receiver.get_types() - {None}:
+                        field = type.add_field(node.attr, node, self.typeof(node))
+                        if isinstance(field, PythonField):
+                            self.track_access(node, field)
+                else:
+                    try:
+                        field_type = self.typeof(node)
+                        field = receiver.add_field(node.attr, node, field_type)
+                        if isinstance(field, PythonField):
+                            self.track_access(node, field)
+                    except NoTypeException:
+                        pass
 
     def visit_Global(self, node: ast.Global) -> None:
         for name in node.names:
@@ -1126,11 +1141,25 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
+            if isinstance(receiver, UnionType):
+                set_of_types = []
+                for type_in_union in receiver.get_types() - {None}:
+                    if isinstance(type_in_union, OptionalType):
+                        context = [type_in_union.optional_type.name]
+                    else:
+                        context = [type_in_union.name]
+                    type, _ = self.module.get_type(context, node.attr)
+                    converted = self.convert_type(type)
+                    if converted not in set_of_types:
+                        set_of_types.append(converted)
+                return UnionType(set_of_types) if len(set_of_types) > 1 else set_of_types[0]
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
             type, _ = self.module.get_type(context, node.attr)
+            if type is None:
+                raise NoTypeException
             return self.convert_type(type)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we

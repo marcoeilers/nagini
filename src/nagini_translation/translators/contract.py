@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import copy
 
@@ -26,6 +32,9 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonType,
     PythonVar,
+    UnionType,
+    toposort_classes,
+    chain_cond_exp,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -80,6 +89,8 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.actual_function.type
         if not ctx.actual_function.pure:
+            if ctx.result_var is None:
+                raise InvalidProgramException('invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
@@ -330,6 +341,16 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
+    def translate_assume(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Assume().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        assertion = self.viper.Inhale(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_implies(self, node: ast.Call, ctx: Context,
                           impure=False) -> StmtsAndExpr:
         """
@@ -498,24 +519,35 @@ class ContractTranslator(CommonTranslator):
                     get_func_name(domain_node) == 'Old'):
             domain_old = True
             domain_node = domain_node.args[0]
+
+        ref_var = self.to_ref(var.ref(), ctx)
+        pos = self.to_position(domain_node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
+            if not len(domain_node.args) == 2:
+                msg = 'range() is currently only supported with two args.'
+                raise UnsupportedException(domain_node, msg)
+            arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
+                                                  target_type=self.viper.Int)
+            arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
+                                                  target_type=self.viper.Int)
+            int_var = self.to_int(ref_var, ctx)
+            condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
+                                       self.viper.LtCmp(int_var, arg2, pos, info),
+                                       pos, info)
+            return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
-        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))]
+        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain],
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx), seq_ref, formal_args)
-        ref_var = self.to_ref(var.ref(), ctx)
-        result = self.viper.SeqContains(ref_var, domain_set,
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx))
+                                        [domain], pos, info, seq_ref, formal_args)
+
+        result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
-            result = self.viper.Old(result, self.to_position(domain_node, ctx),
-                                    self.no_info(ctx))
-        return dom_stmt, result
+            result = self.viper.Old(result, pos, info)
+        return dom_stmt, result, True
 
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -655,13 +687,14 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
-                                                              ctx)
+        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var,
+                                                                          domain_node,
+                                                                          ctx)
         lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if triggers:
+        if is_trigger and triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
@@ -710,6 +743,33 @@ class ContractTranslator(CommonTranslator):
             if isinstance(node.args[0], ast.Call):
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
+                if isinstance(node.args[0], ast.Attribute):
+                    type = self.get_type(node.args[0].value, ctx)
+                    if isinstance(type, UnionType):
+                        guarded_field_access = []
+                        stmt, receiver = self.translate_expr(node.args[0].value, ctx)
+                        for recv_type in toposort_classes(type.get_types() - {None}):
+                            target = self.get_target(node.args[0].value, ctx)
+                            field_guard = self.var_type_check(target.sil_name,
+                                                              recv_type,
+                                                              self.to_position(node, ctx),
+                                                              ctx)
+                            field = recv_type.get_field(node.args[0].attr).actual_field
+                            field_access = self.viper.FieldAccess(receiver, field.sil_field,
+                                                                  self.to_position(node, ctx),
+                                                                  self.no_info(ctx))
+                            field_acc = self._translate_acc_field(field_access,
+                                                                  field.type, perm,
+                                                                  self.to_position(node, ctx),
+                                                                  ctx)
+                            guarded_field_access.append((field_guard, field_acc))
+                        if len(guarded_field_access) == 1:
+                            _, field_acc = guarded_field_access[0]
+                            return stmt, field_acc
+                        else:
+                            return (stmt, chain_cond_exp(guarded_field_access, self.viper,
+                                                         self.to_position(node, ctx),
+                                                         self.no_info(ctx), ctx))
                 target = self.get_target(node.args[0], ctx)
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)
@@ -725,6 +785,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_create(node, ctx)
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
+        elif func_name == 'Assume':
+            return self.translate_assume(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':

@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from contextlib import contextmanager
 from nagini_translation.lib.constants import ERROR_NAME, RESULT_NAME
 from nagini_translation.lib.io_context import IOOpenContext
