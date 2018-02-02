@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
+from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.typedefs import (
     Expr,
     Stmt,
@@ -98,8 +99,7 @@ class PermTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name == 'ARP':
             if len(node.args) == 0:
-                return self.viper.FuncApp('rd', [], self.to_position(node, ctx),
-                                          self.no_info(ctx), self.viper.Ref, {})
+                return self.get_arp_for_context(node, ctx)
             elif len(node.args) == 1:
                 arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Int)
                 if arg0_stmt:
@@ -117,10 +117,26 @@ class PermTranslator(CommonTranslator):
     def translate_perm_Name(self, node: ast.Name, ctx: Context) -> Expr:
         if node.id == 'RD_PRED':
             return self.viper.FuncApp('globalRd', [], self.to_position(node, ctx),
-                                      self.no_info(ctx), self.viper.Ref, {})
+                                      self.no_info(ctx), self.viper.Perm, {})
 
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)
         if not stmt:
             return expr
         raise InvalidProgramException(node, 'purity.violated')
+
+    def get_arp_for_context(self, node: ast.AST, ctx: Context):
+        if ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and ctx.actual_function.pure:
+            return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
+        else:
+            if ctx.current_thread_object is not None:
+                formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+                if ctx.is_thread_start:
+                    return self.viper.FuncApp('rd_token_fresh', [ctx.current_thread_object], self.to_position(node, ctx),
+                                              self.no_info(ctx), self.viper.Perm, [formal_arg])
+                else:
+                    return self.viper.FuncApp('rd_token', [ctx.current_thread_object], self.to_position(node, ctx),
+                                              self.no_info(ctx), self.viper.Perm, [formal_arg])
+            else:
+                return self.viper.FuncApp('rd', [], self.to_position(node, ctx),
+                                          self.no_info(ctx), self.viper.Perm, {})

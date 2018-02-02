@@ -1139,6 +1139,7 @@ class CallTranslator(CommonTranslator):
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, True
         method_options = []
         for arg in node.args:
             target = self.get_target(arg, ctx)
@@ -1174,12 +1175,14 @@ class CallTranslator(CommonTranslator):
         precond_pos = self.to_position(node, ctx, rules=rules.THREAD_START_PRECONDITION)
         stmts.extend(self.create_method_fork(ctx, method_options, thread, precond_pos,
                                              info, node))
+        ctx.current_thread_object, ctx.is_thread_start = None, False
         return thread_stmt + stmts, None
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         pos, info = self.to_position(node,ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, False
         stmts = thread_stmt
         joinable_pos = self.to_position(node, ctx, rules=rules.THREAD_JOIN_JOINABLE)
         joinable_func = self.viper.FuncApp(JOINABLE_FUNC, [thread],
@@ -1286,6 +1289,8 @@ class CallTranslator(CommonTranslator):
         post_pred = self.viper.PredicateAccessPredicate(post_pred_acc, post_perm, pos, info)
         exhale_pred = self.viper.Exhale(post_pred, pos, info)
         stmts.append(exhale_pred)
+
+        ctx.current_thread_object, ctx.is_thread_start = None, False
 
         return stmts, None
 

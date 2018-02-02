@@ -731,11 +731,7 @@ class ContractTranslator(CommonTranslator):
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
-                if ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and ctx.actual_function.pure:
-                    perm = self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
-                else:
-                    perm = self.viper.FuncApp('rd', {}, self.to_position(node, ctx),
-                                              self.no_info(ctx), self.viper.Ref, {})
+                perm = self.get_arp_for_context(node, ctx)
             elif func_name == 'Wildcard':
                 perm = self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
             else:

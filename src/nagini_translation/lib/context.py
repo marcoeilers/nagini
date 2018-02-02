@@ -45,6 +45,8 @@ class Context:
         self._global_counter = 0
         self.perm_factor = None
         self._old_aliases = {}
+        self.current_thread_object = None
+        self.is_thread_start = False
 
     def get_fresh_int(self) -> int:
         """
