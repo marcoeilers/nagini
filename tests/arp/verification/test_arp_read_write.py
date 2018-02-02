@@ -7,20 +7,17 @@ from nagini_contracts.thread import Thread
 class Cell:
     def __init__(self, val: int) -> None:
         self.value = val
+        self.rds = 0
         Ensures(Acc(self.value) and self.value == val)
+        Ensures(Acc(self.rds) and self.rds == 0)
 
 
 class CellLock(Lock[Cell]):
 
-    def __init__(self, locked_object: Cell) -> None:
-        super().__init__(locked_object)
-        self.rds = 0
-        Ensures(Acc(self.rds) and self.rds == 0)
-
     @Predicate
     def invariant(self) -> bool:
-        return Acc(self.rds) and self.rds >= 0 and \
-               Acc(self.get_locked().value, 1 - self.rds * ARP())
+        return Acc(self.get_locked().rds) and self.get_locked().rds >= 0 and \
+               Acc(self.get_locked().value, 1 - self.get_locked().rds * ARP())
 
 
 class Writer:
@@ -37,10 +34,11 @@ class Reader:
 
 class RWController:
     def __init__(self, c: Cell) -> None:
-        self.c = c
-        self.lock = CellLock(self.c)
+        Requires(Acc(c.rds) and Acc(c.value) and c.rds == 0)
         Ensures(Acc(self.c) and self.c == c and Acc(self.lock) and self.lock.get_locked() is self.c)
         Ensures(WaitLevel() < Level(self.lock))
+        self.c = c  # type: Cell
+        self.lock = CellLock(self.c)  # type: CellLock
 
     def do_write(self, writer: Writer) -> None:
         Requires(writer is not None)
@@ -49,7 +47,7 @@ class RWController:
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
         Unfold(self.lock.invariant())
-        if self.lock.rds != 0:
+        if self.c.rds != 0:
             Fold(self.lock.invariant())
             self.lock.release()
             self.do_write(writer)
@@ -65,12 +63,12 @@ class RWController:
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
         Unfold(self.lock.invariant())
-        self.lock.rds += 1
+        self.c.rds += 1
         Fold(self.lock.invariant())
         self.lock.release()
         reader.read(self.c)
         self.lock.acquire()
         Unfold(self.lock.invariant())
-        self.lock.rds -= 1
+        self.c.rds -= 1
         Fold(self.lock.invariant())
         self.lock.release()
