@@ -108,6 +108,14 @@ class PermTranslator(CommonTranslator):
                 formal_arg = self.viper.LocalVarDecl('count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
                 return self.viper.FuncApp('rdc', [arg0], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Perm, [formal_arg])
+        elif func_name == 'getARP':
+            if len(node.args) == 1:
+                formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+                arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Ref)
+                if arg0_stmt:
+                    raise InvalidProgramException(node, 'purity.violated')
+                return self.viper.FuncApp('rd_token', [arg0], self.to_position(node, ctx),
+                                          self.no_info(ctx), self.viper.Perm, [formal_arg])
 
         call_stmt, call = self.translate_expr(node, ctx, self.viper.Int)
         if not call_stmt:

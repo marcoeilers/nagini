@@ -24,6 +24,9 @@ def getArg(t: Thread, i: int) -> object:
 def getOld(t: Thread, o: object) -> object:
     pass
 
+def getARP(t: Thread) -> float:
+    pass
+
 
 def arg(i: int) -> Any:
     pass
