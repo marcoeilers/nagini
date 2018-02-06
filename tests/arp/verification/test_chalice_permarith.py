@@ -29,6 +29,10 @@ class Cell:
         Requires(Acc(self.x, 1/100 - ARP(1) - 2/100))
         Assert(False)  # this should verify, as the precondition contains an invalid permission
 
+    def a3(self, n: int) -> None:
+        #:: ExpectedOutput(assert.failed:insufficient.permission)
+        Assert(Acc(self.x, 1/100 - ARP(1) - 2/100))  # ERROR: invalid (negative) permission
+
     def a4(self, n: int) -> None:
         Requires(n > 0)
         Requires(Acc(self.x, ARP(n)))

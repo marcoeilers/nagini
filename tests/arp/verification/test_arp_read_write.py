@@ -50,9 +50,9 @@ class RWController:
         if self.c.rds != 0:
             Fold(self.lock.invariant())
             self.lock.release()
-            self.do_write(writer)
+            self.do_write(writer)  # try again
         else:
-            writer.write(self.c)
+            writer.write(self.c)   # lock acquired successfully
             Fold(self.lock.invariant())
             self.lock.release()
 
