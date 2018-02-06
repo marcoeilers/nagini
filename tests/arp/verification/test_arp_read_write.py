@@ -48,10 +48,12 @@ class RWController:
         self.lock.acquire()
         Unfold(self.lock.invariant())
         if self.c.rds != 0:
+            #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 0)
             Fold(self.lock.invariant())
             self.lock.release()
             self.do_write(writer)  # try again
         else:
+            #:: UnexpectedOutput(carbon)(leak_check.failed:caller.has_unsatisfied_obligations, 0)
             writer.write(self.c)   # lock acquired successfully
             Fold(self.lock.invariant())
             self.lock.release()
@@ -64,6 +66,7 @@ class RWController:
         self.lock.acquire()
         Unfold(self.lock.invariant())
         self.c.rds += 1
+        #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 0)
         Fold(self.lock.invariant())
         self.lock.release()
         reader.read(self.c)

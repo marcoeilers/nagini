@@ -30,7 +30,7 @@ class Cell:
         Assert(False)  # this should verify, as the precondition contains an invalid permission
 
     def a3(self, n: int) -> None:
-        #:: ExpectedOutput(assert.failed:insufficient.permission)
+        #:: ExpectedOutput(silicon)(assert.failed:negative.permission)|ExpectedOutput(carbon)(assert.failed:insufficient.permission)
         Assert(Acc(self.x, 1/100 - ARP(1) - 2/100))  # ERROR: invalid (negative) permission
 
     def a4(self, n: int) -> None:

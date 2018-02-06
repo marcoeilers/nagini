@@ -1,6 +1,6 @@
 from nagini_contracts.lock import Lock
 from nagini_contracts.contracts import *
-from nagini_contracts.obligations import Level, WaitLevel
+from nagini_contracts.obligations import Level, WaitLevel, MustTerminate
 from nagini_contracts.thread import Thread
 
 
@@ -30,6 +30,7 @@ class ThingWithCell:
 
     def need_value(self) -> None:
         Requires(Rd(self.c) and Rd(self.c.value))
+        Requires(MustTerminate(2))
         Ensures(Rd(self.c) and Rd(self.c.value))
         pass
 
@@ -37,11 +38,12 @@ class ThingWithCell:
         Requires(Rd(self.l) and Rd(self.c) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Rd(self.l) and Rd(self.c))
-        #:: ExpectedOutput(postcondition.violated:assertion.false)
+        #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(postcondition.violated:assertion.false, 0)
         Ensures(False)
         self.l.acquire()
         Unfold(self.l.invariant())
         self.c.n += 1
+        #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 0)
         Fold(self.l.invariant())
         self.l.release()
         self.need_value()
@@ -51,6 +53,8 @@ class ThingWithCell:
         t2.start(self.need_value)
         t1.join(self.need_value)
         t2.join(self.need_value)
+        #:: ExpectedOutput(carbon)(assert.failed:assertion.false)
+        Assert(False)  # Carbon does not terminate for the next statement
         self.need_value()
         self.l.acquire()
         Unfold(self.l.invariant())

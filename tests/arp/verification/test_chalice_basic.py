@@ -46,6 +46,7 @@ class Cell:
         self.dispose_rd()
         t2 = Thread(None, self.dispose_rd, args=())
         t2.start(self.dispose_rd)
+        #:: UnexpectedOutput(silicon)(call.precondition:insufficient.permission, 0)
         self.dispose_rd()
 
     # forking and method calls of dispose_rd
@@ -69,8 +70,12 @@ class Cell:
         t1 = Thread(None, self.dispose_rd, args=())
         t1.start(self.dispose_rd)
         t2 = Thread(None, self.dispose_rd, args=())
+        # probably due to timeout in silicon, does not always occur
+        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission, 0)
         t2.start(self.dispose_rd)
         t3 = Thread(None, self.dispose_rd, args=())
+        # probably due to timeout in silicon, does not always occur
+        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission, 0)
         t3.start(self.dispose_rd)
         t4 = Thread(None, self.dispose_rd, args=())
         t4.start(self.dispose_rd)
@@ -90,7 +95,7 @@ class Cell:
     # joining to regain permission
     def a9(self, a: int) -> None:
         Requires(Rd(self.x))
-        #:: ExpectedOutput(postcondition.violated.insufficient.permission)
+        #:: ExpectedOutput(postcondition.violated:insufficient.permission)
         Ensures(Rd(self.x))
         t1 = Thread(None, self.dispose_rd, args=())
         t1.start(self.dispose_rd)

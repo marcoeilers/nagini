@@ -16,6 +16,8 @@ class Clazz:
 
     def startAndJoinWrite(self) -> None:
         Requires(Acc(self.x))
+        # probably due to timeout in silicon, does not always occur
+        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 0)
         Ensures(Acc(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
@@ -26,6 +28,8 @@ class Clazz:
 
     def startAndJoinRead(self) -> None:
         Requires(Rd(self.x))
+        # probably due to timeout in silicon, does not always occur
+        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 0)
         Ensures(Rd(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
@@ -62,14 +66,15 @@ class Clazz:
         t.join(self.readX)
 
     def join2(self, t1: Thread, t2: Thread) -> None:
+        Requires(t1 is not t2)
         Requires(getMethod(t1) == Clazz.readX)
         Requires(getMethod(t2) == Clazz.readX)
         Requires(getArg(t1, 0) is self)
         Requires(getArg(t2, 0) is self)
         Requires(MayJoin(t1))
         Requires(MayJoin(t2))
-        Requires(Acc(ThreadPost(t1), 1))
-        Requires(Acc(ThreadPost(t2), 1))
+        Requires(Acc(ThreadPost(t1)))
+        Requires(Acc(ThreadPost(t2)))
         Requires(WaitLevel() < Level(t1))
         Requires(WaitLevel() < Level(t2))
         Ensures(Acc(self.x, getARP(t1) + getARP(t2)))

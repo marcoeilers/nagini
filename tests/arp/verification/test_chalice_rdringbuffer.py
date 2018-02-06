@@ -61,6 +61,7 @@ class RingBuffer:
         Requires(Rd(self.valid()))
         Requires(len(self.contents()) != 0)
         Ensures(Result() == self.contents()[0])
+        #:: UnexpectedOutput(silicon)(application.precondition:assertion.false, 0)
         return Unfolding(Rd(self.valid()), self.data[self.first])
 
     def push(self, x: int) -> None:
