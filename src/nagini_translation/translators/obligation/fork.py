@@ -89,6 +89,8 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
                 self._ctx.set_alias(name, arg_vars[index])
             # old_class = self._ctx.current_class
             self._ctx.inlined_calls.append(method)
+            old_loop_stack = self._ctx.obligation_context._loop_stack
+            self._ctx.obligation_context._loop_stack = []
 
             old_info = self.viper.TrueLit(self._position, self._info)
             normalizer = OldExpressionNormalizer()
@@ -119,6 +121,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
             for name in method._args:
                 self._ctx.remove_alias(name)
             self._ctx.inlined_calls.pop()
+            self._ctx.obligation_context._loop_stack = old_loop_stack
             joinable_func = self.viper.FuncApp(JOINABLE_FUNC, [self._thread],
                                                self._position, self._info,
                                                self.viper.Bool)
