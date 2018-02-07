@@ -1,6 +1,6 @@
 from nagini_contracts.lock import Lock
 from nagini_contracts.contracts import *
-from nagini_contracts.obligations import Level, WaitLevel
+from nagini_contracts.obligations import Level, WaitLevel, MustTerminate
 from nagini_contracts.thread import Thread
 
 
@@ -23,12 +23,14 @@ class CellLock(Lock[Cell]):
 class Writer:
     def write(self, data: Cell) -> None:
         Requires(Acc(data.value))
+        Requires(MustTerminate(2))
         Ensures(Acc(data.value))
 
 
 class Reader:
     def read(self, data: Cell) -> None:
         Requires(Rd(data.value))
+        Requires(MustTerminate(2))
         Ensures(Rd(data.value))
 
 
@@ -53,7 +55,6 @@ class RWController:
             self.lock.release()
             self.do_write(writer)  # try again
         else:
-            #:: UnexpectedOutput(carbon)(leak_check.failed:caller.has_unsatisfied_obligations, 0)
             writer.write(self.c)   # lock acquired successfully
             Fold(self.lock.invariant())
             self.lock.release()
