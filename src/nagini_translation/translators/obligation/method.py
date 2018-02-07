@@ -15,6 +15,7 @@ from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
+    PythonVar,
 )
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -26,6 +27,9 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.translators.obligation.common import (
     CommonObligationTranslator,
+)
+from nagini_translation.translators.obligation.fork import (
+    ObligationMethodForkConstructor,
 )
 from nagini_translation.translators.obligation.method_node import (
     ObligationMethod,
@@ -92,15 +96,25 @@ class MethodObligationTranslator(CommonObligationTranslator):
         return node
 
     def create_method_call_node(
-            self, ctx: Context, methodname: str, original_args: List[Expr],
+            self, ctx: Context, method_name: str, original_args: List[Expr],
             targets: List[Expr], position: Position, info: Info,
             target_method: PythonMethod = None,
             target_node: ast.Call = None) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
         obligation_method_call = ObligationMethodCall(
-            methodname, original_args, targets)
+            method_name, original_args, targets)
         constructor = ObligationMethodCallNodeConstructor(
             obligation_method_call, position, info, self, ctx,
             self._obligation_manager, target_method, target_node)
         constructor.construct_call()
+        return constructor.get_statements()
+
+    def create_method_fork(self, ctx: Context, targets, thread: Expr,
+                           position: Position, info: Info,
+                           target_node: ast.Call=None) -> List[Stmt]:
+        constructor = ObligationMethodForkConstructor(targets, thread, position, info,
+                                                      self, ctx, self._obligation_manager,
+                                                      target_node)
+
+        constructor.construct_fork()
         return constructor.get_statements()

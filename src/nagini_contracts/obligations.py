@@ -9,6 +9,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # pragma pylint: disable=invalid-name,unused-argument
 
 
+from typing import Union
+from nagini_contracts.thread import Thread
+
+
 OBLIGATION_CONTRACT_FUNCS = [
     'MustTerminate',
     'MustRelease',
@@ -32,7 +36,7 @@ def WaitLevel() -> LevelType:
     """The wait level of the current thread."""
 
 
-def Level(l: BaseLock) -> LevelType:
+def Level(l: Union[BaseLock, Thread]) -> LevelType:
     """Level of the given lock."""
 
 

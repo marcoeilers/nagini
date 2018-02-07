@@ -348,8 +348,13 @@ class ViperAST:
     def Implies(self, left, right, position, info):
         return self.ast.Implies(left, right, position, info, self.NoTrafos)
 
-    def FuncApp(self, name, args, position, info, type, formalargs):
+    def FuncApp(self, name, args, position, info, type, formalargs=None):
         self.used_names.add(name)
+        if formalargs is None:
+            formalargs = []
+            for i, a in enumerate(args):
+                formalargs.append(self.LocalVarDecl('p' + str(i), a.typ(), a.pos(),
+                                                    a.info()))
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.to_seq(formalargs), self.NoTrafos)
 
