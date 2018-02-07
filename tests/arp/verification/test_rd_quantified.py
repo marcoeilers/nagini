@@ -10,30 +10,34 @@ class Clazz:
         self.y = 3  # type: int
         self.seq = Sequence(self)  # type: Sequence[Clazz]
 
-    def m1(self) -> None:
+    def m1(self, b: bool) -> None:
         Requires(self != None)
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Rd(r.x)))
         Ensures(Rd(self.seq) and Forall(self.seq, lambda r: Rd(r.x)))
-        self.m1()
+        if b:
+            self.m1(b)
 
-    def m1_1(self) -> None:
+    def m1_1(self, b: bool) -> None:
         Requires(self != None)
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Rd(r.x)))
         Ensures(Rd(self.seq) and Forall(self.seq, lambda r: Rd(r.x)))
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
-        self.m1()
+        if b:
+            self.m1(b)
 
-    def m2(self) -> None:
+    def m2(self, b: bool) -> None:
         Requires(self != None)
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Acc(r.x)))
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Acc(r.x)))
-        self.m1()
+        if b:
+            self.m1(b)
 
-    def m2_1(self) -> None:
+    def m2_1(self, b: bool) -> None:
         Requires(self != None)
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Acc(r.x)))
         Requires(Rd(self.seq) and Forall(self.seq, lambda r: Acc(r.x)))
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
-        self.m1()
+        if b:
+            self.m1(b)
