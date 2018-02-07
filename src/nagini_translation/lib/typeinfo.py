@@ -63,6 +63,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(node.expr, mypy.nodes.IndexExpr) and
                 not isinstance(rectype, mypy.types.CallableType) and
                 not isinstance(rectype, str) and
+                not isinstance(rectype, mypy.types.AnyType) and
                 not isinstance(rectype, mypy.types.UnionType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
             self.set_type(rectype.type.fullname().split('.') + [node.name],
