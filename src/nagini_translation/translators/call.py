@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import copy
 
 from collections import OrderedDict
 from nagini_contracts.contracts import (
@@ -13,19 +14,30 @@ from nagini_contracts.contracts import (
 )
 from nagini_contracts.io import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
+from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
     BUILTINS,
     DICT_TYPE,
     END_LABEL,
     ERROR_NAME,
+    GET_ARG_FUNC,
+    GET_METHOD_FUNC,
+    GET_OLD_FUNC,
+    JOINABLE_FUNC,
     LIST_TYPE,
+    METHOD_ID_DOMAIN,
+    OBJECT_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
     STRING_TYPE,
+    THREAD_DOMAIN,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
     TUPLE_TYPE,
 )
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
@@ -49,6 +61,9 @@ from nagini_translation.lib.util import (
     get_body_indices,
     get_func_name,
     InvalidProgramException,
+    OldExpressionCollector,
+    OldExpressionNormalizer,
+    pprint,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -57,6 +72,7 @@ from typing import Dict, List, Tuple, Union, Set
 
 
 class CallTranslator(CommonTranslator):
+
 
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -132,6 +148,13 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def _is_lock_subtype(self, cls: PythonClass) -> bool:
+        if cls is None:
+            return False
+        if cls.name == 'Lock':
+            return cls
+        return self._is_lock_subtype(cls.superclass)
+
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -147,6 +170,7 @@ class CallTranslator(CommonTranslator):
                                                        self.translator)
         result_type = self.get_type(node, ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
         # the concrete type arguments.
@@ -155,7 +179,7 @@ class CallTranslator(CommonTranslator):
         current_type = result_type
         while current_type:
             if isinstance(current_type, GenericType):
-                vars_args = zip(current_type.cls.type_vars.items(),
+                vars_args = zip(current_type.python_class.type_vars.items(),
                                 current_type.type_args)
                 for (name, var), arg in vars_args:
                     literal = self.type_factory.translate_type_literal(arg, pos,
@@ -191,6 +215,20 @@ class CallTranslator(CommonTranslator):
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
         stmts = [new, type_inhale] + may_set_inhales
+
+        if self._is_lock_subtype(target_class):
+            lock_class = self._is_lock_subtype(target_class)
+            locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
+                                                [None], node, ctx, pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+            invariant_pred = lock_class.get_predicate('invariant')
+            full_perm = self.viper.FullPerm(pos, info)
+            pred_acc = self.viper.PredicateAccess([res_var.ref()],
+                                                  invariant_pred.sil_name, pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
+            stmts.append(self.viper.Fold(acc_pred, pos, info))
+
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls
@@ -357,13 +395,15 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        # Mark the current function as depending on the called method. If we're in
-        # a global context, assert that the called method and its dependencies are
-        # defined.
-        self._add_dependencies(node.func, target, ctx)
         defined_check = []
-        if self.is_main_method(ctx) and not target.cls:
-            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called method. If we're in
+            # a global context, assert that the called method and its dependencies are
+            # defined.
+            self._add_dependencies(node.func, target, ctx)
+            if self.is_main_method(ctx) and not target.cls:
+                defined_check = self.assert_global_defined(target, ctx.module, node.func,
+                                                           ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -400,12 +440,14 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        # Mark the current function as depending on the called function. If we're in
-        # a global context, wrap the result into a check that the called function and its
-        # dependencies are defined.
-        self._add_dependencies(node.func, target, ctx)
-        if not target.cls and self.is_main_method(ctx):
-            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called function. If we're in
+            # a global context, wrap the result into a check that the called function and
+            # its dependencies are defined.
+            self._add_dependencies(node.func, target, ctx)
+            if not target.cls and self.is_main_method(ctx):
+                call = self.wrap_global_defined_check(call, target, ctx.module, node.func,
+                                                      ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -468,7 +510,7 @@ class CallTranslator(CommonTranslator):
         if called_func.method_type == MethodType.normal:
             if isinstance(node.func, ast.Attribute):
                 called_name = get_func_name(node.func.value)
-                if called_name == 'Result':
+                if called_name in ('Result', 'TypedResult'):
                     return True
                 rec_target = self.get_target(node.func.value, ctx)
                 if isinstance(rec_target, PythonModule):
@@ -548,6 +590,20 @@ class CallTranslator(CommonTranslator):
 
         if implicit_receiver is None:
             implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
+
+        if target.interface:
+            if keywords:
+                raise UnsupportedException(node, desc='Keyword arguments in call to '
+                                                      'builtin function.')
+            diff = target.nargs - len(unpacked_args)
+            if diff < 0:
+                raise UnsupportedException(node, 'Unsupported version of builtin '
+                                                 'function.')
+            if diff > 0:
+                null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+                unpacked_args += [null] * diff
+                unpacked_arg_types += [None] * diff
+            return arg_stmts, unpacked_args, unpacked_arg_types
 
         nargs = target.nargs
         keys = list(target.args.keys())
@@ -915,6 +971,15 @@ class CallTranslator(CommonTranslator):
             return self._translate_method_call(target, args, arg_stmts,
                                                position, node, ctx)
 
+    def _is_thread_method_call(self, node: ast.Call, name: str, ctx: Context) -> bool:
+        if isinstance(node.func, ast.Attribute):
+            val_type = self.get_type(node.func.value, ctx)
+            if (isinstance(val_type, PythonClass) and
+                        val_type.name == "Thread" and
+                        node.func.attr == name):
+                return True
+            return False
+
     def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
@@ -922,6 +987,7 @@ class CallTranslator(CommonTranslator):
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
         """
+
         is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)
         if is_name:
@@ -935,14 +1001,293 @@ class CallTranslator(CommonTranslator):
                 return self.translate_obligation_contractfunc_call(node, ctx)
             elif func_name in BUILTINS:
                 return self._translate_builtin_func(node, ctx)
+            elif func_name == "Thread":
+                return self._translate_thread_creation(node, ctx)
             elif func_name in BUILTIN_PREDICATES:
                 return [], self.translate_contractfunc_call(node, ctx, impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
             return self.translate_io_operation_call(node, ctx)
+        elif self._is_thread_method_call(node, 'start', ctx):
+            return self._translate_thread_start(node,ctx)
+        elif self._is_thread_method_call(node, 'join', ctx):
+                return self._translate_thread_join(node,ctx)
         else:
             return self.translate_normal_call_node(node, ctx, impure)
+
+    def _get_arg(self, nargs: int, keywords: List[str], index: int, kw: str) -> int:
+        if nargs > index:
+            return index
+        if kw in keywords:
+            return nargs + keywords.index(kw)
+        return None
+
+    def _translate_thread_creation(self, node: ast.Call,
+                                   ctx: Context) -> StmtsAndExpr:
+        """Translates the instantiation of a Thread object."""
+        pos, info = self.to_position(node,ctx), self.no_info(ctx)
+
+        arg_exprs = [a for a in node.args] + [kw.value for kw in node.keywords]
+        keywords = [kw.arg for kw in node.keywords]
+
+        group_arg = self._get_arg(len(node.args), keywords, 0, 'group')
+        target_arg = self._get_arg(len(node.args), keywords, 1, 'target')
+        name_arg = self._get_arg(len(node.args), keywords, 2, 'name')
+        args_arg = self._get_arg(len(node.args), keywords, 3, 'args')
+        kwargs_arg = self._get_arg(len(node.args), keywords, 4, 'kwargs')
+        daemon_arg = self._get_arg(len(node.args), keywords, 5, 'daemon')
+
+        if target_arg is None:
+            raise InvalidProgramException(node, 'invalid.thread.creation')
+        if kwargs_arg or daemon_arg:
+            raise UnsupportedException(node, 'Unsupported thread parameter.')
+
+        thread_arg_stmts = []
+        thread_arg_vals = []
+        for index, expr in enumerate(arg_exprs):
+            if index is target_arg or index is args_arg:
+                thread_arg_vals.append(None)
+                continue
+            arg_stmt, arg_val = self.translate_expr(expr, ctx)
+            thread_arg_stmts.extend(arg_stmt)
+            thread_arg_vals.append(arg_val)
+
+        target_arg = arg_exprs[target_arg]
+        args_arg = arg_exprs[args_arg]
+
+        if group_arg is not None:
+            group_none_pos = self.to_position(node, ctx, error_string='group is None',
+                                              rules=rules.THREAD_CREATION_GROUP_NONE)
+            null = self.viper.NullLit(group_none_pos, info)
+            is_none = self.viper.EqCmp(thread_arg_vals[group_arg], null, group_none_pos,
+                                       info)
+            assert_none = self.viper.Assert(is_none, group_none_pos, info)
+            thread_arg_stmts.append(assert_none)
+
+        target = self.get_target(target_arg, ctx)
+        if not isinstance(target, PythonMethod):
+            raise InvalidProgramException(node, 'invalid.thread.creation')
+        if target.pure or target.predicate:
+            raise InvalidProgramException(node, 'invalid.thread.creation')
+        if not isinstance(args_arg, ast.Tuple):
+            raise InvalidProgramException(node, 'invalid.thread.creation')
+        meth_args = args_arg.elts if args_arg is not None else []
+
+        if isinstance(target_arg, ast.Attribute):
+            receiver = self.get_target(target_arg.value, ctx)
+            if not isinstance(receiver, PythonType):
+                meth_args = [target_arg.value] + meth_args
+
+        if len(meth_args) != len(target.args):
+            no_default_args = [arg for arg in target.args.values()
+                               if arg.default_expr is None]
+            if len(no_default_args) != len(target.args):
+                raise UnsupportedException(node, 'Thread target with default arguments.')
+            else:
+                raise InvalidProgramException(node, 'invalid.thread.creation')
+
+        thread_class = ctx.module.global_module.classes['Thread']
+        thread_var = ctx.actual_function.create_variable('threadingVar', thread_class,
+                                                         self.translator)
+        thread = thread_var.ref(node, ctx)
+        newstmt = self.viper.NewStmt(thread, [], pos, info)
+
+        thread_object_type = self.type_check(thread, thread_class, pos, ctx)
+        inhale_thread_type = self.viper.Inhale(thread_object_type, pos, info)
+
+        start_pred_acc = self.viper.PredicateAccess([thread], THREAD_START_PRED,
+                                                    pos, info)
+        full_perm = self.viper.FullPerm(pos, info)
+        start_pred = self.viper.PredicateAccessPredicate(start_pred_acc, full_perm, pos,
+                                                         info)
+        inhale_start_perm = self.viper.Inhale(start_pred, pos, info)
+
+        arg_stmts = []
+        arg_assumptions = self.viper.TrueLit(pos, info)
+        arg_type_checks = self.viper.TrueLit(pos, info)
+        method_args = list(target._args.values())
+        for i, arg in enumerate(meth_args):
+            arg_stmt, arg_val = self.translate_expr(arg, ctx, self.viper.Ref)
+            arg_stmts.extend(arg_stmt)
+            index = self.viper.IntLit(i, pos, info)
+            arg_func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, index],
+                                                self.viper.Ref, pos, info, THREAD_DOMAIN)
+            func_equal = self.viper.EqCmp(arg_func, arg_val, pos, info)
+            arg_assumptions = self.viper.And(arg_assumptions, func_equal, pos, info)
+            arg_type_check = self.type_check(arg_val, method_args[i].type, pos, ctx)
+            arg_type_checks = self.viper.EqCmp(arg_type_checks, arg_type_check, pos, info)
+
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        thread_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
+        actual_method = self.viper.DomainFuncApp(target.threading_id, [], method_id_type,
+                                                 pos, info, METHOD_ID_DOMAIN)
+        inhale_method = self.viper.Inhale(self.viper.EqCmp(thread_method, actual_method,
+                                                           pos, info),
+                                          pos,info)
+        arg_check_pos = self.to_position(node, ctx, rules=rules.THREAD_CREATION_ARG_TYPE)
+        check_arg_types = self.viper.Assert(arg_type_checks, arg_check_pos, info)
+        inhale_args = self.viper.Inhale(arg_assumptions, pos, info)
+        stmts = thread_arg_stmts + arg_stmts + [newstmt, inhale_thread_type,
+                                                inhale_method, check_arg_types,
+                                                inhale_args, inhale_start_perm]
+        return stmts, thread
+
+    def _translate_thread_start(self, node: ast.Call,
+                                    ctx: Context):
+        pos, info = self.to_position(node, ctx), self.no_info(ctx)
+        assert isinstance(node.func, ast.Attribute)
+        thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        method_options = []
+        for arg in node.args:
+            target = self.get_target(arg, ctx)
+            if not (isinstance(target, PythonMethod) and not target.pure and
+                        not target.predicate):
+                raise InvalidProgramException(node, 'invalid.thread.start')
+            method_options.append(target)
+
+        stmts = []
+        # exhale mystart predicate
+        start_pred_pos = self.to_position(node, ctx, rules=rules.THREAD_START_PERMISSION)
+        full_perm = self.viper.FullPerm(start_pred_pos, info)
+        start_pred_acc = self.viper.PredicateAccess([thread], THREAD_START_PRED, start_pred_pos,
+                                                    info)
+        start_pred = self.viper.PredicateAccessPredicate(start_pred_acc, full_perm,
+                                                         start_pred_pos, info)
+        stmts.append(self.viper.Exhale(start_pred, start_pred_pos, info))
+        # exhale method in options
+        options_pos = self.to_position(node, ctx,
+                                       rules=rules.THREAD_START_METHOD_UNLISTED)
+        correct_method = self.viper.FalseLit(options_pos, info)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        actual_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, options_pos, info,
+                                                 THREAD_DOMAIN)
+        for method in method_options:
+            this_method = self.viper.DomainFuncApp(method.threading_id, [],
+                                                   method_id_type, options_pos, info,
+                                                   METHOD_ID_DOMAIN)
+            this_option = self.viper.EqCmp(actual_method, this_method, options_pos, info)
+            correct_method = self.viper.Or(correct_method, this_option, options_pos, info)
+        stmts.append(self.viper.Assert(correct_method, options_pos, info))
+        precond_pos = self.to_position(node, ctx, rules=rules.THREAD_START_PRECONDITION)
+        stmts.extend(self.create_method_fork(ctx, method_options, thread, precond_pos,
+                                             info, node))
+        return thread_stmt + stmts, None
+
+    def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        pos, info = self.to_position(node,ctx), self.no_info(ctx)
+        assert isinstance(node.func, ast.Attribute)
+        thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        stmts = thread_stmt
+        joinable_pos = self.to_position(node, ctx, rules=rules.THREAD_JOIN_JOINABLE)
+        joinable_func = self.viper.FuncApp(JOINABLE_FUNC, [thread],
+                                           joinable_pos, info,
+                                           self.viper.Bool)
+
+        stmts.append(self.viper.Assert(joinable_func, joinable_pos, info))
+        wait_level_pos = self.to_position(node, ctx, rules=rules.THREAD_JOIN_WAITLEVEL)
+        thread_level = self.create_level_call(sil.RefExpr(thread))
+        residue_var = sil.PermVar(ctx.actual_function.obligation_info.residue_level)
+        obligation_assertion = self.create_level_below(thread_level, residue_var, ctx)
+        obligation_assertion = obligation_assertion.translate(self, ctx, wait_level_pos,
+                                                              info)
+        stmts.append(self.viper.Assert(obligation_assertion, wait_level_pos, info))
+
+        post_pred_acc = self.viper.PredicateAccess([thread], THREAD_POST_PRED, pos, info)
+        post_perm = self.viper.CurrentPerm(post_pred_acc, pos, info)
+        any_perm = self.viper.PermGtCmp(post_perm, self.viper.NoPerm(pos, info), pos, info)
+
+        ctx.perm_factor = post_perm
+
+        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
+        res_var = ctx.actual_function.create_variable('join_result', object_class,
+                                                      self.translator)
+
+        method_options = []
+        for arg in node.args:
+            target = self.get_target(arg, ctx)
+            if not (isinstance(target, PythonMethod) and not target.pure and
+                        not target.predicate):
+                raise InvalidProgramException(node, 'invalid.thread.join')
+            method_options.append(target)
+
+        else_block = self.translate_block([], pos, info)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        actual_method = self.viper.DomainFuncApp(GET_METHOD_FUNC, [thread],
+                                                 method_id_type, pos, info, THREAD_DOMAIN)
+
+        for method in method_options:
+            method_stmts = []
+
+            # set arg aliases with types
+            for index, arg in enumerate(method._args.values()):
+                arg_var = ctx.actual_function.create_variable('thread_arg', arg.type,
+                                                              self.translator)
+                ctx.set_alias(arg.name, arg_var)
+                id = self.viper.IntLit(index, pos, info)
+                arg_func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, id],
+                                                    self.viper.Ref, pos, info,
+                                                    THREAD_DOMAIN)
+                method_stmts.append(self.viper.LocalVarAssign(arg_var.ref(), arg_func,
+                                                              pos, info))
+                method_stmts.append(self.viper.Inhale(self.type_check(arg_var.ref(),
+                                                                      arg.type, pos, ctx,
+                                                                      inhale_exhale=False),
+                                                      pos, info))
+            if method.type:
+                ctx.set_alias(RESULT_NAME, res_var)
+                res_var.type = method.type
+
+            # set old values
+            collector = OldExpressionCollector()
+            normalizer = OldExpressionNormalizer()
+            normalizer.arg_names = [arg for arg in method._args]
+            for post, _ in method.postcondition:
+                collector.visit(post)
+            for old in collector.expressions:
+                print_old = normalizer.visit(copy.deepcopy(old))
+                key = pprint(print_old)
+                id = self.viper.IntLit(self._get_string_value(key), pos, info)
+                old_func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, id],
+                                                    self.viper.Ref, pos, info,
+                                                    THREAD_DOMAIN)
+                ctx.set_old_expr_alias(key, old_func)
+                old_type = self.get_type(old, ctx)
+                method_stmts.append(self.viper.Inhale(self.type_check(old_func,
+                                                                      old_type, pos, ctx,
+                                                                      inhale_exhale=False),
+                                                      pos, info))
+
+            post_assertion = self.viper.TrueLit(pos, info)
+            ctx.inlined_calls.append(method)
+
+            for post, _ in method.postcondition:
+                _, post_val = self.translate_expr(post, ctx, impure=True)
+                post_assertion = self.viper.And(post_assertion, post_val, pos, info)
+
+            ctx.inlined_calls.pop()
+            ctx.clear_old_expr_aliases()
+            for name in method._args:
+                ctx.remove_alias(name)
+            ctx.remove_alias(RESULT_NAME)
+            method_stmts.append(self.viper.Inhale(post_assertion, pos, info))
+            then_block = self.translate_block(method_stmts, pos, info)
+            this_method = self.viper.DomainFuncApp(method.threading_id, [],
+                                                   method_id_type, pos, info,
+                                                   METHOD_ID_DOMAIN)
+            correct_method = self.viper.EqCmp(actual_method, this_method, pos, info)
+            cond = self.viper.And(any_perm, correct_method, pos, info)
+            stmts.append(self.viper.If(cond, then_block, else_block, pos, info))
+
+        ctx.perm_factor = None
+
+        post_pred = self.viper.PredicateAccessPredicate(post_pred_acc, post_perm, pos, info)
+        exhale_pred = self.viper.Exhale(post_pred, pos, info)
+        stmts.append(exhale_pred)
+
+        return stmts, None
 
     def _is_cls_call(self, node: ast.Call, ctx: Context) -> bool:
         """

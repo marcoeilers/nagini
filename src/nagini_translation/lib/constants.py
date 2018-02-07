@@ -23,7 +23,9 @@ BUILTINS = ['cast',
             'type',
             'list']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
+THREADING = ['Thread']
+
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
@@ -44,6 +46,22 @@ CHECK_DEFINED_FUNC = '_checkDefined'
 GLOBAL_CHECK_DEFINED_FUNC = '_checkDefinedG'
 
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
+
+JOINABLE_FUNC = '_joinable'
+
+THREAD_POST_PRED = '_thread_post'
+
+THREAD_START_PRED = '_thread_start'
+
+THREAD_DOMAIN = 'Thread'
+
+METHOD_ID_DOMAIN = 'ThreadingID'
+
+GET_ARG_FUNC = 'getArg'
+
+GET_OLD_FUNC = 'getOld'
+
+GET_METHOD_FUNC = 'getMethod'
 
 GLOBAL_VAR_FIELD = '_val'
 
@@ -79,6 +97,7 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    'Thread',
     MAY_SET_PRED,
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,
@@ -176,7 +195,8 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
-    '__getitem__'
+    '__getitem__',
+    '__setitem__'
 }
 
 RESULT_NAME = '_res'
@@ -190,6 +210,8 @@ LIST_TYPE = 'list'
 RANGE_TYPE = 'range'
 
 SEQ_TYPE = 'Sequence'
+
+PSET_TYPE = 'PSet'
 
 TUPLE_TYPE = 'tuple'
 
@@ -217,11 +239,13 @@ PRIMITIVE_BOOL_TYPE = PRIMITIVE_PREFIX + BOOL_TYPE
 
 PRIMITIVE_SEQ_TYPE = PRIMITIVE_PREFIX + SEQ_TYPE
 
+PRIMITIVE_SET_TYPE = PRIMITIVE_PREFIX + 'Set'
+
 OBJECT_TYPE = 'object'
 
 CALLABLE_TYPE = 'Callable'
 
-PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE, CALLABLE_TYPE}
+PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE, PRIMITIVE_SET_TYPE, CALLABLE_TYPE}
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 
@@ -246,6 +270,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'nagini_contracts.contracts',
                    'nagini_contracts.io',
                    'nagini_contracts.obligations',
+                   'nagini_contracts.thread',
                    'sys',
                    'types',
                    'typing',

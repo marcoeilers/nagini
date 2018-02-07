@@ -521,6 +521,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
                                         ctx)
             return call, val
+        return None
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
@@ -644,6 +645,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc = self.viper.PredicateAccess(args, pred_name,
                                               self.to_position(node, ctx),
                                               self.no_info(ctx))
+        if ctx.perm_factor:
+            pos = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
             self.to_position(node, ctx), self.no_info(ctx))
         return pred_acc_pred

@@ -41,7 +41,7 @@ def test_dict_get() -> None:
     super1 = Super()
     super2 = Super()
     super3 = Super()
-    mydict = {1: super1, 7 : super3}
+    mydict = {1: super1, 7: super3}
     empty_dict = {} # type: Dict[int, Super]
     Assert(mydict.get(1) == super1)
     Assert(mydict.get(7) == super3)

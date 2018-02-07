@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
+    OptionalType,
     PythonField,
     PythonGlobalVar,
     PythonMethod,
@@ -84,6 +85,8 @@ class StatementTranslator(CommonTranslator):
         in the given module (including those of other imported modules), if said module
         has not been imported before.
         """
+        if ctx.module not in self.imported_modules:
+            self.imported_modules.add(ctx.module)
         pos = self.to_position(import_stmt, ctx)
         info = self.no_info(ctx)
         cond_stmts = []
@@ -940,9 +943,8 @@ class StatementTranslator(CommonTranslator):
                                           position, self.no_info(ctx))]
 
     def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
-                  rhs_end: Optional[Expr],
-                  rhs_type: PythonType,
-                  node: ast.AST, ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+                  rhs_end: Optional[Expr], rhs_type: PythonType, node: ast.AST,
+                  ctx: Context, allow_impure=False) -> Tuple[List[Stmt], List[Expr]]:
         """
         Assigns the given expression ``rhs`` to the target given in ``lhs``.
         If ``rhs_index`` is set, will only assign the element of ``rhs`` at
@@ -972,16 +974,17 @@ class StatementTranslator(CommonTranslator):
         if isinstance(lhs, ast.Tuple):
             return self._assign_to_tuple(lhs, rhs, rhs_type, node, ctx)
 
-        return self._assign_single_value(lhs, rhs, rhs_type, node, ctx)
+        return self._assign_single_value(lhs, rhs, rhs_type, node, ctx,
+                                         allow_impure=allow_impure)
 
-    def _assign_single_value(self, lhs: ast.AST, rhs: Expr,
-                             rhs_type: PythonType, node: ast.AST,
-                             ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+    def _assign_single_value(self, lhs: ast.AST, rhs: Expr, rhs_type: PythonType,
+                             node: ast.AST, ctx: Context,
+                             allow_impure: bool) -> Tuple[List[Stmt], List[Expr]]:
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
         if isinstance(lhs, ast.Subscript):
-            return self._assign_with_subscript(lhs, rhs, node, ctx)
+            return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
 
         target = self.get_target(lhs, ctx)
         if isinstance(target, PythonType):
@@ -1003,7 +1006,7 @@ class StatementTranslator(CommonTranslator):
             return arg_stmt + call, [getter_equal]
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
-            if isinstance(type, UnionType):
+            if isinstance(type, UnionType) and not isinstance(type, OptionalType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []
                 for recv_type in toposort_classes(type.get_types() - {None}):
@@ -1081,7 +1084,8 @@ class StatementTranslator(CommonTranslator):
         return inner_if
 
     def _assign_with_subscript(self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
-                               ctx: Context) -> Tuple[List[Stmt], List[Expr]]:
+                               ctx: Context,
+                               allow_impure: bool) -> Tuple[List[Stmt], List[Expr]]:
         # Special treatment for subscript; instead of an assignment, we
         # need to call a setitem method.
         if not isinstance(node.targets[0].slice, ast.Index):
@@ -1097,10 +1101,17 @@ class StatementTranslator(CommonTranslator):
                                     arg_types, [], node, ctx)
         # The respective assertion states that getitem with the given index
         # now has the assigned value.
-        item = self.get_function_call(
-            target_cls, '__getitem__', [target, index], [None, None], node, ctx)
-        val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
-        return lhs_stmt + ind_stmt + stmt, [val]
+        if allow_impure:
+            item_stmt, item = self.get_func_or_method_call(target_cls, '__getitem__',
+                                                           [target, index], [None, None],
+                                                           node, ctx)
+            val = None
+        else:
+            item_stmt = []
+            item = self.get_function_call(
+                target_cls, '__getitem__', [target, index], [None, None], node, ctx)
+            val = self.viper.EqCmp(item, rhs, position, self.no_info(ctx))
+        return lhs_stmt + ind_stmt + stmt + item_stmt, [val]
 
     def _assign_to_tuple(self, lhs: ast.Tuple, rhs: Expr, rhs_type: PythonType,
                          node: ast.AST,
@@ -1205,7 +1216,7 @@ class StatementTranslator(CommonTranslator):
         assign_stmts = []
         for target in node.targets:
             target_stmt, _ = self.assign_to(target, rhs, None, None, rhs_type,
-                                            node, ctx)
+                                            node, ctx, allow_impure=True)
             assign_stmts += target_stmt
         return rhs_stmt + assign_stmts
 

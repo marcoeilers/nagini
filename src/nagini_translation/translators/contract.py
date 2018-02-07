@@ -5,16 +5,25 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
+import copy
 
 from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
-    INT_TYPE,
+    GET_ARG_FUNC,
+    GET_METHOD_FUNC,
+    GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
+    INT_TYPE,
+    JOINABLE_FUNC,
+    METHOD_ID_DOMAIN,
     PRIMITIVES,
     RANGE_TYPE,
     SEQ_TYPE,
+    THREAD_DOMAIN,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -30,7 +39,6 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.typedefs import (
     Expr,
     Position,
-    Stmt,
     StmtsAndExpr,
 )
 from nagini_translation.lib.util import (
@@ -38,6 +46,8 @@ from nagini_translation.lib.util import (
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
+    OldExpressionNormalizer,
+    pprint,
     UnsupportedException,
 )
 from nagini_translation.translators.abstract import Context
@@ -79,6 +89,8 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.actual_function.type
         if not ctx.actual_function.pure:
+            if ctx.result_var is None:
+                raise InvalidProgramException('invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
@@ -130,15 +142,39 @@ class ContractTranslator(CommonTranslator):
             # field dict_acc : Set[Ref]
             field = self.viper.Field('dict_acc', set_ref, self.no_position(ctx),
                                      self.no_info(ctx))
+        elif name == 'MayStart':
+            return self.translate_may_start(node, args, perm, ctx)
+        elif name == 'ThreadPost':
+            return self.translate_thread_post(node, args, perm, ctx)
         else:
             raise UnsupportedException(node)
         field_acc = self.viper.FieldAccess(args[0], field,
                                            self.to_position(node, ctx),
                                            self.no_info(ctx))
-        pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               self.to_position(node, ctx),
-                                               self.no_info(ctx))
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if ctx.perm_factor:
+            perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
         return pred
+
+    def translate_may_start(self, node: ast.Call, args: List[Expr], perm: Expr,
+                            ctx: Context) -> Expr:
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        pred_access = self.viper.PredicateAccess(args, THREAD_START_PRED, pos, info)
+        access_pred = self.viper.PredicateAccessPredicate(pred_access, perm, pos, info)
+        return access_pred
+
+    def translate_thread_post(self, node: ast.Call, args: List[Expr], perm: Expr,
+                            ctx: Context) -> Expr:
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        pred_access = self.viper.PredicateAccess(args, THREAD_POST_PRED, pos, info)
+        access_pred = self.viper.PredicateAccessPredicate(pred_access, perm, pos, info)
+        func = self.viper.FuncApp(JOINABLE_FUNC, args, pos, info, self.viper.Bool)
+        conjunction = self.viper.And(access_pred, func, pos, info)
+        return conjunction
 
     def translate_unwrapped_builtin_predicate(self, node: ast.Call, ctx: Context) -> Expr:
         args = []
@@ -237,13 +273,16 @@ class ContractTranslator(CommonTranslator):
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
                              perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
+        info = self.no_info(ctx)
+        if ctx.perm_factor:
+            perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               pos, self.no_info(ctx))
+                                               pos, info)
         # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,
                                         self.no_position(ctx), ctx)
-            pred = self.viper.And(pred, type_info, pos, self.no_info(ctx))
+            pred = self.viper.And(pred, type_info, pos, info)
         return pred
 
     def translate_may_set(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -302,6 +341,16 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
+    def translate_assume(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Assume().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        assertion = self.viper.Inhale(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_implies(self, node: ast.Call, ctx: Context,
                           impure=False) -> StmtsAndExpr:
         """
@@ -324,6 +373,16 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
+
+        if ctx.old_expr_aliases:
+            normalizer = OldExpressionNormalizer()
+            normalizer.arg_names = [a for a in ctx.actual_function._args]
+
+            normalized = normalizer.visit(copy.deepcopy(node.args[0]))
+            key = pprint(normalized)
+            if key in ctx.old_expr_aliases:
+                return [], ctx.old_expr_aliases[key]
+
         stmt, exp = self.translate_expr(node.args[0], ctx)
         res = self.viper.Old(exp, self.to_position(node, ctx),
                              self.no_info(ctx))
@@ -460,24 +519,35 @@ class ContractTranslator(CommonTranslator):
                     get_func_name(domain_node) == 'Old'):
             domain_old = True
             domain_node = domain_node.args[0]
+
+        ref_var = self.to_ref(var.ref(), ctx)
+        pos = self.to_position(domain_node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
+            if not len(domain_node.args) == 2:
+                msg = 'range() is currently only supported with two args.'
+                raise UnsupportedException(domain_node, msg)
+            arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
+                                                  target_type=self.viper.Int)
+            arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
+                                                  target_type=self.viper.Int)
+            int_var = self.to_int(ref_var, ctx)
+            condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
+                                       self.viper.LtCmp(int_var, arg2, pos, info),
+                                       pos, info)
+            return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
-        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))]
+        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain],
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx), seq_ref, formal_args)
-        ref_var = self.to_ref(var.ref(), ctx)
-        result = self.viper.SeqContains(ref_var, domain_set,
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx))
+                                        [domain], pos, info, seq_ref, formal_args)
+
+        result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
-            result = self.viper.Old(result, self.to_position(domain_node, ctx),
-                                    self.no_info(ctx))
-        return dom_stmt, result
+            result = self.viper.Old(result, pos, info)
+        return dom_stmt, result, True
 
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -528,6 +598,61 @@ class ContractTranslator(CommonTranslator):
                                         ctx)
         return val_stmts, result
 
+    def translate_pset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        set_type = self.get_type(node, ctx)
+        viper_type = self.translate_type(set_type.type_args[0], ctx)
+        val_stmts = []
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type=viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSet(vals, self.to_position(node, ctx),
+                                            self.no_info(ctx))
+        else:
+            result = self.viper.EmptySet(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        type_arg = set_type.type_args[0]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, position,
+                                                            ctx)
+        result = self.get_function_call(set_type.cls, '__create__',
+                                        [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+
+    def translate_get_arg(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        thread_stmt, thread = self.translate_expr(node.args[0], ctx)
+        index_stmt, index = self.translate_expr(node.args[1], ctx,
+                                                target_type=self.viper.Int)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        method_id_type = self.viper.DomainType(METHOD_ID_DOMAIN, {}, [])
+        func = self.viper.DomainFuncApp(GET_ARG_FUNC, [thread, index], self.viper.Ref,
+                                        pos, info, THREAD_DOMAIN)
+        return thread_stmt + index_stmt, func
+
+    def translate_get_old(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        stmt, thread = self.translate_expr(node.args[0], ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        old_string = pprint(node.args[1])
+        index = self._get_string_value(old_string)
+        index = self.viper.IntLit(index, pos, info)
+        func = self.viper.DomainFuncApp(GET_OLD_FUNC, [thread, index], self.viper.Ref,
+                                        pos, info, THREAD_DOMAIN)
+        return stmt, func
+
+    def translate_may_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        stmt, thread = self.translate_expr(node.args[0], ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        func = self.viper.FuncApp(JOINABLE_FUNC, [thread], pos, info, self.viper.Bool)
+        return stmt, func
+
     def translate_forall(self, node: ast.Call, ctx: Context,
                          impure=False) -> StmtsAndExpr:
         domain_node = node.args[0]
@@ -562,13 +687,14 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
-                                                              ctx)
+        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var,
+                                                                          domain_node,
+                                                                          ctx)
         lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if triggers:
+        if is_trigger and triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
@@ -597,7 +723,7 @@ class ContractTranslator(CommonTranslator):
         Translates calls to contract functions like Result() and Acc()
         """
         func_name = get_func_name(node)
-        if func_name == 'Result':
+        if func_name in ('Result', 'TypedResult'):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
@@ -654,6 +780,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_create(node, ctx)
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
+        elif func_name == 'Assume':
+            return self.translate_assume(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':
@@ -672,7 +800,19 @@ class ContractTranslator(CommonTranslator):
             return self.translate_previous(node, ctx)
         elif func_name == 'Sequence':
             return self.translate_sequence(node, ctx)
+        elif func_name == 'PSet':
+            return self.translate_pset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
+        elif func_name == 'MayJoin':
+            return self.translate_may_join(node, ctx)
+        elif func_name == 'getArg':
+            return self.translate_get_arg(node, ctx)
+        elif func_name == 'getOld':
+            return self.translate_get_old(node, ctx)
+        elif func_name == 'getMethod':
+            raise InvalidProgramException(node, 'invalid.get.method.use')
+        elif func_name == 'arg':
+            raise InvalidProgramException(node, 'invalid.arg.use')
         else:
             raise UnsupportedException(node)

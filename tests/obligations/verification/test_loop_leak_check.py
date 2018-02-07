@@ -16,7 +16,7 @@ def MustInvoke_context_1(t1: Place) -> None:
         i += 1
 
 
-def MustRelease_context_1(lock: Lock) -> None:
+def MustRelease_context_1(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
     #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
@@ -34,7 +34,7 @@ def MustInvoke_context_2(t1: Place) -> None:
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def MustRelease_context_2(lock: Lock) -> None:
+def MustRelease_context_2(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
     while i < 5:
@@ -53,7 +53,7 @@ def MustInvoke_body_1(t1: Place) -> None:
 
 
 #:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
-def MustRelease_body_1(lock: Lock) -> None:
+def MustRelease_body_1(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
     while i < 5:
@@ -72,7 +72,7 @@ def MustInvoke_body_2(t1: Place) -> None:
         i += 1
 
 
-def MustRelease_body_2(lock: Lock) -> None:
+def MustRelease_body_2(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
     #:: ExpectedOutput(carbon)(leak_check.failed:loop_body.leaks_obligations)

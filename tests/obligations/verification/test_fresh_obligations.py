@@ -13,7 +13,7 @@ from nagini_contracts.lock import Lock
 # Positive examples.
 
 
-def await_1(l: Lock) -> None:
+def await_1(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
@@ -21,13 +21,14 @@ def await_1(l: Lock) -> None:
     while i > 0:
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
+        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
     l.release()
 
 
-def await_2(l: Lock) -> None:
+def await_2(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
@@ -36,6 +37,7 @@ def await_2(l: Lock) -> None:
     while i > 0:
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
+        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
@@ -44,21 +46,23 @@ def await_2(l: Lock) -> None:
 # Obligations in method/loop body must be bounded.
 
 
-def await_3(l: Lock) -> None:
+def await_3(l: Lock[object]) -> None:
     Requires(MustRelease(l))
     Requires(WaitLevel() < Level(l))
+    Requires(l.invariant())
     Ensures(MustRelease(l))
     i = 5
     while i > 0:
         #:: ExpectedOutput(invariant.not.established:insufficient.permission)
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
+        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
 
 
-def await_4(l: Lock) -> None:
+def await_4(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
@@ -70,7 +74,7 @@ def await_4(l: Lock) -> None:
         i -= 1
 
 
-def infinite_recursion(l: Lock) -> None:
+def infinite_recursion(l: Lock[object]) -> None:
     Requires(MustRelease(l))
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     infinite_recursion(l)
@@ -79,18 +83,21 @@ def infinite_recursion(l: Lock) -> None:
 # Sometimes we do not have fresh obligation.
 
 
-def no_obligation_1(l: Lock) -> None:
+def no_obligation_1(l: Lock[object]) -> None:
     Requires(Implies(False, MustRelease(l)))
     Requires(l is not None)
+    Requires(l.invariant())
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     l.release()
 
 
-def no_obligation_2(l: Lock) -> None:
+def no_obligation_2(l: Lock[object]) -> None:
     Requires(l is not None)
+    Requires(l.invariant())
     i = 5
     while i > 0:
         Invariant(Implies(False, MustRelease(l)))
+        Invariant(l.invariant())
         #:: ExpectedOutput(call.precondition:insufficient.permission)
         l.release()
         i -= 1
@@ -101,29 +108,33 @@ def no_obligation_2(l: Lock) -> None:
 
 class A:
 
-    def release(self, l: Lock) -> None:
+    def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
+        Requires(l.invariant())
         l.release()
 
 
 class ASub(A):
 
-    def release(self, l: Lock) -> None:
+    def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
+        Requires(l.invariant())
         l.release()
 
 
 class B:
 
     #:: Label(B_release)
-    def release(self, l: Lock) -> None:
+    def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l, 2))
+        Requires(l.invariant())
         l.release()
 
 
 class BSub(B):
 
     #:: ExpectedOutput(call.precondition:insufficient.permission, B_release)
-    def release(self, l: Lock) -> None:
+    def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
+        Requires(l.invariant())
         l.release()

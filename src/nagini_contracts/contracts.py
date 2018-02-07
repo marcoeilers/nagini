@@ -14,6 +14,7 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -23,10 +24,11 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'TypedResult', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
-                  'MayCreate',]
+                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
+                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'MayJoin',
+                  'MayStart']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -48,14 +50,6 @@ def Invariant(expr: bool) -> bool:
     pass
 
 
-def Previous(it: T) -> List[T]:
-    """
-    Within the body of a loop 'for x in xs', Previous(x) represents the list of
-    the values of x in previous loop iterations.
-    """
-    pass
-
-
 def Assume(expr: bool) -> None:
     pass
 
@@ -72,6 +66,10 @@ def Result() -> Any:
     pass
 
 
+def TypedResult(t: Type[T]) -> T:
+    pass
+
+
 def RaisedException() -> Exception:
     pass
 
@@ -84,7 +82,8 @@ def Implies(p: bool, q: bool) -> bool:
 
 
 def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]],
+           tp: Type[T] = None) -> bool:
     """
     forall x in domain: predicate(x)
     """
@@ -161,6 +160,53 @@ class Sequence(Generic[T], Sized, Iterable[T]):
         Returns a new sequence of the same type, containing the same elements
         except for the element at index ``index``, which is replaced by
         ``new_val``.
+        """
+
+    def __iter__(self) -> Iterator[T]:
+        """
+        Sequences can be quantified over; this is only here so that Sequences
+        can be used as arguments for Forall.
+        """
+
+def Previous(it: T) -> Sequence[T]:
+    """
+    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    the values of x in previous loop iterations.
+    """
+    pass
+
+
+class PSet(Generic[T], Sized, Iterable[T]):
+    """
+    A Sequence[T] represents a pure sequence of instances of subtypes of T, and
+    is translated to native Viper sequences.
+    """
+
+    def __init__(self, *args: T) -> None:
+        """
+        ``PSet(a, b, c)`` creates a Sequence instance containing the objects
+        a, b and c in that order.
+        """
+
+    def __contains__(self, item: object) -> bool:
+        """
+        True iff this set contains the given object (not taking ``__eq__``
+        into account).
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the length of this set.
+        """
+
+    def __add__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Concatenates two Sequences of the same type to get a new Sequence.
+        """
+
+    def __sub__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Concatenates two Sequences of the same type to get a new Sequence.
         """
 
     def __iter__(self) -> Iterator[T]:
@@ -313,9 +359,10 @@ __all__ = [
         'Assert',
         'Old',
         'Result',
+        'TypedResult',
         'RaisedException',
         'Implies',
-        'Forall',
+        'Forall', 'Foralll',
         'Exists',
         'Low',
         'Acc',
@@ -334,6 +381,7 @@ __all__ = [
         'set_pred',
         'Sequence',
         'ToSeq',
+        'PSet',
         'MaySet',
         'MayCreate',
         ]

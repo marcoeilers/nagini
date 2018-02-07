@@ -53,6 +53,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    NoTypeException,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -799,6 +800,10 @@ class Analyzer(ast.NodeVisitor):
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
                 node, 'invalid.io_operation.misplaced_property')
+        if isinstance(node.func, ast.Name) and node.func.id == 'Thread':
+            return
+        if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
+            return
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
@@ -976,7 +981,8 @@ class Analyzer(ast.NodeVisitor):
         # is also accessed in a simpler expression elsewhere, we just do
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
-            not isinstance(node.value, ast.Subscript)):
+                not isinstance(node.value, ast.Subscript) and
+                not (isinstance(node.value, ast.Call) and isinstance(node.ctx, ast.Load))):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
@@ -990,9 +996,13 @@ class Analyzer(ast.NodeVisitor):
                         if isinstance(field, PythonField):
                             self.track_access(node, field)
                 else:
-                    field = receiver.add_field(node.attr, node, self.typeof(node))
-                    if isinstance(field, PythonField):
-                        self.track_access(node, field)
+                    try:
+                        field_type = self.typeof(node)
+                        field = receiver.add_field(node.attr, node, field_type)
+                        if isinstance(field, PythonField):
+                            self.track_access(node, field)
+                    except NoTypeException:
+                        pass
 
     def visit_Global(self, node: ast.Global) -> None:
         for name in node.names:
@@ -1132,20 +1142,24 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             if isinstance(receiver, UnionType):
-                set_of_types = set() 
+                set_of_types = []
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):
                         context = [type_in_union.optional_type.name]
                     else:
                         context = [type_in_union.name]
                     type, _ = self.module.get_type(context, node.attr)
-                    set_of_types.add(self.convert_type(type))
-                return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
+                    converted = self.convert_type(type)
+                    if converted not in set_of_types:
+                        set_of_types.append(converted)
+                return UnionType(set_of_types) if len(set_of_types) > 1 else set_of_types[0]
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
             type, _ = self.module.get_type(context, node.attr)
+            if type is None:
+                raise NoTypeException
             return self.convert_type(type)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
@@ -1166,7 +1180,7 @@ class Analyzer(ast.NodeVisitor):
         elif (isinstance(node, ast.Call) and
               isinstance(node.func, ast.Name) and
               node.func.id in CONTRACT_FUNCS):
-            if node.func.id == 'Result':
+            if node.func.id in ('Result', 'TypedResult'):
                 return self.current_function.type
             else:
                 raise UnsupportedException(node)

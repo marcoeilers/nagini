@@ -21,6 +21,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
+    PRIMITIVE_SET_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
@@ -437,10 +438,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type, type)
+            # assert self.types_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.types_match(field.type, type)
+            # assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -634,8 +635,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         otherwise just return the type itself.
         """
         if self.name in PRIMITIVES and self.name not in (PRIMITIVE_SEQ_TYPE + '_type',
+                                                         PRIMITIVE_SET_TYPE + '_type',
                                                          CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
+            if boxed_name == 'Set':
+                boxed_name = 'PSet'
             return self.module.classes[boxed_name]
         return self
 
@@ -792,7 +796,7 @@ class UnionType(GenericType):
 
     @property
     def python_class(self) -> PythonClass:
-        return self.cls
+        return self.cls.python_class
 
     def get_types(self) -> Set[PythonClass]:
         """
@@ -924,6 +928,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.threading_id = None
         self.definition_deps = set()
         self.call_deps = set()
 
@@ -934,7 +939,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         add_all_call_deps(self.call_deps, res, prefix)
 
-
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
         Creates fresh Silver names for all parameters and initializes them,
@@ -942,6 +946,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
@@ -954,6 +959,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
+            requires = set()
+            for requirement in self.requires:
+                requires.add(requirement)
+            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1086,6 +1095,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
