@@ -746,6 +746,9 @@ class GenericType(PythonType):
     def get_contents(self, only_top: bool) -> Dict:
         return self.python_class.get_contents(only_top)
 
+    def __hash__(self) -> int:
+        return hash(self.python_class)
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, GenericType):
             return False
