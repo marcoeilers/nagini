@@ -148,6 +148,13 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def _is_lock_subtype(self, cls: PythonClass) -> bool:
+        if cls is None:
+            return False
+        if cls.name == 'Lock':
+            return cls
+        return self._is_lock_subtype(cls.superclass)
+
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -163,6 +170,7 @@ class CallTranslator(CommonTranslator):
                                                        self.translator)
         result_type = self.get_type(node, ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
         # the concrete type arguments.
@@ -171,7 +179,7 @@ class CallTranslator(CommonTranslator):
         current_type = result_type
         while current_type:
             if isinstance(current_type, GenericType):
-                vars_args = zip(current_type.cls.type_vars.items(),
+                vars_args = zip(current_type.python_class.type_vars.items(),
                                 current_type.type_args)
                 for (name, var), arg in vars_args:
                     literal = self.type_factory.translate_type_literal(arg, pos,
@@ -207,6 +215,22 @@ class CallTranslator(CommonTranslator):
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
         stmts = [new, type_inhale] + may_set_inhales
+
+        if self._is_lock_subtype(target_class):
+            # For locks, fold the invariant predicate before actually calling the
+            # constructor (which requires the predicate in its precondition).
+            lock_class = self._is_lock_subtype(target_class)
+            locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
+                                                [None], node, ctx, pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+            invariant_pred = lock_class.get_predicate('invariant')
+            full_perm = self.viper.FullPerm(pos, info)
+            pred_acc = self.viper.PredicateAccess([res_var.ref()],
+                                                  invariant_pred.sil_name, pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
+            stmts.append(self.viper.Fold(acc_pred, pos, info))
+
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls

@@ -818,7 +818,8 @@ class ProgramTranslator(CommonTranslator):
                     if (method.cls and method.cls != cls and
                             method_name != '__init__' and
                             method.method_type == MethodType.normal and
-                            not method.interface):
+                            not method.interface and
+                            not method.contract_only):
                         # Inherited
                         methods.append(self.create_inherit_check(method, cls,
                                                                  ctx))

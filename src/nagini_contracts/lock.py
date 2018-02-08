@@ -6,11 +6,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 """The lock class stub."""
 
-from typing import Optional
+from typing import Generic, Optional, TypeVar
 
 from nagini_contracts.contracts import (
+    ContractOnly,
     Ensures,
     Implies,
+    Predicate,
+    Pure,
     Requires,
 )
 from nagini_contracts.obligations import (
@@ -22,13 +25,20 @@ from nagini_contracts.obligations import (
 )
 
 
-class Lock(BaseLock):
-    """A stub for locks."""
+T = TypeVar("T")
 
-    def __init__(self,
-                 above: Optional['Lock']=None,
-                 below: Optional['Lock']=None) -> None:
-        """Create a lock at the specified level.
+
+class Lock(BaseLock, Generic[T]):
+    """A stub for a lock that protects (parts of) the state of an object of type T."""
+
+    def __init__(self, locked_object: T,
+                 above: Optional[BaseLock]=None,
+                 below: Optional[BaseLock]=None) -> None:
+        """
+        Create a lock at the specified level, which protects ``locked_object``.
+        Creating the lock "shares" the object (i.e., exhales the invariant).
+        Create subclasses of this class and override ``invariant`` to create a lock
+        with an invariant.
 
         ``Level(above)`` defaults to ``WaitLevel()``.
         """
@@ -37,17 +47,35 @@ class Lock(BaseLock):
                          WaitLevel() < Level(below)))
         Requires(Implies(above is not None and below is not None,
                          Level(above) < Level(below)))
+        Requires(self.invariant())
         Ensures(Implies(above is None, WaitLevel() < Level(self)))
         Ensures(Implies(above is not None, Level(above) < Level(self)))
         Ensures(Implies(below is not None, Level(self) < Level(below)))
 
+    @Pure
+    @ContractOnly
+    def get_locked(self) -> T:
+        """Returns the object protected by this lock."""
+
+    @Predicate
+    def invariant(self) -> bool:
+        """
+        The lock invariant, expressed in terms of ``self.get_locked()``. Override this
+        in a subclass to create a lock with an invariant.
+        """
+        return True
+
+    @ContractOnly
     def acquire(self) -> None:
         """Acquire the lock."""
         Requires(MustTerminate(1))
         Requires(WaitLevel() < Level(self))
+        Ensures(self.invariant())
         Ensures(MustRelease(self))
 
+    @ContractOnly
     def release(self) -> None:
         """Release the lock."""
         Requires(MustTerminate(1))
         Requires(MustRelease(self, 1))
+        Requires(self.invariant())

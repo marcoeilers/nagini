@@ -197,6 +197,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
                         return rectype.type_args[target.generic_type]
+                    if isinstance(target.type, TypeVar):
+                        while rectype.python_class is not target.cls:
+                            rectype = rectype.superclass
+                        name_list = list(rectype.python_class.type_vars.keys())
+                        index = name_list.index(target.type.name)
+                        return rectype.type_args[index]
             return target.type
         if isinstance(target, PythonField):
             result = target.type
@@ -364,7 +370,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists'):
+            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
+                                  'MaySet'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)
