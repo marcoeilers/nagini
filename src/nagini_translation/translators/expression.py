@@ -875,6 +875,10 @@ class ExpressionTranslator(CommonTranslator):
         return stmt + call_stmt, call
 
     def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
+        """
+        Checks if the given comparison is a definition of a thread's target method,
+        i.e., getMethod(t) == some_func.
+        """
         if len(node.ops) != 1 or len(node.comparators) != 1:
             return False
         if not isinstance(node.ops[0], (ast.Eq, ast.Is)):

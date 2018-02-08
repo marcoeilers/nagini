@@ -344,6 +344,7 @@ def is_get_ghost_output(node: ast.Assign) -> bool:
 
 
 class OldExpressionCollector(ast.NodeVisitor):
+    """A visitor that collects all expressions inside Old()-calls."""
     def __init__(self):
         self.expressions = []
 
@@ -354,6 +355,10 @@ class OldExpressionCollector(ast.NodeVisitor):
 
 
 class OldExpressionNormalizer(ast.NodeTransformer):
+    """
+    A visitor that replaces references to specific names by calls to arg(i), where
+    i is the index of the name (given in self.arg_names).
+    """
     def __init__(self):
         self.arg_names = []
 
