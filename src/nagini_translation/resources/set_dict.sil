@@ -25,9 +25,10 @@ function set___contains__(self: Ref, item: Ref) : Bool
     ensures result == (item in self.set_acc)
 
 function set___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
-    requires acc(self.set_acc, wildcard)
-    ensures result == (|self.set_acc| != 0)
+    requires self != null ==> issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires self != null ==> acc(self.set_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.set_acc| != 0)
 
 method set___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
@@ -116,9 +117,10 @@ method dict___iter__(self: Ref) returns (_res: Ref)
 }
 
 function dict___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
-    ensures result == (|self.dict_acc| != 0)
+    requires self != null ==> issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires self != null ==> acc(self.dict_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.dict_acc| != 0)
 
 method dict_keys(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))

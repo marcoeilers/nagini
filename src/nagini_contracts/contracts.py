@@ -25,7 +25,7 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
+                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
                   'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'MayJoin',
                   'MayStart',]
 
@@ -162,6 +162,46 @@ class Sequence(Generic[T], Sized, Iterable[T]):
         Returns a new sequence of the same type, containing the same elements
         except for the element at index ``index``, which is replaced by
         ``new_val``.
+        """
+
+    def __iter__(self) -> Iterator[T]:
+        """
+        Sequences can be quantified over; this is only here so that Sequences
+        can be used as arguments for Forall.
+        """
+
+
+class PSet(Generic[T], Sized, Iterable[T]):
+    """
+    A Sequence[T] represents a pure sequence of instances of subtypes of T, and
+    is translated to native Viper sequences.
+    """
+
+    def __init__(self, *args: T) -> None:
+        """
+        ``PSet(a, b, c)`` creates a Sequence instance containing the objects
+        a, b and c in that order.
+        """
+
+    def __contains__(self, item: object) -> bool:
+        """
+        True iff this set contains the given object (not taking ``__eq__``
+        into account).
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the length of this set.
+        """
+
+    def __add__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Concatenates two Sequences of the same type to get a new Sequence.
+        """
+
+    def __sub__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Concatenates two Sequences of the same type to get a new Sequence.
         """
 
     def __iter__(self) -> Iterator[T]:
@@ -334,6 +374,7 @@ __all__ = [
         'dict_pred',
         'set_pred',
         'Sequence',
+        'PSet',
         'ToSeq',
         'MaySet',
         'MayCreate',

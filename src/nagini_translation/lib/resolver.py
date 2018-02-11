@@ -16,6 +16,8 @@ from nagini_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
+    PRIMITIVE_SEQ_TYPE,
+    PSET_TYPE,
     RANGE_TYPE,
     SEQ_TYPE,
     SET_TYPE,
@@ -219,7 +221,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # If this is a Sequence(...) call, target will be the Sequence class
         # but won't have generic type information. So we don't return here
         # and let the code below take care of the call.
-        if not isinstance(target, PythonType) or target.name != SEQ_TYPE:
+        if not isinstance(target, PythonType) or target.name in (SEQ_TYPE, PSET_TYPE):
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
@@ -231,6 +233,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
+                elif (target.name in (SEQ_TYPE, PSET_TYPE) and
+                          isinstance(node, ast.Call) and node.args):
+                    arg_types = [get_type(arg, containers, container)
+                                 for arg in node.args]
+                    return GenericType(target, [common_supertype(arg_types)])
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
@@ -356,8 +363,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
-    if func_name == 'Sequence':
+    if func_name == SEQ_TYPE:
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
+                                            containers, container)
+    if func_name == PSET_TYPE:
+        return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
                                             containers, container)
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
@@ -380,7 +390,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
-                return GenericType(seq_class, [arg_type])
+                content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(seq_class, [content_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
@@ -429,7 +440,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         raise UnsupportedException(node)
 
 
-def _get_subscript_type(node: ast.Subscript, module: PythonModule,
+def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
     if (node._parent and isinstance(node._parent, ast.Assign) and
@@ -440,6 +451,11 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return get_type(node._parent.targets[0], containers,
                         container)
     value_type = get_type(node.value, containers, container)
+    return _get_subscript_type(value_type, module, node)
+
+
+def _get_subscript_type(value_type: PythonType, module: PythonModule,
+                        node: ast.AST) -> PythonType:
     if isinstance(value_type, OptionalType):
         value_type = value_type.cls
     if value_type.name == TUPLE_TYPE:
@@ -468,8 +484,24 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return module.global_module.classes[INT_TYPE]
     elif value_type.name == SEQ_TYPE:
         return value_type.type_args[0]
+    elif value_type.name == PSET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.python_class.get_func_or_method('__getitem__'):
+        return value_type.python_class.get_func_or_method('__getitem__').type
     else:
         raise UnsupportedException(node)
+
+
+def _get_iteration_type(value_type: PythonType, module: PythonModule,
+                        node: ast.AST) -> PythonType:
+    # Assuming that value_type is some sort of container which supports iteration,
+    # returns the type of the iterator.
+    if value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+        # FIXME: This is very unfortunate, but right now we cannot handle this
+        # generically, so we have to hard code these two cases for the moment.
+        return value_type.type_args[0]
+    else:
+        return _get_subscript_type(value_type, module, node)
 
 
 def common_supertype(types: List[PythonType]) -> Optional[PythonType]:

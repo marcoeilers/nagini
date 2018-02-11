@@ -589,6 +589,22 @@ class CallTranslator(CommonTranslator):
         if implicit_receiver is None:
             implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
 
+        if target.interface:
+            # For interface functions defined directly in silver, missing arguments
+            # are just set to null.
+            if keywords:
+                raise UnsupportedException(node, desc='Keyword arguments in call to '
+                                                      'builtin function.')
+            diff = target.nargs - len(unpacked_args)
+            if diff < 0:
+                raise UnsupportedException(node, 'Unsupported version of builtin '
+                                                 'function.')
+            if diff > 0:
+                    null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+                    unpacked_args += [null] * diff
+                    unpacked_arg_types += [None] * diff
+            return arg_stmts, unpacked_args, unpacked_arg_types
+
         nargs = target.nargs
         keys = list(target.args.keys())
         if implicit_receiver:

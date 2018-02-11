@@ -15,8 +15,9 @@ function str___create__(len: Int, value: Int) : Ref
 	ensures typeof(result) == str()
 
 function str___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), str())
-	ensures result == str___len__(self) != 0
+    requires self != null ==> issubtype(typeof(self), str())
+	ensures self != null ==> result == str___len__(self) != 0
+	ensures self == null ==> !result
 
 function str___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), str())
