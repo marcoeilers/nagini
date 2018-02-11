@@ -17,34 +17,34 @@ class TreeNode:
                 Acc(self.parent) and self.parent is parent)
 
     @Pure
-    def hasLeftChild(self) -> bool:
+    def hasLeftChild(self) -> Optional['TreeNode']:
         Requires(Acc(self.leftChild))
-        return self.leftChild is not None
+        return self.leftChild
 
     @Pure
-    def hasRightChild(self) -> bool:
+    def hasRightChild(self) -> Optional['TreeNode']:
         Requires(Acc(self.rightChild))
-        return self.rightChild is not None
+        return self.rightChild
 
     @Pure
     def isRoot(self) -> bool:
         Requires(tree(self))
-        return Unfolding(tree(self), self.parent is None)
+        return Unfolding(tree(self), not self.parent)
 
     @Pure
     def isLeaf(self) -> bool:
         Requires(tree(self))
-        return Unfolding(tree(self), self.rightChild is None and self.leftChild is None)
+        return Unfolding(tree(self), not (self.rightChild or self.leftChild))
 
     @Pure
-    def hasAnyChildren(self) -> bool:
+    def hasAnyChildren(self) -> Optional['TreeNode']:
         Requires(tree(self))
-        return Unfolding(tree(self), self.rightChild is not None or self.leftChild is not None)
+        return Unfolding(tree(self), self.rightChild or self.leftChild)
 
     @Pure
-    def hasBothChildren(self) -> bool:
+    def hasBothChildren(self) -> Optional['TreeNode']:
         Requires(tree(self))
-        return Unfolding(tree(self), self.rightChild is not None and self.leftChild is not None)
+        return Unfolding(tree(self), self.rightChild and self.leftChild)
 
 
 @Predicate
@@ -80,7 +80,7 @@ class BinarySearchTree:
         Requires(bst(self))
         Ensures(bst(self))
         Unfold(bst(self))
-        if self.root is not None:
+        if self.root:
             increased_size = self._put(key, val, self.root, None, None)
         else:
             self.root = TreeNode(key,val)
@@ -127,7 +127,7 @@ class BinarySearchTree:
         Requires(Acc(bst(self)))
         Ensures(Acc(bst(self)))
         Unfold(bst(self))
-        if self.root is not None:
+        if self.root:
             res = self._get(key, self.root, 2)
             Fold(bst(self))
             return res
@@ -139,7 +139,7 @@ class BinarySearchTree:
         Requires(perm > 0)
         Requires(Implies(currentNode is not None, Acc(tree(currentNode), 1/perm)))
         Ensures(Implies(currentNode is not None, Acc(tree(currentNode), 1/perm)))
-        if currentNode is None:
+        if not currentNode:
             return None
         Unfold(Acc(tree(currentNode), 1/perm))
         if currentNode.key == key:
