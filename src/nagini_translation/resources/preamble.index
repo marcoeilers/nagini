@@ -804,12 +804,12 @@
         "max": {
             "args": ["object", "object"],
             "type": "__prim__int",
-            "requires": ["int___unbox__", "list___len__"]
+            "requires": ["int___unbox__", "list___len__", "list___contains__", "__prim__int___box__"]
         },
         "min": {
             "args": ["object", "object"],
             "type": "__prim__int",
-            "requires": ["int___unbox__", "list___len__"]
+            "requires": ["int___unbox__", "list___len__", "list___contains__", "__prim__int___box__"]
         },
         "abs": {
             "args": ["__prim__int"],

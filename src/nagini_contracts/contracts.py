@@ -179,7 +179,7 @@ class PSet(Generic[T], Sized, Iterable[T]):
 
     def __init__(self, *args: T) -> None:
         """
-        ``PSet(a, b, c)`` creates a Sequence instance containing the objects
+        ``PSet(a, b, c)`` creates a set instance containing the objects
         a, b and c in that order.
         """
 
@@ -191,22 +191,22 @@ class PSet(Generic[T], Sized, Iterable[T]):
 
     def __len__(self) -> int:
         """
-        Returns the length of this set.
+        Returns the cardinality of this set.
         """
 
     def __add__(self, other: 'PSet[T]') -> 'PSet[T]':
         """
-        Concatenates two Sequences of the same type to get a new Sequence.
+        Returns the union of this set and the other.
         """
 
     def __sub__(self, other: 'PSet[T]') -> 'PSet[T]':
         """
-        Concatenates two Sequences of the same type to get a new Sequence.
+        Returns the difference between this set and the other,
         """
 
     def __iter__(self) -> Iterator[T]:
         """
-        Sequences can be quantified over; this is only here so that Sequences
+        Sets can be quantified over; this is only here so that sets
         can be used as arguments for Forall.
         """
 

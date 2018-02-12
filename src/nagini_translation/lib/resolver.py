@@ -218,10 +218,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return result
         if isinstance(target, PythonIOOperation):
             return module.global_module.classes[BOOL_TYPE]
-        # If this is a Sequence(...) call, target will be the Sequence class
-        # but won't have generic type information. So we don't return here
-        # and let the code below take care of the call.
-        if not isinstance(target, PythonType) or target.name in (SEQ_TYPE, PSET_TYPE):
+
+        if isinstance(target, (PythonType, PythonModule)):
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
@@ -253,7 +251,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return GenericType(module.global_module.classes[TUPLE_TYPE],
                            args)
     elif isinstance(node, ast.Subscript):
-        return _get_subscript_type(node, module, containers, container)
+        return get_subscript_type(node, module, containers, container)
     elif isinstance(node, ast.Str):
         return module.global_module.classes[STRING_TYPE]
     elif isinstance(node, ast.Bytes):

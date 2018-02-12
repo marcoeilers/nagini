@@ -118,7 +118,7 @@ function float___create__(i: Int): Ref
 
 function float___bool__(self: Ref): Bool
     requires issubtype(typeof(self), float())
-    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(int___unbox__(self)))
+    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
 
 function float___ge__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), float())
