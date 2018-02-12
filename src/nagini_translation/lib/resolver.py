@@ -457,19 +457,22 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
     if isinstance(value_type, OptionalType):
         value_type = value_type.cls
     if value_type.name == TUPLE_TYPE:
-        if isinstance(node.slice, ast.Slice):
-            raise UnsupportedException(node, 'tuple slicing')
-        if len(value_type.type_args) == 1:
-            return value_type.type_args[0]
-        if isinstance(node.slice.value, ast.UnaryOp):
-            if (isinstance(node.slice.value.op, ast.USub) and
-                    isinstance(node.slice.value.operand, ast.Num)):
-                index = -node.slice.value.operand.n
-            else:
-                raise UnsupportedException(node, 'dynamic subscript type')
-        elif isinstance(node.slice.value, ast.Num):
-            index = node.slice.value.n
-        return value_type.type_args[index]
+        if isinstance(node, ast.Subscript):
+            if isinstance(node.slice, ast.Slice):
+                raise UnsupportedException(node, 'tuple slicing')
+            if len(value_type.type_args) == 1:
+                return value_type.type_args[0]
+            if isinstance(node.slice.value, ast.UnaryOp):
+                if (isinstance(node.slice.value.op, ast.USub) and
+                        isinstance(node.slice.value.operand, ast.Num)):
+                    index = -node.slice.value.operand.n
+                else:
+                    raise UnsupportedException(node, 'dynamic subscript type')
+            elif isinstance(node.slice.value, ast.Num):
+                index = node.slice.value.n
+            return value_type.type_args[index]
+        else:
+            return common_supertype(value_type.type_args)
     elif value_type.name == LIST_TYPE:
         return value_type.type_args[0]
     elif value_type.name == SET_TYPE:
