@@ -92,6 +92,20 @@ def thread_join_part_perm(t: Thread, cl: Cell) -> None:
     cl.val = 11
 
 
+def thread_join_part_perm_twice(t: Thread, cl: Cell) -> None:
+    Requires(getMethod(t) == decr)
+    Requires(getArg(t, 0) is cl)
+    Requires(getArg(t, 1) is 7)
+    Requires(getOld(t, arg(0).val) is 123)
+    Requires(Acc(ThreadPost(t), 1/2))
+    Requires(WaitLevel() < Level(t))
+    t.join(Cell.incr, decr)
+    assert cl.val == 116
+    t.join(Cell.incr, decr)
+    #:: ExpectedOutput(assignment.failed:insufficient.permission)
+    cl.val = 11
+
+
 def thread_join_not_joinable(t: Thread, cl: Cell) -> None:
     Requires(getMethod(t) == decr)
     Requires(getArg(t, 0) is cl)
