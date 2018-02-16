@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, MayJoin, ThreadPost, getOld, arg
+from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, Joinable, ThreadPost, getOld, arg
 from nagini_contracts.obligations import MustTerminate, WaitLevel, Level
 
 
@@ -29,7 +29,7 @@ def thread_join(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t)))
     Requires(WaitLevel() < Level(t))
-    Ensures(MayJoin(t))
+    Ensures(Joinable(t))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(False)
     t.join(Cell.incr, decr)
@@ -60,7 +60,7 @@ def thread_join_wrong_method(t: Thread, cl: Cell) -> None:
 
 
 def thread_join_minimal(t: Thread, cl: Cell) -> None:
-    Requires(MayJoin(t))
+    Requires(Joinable(t))
     Requires(WaitLevel() < Level(t))
     t.join(Cell.incr, decr)
     #:: ExpectedOutput(assert.failed:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
@@ -72,7 +72,7 @@ def thread_join_no_post_perm(t: Thread, cl: Cell) -> None:
     Requires(getArg(t, 0) is cl)
     Requires(getArg(t, 1) is 7)
     Requires(getOld(t, arg(0).val) is 123)
-    Requires(MayJoin(t))
+    Requires(Joinable(t))
     Requires(WaitLevel() < Level(t))
     t.join(Cell.incr, decr)
     #:: ExpectedOutput(assert.failed:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
