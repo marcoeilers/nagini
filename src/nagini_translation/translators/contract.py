@@ -48,7 +48,7 @@ from nagini_translation.lib.util import (
     find_loop_for_previous,
     get_func_name,
     InvalidProgramException,
-    OldExpressionNormalizer,
+    OldExpressionTransformer,
     pprint,
     UnsupportedException,
 )
@@ -370,7 +370,7 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node, 'invalid.contract.call')
 
         if ctx.old_expr_aliases:
-            normalizer = OldExpressionNormalizer()
+            normalizer = OldExpressionTransformer()
             normalizer.arg_names = [a for a in ctx.actual_function._args]
             normalized = normalizer.visit(copy.deepcopy(node.args[0]))
             key = pprint(normalized)
@@ -631,7 +631,7 @@ class ContractTranslator(CommonTranslator):
                                         pos, info, THREAD_DOMAIN)
         return stmt, func
 
-    def translate_may_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_joinable(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         stmt, thread = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -786,8 +786,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_pset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
-        elif func_name == 'MayJoin':
-            return self.translate_may_join(node, ctx)
+        elif func_name == 'Joinable':
+            return self.translate_joinable(node, ctx)
         elif func_name == 'getArg':
             return self.translate_get_arg(node, ctx)
         elif func_name == 'getOld':

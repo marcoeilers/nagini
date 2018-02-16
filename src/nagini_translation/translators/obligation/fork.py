@@ -26,7 +26,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     InvalidProgramException,
     OldExpressionCollector,
-    OldExpressionNormalizer,
+    OldExpressionTransformer,
     pprint,
 )
 from nagini_translation.translators.obligation.manager import (
@@ -62,8 +62,10 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         self._add_waitlevel()
 
     def _create_join_permission(self, method: PythonMethod) -> Expr:
-        # Creates an assertion representing a permission to join the thread and the
-        # ThreadPost predicate if the target method terminates.
+        """
+        Creates an assertion representing a permission to join the thread and the
+        ThreadPost predicate if the target method terminates.
+        """
         tcond = method.obligation_info.create_termination_check(True)
         tcond = tcond.translate(self._translator, self._ctx, self._position,
                                 self._info)
@@ -83,10 +85,12 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
 
     def _remember_old_expressions(self, method: PythonMethod,
                                   collector: OldExpressionCollector) -> Expr:
-        # Creates an assertion that connects all old expressions in the method's
-        # postcondition to the thread object.
+        """
+        Creates an assertion that connects all old expressions in the method's
+        postcondition to the thread object.
+        """
         old_info = self.viper.TrueLit(self._position, self._info)
-        normalizer = OldExpressionNormalizer()
+        normalizer = OldExpressionTransformer()
         normalizer.arg_names = [arg for arg in method._args]
         for expr in collector.expressions:
             print_expr = normalizer.visit(copy.deepcopy(expr))
@@ -102,6 +106,10 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         return old_info
 
     def _set_parameter_aliases(self, method: PythonMethod) -> List[Stmt]:
+        """
+        Sets var aliases in the context so that references to the parameters of this
+        method are translated to references to the respective getArg calls instead.
+        """
         arg_vars = []
         stmts = []
         for index, arg in enumerate(method._args.values()):

@@ -46,7 +46,8 @@ class Context:
         self.perm_factor = None     # If this is set, all translated permission amounts
                                     # are multiplied by this factor.
         self._old_aliases = {}      # Keys are pretty-printed Python expressions,
-                                    # values are expressions they should be translated to.
+                                    # values are Silver expressions they should be
+                                    # translated to.
 
     def get_fresh_int(self) -> int:
         """

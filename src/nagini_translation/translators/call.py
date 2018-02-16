@@ -63,7 +63,7 @@ from nagini_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
     OldExpressionCollector,
-    OldExpressionNormalizer,
+    OldExpressionTransformer,
     pprint,
     UnsupportedException,
 )
@@ -1299,7 +1299,7 @@ class CallTranslator(CommonTranslator):
 
         # Set old values
         collector = OldExpressionCollector()
-        normalizer = OldExpressionNormalizer()
+        normalizer = OldExpressionTransformer()
         normalizer.arg_names = [arg for arg in method._args]
         for post, _ in method.postcondition:
             collector.visit(post)
