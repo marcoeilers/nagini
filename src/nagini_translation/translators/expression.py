@@ -890,6 +890,11 @@ class ExpressionTranslator(CommonTranslator):
         return False
 
     def is_type_equality(self, node: ast.Compare, ctx: Context) -> bool:
+        """
+        Checks if a comparison checks the equality of the type of an object with
+        something else (e.g., ``type(e1) == e2``), since these comparisons need special
+        treatment.
+        """
         if len(node.ops) != 1 or len(node.comparators) != 1:
             return False
         if not isinstance(node.ops[0], (ast.Eq, ast.Is, ast.NotEq, ast.IsNot)):

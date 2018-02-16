@@ -34,7 +34,15 @@ def getMethod(t: Thread) -> Callable:
 
 
 def getArg(t: Thread, i: int) -> object:
-    """Return the ith argument passed to the thread object upon creation."""
+    """
+    Return the ith element passed to the thread constructor in the ``args`` parameter,
+    unless the thread target passed to the constructor contained a receiver object, in
+    which case this will return the (i+1)th argument element from the ``args`` tuple
+    and the receiver object is treated as the argument with index zero.
+
+    t = Thread(target=foo, args=(x, y, z))  # getArg(t, 0) == x, getArg(t, 2) == z
+    t = thread(target=o.bar, args=(x, y, z))  # getArg(t, 0) == o, getArg(t, 1) == x
+    """
     pass
 
 
@@ -53,9 +61,9 @@ def arg(i: int) -> Any:
     pass
 
 
-def MayJoin(t: Thread) -> bool:
+def Joinable(t: Thread) -> bool:
     """
-    A permission to join thread t.
+    Represents that thread t is joinable.
     Threads may be joined if they promise to terminate.
     """
     pass
@@ -71,5 +79,7 @@ def ThreadPost(t: Thread) -> bool:
     A permission to get the postcondition of thread t after joining it.
     If only a fractional amount of permission to ThreadPost(t) is held when joining,
     only that fractional amount of the postcondition will be inhaled.
+    Holding some permission to ThreadPost for a thread implies that the thread
+    is joinable; it is not necessary to write ThreadPost and Joinable.
     """
     pass
