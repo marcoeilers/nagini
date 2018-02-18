@@ -37,20 +37,21 @@ class PermTranslator(CommonTranslator):
                                        self.no_info(ctx))
         raise UnsupportedException(node)
 
+    def translate_perm_or_int(self, node: ast.AST, ctx: Context):
+        if isinstance(node, ast.Num):
+            stmt, int_val = self.translate_expr(node, ctx, self.viper.Int)
+            if stmt:
+                raise InvalidProgramException(node, 'purity.violated')
+            return int_val, True
+        else:
+            int_or_perm_val = self.translate_perm(node, ctx)
+            return int_or_perm_val, int_or_perm_val.typ() == self.viper.Int
+
     def translate_perm_BinOp(self, node: ast.BinOp, ctx: Context) -> Expr:
-        def translate_node(node):
-            if isinstance(node, ast.Num):
-                stmt, nodeprime = self.translate_expr(node, ctx, self.viper.Int)
-                if stmt:
-                    raise InvalidProgramException(node, 'purity.violated')
-                return nodeprime, True
-            else:
-                perm = self.translate_perm(node, ctx)
-                return perm, perm.typ() == self.viper.Int
 
         if isinstance(node.op, ast.Div):
-            left, left_int = translate_node(node.left)
-            right, right_int = translate_node(node.right)
+            left, left_int = self.translate_perm_or_int(node.left, ctx)
+            right, right_int = self.translate_perm_or_int(node.right, ctx)
 
             if left_int and right_int:
                 return self.viper.FractionalPerm(left, right,
@@ -62,8 +63,8 @@ class PermTranslator(CommonTranslator):
                                       self.no_info(ctx))
 
         if isinstance(node.op, ast.Mult):
-            left, left_int = translate_node(node.left)
-            right, right_int = translate_node(node.right)
+            left, left_int = self.translate_perm_or_int(node.left, ctx)
+            right, right_int = self.translate_perm_or_int(node.right, ctx)
 
             if left_int != right_int and right_int:
                 left, left_int, right, right_int = right, right_int, left, left_int
@@ -81,36 +82,41 @@ class PermTranslator(CommonTranslator):
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
 
-        newnode = None
+        new_node = None
         if isinstance(node.op, ast.Add):
-            newnode = self.viper.PermAdd
+            new_node = self.viper.PermAdd
         elif isinstance(node.op, ast.Sub):
-            newnode = self.viper.PermSub
+            new_node = self.viper.PermSub
 
-        if newnode:
+        if new_node:
             left = self.translate_perm(node.left, ctx)
             right = self.translate_perm(node.right, ctx)
-            return newnode(left, right,
-                           self.to_position(node, ctx),
-                           self.no_info(ctx))
+            return new_node(left, right,
+                            self.to_position(node, ctx),
+                            self.no_info(ctx))
         raise UnsupportedException(node)
 
     def translate_perm_Call(self, node: ast.Call, ctx: Context) -> Expr:
         func_name = get_func_name(node)
         if func_name == 'ARP':
+            if not ctx.arp:
+                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             if len(node.args) == 0:
                 return self.get_arp_for_context(node, ctx)
             elif len(node.args) == 1:
                 arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Int)
                 if arg0_stmt:
                     raise InvalidProgramException(node, 'purity.violated')
-                # arg = self.viper.IntLit(node.args[0].n, self.to_position(node, ctx), self.no_info(ctx))
-                formal_arg = self.viper.LocalVarDecl('count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
+                formal_arg = self.viper.LocalVarDecl(
+                    'count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
                 return self.viper.FuncApp('rdc', [arg0], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Perm, [formal_arg])
         elif func_name == 'getARP':
+            if not ctx.arp:
+                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             if len(node.args) == 1:
-                formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+                formal_arg = self.viper.LocalVarDecl(
+                    'tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
                 arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Ref)
                 if arg0_stmt:
                     raise InvalidProgramException(node, 'purity.violated')
@@ -124,8 +130,12 @@ class PermTranslator(CommonTranslator):
 
     def translate_perm_Name(self, node: ast.Name, ctx: Context) -> Expr:
         if node.id == 'RD_PRED':
+            if not ctx.arp:
+                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             return self.viper.FuncApp('globalRd', [], self.to_position(node, ctx),
                                       self.no_info(ctx), self.viper.Perm, {})
+        raise InvalidProgramException(node, 'invalid.name')
+
 
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)
@@ -137,6 +147,8 @@ class PermTranslator(CommonTranslator):
         if ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and ctx.actual_function.pure:
             return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
         else:
+            if not ctx.arp:
+                raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             if ctx.current_thread_object is not None:
                 formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
                 if ctx.is_thread_start:

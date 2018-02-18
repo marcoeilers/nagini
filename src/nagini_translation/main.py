@@ -75,7 +75,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
-              sif: bool = False, reload_resources: bool = False):
+              sif: bool = False, arp: bool = False, reload_resources: bool = False):
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -109,7 +109,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected)
+    prog = translator.translate_program(modules, sil_programs, selected, arp=arp)
     return prog
 
 
@@ -275,7 +275,7 @@ def main() -> None:
 def translate_and_verify(python_file, jvm, args, print=print, arp=False):
     try:
         selected = set(args.select.split(',')) if args.select else set()
-        prog = translate(python_file, jvm, selected, args.sif)
+        prog = translate(python_file, jvm, selected, args.sif, arp=arp)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:
@@ -295,7 +295,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                prog = translate(python_file, jvm, selected, args.sif)
+                prog = translate(python_file, jvm, selected, args.sif, arp=arp)
                 vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
                 #assert vresult

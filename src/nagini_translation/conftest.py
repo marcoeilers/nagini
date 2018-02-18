@@ -180,8 +180,9 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers
-            params.append((file, sif, reload_resources))
-        metafunc.parametrize('path,sif,reload_resources', params)
+            arp = 'arp' in file
+            params.append((file, sif, reload_resources, arp))
+        metafunc.parametrize('path,sif,reload_resources,arp', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
         for test_dir in _pytest_config.verification_test_dirs:
             files = _test_files(test_dir)
