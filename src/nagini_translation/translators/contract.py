@@ -757,7 +757,7 @@ class ContractTranslator(CommonTranslator):
                         raise InvalidProgramException(node, 'invalid.acc')
                     return self.translate_acc_global(node, perm, ctx)
         elif func_name in BUILTIN_PREDICATES:
-            return self.translate_unwrapped_builtin_predicate(node, ctx)
+            return [], self.translate_unwrapped_builtin_predicate(node, ctx)
         elif func_name == 'MaySet':
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
