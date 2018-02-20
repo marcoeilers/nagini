@@ -180,13 +180,14 @@ class ContractTranslator(CommonTranslator):
         conjunction = self.viper.And(access_pred, func, pos, info)
         return conjunction
 
-    def translate_unwrapped_builtin_predicate(self, node: ast.Call, ctx: Context) -> Expr:
+    def translate_unwrapped_builtin_predicate(self, node: ast.Call,
+                                              ctx: Context) -> StmtsAndExpr:
         args = []
         stmt, arg = self.translate_expr(node.args[0], ctx)
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
         perm = self.viper.FullPerm(self.no_position(ctx), self.no_info(ctx))
-        return self.translate_builtin_predicate(node, perm, [arg], ctx)
+        return [], self.translate_builtin_predicate(node, perm, [arg], ctx)
 
     def translate_acc_predicate(self, node: ast.Call, perm: Expr,
                                 ctx: Context) -> StmtsAndExpr:
