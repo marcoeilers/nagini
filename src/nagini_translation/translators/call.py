@@ -967,7 +967,7 @@ class CallTranslator(CommonTranslator):
             elif func_name == "Thread":
                 return self._translate_thread_creation(node, ctx)
             elif func_name in BUILTIN_PREDICATES:
-                return [], self.translate_contractfunc_call(node, ctx, impure)
+                return self.translate_contractfunc_call(node, ctx, impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
