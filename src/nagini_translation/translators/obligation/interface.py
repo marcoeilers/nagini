@@ -208,14 +208,20 @@ class ObligationTranslator(CommonTranslator):
             position, info, method, overriding_check)
 
     def create_method_call_node(
-            self, ctx: Context, methodname: str, args: List[Expr],
+            self, ctx: Context, method_name: str, args: List[Expr],
             targets: List[Expr], position: Position, info: Info,
             target_method: PythonMethod = None,
             target_node: ast.Call = None) -> List[Stmt]:
         """Construct a method call AST node with obligation stuff."""
         return self._method_translator.create_method_call_node(
-            ctx, methodname, args, targets, position, info,
+            ctx, method_name, args, targets, position, info,
             target_method, target_node)
+
+    def create_method_fork(self, ctx: Context, targets, thread: Expr,
+                           position: Position, info: Info,
+                           target_node: ast.Call = None) -> List[Stmt]:
+        return self._method_translator.create_method_fork(
+            ctx, targets, thread, position, info, target_node)
 
     def create_obligation_info(self, method: PythonMethod) -> object:
         """Create obligation info for the method."""

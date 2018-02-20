@@ -43,6 +43,17 @@ class Null(RefExpression):
         return translator.viper.NullLit(position, info)
 
 
+class RefExpr(RefExpression):
+    """A wrapper around an already-translated Silver expression of type Ref."""
+
+    def __init__(self, e: Expr) -> None:
+        self.e = e
+
+    def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
+                  position: Position, info: Info) -> Expr:
+        return self.e
+
+
 class RefVar(RefExpression):
     """A reference to a Ref-typed variable."""
 

@@ -66,6 +66,12 @@ ERRORS = {
         lambda n: 'An internal error occurred.',
     'expression.undefined':
         lambda n: 'Expression {} may not be defined.'.format(pprint(n)),
+    'thread.creation.failed':
+        lambda n: 'Thread creation may fail.',
+    'thread.start.failed':
+        lambda n: 'Thread start may fail.',
+    'thread.join.failed':
+        lambda n: 'Thread join may fail.',
 }
 
 REASONS = {
@@ -122,7 +128,18 @@ REASONS = {
         lambda n: 'Global name may not have been defined.',
     'missing.dependencies':
         lambda n: 'Global dependencies may not be defined.',
-    'internal': lambda n: 'Internal Viper error.'
+    'internal':
+        lambda n: 'Internal Viper error.',
+    'wait.level.invalid':
+        lambda n: 'Thread level may not be lower than current thread.',
+    'thread.not.joinable':
+        lambda n: 'Thread may not be joinable.',
+    'invalid.argument.type':
+        lambda n: 'Thread argument may not fit target method parameter type.',
+    'method.not.listed':
+        lambda n: "Thread's target method may not be listed in start statement.",
+    'missing.start.permission':
+        lambda n: 'May not have permission to start thread.',
 }
 
 VAGUE_REASONS = {

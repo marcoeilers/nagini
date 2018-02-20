@@ -378,6 +378,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[LIST_TYPE]
                 return GenericType(list_class, [arg_type])
+            elif node.func.id in ('getArg', 'getOld', 'getMethod'):
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:

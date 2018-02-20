@@ -799,6 +799,10 @@ class Analyzer(ast.NodeVisitor):
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
                 node, 'invalid.io_operation.misplaced_property')
+        if isinstance(node.func, ast.Name) and node.func.id == 'Thread':
+            return
+        if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
+            return
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
@@ -976,7 +980,9 @@ class Analyzer(ast.NodeVisitor):
         # is also accessed in a simpler expression elsewhere, we just do
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
-            not isinstance(node.value, ast.Subscript)):
+                not isinstance(node.value, ast.Subscript) and
+                not (isinstance(node.value, ast.Call) and
+                         isinstance(node.ctx, ast.Load))):
             target = self.get_target(node.value, self.module)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)

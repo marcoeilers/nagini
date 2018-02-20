@@ -924,6 +924,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
+        self.threading_id = None
         self.definition_deps = set()
         self.call_deps = set()
 
@@ -942,6 +943,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         checks if this method overrides one from a superclass,
         """
         self.sil_name = sil_name
+        self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
         for name, arg in self.args.items():
