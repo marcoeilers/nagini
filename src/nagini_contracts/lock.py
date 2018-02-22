@@ -35,7 +35,8 @@ class Lock(BaseLock, Generic[T]):
                  above: Optional[BaseLock]=None,
                  below: Optional[BaseLock]=None) -> None:
         """
-        Create a lock at the specified level, which protects ``locked_object``.
+        Create a lock whose level is below that of ``below`` and above that of ``above``,
+        which protects ``locked_object``.
         Creating the lock "shares" the object (i.e., exhales the invariant).
         Create subclasses of this class and override ``invariant`` to create a lock
         with an invariant.
