@@ -25,7 +25,7 @@ class WatchDog:
     def delay(self, t: int) -> None:
         Requires(MustTerminate(t))
 
-    def watch(self, d: Lock) -> None:
+    def watch(self, d: Lock['WatchDog']) -> None:
         Requires(d is not None)
         Requires(Acc(self.running))
         Requires(WaitLevel() < Level(d))
@@ -36,6 +36,7 @@ class WatchDog:
             Invariant(Acc(self.running))
             Invariant(MustRelease(d, 1))
             Invariant(WaitLevel() < Level(d))
+            Invariant(d.invariant())
             # TODO: Check some property here.
             d.release()
             self.delay(5)

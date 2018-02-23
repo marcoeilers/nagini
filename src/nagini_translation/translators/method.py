@@ -243,6 +243,7 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = func
+        self.bind_type_vars(func, ctx)
         pos = self.to_position(func.node, ctx)
         if not func.type:
             raise InvalidProgramException(func.node, 'function.type.none')

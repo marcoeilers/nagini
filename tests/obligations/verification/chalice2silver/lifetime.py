@@ -13,7 +13,7 @@ from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def do_release(l: Lock) -> None:
+def do_release(l: Lock[object]) -> None:
     Requires(l is not None)
     #:: Label(do_release__MustTerminate)
     Requires(MustRelease(l, 0))
@@ -21,7 +21,7 @@ def do_release(l: Lock) -> None:
     l.release()
 
 
-def do_release_caller(l: Lock) -> None:
+def do_release_caller(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(MustRelease(l, 1))
 

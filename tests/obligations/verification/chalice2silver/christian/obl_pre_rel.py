@@ -21,16 +21,18 @@ from typing import Optional
 class A:
 
     def __init__(self) -> None:
-        self.x = None   # type: Optional[Lock]
+        self.x = None   # type: Optional[Lock[A]]
         self.y = 0
 
     def t(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
+        Requires(self.x.invariant())
         Ensures(Acc(self.x))
         self.x.release()
 
     def mr(self, other: 'A') -> None:
         Requires(Acc(other.x) and MustRelease(other.x, 2))
+        Requires(other.x.invariant())
         Ensures(Acc(other.x))
         other.x.release()
 

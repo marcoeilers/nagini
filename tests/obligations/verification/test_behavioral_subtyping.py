@@ -12,8 +12,9 @@ class Super:
         Requires(MustTerminate(2))
 
     #:: Label(Super__release)
-    def release(self, lock: Lock) -> None:
+    def release(self, lock: Lock['Super']) -> None:
         Requires(MustRelease(lock, 3))
+        Requires(lock.invariant())
         lock.release()
 
 
@@ -25,9 +26,10 @@ class SubIncreased(Super):
         Requires(MustTerminate(3))
 
     #:: ExpectedOutput(call.precondition:insufficient.permission, Super__release)
-    def release(self, lock: Lock) -> None:
+    def release(self, lock: Lock[Super]) -> None:
         """Measure increased. Error."""
         Requires(MustRelease(lock, 4))
+        Requires(lock.invariant())
         lock.release()
 
 
@@ -46,9 +48,10 @@ class SubDecreased(Super):
         """Measure decreased. Ok."""
         Requires(MustTerminate(1))
 
-    def release(self, lock: Lock) -> None:
+    def release(self, lock: Lock[Super]) -> None:
         """Measure decreased. Ok."""
         Requires(MustRelease(lock, 2))
+        Requires(lock.invariant())
         lock.release()
 
 
@@ -58,7 +61,8 @@ class SubUnchanged(Super):
         """Measure the same. Ok."""
         Requires(MustTerminate(2))
 
-    def release(self, lock: Lock) -> None:
+    def release(self, lock: Lock[Super]) -> None:
         """Measure the same. Ok."""
         Requires(MustRelease(lock, 3))
+        Requires(lock.invariant())
         lock.release()

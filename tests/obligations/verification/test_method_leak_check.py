@@ -31,26 +31,26 @@ def MustInvoke_body(t1: Place) -> None:
     Requires(token(t1, 1))
 
 
-def MustRelease_callee_1(lock: Lock) -> None:
+def MustRelease_callee_1(lock: Lock[object]) -> None:
     pass
 
 
-def MustRelease_caller_1(lock: Lock) -> None:
+def MustRelease_caller_1(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     MustRelease_callee_1(lock)
 
 
-def MustRelease_callee_2(lock: Lock) -> None:
+def MustRelease_callee_2(lock: Lock[object]) -> None:
     Requires(MustTerminate(1))
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def MustRelease_caller_2(lock: Lock) -> None:
+def MustRelease_caller_2(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     MustRelease_callee_2(lock)
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def MustRelease_body(lock: Lock) -> None:
+def MustRelease_body(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
