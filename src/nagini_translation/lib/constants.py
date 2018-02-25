@@ -203,7 +203,8 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
-    '__getitem__'
+    '__getitem__',
+    '__setitem__',
 }
 
 RESULT_NAME = '_res'

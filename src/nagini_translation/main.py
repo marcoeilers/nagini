@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -234,6 +235,7 @@ def main() -> None:
     config.boogie_path = args.boogie
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
+    config.set_verifier(args.verifier)
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
@@ -287,12 +289,13 @@ def translate_and_verify(python_file, jvm, args, print=print):
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark >= 1:
+            print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
+                prog = translate(python_file, jvm, selected, args.sif)
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
-                assert vresult
-                print("RUN,{},{},{},{},{}".format(
+                print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend)
@@ -313,7 +316,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 if e.args[0]:
                     issue += e.args[0]
                 else:
-                    issue += str(e.node)
+                    issue += astunparse.unparse(e.node)
             line = str(e.node.lineno)
             col = str(e.node.col_offset)
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')

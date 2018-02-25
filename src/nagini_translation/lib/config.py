@@ -140,7 +140,7 @@ class FileConfig:
         self.test_config = TestConfig(self.config)
 
 
-def _construct_classpath():
+def _construct_classpath(verifier : str = None):
     """ Contstructs JAVA classpath.
 
     First tries environment variables ``VIPERJAVAPATH``, ``SILICONJAR``
@@ -157,7 +157,8 @@ def _construct_classpath():
 
     if silicon_jar or carbon_jar:
         return os.pathsep.join(
-            jar for jar in (silicon_jar, carbon_jar) if jar)
+            jar for jar, v in ((silicon_jar, 'carbon'), (carbon_jar, 'silicon'))
+            if jar and v != verifier)
 
     if sys.platform.startswith('linux'):
         if os.path.isdir('/usr/lib/viper'):
@@ -232,6 +233,13 @@ def _get_mypy_dir():
     return None
 
 
+def set_verifier(v: str):
+    global classpath
+    not_set_by_arg = classpath == _construct_classpath()
+    if not_set_by_arg:
+        classpath = _construct_classpath(v)
+
+
 mypy_dir = _get_mypy_dir()
 """
 Mypy executable dir. Initialized by calling
@@ -290,4 +298,5 @@ __all__ = (
     'mypy_path',
     'mypy_dir',
     'obligation_config',
+    'set_verifier',
 )

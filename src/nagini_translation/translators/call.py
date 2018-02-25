@@ -200,14 +200,15 @@ class CallTranslator(CommonTranslator):
 
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
-        # Mark the current function as depending on the called class. If we're in
-        # a global context, assert that the called class and its dependencies are defined.
-        func_node = node.func if isinstance(node, ast.Call) else node
-        self._add_dependencies(func_node, target_class, ctx)
-        defined_check = []
-        if self.is_main_method(ctx):
-            defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
-                                                       ctx)
+        if target_class.module is not target_class.module.global_module:
+            # Mark the current function as depending on the called class. If we're in
+            # a global context, assert that the called class and its dependencies are defined.
+            func_node = node.func if isinstance(node, ast.Call) else node
+            self._add_dependencies(func_node, target_class, ctx)
+            defined_check = []
+            if self.is_main_method(ctx):
+                defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
+                                                           ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -397,13 +398,14 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        # Mark the current function as depending on the called method. If we're in
-        # a global context, assert that the called method and its dependencies are
-        # defined.
-        self._add_dependencies(node.func, target, ctx)
-        defined_check = []
-        if self.is_main_method(ctx) and not target.cls:
-            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called method. If we're in
+            # a global context, assert that the called method and its dependencies are
+            # defined.
+            self._add_dependencies(node.func, target, ctx)
+            defined_check = []
+            if self.is_main_method(ctx) and not target.cls:
+                defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -440,12 +442,13 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        # Mark the current function as depending on the called function. If we're in
-        # a global context, wrap the result into a check that the called function and its
-        # dependencies are defined.
-        self._add_dependencies(node.func, target, ctx)
-        if not target.cls and self.is_main_method(ctx):
-            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called function. If we're in
+            # a global context, wrap the result into a check that the called function and its
+            # dependencies are defined.
+            self._add_dependencies(node.func, target, ctx)
+            if not target.cls and self.is_main_method(ctx):
+                call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -600,9 +603,9 @@ class CallTranslator(CommonTranslator):
                 raise UnsupportedException(node, 'Unsupported version of builtin '
                                                  'function.')
             if diff > 0:
-                    null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-                    unpacked_args += [null] * diff
-                    unpacked_arg_types += [None] * diff
+                null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+                unpacked_args += [null] * diff
+                unpacked_arg_types += [None] * diff
             return arg_stmts, unpacked_args, unpacked_arg_types
 
         nargs = target.nargs
