@@ -358,7 +358,7 @@ class OldExpressionCollector(ast.NodeVisitor):
             self.expressions.append(node.args[0])
 
 
-class OldExpressionNormalizer(ast.NodeTransformer):
+class OldExpressionTransformer(ast.NodeTransformer):
     """
     A visitor that replaces references to specific names by calls to arg(i), where
     i is the index of the name (given in self.arg_names).

@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, MayJoin, ThreadPost, getOld, arg
+from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, ThreadPost, getOld, arg
 from nagini_contracts.obligations import MustTerminate
 
 
@@ -15,12 +15,12 @@ class Cell:
 
 
 @Predicate
-def get(c: Cell, n: int) -> bool:
+def get(c: Cell) -> bool:
     return Acc(c.val)
 
 
 def client_create(b: bool) -> Thread:
     cl = Cell()
     #:: ExpectedOutput(invalid.program:invalid.thread.creation)
-    t = Thread(target=get, group=None, args=(cl, 6))
+    t = Thread(target=get, group=None, args=(cl,))
     return t

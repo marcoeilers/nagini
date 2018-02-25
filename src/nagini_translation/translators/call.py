@@ -63,7 +63,7 @@ from nagini_translation.lib.util import (
     get_func_name,
     InvalidProgramException,
     OldExpressionCollector,
-    OldExpressionNormalizer,
+    OldExpressionTransformer,
     pprint,
     UnsupportedException,
 )
@@ -1010,7 +1010,7 @@ class CallTranslator(CommonTranslator):
             elif func_name == "Thread":
                 return self._translate_thread_creation(node, ctx)
             elif func_name in BUILTIN_PREDICATES:
-                return [], self.translate_contractfunc_call(node, ctx, impure)
+                return self.translate_contractfunc_call(node, ctx, impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
@@ -1302,7 +1302,7 @@ class CallTranslator(CommonTranslator):
 
         # Set old values
         collector = OldExpressionCollector()
-        normalizer = OldExpressionNormalizer()
+        normalizer = OldExpressionTransformer()
         normalizer.arg_names = [arg for arg in method._args]
         for post, _ in method.postcondition:
             collector.visit(post)
