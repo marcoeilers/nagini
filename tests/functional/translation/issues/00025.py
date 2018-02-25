@@ -1,4 +1,3 @@
-#:: IgnoreFile(25)
 from nagini_contracts.contracts import *
 
 class C:
@@ -6,5 +5,6 @@ class C:
         self.f = 1
 
 def bla(x: C) -> None:
+    #:: ExpectedOutput(invalid.program:invalid.contract.position)
     if Acc(x.f):
         pass
