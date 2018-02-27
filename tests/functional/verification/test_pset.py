@@ -9,8 +9,8 @@ def test_pset() -> None:
     ints = PSet(1, 2, 3)
     four = PSet(4)
     a = A()
-    ass = PSet(a)
-    assert a in ass
+    a_set = PSet(a)
+    assert a in a_set
     assert 3 in ints and 1 in ints
     assert 4 not in ints
     assert len(ints) == 3
