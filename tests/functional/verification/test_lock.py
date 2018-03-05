@@ -16,7 +16,7 @@ class CellLock(Lock[Cell]):
         return Acc(self.get_locked().value)
 
 
-class ThingWithCell:
+class CellMonitor:
     def __init__(self) -> None:
         self.c = Cell(12)
         self.c.value = 14
@@ -90,14 +90,14 @@ class ThingWithCell:
 
 
 def client_1() -> None:
-    twc = ThingWithCell()
+    twc = CellMonitor()
     twc.l.acquire()
     twc.l.release()
     twc.acquire_release_correct()
 
 
 def client_2() -> None:
-    twc = ThingWithCell()
+    twc = CellMonitor()
     twc.acquire_release_correct()
 
 
