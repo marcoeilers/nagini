@@ -19,6 +19,7 @@ from nagini_translation.lib.constants import (
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
     PRIMITIVES,
+    PSET_TYPE,
     RANGE_TYPE,
     SEQ_TYPE,
     THREAD_DOMAIN,
@@ -580,6 +581,34 @@ class ContractTranslator(CommonTranslator):
                                         ctx)
         return val_stmts, result
 
+    def translate_pset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        set_type = self.get_type(node, ctx)
+
+        viper_type = self.translate_type(set_type.type_args[0], ctx)
+        val_stmts = []
+
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type = viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitSet(vals, self.to_position(node, ctx),
+                                            self.no_info(ctx))
+        else:
+            result = self.viper.EmptySet(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        type_arg = set_type.type_args[0]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, position,
+                                                            ctx)
+        result = self.get_function_call(set_type.cls, '__create__',
+                                        [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+
     def translate_get_arg(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         thread_stmt, thread = self.translate_expr(node.args[0], ctx)
         index_stmt, index = self.translate_expr(node.args[1], ctx,
@@ -751,8 +780,10 @@ class ContractTranslator(CommonTranslator):
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
-        elif func_name == 'Sequence':
+        elif func_name == SEQ_TYPE:
             return self.translate_sequence(node, ctx)
+        elif func_name == PSET_TYPE:
+            return self.translate_pset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'Joinable':

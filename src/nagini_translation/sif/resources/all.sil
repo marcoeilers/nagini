@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import "../../resources/bool.sil"
+import "bool.sil"
 import "../../resources/lock.sil"
 import "../../resources/measures.sil"
 import "../../resources/pytype.sil"

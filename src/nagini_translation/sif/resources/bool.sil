@@ -117,8 +117,7 @@ function float___create__(i: Int): Ref
     ensures typeof(result) == float()
 
 function float___bool__(self: Ref): Bool
-    requires self != null ==> issubtype(typeof(self), float())
-    ensures self == null ==> !result
+    requires issubtype(typeof(self), float())
     ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
 
 function float___ge__(self: Ref, other: Ref): Bool
@@ -194,18 +193,12 @@ function object___cast__(typ: PyType, obj: Ref): Ref
     ensures issubtype(typeof(obj), typ)
 
 function max(a: Ref, b: Ref): Int
-    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
-             (issubtype(typeof(a), list(int())) && b == null)
-    requires issubtype(typeof(a), list(int())) ==> acc(a.list_acc, 1/100) && list___len__(a) > 0
-    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
-    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
+    requires issubtype(typeof(a), int()) && issubtype(typeof(b), int())
+    ensures result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
 
 function min(a: Ref, b: Ref): Int
-    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
-             (issubtype(typeof(a), list(int())) && b == null)
-    requires issubtype(typeof(a), list(int())) ==>  acc(a.list_acc, 1/100) && list___len__(a) > 0
-    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
-    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
+    requires issubtype(typeof(a), int()) && issubtype(typeof(b), int())
+    ensures result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
 
 function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)

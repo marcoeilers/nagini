@@ -16,7 +16,7 @@ class CellLock(Lock[Cell]):
         return Acc(self.get_locked().value)
 
 
-class ThingWithCell:
+class CellMonitor:
     def __init__(self) -> None:
         self.c = Cell(12)
         self.c.value = 14
@@ -26,7 +26,7 @@ class ThingWithCell:
         Ensures(Acc(self.c) and Acc(self.l) and self.l.get_locked() is self.c)
         Ensures(WaitLevel() < Level(self.l))
 
-    def do_a_thing(self) -> None:
+    def acquire_release_correct(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
@@ -38,7 +38,7 @@ class ThingWithCell:
         Fold(self.l.invariant())
         self.l.release()
 
-    def do_a_thing_2(self) -> None:
+    def fold_missing(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         self.l.acquire()
@@ -47,7 +47,7 @@ class ThingWithCell:
         #:: ExpectedOutput(call.precondition:insufficient.permission)
         self.l.release()
 
-    def do_a_thing_3(self) -> None:
+    def unspecified_locked_object(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2))
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
@@ -58,7 +58,7 @@ class ThingWithCell:
         Fold(self.l.invariant())
         self.l.release()
 
-    def do_a_thing_4(self) -> None:
+    def unspecified_waitlevel(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         #:: ExpectedOutput(call.precondition:assertion.false)
@@ -69,7 +69,7 @@ class ThingWithCell:
         self.l.release()
 
     #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-    def do_a_thing_5(self) -> None:
+    def no_release(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
@@ -78,7 +78,7 @@ class ThingWithCell:
         self.c.value += 2
         Fold(self.l.invariant())
 
-    def do_a_thing_6(self) -> None:
+    def no_acquire(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
@@ -90,15 +90,15 @@ class ThingWithCell:
 
 
 def client_1() -> None:
-    twc = ThingWithCell()
+    twc = CellMonitor()
     twc.l.acquire()
     twc.l.release()
-    twc.do_a_thing()
+    twc.acquire_release_correct()
 
 
 def client_2() -> None:
-    twc = ThingWithCell()
-    twc.do_a_thing()
+    twc = CellMonitor()
+    twc.acquire_release_correct()
 
 
 class NCell:

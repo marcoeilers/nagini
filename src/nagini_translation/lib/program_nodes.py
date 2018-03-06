@@ -21,6 +21,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
+    PRIMITIVE_SET_TYPE,
     PRIMITIVES,
     RESULT_NAME,
     STRING_TYPE,
@@ -634,8 +635,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         otherwise just return the type itself.
         """
         if self.name in PRIMITIVES and self.name not in (PRIMITIVE_SEQ_TYPE + '_type',
+                                                         PRIMITIVE_SET_TYPE + '_type',
                                                          CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
+            if boxed_name == 'Set':
+                boxed_name = 'PSet'
             return self.module.classes[boxed_name]
         return self
 
@@ -959,6 +963,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                 translator)
         self.obligation_info = translator.create_obligation_info(self)
         if self.interface:
+            requires = set()
+            for requirement in self.requires:
+                requires.add(requirement)
+            translator.set_required_names(self.sil_name, requires)
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
