@@ -8,10 +8,11 @@ def callee() -> int:
     raise Exception()
 
 
+#:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def caller() -> int:
     try:
         a = callee()
     except:
-        #:: ExpectedOutput(expression.undefined:undefined.local.variable)|ExpectedOutput(carbon)(postcondition.violated:assertion.false)
+        #:: ExpectedOutput(expression.undefined:undefined.local.variable)
         return a
     return 5
