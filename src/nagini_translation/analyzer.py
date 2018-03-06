@@ -460,15 +460,20 @@ class Analyzer(ast.NodeVisitor):
                 if not (isinstance(base, ast.Name) and
                         base.id in MYPY_SUPERCLASSES):
                     actual_bases.append(base)
+        
+        if len(actual_bases) > 0:
+            cls.superclass = self.find_or_create_target_class(actual_bases[0])
+            if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
+                actual_bases = [actual_bases[0]]
+                cls.is_adt = True
+
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
-        if len(actual_bases) == 1:
-            cls.superclass = self.find_or_create_target_class(actual_bases[0])
-        else:
+        if len(actual_bases) == 0:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
-
+        
         for member in node.body:
             self.visit(member, node)
         self.current_class = None

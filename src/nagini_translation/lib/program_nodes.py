@@ -375,6 +375,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self._has_classmethod = False
         self.type_vars = OrderedDict()
         self.definition_deps = set()
+        self.is_adt = name == 'ADT'
 
     @property
     def all_subclasses(self) -> List['PythonClass']:
