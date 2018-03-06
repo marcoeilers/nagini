@@ -48,6 +48,9 @@ class Context:
         self._old_aliases = {}      # Keys are pretty-printed Python expressions,
                                     # values are Silver expressions they should be
                                     # translated to.
+        self.ignore_waitlevel_constraints = False      # If this is set, all encountered
+                                                       # WaitLevel() < e constraints will
+                                                       # be translated to true.
 
     def get_fresh_int(self) -> int:
         """

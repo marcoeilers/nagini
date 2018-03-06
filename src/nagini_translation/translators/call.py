@@ -730,6 +730,7 @@ class CallTranslator(CommonTranslator):
         ctx.inlined_calls.append(method)
         ctx.var_aliases = var_aliases
         ctx.label_aliases = {}
+        ctx.ignore_waitlevel_constraints = True
 
         # Create local var aliases
         locals_to_copy = method.locals.copy()
@@ -1333,6 +1334,7 @@ class CallTranslator(CommonTranslator):
         for name in method._args:
             ctx.remove_alias(name)
         ctx.remove_alias(RESULT_NAME)
+        ctx.ignore_waitlevel_constraints = False
 
         # Inhale postcondition if there's a permission to ThreadPost and this method
         # is the actual method.

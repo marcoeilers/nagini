@@ -24,6 +24,7 @@ from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
@@ -76,7 +77,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
-              sif: bool = False, reload_resources: bool = False):
+              sif: bool = False, ignore_global: bool = False,
+              reload_resources: bool = False) -> Program:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -110,7 +112,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected)
+    prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
     return prog
 
 
@@ -226,6 +228,11 @@ def main() -> None:
         help='select specific methods or classes to verify, separated by commas'
     )
     parser.add_argument(
+        '--ignore-global',
+        action='store_true',
+        help='do not verify the the top level program (global statements)'
+    )
+    parser.add_argument(
         '--server',
         action='store_true',
         help='Start Nagini server'
@@ -273,7 +280,7 @@ def main() -> None:
 def translate_and_verify(python_file, jvm, args, print=print):
     try:
         selected = set(args.select.split(',')) if args.select else set()
-        prog = translate(python_file, jvm, selected, args.sif)
+        prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:
