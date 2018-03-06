@@ -173,14 +173,14 @@ class Sequence(Generic[T], Sized, Iterable[T]):
 
 class PSet(Generic[T], Sized, Iterable[T]):
     """
-    A Sequence[T] represents a pure sequence of instances of subtypes of T, and
-    is translated to native Viper sequences.
+    A PSet[T] represents a pure set of instances of subtypes of T, and is translated to
+    native Viper sets.
     """
 
     def __init__(self, *args: T) -> None:
         """
         ``PSet(a, b, c)`` creates a set instance containing the objects
-        a, b and c in that order.
+        a, b and c.
         """
 
     def __contains__(self, item: object) -> bool:
