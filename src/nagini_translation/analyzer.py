@@ -184,7 +184,7 @@ class Analyzer(ast.NodeVisitor):
     def add_module(self, abs_path: str, into: str, as_name: Optional[str],
                    node: ast.Module, names: List[Tuple[str, str]] = None) -> None:
         """
-        Adds the module with the given 'abs_path' into the the module with
+        Adds the module with the given 'abs_path' into the module with
         path 'into'. If it's a from-import, 'as_name' should be None and
         'names' may contain rename information for specific imported
         members, otherwise (with a normal import) as_name should contain the
@@ -460,12 +460,31 @@ class Analyzer(ast.NodeVisitor):
                 if not (isinstance(base, ast.Name) and
                         base.id in MYPY_SUPERCLASSES):
                     actual_bases.append(base)
-        
+
         if len(actual_bases) > 0:
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
+
+            # Process ADT defined via a class hierarchy (sum) and a NamedTuple (product)
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
-                actual_bases = [actual_bases[0]]
                 cls.is_adt = True
+                # Detect malformed ADTs
+                if len(actual_bases) > 2:
+                    raise InvalidProgramException(cls.node, 'malformed algebraic data type: superclasses can only be a class optionally followed by one NamedTuple')
+                if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
+                    raise InvalidProgramException(cls.node, 'malformed algebraic data type: classes cannot have body, fields should be defined in NamedTuples instead')
+                elif len(actual_bases) == 2:
+                    if not (isinstance(actual_bases[1], ast.Call) and actual_bases[1].func.id == 'NamedTuple'):
+                        raise InvalidProgramException(actual_bases[1], 'malformed algebraic data type: only NamedTuple can be used to define fields')
+                    if not (cls.name == actual_bases[1].args[0].s):
+                        raise InvalidProgramException(actual_bases[1], 'malformed algebraic data type: name of NamedTuple has to be the same of the class (ADT Constructor)')
+                    
+                    # Parse NamedTuple's fields and their respective types
+                    for field_decl in actual_bases[1].args[1].elts:
+                        field_name, field_type = field_decl.elts
+                        cls.add_field(field_name.s, field_decl, self.get_target(field_type, self.module))
+
+                    # Consider ADTs as a special case of single inheritance
+                    actual_bases = [actual_bases[0]]
 
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
