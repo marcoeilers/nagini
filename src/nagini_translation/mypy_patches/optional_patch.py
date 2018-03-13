@@ -1,4 +1,10 @@
 """
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
+"""
 Monkey-patches member access resolution for union types so that no error
 message is generated when accessing members of optional types, and type
 inference and checking can proceed normally.

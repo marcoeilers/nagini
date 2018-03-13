@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 DEFAULT_CLIENT_SOCKET = "tcp://localhost:5555"
@@ -14,9 +20,12 @@ BUILTINS = ['cast',
             'set',
             'super',
             'range',
-            'type']
+            'type',
+            'list']
 
-BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred']
+THREADING = ['Thread']
+
+BUILTIN_PREDICATES = ['list_pred', 'set_pred', 'dict_pred', 'MayStart', 'ThreadPost']
 
 FUNCTION_DOMAIN_NAME = 'Function'
 
@@ -24,9 +33,43 @@ MAY_SET_PRED = '_MaySet'
 
 IS_DEFINED_FUNC = '_isDefined'
 
+ASSERTING_FUNC = '_asserting'
+
+NAME_QUANTIFIER_VAR = '_name'
+
+COMBINE_NAME_FUNC = '_combine'
+
+GLOBAL_IS_DEFINED_FUNC = '_isDefinedG'
+
 CHECK_DEFINED_FUNC = '_checkDefined'
 
+GLOBAL_CHECK_DEFINED_FUNC = '_checkDefinedG'
+
 ARBITRARY_BOOL_FUNC = '_int_to_bool'
+
+JOINABLE_FUNC = '_joinable'
+
+THREAD_POST_PRED = '_thread_post'
+
+THREAD_START_PRED = '_thread_start'
+
+THREAD_DOMAIN = 'Thread'
+
+GET_ARG_FUNC = 'getArg'
+
+GET_OLD_FUNC = 'getOld'
+
+GET_METHOD_FUNC = 'getMethod'
+
+GLOBAL_VAR_FIELD = '_val'
+
+NAME_DOMAIN = '_Name'
+
+COMBINED_NAME_ACCESSOR = '_get_combined_name'
+
+COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
+
+SINGLE_NAME = '_single'
 
 INTERNAL_NAMES = [
     'FuncTriple',
@@ -52,11 +95,25 @@ INTERNAL_NAMES = [
     'issubtype_exclusion',
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
+    'Thread',
+    JOINABLE_FUNC,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
+    GET_ARG_FUNC,
+    GET_OLD_FUNC,
+    GET_METHOD_FUNC,
     MAY_SET_PRED,
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,
     FUNCTION_DOMAIN_NAME,
     ARBITRARY_BOOL_FUNC,
+    GLOBAL_VAR_FIELD,
+    NAME_QUANTIFIER_VAR,
+    COMBINE_NAME_FUNC,
+    NAME_DOMAIN,
+    COMBINED_NAME_ACCESSOR,
+    COMBINED_PREFIX_ACCESSOR,
+    SINGLE_NAME,
 ]
 
 VIPER_KEYWORDS = [
@@ -142,6 +199,7 @@ LEGAL_MAGIC_METHODS = {
     '__str__',
     '__len__',
     '__bool__',
+    '__getitem__'
 }
 
 RESULT_NAME = '_res'
@@ -170,6 +228,8 @@ BYTES_TYPE = 'bytes'
 
 INT_TYPE = 'int'
 
+FLOAT_TYPE = 'float'
+
 BOOL_TYPE = 'bool'
 
 PRIMITIVE_PREFIX = '__prim__'
@@ -188,6 +248,14 @@ PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE, CALLA
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE, CALLABLE_TYPE}
 
+NAME_VAR = '__name__'
+
+FILE_VAR = '__file__'
+
+MODULE_VARS = (NAME_VAR, FILE_VAR)
+
+MAIN_METHOD_NAME = '__main__'
+
 MYPY_SUPERCLASSES = {
     'Sized',
 }
@@ -201,15 +269,30 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'nagini_contracts.contracts',
                    'nagini_contracts.io',
                    'nagini_contracts.obligations',
+                   'nagini_contracts.thread',
                    'sys',
                    'types',
                    'typing',
                    }
+
+IGNORED_MODULE_NAMES = {
+    '_importlib_modulespec': [],
+    'abc': [],
+    'builtins': [],
+    'nagini_contracts': [],
+    'nagini_contracts.contracts': [],
+    'nagini_contracts.io': [],
+    'nagini_contracts.obligations': ['BaseLock'],
+    'sys': [],
+    'types': [],
+    'typing': [],
+}
 
 OPERATOR_FUNCTIONS = {
     ast.Add: '__add__',
     ast.Sub: '__sub__',
     ast.Mult: '__mul__',
     ast.FloorDiv: '__floordiv__',
+    ast.Div: '__div__',
     ast.Mod: '__mod__',
 }

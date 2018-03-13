@@ -1,0 +1,45 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Domain that contains functions for encoding and combining names (represented as
+ * integers). Used for checking definedness of global names.
+ */
+
+domain _Name {
+    function _combine(n1: _Name, n2: _Name): _Name
+    function _single(n: Int): _Name
+
+    function _get_combined_prefix(n: _Name): _Name
+    function _get_combined_name(n: _Name): _Name
+    function _get_value(n: _Name): Int
+    function _is_single(n: _Name): Bool
+
+    axiom all_single_or_combined {
+        forall n: _Name :: n == _single(_get_value(n)) || n == _combine(_get_combined_prefix(n), _get_combined_name(n))
+    }
+
+    axiom single_is_single {
+        forall i: Int :: {_single(i)} _is_single(_single(i))
+    }
+
+    axiom combined_is_not_single {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} !_is_single(_combine(n1, n2))
+    }
+
+    axiom decompose_single {
+        forall i: Int :: {_single(i)} _get_value(_single(i)) == i
+    }
+
+    axiom decompose_combined_prefix {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_prefix(_combine(n1, n2)) == n1
+    }
+
+    axiom decompose_combined_name {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)} _get_combined_name(_combine(n1, n2)) == n2
+    }
+
+}

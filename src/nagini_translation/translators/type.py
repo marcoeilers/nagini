@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_translation.lib.constants import (
@@ -9,6 +15,7 @@ from nagini_translation.lib.program_nodes import (
     PythonIOOperation,
     PythonMethod,
     PythonType,
+    SilverType,
 )
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.resolver import get_type as do_get_type
@@ -43,7 +50,9 @@ class TypeTranslator(CommonTranslator):
         """
         Translates the given type to the corresponding Viper type (Int, Ref, ..)
         """
-        if cls.name == CALLABLE_TYPE:
+        if isinstance(cls, SilverType):
+            return cls.type
+        elif cls.name == CALLABLE_TYPE:
             return self.viper.function_domain_type()
         elif cls.name in PRIMITIVES:
             cls = cls.try_box()
@@ -68,10 +77,7 @@ class TypeTranslator(CommonTranslator):
         else:
             # Assume module
             containers.extend(container.get_included_modules())
-        result = do_get_type(node, containers, container)
-        if result:
-            result = result.try_box()
-        return result
+        return do_get_type(node, containers, container)
 
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position',

@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 import astunparse
 
@@ -335,3 +341,31 @@ def is_get_ghost_output(node: ast.Assign) -> bool:
     return (isinstance(node.value, ast.Call) and
             isinstance(node.value.func, ast.Name) and
             node.value.func.id == 'GetGhostOutput')
+
+
+class OldExpressionCollector(ast.NodeVisitor):
+    """A visitor that collects all expressions inside Old()-calls."""
+    def __init__(self):
+        self.expressions = []
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if isinstance(node.func, ast.Name) and node.func.id == 'Old':
+            assert len(node.args) == 1
+            self.expressions.append(node.args[0])
+
+
+class OldExpressionTransformer(ast.NodeTransformer):
+    """
+    A visitor that replaces references to specific names by calls to arg(i), where
+    i is the index of the name (given in self.arg_names).
+    """
+    def __init__(self):
+        self.arg_names = []
+
+    def visit_Name(self, node: ast.Name):
+        if node.id in self.arg_names:
+            index = self.arg_names.index(node.id)
+            return ast.Call(func=ast.Name(id='arg', ctx=ast.Load()),
+                            args=[ast.Num(n=index)],
+                            keywords=[])
+        return node

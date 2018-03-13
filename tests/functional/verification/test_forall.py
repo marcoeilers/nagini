@@ -3,13 +3,13 @@ from nagini_contracts.contracts import *
 
 def test_range() -> None:
     r = range(3, 6)
-    Assert(Forall(r, lambda i: (i > 1, [])))
+    Assert(Forall(r, lambda i: i > 1))
 
 
 def test_range_2() -> None:
     r = range(3, 6)
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(Forall(r, lambda i: (i > 4, [])))
+    Assert(Forall(r, lambda i: i > 4))
 
 
 def test_list() -> None:

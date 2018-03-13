@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import abc
 import ast
 
@@ -11,6 +17,7 @@ from nagini_translation.lib.constants import (
     END_LABEL,
     ERROR_NAME,
     INTERNAL_NAMES,
+    MODULE_VARS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
@@ -20,7 +27,7 @@ from nagini_translation.lib.constants import (
     VIPER_KEYWORDS,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
-from nagini_translation.lib.typedefs import Expr
+from nagini_translation.lib.typedefs import Expr, Stmt
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
@@ -31,6 +38,7 @@ from nagini_translation.lib.views import (
     IOOperationContentDict,
 )
 from typing import Any, Dict, List, Optional, Set, Tuple
+from toposort import toposort_flatten
 
 
 class ContainerInterface(metaclass=ABCMeta):
@@ -55,6 +63,7 @@ class PythonScope:
     def __init__(self, sil_names: Set[str], superscope: 'PythonScope'):
         self.sil_names = sil_names
         self.superscope = superscope
+        self._module = None
 
     def contains_name(self, name: str) -> bool:
         if self.sil_names is not None:
@@ -91,17 +100,33 @@ class PythonScope:
 
     @property
     def module(self) -> 'PythonModule':
+        if self._module is not None:
+            return self._module
         if self.superscope is not None:
             return self.superscope.module
         else:
             return self
 
 
-class PythonModule(PythonScope, ContainerInterface):
+class PythonStatementContainer:
+    """
+    Class to be mixed into any node that contains executable statements (currently methods
+    and modules). Stores the analyzer information related to those statements.
+    """
+    def __init__(self):
+        self.labels = [END_LABEL]
+        self.precondition = []
+        self.postcondition = []
+        self.try_blocks = []  # direct
+        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
+
+
+class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
     def __init__(self, types: TypeInfo,
                  node_factory: 'ProgramNodeFactory',
                  type_prefix: str,
                  global_module: 'PythonModule',
+                 node: ast.Module,
                  sil_names: Set[str] = None,
                  file: str = None) -> None:
         """
@@ -115,7 +140,9 @@ class PythonModule(PythonScope, ContainerInterface):
         if sil_names is None:
             sil_names = set(VIPER_KEYWORDS + INTERNAL_NAMES)
             sil_names |= set([RESULT_NAME, ERROR_NAME, END_LABEL])
-        super().__init__(sil_names, None)
+        PythonScope.__init__(self, sil_names, None)
+        PythonStatementContainer.__init__(self)
+        self.node = node
         self.classes = OrderedDict()
         self.functions = OrderedDict()
         self.methods = OrderedDict()
@@ -131,13 +158,30 @@ class PythonModule(PythonScope, ContainerInterface):
         self.types = types
         self.type_vars = OrderedDict()
         self.file = file
+        self.defined_var = None
+        self.names_var = None
+        if global_module and type_prefix != '__main__':
+            self.add_builtin_vars()
+
+    def add_builtin_vars(self) -> None:
+        """
+        Adds builtin variables that are defined in every module.
+        """
+        file_var = PythonGlobalVar('__file__', None,
+                                   self.global_module.classes[STRING_TYPE], self)
+        self.global_vars['__file__'] = file_var
+        name_var = PythonGlobalVar('__name__', None,
+                                   self.global_module.classes[STRING_TYPE], self)
+        self.global_vars['__name__'] = name_var
+
 
     def process(self, translator: 'Translator') -> None:
-        if self.type_prefix:
-            # If this is not the global module, add a __file__ variable
-            file_var = PythonGlobalVar('__file__', None,
-                                       self.global_module.classes[STRING_TYPE])
-            self.global_vars['__file__'] = file_var
+        self.sil_name = self.get_fresh_name('module')
+        defined_var_name = self.get_fresh_name('module_defined')
+        self.defined_var = defined_var_name
+        names_var_name = self.get_fresh_name('module_names')
+        self.names_var = names_var_name
+
         for name, cls in self.classes.items():
             if name == cls.name:
                 # if this is not a type alias
@@ -187,7 +231,7 @@ class PythonModule(PythonScope, ContainerInterface):
             module_result = module.get_type(prefixes, name)
             if module_result is not None:
                 return module_result
-        return None
+        return None, None
 
     def get_func_type(self, path: List[str], callable=False):
         """
@@ -207,12 +251,19 @@ class PythonModule(PythonScope, ContainerInterface):
                 return module_result
         return None
 
-    def get_included_modules(
-            self, include_global: bool = True) -> List['PythonModule']:
+    def get_included_modules(self, exclude: Set['PythonModule'] = (),
+                             include_global: bool = True) -> List['PythonModule']:
+        """
+        Returns a list of modules whose contents are (transitively) available in the this
+        module, optionally including the global module, but excluding the modules in the
+        given set (to prevent infinite recursion in case of cyclic imports).
+        """
         result = [self]
         for p in self.from_imports:
-            result.extend(p.get_included_modules(include_global=False))
-        result.append(self.global_module)
+            result.extend(p.get_included_modules(exclude + (self,),
+                                                 include_global=False))
+        if include_global:
+            result.append(self.global_module)
         return result
 
     def get_contents(self, only_top: bool) -> Dict:
@@ -254,6 +305,16 @@ class PythonType(metaclass=ABCMeta):
         """
         # By default, just return self. Subclasses can override.
         return self
+
+
+class SilverType(PythonType):
+    """
+    Wrapper around a Silver type. Only used for creating local variables with types not
+    present in Python.
+    """
+    def __init__(self, type, module):
+        self.type = type
+        self.module = module
 
 
 class TypeVar(PythonType, ContainerInterface):
@@ -301,8 +362,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
+        self.direct_subclasses = []
         self.node_factory = node_factory
         self.superclass = superclass
+        if superclass:
+            superclass.direct_subclasses.append(self)
         self.functions = OrderedDict()
         self.methods = OrderedDict()
         self.static_methods = OrderedDict()
@@ -314,6 +378,28 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
+        self.definition_deps = set()
+
+    @property
+    def all_subclasses(self) -> List['PythonClass']:
+        """
+        Returns all direct or indirect subclasses of this class.
+        """
+        res = [self]
+        for sub in self.direct_subclasses:
+            res.extend(sub.all_subclasses)
+        return res
+
+    @property
+    def call_deps(self):
+        """
+        Returns the dependencies which need to be defined when calling this class, i.e.,
+        its constructor.
+        """
+        constructor = self.get_method('__init__')
+        if constructor:
+            return constructor.call_deps
+        return set()
 
     @property
     def all_methods(self) -> Set[str]:
@@ -331,6 +417,22 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
+    def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
+        """
+        Checks if types are either the same or, if one of them is an union, checks
+        if the other type belongs to the set of types in the union. Finally, if
+        both types are unions, this function returns true if they have elements
+        in common.
+        """
+        if not isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
+            return type_a in type_b.get_types()
+        elif not isinstance(type_b, UnionType) and isinstance(type_a, UnionType):
+            return type_b in type_a.get_types()
+        elif isinstance(type_a, UnionType) and isinstance(type_b, UnionType):
+            return len(type_a.get_types() & type_b.get_types()) > 0
+        else:
+            return type_a == type_b
+
     def add_field(self, name: str, node: ast.AST,
                   type: 'PythonType') -> 'PythonField':
         """
@@ -339,10 +441,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert field.type == type
+            assert self.types_match(field.type, type)
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert field.type == type
+            assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -696,6 +798,21 @@ class UnionType(GenericType):
     def python_class(self) -> PythonClass:
         return self.cls
 
+    def get_types(self) -> Set[PythonClass]:
+        """
+        Returns a flattened set of types contained in Union
+        """
+        result = set()
+        for type in self.type_args:
+            if not isinstance(type, UnionType):
+                if type is None:
+                    result.add(None)
+                else:
+                    result.add(type.python_class)
+            else:
+                result |= type.get_types()
+        return result
+
 
 class OptionalType(UnionType):
     """
@@ -713,6 +830,15 @@ class OptionalType(UnionType):
     def cls(self):
         return self.optional_type
 
+    def get_types(self) -> Set[PythonClass]:
+        """
+        Returns a flattened set of types contained in Optional
+        """
+        if isinstance(self.optional_type, UnionType):
+            return {None} | self.optional_type.get_types()
+        else:
+            return {None} | {self.optional_type}
+
 
 class MethodType(Enum):
     normal = 0
@@ -720,7 +846,34 @@ class MethodType(Enum):
     class_method = 2
 
 
-class PythonMethod(PythonNode, PythonScope, ContainerInterface):
+def add_all_call_deps(call_deps: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                      res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                      prefix: Tuple[PythonNode, ...]=()) -> None:
+    """
+    Adds all dependencies represented by call_deps to the given set.
+    The set will contain tuples of length at least 3, where the first element is
+    the Python AST node representing the access, the second the PythonNode accessed,
+    the third the PythonModule in which the first name needs to be defined.
+    All further elements are PythonNodes which represent conditions, i.e., the name
+    needs to be defined in the module IF all the conditional PythonNodes have been
+    defined in their respective modules.
+    """
+    for dep in call_deps:
+        if dep not in res:
+            c_prefix = prefix
+            if len(dep) > 3:
+                # this is a conditional dependency; its dependencies are to be in-
+                # cluded under this condition.
+                c_prefix = prefix + dep[3:]
+            else:
+                # this is a direct dependency, add it to the result
+                res.add(dep + c_prefix)
+
+            if hasattr(dep[1], 'add_all_call_deps'):
+                dep[1].add_all_call_deps(res, c_prefix)
+
+
+class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementContainer):
     """
     Represents a Python function which may be pure or impure, belong
     to a class or not
@@ -744,12 +897,14 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
+        PythonStatementContainer.__init__(self)
         if cls is not None:
             if not isinstance(cls, PythonClass):
                 raise Exception(cls)
         self.cls = cls
         self.overrides = None  # infer
         self._locals = OrderedDict()  # direct
+        self.globals = set()
         self._args = OrderedDict()  # direct
         self._special_vars = OrderedDict()  # direct
         self._io_existential_vars = OrderedDict()
@@ -757,29 +912,33 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface):
         self.var_arg = None   # direct
         self.kw_arg = None  # direct
         self.type = None  # infer
-        self.callable_type: PythonType = None
+        self.callable_type = None  # type: PythonType
         self.generic_type = -1
         self.result = None  # infer
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
-        self.precondition = []
-        self.postcondition = []
-        self.try_blocks = []  # direct
         self.pure = pure
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
         self.interface_dict = interface_dict
         self.node_factory = node_factory
-        self.labels = [END_LABEL]
         self.method_type = method_type
         self.obligation_info = None
-        self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
         self.requires = []
         self.type_vars = OrderedDict()
         self.setter = None
         self.func_constant = None
-        self.call_slot_proofs: Dict[ast.FunctionDef, CallSlotProof] = {}
+        self.call_slot_proofs = {}  # type: Dict[ast.FunctionDef, CallSlotProof]
+        self.definition_deps = set()
+        self.call_deps = set()
+
+    def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                          prefix: Tuple[PythonNode, ...]=()) -> None:
+        """
+        Adds all dependencies needed when this method is called to the given set.
+        """
+        add_all_call_deps(self.call_deps, res, prefix)
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -960,6 +1119,12 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self._body = None
         self._io_existentials = None
         self.func_args = []
+        self.definition_deps = set()
+        self.call_deps = set()
+
+    def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
+                          prefix: Tuple[PythonNode, ...]=()) -> None:
+        add_all_call_deps(self.call_deps, res, prefix)
 
     @property
     def is_builtin(self) -> bool:
@@ -1171,7 +1336,7 @@ class PythonTryBlock(PythonNode):
 
     def __init__(self, node: ast.AST, try_name: str,
                  node_factory: 'ProgramNodeFactory',
-                 method: PythonMethod,
+                 method: PythonStatementContainer,
                  protected_region: ast.AST):
         """
         :param node_factory: Factory to create PythonVar objects.
@@ -1211,7 +1376,8 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      int_type)
         result.process(sil_name, translator)
-        self.method.locals[sil_name] = result
+        if isinstance(self.method, PythonMethod):
+            self.method.locals[sil_name] = result
         self.finally_var = result
         return result
 
@@ -1227,7 +1393,8 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
-        self.method.locals[sil_name] = result
+        if isinstance(self.method, PythonMethod):
+            self.method.locals[sil_name] = result
         self.error_var = result
         return result
 
@@ -1312,11 +1479,20 @@ class PythonGlobalVar(PythonVarBase):
     Represents a global variable in Python.
     """
 
-    def __init__(self, name: str, node: ast.AST, type: PythonClass,
+    def __init__(self, name: str, node: ast.AST, type: PythonClass, module: PythonModule,
                  cls: PythonClass = None):
         super().__init__(name, node, type)
+        self.module = module
         self.cls = cls
         self.overrides = None
+
+    @property
+    def is_final(self) -> bool:
+        """
+        A variable is final if it is written to only once (globally). Built-in module
+        variables like __name__ are not considered final.
+        """
+        return len(self.writes) <= 1 and self.name not in MODULE_VARS
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         super().process(sil_name, translator)
@@ -1521,14 +1697,14 @@ class ProgramNodeFactory:
         return PythonVar(name, node, type_)
 
     def create_python_global_var(
-            self, name: str, node: ast.AST,
-            type_: PythonClass) -> PythonGlobalVar:
-        return PythonGlobalVar(name, node, type_)
+            self, name: str, node: ast.AST, type_: PythonClass,
+            module: PythonModule) -> PythonGlobalVar:
+        return PythonGlobalVar(name, node, type_, module)
 
     def create_static_field(
-            self, name: str, node: ast.AST, type_: PythonClass,
+            self, name: str, node: ast.AST, type_: PythonClass, module: PythonModule,
             cls: PythonClass) -> PythonGlobalVar:
-        return PythonGlobalVar(name, node, type_, cls)
+        return PythonGlobalVar(name, node, type_, module, cls)
 
     def create_python_io_existential_var(
             self, name: str, node: ast.AST,
@@ -1628,7 +1804,7 @@ class CallSlotBase(PythonMethod):
         self.uq_variables = OrderedDict()  # type: Dict[str, PythonVar]
         # NOTE: currently we only support one single return variable
         self.return_variables = None  # type: List[ast.Name]
-        self.body: List[ast.stmt] = None
+        self.body = None  # type: List[ast.stmt]
 
 
 class CallSlot(CallSlotBase):
@@ -1650,7 +1826,7 @@ class CallSlot(CallSlotBase):
         )
 
         self.call = None  # type: ast.Call
-        self.sil_application_name: str = None
+        self.sil_application_name = None  # type: str
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1724,4 +1900,45 @@ class CallSlotProof(CallSlotBase):
         )
 
         self.call_slot_instantiation = call_slot_instantiation
-        self.old_label: str = old_label
+        self.old_label = old_label  # type: str
+
+
+def toposort_classes(class_set: Set[PythonClass]) -> List[PythonClass]:
+    """
+    Topological sorting of classes in a set, ensuring that derived classes
+    precede their base classes in the returned list
+    """
+    map = {}
+
+    for type in class_set:
+        map[type] = set(type.all_subclasses) & class_set
+
+    return list(toposort_flatten(map, False))
+
+def chain_if_stmts(guarded_blocks: List[Tuple[Expr, Stmt]],
+                   viper, position, info, ctx) -> Stmt:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    block and produces an equivalent chain of if statements.
+    """
+    assert(guarded_blocks)
+    guard, then_block = guarded_blocks[0]
+    if len(guarded_blocks) == 1:
+        else_block = viper.Seqn([], position, info) # Empty block
+    else:
+        else_block = chain_if_stmts(guarded_blocks[1:], viper, position, info, ctx)
+    return viper.If(guard, then_block, else_block, position, info)
+
+def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
+                   viper, position, info, ctx) -> Expr:
+    """
+    Receives a list of tuples each one containing a guard and a guarded
+    expression and produces an equivalent chain of conditional expressions.
+    """
+    assert(len(guarded_expr) >= 2)
+    guard, then_exp = guarded_expr[0]
+    if len(guarded_expr) == 2:
+        _, else_exp = guarded_expr[1]
+    else:
+        else_exp = chain_cond_exp(guarded_expr[1:], viper, position, info, ctx)
+    return viper.CondExp(guard, then_exp, else_exp, position, info)

@@ -4,12 +4,35 @@ from nagini_contracts.contracts import *
 class Super:
     pass
 
+
 def test_constr() -> None:
     super1 = Super()
     super2 = Super()
     super3 = Super()
     super_list = [super1, super2, super3]
     empty_list = [] # type: List[Super]
+
+
+def test_alternate_constr() -> None:
+    a = list()  # type: List[int]
+    assert len(a) == 0
+    assert 6 not in a
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert 2 in a
+
+
+def test_constr_arg() -> None:
+    l1 = [1,2,3]
+    l2 = list(l1)
+    assert 2 in l2
+    assert l2[2] == 3
+    l1[0] = 5
+    assert l2[0] == 1
+    l2[1] = 7
+    assert l1[1] == 2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert 8 in l2
+
 
 def test_len() -> None:
     super1 = Super()

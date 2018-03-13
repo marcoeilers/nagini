@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from typing import (
     Any,
     Callable,
@@ -8,8 +14,8 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
-    Type,
     TypeVar,
+    Union,
 )
 
 
@@ -20,8 +26,9 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'ToSeq', 'MaySet',
-                  'MayCreate', 'CallSlot', 'CallSlotProof',
-                  'UniversallyQuantified', 'ClosureCall', ]
+                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
+                  'MayStart', 'CallSlot', 'CallSlotProof',
+                  'UniversallyQuantified', 'ClosureCall',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -79,7 +86,7 @@ def Implies(p: bool, q: bool) -> bool:
 
 
 def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Tuple[bool, List[List[Any]]]]) -> bool:
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """
@@ -311,7 +318,7 @@ def ClosureCall(call: T, justification: Any) -> T:
     pass
 
 
-def list_pred(l: List[T]) -> bool:
+def list_pred(l: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a list. To be used like normal predicates, except it does not need to
@@ -320,7 +327,7 @@ def list_pred(l: List[T]) -> bool:
     pass
 
 
-def set_pred(s: Set[T]) -> bool:
+def set_pred(s: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a set. To be used like normal predicates, except it does not need to
@@ -329,7 +336,7 @@ def set_pred(s: Set[T]) -> bool:
     pass
 
 
-def dict_pred(d: Dict[T, V]) -> bool:
+def dict_pred(d: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
     to a dict. To be used like normal predicates, except it does not need to

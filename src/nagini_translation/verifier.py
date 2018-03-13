@@ -1,6 +1,13 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from abc import ABCMeta
+from collections import OrderedDict
 from enum import Enum
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
@@ -44,8 +51,11 @@ class Failure(VerificationResult):
 
     def to_string(self, ide_mode: bool) -> str:
         all_errors = [error.string(ide_mode) for error in self.errors]
-        return "Verification failed\nErrors:\n" + '\n'.join(
-            all_errors)
+        unique_errors = []
+        for e in all_errors:
+            if e not in unique_errors:
+                unique_errors.append(e)
+        return "Verification failed\nErrors:\n" + '\n'.join(unique_errors)
 
 
 class Silicon:

@@ -1,6 +1,16 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 """Functions and classes needed for writing obligation related contracts."""
 
 # pragma pylint: disable=invalid-name,unused-argument
+
+
+from typing import Union
+from nagini_contracts.thread import Thread
 
 
 OBLIGATION_CONTRACT_FUNCS = [
@@ -26,8 +36,8 @@ def WaitLevel() -> LevelType:
     """The wait level of the current thread."""
 
 
-def Level(l: BaseLock) -> LevelType:
-    """Level of the given lock."""
+def Level(l: Union[BaseLock, Thread]) -> LevelType:
+    """Level of the given lock or thread."""
 
 
 def MustRelease(lock: BaseLock, measure: int = None) -> bool:

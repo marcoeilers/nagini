@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import argparse
 import inspect
 import json
@@ -42,7 +48,8 @@ def parse_sil_file(sil_path: str, jvm):
     with open(sil_path, 'r') as file:
         text = file.read()
     path = jvm.java.nio.file.Paths.get(sil_path, [])
-    parsed = parser.parse(text, path)
+    none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
+    parsed = parser.parse(text, path, none)
     assert (isinstance(parsed, getattr(jvm.fastparse.core,
                                        'Parsed$Success')))
     parse_result = parsed.value()
@@ -59,16 +66,12 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-sil_programs = []
-
-
 def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
     if sif:
         resources_path = os.path.join(current_path, 'sif/resources')
-    sil_programs.append(parse_sil_file(
-        os.path.join(resources_path, 'all.sil'), jvm))
+    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
@@ -80,34 +83,31 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    builtins = []
-    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
-        sil_interface = [file.read()]
 
-    modules = [path] + builtins
     viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
-    type_correct = types.check(os.path.abspath(path))
+    type_correct = types.check(path)
     if not type_correct:
         return None
+
     if sif:
         analyzer = SIFAnalyzer(types, path, selected)
     else:
         analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    for si in sil_interface:
-        analyzer.add_native_silver_builtins(json.loads(si))
+    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
+        analyzer.add_native_silver_builtins(json.loads(file.read()))
 
+    main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
         translator = SIFTranslator(jvm, path, types, viperast)
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
-    global sil_programs
-    if not sil_programs or reload_resources:
-        sil_programs = []
-        load_sil_files(jvm, sif)
+    if 'sil_programs' not in globals() or reload_resources:
+        global sil_programs
+        sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected)
     return prog
@@ -118,21 +118,14 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
     Starting from the main module, finds all imports and sets up all modules
     for them.
     """
-    main_module = analyzer.module
     analyzer.module_index = 0
     analyzer.collect_imports(path)
 
-    for module in analyzer.module_paths:
-        if module.startswith('mod$'):
-            continue
-        if module != os.path.abspath(path):
-            analyzer.contract_only = True
-            analyzer.module = analyzer.modules[module]
-            analyzer.visit_module(module)
-        else:
-            analyzer.module = main_module
-            analyzer.contract_only = False
-            analyzer.visit_module(module)
+    analyzer.analyze()
+
+    # Carry out all tasks that were deferred to the end of the analysis.
+    for task in analyzer.deferred_tasks:
+        task()
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
@@ -259,7 +252,8 @@ def main() -> None:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
-        load_sil_files(jvm, args.sif)
+        global sil_programs
+        sil_programs = load_sil_files(jvm, args.sif)
 
         while True:
             file = socket.recv_string()

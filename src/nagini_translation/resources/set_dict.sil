@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 field set_acc : Set[Ref]
 
 method set___init__() returns (res: Ref)
@@ -46,6 +52,17 @@ method set_add(self: Ref, item: Ref) returns ()
     requires issubtype(typeof(item), set_arg(typeof(self), 0))
     ensures acc(self.set_acc)
     ensures self.set_acc == old(self.set_acc) union Set(item)
+{
+    assume false
+}
+
+method set_remove(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(item), set_arg(typeof(self), 0))
+    requires item in self.set_acc
+    ensures acc(self.set_acc)
+    ensures self.set_acc == old(self.set_acc) setminus Set(item)
 {
     assume false
 }

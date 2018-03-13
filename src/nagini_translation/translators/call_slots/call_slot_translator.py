@@ -249,8 +249,8 @@ class CallSlotTranslator(CommonTranslator):
             result_var = ctx.current_function.create_variable(
                 target.name + '_res', target.type, self.translator).ref()
 
-        stmts: List[Stmt] = []
-        arg_exprs: List[Expr] = []
+        stmts = []  # type: List[Stmt]
+        arg_exprs = []  # type: List[Expr]
 
         for arg in args:
             expr = self._translate_pure_expr(arg, ctx)
@@ -272,7 +272,7 @@ class CallSlotTranslator(CommonTranslator):
 
     def _application_static_dispatch(self, call: ast.Call, justification: ast.Name, ctx: Context) -> StmtsAndExpr:
 
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
         position = self.to_position(call, ctx)
         info = self.no_info(ctx)
         target = self.get_target(justification, ctx)
@@ -346,7 +346,7 @@ class CallSlotTranslator(CommonTranslator):
         vars = proof.get_args()
         values = proof.call_slot_instantiation.args
 
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
 
         assert len(vars) == len(values)
         for var, value in zip(vars, values):
@@ -410,7 +410,7 @@ class CallSlotTranslator(CommonTranslator):
             '__proof_' + var.name, var.type, self.config.translator
         )
 
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
         position = self.to_position(val, ctx)
         info = self.no_info(ctx)
         stmts.append(self.set_var_defined(
@@ -464,7 +464,7 @@ class CallSlotTranslator(CommonTranslator):
         ctx: Context
     ) -> List[Stmt]:
 
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
         position = self.to_position(proof.node, ctx)
         info = self.no_info(ctx)
 
@@ -518,7 +518,7 @@ class CallSlotTranslator(CommonTranslator):
         return stmts
 
     def _proof_introduce_uq_ret_vars(self, proof: CallSlotProof, ctx: Context) -> List[Stmt]:
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
 
         for var in proof.uq_variables.values():
             proof_var = ctx.current_function.create_variable(
@@ -582,7 +582,7 @@ class CallSlotTranslator(CommonTranslator):
         ctx: Context
     ) -> List[Stmt]:
 
-        viper_stmts: List[Stmt] = []
+        viper_stmts = []  # type: List[Stmt]
 
         for stmt in body:
 
@@ -653,7 +653,7 @@ class CallSlotTranslator(CommonTranslator):
         ctx: Context
     ) -> List[Stmt]:
 
-        stmts: List[Stmt] = []
+        stmts = []  # type: List[Stmt]
 
         for arg_call, arg_slot in zip(stmt.value.args[0].args, call_slot.call.args):
             stmts.append(self._application_call_slot_arg_match(

@@ -1,9 +1,16 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 from contextlib import contextmanager
 from nagini_translation.lib.constants import ERROR_NAME, RESULT_NAME
 from nagini_translation.lib.io_context import IOOpenContext
 from nagini_translation.lib.obligation_context import ObligationContext
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
+    PythonType,
     PythonVar,
     PythonVarBase,
     CallSlotProof,
@@ -37,7 +44,12 @@ class Context:
         self._current_alias_context = []
         self.bound_type_vars = {}
         self._global_counter = 0
-        self.current_call_slot_proof: CallSlotProof = None
+        self.current_call_slot_proof = None  # type: CallSlotProof
+        self.perm_factor = None     # If this is set, all translated permission amounts
+                                    # are multiplied by this factor.
+        self._old_aliases = {}      # Keys are pretty-printed Python expressions,
+                                    # values are Silver expressions they should be
+                                    # translated to.
 
     def get_fresh_int(self) -> int:
         """
@@ -164,6 +176,16 @@ class Context:
         elif name in self.var_aliases:
             del self.var_aliases[name]
 
+    def set_old_expr_alias(self, key: str, val: Expr) -> None:
+        self._old_aliases[key] = val
+
+    def clear_old_expr_aliases(self) -> None:
+        self._old_aliases.clear()
+
+    @property
+    def old_expr_aliases(self):
+        return self._old_aliases
+
     def get_contents(self, only_top: bool) -> Dict:
         """
         Returns the elements that can be accessed from this container (to be
@@ -171,3 +193,4 @@ class Context:
         elements that can be accessed without a receiver.
         """
         return self.var_aliases
+

@@ -1,4 +1,10 @@
 """
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
+"""
 Monkey-patches the mypy parser to add column information to the mypy AST.
 More precisely, we monkey-patch the transformer that takes the normal
 Python AST and turns it into a mypy AST to add, for every node, the column

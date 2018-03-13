@@ -1,11 +1,11 @@
 from nagini_contracts.contracts import *
 
-x = 4
 
-#:: ExpectedOutput(invalid.program:multiple.definitions)
-x = 5
-
-def bla() -> None:
+def bla(x: int) -> None:
     Requires(True)
     Ensures(x == 5)
-    pass
+
+
+#:: ExpectedOutput(type.error:Name 'bla' already defined)
+def bla(u: int, b: str) -> None:
+    return

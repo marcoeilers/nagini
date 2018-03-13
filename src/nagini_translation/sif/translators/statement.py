@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_translation.lib.program_nodes import PythonMethod
@@ -156,7 +162,7 @@ class SIFStatementTranslator(StatementTranslator):
                 invariants.append(invariant)
 
         start, end = get_body_indices(node.body)
-        var_types = self._get_havoced_var_type_info(node.body[start:end], ctx)
+        var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         invariants = var_types + invariants
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in
                         node.body[start:end]])
@@ -168,17 +174,17 @@ class SIFStatementTranslator(StatementTranslator):
         res = tl_stmts + loop_stmts
         return res
 
-    def _get_havoced_var_type_info(self, nodes: List[ast.AST],
+    def _get_havocked_var_type_info(self, nodes: List[ast.AST],
                                    ctx: SIFContext) -> List[Expr]:
         """
         Creates a list of assertions containing type information for all local
         variables written to within the given partial ASTs which already
         existed before.
         To be used to remember type information about arguments/local variables
-        which are assigned to in loops and therefore havoced.
+        which are assigned to in loops and therefore havocked.
         """
         result = []
-        vars = self._get_havoced_vars(nodes, ctx)
+        vars = self._get_havocked_vars(nodes, ctx)
         for var in vars:
             result.append(self.type_check(var.ref(), var.type,
                                           self.no_position(ctx), ctx))

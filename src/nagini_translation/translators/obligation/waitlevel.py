@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 """Wait-level translator."""
 
 
@@ -101,7 +107,7 @@ class WaitLevelTranslator(CommonTranslator):
             oper(self.create_level_call(sil.RefVar(var)), expr))
         return sil.BigAnd([for_perm, oper(residue_level_var, expr)])
 
-    def _create_level_below(
+    def create_level_below(
             self, expr: sil.PermExpression,
             residue_level_var: sil.PermExpression,
             ctx: Context) -> sil.BoolExpression:
@@ -131,7 +137,7 @@ class WaitLevelTranslator(CommonTranslator):
             sil.TrueLit(),
             sil.Implies(
                 guard,
-                self._create_level_below(
+                self.create_level_below(
                     expr,
                     sil.PermVar(level),
                     ctx)))

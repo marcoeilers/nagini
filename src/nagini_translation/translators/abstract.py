@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from abc import ABCMeta
@@ -6,8 +12,10 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonClass,
     PythonExceptionHandler,
+    PythonGlobalVar,
     PythonIOOperation,
     PythonMethod,
+    PythonModule,
     PythonTryBlock,
     PythonType,
     PythonVar,
@@ -60,7 +68,7 @@ class TranslatorConfig:
 class AbstractTranslator(metaclass=ABCMeta):
     """
     Abstract class which all specialized translators extend. Provides a number
-    of interface methods through which spcialized translators can interact, and
+    of interface methods through which specialized translators can interact, and
     forwards calls to those methods to the respective translators.
     """
 
@@ -80,9 +88,10 @@ class AbstractTranslator(metaclass=ABCMeta):
 
     def translate_expr(self, node: ast.AST, ctx: Context,
                        target_type: object = None,
-                       impure: bool = False) -> StmtsAndExpr:
+                       impure: bool = False,
+                       as_read: bool = False) -> StmtsAndExpr:
         return self.config.expr_translator.translate_expr(
-            node, ctx, target_type, impure)
+            node, ctx, target_type, impure, as_read)
 
     def translate_stmt(self, node: ast.AST, ctx: Context) -> List[Stmt]:
         return self.config.stmt_translator.translate_stmt(node, ctx)
@@ -117,6 +126,17 @@ class AbstractTranslator(metaclass=ABCMeta):
                             ctx: Context) -> 'ast.silver.Predicate':
         return self.config.pred_translator.translate_predicate(pred, ctx)
 
+    def translate_static_field_access(self, field: PythonGlobalVar,
+                                      receiver: Union[Expr, PythonType],
+                                      node, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_static_field_access(field, receiver,
+                                                                         node, ctx)
+
+    def translate_global_var_reference(self, target: PythonGlobalVar, node: ast.AST,
+                                       ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_global_var_reference(target, node,
+                                                                          ctx)
+
     def translate_io_operation(
             self,
             operation: PythonIOOperation,
@@ -133,6 +153,10 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         return self.config.method_translator.translate_method(method, ctx)
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> 'silver.ast.Method':
+        return self.config.method_translator.translate_main_method(modules, ctx)
 
     def translate_function(self, func: PythonMethod,
                            ctx: Context) -> 'silver.ast.Function':
@@ -285,6 +309,13 @@ class AbstractTranslator(metaclass=ABCMeta):
             ctx, methodname, args, targets, position, info, target_method,
             target_node)
 
+    def create_method_fork(self, ctx: Context, targets, thread: Expr,
+                           position: Position, info: Info,
+                           target_node: ast.Call = None) -> List[Stmt]:
+        translator = self.config.obligation_translator
+        return translator.create_method_fork(ctx, targets, thread, position, info,
+                                             target_node)
+
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], ctx: Context,
             err_var: PythonVar = None) -> None:
@@ -325,6 +356,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                      node: ast.AST, ctx: Context) -> Expr:
         return self.config.expr_translator.create_tuple(vals, val_types, node,
                                                         ctx)
+
+    def translate_string(self, s: str, node: ast.AST, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_string(s, node, ctx)
 
     def translate_args(self, target: PythonMethod, arg_nodes: List,
                        keywords: List, node: ast.AST, ctx: Context,

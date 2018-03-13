@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 """Conversion rules from Silver level errors to Nagini errors."""
 
 
@@ -61,6 +67,46 @@ LOCAL_VARIABLE_NOT_DEFINED = {
     ('application.precondition', 'assertion.false'):
         ('expression.undefined', 'undefined.local.variable')
 }
+GLOBAL_NAME_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'undefined.global.name')
+}
+DEPENDENCIES_NOT_DEFINED = {
+    ('application.precondition', 'assertion.false'):
+        ('expression.undefined', 'missing.dependencies')
+}
+THREAD_CREATION_ARG_TYPE = {
+    ('assert.failed', 'assertion.false'):
+        ('thread.creation.failed', 'invalid.argument.type')
+}
+THREAD_CREATION_GROUP_NONE = {
+    ('assert.failed', 'assertion.false'):
+        ('thread.creation.failed', 'assertion.false')
+}
+THREAD_START_METHOD_UNLISTED = {
+    ('assert.failed', 'assertion.false'):
+        ('thread.start.failed', 'method.not.listed')
+}
+THREAD_START_PERMISSION = {
+    ('exhale.failed', 'insufficient.permission'):
+        ('thread.start.failed', 'missing.start.permission')
+}
+THREAD_START_PRECONDITION = {
+    ('exhale.failed', 'insufficient.permission'):
+        ('thread.start.failed', 'insufficient.permission'),
+    ('inhale.failed', 'insufficient.permission'):
+        ('thread.start.failed', 'insufficient.permission'),
+    ('exhale.failed', 'assertion.false'):
+        ('thread.start.failed', 'assertion.false')
+}
+THREAD_JOIN_WAITLEVEL = {
+    ('assert.failed', 'assertion.false'):
+        ('thread.join.failed', 'wait.level.invalid')
+}
+THREAD_JOIN_JOINABLE = {
+    ('assert.failed', 'assertion.false'):
+        ('thread.join.failed', 'thread.not.joinable')
+}
 
 __all__ = (
     'Rules',
@@ -76,4 +122,6 @@ __all__ = (
     'OBLIGATION_LOOP_BODY_LEAK_CHECK_FAIL',
     'OBLIGATION_LOOP_MEASURE_NON_POSITIVE',
     'LOCAL_VARIABLE_NOT_DEFINED',
+    'GLOBAL_NAME_NOT_DEFINED',
+    'DEPENDENCIES_NOT_DEFINED',
 )

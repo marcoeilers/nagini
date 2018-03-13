@@ -1,3 +1,9 @@
+"""
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
+
 import ast
 
 from nagini_contracts.contracts import CONTRACT_FUNCS
@@ -41,15 +47,19 @@ from typing import List, Optional
 
 def get_target(node: ast.AST,
                containers: List[ContainerInterface],
-               container: PythonNode) -> Optional[PythonNode]:
+               container: PythonNode, type: bool = False) -> Optional[PythonNode]:
     """
     Finds the PythonNode that the given ``node`` refers to, e.g. a PythonClass
     or a PythonVar, if the immediate container (e.g. a PythonMethod) of the node
     is ``container``, by looking in the given ``containers`` (can be e.g.
     PythonMethods, the Context, PythonModules, etc).
+    If the ``type`` parameter is set, will also consider string literals as potential
+    references.
     """
     if isinstance(node, ast.Name):
         return find_entry(node.id, True, containers)
+    elif type and isinstance(node, ast.Str):
+        return find_entry(node.s, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
@@ -71,9 +81,9 @@ def get_target(node: ast.AST,
         if isinstance(lhs, OptionalType):
             lhs = lhs.optional_type
         if isinstance(lhs, UnionType):
-            # Try to access the member on the common supertype of all union
-            # elements.
-            lhs = lhs.cls
+            # When receiver's type is union, a method call have multiple
+            # targets, therefore None is returned in such cases
+            return None
         if isinstance(lhs, GenericType) and lhs.name == 'type':
             # For direct references to type objects, we want to lookup things
             # defined in the class. So instead of type[C], we want to look in
@@ -110,16 +120,29 @@ def get_target(node: ast.AST,
                 type_class = module.global_module.classes[LIST_TYPE]
             if node.value.id == 'Tuple':
                 type_class = module.global_module.classes[TUPLE_TYPE]
+            if not type_class:
+                possible_class = get_target(node.value, containers, container)
+                if isinstance(possible_class, PythonType):
+                    type_class = possible_class
             if type_class:
-                args = []
+                # Look up the type arguments. Also consider string arguments.
                 if isinstance(node.slice.value, ast.Tuple):
-                    args = [get_target(arg, containers, container)
+                    args = [get_target(arg, containers, container, True)
                             for arg in node.slice.value.elts]
-                elif isinstance(node.slice.value, ast.Name):
-                    args = [get_target(node.slice.value, containers, container)]
                 else:
-                    assert False
+                    args = [get_target(node.slice.value, containers, container, True)]
                 return GenericType(type_class, args)
+            if node.value.id == 'Optional':
+                option = get_target(node.slice.value, containers, container, True)
+                return OptionalType(option)
+            if node.value.id == 'Union':
+                if isinstance(node.slice.value, ast.Tuple):
+                    elts = [get_target(e, containers, container, True)
+                            for e in node.slice.value.elts]
+                    return UnionType(elts)
+                else:
+                    return get_target(node.slice.value, containers, container, True)
+
     else:
         return None
 
@@ -294,7 +317,7 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
     for a dict), returns the type of the collection.
     """
-    if node._parent and isinstance(node._parent, ast.Assign):
+    if hasattr(node, '_parent') and isinstance(node._parent, ast.Assign):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.
@@ -359,6 +382,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return GenericType(list_class, [arg_type])
             elif node.func.id == 'ClosureCall':
                  return get_type(node.args[0], containers, container).type_args[-1]
+            elif node.func.id in ('getArg', 'getOld', 'getMethod'):
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
@@ -376,12 +402,22 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             return target.type
     elif isinstance(node.func, ast.Attribute):
         rectype = get_type(node.func.value, containers, container)
-        if isinstance(rectype, PythonType):
+        if isinstance(rectype, UnionType):
+            set_of_classes = rectype.get_types() - {None}
+            set_of_return_types = {type.get_func_or_method(node.func.attr).type
+                                   for type in set_of_classes}
+            if len(set_of_return_types) == 1:
+                return set_of_return_types.pop()
+            else:
+                return UnionType(list(set_of_return_types))
+        elif isinstance(rectype, PythonType):
             target = rectype.get_func_or_method(node.func.attr)
             if target.generic_type != -1:
                 return rectype.type_args[target.generic_type]
             else:
                 return target.type
+    else:
+        raise UnsupportedException(node)
 
 
 def _get_subscript_type(node: ast.Subscript, module: PythonModule,
