@@ -337,6 +337,9 @@ class TypeInfo:
     def is_callable_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.CallableType)
 
+    def is_any_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.AnyType)
+
     def is_type_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeType)
 

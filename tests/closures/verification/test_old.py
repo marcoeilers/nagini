@@ -24,48 +24,48 @@ class Argument:
 inc_type = Callable[[Argument], Optional[object]]
 
 
-def inc(arg: Argument) -> Optional[object]:
-    Requires(Acc(arg.parameter) and Acc(arg.result))
+def inc(argm: Argument) -> Optional[object]:
+    Requires(Acc(argm.parameter) and Acc(argm.result))
 
-    Ensures(Acc(arg.parameter) and Acc(arg.result))
-    Ensures(arg.result == Old(arg.result) + arg.parameter)
-    Ensures(arg.parameter == Old(arg.parameter))
+    Ensures(Acc(argm.parameter) and Acc(argm.result))
+    Ensures(argm.result == Old(argm.result) + argm.parameter)
+    Ensures(argm.parameter == Old(argm.parameter))
 
-    arg.result = arg.result + arg.parameter
+    argm.result = argm.result + argm.parameter
 
     return None
 
 
 @CallSlot
-def inc_call_slot(f: inc_type, arg: Argument) -> None:
-    Requires(Acc(arg.parameter) and Acc(arg.result))
+def inc_call_slot(f: inc_type, argm: Argument) -> None:
+    Requires(Acc(argm.parameter) and Acc(argm.result))
 
-    f(arg)
+    f(argm)
 
-    Ensures(Acc(arg.parameter) and Acc(arg.result))
-    Ensures(arg.result >= Old(arg.result) + arg.parameter)
-    Ensures(arg.parameter == Old(arg.parameter))
+    Ensures(Acc(argm.parameter) and Acc(argm.result))
+    Ensures(argm.result >= Old(argm.result) + argm.parameter)
+    Ensures(argm.parameter == Old(argm.parameter))
 
 
 def test() -> None:
 
-    arg = Argument(1, 2)
+    argm = Argument(1, 2)
 
-    arg.result = 20
-    arg.parameter = 50
+    argm.result = 20
+    argm.parameter = 50
 
     f = inc
 
-    @CallSlotProof(inc_call_slot(inc, arg))
-    def inc_proof(f: inc_type, arg: Argument) -> None:
-        Requires(Acc(arg.parameter) and Acc(arg.result))
+    @CallSlotProof(inc_call_slot(inc, argm))
+    def inc_proof(f: inc_type, argm: Argument) -> None:
+        Requires(Acc(argm.parameter) and Acc(argm.result))
 
-        ClosureCall(f(arg), inc)
+        ClosureCall(f(argm), inc)
 
-        Ensures(Acc(arg.parameter) and Acc(arg.result))
-        Ensures(arg.result >= Old(arg.result) + arg.parameter)
-        Ensures(arg.parameter == Old(arg.parameter))
+        Ensures(Acc(argm.parameter) and Acc(argm.result))
+        Ensures(argm.result >= Old(argm.result) + argm.parameter)
+        Ensures(argm.parameter == Old(argm.parameter))
 
-    ClosureCall(f(arg), inc_call_slot(f, arg)())
+    ClosureCall(f(argm), inc_call_slot(f, argm)())
 
-    assert arg.result >= 70 and arg.parameter == 50
+    assert argm.result >= 70 and argm.parameter == 50

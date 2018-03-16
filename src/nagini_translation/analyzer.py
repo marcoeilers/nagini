@@ -1063,6 +1063,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_type_type(mypy_type, node)
         elif self.types.is_callable_type(mypy_type):
             return self._convert_callable_type(mypy_type, node)
+        elif self.types.is_any_type(mypy_type):
+            raise UnsupportedException(node, 'Found Any type. Type annotation missing?')
         else:
             raise UnsupportedException(mypy_type)
         return result

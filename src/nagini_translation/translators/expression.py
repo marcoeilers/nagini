@@ -832,7 +832,7 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        if op not in self._primitive_operations:
+        if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
@@ -891,6 +891,13 @@ class ExpressionTranslator(CommonTranslator):
                         arg.func.id == 'getMethod'):
                 return True
         return False
+
+    def is_callable_equality(self, node: ast.Compare, ctx: Context) -> bool:
+        if len(node.ops) != 1 or len(node.comparators) != 1:
+            return False
+        if not isinstance(node.ops[0], (ast.Eq, ast.Is, ast.NotEq, ast.IsNot)):
+            return False
+        # TODO
 
     def is_type_equality(self, node: ast.Compare, ctx: Context) -> bool:
         """
@@ -970,6 +977,8 @@ class ExpressionTranslator(CommonTranslator):
             return self.translate_thread_method_definition(node, ctx)
         if self.is_type_equality(node, ctx):
             return self.translate_type_equality(node, ctx)
+        # if self.is_callable_equality(node, ctx):
+        #     return self.translate_callable_equality(node, ctx)
         if len(node.ops) != 1 or len(node.comparators) != 1:
             raise UnsupportedException(node)
         left_stmt, left = self.translate_expr(node.left, ctx)

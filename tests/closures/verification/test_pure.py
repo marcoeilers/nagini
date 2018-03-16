@@ -31,41 +31,41 @@ F_Type = Callable[[Argument, int], int]
 
 
 @Pure
-def add(arg: Argument, x: int) -> int:
-    Requires(Acc(arg.parameter))
-    Ensures(Result() == x + arg.parameter)
-    return x + arg.parameter
+def add(argm: Argument, x: int) -> int:
+    Requires(Acc(argm.parameter))
+    Ensures(Result() == x + argm.parameter)
+    return x + argm.parameter
 
 
 @Pure
-def mul(arg: Argument, x: int) -> int:
-    Requires(Acc(arg.parameter))
-    Ensures(Result() == x * arg.parameter)
-    return x * arg.parameter
+def mul(argm: Argument, x: int) -> int:
+    Requires(Acc(argm.parameter))
+    Ensures(Result() == x * argm.parameter)
+    return x * argm.parameter
 
 
 @Pure
 @CallSlot
-def pure_call_slot(f: F_Type, arg: Argument) -> None:
+def pure_call_slot(f: F_Type, argm: Argument) -> None:
 
     @UniversallyQuantified
     def uq(x: int) -> None:
-        Requires(Acc(arg.parameter) and arg.parameter > 0 and x > 1)
+        Requires(Acc(argm.parameter) and argm.parameter > 0 and x > 1)
 
-        y = f(arg, x)
+        y = f(argm, x)
 
-        Ensures(y > arg.parameter)
+        Ensures(y > argm.parameter)
 
 
-def client(f: F_Type, arg: Argument) -> None:
-    Requires(Acc(arg.parameter) and Acc(arg.result))
-    Requires(arg.parameter > 0)
-    Requires(pure_call_slot(f, arg))
-    Ensures(Acc(arg.parameter) and Acc(arg.result))
-    Ensures(arg.parameter == Old(arg.parameter))
-    Ensures(arg.result > arg.parameter)
+def client(f: F_Type, argm: Argument) -> None:
+    Requires(Acc(argm.parameter) and Acc(argm.result))
+    Requires(argm.parameter > 0)
+    Requires(pure_call_slot(f, argm))
+    Ensures(Acc(argm.parameter) and Acc(argm.result))
+    Ensures(argm.parameter == Old(argm.parameter))
+    Ensures(argm.result > argm.parameter)
 
-    arg.result = ClosureCall(f(arg, 20), pure_call_slot(f, arg)(20))
+    argm.result = ClosureCall(f(argm, 20), pure_call_slot(f, argm)(20))
 
 
 def method() -> None:
@@ -75,23 +75,23 @@ def method() -> None:
     else:
         f = mul
 
-    arg = Argument(10, 5)
+    argm = Argument(10, 5)
 
-    @CallSlotProof(pure_call_slot(f, arg))
-    def pure_call_slot(f: F_Type, arg: Argument) -> None:
+    @CallSlotProof(pure_call_slot(f, argm))
+    def pure_call_slot(f: F_Type, argm: Argument) -> None:
 
         @UniversallyQuantified
         def uq(x: int) -> None:
-            Requires(Acc(arg.parameter) and arg.parameter > 0 and x > 1)
+            Requires(Acc(argm.parameter) and argm.parameter > 0 and x > 1)
 
             if f == add:
-                y = ClosureCall(f(arg, x), add)  # type: int
+                y = ClosureCall(f(argm, x), add)  # type: int
             else:
-                y = ClosureCall(f(arg, x), mul)
+                y = ClosureCall(f(argm, x), mul)
 
-            Ensures(y > arg.parameter)
+            Ensures(y > argm.parameter)
 
-    client(f, arg)
+    client(f, argm)
 
-    assert arg.parameter == 10
-    assert arg.result > arg.parameter
+    assert argm.parameter == 10
+    assert argm.result > argm.parameter
