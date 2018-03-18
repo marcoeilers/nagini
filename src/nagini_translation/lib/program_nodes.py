@@ -227,7 +227,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             return local_type, local_alts
         for module in self.from_imports:
             module_result = module.get_type(prefixes, name)
-            if module_result is not None:
+            if module_result != (None, None):
                 return module_result
         return None, None
 

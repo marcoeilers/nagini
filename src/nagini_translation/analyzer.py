@@ -990,13 +990,15 @@ class Analyzer(ast.NodeVisitor):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
-                if isinstance(receiver, UnionType):
+                if (isinstance(receiver, UnionType) and
+                        not isinstance(receiver, OptionalType)):
                     for type in receiver.get_types() - {None}:
                         field = type.add_field(node.attr, node, self.typeof(node))
                         if isinstance(field, PythonField):
                             self.track_access(node, field)
                 else:
-                    field = receiver.add_field(node.attr, node, self.typeof(node))
+                    field = receiver.python_class.add_field(node.attr, node,
+                                                            self.typeof(node))
                     if isinstance(field, PythonField):
                         self.track_access(node, field)
 
@@ -1138,7 +1140,7 @@ class Analyzer(ast.NodeVisitor):
             return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
-            if isinstance(receiver, UnionType):
+            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
                 set_of_types = set() 
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):

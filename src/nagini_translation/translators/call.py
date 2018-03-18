@@ -41,6 +41,7 @@ from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
+    OptionalType,
     PythonClass,
     PythonIOOperation,
     PythonMethod,
@@ -862,7 +863,15 @@ class CallTranslator(CommonTranslator):
             # Handle method calls when receiver's type is union
             if isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
-                if isinstance(rectype, UnionType):
+                if (isinstance(rectype, UnionType) and
+                        not isinstance(rectype, OptionalType)):
+                    # Check if the call refers to a predicate (family),
+                    # in which case we don't need special treatment.
+                    target_pred = rectype.python_class.get_predicate(node.func.attr)
+                    if target_pred:
+                        return self.translate_normal_call(target_pred, arg_stmts, args,
+                                                          arg_types, node, ctx, impure)
+                    # Otherwise apply special union treatment.
                     return self.translate_method_call_in_union(arg_stmts, args, arg_types,
                                                                rectype, node, ctx, impure)
 
