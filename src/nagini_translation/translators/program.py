@@ -667,6 +667,109 @@ class ProgramTranslator(CommonTranslator):
                                             pos, info)
         return may_set_pred
 
+    def create_adts_domain(self, adts: List[PythonClass],
+                           ctx: Context) -> List['silver.ast.domain']:
+        """
+        Translate Algebraic Data Types defined in Python, with classes (sum)
+        and a NamedTuple (product), to a domain in Viper. Further documentation
+        on ADT syntax can be found in ADT.py.
+        """
+
+        def get_cons_args_decl(cons, adt_name, adt_type, pos, info):
+            arguments = []
+            for arg_name, arg_type in cons.fields.items():
+                if arg_type.type.name == adt_name:
+                    argument_type = adt_type
+                else:
+                    argument_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                argument = self.viper.LocalVarDecl(arg_name, argument_type, pos, info)
+                arguments.append(argument)
+            return arguments
+
+        def get_cons_args(cons, adt_name, adt_type, pos, info):
+            arguments = []
+            for arg_name, arg_type in cons.fields.items():
+                if arg_type.type.name == adt_name:
+                    argument_type = adt_type
+                else:
+                    argument_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                argument = self.viper.LocalVar(arg_name, argument_type, pos, info)
+                arguments.append(argument)
+            return arguments
+
+        def conjoin(eqs, pos, info):
+            if len(eqs) == 1:
+                return eqs[0]
+            else:
+                return self.viper.And(eqs[0], conjoin(eqs[1:], pos, info), pos, info)
+
+        pos = self.no_position(ctx) # TODO: put the right positions (several places)
+        info = self.no_info(ctx)
+        translated_adts = []
+
+        for adt in adts:
+            assert adt.is_adt and adt.is_defining_adt
+            functions = []
+            adt_type = self.viper.DomainType(adt.name, {}, [])
+
+            # Create constructors
+            assert adt.all_subclasses[0] == adt
+            for cons in adt.all_subclasses[1:]:
+                arguments = get_cons_args_decl(cons, adt.name, adt_type, pos, info)
+                function = self.viper.DomainFunc(cons.name, arguments, adt_type, False, pos, info, adt.name)
+                functions.append(function)
+
+            # Create deconstructors
+            argument = self.viper.LocalVarDecl('obj', adt_type, pos, info)
+            for cls in adt.all_subclasses[1:]:
+                for arg_name, arg_type in cls.fields.items():
+                    if arg_type.type.name == adt.name:
+                        function_type = adt_type
+                    else:
+                        function_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                    function = self.viper.DomainFunc(cls.name + '_' + arg_name, [argument], function_type, False, pos, info, adt.name)
+                    functions.append(function)
+            
+            # Constructor types
+            ## Given the ADT, return the constructor used to create it
+            function = self.viper.DomainFunc(adt.name + '_type', [argument], self.viper.Int, False, pos, info, adt.name)
+            functions.append(function)
+
+            ## Create a constant for each constructor
+            for cls in adt.all_subclasses[1:]:
+                function = self.viper.DomainFunc(cls.name + '_type', [], self.viper.Int, True, pos, info, adt.name)
+                functions.append(function)
+
+            ## Create a boolean function for each type
+            for cls in adt.all_subclasses[1:]:
+                function = self.viper.DomainFunc('is_' + cls.name, [argument], self.viper.Bool, False, pos, info, adt.name)
+                functions.append(function)
+
+            # Create axioms
+            axioms = []
+            
+            ## Destructors over constructors
+            for cons in adt.all_subclasses[1:]:
+                args = get_cons_args(cons, adt.name, adt_type, pos, info)
+                args_decl = get_cons_args_decl(cons, adt.name, adt_type, pos, info)
+                if len(args) > 0:
+                    cons_call = self.viper.DomainFuncApp(cons.name, args, adt_type, pos, info, adt.name) #TODO adt_type
+                    trigger = self.viper.Trigger([cons_call], pos, info)
+                    eqs = []
+                    for (arg_name, _), arg in zip(cons.fields.items(), args):
+                        decons_call = self.viper.DomainFuncApp(cons.name + '_' + arg_name, [cons_call], adt_type, pos, info, adt.name) #TODO adt_type
+                        eq = self.viper.EqCmp(decons_call, arg, pos, info)
+                        eqs.append(eq)
+                    body = conjoin(eqs, pos, info)
+                    forall = self.viper.Forall(args_decl, [trigger], body, pos, info)
+                    axiom = self.viper.DomainAxiom('Deconstructors_over_' + cons.name, forall, pos, info, adt.name)
+                    axioms.append(axiom)
+
+            # Create domain
+            translated_adts.append(self.viper.Domain(adt.name, functions, axioms, [], pos, info))
+
+        return translated_adts
+
     def translate_program(self, modules: List[PythonModule],
                           sil_progs: Program, ctx: Context,
                           selected: Set[str] = None) -> 'silver.ast.Program':
@@ -703,6 +806,9 @@ class ProgramTranslator(CommonTranslator):
         # to be verified (if any).
         selected_names = []
 
+        # List of classes that define algebraic data types
+        adt_list = []
+
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
         for module in modules:
@@ -717,6 +823,8 @@ class ProgramTranslator(CommonTranslator):
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives or entries for type variables.
+                    continue
+                if cls.is_adt:
                     continue
                 containers.append(cls)
                 f_fields, f_funcs, f_methods = self._translate_fields(cls, ctx)
@@ -772,6 +880,10 @@ class ProgramTranslator(CommonTranslator):
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
                     # Skip primitives and type variable entries.
+                    continue
+                if cls.is_adt:
+                    if cls.is_defining_adt:
+                        adt_list.append(cls)
                     continue
                 old_class = ctx.current_class
                 ctx.current_class = cls
@@ -882,6 +994,7 @@ class ProgramTranslator(CommonTranslator):
         domains.append(self.create_thread_domain(ctx))
         domains.append(self.create_functions_domain(func_constants, ctx))
         domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
+        domains.extend(self.create_adts_domain(adt_list, ctx))
 
         converted_sil_progs = self._convert_silver_elements(sil_progs,
                                                             all_used_names, ctx)

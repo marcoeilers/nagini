@@ -468,20 +468,24 @@ class Analyzer(ast.NodeVisitor):
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
                 cls.is_adt = True
                 # Detect malformed ADTs
+                # ADT classes can have at most two superclasses
                 if len(actual_bases) > 2:
                     raise InvalidProgramException(cls.node, 'malformed.adt',
                             'malformed algebraic data type: superclasses can only ' +
                             'be a class optionally followed by one NamedTuple')
+                # ADT classes should have no body
                 if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
                     raise InvalidProgramException(cls.node, 'malformed.adt',
                             'malformed algebraic data type: classes cannot have ' +
                             'body, fields should be defined in NamedTuples instead')
                 elif len(actual_bases) == 2:
+                    # ADT classes can only define fields by inheriting from NamedTuple
                     if not (isinstance(actual_bases[1], ast.Call)
                        and actual_bases[1].func.id == 'NamedTuple'):
                         raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                             'malformed algebraic data type: only NamedTuple can be ' +
                             'used to define fields')
+                    # The name of the NamedTuple should match the ADT being defined
                     if not (cls.name == actual_bases[1].args[0].s):
                         raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                             'malformed algebraic data type: name of NamedTuple has to ' +
@@ -1058,6 +1062,12 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
+            # Handle case where ADT (class) is typed as tuple
+            if hasattr(mypy_type, 'fallback'):
+                fallback_type = self.convert_type(mypy_type.fallback, node)
+                if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
+                    return fallback_type
+            # Regular tuple handling
             args = [self.convert_type(arg_type, node)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],

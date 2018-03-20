@@ -375,7 +375,16 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self._has_classmethod = False
         self.type_vars = OrderedDict()
         self.definition_deps = set()
-        self.is_adt = name == 'ADT'
+        self.is_adt = name == 'ADT' # This flag can also be set transitively
+
+    @property
+    def is_defining_adt(self) -> bool:
+        """
+        Returns true if class is defining the ADT's name.
+        """
+        if self.superclass:
+            return self.superclass.name == 'ADT'
+        return False
 
     @property
     def all_subclasses(self) -> List['PythonClass']:
