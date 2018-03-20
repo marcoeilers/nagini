@@ -702,6 +702,12 @@ class ProgramTranslator(CommonTranslator):
                 return eqs[0]
             else:
                 return self.viper.And(eqs[0], conjoin(eqs[1:], pos, info), pos, info)
+        
+        def disjoin(eqs, pos, info):
+            if len(eqs) == 1:
+                return eqs[0]
+            else:
+                return self.viper.Or(eqs[0], disjoin(eqs[1:], pos, info), pos, info)
 
         pos = self.no_position(ctx) # TODO: put the right positions (several places)
         info = self.no_info(ctx)
@@ -709,6 +715,7 @@ class ProgramTranslator(CommonTranslator):
 
         for adt in adts:
             assert adt.is_adt and adt.is_defining_adt
+            assert len(adt.all_subclasses) > 1
 
             # Create domain functions
             functions = []
@@ -799,9 +806,28 @@ class ProgramTranslator(CommonTranslator):
                     forall = self.viper.Forall(args_decl, [], eq, pos, info)
                 axiom = self.viper.DomainAxiom('Type_of_' + cons.name, forall, pos, info, adt.name)
                 axioms.append(axiom)
-            
-            ## Enforce constructor type function always has a constant to represent its result
 
+            ## Enforce constructor type function always has a constant to represent its result
+            eqs = []
+            for cons in adt.all_subclasses[1:]:
+                cons_type_call = self.viper.DomainFuncApp('Cons_type', [adt_obj_use], self.viper.Int, pos, info, adt.name)
+                cons_const_call = self.viper.DomainFuncApp(cons.name + '_type', [], self.viper.Int, pos, info, adt.name)
+                eqs.append(self.viper.EqCmp(cons_type_call, cons_const_call, pos, info))
+            body = disjoin(eqs, pos, info)
+            forall = self.viper.Forall([argument], [], body, pos, info)
+            axiom = self.viper.DomainAxiom('Type_existance', forall, pos, info, adt.name)
+            axioms.append(axiom)
+
+            ## Enforces constructor type function with is_constructor function
+            for cons in adt.all_subclasses[1:]:
+                cons_type_call = self.viper.DomainFuncApp('Cons_type', [adt_obj_use], self.viper.Int, pos, info, adt.name)
+                cons_const_call = self.viper.DomainFuncApp(cons.name + '_type', [], self.viper.Int, pos, info, adt.name)
+                type_id_eq = self.viper.EqCmp(cons_type_call, cons_const_call, pos, info)
+                is_cons_call = self.viper.DomainFuncApp('is_' + cons.name, [adt_obj_use], self.viper.Bool, pos, info, adt.name)
+                eqv = self.viper.EqCmp(type_id_eq, is_cons_call, pos, info)
+                forall = self.viper.Forall([argument], [], eqv, pos, info)
+                axiom = self.viper.DomainAxiom('Type_is_' + cons.name, forall, pos, info, adt.name)
+                axioms.append(axiom)
 
             # Create domain
             domains.append(self.viper.Domain(adt.name, functions, axioms, [], pos, info))
