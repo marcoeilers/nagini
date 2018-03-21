@@ -206,7 +206,11 @@ def main() -> None:
     parser.add_argument(
         '--sif',
         action='store_true',
-        help='Verify secure information flow')
+        help='verify secure information flow')
+    parser.add_argument(
+        '--show-viper-errors',
+        action='store_true',
+        help='show Viper-level error messages if no Python errors are available')
     parser.add_argument(
         '--log',
         type=_parse_log_level,
@@ -309,7 +313,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
             vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
             print("Verification completed.")
-        print(vresult.to_string(args.ide_mode))
+        print(vresult.to_string(args.ide_mode, args.show_viper_errors))
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
