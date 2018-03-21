@@ -162,6 +162,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
             self._ctx.inlined_calls.append(method)
             old_loop_stack = self._ctx.obligation_context._loop_stack
             self._ctx.obligation_context._loop_stack = []
+            self._ctx.ignore_waitlevel_constraints = True
 
             # Remember values of old expressions in postcondition.
             old_info = self._remember_old_expressions(method, collector)
@@ -185,6 +186,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
                 self._ctx.remove_alias(name)
             self._ctx.inlined_calls.pop()
             self._ctx.obligation_context._loop_stack = old_loop_stack
+            self._ctx.ignore_waitlevel_constraints = False
 
             # Do all this under the condition that the current method is the thread's
             # actual target method.

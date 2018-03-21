@@ -521,6 +521,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
                                         ctx)
             return call, val
+        return None, None
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],

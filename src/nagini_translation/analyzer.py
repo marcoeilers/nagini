@@ -449,7 +449,7 @@ class Analyzer(ast.NodeVisitor):
                 for arg_name in arg_names:
                     assert arg_name in self.module.type_vars
                     var_info = self.module.type_vars[arg_name]
-                    bound = self.convert_type(var_info[0])
+                    bound = self.convert_type(var_info[0], base)
                     var = TypeVar(arg_name, bound, self.module,
                                   target_type=cls, index=current_index)
                     cls.type_vars[arg_name] = var
@@ -583,7 +583,7 @@ class Analyzer(ast.NodeVisitor):
         self.visit(node.args, node)
 
         if not is_property_setter:
-            func.type = self.convert_type(functype)
+            func.type = self.convert_type(functype, node)
 
         for child in node.body:
             if is_io_existential(child):
@@ -632,7 +632,7 @@ class Analyzer(ast.NodeVisitor):
             # If it's a type alias marked by mypy
             if lhs_name in self.types.type_aliases:
                 type_name = self.types.type_aliases[lhs_name]
-                aliased_type = self.convert_type(type_name)
+                aliased_type = self.convert_type(type_name, node)
                 self.module.classes[node.targets[0].id] = aliased_type
                 is_alias = True
             # If it's a type variable marked by mypy
@@ -990,13 +990,15 @@ class Analyzer(ast.NodeVisitor):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
-                if isinstance(receiver, UnionType):
+                if (isinstance(receiver, UnionType) and
+                        not isinstance(receiver, OptionalType)):
                     for type in receiver.get_types() - {None}:
                         field = type.add_field(node.attr, node, self.typeof(node))
                         if isinstance(field, PythonField):
                             self.track_access(node, field)
                 else:
-                    field = receiver.add_field(node.attr, node, self.typeof(node))
+                    field = receiver.python_class.add_field(node.attr, node,
+                                                            self.typeof(node))
                     if isinstance(field, PythonField):
                         self.track_access(node, field)
 
@@ -1009,7 +1011,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node)
 
-    def convert_type(self, mypy_type, node=None) -> PythonType:
+    def convert_type(self, mypy_type, node) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
         """
@@ -1037,7 +1039,8 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_callable_type(mypy_type):
             return self._convert_callable_type(mypy_type, node)
         else:
-            raise UnsupportedException(mypy_type)
+            msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
+            raise UnsupportedException(node, desc=msg)
         return result
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
@@ -1087,7 +1090,7 @@ class Analyzer(ast.NodeVisitor):
     def _convert_type_type(self, mypy_type, node) -> PythonType:
         name = 'type'
         type_class = self.module.global_module.classes['type']
-        args = [self.convert_type(mypy_type.item)]
+        args = [self.convert_type(mypy_type.item, node)]
         return GenericType(type_class, args)
 
     def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
@@ -1110,7 +1113,7 @@ class Analyzer(ast.NodeVisitor):
             result = {}
             if alts:
                 for line, type in alts.items():
-                    result[line] = self.convert_type(type)
+                    result[line] = self.convert_type(type, node)
             return result
         else:
             return {}
@@ -1133,11 +1136,11 @@ class Analyzer(ast.NodeVisitor):
             type, alts = self.module.get_type(context, node.id)
             key = (node.lineno, node.col_offset)
             if alts and key in alts:
-                return self.convert_type(alts[key])
-            return self.convert_type(type)
+                return self.convert_type(alts[key], node)
+            return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
-            if isinstance(receiver, UnionType):
+            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
                 set_of_types = set() 
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):
@@ -1145,14 +1148,14 @@ class Analyzer(ast.NodeVisitor):
                     else:
                         context = [type_in_union.name]
                     type, _ = self.module.get_type(context, node.attr)
-                    set_of_types.add(self.convert_type(type))
+                    set_of_types.add(self.convert_type(type, node))
                 return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
             type, _ = self.module.get_type(context, node.attr)
-            return self.convert_type(type)
+            return self.convert_type(type, node)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
             # return the type 'type[C]', where C is the class the method

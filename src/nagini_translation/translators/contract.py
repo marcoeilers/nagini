@@ -12,7 +12,6 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
     GET_ARG_FUNC,
-    GET_METHOD_FUNC,
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
@@ -54,7 +53,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List
+from typing import List, Tuple
 
 
 class ContractTranslator(CommonTranslator):
@@ -91,6 +90,8 @@ class ContractTranslator(CommonTranslator):
         assert len(node.args) == 0
         type = ctx.actual_function.type
         if not ctx.actual_function.pure:
+            if ctx.result_var is None:
+                raise InvalidProgramException(node, 'invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
             return ([], self.viper.Result(self.translate_type(type, ctx),
@@ -151,14 +152,11 @@ class ContractTranslator(CommonTranslator):
         field_acc = self.viper.FieldAccess(args[0], field,
                                            self.to_position(node, ctx),
                                            self.no_info(ctx))
-        pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               self.to_position(node, ctx),
-                                               self.no_info(ctx))
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
-            pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
+        pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
         return pred
 
     def translate_may_start(self, node: ast.Call, args: List[Expr], perm: Expr,
@@ -346,6 +344,16 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
+    def translate_assume(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Assume().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        assertion = self.viper.Inhale(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_implies(self, node: ast.Call, ctx: Context,
                           impure=False) -> StmtsAndExpr:
         """
@@ -503,7 +511,7 @@ class ContractTranslator(CommonTranslator):
 
     def _create_quantifier_contains_expr(self, var: PythonVar,
                                          domain_node: ast.AST,
-                                         ctx: Context) -> StmtsAndExpr:
+                                         ctx: Context) -> Tuple[List[Stmt], Expr, bool]:
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that var is an element of the given domain.
@@ -513,24 +521,33 @@ class ContractTranslator(CommonTranslator):
                     get_func_name(domain_node) == 'Old'):
             domain_old = True
             domain_node = domain_node.args[0]
+        ref_var = self.to_ref(var.ref(), ctx)
+        pos = self.to_position(domain_node, ctx)
+        info = self.no_info(ctx)
+
+        if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
+            if not len(domain_node.args) == 2:
+                msg = 'range() is currently only supported with two args.'
+                raise UnsupportedException(domain_node, msg)
+            arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
+                                                  target_type = self.viper.Int)
+            arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
+                                                  target_type = self.viper.Int)
+            int_var = self.to_int(ref_var, ctx)
+            condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
+                                       self.viper.LtCmp(int_var, arg2, pos, info),
+                                       pos, info)
+            return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
-        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref,
-                                               self.no_position(ctx),
-                                               self.no_info(ctx))]
+        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)]
         domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain],
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx), seq_ref, formal_args)
-        ref_var = self.to_ref(var.ref(), ctx)
-        result = self.viper.SeqContains(ref_var, domain_set,
-                                        self.to_position(domain_node, ctx),
-                                        self.no_info(ctx))
+                                        [domain], pos, info, seq_ref, formal_args)
+        result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
-            result = self.viper.Old(result, self.to_position(domain_node, ctx),
-                                    self.no_info(ctx))
-        return dom_stmt, result
+            result = self.viper.Old(result, pos, info)
+        return dom_stmt, result, True
 
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -672,13 +689,14 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs = self._create_quantifier_contains_expr(var, domain_node,
-                                                              ctx)
+        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var,
+                                                                          domain_node,
+                                                                          ctx)
         lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if triggers:
+        if is_trigger and triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
@@ -764,6 +782,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_create(node, ctx)
         elif func_name == 'Assert':
             return self.translate_assert(node, ctx)
+        elif func_name == 'Assume':
+            return self.translate_assume(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':

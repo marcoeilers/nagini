@@ -31,6 +31,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
+    OptionalType,
     PythonClass,
     PythonField,
     PythonGlobalVar,
@@ -732,7 +733,8 @@ class ExpressionTranslator(CommonTranslator):
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
             return [], field_func
-        elif target is not None and isinstance(target.type, UnionType):
+        elif (target is not None and isinstance(target.type, UnionType) and
+                  not isinstance(target.type, OptionalType)):
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             guarded_field_access = []

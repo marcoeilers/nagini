@@ -667,9 +667,9 @@ class ProgramTranslator(CommonTranslator):
                                             pos, info)
         return may_set_pred
 
-    def translate_program(self, modules: List[PythonModule],
-                          sil_progs: Program, ctx: Context,
-                          selected: Set[str] = None) -> 'silver.ast.Program':
+    def translate_program(self, modules: List[PythonModule], sil_progs: Program,
+                          ctx: Context, selected: Set[str] = None,
+                          ignore_global: bool = False) -> Program:
         """
         Translates the PythonModules created by the analyzer to a Viper program.
         """
@@ -834,9 +834,10 @@ class ProgramTranslator(CommonTranslator):
                         predicate_families[cpred] = [pred]
                 ctx.current_class = old_class
 
-        main_py_method, main_method = self.translate_main_method(modules, ctx)
-        methods.append(main_method)
-        self.track_dependencies(selected_names, selected, main_py_method, ctx)
+        if not ignore_global:
+            main_py_method, main_method = self.translate_main_method(modules, ctx)
+            methods.append(main_method)
+            self.track_dependencies(selected_names, selected, main_py_method, ctx)
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.
