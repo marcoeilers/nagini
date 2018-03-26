@@ -730,19 +730,19 @@ class ProgramTranslator(CommonTranslator):
                 domain_funcs.append(function)
 
             ## Create deconstructors
-            argument = self.viper.LocalVarDecl('obj', adt_type, pos, info)
+            adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
             for cons in adt.all_subclasses[1:]:
                 for arg_name, arg_type in cons.fields.items():
                     if arg_type.type.name == adt.name:
                         function_type = adt_type
                     else:
                         function_type = self.viper.Ref  # TODO decide if type is direct or boxing
-                    function = self.viper.DomainFunc(cons.name + '_' + arg_name, [argument], function_type, False, pos, info, adt.name)
+                    function = self.viper.DomainFunc(cons.name + '_' + arg_name, [adt_obj_decl], function_type, False, pos, info, adt.name)
                     domain_funcs.append(function)
             
             ## Constructor types
             ### Given the ADT, return the constructor used to create it
-            function = self.viper.DomainFunc('Cons_type', [argument], self.viper.Int, False, pos, info, adt.name)
+            function = self.viper.DomainFunc('Cons_type', [adt_obj_decl], self.viper.Int, False, pos, info, adt.name)
             domain_funcs.append(function)
 
             ### Create a constant for each constructor
@@ -752,12 +752,12 @@ class ProgramTranslator(CommonTranslator):
 
             ### Create a boolean function for each type
             for cons in adt.all_subclasses[1:]:
-                function = self.viper.DomainFunc('is_' + cons.name, [argument], self.viper.Bool, False, pos, info, adt.name)
+                function = self.viper.DomainFunc('is_' + cons.name, [adt_obj_decl], self.viper.Bool, False, pos, info, adt.name)
                 domain_funcs.append(function)
             
             # Create a boolean function to ensure a reference argument refers to this ADT
-            arg_ref = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
-            function = self.viper.DomainFunc('is_' + adt.name, [arg_ref], self.viper.Bool, False, pos, info, adt.name)
+            adt_ref_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
+            function = self.viper.DomainFunc('is_' + adt.name, [adt_ref_decl], self.viper.Bool, False, pos, info, adt.name)
             domain_funcs.append(function)
 
             # Create domain axioms
@@ -794,7 +794,7 @@ class ProgramTranslator(CommonTranslator):
                     cons_call = self.viper.DomainFuncApp(cons.name, decons_calls, adt_type, pos, info, adt.name)
                     eq = self.viper.EqCmp(adt_obj_use, cons_call, pos, info)
                     body = self.viper.Implies(is_cons_call, eq, pos, info)
-                    forall = self.viper.Forall([argument], triggers, body, pos, info)
+                    forall = self.viper.Forall([adt_obj_decl], triggers, body, pos, info)
                     axiom = self.viper.DomainAxiom('Cons_' + cons.name + '_over_decons', forall, pos, info, adt.name)
                     axioms.append(axiom)
             
@@ -820,7 +820,7 @@ class ProgramTranslator(CommonTranslator):
                 cons_const_call = self.viper.DomainFuncApp(cons.name + '_type', [], self.viper.Int, pos, info, adt.name)
                 eqs.append(self.viper.EqCmp(cons_type_call, cons_const_call, pos, info))
             body = disjoin(eqs, pos, info)
-            forall = self.viper.Forall([argument], [], body, pos, info)
+            forall = self.viper.Forall([adt_obj_decl], [], body, pos, info)
             axiom = self.viper.DomainAxiom('Constrain_cons_type_function_cons_constants', forall, pos, info, adt.name)
             axioms.append(axiom)
 
@@ -831,7 +831,7 @@ class ProgramTranslator(CommonTranslator):
                 type_id_eq = self.viper.EqCmp(cons_type_call, cons_const_call, pos, info)
                 is_cons_call = self.viper.DomainFuncApp('is_' + cons.name, [adt_obj_use], self.viper.Bool, pos, info, adt.name)
                 eqv = self.viper.EqCmp(type_id_eq, is_cons_call, pos, info)
-                forall = self.viper.Forall([argument], [], eqv, pos, info)
+                forall = self.viper.Forall([adt_obj_decl], [], eqv, pos, info)
                 axiom = self.viper.DomainAxiom('Associate_cons_type_function_with_is_' + cons.name + '_bool_function', forall, pos, info, adt.name)
                 axioms.append(axiom)
 
@@ -845,17 +845,17 @@ class ProgramTranslator(CommonTranslator):
             postconds.append(self.viper.DomainFuncApp('is_' + adt.name, [result], self.viper.Bool, pos, info, adt.name))
             unbox_func = self.viper.FuncApp('unbox_' + adt.name, [result], pos, info, adt_type)
             postconds.append(self.viper.EqCmp(unbox_func, adt_obj_use, pos, info))
-            function = self.viper.Function('box_' + adt.name, [argument], self.viper.Ref, [], postconds, None, pos, info)
+            function = self.viper.Function('box_' + adt.name, [adt_obj_decl], self.viper.Ref, [], postconds, None, pos, info)
             functions.append(function)
 
             ## Create unbox function
             preconds = []
             postconds = []
-            arg_ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
-            preconds.append(self.viper.DomainFuncApp('is_' + adt.name, [arg_ref_use], self.viper.Bool, pos, info, adt.name))
+            adt_ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
+            preconds.append(self.viper.DomainFuncApp('is_' + adt.name, [adt_ref_use], self.viper.Bool, pos, info, adt.name))
             box_func = self.viper.FuncApp('box_' + adt.name, [result], pos, info, self.viper.Ref)
-            postconds.append(self.viper.EqCmp(box_func, arg_ref_use, pos, info))
-            function = self.viper.Function('unbox_' + adt.name, [arg_ref], adt_type, preconds, postconds, None, pos, info)
+            postconds.append(self.viper.EqCmp(box_func, adt_ref_use, pos, info))
+            function = self.viper.Function('unbox_' + adt.name, [adt_ref_decl], adt_type, preconds, postconds, None, pos, info)
             functions.append(function)
 
         return domains, functions
