@@ -756,11 +756,6 @@ class ProgramTranslator(CommonTranslator):
                 function = self.viper.DomainFunc('is_' + cons.name, [adt_obj_decl], self.viper.Bool, False, pos, info, adt_name)
                 domain_funcs.append(function)
             
-            # Create a boolean function to ensure a reference argument refers to this ADT
-            adt_ref_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
-            function = self.viper.DomainFunc('is_' + adt_name, [adt_ref_decl], self.viper.Bool, False, pos, info, adt_name)
-            domain_funcs.append(function)
-
             # Create domain axioms
             axioms = []
 
@@ -843,7 +838,7 @@ class ProgramTranslator(CommonTranslator):
             ## Create box function
             postconds = []
             result = self.viper.Result(self.viper.Ref, pos, info)
-            postconds.append(self.viper.DomainFuncApp('is_' + adt_name, [result], self.viper.Bool, pos, info, adt_name))
+            postconds.append(self.type_factory.type_check(result, adt, pos, ctx))
             unbox_func = self.viper.FuncApp('unbox_' + adt_name, [result], pos, info, adt_type)
             postconds.append(self.viper.EqCmp(unbox_func, adt_obj_use, pos, info))
             function = self.viper.Function('box_' + adt_name, [adt_obj_decl], self.viper.Ref, [], postconds, None, pos, info)
@@ -853,9 +848,10 @@ class ProgramTranslator(CommonTranslator):
             preconds = []
             postconds = []
             adt_ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
-            preconds.append(self.viper.DomainFuncApp('is_' + adt_name, [adt_ref_use], self.viper.Bool, pos, info, adt_name))
+            preconds.append(self.type_factory.type_check(adt_ref_use, adt, pos, ctx))
             box_func = self.viper.FuncApp('box_' + adt_name, [result], pos, info, self.viper.Ref)
             postconds.append(self.viper.EqCmp(box_func, adt_ref_use, pos, info))
+            adt_ref_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
             function = self.viper.Function('unbox_' + adt_name, [adt_ref_decl], adt_type, preconds, postconds, None, pos, info)
             functions.append(function)
 
