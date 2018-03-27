@@ -148,6 +148,16 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def translate_adt_cons(self, adt: PythonClass, node: ast.Call, args: List, ctx: Context) -> StmtsAndExpr:
+        type_returned = self.viper.Ref      # TODO
+        info = self.no_info(ctx)            # TODO
+        pos = self.no_position(ctx)         # TODO
+
+        for arg in args:
+            _, call = self.translate_expr(node, ctx)
+        cons_call = self.viper.DomainFuncApp(adt.name, [], type_returned, pos, info, adt.name)
+        return [], cons_call
+
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -157,6 +167,8 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
+#        if target_class.is_adt:
+#            return self.translate_adt_cons(target_class, node, args, ctx)
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
