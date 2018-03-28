@@ -387,6 +387,16 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         return False
 
     @property
+    def adt_def(self) -> 'PythonClass':
+        """
+        Return's the class that defines the ADT.
+        """
+        if self.is_defining_adt:
+            return self
+        else:
+            return self.superclass.adt_def
+
+    @property
     def all_subclasses(self) -> List['PythonClass']:
         """
         Returns all direct or indirect subclasses of this class.

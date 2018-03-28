@@ -726,7 +726,7 @@ class ProgramTranslator(CommonTranslator):
             ## Create constructors
             assert adt.all_subclasses[0] == adt
             for cons in adt.all_subclasses[1:]:
-                arguments = get_cons_args_decl(cons, adt_name, adt_type, pos, info)
+                arguments = get_cons_args_decl(cons, adt.name, adt_type, pos, info)
                 function = self.viper.DomainFunc(cons.name + '_ADT', arguments, adt_type, False, pos, info, adt_name)
                 domain_funcs.append(function)
 
@@ -734,7 +734,7 @@ class ProgramTranslator(CommonTranslator):
             adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
             for cons in adt.all_subclasses[1:]:
                 for arg_name, arg_type in cons.fields.items():
-                    if arg_type.type.name == adt_name:
+                    if arg_type.type.name == adt.name:
                         function_type = adt_type
                     else:
                         function_type = self.viper.Ref  # TODO decide if type is direct or boxing
@@ -761,8 +761,8 @@ class ProgramTranslator(CommonTranslator):
 
             ## Destructors over constructors
             for cons in adt.all_subclasses[1:]:
-                args = get_cons_args(cons, adt_name, adt_type, pos, info)
-                args_decl = get_cons_args_decl(cons, adt_name, adt_type, pos, info)
+                args = get_cons_args(cons, adt.name, adt_type, pos, info)
+                args_decl = get_cons_args_decl(cons, adt.name, adt_type, pos, info)
                 if len(args) > 0:
                     cons_call = self.viper.DomainFuncApp(cons.name + '_ADT', args, adt_type, pos, info, adt_name)
                     trigger = self.viper.Trigger([cons_call], pos, info)
@@ -780,7 +780,7 @@ class ProgramTranslator(CommonTranslator):
             adt_obj_use = self.viper.LocalVar('obj', adt_type, pos, info)
             for cons in adt.all_subclasses[1:]:
                 if len(cons.fields.items()) > 0:
-                    args = get_cons_args(cons, adt_name, adt_type, pos, info)
+                    args = get_cons_args(cons, adt.name, adt_type, pos, info)
                     triggers, decons_calls = [], []
                     is_cons_call = self.viper.DomainFuncApp('is_' + cons.name, [adt_obj_use], self.viper.Bool, pos, info, adt_name)
                     for (arg_name, _), arg in zip(cons.fields.items(), args):
@@ -796,7 +796,7 @@ class ProgramTranslator(CommonTranslator):
 
             ## Associate constructor type function with constructor constant
             for cons in adt.all_subclasses[1:]:
-                args = get_cons_args(cons, adt_name, adt_type, pos, info)
+                args = get_cons_args(cons, adt.name, adt_type, pos, info)
                 cons_call = self.viper.DomainFuncApp(cons.name + '_ADT', args, adt_type, pos, info, adt_name)
                 cons_type_call = self.viper.DomainFuncApp('Cons_type', [cons_call], self.viper.Int, pos, info, adt_name)
                 cons_const_call = self.viper.DomainFuncApp(cons.name + '_type', [], self.viper.Int, pos, info, adt_name)
@@ -804,7 +804,7 @@ class ProgramTranslator(CommonTranslator):
                 if len(cons.fields.items()) == 0:
                     forall = eq
                 else:
-                    args_decl = get_cons_args_decl(cons, adt_name, adt_type, pos, info)
+                    args_decl = get_cons_args_decl(cons, adt.name, adt_type, pos, info)
                     forall = self.viper.Forall(args_decl, [], eq, pos, info)
                 axiom = self.viper.DomainAxiom('Associate_cons_type_function_with_' + cons.name + '_constant', forall, pos, info, adt_name)
                 axioms.append(axiom)
