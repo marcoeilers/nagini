@@ -681,7 +681,7 @@ class ProgramTranslator(CommonTranslator):
                 if arg_type.type.name == adt_name:
                     argument_type = adt_type
                 else:
-                    argument_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                    argument_type = self.viper.Ref
                 argument = self.viper.LocalVarDecl(arg_name, argument_type, pos, info)
                 arguments.append(argument)
             return arguments
@@ -692,7 +692,7 @@ class ProgramTranslator(CommonTranslator):
                 if arg_type.type.name == adt_name:
                     argument_type = adt_type
                 else:
-                    argument_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                    argument_type = self.viper.Ref
                 argument = self.viper.LocalVar(arg_name, argument_type, pos, info)
                 arguments.append(argument)
             return arguments

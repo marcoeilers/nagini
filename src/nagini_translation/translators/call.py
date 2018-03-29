@@ -152,6 +152,13 @@ class CallTranslator(CommonTranslator):
         info = self.no_info(ctx)
         adt_name = cons.adt_def.name + '_ADT'
         adt_type = self.viper.DomainType(adt_name, {}, [])
+
+        # If expected argument type is the adt type, unbox translated argument
+        for index, ((_, arg_type), translated_arg) in enumerate(zip(cons.fields.items(), args)):
+            if arg_type.type == cons.adt_def:
+                unbox_func = self.viper.FuncApp('unbox_' + adt_name, [translated_arg], pos, info, adt_type)
+                args[index] = unbox_func
+
         cons_call = self.viper.DomainFuncApp(cons.name + '_ADT', args, adt_type, pos, info, adt_name)
         box_func = self.viper.FuncApp('box_' + adt_name, [cons_call], pos, info, self.viper.Ref)
         return box_func
