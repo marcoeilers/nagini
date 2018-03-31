@@ -17,7 +17,7 @@ class Clazz:
     def startAndJoinWrite(self) -> None:
         Requires(Acc(self.x))
         # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 0)
+        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 320)
         Ensures(Acc(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
@@ -29,7 +29,7 @@ class Clazz:
     def startAndJoinRead(self) -> None:
         Requires(Rd(self.x))
         # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 0)
+        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 320)
         Ensures(Rd(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
