@@ -140,6 +140,7 @@ class Carbon:
         self.carbon.start()
         self.arpplugin = ARPPlugin(jvm)
         self.ready = True
+        self.jvm = jvm
 
     def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
@@ -148,7 +149,16 @@ class Carbon:
         if not self.ready:
             self.carbon.restart()
         if arp:
+            fields = self.jvm.scala.collection.mutable.ArraySeq(6)
+            fields.update(0, "MustReleaseBounded")
+            fields.update(1, "MustReleaseUnbounded")
+            fields.update(2, "MustTerminate")
+            fields.update(3, "MustInvokeBounded")
+            fields.update(4, "MustInvokeUnbounded")
+            fields.update(5, "MustInvokeCredit")
+            self.arpplugin.arpplugin.setIgnoredFields(fields)
             arp_prog = self.arpplugin.beforeVerify(prog)
+            print(arp_prog)
             arp_result = self.carbon.verify(arp_prog)
             result = self.arpplugin.mapVerificationResult(arp_result)
         else:
