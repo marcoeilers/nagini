@@ -117,10 +117,11 @@ class ObligationMethodNodeConstructor:
             # Convert body to Scala.
             body_block = self._translator.translate_block(
                 body, self._position, self._info)
-        return self._viper.Method(
+        res = self._viper.Method(
             method.name, method.args, method.returns,
             method.pres, method.posts, method.local_vars, body_block,
             self._position, self._info)
+        return res
 
     def add_obligations(self) -> None:
         """Add obligation stuff to Method."""
@@ -288,8 +289,11 @@ class ObligationMethodNodeConstructor:
         check = sil.InhaleExhale(sil.TrueLit(), exhale)
         # Translate to Silver.
         if self._python_method.node is None:
-            # TODO: Handle interface methods properly.
-            node = ast.AST()
+            node = ast.FunctionDef()
+            if self._python_method.interface_name is not None:
+                node.name = self._python_method.interface_name
+            else:
+                node.name = self._python_method.name
             node.lineno = 0
             node.col_offset = 0
         else:
