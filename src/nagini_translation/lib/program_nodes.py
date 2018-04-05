@@ -372,7 +372,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.static_fields = OrderedDict()
         self.type = None  # infer, domain type
         self.interface = interface
-        self.interface_name = None
         self.defined = False
         self._has_classmethod = False
         self.type_vars = OrderedDict()
@@ -924,6 +923,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
+        self.interface_name = None
         self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.method_type = method_type
