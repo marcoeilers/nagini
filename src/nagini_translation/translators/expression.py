@@ -716,6 +716,38 @@ class ExpressionTranslator(CommonTranslator):
                 ctx.current_function.call_deps.add((node, receiver, ctx.module))
         return res
 
+    def translate_adt_decons(self, decons: PythonClass, node: ast.Attribute, pos: Position, ctx: Context) -> StmtsAndExpr:
+        """
+        Deconstructs the ADT into the selected component, boxing the result if the projected component's type is ADT (recursive composition).
+        """
+        info = self.no_info(ctx)
+        adt_name = decons.adt_def.name + '_ADT'
+        adt_type = self.viper.DomainType(adt_name, {}, [])
+
+        # If ADT is casted, ignore the casting since 'decons' already reflects the casted type
+        if isinstance(node.value , ast.Call) and node.value.func.id == 'cast':
+            stmt, adt_obj = self.translate_expr(node.value.args[1], ctx)
+        else:
+            stmt, adt_obj = self.translate_expr(node.value, ctx)
+
+        # Unbox ADT to be deconstructed
+        unbox_func = self.viper.FuncApp('unbox_' + adt_name, [adt_obj], pos, info, adt_type)
+
+        # Calculate return type
+        if decons.fields[node.attr].type == decons.adt_def:
+            decons_type = adt_type
+        else:
+            decons_type = self.viper.Ref
+
+        # Translate deconstruction call
+        decons_call = self.viper.DomainFuncApp(decons.name + '_' + node.attr, [unbox_func], decons_type, pos, info, adt_name)
+
+        # If returned type is ADT type, box it
+        if decons_type == adt_type:
+            decons_call = self.viper.FuncApp('box_' + adt_name, [decons_call], pos, info, self.viper.Ref)
+
+        return stmt, decons_call
+
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
@@ -753,6 +785,11 @@ class ExpressionTranslator(CommonTranslator):
                 return (stmt, chain_cond_exp(guarded_field_access, self.viper,
                                              position, self.no_info(ctx), ctx))
         else:
+            # If the receiver is an ADT, attribute access is translated as deconstruction
+            recv_type = self.get_type(node.value, ctx)
+            if isinstance(recv_type, PythonClass) and recv_type.is_adt:
+                return self.translate_adt_decons(recv_type, node, position, ctx)
+
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             field = self._lookup_field(node, ctx)
