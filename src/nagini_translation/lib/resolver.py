@@ -73,7 +73,7 @@ def get_target(node: ast.AST,
             # Return the type of the current method's superclass
             return container.cls.superclass
         elif func_name == 'cast':
-            return get_target(node.args[0], containers, container)
+            return None
         return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
