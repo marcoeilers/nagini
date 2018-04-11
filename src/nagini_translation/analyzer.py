@@ -1064,9 +1064,12 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_tuple_type(mypy_type):
             # Handle case where ADT (class) is typed as tuple
             if hasattr(mypy_type, 'fallback'):
-                fallback_type = self.convert_type(mypy_type.fallback, node)
-                if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
-                    return fallback_type
+                try:
+                    fallback_type = self.convert_type(mypy_type.fallback, node)
+                    if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
+                        return fallback_type
+                except UnsupportedException:
+                    pass
             # Regular tuple handling
             args = [self.convert_type(arg_type, node)
                     for arg_type in mypy_type.items]
