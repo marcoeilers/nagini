@@ -737,7 +737,7 @@ class ProgramTranslator(CommonTranslator):
                     if arg_type.type.name == adt.name:
                         function_type = adt_type
                     else:
-                        function_type = self.viper.Ref  # TODO decide if type is direct or boxing
+                        function_type = self.viper.Ref
                     function = self.viper.DomainFunc(cons.name + '_' + arg_name, [adt_obj_decl], function_type, False, pos, info, adt_name)
                     domain_funcs.append(function)
             
@@ -849,6 +849,7 @@ class ProgramTranslator(CommonTranslator):
             postconds = []
             adt_ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
             preconds.append(self.type_factory.type_check(adt_ref_use, adt, pos, ctx))
+            result = self.viper.Result(adt_type, pos, info)
             box_func = self.viper.FuncApp('box_' + adt_name, [result], pos, info, self.viper.Ref)
             postconds.append(self.viper.EqCmp(box_func, adt_ref_use, pos, info))
             adt_ref_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
