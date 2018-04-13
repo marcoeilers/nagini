@@ -16,7 +16,6 @@ class Node(LinkedList, NamedTuple('Node', [('elem', int), ('next', LinkedList)])
 class Null(LinkedList, NamedTuple('Null', [])):
     pass
 
-
 def common_use_of_ADTs()-> None:
     l_1 = Null()
 
@@ -31,3 +30,13 @@ def common_use_of_ADTs()-> None:
 def preppend_2(l: LinkedList, elem: int) -> LinkedList:
     Ensures(Result() == Node(elem, l))
     return Node(elem, l)
+
+def wrong_cast_1(l: LinkedList) -> None:
+    Requires(l == Node(3, Node(4, Null())))
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    temp = cast(Null, l)
+
+def wrong_cast_2(l: LinkedList) -> None:
+    Requires(l == Node(3, Null()))
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    temp = cast(Null, l)
