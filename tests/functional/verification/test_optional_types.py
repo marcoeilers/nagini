@@ -5,14 +5,18 @@ from typing import Optional
 class Cont1:
     def __init__(self) -> None:
         Ensures(Acc(self.v))  # type: ignore
+        Ensures(Acc(self.c2) and Acc(self.c2.v))  # type: ignore
         self.v = 2
+        self.c2 = Cont2()
 
     def m(self) -> None:
         return
 
 
 class Cont2:
-    pass
+    def __init__(self) -> None:
+        Ensures(Acc(self.v))  # type: ignore
+        self.v = 2
 
 
 def return_optional(b: bool) -> Optional[Cont1]:
@@ -84,3 +88,10 @@ def method_access(o1: Optional[Cont1], b: bool) -> None:
         o1.m()
     #:: ExpectedOutput(call.precondition:assertion.false)
     o1.m()
+
+def complex_expression(o1: Optional[Cont1], b: bool) -> None:
+    Requires(Implies(b, o1 is not None and Acc(o1.c2) and Acc(o1.c2.v)))
+    if b:
+        o1.c2.v = 12
+    #:: ExpectedOutput(assignment.failed:insufficient.permission)
+    tmp = o1.c2.v

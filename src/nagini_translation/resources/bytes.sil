@@ -19,8 +19,9 @@ function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
 	ensures bytes___val__(result) == value
 
 function bytes___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), bytes())
-	ensures result == bytes___len__(self) != 0
+    requires self != null ==> issubtype(typeof(self), bytes())
+    ensures self == null ==> !result
+	ensures self != null ==> result == (bytes___len__(self) != 0)
 
 function bytes___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), bytes())

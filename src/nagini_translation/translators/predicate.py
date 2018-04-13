@@ -69,6 +69,7 @@ class PredicateTranslator(CommonTranslator):
         args = []
         self_var_ref = root.args[next(iter(root.args))].ref()
         arg_types = self.viper.TrueLit(self.no_position(ctx), self.no_info(ctx))
+        self.bind_type_vars(root, ctx)
         for arg in root.args.values():
             args.append(arg.decl)
             arg_type = self.type_check(arg.ref(), arg.type,
@@ -85,6 +86,7 @@ class PredicateTranslator(CommonTranslator):
                                               'invalid.predicate')
             ctx.current_function = instance
             ctx.module = instance.module
+            self.bind_type_vars(instance, ctx)
             # Replace variables in instance by variables in root, since we use the
             # parameter names from root.
             for root_name, current_name in zip(root.args.keys(),
@@ -97,11 +99,16 @@ class PredicateTranslator(CommonTranslator):
                     root_var = copy.copy(root_var)
                     root_var.type = instance.cls
                 ctx.set_alias(current_name, root_var)
-            if len(instance.node.body) != 1:
+            actual_body_start = 0
+            while (actual_body_start < len(instance.node.body) and
+                       isinstance(instance.node.body[actual_body_start], ast.Expr) and
+                    isinstance(instance.node.body[actual_body_start].value, ast.Str)):
+                actual_body_start += 1
+            if len(instance.node.body[actual_body_start:]) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
             stmt, current = self.translate_expr(
-                    instance.node.body[0],
+                    instance.node.body[actual_body_start],
                     ctx, impure=True,
                     target_type=self.viper.Bool)
             if stmt:

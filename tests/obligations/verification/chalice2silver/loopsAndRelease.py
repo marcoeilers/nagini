@@ -14,19 +14,21 @@ from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def rel_now(a: Lock) -> None:
+def rel_now(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
+    Requires(a.invariant())
     a.release()
 
 
-def rel_later(a: Lock) -> None:
+def rel_later(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 10))
+    Requires(a.invariant())
     a.release()
 
 
-def f(a: Lock) -> None:
+def f(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 
@@ -40,7 +42,7 @@ def f(a: Lock) -> None:
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def f_leak(a: Lock) -> None:
+def f_leak(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 
@@ -52,7 +54,7 @@ def f_leak(a: Lock) -> None:
         i += 1
 
 
-def f_leak2(a: Lock) -> None:
+def f_leak2(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 

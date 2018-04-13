@@ -21,7 +21,7 @@ class A:
 
     def __init__(self) -> None:
         Ensures(Acc(self.a) and Acc(self.b))
-        self.a = None   # type: Optional[Lock]
+        self.a = None   # type: Optional[Lock[A]]
         self.b = 0      # type: int
 
     def d3(self) -> None:
@@ -56,19 +56,20 @@ class A:
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
         Requires(other.b >= 2)
+        Requires(other.a.invariant())
 
         other.a.release()
 
     def timed_release_unbounded(self) -> None:
         x = A()
-        x.a = Lock()
+        x.a = Lock(x)
         x.a.acquire()
         x.b = 15
         self.quick_release(x)
 
     def timed_release_unbounded_subzero(self) -> None:
         x = A()
-        x.a = Lock()
+        x.a = Lock(x)
         x.a.acquire()
         x.b = -1
         #:: ExpectedOutput(call.precondition:obligation_measure.non_positive)
@@ -87,16 +88,16 @@ class A:
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
 
-        #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(call.precondition:insufficient.permission)
+        #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(call.precondition:insufficient.permission)|ExpectedOutput(carbon)(call.precondition:insufficient.permission)
         self.quick_release(other)
 
     def timed_release_bounded_statdec(self, other: 'A') -> None:
-        Requires(Acc(other.a) and Acc(other.b))
+        Requires(Acc(other.a) and Acc(other.b) and other.a.invariant())
         Requires(other.b > 5 and MustRelease(other.a,other.b+1))
         self.quick_release(other)
 
     def timed_release_bounded_mutdec(self, other: 'A') -> None:
-        Requires(Acc(other.a) and Acc(other.b) and other.b > 2)
+        Requires(Acc(other.a) and Acc(other.b) and other.b > 2 and other.a.invariant())
         Requires(MustRelease(other.a, other.b))
         other.b -= 1
         self.quick_release(other)

@@ -195,6 +195,8 @@ class WaitLevelTranslator(CommonTranslator):
         exhale = self._create_level_below_inex(
             guard, expr, obligation_info.residue_level, ctx)
         translated_exhale = exhale.translate(self, ctx, position, info)
+        if ctx.ignore_waitlevel_constraints:
+            return sil.TrueLit()
         if ctx.obligation_context.is_translating_posts:
             obligation_info.add_postcondition(translated_exhale)
             caller_inhale = sil.InhaleExhale(

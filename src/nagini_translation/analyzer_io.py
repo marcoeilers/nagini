@@ -79,7 +79,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         func_type = self._parent.module.get_func_type([op_name])
         if isinstance(func_type, AnyType):
             self._raise_invalid_operation('return_type_not_bool')
-        operation_type = self._parent.convert_type(func_type)
+        operation_type = self._parent.convert_type(func_type,
+                                                   self._current_io_operation.node)
         if not operation_type or operation_type.name != BOOL_TYPE:
             self._raise_invalid_operation('return_type_not_bool')
 
@@ -115,7 +116,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         typ, _ = self._parent.module.get_type(scopes, node.arg)
         # to avoid problems with boxed versions not being reference-equal,
         # always use unboxed versions
-        result = self._parent.convert_type(typ).try_unbox()
+        result = self._parent.convert_type(typ, node).try_unbox()
         return result
 
     def _set_preset(self, inputs: List[ast.arg]) -> List[ast.arg]:

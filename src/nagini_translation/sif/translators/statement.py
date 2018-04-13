@@ -108,7 +108,7 @@ class SIFStatementTranslator(StatementTranslator):
 
     def _assign_with_subscript(
             self, lhs: ast.Tuple, rhs: Expr, node: ast.AST,
-            ctx: SIFContext) -> Tuple[List[Stmt], List[Expr]]:
+            ctx: SIFContext, allow_impure=False) -> Tuple[List[Stmt], List[Expr]]:
         if isinstance(node.targets[0].slice, ast.ExtSlice):
             raise UnsupportedException(
                 node, "assignment to slice not supported")

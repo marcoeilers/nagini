@@ -1,4 +1,3 @@
-#:: IgnoreFile(53)
 from nagini_contracts.contracts import (
     Exsures,
 )
@@ -9,9 +8,11 @@ def callee() -> int:
     raise Exception()
 
 
+#:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
 def caller() -> int:
     try:
         a = callee()
     except:
+        #:: ExpectedOutput(expression.undefined:undefined.local.variable)
         return a
     return 5

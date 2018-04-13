@@ -14,3 +14,12 @@ def test_max() -> None:
     assert c == 0
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
+
+def test_min() -> None:
+    a = [1,2,3]
+    c = min(a)
+    e = min(3, 7)
+    assert e == 3
+    assert c is not 6
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c is not 1

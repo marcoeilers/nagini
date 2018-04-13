@@ -41,6 +41,7 @@ from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
+    OptionalType,
     PythonClass,
     PythonIOOperation,
     PythonMethod,
@@ -169,6 +170,13 @@ class CallTranslator(CommonTranslator):
         box_func = self.viper.FuncApp('box_' + adt_name, [cons_call], pos, info, self.viper.Ref)
         return box_func
 
+    def _is_lock_subtype(self, cls: PythonClass) -> bool:
+        if cls is None:
+            return False
+        if cls.name == 'Lock':
+            return cls
+        return self._is_lock_subtype(cls.superclass)
+
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -184,6 +192,7 @@ class CallTranslator(CommonTranslator):
                                                        self.translator)
         result_type = self.get_type(node, ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
 
         if target_class.is_adt:
             return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
@@ -195,7 +204,7 @@ class CallTranslator(CommonTranslator):
         current_type = result_type
         while current_type:
             if isinstance(current_type, GenericType):
-                vars_args = zip(current_type.cls.type_vars.items(),
+                vars_args = zip(current_type.python_class.type_vars.items(),
                                 current_type.type_args)
                 for (name, var), arg in vars_args:
                     literal = self.type_factory.translate_type_literal(arg, pos,
@@ -216,14 +225,15 @@ class CallTranslator(CommonTranslator):
 
         result_has_type = self.type_factory.type_check(res_var.ref(), result_type, pos,
                                                        ctx, concrete=True)
-        # Mark the current function as depending on the called class. If we're in
-        # a global context, assert that the called class and its dependencies are defined.
-        func_node = node.func if isinstance(node, ast.Call) else node
-        self._add_dependencies(func_node, target_class, ctx)
         defined_check = []
-        if self.is_main_method(ctx):
-            defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
-                                                       ctx)
+        if target_class.module is not target_class.module.global_module:
+            # Mark the current function as depending on the called class. If we're in
+            # a global context, assert that the called class and its dependencies are defined.
+            func_node = node.func if isinstance(node, ast.Call) else node
+            self._add_dependencies(func_node, target_class, ctx)
+            if self.is_main_method(ctx):
+                defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
+                                                           ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -231,6 +241,22 @@ class CallTranslator(CommonTranslator):
                                         self.no_info(ctx))
         args = [res_var.ref()] + args
         stmts = [new, type_inhale] + may_set_inhales
+
+        if self._is_lock_subtype(target_class):
+            # For locks, fold the invariant predicate before actually calling the
+            # constructor (which requires the predicate in its precondition).
+            lock_class = self._is_lock_subtype(target_class)
+            locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
+                                                [None], node, ctx, pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+            invariant_pred = lock_class.get_predicate('invariant')
+            full_perm = self.viper.FullPerm(pos, info)
+            pred_acc = self.viper.PredicateAccess([res_var.ref()],
+                                                  invariant_pred.sil_name, pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
+            stmts.append(self.viper.Fold(acc_pred, pos, info))
+
         target = target_class.get_method('__init__')
         if target:
             target_class = target.cls
@@ -397,13 +423,14 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
-        # Mark the current function as depending on the called method. If we're in
-        # a global context, assert that the called method and its dependencies are
-        # defined.
-        self._add_dependencies(node.func, target, ctx)
         defined_check = []
-        if self.is_main_method(ctx) and not target.cls:
-            defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called method. If we're in
+            # a global context, assert that the called method and its dependencies are
+            # defined.
+            self._add_dependencies(node.func, target, ctx)
+            if self.is_main_method(ctx) and not target.cls:
+                defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -440,12 +467,13 @@ class CallTranslator(CommonTranslator):
         type = self.translate_type(target.type, ctx)
         call = self.viper.FuncApp(target.sil_name, args, position,
                                   self.no_info(ctx), type, formal_args)
-        # Mark the current function as depending on the called function. If we're in
-        # a global context, wrap the result into a check that the called function and its
-        # dependencies are defined.
-        self._add_dependencies(node.func, target, ctx)
-        if not target.cls and self.is_main_method(ctx):
-            call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
+        if target.module is not target.module.global_module:
+            # Mark the current function as depending on the called function. If we're in
+            # a global context, wrap the result into a check that the called function and its
+            # dependencies are defined.
+            self._add_dependencies(node.func, target, ctx)
+            if not target.cls and self.is_main_method(ctx):
+                call = self.wrap_global_defined_check(call, target, ctx.module, node.func, ctx)
         return arg_stmts, call
 
     def _get_call_target(self, node: ast.Call,
@@ -589,6 +617,22 @@ class CallTranslator(CommonTranslator):
         if implicit_receiver is None:
             implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
 
+        if target.interface:
+            # For interface functions defined directly in silver, missing arguments
+            # are just set to null.
+            if keywords:
+                raise UnsupportedException(node, desc='Keyword arguments in call to '
+                                                      'builtin function.')
+            diff = target.nargs - len(unpacked_args)
+            if diff < 0:
+                raise UnsupportedException(node, 'Unsupported version of builtin '
+                                                 'function.')
+            if diff > 0:
+                null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+                unpacked_args += [null] * diff
+                unpacked_arg_types += [None] * diff
+            return arg_stmts, unpacked_args, unpacked_arg_types
+
         nargs = target.nargs
         keys = list(target.args.keys())
         if implicit_receiver:
@@ -711,6 +755,7 @@ class CallTranslator(CommonTranslator):
         ctx.inlined_calls.append(method)
         ctx.var_aliases = var_aliases
         ctx.label_aliases = {}
+        ctx.ignore_waitlevel_constraints = True
 
         # Create local var aliases
         locals_to_copy = method.locals.copy()
@@ -842,7 +887,15 @@ class CallTranslator(CommonTranslator):
             # Handle method calls when receiver's type is union
             if isinstance(node.func, ast.Attribute):
                 rectype = self.get_type(node.func.value, ctx)
-                if isinstance(rectype, UnionType):
+                if (isinstance(rectype, UnionType) and
+                        not isinstance(rectype, OptionalType)):
+                    # Check if the call refers to a predicate (family),
+                    # in which case we don't need special treatment.
+                    target_pred = rectype.python_class.get_predicate(node.func.attr)
+                    if target_pred:
+                        return self.translate_normal_call(target_pred, arg_stmts, args,
+                                                          arg_types, node, ctx, impure)
+                    # Otherwise apply special union treatment.
                     return self.translate_method_call_in_union(arg_stmts, args, arg_types,
                                                                rectype, node, ctx, impure)
 
@@ -1314,6 +1367,7 @@ class CallTranslator(CommonTranslator):
         for name in method._args:
             ctx.remove_alias(name)
         ctx.remove_alias(RESULT_NAME)
+        ctx.ignore_waitlevel_constraints = False
 
         # Inhale postcondition if there's a permission to ThreadPost and this method
         # is the actual method.

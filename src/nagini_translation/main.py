@@ -5,6 +5,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import argparse
+import astunparse
 import inspect
 import json
 import logging
@@ -23,6 +24,7 @@ from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
@@ -75,7 +77,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
-              sif: bool = False, reload_resources: bool = False):
+              sif: bool = False, ignore_global: bool = False,
+              reload_resources: bool = False) -> Program:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -109,7 +112,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected)
+    prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
     return prog
 
 
@@ -225,6 +228,11 @@ def main() -> None:
         help='select specific methods or classes to verify, separated by commas'
     )
     parser.add_argument(
+        '--ignore-global',
+        action='store_true',
+        help='do not verify the the top level program (global statements)'
+    )
+    parser.add_argument(
         '--server',
         action='store_true',
         help='Start Nagini server'
@@ -235,6 +243,7 @@ def main() -> None:
     config.boogie_path = args.boogie
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
+    config.set_verifier(args.verifier)
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
@@ -271,7 +280,7 @@ def main() -> None:
 def translate_and_verify(python_file, jvm, args, print=print):
     try:
         selected = set(args.select.split(',')) if args.select else set()
-        prog = translate(python_file, jvm, selected, args.sif)
+        prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
             print('Translation successful.')
         if args.print_silver:
@@ -288,12 +297,13 @@ def translate_and_verify(python_file, jvm, args, print=print):
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark >= 1:
+            print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
+                prog = translate(python_file, jvm, selected, args.sif)
                 vresult = verify(prog, python_file, jvm, backend=backend)
                 end = time.time()
-                assert vresult
-                print("RUN,{},{},{},{},{}".format(
+                print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(prog, python_file, jvm, backend=backend)
@@ -314,7 +324,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 if e.args[0]:
                     issue += e.args[0]
                 else:
-                    issue += str(e.node)
+                    issue += astunparse.unparse(e.node)
             line = str(e.node.lineno)
             col = str(e.node.col_offset)
             print(issue + ' (' + python_file + '@' + line + '.' + col + ')')
