@@ -723,6 +723,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         info = self.no_info(ctx)
         adt_name = decons.adt_def.name + '_ADT'
+        adt_prefix = decons.adt_def.name + '_'
         adt_type = self.viper.DomainType(adt_name, {}, [])
 
         # If ADT is casted, ignore the casting since 'decons' already reflects the casted type
@@ -741,7 +742,7 @@ class ExpressionTranslator(CommonTranslator):
             decons_type = self.viper.Ref
 
         # Translate deconstruction call
-        decons_call = self.viper.DomainFuncApp(decons.name + '_' + node.attr, [unbox_func], decons_type, pos, info, adt_name)
+        decons_call = self.viper.DomainFuncApp(adt_prefix + decons.name + '_' + node.attr, [unbox_func], decons_type, pos, info, adt_name)
 
         # If returned type is ADT type, box it
         if decons_type == adt_type:

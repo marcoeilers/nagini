@@ -155,6 +155,7 @@ class CallTranslator(CommonTranslator):
         """
         info = self.no_info(ctx)
         adt_name = cons.adt_def.name + '_ADT'
+        adt_prefix = cons.adt_def.name + '_'
         adt_type = self.viper.DomainType(adt_name, {}, [])
 
         # If expected argument type is the ADT type (another constructor call), unbox translated argument
@@ -164,7 +165,7 @@ class CallTranslator(CommonTranslator):
                 args[index] = unbox_func
 
         # Translate constructor call
-        cons_call = self.viper.DomainFuncApp(cons.name + '_ADT', args, adt_type, pos, info, adt_name)
+        cons_call = self.viper.DomainFuncApp(adt_prefix + cons.name, args, adt_type, pos, info, adt_name)
 
         # Box translated constructor
         box_func = self.viper.FuncApp('box_' + adt_name, [cons_call], pos, info, self.viper.Ref)
