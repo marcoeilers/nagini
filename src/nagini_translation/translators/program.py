@@ -831,6 +831,23 @@ class ProgramTranslator(CommonTranslator):
                 forall = self.viper.Forall([adt_obj_decl], [], eqv, pos, info)
                 axiom = self.viper.DomainAxiom(adt_prefix + 'associate_cons_type_function_with_is_' + cons.name + '_bool_function', forall, pos, info, adt_name)
                 axioms.append(axiom)
+            
+            ## Express the fact that constructors can only be subclasses of the ADT (abstract class)
+            ref_var_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
+            typeof_expr = self.type_factory.typeof(ref_var_use, ctx)
+            func_call_expr = self.viper.DomainFuncApp(adt.name, [], self.type_factory.type_type(), pos, info, self.type_factory.type_domain)
+            issubtype_expr = self.type_factory._issubtype(typeof_expr, func_call_expr, ctx)
+            eqs = []
+            for cons in adt.all_subclasses[1:]:
+                cons_call = self.viper.DomainFuncApp(cons.name, [], self.type_factory.type_type(), pos, info, self.type_factory.type_domain)
+                eq = self.viper.EqCmp(typeof_expr, cons_call, pos, info)
+                eqs.append(eq)
+            or_expr = disjoin(eqs, pos, info)
+            impl = self.viper.Implies(issubtype_expr, or_expr, pos, info)
+            ref_var_decl = self.viper.LocalVarDecl('ref', self.viper.Ref, pos, info)
+            forall = self.viper.Forall([ref_var_decl], [], impl, pos, info)
+            axiom = self.viper.DomainAxiom(adt_prefix + 'type_of_constructors', forall, pos, info, adt_name)
+            axioms.append(axiom)
 
             # Create domain
             domains.append(self.viper.Domain(adt_name, domain_funcs, axioms, [], pos, info))

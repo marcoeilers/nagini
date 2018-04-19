@@ -27,9 +27,21 @@ def common_use_of_ADTs()-> None:
     l_3 = Node(3, Node(4, Null()))
     assert cast(Node, l_3.next).elem == 4
 
-def preppend_2(l: LinkedList, elem: int) -> LinkedList:
+def preppend(l: LinkedList, elem: int) -> LinkedList:
     Ensures(Result() == Node(elem, l))
     return Node(elem, l)
+
+def constructor_totality_1(l: LinkedList) -> None:
+    if type(l) is Node:
+        Assert(type(l) is not Null)
+    else:
+        Assert(type(l) is Null)
+
+def constructor_totality_2(l: LinkedList) -> None:
+    if type(l) is Null:
+        Assert(type(l) is not Node)
+    else:
+        Assert(type(l) is Node)
 
 def wrong_cast_1(l: LinkedList) -> None:
     Requires(l == Node(3, Node(4, Null())))
