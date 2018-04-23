@@ -731,11 +731,11 @@ class StatementTranslator(CommonTranslator):
                                 self.viper.NullLit(position, info),
                                 position, info)
 
-        conditional_assign = self.viper.If(cond, self.translate_block(assign_stmt, position, info),
-                                    self.translate_block([], position, info), position, info)
+        conditional_assign = self.viper.If(cond, self.translate_block(assign_stmt,
+                                                                      position, info),
+                                           self.translate_block([], position, info),
+                                           position, info)
         assign_stmt = [conditional_assign]
-
-        #assign_expr = [self.viper.Implies(cond, e, position, info) for e in assign_expr]
 
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
 
@@ -1062,7 +1062,8 @@ class StatementTranslator(CommonTranslator):
             before_assign.append(permission_inhale)
 
         assign_stmt = assignment(var, rhs, position, info)
-        assign_val = self.viper.And(self.viper.EqCmp(var, rhs, position, info), definedness_expr, position, info)
+        assign_val = self.viper.And(self.viper.EqCmp(var, rhs, position, info),
+                                    definedness_expr, position, info)
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
 
     def create_new_field_permission(self, field_acc: Expr, target: PythonField,

@@ -923,7 +923,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.predicate = False
         self.contract_only = contract_only
         self.interface = interface
-        self.interface_name = None
+        self.interface_name = None  # Name to be used in error messages, if different from
+                                    # the "actual" internal name. To be used for interface
+                                    # methods.
         self.interface_dict = interface_dict
         self.node_factory = node_factory
         self.method_type = method_type
