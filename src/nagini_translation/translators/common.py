@@ -257,15 +257,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
         return pred_acc
 
+    def check_var_defined(self, target: PythonVar, position: Position,
+                        info: Info) -> Expr:
+        id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
+        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
+                                        self.viper.Bool, [id_param_decl])
+        return is_defined
+
     def set_var_defined(self, target: PythonVar, position: Position,
                         info: Info) -> Stmt:
         """
         Returns an inhale which assumes that the given local variable is now defined.
         """
-        id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
-        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
-        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
-                                        self.viper.Bool, [id_param_decl])
+        is_defined = self.check_var_defined(target, position, info)
         return self.viper.Inhale(is_defined, position, info)
 
     def set_global_defined(self, declaration: PythonNode, module: PythonModule,

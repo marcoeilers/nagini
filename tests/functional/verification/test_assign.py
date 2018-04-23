@@ -57,7 +57,6 @@ def m5() -> None:
         tmp.append('inside')
         assert len(tmp) == tmpln + 1
         assert len(c) == cln
-        c = tmp
     assert len(b) == 3
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert b == 'not'
