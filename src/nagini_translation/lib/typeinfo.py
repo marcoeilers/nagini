@@ -64,11 +64,16 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(rectype, mypy.types.CallableType) and
                 not isinstance(rectype, str) and
                 not isinstance(rectype, mypy.types.AnyType) and
-                not isinstance(rectype, mypy.types.UnionType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
-            self.set_type(rectype.type.fullname().split('.') + [node.name],
-                          self.type_of(node),
-                          node.line, col(node))
+            if isinstance(rectype, mypy.types.UnionType):
+                types = [i for i in rectype.items
+                         if not isinstance(i, mypy.types.NoneTyp)]
+            else:
+                types = [rectype]
+            for t in types:
+                self.set_type(t.type.fullname().split('.') + [node.name],
+                              self.type_of(node),
+                              node.line, col(node))
         super().visit_member_expr(node)
 
     def visit_del_stmt(self, node: mypy.nodes.DelStmt):

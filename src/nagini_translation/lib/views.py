@@ -129,8 +129,8 @@ class PythonModuleView:
             return []
         return self.module.get_included_modules(exclude, include_global)
 
-    def get_type(self, prefixes, name):
-        return self.module.get_type(prefixes, name)
+    def get_type(self, prefixes, name, previous=()):
+        return self.module.get_type(prefixes, name, previous)
 
     def get_func_type(self, prefix):
         return self.module.get_func_type(prefix)
