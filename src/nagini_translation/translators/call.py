@@ -969,10 +969,10 @@ class CallTranslator(CommonTranslator):
                        family_root.superclass.get_predicate(name)):
                     family_root = family_root.superclass
                 target_name = family_root.get_predicate(name).sil_name
-            if ctx.current_function.pure:
-                perm = self.viper.WildcardPerm(position, self.no_info(ctx))
-            else:
-                perm = self.viper.FullPerm(position, self.no_info(ctx))
+            #if ctx.current_function.pure:
+            #    perm = self.viper.WildcardPerm(position, self.no_info(ctx))
+            #else:
+            perm = self.viper.FullPerm(position, self.no_info(ctx))
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             return arg_stmts, self.create_predicate_access(target_name, args,
