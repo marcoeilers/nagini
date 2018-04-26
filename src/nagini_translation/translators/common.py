@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    OptionalType,
     PythonClass,
     PythonField,
     PythonIOOperation,
@@ -32,6 +33,8 @@ from nagini_translation.lib.program_nodes import (
     PythonNode,
     PythonType,
     PythonVar,
+    toposort_classes,
+    UnionType,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -539,6 +542,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         unboxed the result if needed as well.
         """
         if receiver:
+            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
+                info = self.no_info(ctx)
+                guarded_blocks = []
+                # For each class in union
+                for type in toposort_classes(receiver.get_types() - {None}):
+                    # If receiver is an instance of this particular class
+                    guard = self.type_check(args[0], type, position, ctx)
+                    call = self.get_function_call(type, func_name, args, arg_types, node,
+                                                  ctx, position)
+                    guarded_blocks.append((guard, call))
+                current = guarded_blocks[-1][1]
+                for guard, call in reversed(guarded_blocks[:-1]):
+                    current = self.viper.CondExp(guard, call, current, position, info)
+                return current
             target_cls = receiver
             func = target_cls.get_function(func_name)
         else:

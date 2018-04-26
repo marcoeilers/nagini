@@ -24,10 +24,12 @@ from nagini_translation.lib.constants import (
     GET_ARG_FUNC,
     GET_METHOD_FUNC,
     GET_OLD_FUNC,
+    INT_TYPE,
     JOINABLE_FUNC,
     LIST_TYPE,
     METHOD_ID_DOMAIN,
     OBJECT_TYPE,
+    PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -354,6 +356,44 @@ class CallTranslator(CommonTranslator):
                                       arg_types, node, ctx)
         return start_stmt + end_stmt, call
 
+    def _translate_enumerate(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        if len(node.args) != 1:
+            msg = 'enumerate() is currently only supported with one args.'
+            raise UnsupportedException(node, msg)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        result_type = self.get_type(node, ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        arg_stmt, arg = self.translate_expr(node.args[0], ctx)
+        arg_contents = self.get_function_call(arg_type, '__sil_seq__', [arg], [None],
+                                              node.args[0], ctx)
+        new_list = ctx.actual_function.create_variable('enumerate_res', result_type,
+                                                       self.translator)
+        sil_ref_seq = self.viper.SeqType(self.viper.Ref)
+        seq_field = self.viper.Field('list_acc', sil_ref_seq, pos, info)
+        new_stmt = self.viper.NewStmt(new_list.ref(), [seq_field], pos, info)
+        seq_ref = self.viper.FieldAccess(new_list.ref(), seq_field, pos, info)
+        prim_int_type = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
+        int_type = ctx.module.global_module.classes[INT_TYPE]
+        list_type_info = self.type_check(new_list.ref(), result_type, pos, ctx)
+        list_len_info = self.viper.EqCmp(self.viper.SeqLength(seq_ref, pos, info),
+                                         self.viper.SeqLength(arg_contents, pos, info),
+                                         pos, info)
+        type_inhale = self.viper.Inhale(self.viper.And(list_type_info, list_len_info,
+                                                       pos, info),
+                                        pos, info)
+        i_var = ctx.actual_function.create_variable('i', prim_int_type, self.translator,
+                                                    False)
+        orig_seq_i = self.viper.SeqIndex(arg_contents, i_var.ref(), pos, info)
+        content_type = result_type.type_args[0].type_args[1]
+        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i], [int_type, content_type], node, ctx)
+        new_list_i = self.viper.SeqIndex(seq_ref, i_var.ref(), pos, info)
+        equal_content = self.viper.EqCmp(new_list_i, tuple_for_i, pos, info)
+        trigger = self.viper.Trigger([new_list_i], pos, info)
+        contents_info = self.viper.Forall([i_var.decl], [trigger], equal_content, pos, info)
+        contents_inhale = self.viper.Inhale(contents_info, pos, info)
+        return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node, ctx)
+
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -376,6 +416,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_list(node, ctx)
         elif func_name == 'range':
             return self._translate_range(node, ctx)
+        elif func_name == 'enumerate':
+            return self._translate_enumerate(node, ctx)
         elif func_name == 'type':
             return self._translate_type_func(node, ctx)
         elif func_name == 'cast':

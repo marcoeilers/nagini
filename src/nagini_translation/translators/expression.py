@@ -743,9 +743,17 @@ class ExpressionTranslator(CommonTranslator):
                 field_guard = self.var_type_check(target.sil_name, recv_type, position, ctx)
 
                 # Access the field of the specific type
-                field = recv_type.get_field(node.attr).actual_field
-                field_access = self.viper.FieldAccess(receiver, field.sil_field,
-                                                      position, self.no_info(ctx))
+                field = recv_type.get_field(node.attr)
+                if isinstance(field, PythonField):
+                    field_access = self.viper.FieldAccess(receiver,
+                                                          field.actual_field.sil_field,
+                                                          position, self.no_info(ctx))
+                elif isinstance(field, PythonMethod):
+                    assert False  # too lazy to implement now
+                else:
+                    field = recv_type.get_static_field(node.attr)
+                    field_access = self.translate_static_field_access(field, receiver,
+                                                                      node, ctx)
 
                 guarded_field_access.append((field_guard, field_access))
             if len(guarded_field_access) == 1:
