@@ -27,7 +27,7 @@ def common_use_of_ADTs()-> None:
     l_3 = Node(3, Node(4, Null()))
     assert cast(Node, l_3.next).elem == 4
 
-def preppend(l: LinkedList, elem: int) -> LinkedList:
+def prepend(l: LinkedList, elem: int) -> LinkedList:
     Ensures(Result() == Node(elem, l))
     return Node(elem, l)
 

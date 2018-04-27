@@ -55,6 +55,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.typedefs import (
     Expr,
+    FuncApp,
     Position,
     Stmt,
     StmtsAndExpr,
@@ -149,8 +150,8 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
-    def translate_adt_cons(self, cons: PythonClass, args: List, pos,
-                           ctx: Context) -> Expr:
+    def translate_adt_cons(self, cons: PythonClass, args: List[FuncApp],
+                           pos: Position, ctx: Context) -> Expr:
         """
         Constructs ADTs via a sequence of constructor calls and
         boxing/unboxing calls.
@@ -162,8 +163,8 @@ class CallTranslator(CommonTranslator):
 
         # If expected argument type is the ADT type (another constructor call),
         # unbox translated argument
-        for index, ((_, arg_type), translated_arg) in enumerate(zip(cons.fields.items(),
-                                                                args)):
+        for index, (arg_type, translated_arg) in enumerate(zip(cons.fields.values(),
+                                                               args)):
             if arg_type.type == cons.adt_def:
                 unbox_func = self.viper.FuncApp('unbox_' + adt_name, [translated_arg],
                                                 pos, info, adt_type)

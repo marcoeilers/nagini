@@ -429,6 +429,54 @@ class Analyzer(ast.NodeVisitor):
             raise UnsupportedException(node,
                                        'class literal has unsupported format')
 
+    def _check_is_adt_well_formed(self, adt: PythonClass,
+                                  actual_bases: List[ast.AST],
+                                  node: ast.AST, ast: ast.AST):
+        """
+        Chechs if the ADT is syntactically well-formed, throwing an
+        invalid program exception otherwise.
+        """
+        adt.is_adt = True
+        # ADT classes can have at most two superclasses
+        if len(actual_bases) > 2:
+            raise InvalidProgramException(adt.node, 'malformed.adt',
+                    'malformed algebraic data type: superclasses can only ' +
+                    'be a class optionally followed by one NamedTuple')
+        # ADT classes should have no body
+        if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
+            raise InvalidProgramException(adt.node, 'malformed.adt',
+                    'malformed algebraic data type: classes cannot have ' +
+                    'body, fields should be defined in NamedTuples instead')
+        elif len(actual_bases) == 2:
+            # ADT classes can only define fields by inheriting from NamedTuple
+            if not (isinstance(actual_bases[1], ast.Call)
+                and actual_bases[1].func.id == 'NamedTuple'):
+                raise InvalidProgramException(actual_bases[1], 'malformed.adt',
+                    'malformed algebraic data type: only NamedTuple can be ' +
+                    'used to define fields')
+            # The name of the NamedTuple should match the ADT being defined
+            if not (adt.name == actual_bases[1].args[0].s):
+                raise InvalidProgramException(actual_bases[1], 'malformed.adt',
+                    'malformed algebraic data type: name of NamedTuple has to ' +
+                    'be the same of the class (ADT Constructor)')
+
+    def _visit_ADT(self, cls: PythonClass, actual_bases: List[ast.AST],
+                   node: ast.AST, ast: ast.AST) -> List[ast.AST]:
+        """
+        Parses an ADT if well-formed, throwing an exception otherwise. The
+        ADT is defined by a class hierarchy (sum) and a NamedTuple (product).
+        """
+        self._check_is_adt_well_formed(cls, actual_bases, node, ast)
+        if len(actual_bases) == 2:
+            # Parse NamedTuple's fields and their respective types
+            for field_decl in actual_bases[1].args[1].elts:
+                field_name, field_type = field_decl.elts
+                cls.add_field(field_name.s, field_decl,
+                    self.get_target(field_type, self.module))
+            # Consider ADTs as a special case of single inheritance
+            actual_bases = [actual_bases[0]]
+        return actual_bases
+
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.current_function or self.current_class:
             raise InvalidProgramException(node, 'nested.class.declaration')
@@ -463,43 +511,8 @@ class Analyzer(ast.NodeVisitor):
 
         if len(actual_bases) > 0:
             cls.superclass = self.find_or_create_target_class(actual_bases[0])
-
-            # Process ADT defined by a class hierarchy (sum) and a NamedTuple (product)
             if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
-                cls.is_adt = True
-                # Detect malformed ADTs
-                # ADT classes can have at most two superclasses
-                if len(actual_bases) > 2:
-                    raise InvalidProgramException(cls.node, 'malformed.adt',
-                            'malformed algebraic data type: superclasses can only ' +
-                            'be a class optionally followed by one NamedTuple')
-                # ADT classes should have no body
-                if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
-                    raise InvalidProgramException(cls.node, 'malformed.adt',
-                            'malformed algebraic data type: classes cannot have ' +
-                            'body, fields should be defined in NamedTuples instead')
-                elif len(actual_bases) == 2:
-                    # ADT classes can only define fields by inheriting from NamedTuple
-                    if not (isinstance(actual_bases[1], ast.Call)
-                       and actual_bases[1].func.id == 'NamedTuple'):
-                        raise InvalidProgramException(actual_bases[1], 'malformed.adt',
-                            'malformed algebraic data type: only NamedTuple can be ' +
-                            'used to define fields')
-                    # The name of the NamedTuple should match the ADT being defined
-                    if not (cls.name == actual_bases[1].args[0].s):
-                        raise InvalidProgramException(actual_bases[1], 'malformed.adt',
-                            'malformed algebraic data type: name of NamedTuple has to ' +
-                            'be the same of the class (ADT Constructor)')
-                    
-                    # Parse NamedTuple's fields and their respective types
-                    for field_decl in actual_bases[1].args[1].elts:
-                        field_name, field_type = field_decl.elts
-                        cls.add_field(field_name.s, field_decl,
-                            self.get_target(field_type, self.module))
-
-                    # Consider ADTs as a special case of single inheritance
-                    actual_bases = [actual_bases[0]]
-
+                actual_bases = self._visit_ADT(cls, actual_bases, node, ast)
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
         if len(actual_bases) == 0:
@@ -1064,15 +1077,19 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
-            # Handle case where ADT (class) is typed as tuple
             if hasattr(mypy_type, 'fallback'):
+                # Handle ADTs which are typed as tuple and should fallback to class
                 try:
                     fallback_type = self.convert_type(mypy_type.fallback, node)
                     if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
                         return fallback_type
                 except UnsupportedException:
+                    # When attempting to fallback a tuple that is not an ADT
+                    # an exception could be raised (for example trying to fallback
+                    # to Any). In this case we capture the exception and proceed
+                    # without falling back (it is definitely not an ADT).
                     pass
-            # Regular tuple handling
+            # Regular tuple handling without falling back
             args = [self.convert_type(arg_type, node)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],

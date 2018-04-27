@@ -390,7 +390,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def adt_def(self) -> 'PythonClass':
         """
-        Return's the class that defines the ADT.
+        Returns the class that defines the ADT.
         """
         if self.is_defining_adt:
             return self

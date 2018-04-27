@@ -13,11 +13,19 @@ Stmt = 'silver.ast.Stmt'
 
 StmtsAndExpr = Tuple[List[Stmt], Expr]
 
+Var = 'silver.ast.LocalVar'
+
 VarDecl = 'silver.ast.LocalVarDecl'
 
 Domain = 'silver.ast.Domain'
 
+DomainAxiom = 'silver.ast.DomainAxiom'
+
+DomainFunc = 'silver.ast.DomainFunc'
+
 DomainFuncApp = 'silver.ast.DomainFuncApp'
+
+DomainType = 'silver.ast.DomainType'
 
 Predicate = 'silver.ast.Predicate'
 
