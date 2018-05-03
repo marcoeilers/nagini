@@ -376,7 +376,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self._has_classmethod = False
         self.type_vars = OrderedDict()
         self.definition_deps = set()
-        self.is_adt = name == 'ADT' # This flag can also be set transitively
+        self.is_adt = name == 'ADT' # This flag is set when the class is
+        # defining an algebraic data type or one of its constructors.
+        # This flag is set transitively across subclasses.
 
     @property
     def is_defining_adt(self) -> bool:

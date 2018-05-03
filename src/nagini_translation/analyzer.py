@@ -443,18 +443,21 @@ class Analyzer(ast.NodeVisitor):
                     'malformed algebraic data type: superclasses can only ' +
                     'be a class optionally followed by one NamedTuple')
         # ADT classes should have no body
-        if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
+        if not (len(node.body) == 1 and isinstance(node.body[0], ast.Pass) or
+                len(node.body) == 2 and isinstance(node.body[0], ast.Expr)
+                                    and isinstance(node.body[1], ast.Pass)):
             raise InvalidProgramException(adt.node, 'malformed.adt',
                     'malformed algebraic data type: classes cannot have ' +
                     'body, fields should be defined in NamedTuples instead')
         elif len(actual_bases) == 2:
-            # ADT classes can only define fields by inheriting from NamedTuple
+            # ADT classes can only be defined via NamedTuple
             if not (isinstance(actual_bases[1], ast.Call)
                 and actual_bases[1].func.id == 'NamedTuple'):
                 raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                     'malformed algebraic data type: only NamedTuple can be ' +
-                    'used to define fields')
-            # The name of the NamedTuple should match the ADT being defined
+                    'used to define constructors')
+            # The name of the NamedTuple should match the ADT constructor being
+            # defined
             if not (adt.name == actual_bases[1].args[0].s):
                 raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                     'malformed algebraic data type: name of NamedTuple has to ' +

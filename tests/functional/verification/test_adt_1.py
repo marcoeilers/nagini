@@ -8,12 +8,21 @@ from typing import (
 )
 
 class LinkedList(ADT):
+    """
+    This class defines a linked list ADT.
+    """
     pass
 
 class Node(LinkedList, NamedTuple('Node', [('elem', int), ('next', LinkedList)])):
+    """
+    Constructor for Node.
+    """
     pass
 
 class Null(LinkedList, NamedTuple('Null', [])):
+    """
+    Constructor for Null.
+    """
     pass
 
 def common_use_of_ADTs()-> None:
