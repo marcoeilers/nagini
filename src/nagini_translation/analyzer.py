@@ -433,7 +433,7 @@ class Analyzer(ast.NodeVisitor):
                                   actual_bases: List[ast.AST],
                                   node: ast.AST, ast: ast.AST):
         """
-        Chechs if the ADT is syntactically well-formed, throwing an
+        Checks if the ADT is syntactically well-formed, throwing an
         invalid program exception otherwise.
         """
         adt.is_adt = True
@@ -462,6 +462,21 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                     'malformed algebraic data type: name of NamedTuple has to ' +
                     'be the same of the class (ADT Constructor)')
+            # ADT constructor cannot be a direct subclass of 'ADT' since there
+            # should be an intermediary class in the hierarchy defining the ADT
+            # class the ADT constructor should be part of (i.e. subclass of)
+            if adt.superclass.name == 'ADT':
+                raise InvalidProgramException(node, 'malformed.adt',
+                    'malformed algebraic datatype: ADT constructor classes ' +
+                    'cannot inherit directly from ADT class, instead they ' +
+                    'should inherit from their own ADT defining class, which ' +
+                    'should be a direct subclass of ADT')
+        else: # len(actual_bases) == 1
+            # ADT defining classes should inherit directly from ADT class
+            if adt.superclass.name != 'ADT':
+                raise InvalidProgramException(node, 'malformed.adt',
+                    'malformed algebraic datatype: ADT defining classes ' +
+                    'should be direct subclasses of ADT class')
 
     def _visit_ADT(self, cls: PythonClass, actual_bases: List[ast.AST],
                    node: ast.AST, ast: ast.AST) -> List[ast.AST]:
