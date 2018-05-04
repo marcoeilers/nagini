@@ -724,7 +724,7 @@ class ExpressionTranslator(CommonTranslator):
         if the projected component's type is ADT (recursive composition).
         """
         info = self.no_info(ctx)
-        adt_name = decons.adt_def.name + '_ADT'
+        adt_name = decons.adt_domain_name
         adt_prefix = decons.adt_def.name + '_'
         adt_type = self.viper.DomainType(adt_name, {}, [])
 

@@ -398,6 +398,15 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return self
         else:
             return self.superclass.adt_def
+    
+    @property
+    def adt_domain_name(self) -> str:
+        """
+        Returns the domain name where the ADT is defined.
+        """
+        if not hasattr(self.adt_def, '_adt_domain_name'):
+            self.adt_def._adt_domain_name = self.adt_def.get_fresh_name(self.adt_def.name)
+        return self.adt_def._adt_domain_name
 
     @property
     def all_subclasses(self) -> List['PythonClass']:

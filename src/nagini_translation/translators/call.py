@@ -157,7 +157,7 @@ class CallTranslator(CommonTranslator):
         boxing/unboxing calls.
         """
         info = self.no_info(ctx)
-        adt_name = cons.adt_def.name + '_ADT'
+        adt_name = cons.adt_domain_name
         adt_prefix = cons.adt_def.name + '_'
         adt_type = self.viper.DomainType(adt_name, {}, [])
 

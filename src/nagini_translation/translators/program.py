@@ -1004,7 +1004,7 @@ class ProgramTranslator(CommonTranslator):
 
             # Create domain functions
             domain_funcs = []
-            adt_name = adt.name + '_ADT'
+            adt_name = adt.adt_domain_name
             adt_prefix = adt.name + '_'
             adt_type = self.viper.DomainType(adt_name, {}, [])
 
