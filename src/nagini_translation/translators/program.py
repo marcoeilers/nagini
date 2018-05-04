@@ -998,7 +998,12 @@ class ProgramTranslator(CommonTranslator):
 
         for adt in adts:
             assert adt.is_adt and adt.is_defining_adt
-            assert len(adt.all_subclasses) > 1
+
+            # ADTs should have constructors
+            if len(adt.all_subclasses) <= 1:
+                raise InvalidProgramException(adt.node, 'malformed.adt',
+                    'malformed algebraic datatype: ADT has no constructors, ' +
+                    'which should be defined as subclasses of the ADT class')
 
             pos = self.to_position(adt, ctx)
 
