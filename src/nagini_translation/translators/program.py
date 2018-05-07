@@ -168,7 +168,7 @@ class ProgramTranslator(CommonTranslator):
                             body = value
                             posts.append(self.viper.EqCmp(result, value, position,
                                                           self.no_info(ctx)))
-                except AttributeError:
+                except AttributeError as e:
                     # The translation (probably) tried to access ctx.current_function
                     pass
             else:
@@ -707,12 +707,6 @@ class ProgramTranslator(CommonTranslator):
         # fields, and default arguments.
         for module in modules:
             ctx.module = module
-            for var in module.global_vars.values():
-                if not var.module is module:
-                    continue
-                self.track_dependencies(selected_names, selected, var, ctx)
-                functions.append(
-                    self.create_global_var_function(var, ctx))
             containers = [module]
             for class_name, cls in module.classes.items():
                 if class_name in PRIMITIVES or class_name != cls.name:
@@ -838,6 +832,19 @@ class ProgramTranslator(CommonTranslator):
             main_py_method, main_method = self.translate_main_method(modules, ctx)
             methods.append(main_method)
             self.track_dependencies(selected_names, selected, main_py_method, ctx)
+
+        # Translate global variables.
+        for module in modules:
+            ctx.module = module
+            for var in module.global_vars.values():
+                if not var.module is module:
+                    continue
+                self.track_dependencies(selected_names, selected, var, ctx)
+                # TODO: Check for every references function:
+                # - if it doesnt exist yet it has no precondition so its okay
+                # - if its precondition contains predicates or perms
+                functions.append(
+                    self.create_global_var_function(var, ctx))
 
         # IO operations are translated last because we need to know which functions are
         # used with Eval.

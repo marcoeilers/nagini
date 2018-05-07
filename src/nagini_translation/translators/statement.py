@@ -727,6 +727,16 @@ class StatementTranslator(CommonTranslator):
                                                   None, None, target_type,
                                                   node, ctx)
 
+        cond = self.viper.EqCmp(err_var.ref(),
+                                self.viper.NullLit(position, info),
+                                position, info)
+
+        conditional_assign = self.viper.If(cond, self.translate_block(assign_stmt,
+                                                                      position, info),
+                                           self.translate_block([], position, info),
+                                           position, info)
+        assign_stmt = [conditional_assign]
+
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
 
         invariant = self._create_for_loop_invariant(iter_var, target_var,
@@ -752,9 +762,7 @@ class StatementTranslator(CommonTranslator):
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
         body.extend(assign_stmt)
-        cond = self.viper.EqCmp(err_var.ref(),
-                                self.viper.NullLit(position, info),
-                                position, info)
+
         loop = global_stmts + self.create_while_node(
             ctx, cond, invariant, [], body, node)
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
@@ -983,6 +991,7 @@ class StatementTranslator(CommonTranslator):
                              allow_impure: bool) -> Tuple[List[Stmt], List[Expr]]:
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
+        definedness_expr = self.viper.TrueLit(position, info)
 
         if isinstance(lhs, ast.Subscript):
             return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
@@ -1021,9 +1030,9 @@ class StatementTranslator(CommonTranslator):
                     assign_stmt = self.viper.FieldAssign(field_access, rhs, position, info)
                     block = self.translate_block([permission, assign_stmt], position, info)
                     guarded_field_assign.append((assign_guard, block))
-                chainned_field_assign = chain_if_stmts(guarded_field_assign, self.viper,
+                chained_field_assign = chain_if_stmts(guarded_field_assign, self.viper,
                                                        position, info, ctx)
-                return stmt + [chainned_field_assign], None
+                return stmt + [chained_field_assign], None
         lhs_stmt, var = self.translate_expr(lhs, ctx)
         before_assign = []
         after_assign = []
@@ -1045,6 +1054,7 @@ class StatementTranslator(CommonTranslator):
             assignment = self.viper.LocalVarAssign
             if self.is_local_variable(target, ctx):
                 after_assign.append(self.set_var_defined(target, position, info))
+                definedness_expr = self.check_var_defined(target, position, info)
         else:
             assignment = self.viper.FieldAssign
             permission_inhale = self.create_new_field_permission(var, target,
@@ -1052,7 +1062,8 @@ class StatementTranslator(CommonTranslator):
             before_assign.append(permission_inhale)
 
         assign_stmt = assignment(var, rhs, position, info)
-        assign_val = self.viper.EqCmp(var, rhs, position, info)
+        assign_val = self.viper.And(self.viper.EqCmp(var, rhs, position, info),
+                                    definedness_expr, position, info)
         return lhs_stmt + before_assign + [assign_stmt] + after_assign, [assign_val]
 
     def create_new_field_permission(self, field_acc: Expr, target: PythonField,

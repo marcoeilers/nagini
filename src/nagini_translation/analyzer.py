@@ -305,6 +305,8 @@ class Analyzer(ast.NodeVisitor):
         method = node_factory.create_python_method(
             method_name, None, cls, self.module.global_module, pure, False, node_factory,
             interface=True, interface_dict=if_method)
+        if 'display_name' in if_method:
+            method.interface_name = if_method['display_name']
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
