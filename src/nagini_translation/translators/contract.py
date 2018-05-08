@@ -459,6 +459,16 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 2:
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if not isinstance(node.args[0], ast.Call):
+            raise InvalidProgramException(node, 'invalid.contract.call')
+        if get_func_name(node.args[0]) in ('Acc', 'Rd'):
+            pred_call = node.args[0].args[0]
+        else:
+            pred_call = node.args[0]
+        target_pred = self.get_target(pred_call, ctx)
+        if not isinstance(target_pred, PythonMethod) or not target_pred.predicate:
+            raise InvalidProgramException(node, 'invalid.contract.call')
+
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
         if pred_stmt:
