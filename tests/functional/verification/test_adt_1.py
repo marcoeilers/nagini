@@ -85,13 +85,6 @@ def receive_object_and_convert_to_adt(o: object) -> None:
     l = cast(LinkedList, o)
     Assert(type(o) is Null)
 
-global_adt = Node(62, Node(32, Null()))
-
-#def use_global_adt() -> bool:  #TODO: may work after merge
-#    Requires(isinstance(cast(Node, global_adt).elem, int))
-#    Ensures(Result() == True)
-#    return cast(Node, global_adt).elem == 62
-
 @Predicate
 def positive_values_predicate(l: LinkedList) -> bool:
     return Implies(type(l) is Node, type(cast(Node, l).elem) is int and cast(Node, l).elem > 0 and positive_values_predicate(cast(Node, l).next))
