@@ -52,15 +52,15 @@ def common_use_of_ADTs()-> None:
     Assert(type(cast(Leaf, cast(Node, polymorphic_tree).right).fruit) is Grape)
 
 # Ordinary class
-class Weight:
+class Property:
     def __init__(self, weight: int) -> None:
         Ensures(Acc(self.weight))
         self.weight = weight    # type: int
 
 # An ADT that aggregates an object from ordinary class
-class Pineapple(Fruit, NamedTuple('Pineapple', [('weight', Weight)])):
+class Pineapple(Fruit, NamedTuple('Pineapple', [('property', Property)])):
     pass
 
 def heterogeneous_composition() -> None:
-    Assert(Pineapple(Weight(400)).weight.weight == 400)
-    pass
+    pinapple = Pineapple(Property(400))
+    x = pinapple.property.weight
