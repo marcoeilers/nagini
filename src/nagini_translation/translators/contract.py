@@ -349,7 +349,7 @@ class ContractTranslator(CommonTranslator):
         Translates a call to Assume().
         """
         assert len(node.args) == 1
-        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, False)
         assertion = self.viper.Inhale(expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return stmt + [assertion], None
@@ -463,7 +463,7 @@ class ContractTranslator(CommonTranslator):
                                               self.viper.Bool, True)
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        expr_stmt, expr = self.translate_expr(node.args[1], ctx, impure)
+        expr_stmt, expr = self.translate_expr(node.args[1], ctx)
         expr = self.unwrap(expr)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
