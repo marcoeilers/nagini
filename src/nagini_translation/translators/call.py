@@ -195,16 +195,17 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
+        pos = self.to_position(node, ctx)
+
+        if target_class.is_adt:
+            return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
+
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
                                                        self.translator)
         result_type = self.get_type(node, ctx)
-        pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-
-        if target_class.is_adt:
-            return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
 
         # Temporarily bind the type variables of the constructed class to
         # the concrete type arguments.

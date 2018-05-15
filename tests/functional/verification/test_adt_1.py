@@ -111,6 +111,12 @@ def get_ith_value(l: LinkedList, index: int) -> int:
     Ensures(Result() >= 0)
     return Unfolding(positive_values_predicate(l), 0 if type(l) is Null else cast(Node, l).elem if index == 0 else get_ith_value(cast(Node, l).next, index - 1))
 
+global_adt = Node(62, Node(32, Null()))
+
+def test_globals() -> None:
+    Assert(global_adt.elem == 62)
+    Assert(cast(Node, global_adt.next).elem == 32)
+
 def wrong_cast_1(l: LinkedList) -> None:
     Requires(l == Node(3, Node(4, Null())))
     #:: ExpectedOutput(application.precondition:assertion.false)
