@@ -66,6 +66,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(rectype, mypy.types.AnyType) and
                 not isinstance(rectype, mypy.types.UnionType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
+            if not hasattr(rectype, 'type'): # Work around issue 979 in MyPy
+                rectype = rectype.fallback   # 'TupleType' object has no attribute 'type'
             self.set_type(rectype.type.fullname().split('.') + [node.name],
                           self.type_of(node),
                           node.line, col(node))

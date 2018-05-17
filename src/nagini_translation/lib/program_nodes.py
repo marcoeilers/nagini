@@ -376,6 +376,37 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self._has_classmethod = False
         self.type_vars = OrderedDict()
         self.definition_deps = set()
+        self.is_adt = name == 'ADT' # This flag is set when the class is
+        # defining an algebraic data type or one of its constructors.
+        # This flag is set transitively across subclasses.
+
+    @property
+    def is_defining_adt(self) -> bool:
+        """
+        Returns true if class is defining the ADT's name.
+        """
+        if self.superclass:
+            return self.superclass.name == 'ADT'
+        return False
+
+    @property
+    def adt_def(self) -> 'PythonClass':
+        """
+        Returns the class that defines the ADT.
+        """
+        if self.is_defining_adt:
+            return self
+        else:
+            return self.superclass.adt_def
+    
+    @property
+    def adt_domain_name(self) -> str:
+        """
+        Returns the domain name where the ADT is defined.
+        """
+        if not hasattr(self.adt_def, '_adt_domain_name'):
+            self.adt_def._adt_domain_name = self.adt_def.get_fresh_name(self.adt_def.name)
+        return self.adt_def._adt_domain_name
 
     @property
     def all_subclasses(self) -> List['PythonClass']:

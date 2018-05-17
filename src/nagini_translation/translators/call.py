@@ -55,6 +55,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.typedefs import (
     Expr,
+    FuncApp,
     Position,
     Stmt,
     StmtsAndExpr,
@@ -149,6 +150,35 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def translate_adt_cons(self, cons: PythonClass, args: List[FuncApp],
+                           pos: Position, ctx: Context) -> Expr:
+        """
+        Constructs ADTs via a sequence of constructor calls and
+        boxing/unboxing calls.
+        """
+        info = self.no_info(ctx)
+        adt_name = cons.adt_domain_name
+        adt_prefix = cons.adt_def.name + '_'
+        adt_type = self.viper.DomainType(adt_name, {}, [])
+
+        # If expected argument type is the ADT type (another constructor call),
+        # unbox translated argument
+        for index, (arg_type, translated_arg) in enumerate(zip(cons.fields.values(),
+                                                               args)):
+            if arg_type.type == cons.adt_def:
+                unbox_func = self.viper.FuncApp('unbox_' + adt_name, [translated_arg],
+                                                pos, info, adt_type)
+                args[index] = unbox_func
+
+        # Translate constructor call
+        cons_call = self.viper.DomainFuncApp(adt_prefix + cons.name, args, adt_type,
+                                             pos, info, adt_name)
+
+        # Box translated constructor
+        box_func = self.viper.FuncApp('box_' + adt_name, [cons_call], pos, info,
+                                      self.viper.Ref)
+        return box_func
+
     def _is_lock_subtype(self, cls: PythonClass) -> bool:
         if cls is None:
             return False
@@ -165,12 +195,16 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
+        pos = self.to_position(node, ctx)
+
+        if target_class.is_adt:
+            return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
+
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
                                                        self.translator)
         result_type = self.get_type(node, ctx)
-        pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
