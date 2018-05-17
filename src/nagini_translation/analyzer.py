@@ -438,7 +438,6 @@ class Analyzer(ast.NodeVisitor):
         Checks if the ADT is syntactically well-formed, throwing an
         invalid program exception otherwise.
         """
-        adt.is_adt = True
         # ADT classes can have at most two superclasses
         if len(actual_bases) > 2:
             raise InvalidProgramException(adt.node, 'malformed.adt',
@@ -487,6 +486,7 @@ class Analyzer(ast.NodeVisitor):
         ADT is defined by a class hierarchy (sum) and a NamedTuple (product).
         """
         self._check_is_adt_well_formed(cls, actual_bases, node, ast)
+        cls.is_adt = True
         if len(actual_bases) == 2:
             # Parse NamedTuple's fields and their respective types
             for field_decl in actual_bases[1].args[1].elts:
