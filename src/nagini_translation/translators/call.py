@@ -389,8 +389,12 @@ class CallTranslator(CommonTranslator):
         tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i], [int_type, content_type], node, ctx)
         new_list_i = self.viper.SeqIndex(seq_ref, i_var.ref(), pos, info)
         equal_content = self.viper.EqCmp(new_list_i, tuple_for_i, pos, info)
+        i_positive = self.viper.GeCmp(i_var.ref(), self.viper.IntLit(0, pos, info), pos, info)
+        i_lt_len = self.viper.LtCmp(i_var.ref(), self.viper.SeqLength(seq_ref, pos, info), pos, info)
+        i_in_bounds = self.viper.And(i_positive, i_lt_len, pos, info)
+        body = self.viper.Implies(i_in_bounds, equal_content, pos, info)
         trigger = self.viper.Trigger([new_list_i], pos, info)
-        contents_info = self.viper.Forall([i_var.decl], [trigger], equal_content, pos, info)
+        contents_info = self.viper.Forall([i_var.decl], [trigger], body, pos, info)
         contents_inhale = self.viper.Inhale(contents_info, pos, info)
         return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node, ctx)
 
