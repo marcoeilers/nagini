@@ -364,6 +364,17 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        node._parent = parent
+        for field in node._fields:
+            fieldval = getattr(node, field)
+            if isinstance(fieldval, ast.AST):
+                self.visit_but_ignore(fieldval, node)
+            elif isinstance(fieldval, list):
+                for item in fieldval:
+                    if isinstance(item, ast.AST):
+                        self.visit_but_ignore(item, node)
+
     def get_target(self, node: ast.AST,
                    container: ContainerInterface) -> PythonNode:
         """
@@ -694,6 +705,7 @@ class Analyzer(ast.NodeVisitor):
         var = self.node_factory.create_python_var(
             target.id, target, self.typeof(target))
         self.current_function.special_vars[local_name] = var
+        self.visit_but_ignore(node, node._parent)
         return
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
