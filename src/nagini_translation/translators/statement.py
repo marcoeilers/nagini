@@ -400,14 +400,14 @@ class StatementTranslator(CommonTranslator):
     def translate_stmt_Pass(self, node: ast.Pass, ctx: Context) -> List[Stmt]:
         return []
 
-    def _create_for_loop_invariant(self, iter_var: PythonVar,
+    def _create_for_loop_invariant(self, iter_var: PythonVar, seq_temp_var: PythonVar,
                                    target_var: PythonVar,
                                    err_var: PythonVar,
                                    iterable: Expr,
                                    iterable_type: PythonType,
                                    assign_expr: List[Expr],
                                    node: ast.AST,
-                                   ctx: Context) -> List[Stmt]:
+                                   ctx: Context) -> List[Expr]:
         """
         Creates the default invariant for for loops using iterators. It's a
         static block of code that's always the same except for possible boxing
@@ -452,7 +452,6 @@ class StatementTranslator(CommonTranslator):
         iter_seq = self.viper.FuncApp(seq_func_name, [iterable], pos, info,
                                       seq_ref, [param])
         full_perm = self.viper.FullPerm(pos, info)
-        wildcard = self.viper.WildcardPerm(pos, info)
 
         invariant = []
         one = self.viper.IntLit(1, pos, info)
@@ -481,6 +480,9 @@ class StatementTranslator(CommonTranslator):
         invariant.append(iter_acc_pred)
 
         iter_list_equal = self.viper.EqCmp(iter_acc, iter_seq, pos, info)
+        invariant.append(iter_list_equal)
+
+        iter_list_equal = self.viper.EqCmp(seq_temp_var.ref(), iter_seq, pos, info)
         invariant.append(iter_list_equal)
 
         index_field = self.viper.Field('__iter_index', self.viper.Int, pos,
@@ -737,9 +739,23 @@ class StatementTranslator(CommonTranslator):
                                            position, info)
         assign_stmt = [conditional_assign]
 
+        seq_ref = self.viper.SeqType(self.viper.Ref)
+        seq_ref_type = SilverType(seq_ref, ctx.module)
+
+        seq_temp_var = ctx.current_function.create_variable('seqtmp', seq_ref_type,
+                                                            self.translator)
+
+        seq_func_name = iterable_type.name + '___sil_seq__'
+        param = self.viper.LocalVarDecl('self', self.viper.Ref, position, info)
+        iter_seq = self.viper.FuncApp(seq_func_name, [iterable], position, info,
+                                      seq_ref, [param])
+
+        seq_temp_assign = self.viper.LocalVarAssign(seq_temp_var.ref(), iter_seq,
+                                                    position, info)
+
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
 
-        invariant = self._create_for_loop_invariant(iter_var, target_var,
+        invariant = self._create_for_loop_invariant(iter_var, seq_temp_var, target_var,
                                                     err_var, iterable,
                                                     iterable_type, assign_expr,
                                                     node, ctx)
@@ -769,7 +785,7 @@ class StatementTranslator(CommonTranslator):
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
         result = (iterable_stmt + iter_assign + next_call + assign_stmt +
-                  loop + iter_del)
+                  [seq_temp_assign] + loop + iter_del)
         result += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt

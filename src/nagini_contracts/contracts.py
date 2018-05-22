@@ -14,6 +14,7 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -27,7 +28,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
                   'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
-                  'MayStart',]
+                  'MayStart', 'Let',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -83,6 +84,12 @@ def Implies(p: bool, q: bool) -> bool:
     """
     pass
 
+
+def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
+    """
+    Let(5, int, lambda x : x + 34) means let x = 5 in x + 34
+    """
+    pass
 
 def Forall(domain: Iterable[T],
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
@@ -358,6 +365,7 @@ __all__ = [
         'Implies',
         'Forall',
         'Exists',
+        'Let',
         'Low',
         'Acc',
         'Rd',

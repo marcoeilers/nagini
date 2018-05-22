@@ -413,6 +413,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id in ('getArg', 'getOld', 'getMethod'):
                 object_class = module.global_module.classes[OBJECT_TYPE]
                 return object_class
+            elif node.func.id == 'Let':
+                body_type = get_target(node.args[1], containers, container)
+                if isinstance(body_type, PythonType):
+                    return body_type
+                raise InvalidProgramException(node, 'invalid.let')
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
