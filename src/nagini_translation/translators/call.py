@@ -863,28 +863,47 @@ class CallTranslator(CommonTranslator):
         chain of method calls, one for each class in the union according to receiver's
         type.
         """
-        position = self.to_position(node, ctx)
+        pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         guarded_blocks = []
-        # For each class in union
+
+        return_var_created = False
+
+        # For each type in union (subclasses first)
         for type in toposort_classes(rectype.get_types() - {None}):
-            # If receiver is an instance of this particular class
-            method_call_guard = self.var_type_check(node.func.value.id, type, position,
-                                                    ctx)
-            # Call its respective method
-            method_call, return_var = self.translate_normal_call(
-                type.get_func_or_method(node.func.attr), arg_stmts,
-                args, arg_types, node, ctx, impure)
-            if 'final_return_var' not in locals():
-                final_return_var = return_var
-            else:
-                if return_var:
-                    method_call.append(self.viper.LocalVarAssign(final_return_var,
-                                       return_var, position, info))
-            method_call_block = self.translate_block(method_call, position, info)
-            guarded_blocks.append((method_call_guard, method_call_block))
-        return ([chain_if_stmts(guarded_blocks, self.viper, position, info, ctx)],
-                final_return_var)
+
+            # Create guard checking if receiver is an instance of this type
+            guard = self.var_type_check(node.func.value.id, type, pos, ctx)
+
+            # Translate the method call (method of this type)
+            stmts, expr = self.translate_normal_call(
+                type.get_func_or_method(node.func.attr), arg_stmts, args,
+                arg_types, node, ctx, impure)
+            
+            # If the method call returns a value
+            if expr is not None:
+                if not return_var_created:
+
+                    # Create a variable to assign the returned value
+                    return_var = ctx.current_function.create_variable('return_var',
+                                 type.get_func_or_method(node.func.attr).type,
+                                 self.translator)
+
+                    return_var_created = True
+                
+                # Assign the returned value to fresh variable
+                stmts.append(self.viper.LocalVarAssign(return_var.ref(node, ctx),
+                             expr, pos, info))
+
+            # Wraps method call and return variable assignment in a block
+            block = self.translate_block(stmts, pos, info)
+
+            # Stores guard and block as a tuple in a list
+            guarded_blocks.append((guard, block))
+            
+        # Chain guards and blocks in an if-then-else statement
+        return ([chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)],
+                return_var._ref if return_var_created else None)
 
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
