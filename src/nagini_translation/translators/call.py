@@ -39,6 +39,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    chain_cond_exp,
     GenericType,
     MethodType,
     OptionalType,
@@ -857,7 +858,7 @@ class CallTranslator(CommonTranslator):
     def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
                                        arg_types: List[PythonType], rectype: UnionType,
                                        node: ast.Call, ctx: Context,
-                                       impure) -> StmtsAndExpr:
+                                       impure: bool) -> StmtsAndExpr:
         """
         Translate a method call, when the receiver is of type union, into an if-then-else
         chain of method calls, one for each class in the union according to receiver's
@@ -865,9 +866,9 @@ class CallTranslator(CommonTranslator):
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        guarded_blocks = []
-
-        return_var_created = False
+        guard_stmts_expr = []
+        value_returned = False
+        pure = True
 
         # For each type in union (subclasses first)
         for type in toposort_classes(rectype.get_types() - {None}):
@@ -880,30 +881,43 @@ class CallTranslator(CommonTranslator):
                 type.get_func_or_method(node.func.attr), arg_stmts, args,
                 arg_types, node, ctx, impure)
             
-            # If the method call returns a value
-            if expr is not None:
-                if not return_var_created:
+            # Stores guard and translated method call as tuple
+            guard_stmts_expr.append((guard, stmts, expr))
 
-                    # Create a variable to assign the returned value
-                    return_var = ctx.current_function.create_variable('return_var',
-                                 type.get_func_or_method(node.func.attr).type,
-                                 self.translator)
+            # Calculate properties about the return value
+            value_returned = value_returned or expr is not None
+            pure = pure and len(stmts) == 0
 
-                    return_var_created = True
-                
-                # Assign the returned value to fresh variable
-                stmts.append(self.viper.LocalVarAssign(return_var.ref(node, ctx),
-                             expr, pos, info))
+        # Sanitize return value properties
+        assert not pure or value_returned
 
-            # Wraps method call and return variable assignment in a block
-            block = self.translate_block(stmts, pos, info)
+        if not pure and value_returned:
 
-            # Stores guard and block as a tuple in a list
-            guarded_blocks.append((guard, block))
-            
-        # Chain guards and blocks in an if-then-else statement
-        return ([chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)],
-                return_var._ref if return_var_created else None)
+            # Create a variable to assign the returned value
+            return_var = ctx.current_function.create_variable('return_var',
+                         ctx.module.global_module.classes[OBJECT_TYPE],
+                         self.translator)
+
+            for _, stmts, expr in guard_stmts_expr:
+                if expr is not None:
+
+                    # Assign the returned value to fresh variable
+                    stmts.append(self.viper.LocalVarAssign(return_var.ref(
+                                 node, ctx), expr, pos, info))
+
+        if pure:
+
+            # Chain list of guard and pure expression tuples in an if-then-else
+            # expression
+            guarded_expr = [(guard, expr) for guard, _, expr in guard_stmts_expr]
+            return [], chain_cond_exp(guarded_expr, self.viper, pos, info, ctx)
+        else:
+
+            # Chain guards and blocks in an if-then-else statement
+            guarded_blocks = [(guard, self.translate_block(stmts, pos, info))
+                              for guard, stmts, _ in guard_stmts_expr]
+            return ([chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)],
+                    return_var._ref if value_returned else None)
 
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
