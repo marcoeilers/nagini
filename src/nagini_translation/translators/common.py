@@ -24,6 +24,8 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    chain_cond_exp,
+    UnionType,
     PythonClass,
     PythonField,
     PythonIOOperation,
@@ -32,6 +34,7 @@ from nagini_translation.lib.program_nodes import (
     PythonNode,
     PythonType,
     PythonVar,
+    toposort_classes,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -528,7 +531,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return None, None
 
-    def get_function_call(self, receiver: PythonType,
+    def _get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
                           ctx: Context,
@@ -571,6 +574,40 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   actual_position,
                                   self.no_info(ctx), type, formal_args)
         return call
+
+    def get_function_call(self, receiver: PythonType,
+                          func_name: str, args: List[Expr],
+                          arg_types: List[PythonType], node: ast.AST,
+                          ctx: Context,
+                          position: Position = None) -> FuncApp:
+        """
+        Wrapper function to _get_function_call, handling receivers of
+        Union type, passing through otherwise.
+        """
+
+        if receiver and isinstance(receiver, UnionType):
+            assert isinstance(node, ast.Name)
+            guarded_functions = []
+            for type in toposort_classes(receiver.get_types() - {None}):
+
+                # Create guard checking if receiver is an instance of this type
+                guard = self.var_type_check(node.id, type, position, ctx)
+
+                # Translate the method call (method of this type)
+                function = self._get_function_call(type, func_name, args, arg_types,
+                                                   node, ctx, position)
+
+                # Stores guard and translated method call as tuple
+                guarded_functions.append((guard, function))
+
+            # Chain list of guard and function call tuples in an if-then-else
+            # expression
+            return chain_cond_exp(guarded_functions, self.viper, position,
+                                  self.no_info(ctx), ctx)
+        else:
+            # Pass-through
+            return self._get_function_call(receiver, func_name, args,
+                                           arg_types, node, ctx, position)
 
     def get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],

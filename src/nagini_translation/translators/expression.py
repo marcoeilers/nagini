@@ -128,10 +128,11 @@ class ExpressionTranslator(CommonTranslator):
         self._as_read = old_as_read
         return stmt, result
 
-    def _translate_only(self, node: ast.AST, ctx: Context, impure=False):
+    def _translate_only(self, node: ast.AST, ctx: Context,
+                        impure = False) -> StmtsAndExpr:
         """
-        Translates an expression, but does so without changing the expression's type in
-        any way.
+        Translates an expression, but does so without changing the expression's
+        type in any way.
         """
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
