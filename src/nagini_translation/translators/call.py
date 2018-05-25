@@ -855,14 +855,14 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
-                                       arg_types: List[PythonType], rectype: UnionType,
-                                       node: ast.Call, ctx: Context,
-                                       impure: bool) -> StmtsAndExpr:
+    def translate_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
+                                arg_types: List[PythonType], rectype: UnionType,
+                                node: ast.Call, ctx: Context,
+                                impure: bool) -> StmtsAndExpr:
         """
-        Translate a method call, when the receiver is of type union, into an if-then-else
-        chain of method calls, one for each class in the union according to receiver's
-        type.
+        Translate a method call or function call when the receiver is of type
+        union. A chain of if-then-else statements or expressions will be used
+        to call the method or function of each class in the union.
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
@@ -939,8 +939,8 @@ class CallTranslator(CommonTranslator):
                         return self.translate_normal_call(target_pred, arg_stmts, args,
                                                           arg_types, node, ctx, impure)
                     # Otherwise apply special union treatment.
-                    return self.translate_method_call_in_union(arg_stmts, args, arg_types,
-                                                               rectype, node, ctx, impure)
+                    return self.translate_call_in_union(arg_stmts, args, arg_types,
+                                                        rectype, node, ctx, impure)
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
