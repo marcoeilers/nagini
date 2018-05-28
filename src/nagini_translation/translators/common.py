@@ -582,22 +582,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                           position: Position = None) -> FuncApp:
         """
         Wrapper function to _get_function_call, handling receivers of
-        Union type, passing through otherwise.
+        union type, passing through otherwise.
         """
-
-        if receiver and isinstance(receiver, UnionType):
-            assert isinstance(node, ast.Name)
+        if receiver and type(receiver) is UnionType:
+            position = self.no_position(ctx) if not position else position
             guarded_functions = []
-            for type in toposort_classes(receiver.get_types() - {None}):
+            for cls in toposort_classes(receiver.get_types() - {None}):
 
                 # Create guard checking if receiver is an instance of this type
-                guard = self.var_type_check(node.id, type, position, ctx)
+                guard = self.type_check(args[0], cls, position, ctx)
 
-                # Translate the method call (method of this type)
-                function = self._get_function_call(type, func_name, args, arg_types,
-                                                   node, ctx, position)
+                # Translate the function call on this particular receiver type
+                function = self._get_function_call(cls, func_name, args,
+                                                   arg_types, node, ctx,
+                                                   position)
 
-                # Stores guard and translated method call as tuple
+                # Stores guard and translated function call as tuple in a list
                 guarded_functions.append((guard, function))
 
             # Chain list of guard and function call tuples in an if-then-else
