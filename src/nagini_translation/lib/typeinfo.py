@@ -71,6 +71,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             else:
                 types = [rectype]
             for t in types:
+                if not hasattr(t, 'type'): # Work around issue 979 in MyPy
+                    t = t.fallback   # 'TupleType' object has no attribute 'type'
                 self.set_type(t.type.fullname().split('.') + [node.name],
                               self.type_of(node),
                               node.line, col(node))

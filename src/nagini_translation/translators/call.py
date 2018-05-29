@@ -41,6 +41,7 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    chain_cond_exp,
     GenericType,
     MethodType,
     OptionalType,
@@ -57,6 +58,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.typedefs import (
     Expr,
+    FuncApp,
     Position,
     Stmt,
     StmtsAndExpr,
@@ -151,6 +153,35 @@ class CallTranslator(CommonTranslator):
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
 
+    def translate_adt_cons(self, cons: PythonClass, args: List[FuncApp],
+                           pos: Position, ctx: Context) -> Expr:
+        """
+        Constructs ADTs via a sequence of constructor calls and
+        boxing/unboxing calls.
+        """
+        info = self.no_info(ctx)
+        adt_name = cons.adt_domain_name
+        adt_prefix = cons.adt_def.name + '_'
+        adt_type = self.viper.DomainType(adt_name, {}, [])
+
+        # If expected argument type is the ADT type (another constructor call),
+        # unbox translated argument
+        for index, (arg_type, translated_arg) in enumerate(zip(cons.fields.values(),
+                                                               args)):
+            if arg_type.type == cons.adt_def:
+                unbox_func = self.viper.FuncApp('unbox_' + adt_name, [translated_arg],
+                                                pos, info, adt_type)
+                args[index] = unbox_func
+
+        # Translate constructor call
+        cons_call = self.viper.DomainFuncApp(adt_prefix + cons.name, args, adt_type,
+                                             pos, info, adt_name)
+
+        # Box translated constructor
+        box_func = self.viper.FuncApp('box_' + adt_name, [cons_call], pos, info,
+                                      self.viper.Ref)
+        return box_func
+
     def _is_lock_subtype(self, cls: PythonClass) -> bool:
         if cls is None:
             return False
@@ -167,12 +198,16 @@ class CallTranslator(CommonTranslator):
         evaluation.
         """
         assert all(args), "Some args are None: {}".format(args)
+        pos = self.to_position(node, ctx)
+
+        if target_class.is_adt:
+            return arg_stmts, self.translate_adt_cons(target_class, args, pos, ctx)
+
         res_var = ctx.current_function.create_variable(target_class.name +
                                                        '_res',
                                                        target_class,
                                                        self.translator)
         result_type = self.get_type(node, ctx)
-        pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to
@@ -866,37 +901,69 @@ class CallTranslator(CommonTranslator):
         ctx.position.pop()
         return stmts, result
 
-    def translate_method_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
-                                       arg_types: List[PythonType], rectype: UnionType,
-                                       node: ast.Call, ctx: Context,
-                                       impure) -> StmtsAndExpr:
+    def translate_call_in_union(self, arg_stmts: List[Stmt], args: List[Expr],
+                                arg_types: List[PythonType], rectype: UnionType,
+                                node: ast.Call, ctx: Context,
+                                impure: bool) -> StmtsAndExpr:
         """
-        Translate a method call, when the receiver is of type union, into an if-then-else
-        chain of method calls, one for each class in the union according to receiver's
-        type.
+        Translate a method call or function call when the receiver is of type
+        union. A chain of if-then-else statements or expressions will be used
+        to call the method or function of each class in the union.
         """
-        position = self.to_position(node, ctx)
+        pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        guarded_blocks = []
-        # For each class in union
+        guard_stmts_expr = []
+        value_returned = False
+        pure = True
+
+        # For each type in union (subclasses first)
         for type in toposort_classes(rectype.get_types() - {None}):
-            # If receiver is an instance of this particular class
-            method_call_guard = self.var_type_check(node.func.value.id, type, position,
-                                                    ctx)
-            # Call its respective method
-            method_call, return_var = self.translate_normal_call(
-                type.get_func_or_method(node.func.attr), arg_stmts,
-                args, arg_types, node, ctx, impure)
-            if 'final_return_var' not in locals():
-                final_return_var = return_var
-            else:
-                if return_var:
-                    method_call.append(self.viper.LocalVarAssign(final_return_var,
-                                       return_var, position, info))
-            method_call_block = self.translate_block(method_call, position, info)
-            guarded_blocks.append((method_call_guard, method_call_block))
-        return ([chain_if_stmts(guarded_blocks, self.viper, position, info, ctx)],
-                final_return_var)
+
+            # Create guard checking if receiver is an instance of this type
+            guard = self.var_type_check(node.func.value.id, type, pos, ctx)
+
+            # Translate the method call (method of this type)
+            stmts, expr = self.translate_normal_call(
+                type.get_func_or_method(node.func.attr), arg_stmts, args,
+                arg_types, node, ctx, impure)
+            
+            # Stores guard and translated method call as tuple
+            guard_stmts_expr.append((guard, stmts, expr))
+
+            # Calculate properties about the return value
+            value_returned = value_returned or expr is not None
+            pure = pure and len(stmts) == 0
+
+        # Sanitize return value properties
+        assert not pure or value_returned
+
+        if not pure and value_returned:
+
+            # Create a variable to assign the returned value
+            return_var = ctx.current_function.create_variable('return_var',
+                         ctx.module.global_module.classes[OBJECT_TYPE],
+                         self.translator)
+
+            for _, stmts, expr in guard_stmts_expr:
+                if expr is not None:
+
+                    # Assign the returned value to fresh variable
+                    stmts.append(self.viper.LocalVarAssign(return_var.ref(
+                                 node, ctx), expr, pos, info))
+
+        if pure:
+
+            # Chain list of guard and pure expression tuples in an if-then-else
+            # expression
+            guarded_expr = [(guard, expr) for guard, _, expr in guard_stmts_expr]
+            return [], chain_cond_exp(guarded_expr, self.viper, pos, info, ctx)
+        else:
+
+            # Chain guards and blocks in an if-then-else statement
+            guarded_blocks = [(guard, self.translate_block(stmts, pos, info))
+                              for guard, stmts, _ in guard_stmts_expr]
+            return ([chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)],
+                    return_var._ref if value_returned else None)
 
     def translate_normal_call_node(self, node: ast.Call, ctx: Context,
                                    impure=False) -> StmtsAndExpr:
@@ -918,8 +985,8 @@ class CallTranslator(CommonTranslator):
                         return self.translate_normal_call(target_pred, arg_stmts, args,
                                                           arg_types, node, ctx, impure)
                     # Otherwise apply special union treatment.
-                    return self.translate_method_call_in_union(arg_stmts, args, arg_types,
-                                                               rectype, node, ctx, impure)
+                    return self.translate_call_in_union(arg_stmts, args, arg_types,
+                                                        rectype, node, ctx, impure)
 
             # Must be a function that exists (otherwise mypy would complain)
             # we don't know, so probably some builtin we don't support yet.
