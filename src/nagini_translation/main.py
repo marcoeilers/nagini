@@ -28,6 +28,8 @@ from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
+from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
+from nagini_translation.extended_ast_translator import ExtendedASTTranslator
 from nagini_translation.sif_analyzer import SIFAnalyzer
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.translator import Translator
@@ -87,7 +89,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
 
-    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    if sif:
+        viperast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    else:
+        viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
     type_correct = types.check(path)
     if not type_correct:
@@ -104,7 +109,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
-        translator = SIFTranslator(jvm, path, types, viperast)
+        translator = ExtendedASTTranslator(jvm, path, types, viperast)
     else:
         translator = Translator(jvm, path, types, viperast)
     analyzer.process(translator)
@@ -287,6 +292,10 @@ def translate_and_verify(python_file, jvm, args, print=print):
         prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
             print('Translation successful.')
+        if args.sif:
+            if args.verbose:
+                print('Transforming to MPP.')
+            prog = jvm.viper.silver.sif.SIFTransformer.transform(prog, False)
         if args.print_silver:
             if args.verbose:
                 print('Result:')
