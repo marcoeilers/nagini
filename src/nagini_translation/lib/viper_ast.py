@@ -510,6 +510,7 @@ class ViperAST:
     def is_heap_dependent(self, expr) -> bool:
         """
         Checks if the given expression contains an access to a heap location.
+        Does NOT check for calls to heap-dependent functions.
         """
         for n in [expr] + self.to_list(expr.subnodes()):
             if isinstance(n, self.ast.LocationAccess):

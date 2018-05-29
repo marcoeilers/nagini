@@ -57,9 +57,22 @@ class Reason:
         self.position = Position(self.offending_node.pos())
 
     def __str__(self) -> str:
+        return self.string(False)
+
+    def string(self, show_viper_reason: bool) -> str:
+        """
+        Creates a string representation of this reason including a reference to the Python
+        AST node that caused it.
+        If no such node is available, either returns a partial message that describes the
+        kind of error in general, or outputs the concrete Viper-level description of the
+        error, depending on the parameter ``show_viper_reason``.
+        """
         reason = self._reason_string or self._node
         if reason is None and self.identifier in VAGUE_REASONS:
-            return VAGUE_REASONS[self.identifier]
+            if not show_viper_reason:
+                return VAGUE_REASONS[self.identifier]
+            else:
+                return self._reason.readableMessage()
         return REASONS[self.identifier](reason)
 
 
@@ -135,20 +148,25 @@ class Error:
         return self._error.text()
 
     def __str__(self) -> str:
-        """Format error.
+        return self.string(False, False)
+
+    def string(self, ide_mode: bool, show_viper_errors: bool) -> str:
+        """
+        Format error.
 
         Creates an appropriate error message (referring to the
         responsible Python code) for the given Viper error.
-        """
-        return '{0} {1} ({2})'.format(
-            self.message, self.reason, self.position_string)
 
-    def string(self, ide_mode: bool) -> str:
-        """Format error for IDE."""
+        The error format is either optimized for human readability or uses the same format
+        as IDE-mode Viper error messages, depending on the first parameter.
+        The second parameter determines if the message may show Viper-level error
+        explanations if no Python-level explanation is available.
+        """
         if ide_mode:
             return '{0}:{1}:{2}: error: {3} {4}'.format(
                 self.position.file_name,
                 self.position.line, self.position.column, self.message,
                 self.reason)
         else:
-            return str(self)
+            return '{0} {1} ({2})'.format(
+                self.message, self.reason.string(show_viper_errors), self.position_string)

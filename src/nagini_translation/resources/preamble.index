@@ -36,7 +36,9 @@
         "__getitem_slice__": {
             "args": ["list", "slice"],
             "type": "list",
-            "requires": ["__len__", "slice___start__", "slice___stop__"]
+            "display_name": "__getitem__",
+            "requires": ["__len__", "slice___start__", "slice___stop__"],
+            "MustTerminate": true
         },
         "__add__": {
             "args": ["list", "list"],
@@ -451,6 +453,7 @@
         "__getitem_slice__": {
             "args": ["bytes", "slice"],
             "type": "int",
+            "display_name": "__getitem__",
             "requires": ["__len__", "__val__", "slice___start__", "slice___stop__"]
         },
         "__getitem__": {
@@ -516,6 +519,7 @@
         "__getitem_slice__": {
             "args": ["tuple", "slice"],
             "type": "object",
+            "display_name": "__getitem__",
             "requires": ["__len__", "__getitem__", "__val__", "slice___start__", "slice___stop__"]
         },
         "__contains__": {
@@ -727,6 +731,7 @@
         "__getitem_slice__": {
             "args": ["range", "slice"],
             "type": "range",
+            "display_name": "__getitem__",
             "requires": ["__val__", "int___unbox__", "slice___start__", "slice___stop__"]
         },
         "__contains__": {
