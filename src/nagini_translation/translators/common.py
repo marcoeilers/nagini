@@ -585,7 +585,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         union type, passing through otherwise.
         """
         if receiver and type(receiver) is UnionType:
-            position = self.no_position(ctx) if not position else position
+            position = self.no_position(ctx) if position is None else position
             guarded_functions = []
             for cls in toposort_classes(receiver.get_types() - {None}):
 
