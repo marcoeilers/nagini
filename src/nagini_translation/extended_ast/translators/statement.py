@@ -27,3 +27,9 @@ class ExtendedASTStatementTranslator(StatementTranslator):
 
     def translate_stmt_Return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
         return self._translate_return(node, ctx)
+
+    def translate_stmt_Break(self, node: ast.Break, ctx: Context) -> List[Stmt]:
+        return [self.viper.Break(self.to_position(node, ctx), self.no_info(ctx))]
+
+    def translate_stmt_Continue(self, node: ast.Continue, ctx: Context) -> List[Stmt]:
+        return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]

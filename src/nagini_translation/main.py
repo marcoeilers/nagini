@@ -98,10 +98,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if not type_correct:
         return None
 
-    if sif:
-        analyzer = SIFAnalyzer(types, path, selected)
-    else:
-        analyzer = Analyzer(types, path, selected)
+    # if sif:
+    #     analyzer = SIFAnalyzer(types, path, selected)
+    # else:
+    analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
@@ -109,6 +109,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
+        # Todo: why is this necessary? Used to work with writing it in file.
+        config.file_config.config.set('Obligations', 'disable_all', 'True') 
         translator = ExtendedASTTranslator(jvm, path, types, viperast)
     else:
         translator = Translator(jvm, path, types, viperast)
@@ -295,7 +297,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.sif:
             if args.verbose:
                 print('Transforming to MPP.')
-            prog = jvm.viper.silver.sif.SIFTransformer.transform(prog, False)
+            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
         if args.print_silver:
             if args.verbose:
                 print('Result:')
