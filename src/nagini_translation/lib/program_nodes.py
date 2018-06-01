@@ -343,6 +343,25 @@ class TypeVar(PythonType, ContainerInterface):
     def python_class(self) -> 'PythonClass':
         return self.bound
 
+class SingletonFreshName:
+    """
+    This class wraps the fresh name facility in scope by using it only when
+    a new name is given. It is designed to store and retrieve the fresh name
+    based on the original name given.
+    """
+
+    def __init__(self, scope: PythonScope) -> None:
+        self._fresh_name_dict = {}
+        self._scope = scope
+
+    def __call__(self, name: str) -> str:
+        """
+        Returns a fresh name for a given name and scope if enquired for the
+        first time, otherwise returns the previously given fresh name.
+        """
+        if name not in self._fresh_name_dict:
+            self._fresh_name_dict[name] = self._scope.get_fresh_name(name)
+        return self._fresh_name_dict[name]
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
@@ -383,8 +402,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def is_defining_adt(self) -> bool:
         """
-        Returns true if class is defining the ADT's name.
+        Returns true if the class is defining an algebraic data type. This class
+        defines the name of the ADT and should be directly inherited by the
+        classes defining the ADT's constructors.
         """
+        assert self.is_adt
         if self.superclass:
             return self.superclass.name == 'ADT'
         return False
@@ -394,19 +416,24 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         Returns the class that defines the ADT.
         """
+        assert self.is_adt
         if self.is_defining_adt:
             return self
         else:
             return self.superclass.adt_def
-    
+
     @property
     def adt_domain_name(self) -> str:
         """
         Returns the domain name where the ADT is defined.
         """
-        if not hasattr(self.adt_def, '_adt_domain_name'):
-            self.adt_def._adt_domain_name = self.adt_def.get_fresh_name(self.adt_def.name)
-        return self.adt_def._adt_domain_name
+        assert self.is_adt
+        return self.fresh(self.adt_def.name)
+
+    @property
+    def adt_prefix(self) -> str:
+        assert self.is_adt
+        return self.adt_def.name + '_'
 
     @property
     def all_subclasses(self) -> List['PythonClass']:
@@ -444,6 +471,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             result |= self.superclass.all_static_fields
         result |= set(self.static_fields)
         return result
+
+    def fresh(self, name: str) -> str:
+        assert self.is_adt
+        if not hasattr(self.adt_def, '_fresh'):
+            self.adt_def._fresh = SingletonFreshName(self.module)
+        return self.adt_def._fresh(name)
 
     def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
         """
