@@ -724,30 +724,32 @@ class ExpressionTranslator(CommonTranslator):
         if the projected component's type is ADT (recursive composition).
         """
         info = self.no_info(ctx)
-        adt_name = decons.adt_domain_name
-        adt_prefix = decons.adt_def.name + '_'
-        adt_type = self.viper.DomainType(adt_name, {}, [])
+        adt_type = self.viper.DomainType(decons.adt_domain_name, {}, [])
 
         # Translate receiver
         stmt, adt_obj = self.translate_expr(node.value, ctx)
 
         # Unbox ADT to be deconstructed
-        unbox_func = self.viper.FuncApp('unbox_' + adt_name, [adt_obj], pos,
-                                        info, adt_type)
+        unbox_func = self.viper.FuncApp(decons.fresh('unbox_' +
+                                        decons.adt_domain_name),
+                                        [adt_obj], pos, info, adt_type)
 
         # Calculate return type
         decons_type = (adt_type if decons.fields[node.attr].type == decons.adt_def
                        else self.viper.Ref)
 
         # Translate deconstruction call
-        decons_call = self.viper.DomainFuncApp(adt_prefix + decons.name + '_'
-                                               + node.attr, [unbox_func],
-                                               decons_type, pos, info, adt_name)
+        decons_call = self.viper.DomainFuncApp(decons.fresh(decons.adt_prefix +
+                                               decons.name + '_' + node.attr),
+                                               [unbox_func], decons_type, pos,
+                                               info, decons.adt_domain_name)
 
         # If returned type is ADT type, box it
         if decons_type == adt_type:
-            decons_call = self.viper.FuncApp('box_' + adt_name, [decons_call],
-                                             pos, info, self.viper.Ref)
+            decons_call = self.viper.FuncApp(decons.fresh('box_' +
+                                             decons.adt_domain_name),
+                                             [decons_call], pos, info,
+                                             self.viper.Ref)
 
         return stmt, decons_call
 

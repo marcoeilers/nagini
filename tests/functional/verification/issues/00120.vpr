@@ -1,0 +1,842 @@
+domain PyType {
+  
+  function extends_(sub: PyType, super: PyType): Bool
+  
+  function issubtype(sub: PyType, super: PyType): Bool
+  
+  function isnotsubtype(sub: PyType, super: PyType): Bool
+  
+  function tuple_args(t: PyType): Seq[PyType]
+  
+  function typeof(obj: Ref): PyType
+  
+  function get_basic(t: PyType): PyType
+  
+  function union_type_1(arg_1: PyType): PyType
+  
+  function union_type_2(arg_1: PyType, arg_2: PyType): PyType
+  
+  function union_type_3(arg_1: PyType, arg_2: PyType, arg_3: PyType): PyType
+  
+  function union_type_4(arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType): PyType
+  
+  unique function Place(): PyType
+  
+  unique function object(): PyType
+  
+  unique function Sequence_basic(): PyType
+  
+  function Sequence(arg0: PyType): PyType
+  
+  function Sequence_arg(typ: PyType, index: Int): PyType
+  
+  unique function LevelType(): PyType
+  
+  unique function PSet_basic(): PyType
+  
+  function PSet(arg0: PyType): PyType
+  
+  function PSet_arg(typ: PyType, index: Int): PyType
+  
+  unique function range(): PyType
+  
+  unique function str(): PyType
+  
+  unique function Exception(): PyType
+  
+  unique function NoneType(): PyType
+  
+  unique function bool(): PyType
+  
+  unique function type(): PyType
+  
+  unique function dict_basic(): PyType
+  
+  function dict(arg0: PyType, arg1: PyType): PyType
+  
+  function dict_arg(typ: PyType, index: Int): PyType
+  
+  unique function Thread_0(): PyType
+  
+  unique function bytes(): PyType
+  
+  unique function traceback(): PyType
+  
+  unique function slice(): PyType
+  
+  unique function tuple_basic(): PyType
+  
+  function tuple(args: Seq[PyType]): PyType
+  
+  function tuple_arg(typ: PyType, index: Int): PyType
+  
+  unique function Iterator_basic(): PyType
+  
+  function Iterator(arg0: PyType): PyType
+  
+  function Iterator_arg(typ: PyType, index: Int): PyType
+  
+  unique function int(): PyType
+  
+  unique function list_basic(): PyType
+  
+  function list(arg0: PyType): PyType
+  
+  function list_arg(typ: PyType, index: Int): PyType
+  
+  unique function float(): PyType
+  
+  unique function set_basic(): PyType
+  
+  function set(arg0: PyType): PyType
+  
+  function set_arg(typ: PyType, index: Int): PyType
+  
+  unique function __prim__Sequence_type(): PyType
+  
+  unique function ADT(): PyType
+  
+  unique function Tree(): PyType
+  
+  unique function Leaf(): PyType
+  
+  unique function Node(): PyType
+  
+  unique function Tree_0(): PyType
+  
+  unique function Leaf_0(): PyType
+  
+  unique function Node_0(): PyType
+  
+  axiom issubtype_transitivity {
+    (forall sub: PyType, middle: PyType, super: PyType :: { issubtype(sub, middle),issubtype(middle, super) } issubtype(sub, middle) && issubtype(middle, super) ==> issubtype(sub, super))
+  }
+  
+  axiom issubtype_reflexivity {
+    (forall type_: PyType :: { issubtype(type_, type_) } issubtype(type_, type_))
+  }
+  
+  axiom extends_implies_subtype {
+    (forall sub: PyType, sub2: PyType :: { extends_(sub, sub2) } extends_(sub, sub2) ==> issubtype(sub, sub2))
+  }
+  
+  axiom null_nonetype {
+    (forall r: Ref :: { typeof(r) } issubtype(typeof(r), NoneType()) == (r == null))
+  }
+  
+  axiom issubtype_object {
+    (forall type_: PyType :: { issubtype(type_, object()) } issubtype(type_, object()))
+  }
+  
+  axiom issubtype_exclusion {
+    (forall sub: PyType, sub2: PyType, super: PyType :: { extends_(sub, super),extends_(sub2, super) } extends_(sub, super) && extends_(sub2, super) && sub != sub2 ==> isnotsubtype(sub, sub2) && isnotsubtype(sub2, sub))
+  }
+  
+  axiom issubtype_exclusion_2 {
+    (forall sub: PyType, super: PyType :: { issubtype(sub, super) } { issubtype(super, sub) } issubtype(sub, super) && sub != super ==> !issubtype(super, sub))
+  }
+  
+  axiom issubtype_exclusion_propagation {
+    (forall sub: PyType, middle: PyType, super: PyType :: { issubtype(sub, middle),isnotsubtype(middle, super) } issubtype(sub, middle) && isnotsubtype(middle, super) ==> !issubtype(sub, super))
+  }
+  
+  axiom tuple_arg_def {
+    (forall seq: Seq[PyType], i: Int, Z: PyType :: { tuple(seq),tuple_arg(Z, i) } issubtype(Z, tuple(seq)) ==> issubtype(tuple_arg(Z, i), seq[i]))
+  }
+  
+  axiom tuple_args_def {
+    (forall seq: Seq[PyType], Z: PyType :: { issubtype(Z, tuple(seq)) } issubtype(Z, tuple(seq)) ==> |tuple_args(Z)| == |seq|)
+  }
+  
+  axiom tuple_self_subtype {
+    (forall seq1: Seq[PyType], seq2: Seq[PyType] :: seq1 != seq2 && |seq1| == |seq2| && (forall i: Int :: i >= 0 && i < |seq1| ==> issubtype(seq1[i], seq2[i])) ==> issubtype(tuple(seq1), tuple(seq2)))
+  }
+  
+  axiom union_subtype_1 {
+    (forall arg_1: PyType, X: PyType :: { issubtype(X, union_type_1(arg_1)) } issubtype(X, union_type_1(arg_1)) == (false || issubtype(X, arg_1)))
+  }
+  
+  axiom union_subtype_2 {
+    (forall arg_1: PyType, arg_2: PyType, X: PyType :: { issubtype(X, union_type_2(arg_1, arg_2)) } issubtype(X, union_type_2(arg_1, arg_2)) == (false || issubtype(X, arg_1) || issubtype(X, arg_2)))
+  }
+  
+  axiom union_subtype_3 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, X: PyType :: { issubtype(X, union_type_3(arg_1, arg_2, arg_3)) } issubtype(X, union_type_3(arg_1, arg_2, arg_3)) == (false || issubtype(X, arg_1) || issubtype(X, arg_2) || issubtype(X, arg_3)))
+  }
+  
+  axiom union_subtype_4 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType, X: PyType :: { issubtype(X, union_type_4(arg_1, arg_2, arg_3, arg_4)) } issubtype(X, union_type_4(arg_1, arg_2, arg_3, arg_4)) == (false || issubtype(X, arg_1) || issubtype(X, arg_2) || issubtype(X, arg_3) || issubtype(X, arg_4)))
+  }
+  
+  axiom subtype_union_1 {
+    (forall arg_1: PyType, X: PyType :: { issubtype(union_type_1(arg_1), X) } issubtype(union_type_1(arg_1), X) == (true && issubtype(arg_1, X)))
+  }
+  
+  axiom subtype_union_2 {
+    (forall arg_1: PyType, arg_2: PyType, X: PyType :: { issubtype(union_type_2(arg_1, arg_2), X) } issubtype(union_type_2(arg_1, arg_2), X) == (true && issubtype(arg_1, X) && issubtype(arg_2, X)))
+  }
+  
+  axiom subtype_union_3 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, X: PyType :: { issubtype(union_type_3(arg_1, arg_2, arg_3), X) } issubtype(union_type_3(arg_1, arg_2, arg_3), X) == (true && issubtype(arg_1, X) && issubtype(arg_2, X) && issubtype(arg_3, X)))
+  }
+  
+  axiom subtype_union_4 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType, X: PyType :: { issubtype(union_type_4(arg_1, arg_2, arg_3, arg_4), X) } issubtype(union_type_4(arg_1, arg_2, arg_3, arg_4), X) == (true && issubtype(arg_1, X) && issubtype(arg_2, X) && issubtype(arg_3, X) && issubtype(arg_4, X)))
+  }
+  
+  axiom subtype_Place {
+    extends_(Place(), object()) && get_basic(Place()) == Place()
+  }
+  
+  axiom subtype_Sequence {
+    (forall var0: PyType :: { Sequence(var0) } extends_(Sequence(var0), object()) && get_basic(Sequence(var0)) == Sequence_basic())
+  }
+  
+  axiom Sequence_args0 {
+    (forall Z: PyType, arg0: PyType :: issubtype(Z, Sequence(arg0)) ==> Sequence_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_PSet {
+    (forall var0: PyType :: { PSet(var0) } extends_(PSet(var0), object()) && get_basic(PSet(var0)) == PSet_basic())
+  }
+  
+  axiom PSet_args0 {
+    (forall Z: PyType, arg0: PyType :: issubtype(Z, PSet(arg0)) ==> PSet_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_range {
+    extends_(range(), object()) && get_basic(range()) == range()
+  }
+  
+  axiom subtype_str {
+    extends_(str(), object()) && get_basic(str()) == str()
+  }
+  
+  axiom subtype_Exception {
+    extends_(Exception(), object()) && get_basic(Exception()) == Exception()
+  }
+  
+  axiom subtype_NoneType {
+    extends_(NoneType(), object()) && get_basic(NoneType()) == NoneType()
+  }
+  
+  axiom subtype_bool {
+    extends_(bool(), int()) && get_basic(bool()) == bool()
+  }
+  
+  axiom subtype_type {
+    extends_(type(), object()) && get_basic(type()) == type()
+  }
+  
+  axiom subtype_dict {
+    (forall var0: PyType, var1: PyType :: { dict(var0, var1) } extends_(dict(var0, var1), object()) && get_basic(dict(var0, var1)) == dict_basic())
+  }
+  
+  axiom dict_args0 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType :: issubtype(Z, dict(arg0, arg1)) ==> dict_arg(Z, 0) == arg0)
+  }
+  
+  axiom dict_args1 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType :: issubtype(Z, dict(arg0, arg1)) ==> dict_arg(Z, 1) == arg1)
+  }
+  
+  axiom subtype_Thread_0 {
+    extends_(Thread_0(), object()) && get_basic(Thread_0()) == Thread_0()
+  }
+  
+  axiom subtype_bytes {
+    extends_(bytes(), object()) && get_basic(bytes()) == bytes()
+  }
+  
+  axiom subtype_traceback {
+    extends_(traceback(), object()) && get_basic(traceback()) == traceback()
+  }
+  
+  axiom subtype_slice {
+    extends_(slice(), object()) && get_basic(slice()) == slice()
+  }
+  
+  axiom subtype_tuple {
+    (forall args: Seq[PyType] :: { tuple(args) } ((forall e: PyType :: (e in args) ==> e == object()) ==> extends_(tuple(args), object())) && get_basic(tuple(args)) == tuple_basic())
+  }
+  
+  axiom subtype_Iterator {
+    (forall var0: PyType :: { Iterator(var0) } extends_(Iterator(var0), object()) && get_basic(Iterator(var0)) == Iterator_basic())
+  }
+  
+  axiom Iterator_args0 {
+    (forall Z: PyType, arg0: PyType :: issubtype(Z, Iterator(arg0)) ==> Iterator_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_int {
+    extends_(int(), float()) && get_basic(int()) == int()
+  }
+  
+  axiom subtype_list {
+    (forall var0: PyType :: { list(var0) } extends_(list(var0), object()) && get_basic(list(var0)) == list_basic())
+  }
+  
+  axiom list_args0 {
+    (forall Z: PyType, arg0: PyType :: issubtype(Z, list(arg0)) ==> list_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_float {
+    extends_(float(), object()) && get_basic(float()) == float()
+  }
+  
+  axiom subtype_set {
+    (forall var0: PyType :: { set(var0) } extends_(set(var0), object()) && get_basic(set(var0)) == set_basic())
+  }
+  
+  axiom set_args0 {
+    (forall Z: PyType, arg0: PyType :: issubtype(Z, set(arg0)) ==> set_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype___prim__Sequence_type {
+    extends_(__prim__Sequence_type(), object()) && get_basic(__prim__Sequence_type()) == __prim__Sequence_type()
+  }
+  
+  axiom subtype_ADT {
+    extends_(ADT(), object()) && get_basic(ADT()) == ADT()
+  }
+  
+  axiom subtype_Tree {
+    extends_(Tree(), ADT()) && get_basic(Tree()) == Tree()
+  }
+  
+  axiom subtype_Leaf {
+    extends_(Leaf(), Tree()) && get_basic(Leaf()) == Leaf()
+  }
+  
+  axiom subtype_Node {
+    extends_(Node(), Tree()) && get_basic(Node()) == Node()
+  }
+  
+  axiom subtype_Tree_0 {
+    extends_(Tree_0(), ADT()) && get_basic(Tree_0()) == Tree_0()
+  }
+  
+  axiom subtype_Leaf_0 {
+    extends_(Leaf_0(), Tree_0()) && get_basic(Leaf_0()) == Leaf_0()
+  }
+  
+  axiom subtype_Node_0 {
+    extends_(Node_0(), Tree_0()) && get_basic(Node_0()) == Node_0()
+  }
+}
+
+domain Thread {
+  
+  function getMethod(t: Ref): ThreadingID
+  
+  function getArg(t: Ref, i: Int): Ref
+  
+  function getOld(t: Ref, i: Int): Ref
+}
+
+domain Function {
+  
+  
+}
+
+domain ThreadingID {
+  
+  unique function __iter___threading(): ThreadingID
+  
+  unique function split_threading(): ThreadingID
+  
+  unique function keys_threading(): ThreadingID
+  
+  unique function __init___threading(): ThreadingID
+  
+  unique function values_threading(): ThreadingID
+  
+  unique function __iter___threading_0(): ThreadingID
+  
+  unique function __setitem___threading(): ThreadingID
+  
+  unique function __del___threading(): ThreadingID
+  
+  unique function __next___threading(): ThreadingID
+  
+  unique function reverse_threading(): ThreadingID
+  
+  unique function __init___threading_0(): ThreadingID
+  
+  unique function __getitem_slice___threading_2(): ThreadingID
+  
+  unique function __iter___threading_1(): ThreadingID
+  
+  unique function append_threading(): ThreadingID
+  
+  unique function extend_threading(): ThreadingID
+  
+  unique function __mul___threading_1(): ThreadingID
+  
+  unique function __add___threading_4(): ThreadingID
+  
+  unique function __setitem___threading_0(): ThreadingID
+  
+  unique function add_threading(): ThreadingID
+  
+  unique function clear_threading(): ThreadingID
+  
+  unique function __init___threading_1(): ThreadingID
+  
+  unique function remove_threading(): ThreadingID
+  
+  unique function __iter___threading_2(): ThreadingID
+  
+  unique function common_use_of_ADTs_threading(): ThreadingID
+}
+
+domain Tree_2 {
+  
+  function Tree_Leaf_0(elem: Ref): Tree_2
+  
+  function Tree_Node_0(left: Tree_2, right: Tree_2): Tree_2
+  
+  function Tree_Leaf_elem_0(obj: Tree_2): Ref
+  
+  function Tree_Node_left_0(obj: Tree_2): Tree_2
+  
+  function Tree_Node_right_0(obj: Tree_2): Tree_2
+  
+  function Tree_cons_type(obj: Tree_2): Int
+  
+  unique function Tree_Leaf_type(): Int
+  
+  unique function Tree_Node_type(): Int
+  
+  function Tree_is_Leaf(obj: Tree_2): Bool
+  
+  function Tree_is_Node(obj: Tree_2): Bool
+  
+  axiom Tree_decons_over_cons_Leaf {
+    (forall elem: Ref :: { Tree_Leaf_0(elem) } Tree_Leaf_elem_0(Tree_Leaf_0(elem)) == elem)
+  }
+  
+  axiom Tree_decons_over_cons_Node {
+    (forall left: Tree_2, right: Tree_2 :: { Tree_Node_0(left, right) } Tree_Node_left_0(Tree_Node_0(left, right)) == left && Tree_Node_right_0(Tree_Node_0(left, right)) == right)
+  }
+  
+  axiom Tree_cons_Leaf_over_decons {
+    (forall obj: Tree_2 :: { Tree_Leaf_elem_0(obj) } Tree_is_Leaf(obj) ==> obj == Tree_Leaf_0(Tree_Leaf_elem_0(obj)))
+  }
+  
+  axiom Tree_cons_Node_over_decons {
+    (forall obj: Tree_2 :: { Tree_Node_left_0(obj) } { Tree_Node_right_0(obj) } Tree_is_Node(obj) ==> obj == Tree_Node_0(Tree_Node_left_0(obj), Tree_Node_right_0(obj)))
+  }
+  
+  axiom Tree_associate_cons_type_function_with_Leaf_constant {
+    (forall elem: Ref :: Tree_cons_type(Tree_Leaf_0(elem)) == Tree_Leaf_type())
+  }
+  
+  axiom Tree_associate_cons_type_function_with_Node_constant {
+    (forall left: Tree_2, right: Tree_2 :: Tree_cons_type(Tree_Node_0(left, right)) == Tree_Node_type())
+  }
+  
+  axiom Tree_constrain_cons_type_function_cons_constants {
+    (forall obj: Tree_2 :: Tree_cons_type(obj) == Tree_Leaf_type() || Tree_cons_type(obj) == Tree_Node_type())
+  }
+  
+  axiom Tree_associate_cons_type_function_with_is_Leaf_bool_function {
+    (forall obj: Tree_2 :: (Tree_cons_type(obj) == Tree_Leaf_type()) == Tree_is_Leaf(obj))
+  }
+  
+  axiom Tree_associate_cons_type_function_with_is_Node_bool_function {
+    (forall obj: Tree_2 :: (Tree_cons_type(obj) == Tree_Node_type()) == Tree_is_Node(obj))
+  }
+  
+  axiom Tree_type_of_constructors {
+    (forall ref: Ref :: issubtype(typeof(ref), Tree()) ==> typeof(ref) == Leaf() || typeof(ref) == Node())
+  }
+}
+
+domain Tree_1 {
+  
+  function Tree_Leaf(elem: Ref): Tree_1
+  
+  function Tree_Node(left: Tree_1, right: Tree_1): Tree_1
+  
+  function Tree_Leaf_elem(obj: Tree_1): Ref
+  
+  function Tree_Node_left(obj: Tree_1): Tree_1
+  
+  function Tree_Node_right(obj: Tree_1): Tree_1
+  
+  function Tree_cons_type_0(obj: Tree_1): Int
+  
+  unique function Tree_Leaf_type_0(): Int
+  
+  unique function Tree_Node_type_0(): Int
+  
+  function Tree_is_Leaf_0(obj: Tree_1): Bool
+  
+  function Tree_is_Node_0(obj: Tree_1): Bool
+  
+  axiom Tree_decons_over_cons_Leaf_0 {
+    (forall elem: Ref :: { Tree_Leaf(elem) } Tree_Leaf_elem(Tree_Leaf(elem)) == elem)
+  }
+  
+  axiom Tree_decons_over_cons_Node_0 {
+    (forall left: Tree_1, right: Tree_1 :: { Tree_Node(left, right) } Tree_Node_left(Tree_Node(left, right)) == left && Tree_Node_right(Tree_Node(left, right)) == right)
+  }
+  
+  axiom Tree_cons_Leaf_over_decons_0 {
+    (forall obj: Tree_1 :: { Tree_Leaf_elem(obj) } Tree_is_Leaf_0(obj) ==> obj == Tree_Leaf(Tree_Leaf_elem(obj)))
+  }
+  
+  axiom Tree_cons_Node_over_decons_0 {
+    (forall obj: Tree_1 :: { Tree_Node_left(obj) } { Tree_Node_right(obj) } Tree_is_Node_0(obj) ==> obj == Tree_Node(Tree_Node_left(obj), Tree_Node_right(obj)))
+  }
+  
+  axiom Tree_associate_cons_type_function_with_Leaf_constant_0 {
+    (forall elem: Ref :: Tree_cons_type_0(Tree_Leaf(elem)) == Tree_Leaf_type_0())
+  }
+  
+  axiom Tree_associate_cons_type_function_with_Node_constant_0 {
+    (forall left: Tree_1, right: Tree_1 :: Tree_cons_type_0(Tree_Node(left, right)) == Tree_Node_type_0())
+  }
+  
+  axiom Tree_constrain_cons_type_function_cons_constants_0 {
+    (forall obj: Tree_1 :: Tree_cons_type_0(obj) == Tree_Leaf_type_0() || Tree_cons_type_0(obj) == Tree_Node_type_0())
+  }
+  
+  axiom Tree_associate_cons_type_function_with_is_Leaf_bool_function_0 {
+    (forall obj: Tree_1 :: (Tree_cons_type_0(obj) == Tree_Leaf_type_0()) == Tree_is_Leaf_0(obj))
+  }
+  
+  axiom Tree_associate_cons_type_function_with_is_Node_bool_function_0 {
+    (forall obj: Tree_1 :: (Tree_cons_type_0(obj) == Tree_Node_type_0()) == Tree_is_Node_0(obj))
+  }
+  
+  axiom Tree_type_of_constructors_0 {
+    (forall ref: Ref :: issubtype(typeof(ref), Tree()) ==> typeof(ref) == Leaf() || typeof(ref) == Node())
+  }
+}
+
+domain Measure$ {
+  
+  function Measure$create(guard: Bool, key: Ref, value: Int): Measure$
+  
+  function Measure$guard(m: Measure$): Bool
+  
+  function Measure$key(m: Measure$): Ref
+  
+  function Measure$value(m: Measure$): Int
+  
+  axiom Measure$A0 {
+    (forall g: Bool, k: Ref, v: Int :: { Measure$guard(Measure$create(g, k, v)) } Measure$guard(Measure$create(g, k, v)) == g)
+  }
+  
+  axiom Measure$A1 {
+    (forall g: Bool, k: Ref, v: Int :: { Measure$key(Measure$create(g, k, v)) } Measure$key(Measure$create(g, k, v)) == k)
+  }
+  
+  axiom Measure$A2 {
+    (forall g: Bool, k: Ref, v: Int :: { Measure$value(Measure$create(g, k, v)) } Measure$value(Measure$create(g, k, v)) == v)
+  }
+}
+
+domain _Name {
+  
+  function _combine(n1: _Name, n2: _Name): _Name
+  
+  function _single(n: Int): _Name
+  
+  function _get_combined_prefix(n: _Name): _Name
+  
+  function _get_combined_name(n: _Name): _Name
+  
+  function _get_value(n: _Name): Int
+  
+  function _is_single(n: _Name): Bool
+  
+  axiom all_single_or_combined {
+    (forall n: _Name :: n == _single(_get_value(n)) || n == _combine(_get_combined_prefix(n), _get_combined_name(n)))
+  }
+  
+  axiom single_is_single {
+    (forall i: Int :: { _single(i) } _is_single(_single(i)))
+  }
+  
+  axiom combined_is_not_single {
+    (forall n1: _Name, n2: _Name :: { _combine(n1, n2) } !_is_single(_combine(n1, n2)))
+  }
+  
+  axiom decompose_single {
+    (forall i: Int :: { _single(i) } _get_value(_single(i)) == i)
+  }
+  
+  axiom decompose_combined_prefix {
+    (forall n1: _Name, n2: _Name :: { _combine(n1, n2) } _get_combined_prefix(_combine(n1, n2)) == n1)
+  }
+  
+  axiom decompose_combined_name {
+    (forall n1: _Name, n2: _Name :: { _combine(n1, n2) } _get_combined_name(_combine(n1, n2)) == n2)
+  }
+}
+
+field _val: Ref
+
+field __container: Ref
+
+field __iter_index: Int
+
+field __previous: Ref
+
+field list_acc: Seq[Ref]
+
+field set_acc: Set[Ref]
+
+field dict_acc: Set[Ref]
+
+field Measure$acc: Seq[Ref]
+
+field MustReleaseBounded: Int
+
+field MustReleaseUnbounded: Int
+
+function _joinable(t: Ref): Bool 
+
+
+function _isDefined(id: Int): Bool 
+
+
+function _checkDefined(val: Ref, id: Int): Ref
+  requires _isDefined(id) 
+{
+  val
+}
+
+function _asserting(val: Ref, ass: Bool): Ref
+  requires ass 
+{
+  val
+}
+
+function _int_to_bool(i: Int): Bool 
+
+
+function __file__(): Ref 
+
+
+function __name__(): Ref 
+
+
+function __file___0(): Ref 
+
+
+function __name___0(): Ref 
+
+
+function __file___1(): Ref 
+
+
+function __name___1(): Ref 
+
+
+function box_Tree_2(obj: Tree_2): Ref
+  ensures issubtype(typeof(result), Tree())
+  ensures unbox_Tree_2(result) == obj
+  ensures Tree_is_Leaf(obj) ==> typeof(result) == Leaf()
+  ensures Tree_is_Node(obj) ==> typeof(result) == Node() 
+
+
+function unbox_Tree_2(ref: Ref): Tree_2
+  requires issubtype(typeof(ref), Tree())
+  ensures box_Tree_2(result) == ref 
+
+
+function box_Tree_1(obj: Tree_1): Ref
+  ensures issubtype(typeof(result), Tree_0())
+  ensures unbox_Tree_1(result) == obj
+  ensures Tree_is_Leaf_0(obj) ==> typeof(result) == Leaf()
+  ensures Tree_is_Node_0(obj) ==> typeof(result) == Node() 
+
+
+function unbox_Tree_1(ref: Ref): Tree_1
+  requires issubtype(typeof(ref), Tree_0())
+  ensures box_Tree_1(result) == ref 
+
+
+function __prim__int___box__(prim: Int): Ref
+  ensures typeof(result) == int()
+  ensures int___unbox__(result) == prim
+  ensures (forall other: Int :: { __prim__int___box__(other) } (__prim__int___box__(other) == result) == (other == prim)) 
+
+
+function int___unbox__(box: Ref): Int
+  requires issubtype(typeof(box), int())
+  ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
+  ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box 
+
+
+function __prim__bool___box__(prim: Bool): Ref
+  ensures typeof(result) == bool()
+  ensures bool___unbox__(result) == prim
+  ensures int___unbox__(result) == (prim ? 1 : 0) 
+
+
+function bool___unbox__(box: Ref): Bool
+  requires issubtype(typeof(box), bool())
+  ensures __prim__bool___box__(result) == box 
+
+
+function int___eq__(self: Ref, other: Ref): Bool
+  requires issubtype(typeof(self), int())
+  requires issubtype(typeof(other), int()) 
+{
+  int___unbox__(self) == int___unbox__(other)
+}
+
+function object___cast__(typ: PyType, obj: Ref): Ref
+  requires issubtype(typeof(obj), typ)
+  ensures result == obj
+  ensures issubtype(typeof(obj), typ) 
+
+
+function Level(r: Ref): Perm 
+
+
+function str___len__(self: Ref): Int
+  ensures result >= 0 
+
+
+function str___val__(self: Ref): Int 
+
+
+function str___create__(len: Int, value: Int): Ref
+  ensures str___len__(result) == len
+  ensures str___val__(result) == value
+  ensures typeof(result) == str() 
+
+
+function str___eq__(self: Ref, other: Ref): Bool
+  requires issubtype(typeof(self), str())
+  ensures (str___val__(self) == str___val__(other)) == result
+  ensures result ==> str___len__(self) == str___len__(other) 
+
+
+predicate MustTerminate(r: Ref) 
+
+predicate MustInvokeBounded(r: Ref) 
+
+predicate MustInvokeUnbounded(r: Ref) 
+
+predicate MustInvokeCredit(r: Ref) 
+
+predicate _thread_start(t: Ref) 
+
+predicate _thread_post(t: Ref) 
+
+predicate _MaySet(rec: Ref, id: Int) 
+
+method common_use_of_ADTs(_cthread_144: Ref, _caller_measures_144: Seq[Measure$], _residue_144: Perm) returns (_current_wait_level_144: Perm)
+  requires _cthread_144 != null
+  requires issubtype(typeof(_cthread_144), Thread_0())
+  requires [true, perm(MustTerminate(_cthread_144)) == none && ((forperm [MustInvokeBounded] _r_1 :: false) && ((forperm [MustInvokeUnbounded] _r_1 :: false) && ((forperm [MustReleaseBounded] _r_1 :: false) && (forperm [MustReleaseUnbounded] _r_1 :: false))))]
+  ensures [(forperm [MustReleaseBounded, MustReleaseUnbounded] _r :: Level(_r) <= _current_wait_level_144) && _residue_144 <= _current_wait_level_144, true]
+  ensures [true, (forperm [MustInvokeBounded] _r_0 :: false) && ((forperm [MustInvokeUnbounded] _r_0 :: false) && ((forperm [MustReleaseBounded] _r_0 :: false) && (forperm [MustReleaseUnbounded] _r_0 :: false)))]
+{
+  var t_1: Ref
+  var t_2: Ref
+  var t_3: Ref
+  var _cwl_144: Perm
+  var _method_measures_144: Seq[Measure$]
+  _method_measures_144 := Seq[Measure$]()
+  t_1 := box_Tree_1(Tree_Leaf(__prim__int___box__(5)))
+  inhale _isDefined(3235700)
+  t_2 := box_Tree_1(Tree_Leaf(__prim__int___box__(6)))
+  inhale _isDefined(3301236)
+  t_3 := box_Tree_1(Tree_Node(unbox_Tree_1(_checkDefined(t_1, 3235700)), unbox_Tree_1(_checkDefined(t_2, 3301236))))
+  inhale _isDefined(3366772)
+  assert int___eq__(Tree_Leaf_elem(unbox_Tree_1(_checkDefined(t_1, 3235700))), __prim__int___box__(5))
+  assert int___eq__(Tree_Leaf_elem(unbox_Tree_1(_checkDefined(t_2, 3301236))), __prim__int___box__(6))
+  assert int___eq__(Tree_Leaf_elem(unbox_Tree_1(object___cast__(Leaf_0(), box_Tree_1(Tree_Node_left(unbox_Tree_1(_checkDefined(t_3, 3366772))))))), __prim__int___box__(5))
+  assert int___eq__(Tree_Leaf_elem(unbox_Tree_1(object___cast__(Leaf_0(), box_Tree_1(Tree_Node_right(unbox_Tree_1(_checkDefined(t_3, 3366772))))))), __prim__int___box__(6))
+  goto __end
+  label __end
+}
+
+method main(_cthread_145: Ref, _caller_measures_145: Seq[Measure$], _residue_145: Perm) returns (_current_wait_level_145: Perm)
+  requires _cthread_145 != null
+  requires issubtype(typeof(_cthread_145), Thread_0())
+  requires [true, perm(MustTerminate(_cthread_145)) == none && ((forperm [MustInvokeBounded] _r_4 :: false) && ((forperm [MustInvokeUnbounded] _r_4 :: false) && ((forperm [MustReleaseBounded] _r_4 :: false) && (forperm [MustReleaseUnbounded] _r_4 :: false))))]
+  ensures [(forperm [MustReleaseBounded, MustReleaseUnbounded] _r_2 :: Level(_r_2) <= _current_wait_level_145) && _residue_145 <= _current_wait_level_145, true]
+  ensures [true, (forperm [MustInvokeBounded] _r_3 :: false) && ((forperm [MustInvokeUnbounded] _r_3 :: false) && ((forperm [MustReleaseBounded] _r_3 :: false) && (forperm [MustReleaseUnbounded] _r_3 :: false)))]
+{
+  var new_set: Set[_Name]
+  var module_defined_0: Bool
+  var module_names_0: Set[_Name]
+  var module_defined_1: Bool
+  var module_names_1: Set[_Name]
+  var module_defined_2: Bool
+  var module_names_2: Set[_Name]
+  var _cwl_145: Perm
+  var _method_measures_145: Seq[Measure$]
+  _method_measures_145 := Seq[Measure$]()
+  module_defined_0 := false
+  module_names_0 := Set[_Name]()
+  module_names_0 := module_names_0 union Set(_single(3106082509126931487350218591))
+  inhale acc(__file__()._val, 99 / 100) && issubtype(typeof(__file__()._val), str()) && issubtype(typeof(__file__()._val), str())
+  module_names_0 := module_names_0 union Set(_single(2489530350921051593165922143))
+  inhale acc(__name__()._val, 99 / 100) && issubtype(typeof(__name__()._val), str()) && issubtype(typeof(__name__()._val), str()) && !str___eq__(str___create__(8, 2489249333222104298408468319), __name__()._val)
+  module_defined_1 := false
+  module_names_1 := Set[_Name]()
+  module_names_1 := module_names_1 union Set(_single(3106082509126931487350218591))
+  inhale acc(__file___0()._val, 99 / 100) && issubtype(typeof(__file___0()._val), str()) && issubtype(typeof(__file___0()._val), str())
+  module_names_1 := module_names_1 union Set(_single(2489530350921051593165922143))
+  inhale acc(__name___0()._val, 99 / 100) && issubtype(typeof(__name___0()._val), str()) && issubtype(typeof(__name___0()._val), str()) && !str___eq__(str___create__(8, 2489249333222104298408468319), __name___0()._val)
+  module_defined_2 := true
+  module_names_2 := Set[_Name]()
+  module_names_2 := module_names_2 union Set(_single(3106082509126931487350218591))
+  inhale acc(__file___1()._val, 99 / 100) && issubtype(typeof(__file___1()._val), str()) && issubtype(typeof(__file___1()._val), str())
+  module_names_2 := module_names_2 union Set(_single(2489530350921051593165922143))
+  inhale acc(__name___1()._val, 99 / 100) && issubtype(typeof(__name___1()._val), str()) && issubtype(typeof(__name___1()._val), str()) && str___eq__(str___create__(8, 2489249333222104298408468319), __name___1()._val)
+  module_names_2 := module_names_2 union Set(_single(5443074906187839357460504910))
+  module_names_2 := module_names_2 union Set(_single(1953718627))
+  if (!module_defined_0) {
+    module_defined_0 := true
+    assert true
+    module_names_0 := module_names_0 union Set(_single(5522497))
+  }
+  assert (_single(5522497) in module_names_0)
+  module_names_2 := module_names_2 union Set(_single(5522497))
+  if (!module_defined_1) {
+    module_defined_1 := true
+    if (!module_defined_0) {
+      module_defined_0 := true
+      assert true
+      module_names_0 := module_names_0 union Set(_single(5522497))
+    }
+    assert (_single(5522497) in module_names_0)
+    module_names_1 := module_names_1 union Set(_single(5522497))
+    module_names_1 := module_names_1 union Set(_single(5443074906187839357460504910))
+    assert true
+    assert true && (_single(5522497) in module_names_1)
+    module_names_1 := module_names_1 union Set(_single(1701147220))
+    assert true
+    assert true && (_single(1701147220) in module_names_1)
+    module_names_1 := module_names_1 union Set(_single(1717658956))
+    assert true
+    assert true && (_single(1701147220) in module_names_1)
+    module_names_1 := module_names_1 union Set(_single(1701080910))
+  }
+  inhale (forall _name: _Name :: { (_combine(_single(1701147252), _name) in new_set) } (_name in module_names_1) == (_combine(_single(1701147252), _name) in new_set))
+  module_names_2 := module_names_2 union new_set
+  assert true
+  assert true && (_single(5522497) in module_names_2)
+  module_names_2 := module_names_2 union Set(_single(1701147220))
+  assert true
+  assert true && (_single(1701147220) in module_names_2)
+  module_names_2 := module_names_2 union Set(_single(1717658956))
+  assert true
+  assert true && (_single(1701147220) in module_names_2)
+  module_names_2 := module_names_2 union Set(_single(1701080910))
+  assert true
+  module_names_2 := module_names_2 union Set(_single(19886790378824143444564292001352457875501182819))
+  goto __end
+  label __end
+}

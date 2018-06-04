@@ -673,9 +673,9 @@ class ProgramTranslator(CommonTranslator):
                                             pos, info)
         return may_set_pred
 
-    def _get_adt_cons_param_decl(self, cons: PythonClass, adt_name: str,
-                                 adt_type: DomainType, pos: Position,
-                                 info: Info) -> List[VarDecl]:
+    def _get_adt_cons_params_decl(self, cons: PythonClass, adt_name: str,
+                                  adt_type: DomainType, pos: Position,
+                                  info: Info) -> List[VarDecl]:
         """
         Returns the parameters of the ADT constructor as a list of variable
         declarations.
@@ -687,9 +687,9 @@ class ProgramTranslator(CommonTranslator):
             arguments.append(argument)
         return arguments
 
-    def _get_adt_cons_params(self, cons: PythonClass, adt_name: str,
-                             adt_type: DomainType, pos: Position,
-                             info: Info) -> List[Var]:
+    def _get_adt_cons_params_use(self, cons: PythonClass, adt_name: str,
+                                 adt_type: DomainType, pos: Position,
+                                 info: Info) -> List[Var]:
         """
         Returns the parameters of the ADT constructor as a list of variables.
         """
@@ -723,7 +723,7 @@ class ProgramTranslator(CommonTranslator):
         """
         assert adt.all_subclasses[0] == adt
         for cons in adt.all_subclasses[1:]:
-            arguments = self._get_adt_cons_param_decl(cons, adt.name, adt_type,
+            arguments = self._get_adt_cons_params_decl(cons, adt.name, adt_type,
                                                       pos, info)
             yield self.viper.DomainFunc(adt.fresh(adt.adt_prefix + cons.name),
                                         arguments, adt_type, False, pos, info,
@@ -782,9 +782,10 @@ class ProgramTranslator(CommonTranslator):
         constructors.
         """
         for cons in adt.all_subclasses[1:]:
-            args = self._get_adt_cons_params(cons, adt.name, adt_type, pos, info)
-            args_decl = self._get_adt_cons_param_decl(cons, adt.name, adt_type,
-                                                      pos, info)
+            args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos,
+                                                 info)
+            args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type,
+                                                       pos, info)
             if len(args) > 0:
                 cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                      cons.name), args, adt_type,
@@ -817,8 +818,8 @@ class ProgramTranslator(CommonTranslator):
         adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
         for cons in adt.all_subclasses[1:]:
             if len(cons.fields.items()) > 0:
-                args = self._get_adt_cons_params(cons, adt.name, adt_type, pos,
-                                                 info)
+                args = self._get_adt_cons_params_use(cons, adt.name, adt_type,
+                                                     pos, info)
                 triggers, decons_calls = [], []
                 is_cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix
                                                         + 'is_' + cons.name),
@@ -855,7 +856,8 @@ class ProgramTranslator(CommonTranslator):
         """
         adt_obj_use = self.viper.LocalVar('obj', adt_type, pos, info)
         for cons in adt.all_subclasses[1:]:
-            args = self._get_adt_cons_params(cons, adt.name, adt_type, pos, info)
+            args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos,
+                                                 info)
             cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                  cons.name), args, adt_type, pos,
                                                  info, adt.adt_domain_name)
@@ -871,7 +873,8 @@ class ProgramTranslator(CommonTranslator):
             if len(cons.fields.items()) == 0:
                 forall = eq
             else:
-                args_decl = self._get_adt_cons_param_decl(cons, adt.name, adt_type, pos, info)
+                args_decl = self._get_adt_cons_params_decl(cons, adt.name,
+                                                           adt_type, pos, info)
                 forall = self.viper.Forall(args_decl, [], eq, pos, info)
             yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
                                          'associate_cons_type_function_with_' +

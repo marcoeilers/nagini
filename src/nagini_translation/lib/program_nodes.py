@@ -432,6 +432,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
 
     @property
     def adt_prefix(self) -> str:
+        """
+        Returns the prefix of the domain name where the ADT is defined.
+        Prefixes are used in defining domain functions and axioms.
+        """
         assert self.is_adt
         return self.adt_def.name + '_'
 
