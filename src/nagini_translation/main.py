@@ -109,8 +109,6 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
-        # Todo: why is this necessary? Used to work with writing it in file.
-        config.file_config.config.set('Obligations', 'disable_all', 'True') 
         translator = ExtendedASTTranslator(jvm, path, types, viperast)
     else:
         translator = Translator(jvm, path, types, viperast)
@@ -295,9 +293,9 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print('Translation successful.')
         if args.sif:
-            if args.verbose:
-                print('Transforming to MPP.')
             prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+            if args.verbose:
+                print('Transformation to MPP successful.')
         if args.print_silver:
             if args.verbose:
                 print('Result:')

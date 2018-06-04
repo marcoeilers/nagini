@@ -4,23 +4,18 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-import ast
-from typing import List, Set
-
 from nagini_translation.extended_ast.translators.statement import \
     ExtendedASTStatementTranslator
-from nagini_translation.lib.context import Context
+from nagini_translation.extended_ast.translators.method import ExtendedASTMethodTranslator
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.lib.program_nodes import PythonModule, PythonVar
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.translator import Translator
-from nagini_translation.translators.abstract import Expr, TranslatorConfig
+from nagini_translation.translators.abstract import TranslatorConfig
 from nagini_translation.translators.call import CallTranslator
 from nagini_translation.translators.contract import ContractTranslator
 from nagini_translation.translators.expression import ExpressionTranslator
 from nagini_translation.translators.io_operation import IOOperationTranslator
-from nagini_translation.translators.method import MethodTranslator
 from nagini_translation.translators.obligation import ObligationTranslator
 from nagini_translation.translators.permission import PermTranslator
 from nagini_translation.translators.predicate import PredicateTranslator
@@ -32,6 +27,9 @@ from nagini_translation.translators.type_domain_factory import \
 
 
 class ExtendedASTTranslator(Translator):
+    """
+    Translator producing extended Silver AST.
+    """
     def __init__(self, jvm: JVM, source_file: str, type_info: TypeInfo,
                  viper_ast: ViperAST):
         config = TranslatorConfig(self)
@@ -61,7 +59,7 @@ class ExtendedASTTranslator(Translator):
                                                 type_info, viper_ast)
         config.prog_translator = ProgramTranslator(config, jvm, source_file,
                                                    type_info, viper_ast)
-        config.method_translator = MethodTranslator(config, jvm, source_file,
+        config.method_translator = ExtendedASTMethodTranslator(config, jvm, source_file,
                                                     type_info, viper_ast)
         config.type_factory = TypeDomainFactory(viper_ast, self)
 

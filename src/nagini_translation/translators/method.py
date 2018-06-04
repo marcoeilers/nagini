@@ -431,6 +431,47 @@ class MethodTranslator(CommonTranslator):
                                                                self.no_position(ctx), ctx)
             ctx.bound_type_vars[('V',)] = literal
 
+    def _check_self_type(self, method: PythonMethod, ctx: Context) -> Expr:
+        """
+        Return an expression checking the type of the 'self' variable (only for class methods).
+        """
+        type_check = self.type_factory.type_check(
+                next(iter(method.args.values())).ref(), method.cls, self.no_position(ctx), ctx,
+                concrete=True)
+        return self.viper.Inhale(type_check, self.no_position(ctx),
+                                            self.no_info(ctx))
+
+    def _translate_method_body(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        body = []
+        statements = method.node.body
+        body_start, body_end = get_body_indices(statements)
+        # Create local variables for parameters
+        body.extend(self._create_local_vars_for_params(method, ctx))
+        body += flatten(
+            [self.translate_stmt(stmt, ctx) for stmt in
+                method.node.body[body_start:body_end]])    
+        return body
+
+    def _try_block_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        stmts = []
+        for block in method.try_blocks:
+            for handler in block.handlers:
+                stmts += self.translate_handler(handler, ctx)
+            if block.else_block:
+                stmts += self.translate_handler(block.else_block, ctx)
+            if block.finally_block or block.with_item:
+                stmts += self.translate_finally(block, ctx)
+        return stmts
+
+    def _method_body_postamble(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        postamble = []
+        end_label = ctx.get_label_name(END_LABEL)
+        postamble.append(self.viper.Goto(end_label, self.no_position(ctx), self.no_info(ctx)))
+        assert not ctx.var_aliases            
+        postamble += self._try_block_handlers(method, ctx)
+        postamble += self.add_handlers_for_inlines(ctx)
+        return postamble
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -461,12 +502,7 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            type_check = self.type_factory.type_check(
-                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx,
-                concrete=True)
-            inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
-                                            self.no_info(ctx))
-            body.append(inhale_type)
+            body.append(self._check_self_type(method, ctx))
         if method.type:
             # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),
@@ -482,34 +518,18 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
-            statements = method.node.body
-            body_start, body_end = get_body_indices(statements)
             if method.declared_exceptions:
                 body.append(self.viper.LocalVarAssign(error_var_ref,
                     self.viper.NullLit(self.no_position(ctx),
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
-            # Create local variables for parameters
-            body.extend(self._create_local_vars_for_params(method, ctx))
-            body += flatten(
-                [self.translate_stmt(stmt, ctx) for stmt in
-                 method.node.body[body_start:body_end]])
+            body += self._translate_method_body(method, ctx)
+            # TODO: What does the remove_alias do?
             for arg in method.get_args():
                 ctx.remove_alias(arg.name)
-            end_label = ctx.get_label_name(END_LABEL)
-            body.append(self.viper.Goto(end_label, self.no_position(ctx),
-                                        self.no_info(ctx)))
-            assert not ctx.var_aliases
-            for block in method.try_blocks:
-                for handler in block.handlers:
-                    body += self.translate_handler(handler, ctx)
-                if block.else_block:
-                    body += self.translate_handler(block.else_block, ctx)
-                if block.finally_block or block.with_item:
-                    body += self.translate_finally(block, ctx)
-            body += self.add_handlers_for_inlines(ctx)
+            body += self._method_body_postamble(method, ctx)
             locals = [local.decl for local in method.get_locals()
-                      if not local.name.startswith('lambda')]
+                    if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         name = method.sil_name
         nodes = self.create_method_node(
@@ -856,21 +876,7 @@ class MethodTranslator(CommonTranslator):
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
 
-        end_label = ctx.get_label_name(END_LABEL)
-        stmts.append(self.viper.Goto(end_label, self.no_position(ctx),
-                                    self.no_info(ctx)))
-
-        # Append blocks for exception handling etc.
-        assert not ctx.var_aliases
-        for block in main_method.try_blocks:
-            for handler in block.handlers:
-                stmts += self.translate_handler(handler, ctx)
-            if block.else_block:
-                stmts += self.translate_handler(block.else_block, ctx)
-            if block.finally_block or block.with_item:
-                stmts += self.translate_finally(block, ctx)
-        stmts += self.add_handlers_for_inlines(ctx)
-
+        stmts += self._method_body_postamble(main_method, ctx)
         stmts += self._create_method_epilog(main_method, ctx)
 
         main_locals = [local.decl for local in main_method.get_locals()

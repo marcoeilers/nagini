@@ -1231,6 +1231,27 @@ class StatementTranslator(CommonTranslator):
             assign_stmts += target_stmt
         return rhs_stmt + assign_stmts
 
+    def _translate_while_invariants(self, node: ast.While, ctx: Context) -> List[Stmt]:
+        invariants = []
+        for expr, aliases in ctx.actual_function.loop_invariants[node]:
+            with ctx.additional_aliases(aliases):
+                invariants.append(self.translate_contract(expr, ctx))
+        return invariants
+
+    def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
+        start, end = get_body_indices(node.body)
+        body = flatten(
+            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
+        body.append(self.viper.Label(end_label, self.to_position(node, ctx),
+                                     self.no_info(ctx)))
+        return body
+
+    def _while_postamble(self, node: ast.While, ctx: Context) -> List[Stmt]:
+        postamble = [self.viper.Label(post_label, self.to_position(node, ctx), 
+                                      self.no_info(ctx))]
+        postamble += self._set_result_none(ctx)
+        return postamble
+
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
         post_label = ctx.actual_function.get_fresh_name('post_loop')
@@ -1240,19 +1261,13 @@ class StatementTranslator(CommonTranslator):
                                               target_type=self.viper.Bool)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        invariants = []
+        invariants = self._translate_while_invariants(node, ctx)
         locals = []
-        for expr, aliases in ctx.actual_function.loop_invariants[node]:
-            with ctx.additional_aliases(aliases):
-                invariants.append(self.translate_contract(expr, ctx))
         start, end = get_body_indices(node.body)
         var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariants = [global_inv] + var_types + invariants
-        body = flatten(
-            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
-        body.append(self.viper.Label(end_label, self.to_position(node, ctx),
-                                     self.no_info(ctx)))
+        body = self._translate_while_body(node, ctx, end_label)
         loop = global_stmts + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
@@ -1261,9 +1276,7 @@ class StatementTranslator(CommonTranslator):
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
             loop += translated_block
-        loop.append(self.viper.Label(post_label, self.to_position(node, ctx),
-                    self.no_info(ctx)))
-        loop += self._set_result_none(ctx)
+        loop += self._while_postamble(node, ctx)
         return loop
 
     def enter_loop_translation(
