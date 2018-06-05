@@ -25,7 +25,6 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     chain_cond_exp,
-    UnionType,
     PythonClass,
     PythonField,
     PythonIOOperation,
@@ -35,6 +34,7 @@ from nagini_translation.lib.program_nodes import (
     PythonType,
     PythonVar,
     toposort_classes,
+    UnionType,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -539,7 +539,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments. Boxes arguments if necessary, and
-        unboxed the result if needed as well.
+        unboxed the result if needed as well. This method only handles receivers
+        of non-union types.
         """
         if receiver:
             target_cls = receiver
@@ -581,8 +582,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                           ctx: Context,
                           position: Position = None) -> FuncApp:
         """
-        Wrapper function to _get_function_call, handling receivers of
-        union type, passing through otherwise.
+        Creates a function application of the function called func_name, with
+        the given receiver and arguments. Boxes arguments if necessary, and
+        unboxed the result if needed as well. When the receiver is of union
+        type, a function call application is created for each type in the
+        union with its respective guard.
         """
         if receiver and type(receiver) is UnionType:
             position = self.to_position(node, ctx) if position is None else position
