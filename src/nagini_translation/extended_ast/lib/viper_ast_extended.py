@@ -37,4 +37,9 @@ class ViperASTExtended(ViperAST):
     def Label(self, name, position, info):
         """ Don't add the labels, not needed in extended AST. """
         return self.Skip()
-        
+
+    def Low(self, expr, position, info):
+        return self.ast.Low(expr, position, info, self.NoTrafos)
+
+    def LowEvent(self, position, info):
+        return self.ast.LowEvent(position, info, self.NoTrafos)

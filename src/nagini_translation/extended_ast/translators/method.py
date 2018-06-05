@@ -17,13 +17,9 @@ class ExtendedASTMethodTranslator(MethodTranslator):
     """
 
     def _method_body_postamble(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
-        """
-        With the extended AST we don't need the goto statment or the catch blocks.
-        """
+        # With extended AST we don't need goto end or catch blocks.
         return []
 
     def _create_method_epilog(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
-        """
-        With the extended AST we don't need a label at the end of the method.
-        """
+        # With the extended AST we don't need a label at the end of the method.
         return []

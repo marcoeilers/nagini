@@ -431,9 +431,9 @@ class MethodTranslator(CommonTranslator):
                                                                self.no_position(ctx), ctx)
             ctx.bound_type_vars[('V',)] = literal
 
-    def _check_self_type(self, method: PythonMethod, ctx: Context) -> Expr:
+    def _check_self_type(self, method: PythonMethod, ctx: Context) -> Stmt:
         """
-        Return an expression checking the type of the 'self' variable (only for class methods).
+        Return an statement checking the type of the 'self' variable (only for methods in classes).
         """
         type_check = self.type_factory.type_check(
                 next(iter(method.args.values())).ref(), method.cls, self.no_position(ctx), ctx,
@@ -452,7 +452,10 @@ class MethodTranslator(CommonTranslator):
                 method.node.body[body_start:body_end]])    
         return body
 
-    def _try_block_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+    def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        """
+        Translates the handlers of all try blocks, as well as finally blocks.
+        """
         stmts = []
         for block in method.try_blocks:
             for handler in block.handlers:
@@ -468,7 +471,7 @@ class MethodTranslator(CommonTranslator):
         end_label = ctx.get_label_name(END_LABEL)
         postamble.append(self.viper.Goto(end_label, self.no_position(ctx), self.no_info(ctx)))
         assert not ctx.var_aliases            
-        postamble += self._try_block_handlers(method, ctx)
+        postamble += self._translate_try_handlers(method, ctx)
         postamble += self.add_handlers_for_inlines(ctx)
         return postamble
 

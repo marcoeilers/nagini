@@ -24,7 +24,7 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
+                  'Exists', 'Low', 'LowEvent', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
                   'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
                   'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
                   'MayStart',]
@@ -107,6 +107,9 @@ def Low(*args) -> bool:
     +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
     +    Ignored when not verifying information flow.
     """
+    pass
+
+def LowEvent() -> bool:
     pass
 
 
@@ -359,6 +362,7 @@ __all__ = [
         'Forall',
         'Exists',
         'Low',
+        'LowEvent',
         'Acc',
         'Rd',
         'Fold',

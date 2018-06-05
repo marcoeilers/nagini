@@ -18,13 +18,16 @@ class ExtendedASTStatementTranslator(StatementTranslator):
     Extended AST Version of the StatementTranslator
     """
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
-        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        if node.value:
+            rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        else:
+            rhs_stmt, rhs = [], self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if not ctx.result_var:
-            rvar = self.viper.NullLit(pos, info)
-        else:
+        if ctx.result_var:
             rvar = ctx.result_var.ref(node, ctx)
+        else:
+            rvar = None
         ret_stmt = self.viper.Return(rhs, rvar, pos, info)
         return rhs_stmt + [ret_stmt]
 
