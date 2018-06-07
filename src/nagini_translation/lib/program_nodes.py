@@ -515,6 +515,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         else:
             return None
 
+    def has_function(self, name: str) -> bool:
+        """
+        Check the function with the given name exists this class or
+        superclass.
+        """
+        return name in self.functions or (self.superclass.has_function(name)
+               if self.superclass is not None else False)
+
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the function with the given name in this class or a superclass.
@@ -742,6 +750,20 @@ class GenericType(PythonType):
         Returns the method with the given name in this class or a superclass.
         """
         return self.python_class.get_method(name)
+
+    def has_function(self, name: str) -> bool:
+        """
+        Check if all types of the generic type have a function with the given
+        name.
+        """
+        if isinstance(self, UnionType):
+            types_set = self.get_types() - {None}
+            result = len(types_set) > 0
+            for type in types_set:
+                result = result and type.has_function(name)
+            return result
+        else:
+            return self.cls.has_function(name)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
