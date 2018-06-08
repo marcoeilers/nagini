@@ -63,15 +63,20 @@ class Silicon:
     Provides access to the Silicon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str):
+    def __init__(self, jvm: JVM, filename: str, cache : str):
         self._jvm = jvm
         self.silver = jvm.viper.silver
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(4)
+        nargs = 4 if cache == None else 7
+        args = jvm.scala.collection.mutable.ArraySeq(nargs)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
         args.update(2, '--disableCatchingExceptions')
-        args.update(3, filename)
+        if cache is not None:
+            args.update(3, '--ignoreAuxiliary')
+            args.update(4, '--functionCache')
+            args.update(5, cache)
+        args.update(nargs - 1, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.ready = True

@@ -132,13 +132,14 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon,
+           cache : str  = None) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
         if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path)
+            verifier = Silicon(jvm, path, cache)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
         vresult = verifier.verify(prog)
@@ -223,6 +224,10 @@ def main() -> None:
               'performance'),
         default=-1)
     parser.add_argument(
+        '--cache',
+        help=('folder to cache results'),
+        default=None)
+    parser.add_argument(
         '--ide-mode',
         action='store_true',
         help='Output errors in IDE format')
@@ -283,6 +288,7 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args, print=print):
     try:
+        start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
@@ -310,10 +316,11 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend)
+            vresult = verify(prog, python_file, jvm, backend=backend, cache=args.cache)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
+        print(time.time() - start)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):

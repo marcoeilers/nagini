@@ -11,6 +11,7 @@ import nagini_contracts.io_builtins
 import nagini_contracts.lock
 import tokenize
 
+from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
 from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
@@ -81,7 +82,8 @@ class Analyzer(ast.NodeVisitor):
         self.current_scopes = []
         self.contract_only = False
         self.module_paths = [os.path.abspath(path)]
-        self.modules = {os.path.abspath(path): self.module}
+        self.modules = OrderedDict()
+        self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
         self.io_operation_analyzer = IOOperationAnalyzer(
             self, self.node_factory)
