@@ -574,7 +574,7 @@
         "__create__": {
             "args": ["__prim__Sequence", "type"],
             "type": "Sequence",
-            "requires": ["__unbox__"]
+            "requires": ["__sil_seq__"]
         },
         "__unbox__": {
             "args": ["Sequence"],
@@ -584,47 +584,46 @@
         "__contains__": {
             "args": ["Sequence", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__"]
+            "requires": ["__sil_seq__"]
         },
         "__getitem__": {
             "args": ["Sequence", "int"],
             "type": "object",
-            "requires": ["__unbox__", "__len__", "int___unbox__"]
+            "requires": ["__sil_seq__", "__len__", "int___unbox__"]
         },
         "__sil_seq__": {
             "args": ["Sequence"],
-            "type": "__prim__Sequence",
-            "requires": ["__unbox__"]
+            "type": "__prim__Sequence"
         },
         "__len__": {
             "args": ["Sequence"],
             "type": "__prim__int",
-            "requires": ["__unbox__"]
+            "requires": ["__sil_seq__"]
         },
         "take": {
             "args": ["Sequence", "__prim__int"],
             "type": "Sequence",
-            "requires": ["__unbox__", "__create__"]
+            "requires": ["__sil_seq__", "__create__"]
         },
         "drop": {
             "args": ["Sequence", "__prim__int"],
             "type": "Sequence",
-            "requires": ["__unbox__", "__create__"]
+            "requires": ["__sil_seq__", "__create__"]
         },
         "update": {
             "args": ["Sequence", "__prim__int", "object"],
             "type": "Sequence",
-            "requires": ["__unbox__", "__create__"]
+            "requires": ["__sil_seq__", "__create__"]
         },
         "__add__": {
             "args": ["Sequence", "Sequence"],
             "type": "Sequence",
-            "requires": ["__unbox__", "__create__"]
+            "requires": ["__sil_seq__", "__create__"]
         },
         "__eq__": {
             "args": ["Sequence", "Sequence"],
             "type": "__prim__bool",
-            "requires": ["__unbox__"]
+            "requires": ["__sil_seq__"]
         }
     },
     "type_vars": 1,

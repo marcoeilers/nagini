@@ -448,9 +448,7 @@ class StatementTranslator(CommonTranslator):
 
         param = self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)
 
-        seq_func_name = iterable_type.name + '___sil_seq__'
-        iter_seq = self.viper.FuncApp(seq_func_name, [iterable], pos, info,
-                                      seq_ref, [param])
+        iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
         full_perm = self.viper.FullPerm(pos, info)
 
         invariant = []
@@ -745,10 +743,7 @@ class StatementTranslator(CommonTranslator):
         seq_temp_var = ctx.current_function.create_variable('seqtmp', seq_ref_type,
                                                             self.translator)
 
-        seq_func_name = iterable_type.name + '___sil_seq__'
-        param = self.viper.LocalVarDecl('self', self.viper.Ref, position, info)
-        iter_seq = self.viper.FuncApp(seq_func_name, [iterable], position, info,
-                                      seq_ref, [param])
+        iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, position)
 
         seq_temp_assign = self.viper.LocalVarAssign(seq_temp_var.ref(), iter_seq,
                                                     position, info)
@@ -1198,8 +1193,7 @@ class StatementTranslator(CommonTranslator):
                                               list_type, position, ctx),
                               position, info))
         # Set list contents to segment of rhs from rhs_index until rhs_end
-        seq = self.get_function_call(rhs_type, '__sil_seq__',
-                                     [rhs], [None], node, ctx)
+        seq = self.get_sequence(rhs_type, rhs, None, node, ctx)
 
         seq_until = self.viper.SeqTake(seq, rhs_end, position, info)
         seq_from = self.viper.SeqDrop(seq_until, rhs_lit, position, info)

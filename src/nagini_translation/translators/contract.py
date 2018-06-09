@@ -550,10 +550,7 @@ class ContractTranslator(CommonTranslator):
             return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        seq_ref = self.viper.SeqType(self.viper.Ref)
-        formal_args = [self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)]
-        domain_set = self.viper.FuncApp(dom_type.name + '___sil_seq__',
-                                        [domain], pos, info, seq_ref, formal_args)
+        domain_set = self.get_sequence(dom_type, domain, None, domain_node, ctx, pos)
         result = self.viper.SeqContains(ref_var, domain_set, pos, info)
         if domain_old:
             result = self.viper.Old(result, pos, info)
@@ -565,8 +562,7 @@ class ContractTranslator(CommonTranslator):
         stmt, arg = self.translate_expr(node.args[0], ctx)
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
-        seq_call = self.get_function_call(coll_type, '__sil_seq__', [arg],
-                                          [None], node, ctx)
+        seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
         seq_class = ctx.module.global_module.classes[SEQ_TYPE]
         if coll_type.name == RANGE_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
@@ -730,11 +726,12 @@ class ContractTranslator(CommonTranslator):
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if is_trigger and triggers:
+        if is_trigger:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically
             # generated triggers and things are actually worse.
+            # Change: we always do this now.
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
@@ -743,6 +740,8 @@ class ContractTranslator(CommonTranslator):
                 triggers = [lhs_trigger] + triggers
             except Exception:
                 pass
+        if not triggers:
+            print("1212")
         var_type_check = self.type_check(var.ref(), var.type,
                                          self.no_position(ctx), ctx, False)
         implication = self.viper.Implies(var_type_check, implication,

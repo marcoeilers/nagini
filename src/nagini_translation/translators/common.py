@@ -531,6 +531,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return None, None
 
+    def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
+            if receiver.name == 'list':
+                seq_ref = self.viper.SeqType(self.viper.Ref)
+                field = self.viper.Field('list_acc', seq_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+        return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+                                      node, ctx, position)
+
+
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
