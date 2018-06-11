@@ -4,7 +4,6 @@ from resources.sif_utils import input_high, input_low, sif_print
 
 @NotPreservingTL
 def fig1a() -> None:
-    Requires(Low())
     x = input_high()
     if x < 1234:
         x = 0
@@ -14,7 +13,6 @@ def fig1a() -> None:
 
 
 def fig1a_low() -> None:
-    Requires(Low())
     x = input_low()
     if x < 1234:
         sif_print(0)
@@ -40,7 +38,6 @@ def f(x: int) -> int:
 
 
 def fig2b_low() -> None:
-    Requires(Low())
     h = input_high()
     l = input_low()
     x = f(h)
@@ -49,7 +46,6 @@ def fig2b_low() -> None:
 
 
 def fig2b() -> None:
-    Requires(Low())
     h = input_high()
     l = input_low()
     x = f(h)

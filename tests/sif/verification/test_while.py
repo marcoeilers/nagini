@@ -9,7 +9,7 @@ def test(x: int) -> bool:
 
 def while1() -> int:
     """While with low guard."""
-    Requires(Low())
+    # Requires(Low())
     i = input_low()
     sum = 0
     while i != 0:
@@ -23,18 +23,14 @@ def while1() -> int:
 
 def while2() -> None:
     """While with high guard."""
-    Requires(Low())
-    x = input_high()
+    x = input_low()
     while x != 0:
-        #:: ExpectedOutput(carbon)(invariant.not.preserved:assertion.false) | ExpectedOutput(invariant.not.established:assertion.false)
-        Invariant(Low())
         x = x - 1
     sif_print(1)
 
 
 def while3() -> None:
     """Termination leak."""
-    Requires(Low())
     x = input_high()
     while x != 0:
         x = x - 1
@@ -51,7 +47,6 @@ def m1(a: int) -> bool:
 
 def while4() -> int:
     """While with pure guard."""
-    Requires(Low())
     Ensures(Result() == 10)
     i = 15
     sum = 0
@@ -69,7 +64,6 @@ def while4() -> int:
 @NotPreservingTL
 def while5() -> None:
     """Nested while."""
-    Requires(Low())
     h = input_high()
     l = input_low()
     i = 0

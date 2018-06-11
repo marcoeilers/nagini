@@ -567,6 +567,8 @@ class VerificationTest(AnnotatedTest):
         path = os.path.abspath(path)
         prog = translate(path, jvm, sif=sif, reload_resources=reload_resources)
         assert prog is not None
+        if sif:
+            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
         vresult = verify(prog, path, jvm, verifier)
         self._evaluate_result(vresult, annotation_manager, jvm)
 

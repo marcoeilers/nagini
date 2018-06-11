@@ -9,14 +9,12 @@ def high_ref() -> List[int]:
 
 
 def low_ref() -> List[int]:
-    Requires(Low())
     Ensures(Acc(list_pred(Result())))
     Ensures(Low(Result()))
     return [2]
 
 
 def test_high_data() -> None:
-    Requires(Low())
     x = input_high()
     y = input_low()
     l = [1, y]
@@ -28,7 +26,6 @@ def test_high_data() -> None:
 
 @NotPreservingTL
 def test_contains() -> None:
-    Requires(Low())
     x = input_high()
     y = input_low()
     l = [1, 2, 3]
@@ -40,7 +37,6 @@ def test_contains() -> None:
 
 
 def test_contains_2() -> None:
-    Requires(Low())
     x = input_high()
     l = [1, 2, 3]
     b = x in l
@@ -48,7 +44,6 @@ def test_contains_2() -> None:
 
 
 def test_high_ref() -> None:
-    Requires(Low())
     h = high_ref()
     l = low_ref()
     l.append(1)
