@@ -32,6 +32,7 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonNode,
+    PythonTryBlock,
     PythonType,
     PythonVar,
     SilverType,
@@ -850,12 +851,16 @@ class StatementTranslator(CommonTranslator):
                                      self.no_info(ctx))
         return ctx_stmt + [ctx_assign] + enter_call + body + [end_label]
 
-    def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
+    def _get_try_block(self, node: ast.Try, ctx: Context) -> PythonTryBlock:
         try_block = None
         for block in ctx.actual_function.try_blocks:
             if block.node is node:
                 try_block = block
                 break
+        return try_block
+
+    def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
+        try_block = self._get_try_block(node, ctx)
         assert try_block
         code_var = try_block.get_finally_var(self.translator)
         if code_var.sil_name in ctx.var_aliases:
@@ -886,7 +891,10 @@ class StatementTranslator(CommonTranslator):
                                      self.no_info(ctx))
         return body + [end_label]
 
-    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+    def _translate_stmt_raise_create(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+        """
+        Translate the part of raise where we create the exception.
+        """
         var = self.get_error_var(node, ctx)
         raised = self.get_target(node.exc, ctx)
         if (not isinstance(node.exc, ast.Call) and
@@ -908,9 +916,14 @@ class StatementTranslator(CommonTranslator):
             stmt += cause_stmt
         assignment = self.viper.LocalVarAssign(var, exception, position,
                                                self.no_info(ctx))
+        return stmt + [assignment]
+
+    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+        var = self.get_error_var(node, ctx)
+        create_stmts = self._translate_stmt_raise_create(node, ctx)
         catchers = self.create_exception_catchers(var,
             ctx.actual_function.try_blocks, node, ctx)
-        return stmt + [assignment] + catchers
+        return create_stmts + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
         stmt, expr = self.translate_Call(node, ctx)
@@ -1246,10 +1259,11 @@ class StatementTranslator(CommonTranslator):
                                      self.no_info(ctx)))
         return body
 
-    def _while_postamble(self, node: ast.While, ctx: Context) -> List[Stmt]:
+    def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
         postamble = [self.viper.Label(post_label, self.to_position(node, ctx), 
                                       self.no_info(ctx))]
-        postamble += self._set_result_none(ctx)
+        # TODO: does this break anything
+        # postamble += self._set_result_none(ctx)
         return postamble
 
     def translate_stmt_While(self, node: ast.While,
@@ -1276,7 +1290,7 @@ class StatementTranslator(CommonTranslator):
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
             loop += translated_block
-        loop += self._while_postamble(node, ctx)
+        loop += self._while_postamble(node, post_label, ctx)
         return loop
 
     def enter_loop_translation(

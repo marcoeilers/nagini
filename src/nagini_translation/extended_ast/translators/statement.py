@@ -11,7 +11,7 @@ from nagini_translation.lib.typedefs import Stmt
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.statement import StatementTranslator
 from nagini_translation.lib.util import flatten, get_body_indices
-
+from nagini_translation.lib.program_nodes import PythonVar
 
 class ExtendedASTStatementTranslator(StatementTranslator):
     """
@@ -40,7 +40,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
     def translate_stmt_Continue(self, node: ast.Continue, ctx: Context) -> List[Stmt]:
         return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]
 
-    def _while_postamble(self, node: ast.While, ctx: Context) -> List[Stmt]:
+    def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
         return []
 
     def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
@@ -48,3 +48,43 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         return body
+
+    def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
+        try_block = self._get_try_block(node, ctx)
+        assert try_block
+        body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
+        else_block = []
+        if try_block.else_block:
+            else_block = flatten([self.translate_stmt(stmt, ctx)
+                                    for stmt in try_block.else_block.body])
+        finally_block = []
+        if try_block.finally_block:
+            finally_block = flatten([self.translate_stmt(stmt, ctx)
+                                     for stmt in try_block.finally_block])
+        catch_blocks = [] # type: 'silver.sif.SIFExceptionHandler'
+        error_var = try_block.get_error_var(self.translator)
+        if isinstance(error_var, PythonVar):
+            error_var = error_var.ref()
+        for handler in try_block.handlers:
+            error_type_check = self.type_check(error_var, handler.exception, 
+                                               self.to_position(handler.node, ctx), ctx, 
+                                               inhale_exhale=False)
+            handler_body = flatten([self.translate_stmt(stmt, ctx) for stmt in handler.body])
+            handler_body_seqn = self.viper.Seqn(handler_body, 
+                                                self.no_position(ctx), self.no_info(ctx))
+            catch_blocks.append(self.viper.SIFExceptionHandler(error_type_check, handler_body_seqn))
+        return [self.viper.Try(self.viper.Seqn(body, self.no_position(ctx), self.no_info(ctx)), 
+                               catch_blocks, 
+                               self.viper.Seqn(else_block, 
+                                               self.no_position(ctx), self.no_info(ctx)), 
+                               self.viper.Seqn(finally_block, 
+                                               self.no_position(ctx), self.no_info(ctx)),
+                               self.to_position(node, ctx), self.no_info(ctx))]
+
+    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+        var = self.get_error_var(node, ctx)
+        stmts = self._translate_stmt_raise_create(node, ctx)
+        assignment = stmts[-1]
+        stmts_seqn = self.viper.Seqn(stmts[:-1], self.no_position(ctx), self.no_info(ctx))
+        return [self.viper.Raise(stmts_seqn, assignment, 
+                                 self.to_position(node, ctx), self.no_info(ctx))]
