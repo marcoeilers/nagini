@@ -66,25 +66,24 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         if isinstance(error_var, PythonVar):
             error_var = error_var.ref()
         for handler in try_block.handlers:
-            error_type_check = self.type_check(error_var, handler.exception, 
-                                               self.to_position(handler.node, ctx), ctx, 
+            error_type_check = self.type_check(error_var, handler.exception,
+                                               self.to_position(handler.node, ctx), ctx,
                                                inhale_exhale=False)
             handler_body = flatten([self.translate_stmt(stmt, ctx) for stmt in handler.body])
-            handler_body_seqn = self.viper.Seqn(handler_body, 
+            handler_body_seqn = self.viper.Seqn(handler_body,
                                                 self.no_position(ctx), self.no_info(ctx))
             catch_blocks.append(self.viper.SIFExceptionHandler(error_type_check, handler_body_seqn))
-        return [self.viper.Try(self.viper.Seqn(body, self.no_position(ctx), self.no_info(ctx)), 
-                               catch_blocks, 
-                               self.viper.Seqn(else_block, 
-                                               self.no_position(ctx), self.no_info(ctx)), 
-                               self.viper.Seqn(finally_block, 
+        return [self.viper.Try(self.viper.Seqn(body, self.no_position(ctx), self.no_info(ctx)),
+                               catch_blocks,
+                               self.viper.Seqn(else_block,
+                                               self.no_position(ctx), self.no_info(ctx)),
+                               self.viper.Seqn(finally_block,
                                                self.no_position(ctx), self.no_info(ctx)),
                                self.to_position(node, ctx), self.no_info(ctx))]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
-        var = self.get_error_var(node, ctx)
         stmts = self._translate_stmt_raise_create(node, ctx)
         assignment = stmts[-1]
         stmts_seqn = self.viper.Seqn(stmts[:-1], self.no_position(ctx), self.no_info(ctx))
-        return [self.viper.Raise(stmts_seqn, assignment, 
+        return [self.viper.Raise(stmts_seqn, assignment,
                                  self.to_position(node, ctx), self.no_info(ctx))]

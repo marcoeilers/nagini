@@ -56,8 +56,10 @@ class ViperASTExtended(ViperAST):
                                                        else_block, finally_block)
         return self.ast.ExtensionStmt(try_node, position, info, self.NoTrafos)
 
-    def Low(self, expr: Expr, position: Position, info: Info):
-        return self.ast.Low(expr, position, info, self.NoTrafos)
+    def Low(self, expr: Expr, self_check: Expr, position: Position, info: Info):
+        low_node = self.ast_extensions.SIFLowExp(expr, self_check)
+        return self.ast.ExtensionExp(low_node, position, info, self.NoTrafos)
 
-    def LowEvent(self, position: Position, info: Info):
-        return self.ast.LowEvent(position, info, self.NoTrafos)
+    def LowEvent(self, self_check: Expr, position: Position, info: Info):
+        lowevent_node = self.ast_extensions.SIFLowEventExp(self_check)
+        return self.ast.ExtensionExp(lowevent_node, position, info, self.NoTrafos)

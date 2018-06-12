@@ -6,8 +6,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
+from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.typedefs import StmtsAndExpr
-from nagini_translation.lib.util import UnsupportedException, InvalidProgramException
+from nagini_translation.lib.util import (InvalidProgramException,
+                                         UnsupportedException)
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.contract import ContractTranslator
 
@@ -16,6 +18,14 @@ class ExtendedASTContractTranslator(ContractTranslator):
     """
     Extended AST version of the contract translator.
     """
+
+    def _is_in_postcondition(self, node: ast.Expr, func: PythonMethod) -> bool:
+        post = func.postcondition
+        for cond in post:
+            for cond_node in ast.walk(cond[0]):
+                if cond_node is node:
+                    return True
+        return False
 
     def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -26,12 +36,20 @@ class ExtendedASTContractTranslator(ContractTranslator):
         stmts, expr = self.translate_expr(node.args[0], ctx)
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        # determine if surrounding method is dynamically bound
-        return [], self.viper.Low(expr, self.to_position(node, ctx),
+        # determine if we are in a postcondition of a dynamically bound method
+        if ctx.current_class and self._is_in_postcondition(node, ctx.current_function):
+            self_type = self.type_factory.typeof(ctx.current_function.args['self'].ref(), ctx)
+        else:
+            self_type = None
+        return [], self.viper.Low(expr, self_type, self.to_position(node, ctx),
                                   self.no_info(ctx))
 
     def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the LowEvent() contract function.
         """
-        return [], self.viper.LowEvent(self.to_position(node, ctx), self.no_info(ctx))
+        if ctx.current_class:
+            self_type = self.type_factory.typeof(ctx.current_function.args['self'].ref(), ctx)
+        else:
+            self_type = None
+        return [], self.viper.LowEvent(self_type, self.to_position(node, ctx), self.no_info(ctx))
