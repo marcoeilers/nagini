@@ -36,14 +36,15 @@ def m3(x: int) -> None:
     Assert(res == 2 * x)
 
 def next_leapyear(start: int) -> int:
+    Requires(Low(start))
+    Ensures(Low(Result()))
     Ensures(Result() > start)
     Ensures(Result() % 4 == 0)
     Ensures(Result() % 100 != 0 or Result() % 400 == 0)
-
     next_ly = start + 1
     while True:
         Invariant(next_ly > start)
-
+        Invariant(Low(next_ly))
         if next_ly % 4 != 0:
             next_ly = next_ly + 1
             continue

@@ -3,6 +3,9 @@ from nagini_contracts.contracts import *
 class MyException(Exception):
     pass
 
+class MyException2(Exception):
+    pass
+
 def m1(b: bool) -> int:
     Ensures(Implies(b, Result() == -2))
     Ensures(Implies(not b, Result() == 2))
@@ -74,3 +77,23 @@ def m5(b: bool, c: Container) -> None:
     else:
         c.value = -1
         raise MyException()
+
+def m6(i: int, c: Container) -> None:
+    Requires(Low(i))
+    Requires(Acc(c.value))
+    Ensures(Acc(c.value))
+    Ensures(Low(c.value))
+    Ensures(Implies(i == 0, c.value == 0))
+    Ensures(Implies(i < 0, c.value == -1))
+    Ensures(Implies(i > 0, c.value == 1))
+    try:
+        if i < 0:
+            raise MyException()
+        elif i > 0:
+            raise MyException2()
+        else:
+            c.value = 0
+    except MyException:
+        c.value = -1
+    except MyException2:
+        c.value = 1
