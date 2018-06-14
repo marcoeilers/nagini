@@ -1823,7 +1823,8 @@ def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
     Receives a list of tuples each one containing a guard and a guarded
     expression and produces an equivalent chain of conditional expressions.
     """
-    assert(len(guarded_expr) >= 2)
+    if len(guarded_expr) == 1:
+        return guarded_expr[0][1]
     guard, then_exp = guarded_expr[0]
     if len(guarded_expr) == 2:
         _, else_exp = guarded_expr[1]
