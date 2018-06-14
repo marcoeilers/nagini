@@ -541,6 +541,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 seq_ref = self.viper.SeqType(self.viper.Ref)
                 field = self.viper.Field('list_acc', seq_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
+                return res
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
 
