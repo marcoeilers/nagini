@@ -28,7 +28,7 @@ class ExtendedASTExpressionTranslator(ExpressionTranslator):
                                       self.viper.NullLit(self.no_position(ctx),
                                                          self.no_info(ctx)),
                                       position, self.no_info(ctx))
-        raise_stmt = self.viper.Raise(None, None, self.no_position(ctx), self.no_info(ctx))
+        raise_stmt = self.viper.Raise(None, self.no_position(ctx), self.no_info(ctx))
         errcheck = self.viper.If(errnotnull, raise_stmt, self.viper.Skip(),
                                  position, self.no_info(ctx))
         return [errcheck]

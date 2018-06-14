@@ -4,9 +4,11 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from typing import List, Tuple
+from typing import List, Optional
 
-from nagini_translation.lib.typedefs import Expr, Info, Position, Seqn, Var
+from nagini_translation.lib.typedefs import (
+    Expr, Info, Position, Seqn, Stmt, Var, VarAssign
+)
 from nagini_translation.lib.viper_ast import ViperAST
 
 
@@ -19,8 +21,10 @@ class ViperASTExtended(ViperAST):
         super().__init__(jvm, java, scala, viper, sourcefile)
         self.ast_extensions = viper.silver.sif
 
-    def Return(self, expr: Expr, res_var: Var, position: Position, info: Info):
-        return_node = self.ast_extensions.SIFReturnStmt(expr, res_var)
+    def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
+        expr_opt = self.scala.Some(expr) if expr is not None else self.none
+        res_var_opt = self.scala.Some(res_var) if res_var is not None else self.none
+        return_node = self.ast_extensions.SIFReturnStmt(expr_opt, res_var_opt)
         return self.ast.ExtensionStmt(return_node, position, info, self.NoTrafos)
 
     def Break(self, position: Position, info: Info):
@@ -31,35 +35,41 @@ class ViperASTExtended(ViperAST):
         cont_node = self.ast_extensions.SIFContinueStmt()
         return self.ast.ExtensionStmt(cont_node, position, info, self.NoTrafos)
 
-    def Skip(self):
+    def Skip(self) -> Seqn:
         return self.Seqn([], self.NoPosition, self.NoInfo)
 
-    def Goto(self, name: str, position: Position, info: Info):
+    def Goto(self, name: str, position: Position, info: Info) -> Stmt:
         """ Don't add the gotos, not needed in extended AST. """
         return self.Skip()
 
-    def Label(self, name: str, position: Position, info: Info):
+    def Label(self, name: str, position: Position, info: Info) -> Stmt:
         """ Don't add the labels, not needed in extended AST. """
         return self.Skip()
 
-    def Raise(self, create_stmts: Seqn, assignment: Var, position: Position, info: Info):
-        raise_node = self.ast_extensions.SIFRaiseStmt(create_stmts, assignment)
+    def Raise(self, assignment: Optional[VarAssign], position: Position, info: Info):
+        ass_opt = self.scala.Some(assignment) if assignment is not None else self.none
+        raise_node = self.ast_extensions.SIFRaiseStmt(ass_opt)
         return self.ast.ExtensionStmt(raise_node, position, info, self.NoTrafos)
 
     def SIFExceptionHandler(self, exception: Expr, handler: Seqn):
         return self.ast_extensions.SIFExceptionHandler(exception, handler)
 
     def Try(self, body: Seqn, catch_blocks: List['silver.sif.SIFExceptionHandler'],
-            else_block: Seqn, finally_block: Seqn, position: Position, info: Info):
+            else_block: Optional[Seqn], finally_block: Optional[Seqn],
+            position: Position, info: Info):
         catch_blocks_seq = self.to_seq(catch_blocks)
+        else_opt = self.scala.Some(else_block) if else_block is not None else self.none
+        fin_opt = self.scala.Some(finally_block) if finally_block is not None else self.none
         try_node = self.ast_extensions.SIFTryCatchStmt(body, catch_blocks_seq,
-                                                       else_block, finally_block)
+                                                       else_opt, fin_opt)
         return self.ast.ExtensionStmt(try_node, position, info, self.NoTrafos)
 
-    def Low(self, expr: Expr, self_check: Expr, position: Position, info: Info):
-        low_node = self.ast_extensions.SIFLowExp(expr, self_check)
+    def Low(self, expr: Expr, self_check: Optional[Expr], position: Position, info: Info):
+        check_opt = self.scala.Some(self_check) if self_check is not None else self.none
+        low_node = self.ast_extensions.SIFLowExp(expr, check_opt)
         return self.ast.ExtensionExp(low_node, position, info, self.NoTrafos)
 
-    def LowEvent(self, self_check: Expr, position: Position, info: Info):
-        lowevent_node = self.ast_extensions.SIFLowEventExp(self_check)
+    def LowEvent(self, self_check: Optional[Expr], position: Position, info: Info):
+        check_opt = self.scala.Some(self_check) if self_check is not None else self.none
+        lowevent_node = self.ast_extensions.SIFLowEventExp(check_opt)
         return self.ast.ExtensionExp(lowevent_node, position, info, self.NoTrafos)

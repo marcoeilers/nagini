@@ -83,7 +83,5 @@ class ExtendedASTStatementTranslator(StatementTranslator):
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         stmts = self._translate_stmt_raise_create(node, ctx)
-        assignment = stmts[-1]
-        stmts_seqn = self.viper.Seqn(stmts[:-1], self.no_position(ctx), self.no_info(ctx))
-        return [self.viper.Raise(stmts_seqn, assignment,
-                                 self.to_position(node, ctx), self.no_info(ctx))]
+        return stmts[:-1] + [self.viper.Raise(stmts[-1],
+                                              self.to_position(node, ctx), self.no_info(ctx))]

@@ -6,7 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.program_nodes import PythonMethod
+from nagini_translation.lib.program_nodes import PythonMethod, MethodType
 from nagini_translation.lib.typedefs import StmtsAndExpr
 from nagini_translation.lib.util import (InvalidProgramException,
                                          UnsupportedException)
@@ -37,8 +37,11 @@ class ExtendedASTContractTranslator(ContractTranslator):
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
         # determine if we are in a postcondition of a dynamically bound method
-        if ctx.current_class and self._is_in_postcondition(node, ctx.current_function):
-            self_type = self.type_factory.typeof(ctx.current_function.args['self'].ref(), ctx)
+        if (ctx.current_class and
+                ctx.current_function.method_type == MethodType.normal and
+                ctx.obligation_context.is_translating_posts):
+            self_type = self.type_factory.typeof(
+                next(iter(ctx.actual_function.args.values())).ref(), ctx)
         else:
             self_type = None
         return [], self.viper.Low(expr, self_type, self.to_position(node, ctx),
@@ -48,8 +51,10 @@ class ExtendedASTContractTranslator(ContractTranslator):
         """
         Translates a call to the LowEvent() contract function.
         """
-        if ctx.current_class:
-            self_type = self.type_factory.typeof(ctx.current_function.args['self'].ref(), ctx)
+        # TODO: check that lowevent can only be in precondition
+        if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
+            self_type = self.type_factory.typeof(
+                next(iter(ctx.actual_function.args.values())).ref(), ctx)
         else:
             self_type = None
         return [], self.viper.LowEvent(self_type, self.to_position(node, ctx), self.no_info(ctx))
