@@ -420,6 +420,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                                    for type in set_of_classes}
             if len(set_of_return_types) == 1:
                 return set_of_return_types.pop()
+            elif len(set_of_return_types) == 2 and None in set_of_return_types:
+                return OptionalType((set_of_return_types - {None}).pop())
             else:
                 return UnionType(list(set_of_return_types))
         elif isinstance(rectype, PythonType):
