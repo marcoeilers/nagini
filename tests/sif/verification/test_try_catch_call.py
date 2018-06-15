@@ -21,3 +21,11 @@ def m1(x: int, y: int) -> int:
         return divide(x, y)
     except MyZeroDivException:
         return 0
+
+def m2(x: int) -> None:
+    Requires(x > 0)
+    Ensures(False)
+    Exsures(MyZeroDivException, True)
+    while True:
+        divide(10, x)
+        x -= 1

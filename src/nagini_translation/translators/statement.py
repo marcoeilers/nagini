@@ -1260,10 +1260,9 @@ class StatementTranslator(CommonTranslator):
         return body
 
     def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
-        postamble = [self.viper.Label(post_label, self.to_position(node, ctx), 
+        postamble = [self.viper.Label(post_label, self.to_position(node, ctx),
                                       self.no_info(ctx))]
-        # TODO: does this break anything
-        # postamble += self._set_result_none(ctx)
+        postamble += self._set_result_none(ctx)
         return postamble
 
     def translate_stmt_While(self, node: ast.While,
@@ -1285,7 +1284,8 @@ class StatementTranslator(CommonTranslator):
         loop = global_stmts + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
-        loop += self._set_result_none(ctx)
+        # TODO:(meiersev) can we get rid of this? happens in postamble (all tests pass without it)
+        # loop += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])

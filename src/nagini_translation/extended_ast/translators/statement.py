@@ -41,7 +41,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]
 
     def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
-        return []
+        return self._set_result_none(ctx)
 
     def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
         start, end = get_body_indices(node.body)
