@@ -16,15 +16,15 @@ function NoneType___bool__(self: Ref) : Bool
     ensures self == null ==> !result
 
 function object___str__(self: Ref) : Ref
-    ensures issubtype(typeof(result), str())
+    ensures issubtypestr(typeof(result))
 
 function bool___bool__(self: Ref) : Bool
-    requires self != null ==> issubtype(typeof(self), bool())
+    requires self != null ==> issubtypebool(typeof(self))
     ensures self == null ==> !result
     ensures self != null ==> result == bool___unbox__(self)
 
 function int___bool__(self: Ref) : Bool
-    requires self != null ==> issubtype(typeof(self), int())
+    requires self != null ==> issubtypeint(typeof(self))
     ensures self == null ==> !result
     ensures self != null ==> result == (int___unbox__(self) != 0)
 
@@ -34,9 +34,9 @@ function __prim__int___box__(prim: Int): Ref
     ensures forall other: Int :: {__prim__int___box__(other)} ((__prim__int___box__(other) == result) <==> (other == prim))
 
 function int___unbox__(box: Ref): Int
-    requires issubtype(typeof(box), int())
-    ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
-    ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
+    requires issubtypeint(typeof(box))
+    ensures !issubtypebool(typeof(box)) ==> __prim__int___box__(result) == box
+    ensures issubtypebool(typeof(box)) ==> __prim__bool___box__(result != 0) == box
 
 function __prim__bool___box__(prim: Bool): Ref
     ensures typeof(result) == bool()
@@ -44,19 +44,19 @@ function __prim__bool___box__(prim: Bool): Ref
     ensures int___unbox__(result) == (prim ? 1 : 0)
 
 function bool___unbox__(box: Ref): Bool
-    requires issubtype(typeof(box), bool())
+    requires issubtypebool(typeof(box))
     ensures __prim__bool___box__(result) == box
 
 function int___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), int())
-    requires issubtype(typeof(other), int())
+    requires issubtypeint(typeof(self))
+    requires issubtypeint(typeof(other))
 {
     int___unbox__(self) == int___unbox__(other)
 }
 
 function bool___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), bool())
-    requires issubtype(typeof(other), bool())
+    requires issubtypebool(typeof(self))
+    requires issubtypebool(typeof(other))
 {
     bool___unbox__(self) == bool___unbox__(other)
 }
@@ -117,68 +117,68 @@ function float___create__(i: Int): Ref
     ensures typeof(result) == float()
 
 function float___bool__(self: Ref): Bool
-    requires self != null ==> issubtype(typeof(self), float())
+    requires self != null ==> issubtypefloat(typeof(self))
     ensures self == null ==> !result
-    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
+    ensures issubtypeint(typeof(self)) ==> (result == int___bool__(self))
 
 function float___ge__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___ge__(int___unbox__(self), int___unbox__(other)))
 
 function float___gt__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___gt__(int___unbox__(self), int___unbox__(other)))
 
 function float___le__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___le__(int___unbox__(self), int___unbox__(other)))
 
 function float___lt__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___lt__(int___unbox__(self), int___unbox__(other)))
 
 function float___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___eq__(self, other))
 
 function float___add__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures issubtype(typeof(result), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures issubtypefloat(typeof(result))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == __prim__int___box__(int___add__(int___unbox__(self), int___unbox__(other))))
 
 function float___sub__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures issubtype(typeof(result), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures issubtypefloat(typeof(result))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == __prim__int___box__(int___sub__(int___unbox__(self), int___unbox__(other))))
 
 function float___mul__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures issubtype(typeof(result), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    ensures issubtypefloat(typeof(result))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == __prim__int___box__(int___mul__(int___unbox__(self), int___unbox__(other))))
 
 function float___div__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    requires issubtype(typeof(other), int()) ==> int___unbox__(other) != 0
-    requires issubtype(typeof(other), int())  // cannot express non-zero at the moment
-    ensures issubtype(typeof(result), float())
-    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+    requires issubtypefloat(typeof(self))
+    requires issubtypefloat(typeof(other))
+    requires issubtypeint(typeof(other)) ==> int___unbox__(other) != 0
+    requires issubtypeint(typeof(other))  // cannot express non-zero at the moment
+    ensures issubtypefloat(typeof(result))
+    ensures (issubtypeint(typeof(self)) && issubtypeint(typeof(other))) ==>
             (result == int___div__(int___unbox__(self), int___unbox__(other)))
 
 function object___eq__(self: Ref, other: Ref): Bool
@@ -194,18 +194,18 @@ function object___cast__(typ: PyType, obj: Ref): Ref
     ensures issubtype(typeof(obj), typ)
 
 function max(a: Ref, b: Ref): Int
-    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
-             (issubtype(typeof(a), list(int())) && b == null)
-    requires issubtype(typeof(a), list(int())) ==> acc(a.list_acc, 1/100) && list___len__(a) > 0
-    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
-    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
+    requires (issubtypeint(typeof(a)) && issubtypeint(typeof(b))) ||
+             (issubtypelist(typeof(a), int()) && b == null)
+    requires issubtypelist(typeof(a), int()) ==> acc(a.list_acc, 1/100) && list___len__(a) > 0
+    ensures issubtypeint(typeof(a)) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
+    ensures issubtypelist(typeof(a), int()) ==> list___contains__(a, __prim__int___box__(result))
 
 function min(a: Ref, b: Ref): Int
-    requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
-             (issubtype(typeof(a), list(int())) && b == null)
-    requires issubtype(typeof(a), list(int())) ==>  acc(a.list_acc, 1/100) && list___len__(a) > 0
-    ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
-    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
+    requires (issubtypeint(typeof(a)) && issubtypeint(typeof(b))) ||
+             (issubtypelist(typeof(a), int()) && b == null)
+    requires issubtypelist(typeof(a), int()) ==>  acc(a.list_acc, 1/100) && list___len__(a) > 0
+    ensures issubtypeint(typeof(a)) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
+    ensures issubtypelist(typeof(a), int()) ==> list___contains__(a, __prim__int___box__(result))
 
 function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)

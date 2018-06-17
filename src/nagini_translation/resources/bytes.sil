@@ -5,7 +5,7 @@
  */
 
 function bytes___len__(self: Ref): Int
-    requires issubtype(typeof(self), bytes())
+    requires issubtypebytes(typeof(self))
 	ensures result >= 0
 {
     |bytes___val__(self)|
@@ -19,14 +19,14 @@ function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
 	ensures bytes___val__(result) == value
 
 function bytes___bool__(self: Ref) : Bool
-    requires self != null ==> issubtype(typeof(self), bytes())
+    requires self != null ==> issubtypebytes(typeof(self))
     ensures self == null ==> !result
 	ensures self != null ==> result == (bytes___len__(self) != 0)
 
 function bytes___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), bytes())
+    requires issubtypebytes(typeof(self))
     ensures (bytes___val__(self) == bytes___val__(other)) == result
-    ensures result ==> (issubtype(typeof(other), bytes()) && bytes___len__(self) == bytes___len__(other))
+    ensures result ==> (issubtypebytes(typeof(other)) && bytes___len__(self) == bytes___len__(other))
 
 function bytes___sil_seq__(self: Ref) : Seq[Ref]
 {
@@ -34,14 +34,14 @@ function bytes___sil_seq__(self: Ref) : Seq[Ref]
 }
 
 function bytes___add__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), bytes())
-    requires issubtype(typeof(other), bytes())
+    requires issubtypebytes(typeof(self))
+    requires issubtypebytes(typeof(other))
     ensures typeof(result) == bytes()
     ensures bytes___len__(result) == bytes___len__(self) + bytes___len__(other)
     ensures bytes___val__(result) == bytes___val__(self) ++ bytes___val__(other)
 
 function bytes___mul__(self: Ref, factor: Int): Ref
-  requires issubtype(typeof(self), bytes())
+  requires issubtypebytes(typeof(self))
   requires factor >= 0
   ensures typeof(result) == bytes()
   ensures bytes___len__(result) == factor * bytes___len__(self)
@@ -57,15 +57,15 @@ function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
 }
 
 function bytes_join(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), bytes())
-    requires issubtype(typeof(other), list(bytes()))
+    requires issubtypebytes(typeof(self))
+    requires issubtypelist(typeof(other), bytes())
     requires acc(other.list_acc, wildcard)
-    ensures issubtype(typeof(result), bytes())
+    ensures issubtypebytes(typeof(result))
     ensures bytes___val__(result) == (list___len__(other) == 0 ? Seq[Ref]() : bytes_join_val_helper(other, bytes___val__(self), 0))
 
 // Helper function for defining the meaning of byte join
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
-    requires issubtype(typeof(l), list(bytes()))
+    requires issubtypelist(typeof(l), bytes())
     requires acc(l.list_acc, wildcard)
     requires index >= 0 && index < list___len__(l)
     ensures |result| == (index < list___len__(l) - 1 ?
@@ -78,18 +78,18 @@ function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
 }
 
 function bytes___getitem__(self: Ref, index: Int): Ref
-    requires issubtype(typeof(self), bytes())
+    requires issubtypebytes(typeof(self))
     requires index >= 0 ==> index < bytes___len__(self)
     requires index < 0 ==> index >= -bytes___len__(self)
-    ensures issubtype(typeof(result), int())
+    ensures issubtypeint(typeof(result))
     ensures index >= 0 ==> result == bytes___val__(self)[index]
     ensures index < 0 ==> result == bytes___val__(self)[bytes___len__(self) + index]
 
 function bytes___getitem_slice__(self: Ref, index: Ref): Ref
-    requires issubtype(typeof(self), bytes())
-    requires issubtype(typeof(index), slice())
+    requires issubtypebytes(typeof(self))
+    requires issubtypeslice(typeof(index))
     requires (slice___start__(index, bytes___len__(self)) >= 0 && slice___start__(index, bytes___len__(self)) <= bytes___len__(self))
     requires (slice___stop__(index, bytes___len__(self)) >= 0 && slice___stop__(index, bytes___len__(self)) <= bytes___len__(self))
-    ensures issubtype(typeof(result), bytes())
+    ensures issubtypebytes(typeof(result))
     ensures bytes___len__(result) == (slice___stop__(index, bytes___len__(self)) - slice___start__(index, bytes___len__(self)))
     ensures bytes___val__(result) == bytes___val__(self)[slice___start__(index, bytes___len__(self))..slice___stop__(index, bytes___len__(self))]

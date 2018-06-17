@@ -6,7 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
+from nagini_translation.lib.constants import OBJECT_TYPE, PRIMITIVES, TUPLE_TYPE
 from nagini_translation.lib.program_nodes import (
     GenericType,
     OptionalType,
@@ -31,6 +31,7 @@ class TypeDomainFactory:
         self.viper = viper
         self.type_domain = 'PyType'
         self.translator = translator
+        self.created_types = []
 
     def no_position(self, ctx: Context) -> 'silver.ast.Position':
         return self.translator.no_position(ctx)
@@ -44,31 +45,23 @@ class TypeDomainFactory:
     def get_default_axioms(self,
                            ctx: Context) -> List['silver.ast.DomainAxiom']:
         result = [
-            self.create_transitivity_axiom(ctx),
-            self.create_reflexivity_axiom(ctx),
-            self.create_extends_implies_subtype_axiom(ctx),
+            #self.create_reflexivity_axiom(ctx),
             self.create_null_type_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
-            self.create_subtype_exclusion_axiom(ctx),
-            self.create_subtype_exclusion_axiom_2(ctx),
-            self.create_subtype_exclusion_propagation_axiom(ctx),
-            self.create_tuple_arg_axiom(ctx),
             self.create_tuple_args_axiom(ctx),
-            self.create_tuple_subtype_axiom(ctx),
+            #self.create_tuple_subtype_axiom(ctx),
         ]
-        result.extend(self.create_union_subtype_axioms(ctx))
-        result.extend(self.create_subtype_union_axioms(ctx))
+        #result.extend(self.create_union_subtype_axioms(ctx))
+        #result.extend(self.create_subtype_union_axioms(ctx))
         return result
 
     def get_default_functions(self,
                               ctx: Context) -> List['silver.ast.DomainFunc']:
         result = [
-            self.extends_func(ctx),
             self.issubtype_func(ctx),
-            self.isnotsubtype_func(ctx),
-            self.tuple_args_func(ctx),
             self.typeof_func(ctx),
             self.basic_func(ctx),
+            self.tuple_args_func(ctx)
         ]
         result.extend(self.union_funcs(ctx))
         return result
@@ -311,18 +304,22 @@ class TypeDomainFactory:
         type_nargs = len(cls.type_vars) if cls.name != TUPLE_TYPE else -1
         type_funcs = self.create_type_function(cls.sil_name, type_nargs,
                                                position, info, ctx)
-        if cls.interface and not cls.superclass:
-            subtype_axiom = None
+        if not cls.superclass and cls.name != OBJECT_TYPE:
+            subtype_axioms = []
         else:
-            subtype_axiom = self.create_subtype_axiom(cls, supertype,
-                                                      position, info, ctx)
+            subtype_axioms = []
+            subtype_axioms.extend(self.create_self_subtype_axioms(cls, position, info, ctx))
+            for other_type in self.created_types:
+                subtype_axioms.append(self.create_subtype_axiom(cls, other_type, position, info, ctx))
+            self.created_types.append(cls)
         funcs = type_funcs
-        axioms = [subtype_axiom] if subtype_axiom else []
+        axioms = subtype_axioms
         if cls.type_vars or cls.name == TUPLE_TYPE:
             funcs.extend(self.create_arg_functions(cls, ctx))
             # create functions for type arguments
             axioms.extend(self.create_arg_axioms(cls, ctx))
             # create axioms that relate arguments to functions
+
         return funcs, axioms
 
     def create_arg_functions(self, cls: 'PythonClass',
@@ -405,6 +402,8 @@ class TypeDomainFactory:
         result.append(self.viper.DomainFunc(name, args, self.type_type(),
                                             len(args) == 0, position, info,
                                             self.type_domain))
+        t_arg = self.viper.LocalVarDecl('___t', self.type_type(), position, info)
+        result.append(self.viper.DomainFunc('issubtype' + name, [t_arg] + args, self.viper.Bool, False, position, info, self.type_domain))
         return result
 
     def create_type_domain(self, type_funcs: List['silver.ast.DomainFunc'],
@@ -422,7 +421,13 @@ class TypeDomainFactory:
 
     def _issubtype(self, sub: Expr, super: Expr, ctx: Context,
                    position=None) -> 'silver.ast.DomainFuncApp':
-        return self._issubtype_app('issubtype', sub, super, ctx, position)
+        assert isinstance(super, self.viper.ast.DomainFuncApp)
+        args = self.viper.to_list(super.args())
+        if not position:
+            position = self.no_position(ctx)
+        return self.viper.DomainFuncApp('issubtype' + super.funcname(), [sub] + args,
+                                        self.viper.Bool, position,
+                                        self.no_info(ctx), self.type_domain)
 
     def _extends(self, sub: Expr, super: Expr, ctx: Context,
                  position=None) -> 'silver.ast.DomainFuncApp':
@@ -446,7 +451,210 @@ class TypeDomainFactory:
                                         self.no_info(ctx),
                                         self.type_domain)
 
-    def create_subtype_axiom(self, type: PythonType, supertype: PythonType,
+    def create_self_subtype_axioms(self, type: PythonType,
+                             position: 'silver.ast.Position',
+                             info: 'silver.ast.Info',
+                             ctx: Context) -> 'silver.ast.DomainAxiom':
+        type_arg_decls = []
+        type_args = []
+        bound_type_vars = {}
+        if type.name == TUPLE_TYPE:
+            seq_type = self.viper.SeqType(self.type_type())
+            args_ref = self.viper.LocalVar('args', seq_type, position, info)
+            type_args.append(args_ref)
+            type_arg_decls.append(
+                self.viper.LocalVarDecl('args', seq_type, position, info))
+        else:
+            for name, var in type.type_vars.items():
+                var = self.viper.LocalVar(name, self.type_type(), position,
+                                          info)
+                type_args.append(var)
+                type_arg_decls.append(self.viper.LocalVarDecl(name,
+                                                              self.type_type(),
+                                                              position, info))
+                bound_type_vars[(type.name, name)] = var
+
+        type_var = self.viper.LocalVar('class', self.type_type(), position,
+                                       info)
+        type_func = self.viper.DomainFuncApp(type.sil_name, type_args,
+                                             self.type_type(), position, info,
+                                             self.type_domain)
+        body = self._issubtype(type_func, type_func, ctx, position)
+        if type_arg_decls:
+            trigger =self.viper.Trigger([body], position, info)
+            body = self.viper.Forall(type_arg_decls, [trigger], body, position, info)
+
+        for subclass in type.direct_subclasses:
+            if subclass.name in PRIMITIVES:
+                continue
+            subclass_arg_decls = []
+            subclass_args = []
+            bound_subclass_vars = {}
+            if subclass.name == TUPLE_TYPE:
+                seq_subclass = self.viper.SeqType(self.type_type())
+                args_ref = self.viper.LocalVar('args', seq_subclass, position, info)
+                subclass_args.append(args_ref)
+                subclass_arg_decls.append(
+                    self.viper.LocalVarDecl('args', seq_subclass, position, info))
+            else:
+                for name, var in subclass.type_vars.items():
+                    var = self.viper.LocalVar(name, self.type_type(), position,
+                                              info)
+                    subclass_args.append(var)
+                    subclass_arg_decls.append(self.viper.LocalVarDecl(name,
+                                                                  self.type_type(),
+                                                                  position, info))
+                    bound_subclass_vars[(subclass.name, name)] = var
+
+            subclass_var = self.viper.LocalVar('class', self.type_type(), position,
+                                           info)
+            subclass_func = self.viper.DomainFuncApp(subclass.sil_name, subclass_args,
+                                                 self.type_type(), position, info,
+                                                 self.type_domain)
+            subclass_expr = self._issubtype(type_func, subclass_func, ctx, position)
+            subclass_body = self.viper.Not(subclass_expr, position, info)
+            if type_arg_decls or subclass_arg_decls:
+                subclass_trigger = self.viper.Trigger([subclass_expr], position, info)
+                subclass_body = self.viper.Forall(type_arg_decls + subclass_arg_decls, [subclass_trigger], subclass_body, position, info)
+            body = self.viper.And(body, subclass_body, position, info)
+
+        res= [self.viper.DomainAxiom('___selfsub' + type.name, body, position, info, self.type_domain)]
+
+        t_decl = self.viper.LocalVarDecl('_______t', self.type_type(), position, info)
+        t = self.viper.LocalVar('_______t', self.type_type(), position, info)
+        one_part = self._issubtype(t, type_func, ctx, position)
+        other_part = self._issubtype_app('issubtype', t, type_func, ctx, position)
+        other_body = self.viper.EqCmp(one_part, other_part, position, info)
+        if type.name == 'tuple':
+            trigger1 = self.viper.Trigger([one_part], position, info)
+            trigger2 = self.viper.Trigger([other_part], position, info)
+            triggers = [trigger1, trigger2]
+        else:
+            trigger = self.viper.Trigger([one_part], position, info)
+            triggers = [trigger]
+        body = self.viper.Forall([t_decl] + type_arg_decls, triggers, other_body, position, info)
+
+
+
+        res.append(self.viper.DomainAxiom('___issubtype_' + type.name, body, position, info, self.type_domain))
+        return res
+
+    def create_subtype_axiom(self, type: PythonType, other_type: PythonType,
+                             position: 'silver.ast.Position',
+                             info: 'silver.ast.Info',
+                             ctx: Context) -> 'silver.ast.DomainAxiom':
+        type_arg_decls = []
+        type_args = []
+        bound_type_vars = {}
+        if type.name == TUPLE_TYPE:
+            seq_type = self.viper.SeqType(self.type_type())
+            args_ref = self.viper.LocalVar('args', seq_type, position, info)
+            type_args.append(args_ref)
+            type_arg_decls.append(
+                self.viper.LocalVarDecl('args', seq_type, position, info))
+        else:
+            for name, var in type.type_vars.items():
+                var = self.viper.LocalVar(name, self.type_type(), position,
+                                          info)
+                type_args.append(var)
+                type_arg_decls.append(self.viper.LocalVarDecl(name,
+                                                              self.type_type(),
+                                                              position, info))
+                bound_type_vars[(type.name, name)] = var
+
+        type_var = self.viper.LocalVar('class', self.type_type(), position,
+                                       info)
+        type_func = self.viper.DomainFuncApp(type.sil_name, type_args,
+                                             self.type_type(), position, info,
+                                             self.type_domain)
+
+        other_type_arg_decls = []
+        other_type_args = []
+        other_bound_type_vars = {}
+        if other_type.name == TUPLE_TYPE:
+            seq_type = self.viper.SeqType(self.type_type())
+            args_ref = self.viper.LocalVar('args', seq_type, position, info)
+            other_type_args.append(args_ref)
+            other_type_arg_decls.append(
+                self.viper.LocalVarDecl('args', seq_type, position, info))
+        else:
+            for name, var in other_type.type_vars.items():
+                var = self.viper.LocalVar('_'+name, self.type_type(), position,
+                                          info)
+                other_type_args.append(var)
+                other_type_arg_decls.append(self.viper.LocalVarDecl('_'+name,
+                                                              self.type_type(),
+                                                              position, info))
+                other_bound_type_vars[(other_type.name, name)] = var
+
+        other_type_var = self.viper.LocalVar('oclass', self.type_type(), position,
+                                       info)
+        other_type_func = self.viper.DomainFuncApp(other_type.sil_name, other_type_args,
+                                             self.type_type(), position, info,
+                                             self.type_domain)
+
+        common = type.python_class.get_common_superclass(other_type.python_class)
+        t_decl = self.viper.LocalVarDecl('t', self.type_type(), position, info)
+        t_ref = self.viper.LocalVar('t', self.type_type(), position, info)
+        one = self._issubtype(t_ref, type_func, ctx, position)
+        other = self._issubtype(t_ref, other_type_func, ctx, position)
+        trigger = self.viper.Trigger([one, other], position, info)
+        if common is type.python_class:
+            fits = self.viper.TrueLit(position, info)
+            for name, whatever in type.type_vars.items():
+                print("+++")
+            other_and_fits = self.viper.And(other, fits, position, info)
+            implication = self.viper.Implies(other_and_fits, one, position, info)
+            body = self.viper.Forall([t_decl] + type_arg_decls + other_type_arg_decls,
+                                     [trigger], implication, position, info)
+            one_subtype_of_other = self._issubtype(type_func, other_type_func, ctx, position)
+            one_not_subtype_of_other = self.viper.Not(one_subtype_of_other, position, info)
+            if (type_arg_decls + other_type_arg_decls):
+                trigger = self.viper.Trigger([one_subtype_of_other], position, info)
+                one_not_subtype_of_other = self.viper.Forall(type_arg_decls + other_type_arg_decls, [trigger], one_not_subtype_of_other, position, info)
+            body = self.viper.And(body, one_not_subtype_of_other, position, info)
+
+        elif common is other_type.python_class:
+            fits = self.viper.TrueLit(position, info)
+            for name, whatever in other_type.type_vars.items():
+                print("+++")
+            one_and_fits = self.viper.And(one, fits, position, info)
+            implication = self.viper.Implies(one_and_fits, other, position, info)
+            body = self.viper.Forall([t_decl] + type_arg_decls + other_type_arg_decls,
+                                     [trigger], implication, position, info)
+            one_subtype_of_other = self._issubtype(other_type_func, type_func, ctx,
+                                                   position)
+            one_not_subtype_of_other = self.viper.Not(one_subtype_of_other, position,
+                                                      info)
+            if (type_arg_decls + other_type_arg_decls):
+                trigger = self.viper.Trigger([one_subtype_of_other], position, info)
+                one_not_subtype_of_other = self.viper.Forall(
+                    type_arg_decls + other_type_arg_decls, [trigger],
+                    one_not_subtype_of_other, position, info)
+            body = self.viper.And(body, one_not_subtype_of_other, position, info)
+
+        else:
+            not_one = self.viper.Not(one, position, info)
+            not_other = self.viper.Not(other, position, info)
+            either = self.viper.Or(not_one, not_other, position, info)
+            body = self.viper.Forall([t_decl] + type_arg_decls + other_type_arg_decls, [trigger], either, position, info)
+        return self.viper.DomainAxiom('___subtype_' + type.name + '_' + other_type.name, body, position, info, self.type_domain)
+
+
+
+    def create_subtype_unrelated_axiom(self, type: PythonType, other_type: PythonType,
+                             position: 'silver.ast.Position',
+                             info: 'silver.ast.Info',
+                             ctx: Context) -> 'silver.ast.DomainAxiom':
+        pass
+
+    def create_subtype_related_axiom(self, type: PythonType, other_type: PythonType,
+                             position: 'silver.ast.Position',
+                             info: 'silver.ast.Info',
+                             ctx: Context) -> 'silver.ast.DomainAxiom':
+        pass
+
+    def create_subtype_axiom_old(self, type: PythonType, supertype: PythonType,
                              position: 'silver.ast.Position',
                              info: 'silver.ast.Info',
                              ctx: Context) -> 'silver.ast.DomainAxiom':

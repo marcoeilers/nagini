@@ -18,12 +18,12 @@ function range___stop__(self: Ref): Int
 
 
 function range___len__(self: Ref): Int
-  requires issubtype(typeof(self), range())
+  requires issubtyperange(typeof(self))
   ensures result == |range___val__(self)|
 
 
 function range___getitem__(self: Ref, index: Int): Int
-  requires issubtype(typeof(self), range())
+  requires issubtyperange(typeof(self))
   requires index >= 0 ==> index < range___len__(self)
   requires index < 0 ==> index >= -range___len__(self)
   ensures index >= 0 ==> result == range___val__(self)[index]
@@ -31,17 +31,17 @@ function range___getitem__(self: Ref, index: Int): Int
 
 
 function range___getitem_slice__(self: Ref, index: Ref): Ref
-  requires issubtype(typeof(self), range())
-  requires issubtype(typeof(index), slice())
+  requires issubtyperange(typeof(self))
+  requires issubtypeslice(typeof(index))
   requires (slice___start__(index, range___len__(self)) >= 0 && slice___start__(index, range___len__(self)) <= range___len__(self))
   requires (slice___stop__(index, range___len__(self)) >= 0 && slice___stop__(index, range___len__(self)) <= range___len__(self))
-  ensures issubtype(typeof(result), range())
+  ensures issubtyperange(typeof(result))
   ensures range___len__(result) == (slice___stop__(index, range___len__(self)) - slice___start__(index, range___len__(self)))
   ensures range___val__(result) == range___val__(self)[slice___start__(index, range___len__(self))..slice___stop__(index, range___len__(self))]
 
 
 function range___sil_seq__(self: Ref): Seq[Ref]
-  requires issubtype(typeof(self), range())
+  requires issubtyperange(typeof(self))
   ensures |result| == range___len__(self)
   ensures (forall i: Int :: i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (typeof(i) == int() && (int___unbox__(i) in range___val__(self))))
@@ -49,25 +49,25 @@ function range___sil_seq__(self: Ref): Seq[Ref]
 
 
 function range___eq__(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), range())
+  requires issubtyperange(typeof(self))
   ensures (range___val__(self) == range___val__(other)) == result
-  ensures result ==> (issubtype(typeof(other), range()) && range___len__(self) == range___len__(other))
+  ensures result ==> (issubtyperange(typeof(other)) && range___len__(self) == range___len__(other))
 
 
 function range___contains__(self: Ref, item: Ref): Bool
-    requires issubtype(typeof(self), range())
-    requires issubtype(typeof(item), int())
+    requires issubtyperange(typeof(self))
+    requires issubtypeint(typeof(item))
     ensures result == (item in range___sil_seq__(self))
 
 method range___iter__(self: Ref) returns (_res: Ref)
-  requires issubtype(typeof(self), range())
+  requires issubtyperange(typeof(self))
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
   ensures _res.list_acc == range___sil_seq__(self)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
-  ensures issubtype(typeof(_res.__previous), list(int()))
+  ensures issubtypelist(typeof(_res.__previous), int())
 {
   inhale false
 }
