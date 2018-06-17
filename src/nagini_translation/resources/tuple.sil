@@ -73,17 +73,17 @@ function tuple___sil_seq__(self: Ref): Seq[Ref]
 
 function tuple___len__(self: Ref): Int
     ensures result == |tuple___val__(self)|
-    ensures (forall ts: Seq[PyType] :: {issubtype(typeof(self), tuple(ts))} result == |ts|)
+    ensures (forall ts: Seq[PyType] :: {issubtypetuple(typeof(self), ts)} result == |ts|)
 
 function tuple___getitem__(self: Ref, key: Int): Ref
     requires let ln == (tuple___len__(self)) in ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))
-    ensures key >= 0 ==> (forall ts: Seq[PyType] :: {issubtype(typeof(self), tuple(ts))} (issubtype(typeof(self), tuple(ts))  && key < |ts|) ==> issubtype(typeof(result), ts[key]))
-    ensures key < 0 ==> (forall ts: Seq[PyType] :: {issubtype(typeof(self), tuple(ts))} (issubtype(typeof(self), tuple(ts)) && (tuple___len__(self) + key >= 0 && tuple___len__(self) + key < |ts|))==> issubtype(typeof(result), ts[tuple___len__(self) + key]))
+    ensures key >= 0 ==> (forall ts: Seq[PyType] :: {issubtypetuple(typeof(self), ts)} (issubtypetuple(typeof(self), ts)  && key < |ts|) ==> issubtype(typeof(result), ts[key]))
+    ensures key < 0 ==> (forall ts: Seq[PyType] :: {issubtypetuple(typeof(self), ts)} (issubtypetuple(typeof(self), ts) && (tuple___len__(self) + key >= 0 && tuple___len__(self) + key < |ts|))==> issubtype(typeof(result), ts[tuple___len__(self) + key]))
     ensures key >= 0 ==> result == tuple___val__(self)[key]
     ensures key < 0 ==> result == tuple___val__(self)[tuple___len__(self) + key]
 
 function tuple___getitem_slice__(self: Ref, key: Ref): Ref
-    requires issubtype(typeof(key), slice())
+    requires issubtypeslice(typeof(key))
     requires (slice___start__(key, tuple___len__(self)) >= 0 && slice___start__(key, tuple___len__(self)) <= tuple___len__(self))
     requires (slice___stop__(key, tuple___len__(self)) >= 0 && slice___stop__(key, tuple___len__(self)) <= tuple___len__(self))
     ensures typeof(result) == tuple(tuple_args(typeof(self))[slice___start__(key, tuple___len__(self))..slice___stop__(key, tuple___len__(self))])

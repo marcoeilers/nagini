@@ -6,7 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
+from nagini_translation.lib.constants import OBJECT_TYPE, PRIMITIVES, TUPLE_TYPE
 from nagini_translation.lib.program_nodes import (
     GenericType,
     OptionalType,
@@ -48,6 +48,7 @@ class TypeDomainFactory:
             #self.create_reflexivity_axiom(ctx),
             self.create_null_type_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
+            self.create_tuple_args_axiom(ctx),
             #self.create_tuple_subtype_axiom(ctx),
         ]
         #result.extend(self.create_union_subtype_axioms(ctx))
@@ -60,6 +61,7 @@ class TypeDomainFactory:
             self.issubtype_func(ctx),
             self.typeof_func(ctx),
             self.basic_func(ctx),
+            self.tuple_args_func(ctx)
         ]
         result.extend(self.union_funcs(ctx))
         return result
@@ -481,6 +483,41 @@ class TypeDomainFactory:
         if type_arg_decls:
             trigger =self.viper.Trigger([body], position, info)
             body = self.viper.Forall(type_arg_decls, [trigger], body, position, info)
+
+        for subclass in type.direct_subclasses:
+            if subclass.name in PRIMITIVES:
+                continue
+            subclass_arg_decls = []
+            subclass_args = []
+            bound_subclass_vars = {}
+            if subclass.name == TUPLE_TYPE:
+                seq_subclass = self.viper.SeqType(self.type_type())
+                args_ref = self.viper.LocalVar('args', seq_subclass, position, info)
+                subclass_args.append(args_ref)
+                subclass_arg_decls.append(
+                    self.viper.LocalVarDecl('args', seq_subclass, position, info))
+            else:
+                for name, var in subclass.type_vars.items():
+                    var = self.viper.LocalVar(name, self.type_type(), position,
+                                              info)
+                    subclass_args.append(var)
+                    subclass_arg_decls.append(self.viper.LocalVarDecl(name,
+                                                                  self.type_type(),
+                                                                  position, info))
+                    bound_subclass_vars[(subclass.name, name)] = var
+
+            subclass_var = self.viper.LocalVar('class', self.type_type(), position,
+                                           info)
+            subclass_func = self.viper.DomainFuncApp(subclass.sil_name, subclass_args,
+                                                 self.type_type(), position, info,
+                                                 self.type_domain)
+            subclass_expr = self._issubtype(type_func, subclass_func, ctx, position)
+            subclass_body = self.viper.Not(subclass_expr, position, info)
+            if type_arg_decls or subclass_arg_decls:
+                subclass_trigger = self.viper.Trigger([subclass_expr], position, info)
+                subclass_body = self.viper.Forall(type_arg_decls + subclass_arg_decls, [subclass_trigger], subclass_body, position, info)
+            body = self.viper.And(body, subclass_body, position, info)
+
         res= [self.viper.DomainAxiom('___selfsub' + type.name, body, position, info, self.type_domain)]
 
         t_decl = self.viper.LocalVarDecl('_______t', self.type_type(), position, info)
@@ -488,8 +525,17 @@ class TypeDomainFactory:
         one_part = self._issubtype(t, type_func, ctx, position)
         other_part = self._issubtype_app('issubtype', t, type_func, ctx, position)
         other_body = self.viper.EqCmp(one_part, other_part, position, info)
-        trigger = self.viper.Trigger([one_part, other_part], position, info)
-        body = self.viper.Forall([t_decl] + type_arg_decls, [trigger], other_body, position, info)
+        if type.name == 'tuple':
+            trigger1 = self.viper.Trigger([one_part], position, info)
+            trigger2 = self.viper.Trigger([other_part], position, info)
+            triggers = [trigger1, trigger2]
+        else:
+            trigger = self.viper.Trigger([one_part], position, info)
+            triggers = [trigger]
+        body = self.viper.Forall([t_decl] + type_arg_decls, triggers, other_body, position, info)
+
+
+
         res.append(self.viper.DomainAxiom('___issubtype_' + type.name, body, position, info, self.type_domain))
         return res
 

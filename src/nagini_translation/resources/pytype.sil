@@ -7,6 +7,7 @@
 domain PyType {
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
+
     function list(t: PyType): PyType
     function list_arg(t: PyType, i: Int): PyType
     function set(t: PyType): PyType
@@ -23,6 +24,14 @@ domain PyType {
     function PSet(t: PyType): PyType
     function PSet_arg(t: PyType, i: Int): PyType
 
+    function issubtypelist(t: PyType, a1: PyType): Bool
+    function issubtypeset(t: PyType, a1: PyType): Bool
+    function issubtypedict(t: PyType, a1: PyType, a2: PyType): Bool
+    function issubtypetuple(t: PyType, a1: Seq[PyType]): Bool
+    function issubtypeIterator(t: PyType, a1: PyType): Bool
+    function issubtypeSequence(t: PyType, a1: PyType): Bool
+    function issubtypePSet(t: PyType, a1: PyType): Bool
+
     unique function int(): PyType
     unique function float(): PyType
     unique function bool(): PyType
@@ -32,4 +41,14 @@ domain PyType {
     unique function slice(): PyType
     unique function str(): PyType
     unique function NoneType(): PyType
+
+    function issubtypeint(t: PyType) : Bool
+    function issubtypefloat(t: PyType) : Bool
+    function issubtypebool(t: PyType) : Bool
+    function issubtypebytes(t: PyType) : Bool
+    function issubtypebytesarray(t: PyType) : Bool
+    function issubtyperange(t: PyType) : Bool
+    function issubtypeslice(t: PyType) : Bool
+    function issubtypestr(t: PyType) : Bool
+    function issubtypeNoneType(t: PyType) : Bool
 }

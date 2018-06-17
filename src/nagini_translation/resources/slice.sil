@@ -5,14 +5,14 @@
  */
 
 function slice___create__(start: Ref, stop: Ref): Ref
-    requires start == null || issubtype(typeof(start), int())
-    requires stop == null || issubtype(typeof(stop), int())
+    requires start == null || issubtypeint(typeof(start))
+    requires stop == null || issubtypeint(typeof(stop))
     ensures slice___internal_start__(result) == start
     ensures slice___internal_stop__(result) == stop
     ensures typeof(result) == slice()
 
 function slice___internal_start__(self: Ref): Ref
-    ensures result == null || issubtype(typeof(result), int())
+    ensures result == null || issubtypeint(typeof(result))
 
 function slice___start__(self: Ref, len: Int): Int
 {
@@ -31,4 +31,4 @@ function slice___stop__(self: Ref, len: Int): Int
 }
 
 function slice___internal_stop__(self: Ref): Ref
-    ensures result == null || issubtype(typeof(result), int())
+    ensures result == null || issubtypeint(typeof(result))
