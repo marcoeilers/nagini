@@ -200,6 +200,10 @@ class ViperAST:
 
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
+        if func_name.startswith('issubtype'):
+            self.used_names.add(func_name[9:])
+        else:
+            self.used_names.add(func_name)
         arg_decls = [self.LocalVarDecl('arg' + str(i), arg.typ(), arg.pos(),
                                        arg.info())
                      for i, arg in enumerate(args)]

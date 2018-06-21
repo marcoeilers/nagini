@@ -1174,10 +1174,7 @@ class ProgramTranslator(CommonTranslator):
                         adt_list.append(cls)
                 old_class = ctx.current_class
                 ctx.current_class = cls
-                funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.extend(funcs)
-                if axioms:
-                    type_axioms.extend(axioms)
+
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1290,6 +1287,19 @@ class ProgramTranslator(CommonTranslator):
             predicates = [p for p in predicates if p.name() in all_used_names]
             functions = [f for f in functions if f.name() in all_used_names]
             methods = [m for m in methods if m.name() in all_used_names]
+            all_used_names.extend(['NoneType', 'object', 'Place'])
+
+        ctx.current_function = None
+        for module in modules:
+            ctx.module = module
+            for cls in module.classes.values():
+                if all_used_names is not None and cls.sil_name not in all_used_names:
+                    continue
+                ctx.current_class = cls
+                funcs, axioms = self.type_factory.create_type(cls, all_used_names, ctx)
+                type_funcs.extend(funcs)
+                if axioms:
+                    type_axioms.extend(axioms)
 
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))

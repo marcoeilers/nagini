@@ -545,6 +545,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
 
+    def get_contains(self, receiver: PythonType, args: List[Expr], arg_types: List[PythonType],
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
+            if receiver.name in ('list', 'Sequence'):
+                seq = self.get_sequence(receiver, args[0], arg_types[0], node, ctx, position)
+                res = self.viper.SeqContains(args[1], seq, position, info)
+                return res
+        return self.get_function_call(receiver, '__contains__', args, arg_types,
+                                      node, ctx, position)
+
 
     def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],

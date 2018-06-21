@@ -140,8 +140,7 @@ class SIFExpressionTranslator(ExpressionTranslator, ExprCacheMixin):
         bool_type = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
         args = [right, right_p, left, left_p, ctx.current_tl_var_expr]
         arg_types = [right_type, right_type, left_type, left_type, bool_type]
-        func_app = self.get_function_call(
-            right_type, '__contains__', args, arg_types, node, ctx)
+        func_app = self.get_contains(right_type, args, arg_types, node, ctx)
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         res_expr, res_expr_p, tl_expr = \

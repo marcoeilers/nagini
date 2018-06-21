@@ -1084,8 +1084,12 @@ class ExpressionTranslator(CommonTranslator):
             ctx: Context) -> StmtsAndExpr:
         args = [right, left]
         arg_types = [right_type, left_type]
-        app_stmt, app = self.get_func_or_method_call(
-            right_type, '__contains__', args, arg_types, node, ctx)
+        if right_type.get_function('__contains__'):
+            app_stmt = []
+            app = self.get_contains(right_type, args, arg_types, node, ctx)
+        else:
+            app_stmt, app = self.get_func_or_method_call(
+                right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
             app = self.viper.Not(
                 app, self.to_position(node, ctx), self.no_info(ctx))

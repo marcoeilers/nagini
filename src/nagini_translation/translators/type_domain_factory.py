@@ -289,7 +289,7 @@ class TypeDomainFactory:
                                        False, position, info, self.type_domain)
         return result
 
-    def create_type(self, cls: 'PythonClass',
+    def create_type(self, cls: 'PythonClass', used_names,
                     ctx: Context) -> Tuple['silver.ast.DomainFunc',
                                            'silver.ast.DomainAxiom']:
         """
@@ -308,7 +308,7 @@ class TypeDomainFactory:
             subtype_axioms = []
         else:
             subtype_axioms = []
-            subtype_axioms.extend(self.create_self_subtype_axioms(cls, position, info, ctx))
+            subtype_axioms.extend(self.create_self_subtype_axioms(cls, position, info, ctx, used_names))
             for other_type in self.created_types:
                 subtype_axioms.append(self.create_subtype_axiom(cls, other_type, position, info, ctx))
             self.created_types.append(cls)
@@ -454,7 +454,7 @@ class TypeDomainFactory:
     def create_self_subtype_axioms(self, type: PythonType,
                              position: 'silver.ast.Position',
                              info: 'silver.ast.Info',
-                             ctx: Context) -> 'silver.ast.DomainAxiom':
+                             ctx: Context, used_names) -> 'silver.ast.DomainAxiom':
         type_arg_decls = []
         type_args = []
         bound_type_vars = {}
@@ -485,7 +485,7 @@ class TypeDomainFactory:
             body = self.viper.Forall(type_arg_decls, [trigger], body, position, info)
 
         for subclass in type.direct_subclasses:
-            if subclass.name in PRIMITIVES:
+            if subclass.name in PRIMITIVES or (used_names is not None and subclass.sil_name not in used_names):
                 continue
             subclass_arg_decls = []
             subclass_args = []

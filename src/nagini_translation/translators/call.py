@@ -368,8 +368,10 @@ class CallTranslator(CommonTranslator):
             quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position, info)
             quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref, position,
                                                      info)
-            arg_contains = self.get_function_call(arg_type, '__contains__', [contents, quant_var], [None, None], node, ctx)
-            res_contains = self.get_function_call(set_type, '__contains__', [result_var, quant_var], [None, None], node, ctx)
+            arg_contains = self.get_contains(arg_type, [contents, quant_var], [None, None],
+                                             node, ctx)
+            res_contains = self.get_contains(set_type, [result_var, quant_var], [None, None],
+                                             node, ctx)
             contain_equal = self.viper.EqCmp(arg_contains, res_contains, position, info)
             trigger = self.viper.Trigger([res_contains], position, info)
             quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal, position, info)
