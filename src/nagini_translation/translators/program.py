@@ -1292,8 +1292,10 @@ class ProgramTranslator(CommonTranslator):
         ctx.current_function = None
         for module in modules:
             ctx.module = module
-            for cls in module.classes.values():
+            for cls_name, cls in module.classes.items():
                 if all_used_names is not None and cls.sil_name not in all_used_names:
+                    continue
+                if cls.name != cls_name:
                     continue
                 ctx.current_class = cls
                 funcs, axioms = self.type_factory.create_type(cls, all_used_names, ctx)

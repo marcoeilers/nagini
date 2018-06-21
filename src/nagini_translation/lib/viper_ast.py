@@ -198,6 +198,13 @@ class ViperAST:
         return self.ast.DomainType(name, map,
                                    seq)
 
+    def mark_class_used(self, name: str):
+        if name == 'Iterator':
+            self.used_names.add('list')
+            self.used_names.add('dict')
+            self.used_names.add('set')
+        self.used_names.add(name)
+
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
         if func_name.startswith('issubtype'):

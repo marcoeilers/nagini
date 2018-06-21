@@ -303,6 +303,9 @@ class AbstractTranslator(metaclass=ABCMeta):
             targets: List[Expr], position: Position, info: Info,
             target_method: PythonMethod = None,
             target_node: ast.Call = None) -> List[Stmt]:
+        if target_method is not None:
+            if target_method.cls and target_method.cls.interface:
+                self.viper.mark_class_used(target_method.cls.sil_name)
         translator = self.config.obligation_translator
         return translator.create_method_call_node(
             ctx, methodname, args, targets, position, info, target_method,

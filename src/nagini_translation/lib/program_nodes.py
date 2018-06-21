@@ -644,9 +644,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if other.issubtype(self):
             return self
         if self.superclass:
-            return self.superclass.get_common_superclass(other)
+            return self.superclass.python_class.get_common_superclass(other)
         elif other.superclass:
-            return self.get_common_superclass(other.superclass)
+            return self.get_common_superclass(other.superclass.python_class)
         else:
             assert False, 'Internal error: Classes without common superclass.'
 

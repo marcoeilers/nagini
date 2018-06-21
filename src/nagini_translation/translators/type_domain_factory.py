@@ -48,7 +48,7 @@ class TypeDomainFactory:
             #self.create_reflexivity_axiom(ctx),
             self.create_null_type_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
-            self.create_tuple_args_axiom(ctx),
+            #self.create_tuple_args_axiom(ctx),
             #self.create_tuple_subtype_axiom(ctx),
         ]
         #result.extend(self.create_union_subtype_axioms(ctx))
