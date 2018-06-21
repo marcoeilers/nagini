@@ -24,16 +24,14 @@ class ViperASTExtended(ViperAST):
     def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
         expr_opt = self.scala.Some(expr) if expr is not None else self.none
         res_var_opt = self.scala.Some(res_var) if res_var is not None else self.none
-        return_node = self.ast_extensions.SIFReturnStmt(expr_opt, res_var_opt)
-        return self.ast.ExtensionStmt(return_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFReturnStmt(expr_opt, res_var_opt,
+                                                 position, info, self.NoTrafos)
 
     def Break(self, position: Position, info: Info):
-        break_node = self.ast_extensions.SIFBreakStmt()
-        return self.ast.ExtensionStmt(break_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFBreakStmt(position, info, self.NoTrafos)
 
     def Continue(self, position: Position, info: Info):
-        cont_node = self.ast_extensions.SIFContinueStmt()
-        return self.ast.ExtensionStmt(cont_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFContinueStmt(position, info, self.NoTrafos)
 
     def Skip(self) -> Seqn:
         return self.Seqn([], self.NoPosition, self.NoInfo)
@@ -48,11 +46,11 @@ class ViperASTExtended(ViperAST):
 
     def Raise(self, assignment: Optional[VarAssign], position: Position, info: Info):
         ass_opt = self.scala.Some(assignment) if assignment is not None else self.none
-        raise_node = self.ast_extensions.SIFRaiseStmt(ass_opt)
-        return self.ast.ExtensionStmt(raise_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFRaiseStmt(ass_opt, position, info, self.NoTrafos)
 
     def SIFExceptionHandler(self, exception: Expr, handler: Seqn):
-        return self.ast_extensions.SIFExceptionHandler(exception, handler)
+        return self.ast_extensions.SIFExceptionHandler(exception, handler,
+                                                       self.NoPosition, self.NoInfo, self.NoTrafos)
 
     def Try(self, body: Seqn, catch_blocks: List['silver.sif.SIFExceptionHandler'],
             else_block: Optional[Seqn], finally_block: Optional[Seqn],
@@ -60,16 +58,14 @@ class ViperASTExtended(ViperAST):
         catch_blocks_seq = self.to_seq(catch_blocks)
         else_opt = self.scala.Some(else_block) if else_block is not None else self.none
         fin_opt = self.scala.Some(finally_block) if finally_block is not None else self.none
-        try_node = self.ast_extensions.SIFTryCatchStmt(body, catch_blocks_seq,
-                                                       else_opt, fin_opt)
-        return self.ast.ExtensionStmt(try_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFTryCatchStmt(body, catch_blocks_seq,
+                                                       else_opt, fin_opt,
+                                                       position, info, self.NoTrafos)
 
     def Low(self, expr: Expr, self_check: Optional[Expr], position: Position, info: Info):
         check_opt = self.scala.Some(self_check) if self_check is not None else self.none
-        low_node = self.ast_extensions.SIFLowExp(expr, check_opt)
-        return self.ast.ExtensionExp(low_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFLowExp(expr, check_opt, position, info, self.NoTrafos)
 
     def LowEvent(self, self_check: Optional[Expr], position: Position, info: Info):
         check_opt = self.scala.Some(self_check) if self_check is not None else self.none
-        lowevent_node = self.ast_extensions.SIFLowEventExp(check_opt)
-        return self.ast.ExtensionExp(lowevent_node, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFLowEventExp(check_opt, position, info, self.NoTrafos)
