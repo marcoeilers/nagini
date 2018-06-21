@@ -570,11 +570,11 @@ class VerificationTest(AnnotatedTest):
         if sif:
             prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
         vresult = verify(prog, path, jvm, verifier)
-        self._evaluate_result(vresult, annotation_manager, jvm)
+        self._evaluate_result(vresult, annotation_manager, jvm, sif)
 
     def _evaluate_result(
             self, vresult: VerificationResult,
-            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM):
+            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM, sif: bool = False):
         """Evaluate verification result with regard to test annotations."""
         if vresult:
             actual_errors = []
@@ -584,6 +584,14 @@ class VerificationTest(AnnotatedTest):
                 for error in vresult.errors)
             actual_errors = [
                 VerificationError(error) for error in vresult.errors]
+            if sif:
+                # carbon will report all functional errors twice, as we model two executions,
+                # therefore we filter duplicated errors here.
+                distinct = []
+                for error in actual_errors:
+                    if not any(e.__repr__() == error.__repr__() for e in distinct):
+                        distinct.append(error)
+                actual_errors = distinct
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')

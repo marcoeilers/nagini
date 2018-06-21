@@ -37,6 +37,7 @@ def test_contains() -> None:
 
 
 def test_contains_2() -> None:
+    Requires(LowEvent())
     x = input_high()
     l = [1, 2, 3]
     b = x in l
@@ -44,6 +45,7 @@ def test_contains_2() -> None:
 
 
 def test_high_ref() -> None:
+    Requires(LowEvent())
     h = high_ref()
     l = low_ref()
     l.append(1)

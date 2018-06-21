@@ -73,8 +73,6 @@ def parse_sil_file(sil_path: str, jvm):
 def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
-    if sif:
-        resources_path = os.path.join(current_path, 'sif/resources')
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
 
 
@@ -293,6 +291,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print('Translation successful.')
         if args.sif:
+            jvm.viper.silver.sif.SIFExtendedTransformer.setOptimizeSequential(True)
             prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
             if args.verbose:
                 print('Transformation to MPP successful.')
