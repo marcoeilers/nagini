@@ -172,7 +172,8 @@
         "get": {
             "args": ["dict", "object"],
             "type": "object",
-            "generic_type": 1
+            "generic_type": 1,
+            "requires": ["__contains__", "__getitem__"]
         },
         "__bool__": {
             "args": ["dict"],
