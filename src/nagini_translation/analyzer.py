@@ -19,6 +19,7 @@ from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
     IGNORED_IMPORTS,
+    INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
@@ -1108,6 +1109,12 @@ class Analyzer(ast.NodeVisitor):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                if mypy_type.type.name() == 'enumerate':
+                    assert len(args) == 1
+                    int_type = self.module.global_module.classes[INT_TYPE]
+                    tuple_class = self.module.global_module.classes[TUPLE_TYPE]
+                    arg = GenericType(tuple_class, [int_type, args[0]])
+                    args = [arg]
                 result = GenericType(result, args)
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
@@ -1144,14 +1151,18 @@ class Analyzer(ast.NodeVisitor):
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
         prefix = mypy_type._fullname
-        if prefix.endswith('.' + mypy_type.name()):
-            prefix = prefix[:-(len(mypy_type.name()) + 1)]
+        name = mypy_type.name()
+        if prefix == 'builtins.enumerate':
+            prefix = 'builtins.list'
+            name = 'list'
+        if prefix.endswith('.' + name):
+            prefix = prefix[:-(len(name) + 1)]
         target_module = self.module
         for module in self.modules.values():
             if module.type_prefix == prefix:
                 target_module = module
                 break
-        result = self.find_or_create_class(mypy_type.name(),
+        result = self.find_or_create_class(name,
                                            module=target_module)
         return result
 
