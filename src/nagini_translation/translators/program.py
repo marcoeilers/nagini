@@ -186,6 +186,15 @@ class ProgramTranslator(CommonTranslator):
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
+    def _create_inherit_check_postamble(self, stmt: List[Stmt], end_lbl: 'silver.ast.Label',
+                                        ctx: Context) -> None:
+        goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
+                                   self.no_info(ctx))
+        stmts.append(goto_end)
+        stmts += self.add_handlers_for_inlines(ctx)
+
+        stmts.append(end_lbl)
+
     def create_inherit_check(self, method: PythonMethod, cls: PythonClass,
                              ctx: Context) -> 'silver.ast.Callable':
         """
@@ -237,12 +246,9 @@ class ProgramTranslator(CommonTranslator):
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
                                             error_var, ctx)
-        goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
-                                   self.no_info(ctx))
-        stmts.append(goto_end)
-        stmts += self.add_handlers_for_inlines(ctx)
 
-        stmts.append(end_lbl)
+        self._create_inherit_check_postamble(stmts, end_lbl, ctx)
+
         locals_after = set(method.locals.values())
         locals_diff = locals_after.symmetric_difference(locals_before)
         locals = [var.decl for var in locals_diff]
@@ -707,7 +713,7 @@ class ProgramTranslator(CommonTranslator):
         """
         return eqs[0] if len(eqs) == 1 else self.viper.And(eqs[0],
                self._conjoin(eqs[1:], pos, info), pos, info)
-        
+
     def _disjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
         """
         Disjoin all expressions in the list.
@@ -727,7 +733,7 @@ class ProgramTranslator(CommonTranslator):
             arguments = self._get_adt_cons_param_decl(cons, adt.name, adt_type, pos, info)
             yield self.viper.DomainFunc(adt_prefix + cons.name, arguments,
                                         adt_type, False, pos, info, adt_name)
-    
+
     def _create_adt_func_deconstructors(self, adt: PythonClass, adt_prefix: str,
                                         adt_name: str, adt_type: DomainType,
                                         pos: Position, info: Info) -> List[DomainFunc]:
@@ -1020,7 +1026,7 @@ class ProgramTranslator(CommonTranslator):
             ## Create deconstructors
             domain_funcs.extend(self._create_adt_func_deconstructors(adt,
                                 adt_prefix, adt_name, adt_type, pos, info))
-            
+
             ## Constructor types
             domain_funcs.extend(self._create_adt_func_constructor_types(adt,
                                 adt_prefix, adt_name, adt_type, pos, info))

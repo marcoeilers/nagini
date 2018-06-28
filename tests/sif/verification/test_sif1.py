@@ -8,11 +8,12 @@ def fig1a() -> None:
     if x < 1234:
         x = 0
     y = x
-    #:: ExpectedOutput(call.precondition:assertion.false) | ExpectedOutput(carbon)(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false)
     sif_print(y)
 
 
 def fig1a_low() -> None:
+    Requires(LowEvent())
     x = input_low()
     if x < 1234:
         sif_print(0)
@@ -38,6 +39,7 @@ def f(x: int) -> int:
 
 
 def fig2b_low() -> None:
+    Requires(LowEvent())
     h = input_high()
     l = input_low()
     x = f(h)

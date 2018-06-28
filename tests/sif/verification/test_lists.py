@@ -51,7 +51,6 @@ def test_high_ref() -> None:
     l.append(1)
     sif_print(1)
     h.append(2)
-    #:: ExpectedOutput(call.precondition:assertion.false)
     sif_print(2)
 
 

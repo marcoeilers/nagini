@@ -13,6 +13,9 @@ from nagini_translation.extended_ast.translators.expression import (
 from nagini_translation.extended_ast.translators.method import (
     ExtendedASTMethodTranslator
 )
+from nagini_translation.extended_ast.translators.program import (
+    ExtendedASTProgramTranslator
+)
 from nagini_translation.extended_ast.translators.statement import (
     ExtendedASTStatementTranslator
 )
@@ -26,7 +29,6 @@ from nagini_translation.translators.io_operation import IOOperationTranslator
 from nagini_translation.translators.obligation import ObligationTranslator
 from nagini_translation.translators.permission import PermTranslator
 from nagini_translation.translators.predicate import PredicateTranslator
-from nagini_translation.translators.program import ProgramTranslator
 from nagini_translation.translators.pure import PureTranslator
 from nagini_translation.translators.type import TypeTranslator
 from nagini_translation.translators.type_domain_factory import \
@@ -64,7 +66,7 @@ class ExtendedASTTranslator(Translator):
                                                 type_info, viper_ast)
         config.type_translator = TypeTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
-        config.prog_translator = ProgramTranslator(config, jvm, source_file,
+        config.prog_translator = ExtendedASTProgramTranslator(config, jvm, source_file,
                                                    type_info, viper_ast)
         config.method_translator = ExtendedASTMethodTranslator(config, jvm, source_file,
                                                     type_info, viper_ast)

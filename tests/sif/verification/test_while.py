@@ -9,7 +9,7 @@ def test(x: int) -> bool:
 
 def while1() -> int:
     """While with low guard."""
-    # Requires(Low())
+    Requires(LowEvent())
     i = input_low()
     sum = 0
     while i != 0:
@@ -23,6 +23,7 @@ def while1() -> int:
 
 def while2() -> None:
     """While with high guard."""
+    Requires(LowEvent())
     x = input_low()
     while x != 0:
         x = x - 1
@@ -41,12 +42,12 @@ def while3() -> None:
 @Pure
 def m1(a: int) -> bool:
     Ensures(Result() == (a != 5))
-    Ensures(Implies(Low(a), Low(Result())))
     return a != 5
 
 
 def while4() -> int:
     """While with pure guard."""
+    Requires(LowEvent())
     Ensures(Result() == 10)
     i = 15
     sum = 0
@@ -72,5 +73,5 @@ def while5() -> None:
             i = i + 1
             h = h -1
         l = l - 1
-    #:: ExpectedOutput(carbon)(call.precondition:assertion.false) | ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false)
     sif_print(i)

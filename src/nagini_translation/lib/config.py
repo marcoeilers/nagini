@@ -115,7 +115,8 @@ class TestConfig(SectionConfig):
         if not ignore_tests_value:
             self.ignore_tests = set([])
         else:
-            self.ignore_tests = set(ignore_tests_value.strip().splitlines())
+            patterns = ignore_tests_value.strip().splitlines()
+            self.ignore_tests = set([i for pattern in patterns for i in glob.glob(pattern)])
 
         verifiers_value = self._info.get('verifiers')
         if not verifiers_value:

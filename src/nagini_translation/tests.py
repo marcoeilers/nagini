@@ -34,8 +34,10 @@ Supported annotation types are:
 
 
 import abc
+import io
 import os
 import re
+import time
 import tokenize
 
 import pytest
@@ -45,7 +47,9 @@ import nagini_translation.mypy_patches.column_info_patch
 import nagini_translation.mypy_patches.optional_patch
 
 from typing import Any, Dict, List, Optional
+from collections import Counter
 
+from nagini_translation.conftest import write_sif_performance_log_file, _pytest_config
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
@@ -586,11 +590,16 @@ class VerificationTest(AnnotatedTest):
                 VerificationError(error) for error in vresult.errors]
             if sif:
                 # carbon will report all functional errors twice, as we model two executions,
-                # therefore we filter duplicated errors here.
+                # therefore we filter duplicated errors here. (Note: we don't make errors unique,
+                # just remove one duplicate)
                 distinct = []
-                for error in actual_errors:
-                    if not any(e.__repr__() == error.__repr__() for e in distinct):
-                        distinct.append(error)
+                reprs = map(lambda e: e.__repr__(), actual_errors)
+                repr_counts = Counter(reprs)
+                repr_counts = dict(map(lambda rc: (rc[0], -(-rc[1] // 2)), repr_counts.items()))
+                for err in actual_errors:
+                    if repr_counts[err.__repr__()] > 0:
+                        distinct.append(err)
+                        repr_counts[err.__repr__()] -= 1
                 actual_errors = distinct
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
@@ -635,3 +644,55 @@ _TRANSLATION_TESTER = TranslationTest()
 def test_translation(path, sif, reload_resources):
     """Execute provided translation test."""
     _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources)
+
+
+class SIFPerformanceTest(AnnotatedTest):
+    """Test the performance loss of SIF verification vs. normal verification."""
+
+    def timed(self, function, *args, **kwargs):
+        before = time.clock()
+        result = function(*args, **kwargs)
+        after = time.clock()
+        return after - before, result
+
+    def test_file(self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
+                  reload_resources: bool, log_file: io.IOBase):
+        """Test specific Python file."""
+        annotation_manager = self.get_annotation_manager(path, verifier.name)
+        if annotation_manager.ignore_file():
+            pytest.skip('Ignored')
+        path = os.path.abspath(path)
+        # do standard verification as reference
+        trans_time, prog = self.timed(
+            translate, path, jvm, sif=False, reload_resources=reload_resources)
+        assert prog is not None
+        std_time, _ = self.timed(verify, prog, path, jvm, verifier)
+        # sif verification -> translate to extended ast
+        trans_time_sif, prog = self.timed(
+            translate, path, jvm, sif=True, reload_resources=reload_resources)
+        assert prog is not None
+        # measure MPP transformation
+        jvm.viper.silver.sif.SIFExtendedTransformer.optimizeControlFlow(True)
+        jvm.viper.silver.sif.SIFExtendedTransformer.optimizeSequential(True)
+        mpp_trafo_time, prog = self.timed(
+            jvm.viper.silver.sif.SIFExtendedTransformer.transform, prog, False)
+        # measure verification of MPP
+        sif_time, vresult = self.timed(verify, prog, path, jvm, verifier)
+        try:
+            _VERIFICATION_TESTER._evaluate_result(vresult, annotation_manager, jvm, True)
+        except AssertionError as error:
+            result = 'FAILED'
+            raise error
+        else:
+            result = 'PASSED'
+        finally:
+            write_sif_performance_log_file('a', os.path.basename(path), verifier.name, trans_time,
+                                           trans_time_sif, std_time, mpp_trafo_time,
+                                           sif_time, result)
+
+_SIF_PERFORMANCE_TESTER = SIFPerformanceTest()
+
+
+def test_sif_performance(path, verifier, reload_resources, log_file):
+    """Execute provided """
+    _SIF_PERFORMANCE_TESTER.test_file(path, _JVM, verifier, reload_resources, log_file)
