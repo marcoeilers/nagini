@@ -115,7 +115,7 @@ class CallTranslator(CommonTranslator):
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        arg_type = self.get_type(node.args[0], ctx)
+        arg_type = self.get_type(node.args[0], ctx).try_box()
         len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
                                                          [None], node, ctx)
         return stmt + len_stmt, len_val
@@ -321,8 +321,8 @@ class CallTranslator(CommonTranslator):
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
-            arg_seq = self.get_function_call(arg_type, '__sil_seq__', [contents], [None], node, ctx)
-            res_seq = self.get_function_call(set_type, '__sil_seq__', [result_var], [None], node, ctx)
+            arg_seq = self.get_sequence(arg_type, contents, None, node, ctx, position)
+            res_seq = self.get_sequence(set_type, result_var, None, node, ctx, position)
             seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var

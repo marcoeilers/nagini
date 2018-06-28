@@ -198,8 +198,7 @@ class ExpressionTranslator(CommonTranslator):
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
         iter_type = self.get_type(node.generators[0].iter, ctx)
-        sil_seq = self.get_function_call(iter_type.cls, '__sil_seq__', [iter], [None],
-                                         node, ctx)
+        sil_seq = self.get_sequence(iter_type, iter, None, node, ctx, position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
                                      info)
@@ -280,44 +279,61 @@ class ExpressionTranslator(CommonTranslator):
         stmt = constr_call
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
+        content_type = set_type.type_args[0]
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
                                                       set_type, position, ctx),
                                       position, self.no_info(ctx)))
-        for el in node.elts:
-            el_stmt, el_val = self.translate_expr(el, ctx)
-            el_type = self.get_type(el, ctx)
-            args = [res_var.ref(), el_val]
-            arg_types = [None, el_type]
-            append_call = self.get_method_call(set_class, 'add', args,
-                                               arg_types, [], node, ctx)
-            stmt += el_stmt + append_call
-        return stmt, res_var.ref(node, ctx)
+        elements = []
+        assert_pos = self.to_position(node, ctx, error_string='element type is correct')
+        for element in node.elts:
+            el_stmt, el = self.translate_expr(element, ctx)
+            check = self.viper.Assert(self.type_check(el, content_type, assert_pos, ctx,
+                                                      False), assert_pos, info)
+            stmt += el_stmt + [check]
+            elements.append(el)
+        result = res_var.ref(node, ctx)
+        if elements:
+            content_field = self.viper.Field('set_acc', self.viper.SetType(self.viper.Ref),
+                                             position, info)
+            field_acc = self.viper.FieldAccess(result, content_field, position, info)
+            content_seq = self.viper.ExplicitSet(elements, position, info)
+            stmt.append(self.viper.FieldAssign(field_acc, content_seq, position, info))
+        return stmt, result
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
         list_class = ctx.module.global_module.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
-        targets = [res_var.ref()]
-
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
         # Inhale the type of the newly created list (including type arguments)
         list_type = self.get_type(node, ctx)
+        content_type = list_type.type_args[0]
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
                                                       list_type, position, ctx),
                                       position, self.no_info(ctx)))
+        elements = []
+        assert_pos = self.to_position(node, ctx, error_string='element type is correct')
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
-            el_type = self.get_type(element, ctx)
-            args = [res_var.ref(), el]
-            arg_types = [None, el_type]
-            append_call = self.get_method_call(list_class, 'append', args,
-                                               arg_types, [], node, ctx)
-            stmt += el_stmt + append_call
-        return stmt, res_var.ref(node, ctx)
+            check = self.viper.Assert(self.type_check(el, content_type, assert_pos, ctx,
+                                                      False), assert_pos, info)
+            stmt += el_stmt + [check]
+            elements.append(el)
+
+        result = res_var.ref(node, ctx)
+        if elements:
+            content_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
+                                             position, info)
+            field_acc = self.viper.FieldAccess(result, content_field, position, info)
+            content_seq = self.viper.ExplicitSeq(elements, position, info)
+            stmt.append(self.viper.FieldAssign(field_acc, content_seq, position, info))
+        return stmt, result
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
         return [], self.translate_string(node.s, node, ctx)

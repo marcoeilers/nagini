@@ -446,7 +446,7 @@ class ProgramTranslator(CommonTranslator):
         fields.append(self.viper.Field('__iter_index', self.viper.Int,
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
-        fields.append(self.viper.Field('__previous', self.viper.Ref,
+        fields.append(self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('list_acc',
