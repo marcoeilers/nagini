@@ -471,7 +471,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type, type)
+            assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
             assert self.types_match(field.type, type)
