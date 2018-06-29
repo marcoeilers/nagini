@@ -788,12 +788,16 @@ class StatementTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion]
 
-    def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
+    def _get_try_block(self, node: Stmt, ctx: Context) -> PythonTryBlock:
         try_block = None
         for block in ctx.actual_function.try_blocks:
             if block.node is node:
                 try_block = block
                 break
+        return try_block
+
+    def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
+        try_block = self._get_try_block(node, ctx)
         assert try_block
         code_var = try_block.get_finally_var(self.translator)
         if code_var.sil_name in ctx.var_aliases:
@@ -850,14 +854,6 @@ class StatementTranslator(CommonTranslator):
                                      self.to_position(node, ctx),
                                      self.no_info(ctx))
         return ctx_stmt + [ctx_assign] + enter_call + body + [end_label]
-
-    def _get_try_block(self, node: ast.Try, ctx: Context) -> PythonTryBlock:
-        try_block = None
-        for block in ctx.actual_function.try_blocks:
-            if block.node is node:
-                try_block = block
-                break
-        return try_block
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
         try_block = self._get_try_block(node, ctx)
