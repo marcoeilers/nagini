@@ -736,7 +736,7 @@ class ExpressionTranslator(CommonTranslator):
 
         # Calculate return type
         decons_type = (adt_type if decons.fields[node.attr].type == decons.adt_def
-                       else self.viper.Ref)
+                       else self.translate_type(decons.fields[node.attr].type, ctx))
 
         # Translate deconstruction call
         decons_call = self.viper.DomainFuncApp(adt_prefix + decons.name + '_'

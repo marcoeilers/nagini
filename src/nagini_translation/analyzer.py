@@ -507,7 +507,7 @@ class Analyzer(ast.NodeVisitor):
             for field_decl in actual_bases[1].args[1].elts:
                 field_name, field_type = field_decl.elts
                 cls.add_field(field_name.s, field_decl,
-                    self.get_target(field_type, self.module))
+                    self.get_target(field_type, self.module).try_unbox())
             # Consider ADTs as a special case of single inheritance
             actual_bases = [actual_bases[0]]
         return actual_bases

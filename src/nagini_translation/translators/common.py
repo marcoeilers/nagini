@@ -99,6 +99,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return self._is_pure(e.left()) and self._is_pure(e.right())
         return e.isPure()
 
+    def to_type(self, e: Expr, t, ctx) -> Expr:
+        if t is self.viper.Ref:
+            return self.to_ref(e, ctx)
+        if t is self.viper.Int:
+            return self.to_int(e, ctx)
+        if t is self.viper.Bool:
+            return self.to_bool(e, ctx)
+        return e
+
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
         """
         Converts the given expression to an expression of the Silver type Ref

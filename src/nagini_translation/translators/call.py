@@ -30,6 +30,7 @@ from nagini_translation.lib.constants import (
     METHOD_ID_DOMAIN,
     OBJECT_TYPE,
     PRIMITIVE_INT_TYPE,
+    PRIMITIVES,
     RANGE_TYPE,
     RESULT_NAME,
     SET_TYPE,
@@ -172,6 +173,10 @@ class CallTranslator(CommonTranslator):
                 unbox_func = self.viper.FuncApp('unbox_' + adt_name, [translated_arg],
                                                 pos, info, adt_type)
                 args[index] = unbox_func
+            else:
+                if arg_type.type.name in PRIMITIVES:
+                    v_type = self.translate_type(arg_type.type, ctx)
+                    args[index] = self.to_type(translated_arg, v_type, ctx)
 
         # Translate constructor call
         cons_call = self.viper.DomainFuncApp(adt_prefix + cons.name, args, adt_type,
