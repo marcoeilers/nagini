@@ -15,6 +15,6 @@ class ExtendedASTProgramTranslator(ProgramTranslator):
     Extended AST version of program translator.
     """
 
-    def _create_inherit_check_postamble(self, stmt: List[Stmt], end_lbl: 'silver.ast.Label',
+    def _create_inherit_check_postamble(self, stmts: List[Stmt], end_lbl: 'silver.ast.Label',
                                         ctx: Context) -> None:
         pass

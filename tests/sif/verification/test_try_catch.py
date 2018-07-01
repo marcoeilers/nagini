@@ -97,3 +97,22 @@ def m6(i: int, c: Container) -> None:
         c.value = -1
     except MyException2:
         c.value = 1
+
+def m7(i: int, c: Container) -> None:
+    Requires(Acc(c.value))
+    Ensures(Acc(c.value))
+    Ensures(Implies(i == 0, c.value == 20))
+    Ensures(Implies(i != 0, c.value == 30))
+    c.value = 12
+    try:
+        try:
+            if i == 0:
+                raise MyException()
+            else:
+                raise MyException2()
+        finally:
+            cl = 12
+    except MyException:
+        c.value += 8
+    except MyException2:
+        c.value += 18

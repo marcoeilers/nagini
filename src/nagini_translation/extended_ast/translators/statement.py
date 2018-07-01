@@ -10,7 +10,7 @@ from typing import List
 from nagini_translation.lib.constants import ARBITRARY_BOOL_FUNC
 from nagini_translation.lib.program_nodes import PythonClass, PythonTryBlock, PythonVar
 from nagini_translation.lib.typedefs import Expr, Position, Seqn, Stmt, Var, VarDecl
-from nagini_translation.lib.util import flatten, get_body_indices
+from nagini_translation.lib.util import flatten, get_body_indices, get_surrounding_try_blocks
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.statement import StatementTranslator
 
@@ -20,8 +20,15 @@ class ExtendedASTStatementTranslator(StatementTranslator):
     Extended AST Version of the StatementTranslator
     """
 
-    def _get_try_block_error_var(self, try_block: PythonTryBlock) -> 'silver.ast.LocalVarRef':
-        error_var = try_block.get_error_var(self.translator)
+    def _get_try_block_error_var(self, try_block: PythonTryBlock,
+                                 ctx: Context) -> 'silver.ast.LocalVarRef':
+        # We only want one error var, even if there are nested try-blocks -> take the one from the
+        # outermost surrounding block.
+        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks, try_block.node)
+        if tries:
+            error_var = tries[-1].get_error_var(self.translator)
+        else:
+            error_var = try_block.get_error_var(self.translator)
         if isinstance(error_var, PythonVar):
             error_var = error_var.ref()
         return error_var
@@ -71,7 +78,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
             finally_block = flatten([self.translate_stmt(stmt, ctx)
                                      for stmt in try_block.finally_block])
         catch_blocks = [] # type: 'silver.sif.SIFExceptionHandler'
-        error_var = self._get_try_block_error_var(try_block)
+        error_var = self._get_try_block_error_var(try_block, ctx)
         for handler in try_block.handlers:
             error_type_check = self.type_check(error_var, handler.exception,
                                                self.to_position(handler.node, ctx), ctx,
@@ -89,7 +96,16 @@ class ExtendedASTStatementTranslator(StatementTranslator):
                                self.to_position(node, ctx), self.no_info(ctx))]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
-        stmts = self._translate_stmt_raise_create(node, ctx)
+        # try to get the error variable from outermost surrounding try block.
+        tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks, node)
+        if tries:
+            err_var = tries[-1].get_error_var(self.translator)
+            if err_var.sil_name in ctx.var_aliases:
+                err_var = ctx.var_aliases[err_var.sil_name]
+            err_var = err_var.ref()
+        else:
+            err_var = self.get_error_var(node, ctx)
+        stmts = self._translate_stmt_raise_create(node, err_var, ctx)
         return stmts[:-1] + [self.viper.Raise(stmts[-1],
                                               self.to_position(node, ctx), self.no_info(ctx))]
 
@@ -125,7 +141,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
     def _create_With_exception_handler_type_check(self, try_block: PythonTryBlock,
                                                   ctx: Context) -> Expr:
         exception_class = ctx.module.global_module.classes['Exception']
-        error_var = self._get_try_block_error_var(try_block)
+        error_var = self._get_try_block_error_var(try_block, ctx)
         return self.type_check(error_var, exception_class,
                                self.no_position(ctx), ctx, inhale_exhale=False)
 
@@ -134,7 +150,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         ctx_type = self.get_type(try_block.with_item.context_expr, ctx)
-        error_var = self._get_try_block_error_var(try_block)
+        error_var = self._get_try_block_error_var(try_block, ctx)
         err_type_arg = self.type_factory.typeof(error_var, ctx)
 
         tb_class = ctx.module.global_module.classes['traceback']

@@ -895,11 +895,12 @@ class StatementTranslator(CommonTranslator):
                                      self.no_info(ctx))
         return body + [end_label]
 
-    def _translate_stmt_raise_create(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+    def _translate_stmt_raise_create(self, node: ast.Raise,
+                                     error_var: 'silver.ast.LocalVarRef',
+                                     ctx: Context) -> List[Stmt]:
         """
         Translate the part of raise where we create the exception.
         """
-        var = self.get_error_var(node, ctx)
         raised = self.get_target(node.exc, ctx)
         if (not isinstance(node.exc, ast.Call) and
                 isinstance(raised, PythonType)):
@@ -918,15 +919,15 @@ class StatementTranslator(CommonTranslator):
         if node.cause:
             cause_stmt, cause = self.translate_expr(node.cause, ctx)
             stmt += cause_stmt
-        assignment = self.viper.LocalVarAssign(var, exception, position,
+        assignment = self.viper.LocalVarAssign(error_var, exception, position,
                                                self.no_info(ctx))
         return stmt + [assignment]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         var = self.get_error_var(node, ctx)
-        create_stmts = self._translate_stmt_raise_create(node, ctx)
-        catchers = self.create_exception_catchers(var,
-            ctx.actual_function.try_blocks, node, ctx)
+        create_stmts = self._translate_stmt_raise_create(node, var, ctx)
+        catchers = self.create_exception_catchers(
+            var, ctx.actual_function.try_blocks, node, ctx)
         return create_stmts + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:

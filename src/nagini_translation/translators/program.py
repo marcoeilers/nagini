@@ -186,7 +186,7 @@ class ProgramTranslator(CommonTranslator):
                                    self.to_position(var.node, ctx),
                                    self.no_info(ctx))
 
-    def _create_inherit_check_postamble(self, stmt: List[Stmt], end_lbl: 'silver.ast.Label',
+    def _create_inherit_check_postamble(self, stmts: List[Stmt], end_lbl: 'silver.ast.Label',
                                         ctx: Context) -> None:
         goto_end = self.viper.Goto(end_lbl.name(), self.no_position(ctx),
                                    self.no_info(ctx))
