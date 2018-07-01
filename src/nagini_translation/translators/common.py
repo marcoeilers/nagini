@@ -25,6 +25,7 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     chain_cond_exp,
+    OptionalType,
     PythonClass,
     PythonField,
     PythonIOOperation,
@@ -531,7 +532,37 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return None, None
 
-    def _get_function_call(self, receiver: PythonType,
+    def get_quantifier_lhs(self, receiver, arg, node, ctx, position):
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
+            if receiver.name == 'dict':
+                set_ref = self.viper.SetType(self.viper.Ref)
+                field = self.viper.Field('dict_acc', set_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+            if receiver.name == 'set':
+                set_ref = self.viper.SetType(self.viper.Ref)
+                field = self.viper.Field('set_acc', set_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+        return self.get_sequence(receiver, arg, None, node, ctx, position)
+
+    def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
+            if receiver.name == 'list':
+                seq_ref = self.viper.SeqType(self.viper.Ref)
+                field = self.viper.Field('list_acc', seq_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+        return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+                                      node, ctx, position)
+
+    def get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
                           ctx: Context,
@@ -575,43 +606,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   actual_position,
                                   self.no_info(ctx), type, formal_args)
         return call
-
-    def get_function_call(self, receiver: PythonType,
-                          func_name: str, args: List[Expr],
-                          arg_types: List[PythonType], node: ast.AST,
-                          ctx: Context,
-                          position: Position = None) -> FuncApp:
-        """
-        Creates a function application of the function called func_name, with
-        the given receiver and arguments. Boxes arguments if necessary, and
-        unboxed the result if needed as well. When the receiver is of union
-        type, a function call application is created for each type in the
-        union with its respective guard.
-        """
-        if receiver and type(receiver) is UnionType:
-            position = self.to_position(node, ctx) if position is None else position
-            guarded_functions = []
-            for cls in toposort_classes(receiver.get_types() - {None}):
-
-                # Create guard checking if receiver is an instance of this type
-                guard = self.type_check(args[0], cls, position, ctx)
-
-                # Translate the function call on this particular receiver type
-                function = self._get_function_call(cls, func_name, args,
-                                                   arg_types, node, ctx,
-                                                   position)
-
-                # Stores guard and translated function call as tuple in a list
-                guarded_functions.append((guard, function))
-
-            # Chain list of guard and function call tuples in an if-then-else
-            # expression
-            return chain_cond_exp(guarded_functions, self.viper, position,
-                                  self.no_info(ctx), ctx)
-        else:
-            # Pass-through
-            return self._get_function_call(receiver, func_name, args,
-                                           arg_types, node, ctx, position)
 
     def get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],

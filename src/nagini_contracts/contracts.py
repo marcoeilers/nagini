@@ -49,14 +49,6 @@ def Invariant(expr: bool) -> bool:
     pass
 
 
-def Previous(it: T) -> List[T]:
-    """
-    Within the body of a loop 'for x in xs', Previous(x) represents the list of
-    the values of x in previous loop iterations.
-    """
-    pass
-
-
 def Assume(expr: bool) -> None:
     pass
 
@@ -219,6 +211,14 @@ def ToSeq(l: Iterable[T]) -> Sequence[T]:
     Converts the given iterable of a built-in type (list, set, dict, range) to
     a pure Sequence.
     """
+
+
+def Previous(it: T) -> Sequence[T]:
+    """
+    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    the values of x in previous loop iterations.
+    """
+    pass
 
 
 # The following annotations have no runtime semantics. They are only used for
