@@ -69,3 +69,6 @@ class ViperASTExtended(ViperAST):
     def LowEvent(self, self_check: Optional[Expr], position: Position, info: Info):
         check_opt = self.scala.Some(self_check) if self_check is not None else self.none
         return self.ast_extensions.SIFLowEventExp(check_opt, position, info, self.NoTrafos)
+
+    def Declassify(self, expr: Expr, position: Position, info: Info):
+        return self.ast_extensions.SIFDeclassifyStmt(expr, position, info, self.NoTrafos)

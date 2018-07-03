@@ -58,3 +58,13 @@ class ExtendedASTContractTranslator(ContractTranslator):
         else:
             self_type = None
         return [], self.viper.LowEvent(self_type, self.to_position(node, ctx), self.no_info(ctx))
+
+    def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Declassify() contract function.
+        """
+        stmts, expr = self.translate_expr(node.args[0], ctx)
+        if stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        return [self.viper.Declassify(
+            expr, self.to_position(node, ctx), self.no_info(ctx))], None

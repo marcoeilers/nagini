@@ -24,9 +24,9 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'LowEvent', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
-                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
+                  'Exists', 'Low', 'LowEvent', 'Declassify', 'Acc', 'Rd', 'Fold', 'Unfold',
+                  'Unfolding', 'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq',
+                  'MaySet', 'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
                   'MayStart',]
 
 T = TypeVar('T')
@@ -104,6 +104,8 @@ def Low(*args) -> bool:
 def LowEvent() -> bool:
     pass
 
+def Declassify(expr: T) -> bool:
+    pass
 
 class Sequence(Generic[T], Sized, Iterable[T]):
     """
@@ -304,7 +306,7 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
-    
+
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
     Decorator for functions which specifies which return values are ghost
@@ -363,6 +365,7 @@ __all__ = [
         'Exists',
         'Low',
         'LowEvent',
+        'Declassify',
         'Acc',
         'Rd',
         'Fold',

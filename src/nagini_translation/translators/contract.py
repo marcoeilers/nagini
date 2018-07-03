@@ -488,6 +488,12 @@ class ContractTranslator(CommonTranslator):
         return [], self.viper.TrueLit(self.to_position(node, ctx),
                                       self.no_info(ctx))
 
+    def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Declassify() contract function.
+        """
+        return [self.translate_block([], self.no_position(ctx), self.no_info(ctx))], None
+
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
         """
@@ -817,6 +823,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_low(node, ctx)
         elif func_name == 'LowEvent':
             return self.translate_lowevent(node, ctx)
+        elif func_name == 'Declassify':
+            return self.translate_declassify(node, ctx)
         elif func_name == 'Forall':
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':

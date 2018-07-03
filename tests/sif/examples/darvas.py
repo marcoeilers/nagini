@@ -18,7 +18,23 @@ class Account():
         Requires(Low(self.extraService))
         Ensures(Acc(self.balance))
         Ensures(Acc(self.extraService))
+        #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(Low(self.extraService))
+        if amount >= 10000:
+            self.extraService = True
+        else:
+            self.extraService = False
+        self.balance = amount
+
+    def writeBalance_fixed(self, amount: int) -> None:
+        # balance and amount are high -> low extraService reveals information about high variable
+        Requires(Acc(self.balance))
+        Requires(Acc(self.extraService))
+        Requires(Low(self.extraService))
+        Ensures(Acc(self.balance))
+        Ensures(Acc(self.extraService))
+        Ensures(Low(self.extraService))
+        Declassify(amount >= 10000)
         if amount >= 10000:
             self.extraService = True
         else:
