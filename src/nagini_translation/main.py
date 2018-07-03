@@ -29,6 +29,7 @@ from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
+from nagini_translation.extended_ast.lib.util import configure_mpp_transformation
 from nagini_translation.extended_ast_translator import ExtendedASTTranslator
 from nagini_translation.sif_analyzer import SIFAnalyzer
 from nagini_translation.sif_translator import SIFTranslator
@@ -294,8 +295,11 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print('Translation successful.')
         if args.sif:
-            jvm.viper.silver.sif.SIFExtendedTransformer.optimizeControlFlow(False)
-            jvm.viper.silver.sif.SIFExtendedTransformer.optimizeSequential(True)
+            configure_mpp_transformation(jvm,
+                                         ctrl_opt=False,
+                                         seq_opt=False,
+                                         act_opt=False,
+                                         func_opt=False)
             prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
             if args.verbose:
                 print('Transformation to MPP successful.')

@@ -54,6 +54,7 @@ from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException
+from nagini_translation.extended_ast.lib.util import configure_mpp_transformation
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
@@ -672,8 +673,11 @@ class SIFPerformanceTest(AnnotatedTest):
             translate, path, jvm, sif=True, reload_resources=reload_resources)
         assert prog is not None
         # measure MPP transformation
-        jvm.viper.silver.sif.SIFExtendedTransformer.optimizeControlFlow(True)
-        jvm.viper.silver.sif.SIFExtendedTransformer.optimizeSequential(True)
+        configure_mpp_transformation(jvm,
+                                     ctrl_opt=False,
+                                     seq_opt=False,
+                                     act_opt=False,
+                                     func_opt=False)
         mpp_trafo_time, prog = self.timed(
             jvm.viper.silver.sif.SIFExtendedTransformer.transform, prog, False)
         # measure verification of MPP

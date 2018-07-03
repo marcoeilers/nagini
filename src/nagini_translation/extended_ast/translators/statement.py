@@ -29,8 +29,6 @@ class ExtendedASTStatementTranslator(StatementTranslator):
             error_var = tries[-1].get_error_var(self.translator)
         else:
             error_var = try_block.get_error_var(self.translator)
-        if isinstance(error_var, PythonVar):
-            error_var = error_var.ref()
         return error_var
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
@@ -66,6 +64,8 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         return body
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
         try_block = self._get_try_block(node, ctx)
         assert try_block
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
@@ -80,20 +80,24 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         catch_blocks = [] # type: 'silver.sif.SIFExceptionHandler'
         error_var = self._get_try_block_error_var(try_block, ctx)
         for handler in try_block.handlers:
-            error_type_check = self.type_check(error_var, handler.exception,
+            error_type_check = self.type_check(error_var.ref(), handler.exception,
                                                self.to_position(handler.node, ctx), ctx,
                                                inhale_exhale=False)
+            if handler.exception_name:
+                ctx.var_aliases[handler.exception_name] = error_var
+                error_var.type = handler.exception
+
+                body.append(self.set_var_defined(error_var, no_pos, no_info))
             handler_body = flatten([self.translate_stmt(stmt, ctx) for stmt in handler.body])
-            handler_body_seqn = self.viper.Seqn(handler_body,
-                                                self.no_position(ctx), self.no_info(ctx))
+            handler_body_seqn = self.viper.Seqn(handler_body, no_pos, no_info)
             catch_blocks.append(self.viper.SIFExceptionHandler(error_type_check, handler_body_seqn))
-        return [self.viper.Try(self.viper.Seqn(body, self.no_position(ctx), self.no_info(ctx)),
+            if handler.exception_name:
+                del ctx.var_aliases[handler.exception_name]
+        return [self.viper.Try(self.viper.Seqn(body, no_pos, no_info),
                                catch_blocks,
-                               self.viper.Seqn(else_block,
-                                               self.no_position(ctx), self.no_info(ctx)),
-                               self.viper.Seqn(finally_block,
-                                               self.no_position(ctx), self.no_info(ctx)),
-                               self.to_position(node, ctx), self.no_info(ctx))]
+                               self.viper.Seqn(else_block, no_pos, no_info),
+                               self.viper.Seqn(finally_block, no_pos, no_info),
+                               self.to_position(node, ctx), no_info)]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         # try to get the error variable from outermost surrounding try block.
@@ -106,8 +110,9 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         else:
             err_var = self.get_error_var(node, ctx)
         stmts = self._translate_stmt_raise_create(node, err_var, ctx)
-        return stmts[:-1] + [self.viper.Raise(stmts[-1],
-                                              self.to_position(node, ctx), self.no_info(ctx))]
+        return stmts[:-1] + [
+            self.viper.Raise(stmts[-1], self.to_position(node, ctx), self.no_info(ctx))
+            ]
 
     def _translate_With_body(self,
                              try_block: PythonTryBlock,
@@ -142,7 +147,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
                                                   ctx: Context) -> Expr:
         exception_class = ctx.module.global_module.classes['Exception']
         error_var = self._get_try_block_error_var(try_block, ctx)
-        return self.type_check(error_var, exception_class,
+        return self.type_check(error_var.ref(), exception_class,
                                self.no_position(ctx), ctx, inhale_exhale=False)
 
     def _create_With_exception_handler(self, try_block: PythonTryBlock, exit_res: PythonVar,
@@ -150,7 +155,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         ctx_type = self.get_type(try_block.with_item.context_expr, ctx)
-        error_var = self._get_try_block_error_var(try_block, ctx)
+        error_var = self._get_try_block_error_var(try_block, ctx).ref()
         err_type_arg = self.type_factory.typeof(error_var, ctx)
 
         tb_class = ctx.module.global_module.classes['traceback']
