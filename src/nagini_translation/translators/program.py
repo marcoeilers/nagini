@@ -1300,7 +1300,7 @@ class ProgramTranslator(CommonTranslator):
         for module in modules:
             ctx.module = module
             for cls_name, cls in module.classes.items():
-                if all_used_names is not None and cls.sil_name not in all_used_names:
+                if not cls.is_adt and all_used_names is not None and cls.sil_name not in all_used_names:
                     continue
                 if cls.name != cls_name:
                     continue
