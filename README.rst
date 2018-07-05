@@ -1,6 +1,8 @@
 
 Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
 
+You can try a (rather slow) online version of Nagini `here <http://viper.ethz.ch/nagini-examples>`_.
+
 For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com/marcoeilers/nagini-pycharm>`_.
 
 Getting Started (Ubuntu Linux only)
