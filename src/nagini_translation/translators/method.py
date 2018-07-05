@@ -449,7 +449,7 @@ class MethodTranslator(CommonTranslator):
         body.extend(self._create_local_vars_for_params(method, ctx))
         body += flatten(
             [self.translate_stmt(stmt, ctx) for stmt in
-                method.node.body[body_start:body_end]])    
+                method.node.body[body_start:body_end]])
         return body
 
     def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
@@ -470,7 +470,7 @@ class MethodTranslator(CommonTranslator):
         postamble = []
         end_label = ctx.get_label_name(END_LABEL)
         postamble.append(self.viper.Goto(end_label, self.no_position(ctx), self.no_info(ctx)))
-        assert not ctx.var_aliases            
+        assert not ctx.var_aliases
         postamble += self._translate_try_handlers(method, ctx)
         postamble += self.add_handlers_for_inlines(ctx)
         return postamble
@@ -526,12 +526,15 @@ class MethodTranslator(CommonTranslator):
                     self.viper.NullLit(self.no_position(ctx),
                                        self.no_info(ctx)),
                     self.no_position(ctx), self.no_info(ctx)))
+                locals = []
+            else:
+                locals = [error_var_decl]
             body += self._translate_method_body(method, ctx)
             # TODO: What does the remove_alias do?
             for arg in method.get_args():
                 ctx.remove_alias(arg.name)
             body += self._method_body_postamble(method, ctx)
-            locals = [local.decl for local in method.get_locals()
+            locals += [local.decl for local in method.get_locals()
                     if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         name = method.sil_name

@@ -48,9 +48,9 @@ class ViperASTExtended(ViperAST):
         ass_opt = self.scala.Some(assignment) if assignment is not None else self.none
         return self.ast_extensions.SIFRaiseStmt(ass_opt, position, info, self.NoTrafos)
 
-    def SIFExceptionHandler(self, exception: Expr, handler: Seqn):
+    def SIFExceptionHandler(self, err_var: Var, exception: Expr, handler: Seqn):
         return self.ast_extensions.SIFExceptionHandler(
-            exception, handler, self.NoPosition, self.NoInfo, self.NoTrafos)
+            err_var, exception, handler, self.NoPosition, self.NoInfo, self.NoTrafos)
 
     def Try(self, body: Seqn, catch_blocks: List['silver.sif.SIFExceptionHandler'],
             else_block: Optional[Seqn], finally_block: Optional[Seqn],
