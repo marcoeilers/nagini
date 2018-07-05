@@ -69,7 +69,7 @@ Getting Started on Windows
 
 6.  To run the tests, do the following::
 
-        env\\Scripts\\pytest.exe --all-tests --all-verifiers -v src\nagini_translation\tests.py
+        env\Scripts\pytest.exe --all-tests --all-verifiers -v src\nagini_translation\tests.py
 
 
 Command Line Usage
