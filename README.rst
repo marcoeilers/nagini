@@ -140,10 +140,10 @@ To run doctests::
 
     make doctest
 
-Windows Troubleshooting
+Troubleshooting
 =======================
 
-1.  While running ``bin\buildout.exe``, you get an error like ``Microsoft Visual C++ 14.0 is required.`` or ``Unable to fnd vcvarsall.bat``: 
+1.  On Windows: During the setup, you get an error like ``Microsoft Visual C++ 14.0 is required.`` or ``Unable to fnd vcvarsall.bat``: 
 
     Python cannot find the required Visual Studio 2015 C++ installation, make sure you have either installed the Build Tools or checked the "Common Tools" option in your regular VS 2015 installation (see above).
 
@@ -155,7 +155,11 @@ Windows Troubleshooting
 
     Same problem as the previous one, but the paths for Boogie and/or Z3 are either not set or invalid.
 
-4.  When using Carbon, Boogie crashes:
+4.  While running the tests or verifying a single file, you get a stack trace ending with something like ``No matching overloads found``:
+
+    The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
+
+5.  When using Carbon, Boogie crashes:
 
     The Boogie binaries in ViperToolsWin don't seem to work on all systems; in this case, compile Boogie from scratch and set the Boogie path point to the new (or an existing) Boogie installation.
 
