@@ -51,12 +51,12 @@ Getting Started on Windows
         git clone https://github.com/marcoeilers/nagini.git
         cd nagini
         mkdir -p .virtualenv
-	    wget -c https://pypi.python.org/packages/d4/0c/9840c08189e030873387a73b90ada981885010dd9aea134d6de30cd24cb8/virtualenv-15.1.0.tar.gz#md5=44e19f4134906fe2d75124427dc9b716 -O .virtualenv\archive.tar.gz
-	    tar -xvf .virtualenv\archive.tar.gz
-	    mv virtualenv-* .virtualenv\source
+        wget -c https://pypi.python.org/packages/d4/0c/9840c08189e030873387a73b90ada981885010dd9aea134d6de30cd24cb8/virtualenv-15.1.0.tar.gz#md5=44e19f4134906fe2d75124427dc9b716 -O .virtualenv\archive.tar.gz
+        tar -xvf .virtualenv\archive.tar.gz
+        mv virtualenv-* .virtualenv\source
         python3 .virtualenv\source\virtualenv.py env
-	    env\Scripts\pip.exe install -r requirements.txt
-	    env\Scripts\pip.exe install -e .
+        env\Scripts\pip.exe install -r requirements.txt
+        env\Scripts\pip.exe install -e .
 
 4.  Download and extract `ViperToolsWin <http://viper.ethz.ch/downloads/ViperToolsWin.zip>`_ to the nagini directory
 
