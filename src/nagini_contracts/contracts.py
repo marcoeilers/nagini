@@ -24,10 +24,10 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'LowEvent', 'Declassify', 'Acc', 'Rd', 'Fold', 'Unfold',
-                  'Unfolding', 'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq',
-                  'MaySet', 'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
-                  'MayStart',]
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'Acc', 'Rd', 'Fold',
+                  'Unfold', 'Unfolding', 'Previous', 'RaisedException', 'Sequence', 'PSet',
+                  'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg',
+                  'Joinable', 'MayStart',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -99,6 +99,9 @@ def Low(*args) -> bool:
     +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
     +    Ignored when not verifying information flow.
     """
+    pass
+
+def LowVal(expr: T) -> bool:
     pass
 
 def LowEvent() -> bool:
@@ -364,6 +367,7 @@ __all__ = [
         'Forall',
         'Exists',
         'Low',
+        'LowVal',
         'LowEvent',
         'Declassify',
         'Acc',

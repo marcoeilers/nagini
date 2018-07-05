@@ -481,6 +481,12 @@ class ContractTranslator(CommonTranslator):
         return [], self.viper.TrueLit(self.to_position(node, ctx),
                                       self.no_info(ctx))
 
+    def translate_lowval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowVal() contract function.
+        """
+        return self.translate_low(node, ctx)
+
     def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the LowEvent() contract function.
@@ -821,6 +827,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_unfolding(node, ctx, impure)
         elif func_name == 'Low':
             return self.translate_low(node, ctx)
+        elif func_name == 'LowVal':
+            return self.translate_lowval(node, ctx)
         elif func_name == 'LowEvent':
             return self.translate_lowevent(node, ctx)
         elif func_name == 'Declassify':

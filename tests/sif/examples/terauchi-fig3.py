@@ -18,3 +18,12 @@ def main(secret: int, hash: int, input: int) -> int:
     if hashfunc(input) == hash:
         l = secret
     return l
+
+def main_fixed(secret: int, hash: int, input: int) -> int:
+    Requires(Low(input))
+    Ensures(Low(Result()))
+    l = 0
+    Declassify(secret if hashfunc(input) == hash else 0)
+    if hashfunc(input) == hash:
+        l = secret
+    return l

@@ -15,6 +15,7 @@ def low_ref() -> List[int]:
 
 
 def test_high_data() -> None:
+    Requires(LowEvent())
     x = input_high()
     y = input_low()
     l = [1, y]
@@ -26,6 +27,7 @@ def test_high_data() -> None:
 
 @NotPreservingTL
 def test_contains() -> None:
+    Requires(LowEvent())
     x = input_high()
     y = input_low()
     l = [1, 2, 3]
@@ -55,6 +57,7 @@ def test_high_ref() -> None:
 
 
 def test_high_index(low_idx: int, high_idx:int) -> None:
+    Requires(LowEvent())
     Requires(low_idx >=0 and low_idx < 3)
     Requires(Low(low_idx))
     Requires(high_idx >=0 and high_idx < 3)

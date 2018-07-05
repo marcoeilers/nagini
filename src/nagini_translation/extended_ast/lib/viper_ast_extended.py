@@ -49,8 +49,8 @@ class ViperASTExtended(ViperAST):
         return self.ast_extensions.SIFRaiseStmt(ass_opt, position, info, self.NoTrafos)
 
     def SIFExceptionHandler(self, exception: Expr, handler: Seqn):
-        return self.ast_extensions.SIFExceptionHandler(exception, handler,
-                                                       self.NoPosition, self.NoInfo, self.NoTrafos)
+        return self.ast_extensions.SIFExceptionHandler(
+            exception, handler, self.NoPosition, self.NoInfo, self.NoTrafos)
 
     def Try(self, body: Seqn, catch_blocks: List['silver.sif.SIFExceptionHandler'],
             else_block: Optional[Seqn], finally_block: Optional[Seqn],
@@ -58,13 +58,19 @@ class ViperASTExtended(ViperAST):
         catch_blocks_seq = self.to_seq(catch_blocks)
         else_opt = self.scala.Some(else_block) if else_block is not None else self.none
         fin_opt = self.scala.Some(finally_block) if finally_block is not None else self.none
-        return self.ast_extensions.SIFTryCatchStmt(body, catch_blocks_seq,
-                                                       else_opt, fin_opt,
-                                                       position, info, self.NoTrafos)
+        return self.ast_extensions.SIFTryCatchStmt(
+            body, catch_blocks_seq, else_opt, fin_opt, position, info, self.NoTrafos)
 
-    def Low(self, expr: Expr, self_check: Optional[Expr], position: Position, info: Info):
+    def Low(self, expr: Expr, comp: Optional[str] ,self_check: Optional[Expr],
+            position: Position, info: Info):
+        if comp:
+            self.used_names.add(comp)
+            comp_opt = self.scala.Some(comp)
+        else:
+            comp_opt = self.none
         check_opt = self.scala.Some(self_check) if self_check is not None else self.none
-        return self.ast_extensions.SIFLowExp(expr, check_opt, position, info, self.NoTrafos)
+        return self.ast_extensions.SIFLowExp(
+            expr, comp_opt, check_opt, position, info, self.NoTrafos)
 
     def LowEvent(self, self_check: Optional[Expr], position: Position, info: Info):
         check_opt = self.scala.Some(self_check) if self_check is not None else self.none
