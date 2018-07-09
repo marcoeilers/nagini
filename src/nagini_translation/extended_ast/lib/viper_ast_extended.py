@@ -20,6 +20,8 @@ class ViperASTExtended(ViperAST):
     def __init__(self, jvm, java, scala, viper, sourcefile):
         super().__init__(jvm, java, scala, viper, sourcefile)
         self.ast_extensions = viper.silver.sif
+        self.all_low_methods = set()
+        self.equality_comp_functions = set()
 
     def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
         expr_opt = self.scala.Some(expr) if expr is not None else self.none

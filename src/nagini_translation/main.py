@@ -29,7 +29,11 @@ from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
-from nagini_translation.extended_ast.lib.util import configure_mpp_transformation
+from nagini_translation.extended_ast.lib.util import (
+    configure_mpp_transformation,
+    set_all_low_methods,
+    set_equality_comp_functions
+)
 from nagini_translation.extended_ast_translator import ExtendedASTTranslator
 from nagini_translation.sif_analyzer import SIFAnalyzer
 from nagini_translation.sif_translator import SIFTranslator
@@ -120,6 +124,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
+    if sif:
+        set_all_low_methods(jvm, viperast.all_low_methods)
+        set_equality_comp_functions(jvm, viperast.equality_comp_functions)
     return prog
 
 
@@ -296,10 +303,10 @@ def translate_and_verify(python_file, jvm, args, print=print):
             print('Translation successful.')
         if args.sif:
             configure_mpp_transformation(jvm,
-                                         ctrl_opt=False,
-                                         seq_opt=False,
-                                         act_opt=False,
-                                         func_opt=False)
+                                         ctrl_opt=True,
+                                         seq_opt=True,
+                                         act_opt=True,
+                                         func_opt=True)
             prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
             if args.verbose:
                 print('Transformation to MPP successful.')

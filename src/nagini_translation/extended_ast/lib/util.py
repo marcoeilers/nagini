@@ -24,3 +24,22 @@ def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
             "_isDefined", "true")
     else:
         jvm.viper.silver.sif.SIFExtendedTransformer.clearPrimedFuncAppReplacement()
+
+def _to_scala_set(jvm, inset: set):
+    seq = jvm.scala.collection.mutable.ArraySeq(len(inset))
+    for i, elem in enumerate(inset):
+        seq.update(i, elem)
+    return seq.toSet()
+
+def set_all_low_methods(jvm, names: set) -> None:
+    scala_set = _to_scala_set(jvm, names)
+    jvm.viper.silver.sif.SIFExtendedTransformer.setAllLowMethods(scala_set)
+
+def set_equality_comp_functions(jvm, names: set) -> None:
+    if not names:
+        return
+    names_seq = jvm.scala.collection.mutable.ArraySeq(len(names))
+    for i, elem in enumerate(names):
+        names_seq.update(i, (elem, elem))
+    hash_map = names_seq.toMap()
+    jvm.viper.silver.sif.SIFExtendedTransformer.equalityCompFunctions = hash_map

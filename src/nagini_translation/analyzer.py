@@ -539,7 +539,7 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
-        
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -642,6 +642,7 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+        func.all_low = self.is_all_low(node)
 
         # TODO: When we want to support method type parameters, this would be
         # the place to find all type variables used in the parameters which
@@ -1225,7 +1226,7 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
-                set_of_types = set() 
+                set_of_types = set()
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):
                         context = [type_in_union.optional_type.name]
@@ -1346,7 +1347,9 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)))
+                (('property' in decorators) and (len(decorators) != 1)) or
+                (('AllLow' in decorators) and (
+                    ('Predicate' in decorators) or ('Pure' in decorators))))
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """
@@ -1425,3 +1428,9 @@ class Analyzer(ast.NodeVisitor):
         if len(setter_decorator) > 1 or setter_decorator[0].attr != 'setter':
             raise InvalidProgramException(func, 'unknown.decorator')
         return self.current_class.fields[setter_decorator[0].value.id]
+
+    def is_all_low(self, func: ast.FunctionDef) -> bool:
+        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
+        if self._incompatible_decorators(decorators):
+            raise InvalidProgramException(func, "decorators.incompatible")
+        return 'AllLow' in decorators

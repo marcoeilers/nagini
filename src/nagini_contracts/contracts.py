@@ -302,6 +302,12 @@ def NotPreservingTL(func: T) -> T:
     """
     return func
 
+def AllLow(func: T) -> T:
+    """
+    Decorator indicating that everything this method does is low, given that the
+    all the state it gets to work on is low to begin with.
+    """
+    return func
 
 def ContractOnly(func: T) -> T:
     """
@@ -370,6 +376,7 @@ __all__ = [
         'LowVal',
         'LowEvent',
         'Declassify',
+        'AllLow',
         'Acc',
         'Rd',
         'Fold',
