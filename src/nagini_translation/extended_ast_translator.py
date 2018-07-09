@@ -4,6 +4,9 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
+from nagini_translation.extended_ast.translators.call import (
+    ExtendedASTCallTranslator
+)
 from nagini_translation.extended_ast.translators.contract import (
     ExtendedASTContractTranslator
 )
@@ -24,7 +27,6 @@ from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.translator import Translator
 from nagini_translation.translators.abstract import TranslatorConfig
-from nagini_translation.translators.call import CallTranslator
 from nagini_translation.translators.io_operation import IOOperationTranslator
 from nagini_translation.translators.obligation import ObligationTranslator
 from nagini_translation.translators.permission import PermTranslator
@@ -44,8 +46,8 @@ class ExtendedASTTranslator(Translator):
         config = TranslatorConfig(self)
         config.pure_translator = PureTranslator(config, jvm, source_file,
                                                 type_info, viper_ast)
-        config.call_translator = CallTranslator(config, jvm, source_file,
-                                                type_info, viper_ast)
+        config.call_translator = ExtendedASTCallTranslator(
+            config, jvm, source_file, type_info, viper_ast)
         config.contract_translator = ExtendedASTContractTranslator(config, jvm,
                                                                    source_file,
                                                                    type_info,

@@ -29,3 +29,20 @@ def m2(x: int) -> None:
     while True:
         divide(10, x)
         x -= 1
+
+def raiseOnZero(x: int) -> None:
+    Ensures(x != 0)
+    Exsures(Exception, x == 0)
+    if x == 0:
+        raise Exception()
+
+def m3(secret: int) -> int:
+    Ensures(Low(Result()))
+    r = 34
+    try:
+        raiseOnZero(secret)
+    except Exception as e:
+        r = 35
+    finally:
+        r = 36
+    return r

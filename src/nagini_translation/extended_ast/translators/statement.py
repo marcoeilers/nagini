@@ -20,7 +20,7 @@ class ExtendedASTStatementTranslator(StatementTranslator):
     Extended AST Version of the StatementTranslator
     """
 
-    def get_error_var(self, stmt: ast.AST, ctx: Context) -> 'silver.ast.LocalVarRef':
+    def get_error_var(self, stmt: ast.AST, ctx: Context) -> PythonVar:
         return ctx.current_function.error_var
 
     def _translate_return(self, node: ast.Return, ctx: Context) -> List[Stmt]:
