@@ -53,7 +53,7 @@ class CellMonitor:
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         self.l.acquire()
         Unfold(self.l.invariant())
-        #:: ExpectedOutput(assignment.failed:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+        #:: ExpectedOutput(assignment.failed:insufficient.permission)
         self.c.value += 2
         Fold(self.l.invariant())
         self.l.release()

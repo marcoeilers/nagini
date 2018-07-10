@@ -33,7 +33,7 @@ class Data:
 class DataLock(Lock[Data]):
     @Predicate
     def invariant(self) -> bool:
-        return Acc(self.get_locked().d)
+        return Acc(self.get_locked().d) and self.get_locked().d % 2 == 0
 
 
 class WatchDog:
@@ -58,7 +58,7 @@ class WatchDog:
             Invariant(MustRelease(d.lock, 1))
             Invariant(WaitLevel() < Level(d.lock))
             Invariant(d.lock.invariant())
-            # TODO: Check some property here.
+            assert d.d % 2 == 0
             d.lock.release()
             self.delay(5)
             d.lock.acquire()
@@ -79,7 +79,7 @@ def main() -> None:
         Invariant(WaitLevel() < Level(data.lock))
         Invariant(MustRelease(data.lock, 1))
         Invariant(Acc(data.d))
-        data.d = data.d + 1
+        data.d = data.d + 2
         Fold(data.lock.invariant())
         data.lock.release()
         data.lock.acquire()
