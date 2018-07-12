@@ -43,6 +43,11 @@ class ObligationConfig(SectionConfig):
         super().__init__(config, 'Obligations')
 
     @property
+    def disable_vars(self):
+        """Disable all obligation related parameters and arguments."""
+        return self._info.getboolean('disable_vars', False)
+
+    @property
     def disable_all(self):
         """Disable all obligation related checks."""
         return self._info.getboolean('disable_all', False)
