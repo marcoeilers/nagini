@@ -80,3 +80,6 @@ class ViperASTExtended(ViperAST):
 
     def Declassify(self, expr: Expr, position: Position, info: Info):
         return self.ast_extensions.SIFDeclassifyStmt(expr, position, info, self.NoTrafos)
+
+    def AssertNoException(self, position: Position, info: Info):
+        return self.ast_extensions.SIFAssertNoException(position, info, self.NoTrafos)

@@ -521,11 +521,11 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
+            body.append(self.viper.LocalVarAssign(error_var_ref,
+                self.viper.NullLit(self.no_position(ctx),
+                                    self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx)))
             if method.declared_exceptions:
-                body.append(self.viper.LocalVarAssign(error_var_ref,
-                    self.viper.NullLit(self.no_position(ctx),
-                                       self.no_info(ctx)),
-                    self.no_position(ctx), self.no_info(ctx)))
                 locals = []
             else:
                 locals = [error_var_decl]
