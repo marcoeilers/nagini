@@ -33,6 +33,7 @@ from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
     InvalidProgramException,
+    SingletonFreshName,
 )
 from nagini_translation.lib.views import (
     CombinedDict,
@@ -343,25 +344,6 @@ class TypeVar(PythonType, ContainerInterface):
     def python_class(self) -> 'PythonClass':
         return self.bound
 
-class SingletonFreshName:
-    """
-    This class wraps the fresh name facility in scope by using it only when
-    a new name is given. It is designed to store and retrieve the fresh name
-    based on the original name given.
-    """
-
-    def __init__(self, scope: PythonScope) -> None:
-        self._fresh_name_dict = {}
-        self._scope = scope
-
-    def __call__(self, name: str) -> str:
-        """
-        Returns a fresh name for a given name and scope if enquired for the
-        first time, otherwise returns the previously given fresh name.
-        """
-        if name not in self._fresh_name_dict:
-            self._fresh_name_dict[name] = self._scope.get_fresh_name(name)
-        return self._fresh_name_dict[name]
 
 class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     """
