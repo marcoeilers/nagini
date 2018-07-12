@@ -34,7 +34,7 @@ class WriterSuper:
         IOExists1(Place)(
             lambda t2: (
             Requires(
-                #:: ExpectedOutput(not.wellformed:insufficient.permission)
+                #:: ExpectedOutput(not.wellformed:insufficient.permission)|ExpectedOutput(carbon)(not.wellformed:insufficient.permission)
                 token(t1, 2) and
                 ((
                     Acc(self.int_field1, 1/2) and
