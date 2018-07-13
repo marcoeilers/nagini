@@ -7,7 +7,16 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 from typing import Optional
 
-from nagini_translation.lib.program_nodes import PythonField, PythonMethod, PythonVar, MethodType
+from nagini_translation.lib.constants import (
+    BOOL_TYPE,
+    FLOAT_TYPE,
+    INT_TYPE,
+    PSET_TYPE,
+    SEQ_TYPE,
+    STRING_TYPE,
+    TUPLE_TYPE
+)
+from nagini_translation.lib.program_nodes import PythonMethod, MethodType
 from nagini_translation.lib.typedefs import StmtsAndExpr, DomainFuncApp
 from nagini_translation.lib.util import (InvalidProgramException,
                                          UnsupportedException)
@@ -62,9 +71,15 @@ class ExtendedASTContractTranslator(ContractTranslator):
         self_type = self._in_postcondition_of_dyn_bound_call(ctx)
         # determine the comparator function to use
         expr_type = self.get_type(node.args[0], ctx)
-        comparator = expr_type.get_function('__eq__')
+        low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, SEQ_TYPE,
+                         STRING_TYPE, TUPLE_TYPE]
+        if expr_type.name in low_val_types:
+            comparator = expr_type.get_function('__eq__')
+            comparator = comparator.sil_name
+        else:
+            comparator = None
         return [], self.viper.Low(
-            expr, comparator.sil_name, self_type, self.to_position(node, ctx), self.no_info(ctx))
+            expr, comparator, self_type, self.to_position(node, ctx), self.no_info(ctx))
 
     def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
