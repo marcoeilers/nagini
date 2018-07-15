@@ -32,7 +32,7 @@ from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExten
 from nagini_translation.extended_ast.lib.util import (
     configure_mpp_transformation,
     set_all_low_methods,
-    set_equality_comp_functions
+    set_preserves_low_methods
 )
 from nagini_translation.extended_ast_translator import ExtendedASTTranslator
 from nagini_translation.sif_analyzer import SIFAnalyzer
@@ -126,7 +126,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
     if sif:
         set_all_low_methods(jvm, viperast.all_low_methods)
-        set_equality_comp_functions(jvm, viperast.equality_comp_functions)
+        set_preserves_low_methods(jvm, viperast.preserves_low_methods)
     return prog
 
 

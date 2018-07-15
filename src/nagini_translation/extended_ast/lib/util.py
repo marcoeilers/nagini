@@ -35,6 +35,10 @@ def set_all_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
     jvm.viper.silver.sif.SIFExtendedTransformer.setAllLowMethods(scala_set)
 
+def set_preserves_low_methods(jvm, names: set) -> None:
+    scala_set = _to_scala_set(jvm, names)
+    jvm.viper.silver.sif.SIFExtendedTransformer.setPreservesLowMethods(scala_set)
+
 def set_equality_comp_functions(jvm, names: set) -> None:
     if not names:
         return

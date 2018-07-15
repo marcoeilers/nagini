@@ -304,8 +304,17 @@ def NotPreservingTL(func: T) -> T:
 
 def AllLow(func: T) -> T:
     """
-    Decorator indicating that everything this method does is low, given that the
-    all the state it gets to work on is low to begin with.
+    Decorator indicating that everything this method does is low.
+    Requires all inputs to be low, ensures all state it has access to and
+    all return values are low.
+    """
+    return func
+
+def PreservesLow(func: T) -> T:
+    """
+    Decorator indicating that everything this method does preserves lowness.
+    Given that all the state it gets to work on is low to begin with, all state and
+    return values will remain low.
     """
     return func
 
@@ -377,6 +386,7 @@ __all__ = [
         'LowEvent',
         'Declassify',
         'AllLow',
+        'PreservesLow',
         'Acc',
         'Rd',
         'Fold',

@@ -21,6 +21,7 @@ class ViperASTExtended(ViperAST):
         super().__init__(jvm, java, scala, viper, sourcefile)
         self.ast_extensions = viper.silver.sif
         self.all_low_methods = set()
+        self.preserves_low_methods = set()
         self.equality_comp_functions = set()
 
     def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
