@@ -10,7 +10,7 @@ import ast
 from abc import ABCMeta
 from collections import OrderedDict
 from enum import Enum
-from nagini_contracts.io import BUILTIN_IO_OPERATIONS
+from nagini_contracts.io_contracts import BUILTIN_IO_OPERATIONS
 from nagini_translation.lib.constants import (
     BOXED_PRIMITIVES,
     CALLABLE_TYPE,

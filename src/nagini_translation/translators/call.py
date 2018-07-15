@@ -12,7 +12,7 @@ from nagini_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
-from nagini_contracts.io import IO_CONTRACT_FUNCS
+from nagini_contracts.io_contracts import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (

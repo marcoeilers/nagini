@@ -12,7 +12,7 @@ import nagini_contracts.lock
 import tokenize
 
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
