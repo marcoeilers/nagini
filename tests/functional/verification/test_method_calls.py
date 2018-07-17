@@ -66,7 +66,7 @@ def nested_calls() -> None:
 
 
 @Pure
-def id(c1: Class1) -> Class1:
+def ident(c1: Class1) -> Class1:
     return c1
 
 
@@ -74,7 +74,7 @@ def nested_calls2() -> None:
     c1_1 = Class1()
     c1_2 = Class1()
     c1_2.get_c2().set_c1(c1_1.c2.get_c1_impure())
-    c1_1.get_c2().get_c1().c2.set_c1(id(c1_2))
+    c1_1.get_c2().get_c1().c2.set_c1(ident(c1_2))
     Assert(c1_2.c2.c1 == c1_1)
     Assert(c1_1.c2.c1.c2.c1 == c1_1)
     #:: ExpectedOutput(assert.failed:assertion.false)
