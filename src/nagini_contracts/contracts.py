@@ -74,7 +74,7 @@ def Result() -> Any:
     pass
 
 
-def RaisedException() -> Exception:
+def RaisedException() -> Any:
     pass
 
 
