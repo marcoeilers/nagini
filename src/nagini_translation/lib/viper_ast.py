@@ -284,7 +284,8 @@ class ViperAST:
     def ForPerm(self, variable, access, body, position, info):
         if isinstance(access, self.ast.Predicate):
             self.used_names.add(access.name())
-        return self.ast.ForPerm(variable, access, body,
+        variables = self.to_seq([variable])
+        return self.ast.ForPerm(variables, access, body,
                                 position, info, self.NoTrafos)
 
     def PermMinus(self, exp, position, info):
