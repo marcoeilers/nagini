@@ -80,22 +80,20 @@ class ForPerm(BoolExpression):
     """ForPerm expression."""
 
     def __init__(
-            self, var_name: str, targets: List['Predicate'],
+            self, var_name: str, target: 'Predicate',
             body: BoolExpression) -> None:
         self._var_name = var_name
-        self._targets = targets
+        self._target = target
         self._body = body
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
         var = translator.viper.LocalVarDecl(
             self._var_name, translator.viper.Ref, position, info)
-        targets = [
-            target.translate(translator, ctx, position, info)
-            for target in self._targets]
+        target = self._target.translate(translator, ctx, position, info)
         body = self._body.translate(translator, ctx, position, info)
         return translator.viper.ForPerm(
-            var, targets, body, position, info)
+            var, target, body, position, info)
 
 
 class PythonBoolExpression(BoolExpression):

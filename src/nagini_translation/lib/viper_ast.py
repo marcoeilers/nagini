@@ -281,11 +281,10 @@ class ViperAST:
     def CurrentPerm(self, location, position, info):
         return self.ast.CurrentPerm(location, position, info, self.NoTrafos)
 
-    def ForPerm(self, variable, access_list, body, position, info):
-        for acc in access_list:
-            if isinstance(acc, self.ast.Predicate):
-                self.used_names.add(acc.name())
-        return self.ast.ForPerm(variable, self.to_seq(access_list), body,
+    def ForPerm(self, variable, access, body, position, info):
+        if isinstance(access, self.ast.Predicate):
+            self.used_names.add(access.name())
+        return self.ast.ForPerm(variable, access, body,
                                 position, info, self.NoTrafos)
 
     def PermMinus(self, exp, position, info):
