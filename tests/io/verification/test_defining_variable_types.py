@@ -1,6 +1,6 @@
 #:: IgnoreFile(23)
 from nagini_contracts.contracts import Ensures, Requires, ContractOnly
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 @IOOperation

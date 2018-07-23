@@ -18,7 +18,7 @@ from nagini_contracts.contracts import (
     Result,
     Requires,
 )
-from nagini_contracts.io import (
+from nagini_contracts.io_contracts import (
     ctoken,
     IOExists1,
     IOExists2,

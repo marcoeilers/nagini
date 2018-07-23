@@ -7,7 +7,7 @@ from nagini_contracts.contracts import (
     list_pred,
     Previous,
 )
-from nagini_contracts.io import IOExists1
+from nagini_contracts.io_contracts import IOExists1
 from nagini_contracts.obligations import *
 from typing import List
 

@@ -10,7 +10,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from mypy.types import AnyType
-from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
 from typing import cast, List
 
 from nagini_translation.lib import program_nodes as nodes

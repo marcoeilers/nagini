@@ -5,15 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Python With Contracts",
+            "name": "Run Python",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/env/bin/python3",
+            "pythonPath": "${config:python.pythonPath}",
+            "program": "${file}",
+            "cwd": "${workspaceRoot}",
+            "env": {},
+            "envFile": "${workspaceRoot}/.env",
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput"
+            ]
+        },
+        {
+            "name": "Run Python with contracts",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
             "program": "${file}",
             "cwd": "${workspaceRoot}",
             "env": {
-                "PYTHONPATH": "${workspaceRoot}/src"
+                "PYTHONPATH": "${workspaceRoot}/nagini/src"
             },
             "envFile": "${workspaceRoot}/.env",
             "console": "integratedTerminal",
@@ -24,12 +40,12 @@
             ]
         },
         {
-            "name": "Verify Python With Nagini",
+            "name": "Verify Python with Nagini",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/env/bin/python3",
-            "program": "${workspaceRoot}/env/bin/nagini",
+            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
+            "program": "${workspaceRoot}/nagini/env/bin/nagini",
             "args": [
                 "${file}"
             ],
@@ -44,12 +60,12 @@
             ]
         },
         {
-            "name": "Debug Nagini Verifying Python",
+            "name": "Debug Nagini verifying Python",
             "type": "python",
             "request": "launch",
-            "stopOnEntry": true,
-            "pythonPath": "${workspaceRoot}/env/bin/python3",
-            "program": "${workspaceRoot}/env/bin/nagini",
+            "stopOnEntry": false,
+            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
+            "program": "${workspaceRoot}/nagini/env/bin/nagini",
             "args": [
                 "${file}"
             ],
@@ -64,15 +80,43 @@
             ]
         },
         {
-            "name": "Run Python",
+            "name": "Translate Python to Viper",
             "type": "python",
             "request": "launch",
             "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
-            "program": "${file}",
+            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
+            "program": "${workspaceRoot}/nagini/env/bin/nagini",
+            "args": [
+                "--write-silver-to-file",
+                "${fileDirname}/${fileBasenameNoExtension}.vpr",
+                "${file}"
+            ],
             "cwd": "${workspaceRoot}",
             "env": {},
             "envFile": "${workspaceRoot}/.env",
+            "console": "integratedTerminal",
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput"
+            ]
+        },
+        {
+            "name": "Verify Viper with Silicon",
+            "type": "python",
+            "request": "launch",
+            "stopOnEntry": false,
+            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
+            "program": "${workspaceRoot}/nagini/env/bin/nagini",
+            "args": [
+                "--write-silver-to-file",
+                "${fileDirname}/${fileBasenameNoExtension}.vpr",
+                "${file}"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {},
+            "envFile": "${workspaceRoot}/.env",
+            "console": "integratedTerminal",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit",

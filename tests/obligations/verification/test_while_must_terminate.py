@@ -4,7 +4,7 @@ from nagini_contracts.contracts import (
     Invariant,
     Implies,
 )
-from nagini_contracts.io import IOExists1
+from nagini_contracts.io_contracts import IOExists1
 from nagini_contracts.obligations import *
 
 

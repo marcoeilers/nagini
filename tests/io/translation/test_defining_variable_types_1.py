@@ -4,7 +4,7 @@ from nagini_contracts.contracts import (
     Requires,
     Result,
 )
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 @ContractOnly

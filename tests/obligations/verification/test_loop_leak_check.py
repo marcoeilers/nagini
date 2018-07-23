@@ -3,7 +3,7 @@ from nagini_contracts.contracts import (
     Implies,
     Invariant,
 )
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
