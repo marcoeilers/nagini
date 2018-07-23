@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Requires, Ensures, Result
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 from typing import Tuple, Callable
 
 from resources.library import write_string_io, write_string

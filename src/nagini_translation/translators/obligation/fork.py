@@ -217,11 +217,9 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         var = ctx.current_function.create_variable(
             '_r', ctx.module.global_module.classes[OBJECT_TYPE],
             self._translator.translator, local=False)
-        for_perm = sil.ForPerm(
-            var.sil_name,
-            fields,
-            operator.lt(self.create_level_call(sil.RefVar(var)), expr))
-        return sil.BigAnd([for_perm, operator.lt(residue_level_var, expr)])
+        op = operator.lt(self.create_level_call(sil.RefVar(var)), expr)
+        for_perms = [sil.ForPerm(var.sil_name, f, op) for f in fields]
+        return sil.BigAnd(for_perms + [operator.lt(residue_level_var, expr)])
 
     def _translate_level(self, node: ast.Call) -> sil.PermExpression:
         """Translate a call to ``Level``."""
