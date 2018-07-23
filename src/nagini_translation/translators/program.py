@@ -1321,7 +1321,9 @@ class ProgramTranslator(CommonTranslator):
                 if cls_name != cls.name:
                     # type alias
                     continue
-                if not cls.is_adt and all_used_names is not None and cls.sil_name not in all_used_names:
+                if (not cls.is_adt and all_used_names is not None
+                        and cls.sil_name not in all_used_names
+                        and module != module.global_module):
                     continue
                 if cls.name != cls_name:
                     continue
