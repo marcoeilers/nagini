@@ -111,8 +111,12 @@ class PredicateTranslator(CommonTranslator):
             if len(instance.node.body[actual_body_start:]) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
+            content = instance.node.body[actual_body_start]
+            if isinstance(content, ast.Return):
+                content = content.value
+
             stmt, current = self.translate_expr(
-                    instance.node.body[actual_body_start],
+                    content,
                     ctx, impure=True,
                     target_type=self.viper.Bool)
             if stmt:
