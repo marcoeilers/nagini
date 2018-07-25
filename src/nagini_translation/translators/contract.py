@@ -661,7 +661,8 @@ class ContractTranslator(CommonTranslator):
         func = self.viper.FuncApp(JOINABLE_FUNC, [thread], pos, info, self.viper.Bool)
         return stmt, func
 
-    def translate_let(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+    def translate_let(self, node: ast.Call, ctx: Context,
+                      impure : bool = False) -> StmtsAndExpr:
         type = self.get_target(node.args[1], ctx)
         if not isinstance(type, PythonType) or not isinstance(node.args[2], ast.Lambda):
             raise InvalidProgramException(node, 'invalid.let')
@@ -677,7 +678,7 @@ class ContractTranslator(CommonTranslator):
 
         ctx.set_alias(arg.arg, var, None)
 
-        body_stmt, body_val = self.translate_expr(lambda_.body, ctx)
+        body_stmt, body_val = self.translate_expr(lambda_.body, ctx, impure=impure)
 
         ctx.remove_alias(arg.arg)
         pos = self.to_position(node, ctx)
@@ -834,7 +835,7 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
         elif func_name == 'Let':
-            return self.translate_let(node, ctx)
+            return self.translate_let(node, ctx, impure)
         elif func_name == SEQ_TYPE:
             return self.translate_sequence(node, ctx)
         elif func_name == PSET_TYPE:
