@@ -1069,7 +1069,7 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript) and
                 not (isinstance(node.value, ast.Call) and
                          isinstance(node.ctx, ast.Load))):
-            target = self.get_target(node.value, self.module)
+            target = self.get_target(node.value, self.current_function if self.current_function else self.module)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
                 if isinstance(real_target, PythonGlobalVar):
@@ -1282,10 +1282,14 @@ class Analyzer(ast.NodeVisitor):
             type, _ = self.module.get_type(context, node.arg)
             return self.convert_type(type, node)
         elif (isinstance(node, ast.Call) and
-              isinstance(node.func, ast.Name) and
-              node.func.id in CONTRACT_FUNCS):
-            if node.func.id == 'Result':
-                return self.current_function.type
+              isinstance(node.func, ast.Name)):
+            if node.func.id in CONTRACT_FUNCS:
+                if node.func.id == 'Result':
+                    return self.current_function.type
+                else:
+                    raise UnsupportedException(node)
+            elif node.func.id == 'cast':
+                return self.find_or_create_target_class(node.args[0])
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,

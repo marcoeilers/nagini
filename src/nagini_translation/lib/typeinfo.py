@@ -197,7 +197,12 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 return self.all_types[key]
         elif isinstance(node, mypy.nodes.CallExpr):
             if node.callee.name == 'Result':
-                type = self.all_types[tuple(self.prefix)]
+                key = tuple(self.prefix)
+                for i in range(len(key)):
+                    if key[i].startswith('lambda'):
+                        key = key[:i]
+                        break
+                type = self.all_types[key]
                 return type
         if node in self.type_map:
             result = self.type_map[node]
