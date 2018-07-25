@@ -69,6 +69,7 @@ class ViperAST:
         self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
+        self.is_cached = False
 
     def function_domain_type(self):
         return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
@@ -146,7 +147,7 @@ class ViperAST:
         return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
                                self.to_seq(pres), self.to_seq(posts),
                                body_with_locals, position, info,
-                               self.NoTrafos)
+                               self.NoTrafos, self.is_cached)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
