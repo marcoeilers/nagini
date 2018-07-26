@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Requires, Ensures, Pure
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 from typing import Tuple
 
 

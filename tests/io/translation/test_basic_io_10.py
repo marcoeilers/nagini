@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Result
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 @IOOperation #:: ExpectedOutput(type.error:Encountered Any type. Type annotation missing?)

@@ -191,7 +191,6 @@ def test_loop_condition_framing_1() -> None:
     l = Lock(object())
     l.acquire()
     i = 5
-    #:: UnexpectedOutput(carbon)(application.precondition:assertion.false, 70)
     while a.steps < 5:
         #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)|MissingOutput(carbon)(not.wellformed:loop_condition.not_framed_for_obligation_use, 70)|UnexpectedOutput(carbon)(not.wellformed:insufficient.permission, 70)
         Invariant(MustRelease(l, i))

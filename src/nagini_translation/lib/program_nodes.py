@@ -10,7 +10,7 @@ import ast
 from abc import ABCMeta
 from collections import OrderedDict
 from enum import Enum
-from nagini_contracts.io import BUILTIN_IO_OPERATIONS
+from nagini_contracts.io_contracts import BUILTIN_IO_OPERATIONS
 from nagini_translation.lib.constants import (
     BOXED_PRIMITIVES,
     CALLABLE_TYPE,
@@ -33,6 +33,7 @@ from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
     InvalidProgramException,
+    SingletonFreshName,
 )
 from nagini_translation.lib.views import (
     CombinedDict,
@@ -383,8 +384,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def is_defining_adt(self) -> bool:
         """
-        Returns true if class is defining the ADT's name.
+        Returns true if the class is defining an algebraic data type. This class
+        defines the name of the ADT and should be directly inherited by the
+        classes defining the ADT's constructors.
         """
+        assert self.is_adt
         if self.superclass:
             return self.superclass.name == 'ADT'
         return False
@@ -394,19 +398,28 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         Returns the class that defines the ADT.
         """
+        assert self.is_adt
         if self.is_defining_adt:
             return self
         else:
             return self.superclass.adt_def
-    
+
     @property
     def adt_domain_name(self) -> str:
         """
         Returns the domain name where the ADT is defined.
         """
-        if not hasattr(self.adt_def, '_adt_domain_name'):
-            self.adt_def._adt_domain_name = self.adt_def.get_fresh_name(self.adt_def.name)
-        return self.adt_def._adt_domain_name
+        assert self.is_adt
+        return self.fresh(self.adt_def.name)
+
+    @property
+    def adt_prefix(self) -> str:
+        """
+        Returns the prefix of the domain name where the ADT is defined.
+        Prefixes are used in defining domain functions and axioms.
+        """
+        assert self.is_adt
+        return self.adt_def.name + '_'
 
     @property
     def all_subclasses(self) -> List['PythonClass']:
@@ -444,6 +457,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             result |= self.superclass.all_static_fields
         result |= set(self.static_fields)
         return result
+
+    def fresh(self, name: str) -> str:
+        assert self.is_adt
+        if not hasattr(self.adt_def, '_fresh'):
+            self.adt_def._fresh = SingletonFreshName(self.module)
+        return self.adt_def._fresh(name)
 
     def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
         """
@@ -514,6 +533,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return self.superclass.get_method(name)
         else:
             return None
+
+    def has_function(self, name: str) -> bool:
+        """
+        Check the function with the given name exists this class or
+        superclass.
+        """
+        return name in self.functions or (self.superclass.has_function(name)
+               if self.superclass is not None else False)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
@@ -742,6 +769,20 @@ class GenericType(PythonType):
         Returns the method with the given name in this class or a superclass.
         """
         return self.python_class.get_method(name)
+
+    def has_function(self, name: str) -> bool:
+        """
+        Check if all types of the generic type have a function with the given
+        name.
+        """
+        if isinstance(self, UnionType):
+            types_set = self.get_types() - {None}
+            result = len(types_set) > 0
+            for type in types_set:
+                result = result and type.has_function(name)
+            return result
+        else:
+            return self.cls.has_function(name)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
