@@ -18,7 +18,7 @@ class Cell:
 
 
 def let_impure_method(c: Cell) -> None:
-    #:: UnexpectedOutput(carbon)(not.wellformed:insufficient.permission)|UnexpectedOutput(carbon)(not.wellformed:insufficient.permission)
+    #:: UnexpectedOutput(carbon)(not.wellformed:insufficient.permission, 251)|UnexpectedOutput(carbon)(not.wellformed:insufficient.permission, 251)
     Requires(Let(c, bool, lambda cll: Acc(cll.val)))
     Ensures(Acc(c.val))
     Ensures(Let(c.val, bool, lambda v: v == 2))

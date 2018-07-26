@@ -152,6 +152,8 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_parameters(self) -> None:
         """Add current thread, caller measures, and residue parameters."""
+        if obligation_config.disable_vars:
+            return
         self._obligation_method.prepend_arg(
             self._obligation_info.residue_level.decl)
         if not obligation_config.disable_measures:
@@ -176,11 +178,11 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
-        cthread_var = self._obligation_info.current_thread_var
-        cthread = sil.RefVar(cthread_var)
-        preconditions = [
-            cthread != None,        # noqa: E711
-        ]
+        preconditions = []
+        if not obligation_config.disable_vars:
+            cthread_var = self._obligation_info.current_thread_var
+            cthread = sil.RefVar(cthread_var)
+            preconditions.append(cthread != None)
         position = self._position
         if (self._is_body_native_silver() and
                 not obligation_config.disable_termination_check):
@@ -198,9 +200,10 @@ class ObligationMethodNodeConstructor:
             precondition.translate(
                 self._translator, self._ctx, position, self._info)
             for precondition in preconditions]
-        translated.append(self._translator.var_type_check(
-            cthread_var.sil_name, cthread_var.type, self._position,
-            self._ctx))
+        if not obligation_config.disable_vars:
+            translated.append(self._translator.var_type_check(
+                cthread_var.sil_name, cthread_var.type, self._position,
+                self._ctx))
         self._obligation_method.prepend_precondition(translated)
         self._obligation_method.append_preconditions(
             self._obligation_info.get_additional_preconditions())

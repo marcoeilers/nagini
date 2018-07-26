@@ -542,6 +542,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return [], None
 
+    def get_quantifier_lhs(self, receiver, arg, node, ctx, position):
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
+            if receiver.name == 'dict':
+                set_ref = self.viper.SetType(self.viper.Ref)
+                field = self.viper.Field('dict_acc', set_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+            if receiver.name == 'set':
+                set_ref = self.viper.SetType(self.viper.Ref)
+                field = self.viper.Field('set_acc', set_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+        return self.get_sequence(receiver, arg, None, node, ctx, position)
+
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,
                      position: Position = None) -> Expr:
@@ -558,7 +574,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                             arg.funcname() == 'Sequence___create__'):
                     args = self.viper.to_list(arg.args())
                     return args[0]
-
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
 

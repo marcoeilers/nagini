@@ -408,7 +408,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return GenericType(seq_class, [content_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
-                list_class = module.global_module.classes[LIST_TYPE]
+                list_class = module.global_module.classes[SEQ_TYPE]
                 return GenericType(list_class, [arg_type])
             elif node.func.id in ('getArg', 'getOld', 'getMethod'):
                 object_class = module.global_module.classes[OBJECT_TYPE]
