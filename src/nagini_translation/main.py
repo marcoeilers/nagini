@@ -132,14 +132,13 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon,
-           cache : str  = None) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
         if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, cache)
+            verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
         vresult = verifier.verify(prog)
@@ -223,10 +222,6 @@ def main() -> None:
         help=('run verification the given number of times to benchmark '
               'performance'),
         default=-1)
-    parser.add_argument(
-        '--cache',
-        help=('folder to cache results'),
-        default=None)
     parser.add_argument(
         '--ide-mode',
         action='store_true',
@@ -316,7 +311,7 @@ def translate_and_verify(python_file, jvm, args, print=print):
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend, cache=args.cache)
+            vresult = verify(prog, python_file, jvm, backend=backend)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))

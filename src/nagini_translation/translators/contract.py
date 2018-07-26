@@ -113,8 +113,6 @@ class ContractTranslator(CommonTranslator):
         Returns the permission for a Acc() contract function.
         """
         # Only one argument means implicit full permission
-        #if ctx.current_function.pure:
-        #    return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
         if len(node.args) == 1:
             perm = self.viper.FullPerm(self.to_position(node, ctx),
                                        self.no_info(ctx))

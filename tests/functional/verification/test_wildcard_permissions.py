@@ -13,23 +13,23 @@ class Container:
         return Acc(self.v2)
 
     @Pure
-    def needs_pred(self) -> int:
+    def needs_pred_full(self) -> int:
         Requires(self.P())
         return Unfolding(self.P(), self.v2)
 
     @Pure
-    def needs_pred2(self) -> int:
-        Requires(Acc(self.P(), 1/2))
+    def needs_pred(self) -> int:
+        Requires(Rd(self.P()))
         return Unfolding(self.P(), self.v2)
 
     @Pure
-    def needs_field(self) -> int:
+    def needs_field_full(self) -> int:
         Requires(Acc(self.v))
         return self.v
 
     @Pure
-    def needs_field2(self) -> int:
-        Requires(Acc(self.v, 1/2))
+    def needs_field(self) -> int:
+        Requires(Rd(self.v))
         return self.v
 
     def needs_fixed_pred(self) -> int:
