@@ -20,6 +20,12 @@ class Container:
     @Pure
     def needs_pred(self) -> int:
         Requires(Rd(self.P()))
+        return Unfolding(Rd(self.P()), self.v2)
+
+    #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+    @Pure
+    def needs_pred_fails(self) -> int:
+        Requires(Rd(self.P()))
         return Unfolding(self.P(), self.v2)
 
     @Pure
@@ -61,9 +67,7 @@ def rd_client(c: Container) -> None:
     Ensures(Rd(c.P()))
     Ensures(Rd(c.v))
     a = c.needs_pred()
-    b = c.needs_pred2()
     d = c.needs_field()
-    e = c.needs_field2()
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     f = c.needs_fixed_pred()
 
@@ -74,9 +78,9 @@ def fixed_write_client(c: Container) -> None:
     Ensures(Acc(c.P()))
     Ensures(Acc(c.v))
     a = c.needs_pred()
-    b = c.needs_pred2()
+    b = c.needs_pred_full()
     d = c.needs_field()
-    e = c.needs_field2()
+    e = c.needs_field_full()
     f = c.needs_fixed_pred()
 
 
@@ -86,11 +90,9 @@ def fixed_client(c: Container) -> None:
     Ensures(Acc(c.P(), 1/10000))
     Ensures(Acc(c.v, 1/10000))
     a = c.needs_pred()
-    b = c.needs_pred2()
     d = c.needs_field()
-    e = c.needs_field2()
-    #:: ExpectedOutput(call.precondition:insufficient.permission)
-    f = c.needs_fixed_field()
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
+    f = c.needs_pred_full()
 
 
 def none_client_1(c: Container) -> None:
@@ -100,7 +102,7 @@ def none_client_1(c: Container) -> None:
 
 def none_client_2(c: Container) -> None:
     #:: ExpectedOutput(application.precondition:insufficient.permission)
-    a = c.needs_pred2()
+    a = c.needs_pred_full()
 
 
 def none_client_3(c: Container) -> None:
@@ -109,5 +111,5 @@ def none_client_3(c: Container) -> None:
 
 
 def none_client_4(c: Container) -> None:
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
-    a = c.needs_field2()
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
+    a = c.needs_field_full()

@@ -937,7 +937,8 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
-            return self.translate_stmt(node.value, ctx)
+            res, _ = self.translate_Call(node.value, ctx, statement=True)
+            return res
         elif isinstance(node.value, (ast.Str, ast.Ellipsis)):
             # Docstring or ellipsis, just skip.
             return []

@@ -107,6 +107,10 @@ THREAD_JOIN_JOINABLE = {
     ('assert.failed', 'assertion.false'):
         ('thread.join.failed', 'thread.not.joinable')
 }
+INHALE_TO_CALL = {
+    ('inhale.failed', 'insufficient.permission'):
+        ('call.precondition', 'insufficient.permission')
+}
 
 __all__ = (
     'Rules',

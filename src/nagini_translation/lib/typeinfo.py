@@ -66,8 +66,16 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(rectype, mypy.types.AnyType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
             if isinstance(rectype, mypy.types.UnionType):
-                types = [i for i in rectype.items
-                         if not isinstance(i, mypy.types.NoneTyp)]
+                utypes = [rectype]
+                uindex = 0
+                types = []
+                while uindex < len(utypes):
+                    for i in utypes[uindex].items:
+                        if isinstance(i, mypy.types.UnionType):
+                            utypes.append(i)
+                        elif not isinstance(i, mypy.types.NoneTyp):
+                            types.append(i)
+                    uindex += 1
             else:
                 types = [rectype]
             for t in types:

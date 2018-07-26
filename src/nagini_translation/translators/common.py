@@ -553,6 +553,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 field = self.viper.Field('list_acc', seq_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
+            if receiver.name == 'Sequence':
+                if (isinstance(arg, self.viper.ast.FuncApp) and
+                            arg.funcname() == 'Sequence___create__'):
+                    args = self.viper.to_list(arg.args())
+                    return args[0]
+
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
 
@@ -569,20 +575,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         of non-union types.
         """
         if receiver:
-            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
-                info = self.no_info(ctx)
-                guarded_blocks = []
-                # For each class in union
-                for type in toposort_classes(receiver.get_types() - {None}):
-                    # If receiver is an instance of this particular class
-                    guard = self.type_check(args[0], type, position, ctx)
-                    call = self.get_function_call(type, func_name, args, arg_types, node,
-                                                  ctx, position)
-                    guarded_blocks.append((guard, call))
-                current = guarded_blocks[-1][1]
-                for guard, call in reversed(guarded_blocks[:-1]):
-                    current = self.viper.CondExp(guard, call, current, position, info)
-                return current
             target_cls = receiver
             func = target_cls.get_function(func_name)
         else:

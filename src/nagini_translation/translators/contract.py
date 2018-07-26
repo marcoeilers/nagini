@@ -394,6 +394,16 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if not isinstance(node.args[0], ast.Call):
+            raise InvalidProgramException(node, 'invalid.contract.call')
+        if get_func_name(node.args[0]) in ('Acc', 'Rd'):
+            pred_call = node.args[0].args[0]
+        else:
+            pred_call = node.args[0]
+        target_pred = self.get_target(pred_call, ctx)
+        if (target_pred and
+                (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
+            raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
         if self._is_family_fold(node):
@@ -438,6 +448,16 @@ class ContractTranslator(CommonTranslator):
         """
         if len(node.args) != 1:
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if not isinstance(node.args[0], ast.Call):
+            raise InvalidProgramException(node, 'invalid.contract.call')
+        if get_func_name(node.args[0]) in ('Acc', 'Rd'):
+            pred_call = node.args[0].args[0]
+        else:
+            pred_call = node.args[0]
+        target_pred = self.get_target(pred_call, ctx)
+        if (target_pred and
+                (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
+            raise InvalidProgramException(node, 'invalid.contract.call')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
         if self._is_family_fold(node):
@@ -464,7 +484,8 @@ class ContractTranslator(CommonTranslator):
         else:
             pred_call = node.args[0]
         target_pred = self.get_target(pred_call, ctx)
-        if not isinstance(target_pred, PythonMethod) or not target_pred.predicate:
+        if (target_pred and
+                (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
             raise InvalidProgramException(node, 'invalid.contract.call')
 
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
@@ -533,19 +554,19 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(domain_node, ctx)
         info = self.no_info(ctx)
 
-        if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
-            if not len(domain_node.args) == 2:
-                msg = 'range() is currently only supported with two args.'
-                raise UnsupportedException(domain_node, msg)
-            arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
-                                                  target_type = self.viper.Int)
-            arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
-                                                  target_type = self.viper.Int)
-            int_var = self.to_int(ref_var, ctx)
-            condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
-                                       self.viper.LtCmp(int_var, arg2, pos, info),
-                                       pos, info)
-            return arg1_stmt + arg2_stmt, condition, False
+        # if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
+        #     if not len(domain_node.args) == 2:
+        #         msg = 'range() is currently only supported with two args.'
+        #         raise UnsupportedException(domain_node, msg)
+        #     arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
+        #                                           target_type = self.viper.Int)
+        #     arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
+        #                                           target_type = self.viper.Int)
+        #     int_var = self.to_int(ref_var, ctx)
+        #     condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
+        #                                self.viper.LtCmp(int_var, arg2, pos, info),
+        #                                pos, info)
+        #     return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
         domain_set = self.get_sequence(dom_type, domain, None, domain_node, ctx, pos)
@@ -739,8 +760,6 @@ class ContractTranslator(CommonTranslator):
                 triggers = [lhs_trigger] + triggers
             except Exception:
                 pass
-        if not triggers:
-            print("1212")
         var_type_check = self.type_check(var.ref(), var.type,
                                          self.no_position(ctx), ctx, False)
         implication = self.viper.Implies(var_type_check, implication,
@@ -752,7 +771,7 @@ class ContractTranslator(CommonTranslator):
         return dom_stmt, forall
 
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
-                                    impure=False) -> StmtsAndExpr:
+                                    impure=False, statement=False) -> StmtsAndExpr:
         """
         Translates calls to contract functions like Result() and Acc()
         """
@@ -812,18 +831,21 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
             return self.translate_may_create(node, ctx)
-        elif func_name == 'Assert':
-            return self.translate_assert(node, ctx)
-        elif func_name == 'Assume':
-            return self.translate_assume(node, ctx)
+        elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold'):
+            if not statement:
+                raise InvalidProgramException(node, 'invalid.contract.position')
+            if func_name == 'Assert':
+                return self.translate_assert(node, ctx)
+            elif func_name == 'Assume':
+                return self.translate_assume(node, ctx)
+            elif func_name == 'Fold':
+                return self.translate_fold(node, ctx)
+            elif func_name == 'Unfold':
+                return self.translate_unfold(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':
             return self.translate_old(node, ctx)
-        elif func_name == 'Fold':
-            return self.translate_fold(node, ctx)
-        elif func_name == 'Unfold':
-            return self.translate_unfold(node, ctx)
         elif func_name == 'Unfolding':
             return self.translate_unfolding(node, ctx, impure)
         elif func_name == 'Low':

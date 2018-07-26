@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # Abstract definition:
 # Tree = Leaf(elem: int)
 #      | Node(left: Tree, right: Tree)
@@ -29,7 +31,3 @@ def common_use_of_ADTs()-> None:
 
     assert cast(Leaf, t_3.left).elem == 5
     assert cast(Leaf, t_3.right).elem == 6
-
-
-def check_type_is_known(l: Leaf) -> int:
-    return 1 + l.elem

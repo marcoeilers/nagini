@@ -402,7 +402,7 @@ class CallTranslator(CommonTranslator):
         if len(node.args) != 1:
             msg = 'enumerate() is currently only supported with one args.'
             raise UnsupportedException(node, msg)
-        pos = self.to_position(node, ctx)
+        pos = self.to_position(node, ctx, rules=rules.INHALE_TO_CALL)
         info = self.no_info(ctx)
         result_type = self.get_type(node, ctx)
         arg_type = self.get_type(node.args[0], ctx)
@@ -428,18 +428,22 @@ class CallTranslator(CommonTranslator):
         orig_seq_i = self.viper.SeqIndex(arg_contents, i_var.ref(), pos, info)
         content_type = result_type.type_args[0].type_args[1]
         content_has_type = self.type_check(orig_seq_i, content_type, pos, ctx, False)
-        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i], [int_type, content_type], node, ctx)
+        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i],
+                                        [int_type, content_type], node, ctx)
         new_list_i = self.viper.SeqIndex(seq_ref, i_var.ref(), pos, info)
         equal_content = self.viper.EqCmp(new_list_i, tuple_for_i, pos, info)
-        i_positive = self.viper.GeCmp(i_var.ref(), self.viper.IntLit(0, pos, info), pos, info)
-        i_lt_len = self.viper.LtCmp(i_var.ref(), self.viper.SeqLength(seq_ref, pos, info), pos, info)
+        i_positive = self.viper.GeCmp(i_var.ref(), self.viper.IntLit(0, pos, info), pos,
+                                      info)
+        i_lt_len = self.viper.LtCmp(i_var.ref(), self.viper.SeqLength(seq_ref, pos, info),
+                                    pos, info)
         i_in_bounds = self.viper.And(i_positive, i_lt_len, pos, info)
         content_info = self.viper.And(content_has_type, equal_content, pos, info)
         body = self.viper.Implies(i_in_bounds, content_info, pos, info)
         trigger = self.viper.Trigger([new_list_i], pos, info)
         contents_info = self.viper.Forall([i_var.decl], [trigger], body, pos, info)
         contents_inhale = self.viper.Inhale(contents_info, pos, info)
-        return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node, ctx)
+        return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node,
+                                                                                 ctx)
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
@@ -1115,7 +1119,8 @@ class CallTranslator(CommonTranslator):
                 return True
         return False
 
-    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False,
+                       statement=False) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
         like Assert, a builtin Python function like isinstance, a
@@ -1128,7 +1133,7 @@ class CallTranslator(CommonTranslator):
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             elif func_name in CONTRACT_FUNCS:
-                return self.translate_contractfunc_call(node, ctx, impure)
+                return self.translate_contractfunc_call(node, ctx, impure, statement)
             elif func_name in IO_CONTRACT_FUNCS:
                 return self.translate_io_contractfunc_call(node, ctx)
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
