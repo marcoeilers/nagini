@@ -17,7 +17,7 @@ from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def func_t() -> None:
+def t() -> None:
     pass
 
 
@@ -25,13 +25,13 @@ def s() -> None:
     Requires(MustTerminate(1))
 
 
-def func_g(a: Lock[object]) -> None:
+def g(a: Lock[object]) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
     Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
-    func_t()
+    t()
     a.release()
 
 
@@ -50,7 +50,7 @@ def g2(a: Lock[object]) -> None:
     Requires(a.invariant())
 
     a.release()
-    func_t()
+    t()
 
 
 def g3(a: Lock[object]) -> None:
@@ -60,7 +60,7 @@ def g3(a: Lock[object]) -> None:
 
     s()
     a.release()
-    func_t()
+    t()
 
 
 def h1(a: Lock[object]) -> None:
@@ -69,7 +69,7 @@ def h1(a: Lock[object]) -> None:
     Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
-    func_t()
+    t()
     a.release()
 
 
@@ -88,5 +88,5 @@ def h3(a: Lock[object]) -> None:
     Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
-    func_t()
+    t()
     a.release()

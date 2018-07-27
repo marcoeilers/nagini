@@ -144,10 +144,11 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
-                               self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info,
-                               self.NoTrafos, self.is_cached)
+        method = getobject(self.ast, "MethodWithLabelsInScope")
+        return method.apply(name, self.to_seq(args), self.to_seq(returns),
+                            self.to_seq(pres), self.to_seq(posts),
+                            body_with_locals, position, info,
+                            self.NoTrafos, self.is_cached)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
