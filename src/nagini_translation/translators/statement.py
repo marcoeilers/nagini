@@ -953,8 +953,8 @@ class StatementTranslator(CommonTranslator):
                 pos = self.to_position(node, ctx)
                 info = self.no_info(ctx)
                 res_type = self.get_type(node.value, ctx)
-                res_var = ctx.actual_function.create_variable('expr_res', res_type,
-                                                              self.translator)
+                res_var = ctx.current_function.create_variable('expr_res', res_type,
+                                                               self.translator)
                 assign = self.viper.LocalVarAssign(res_var.ref(), val, pos, info)
                 stmt.append(assign)
             return stmt
