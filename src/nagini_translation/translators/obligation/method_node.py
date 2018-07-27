@@ -152,7 +152,7 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_parameters(self) -> None:
         """Add current thread, caller measures, and residue parameters."""
-        if obligation_config.disable_vars:
+        if obligation_config.disable_all:
             return
         self._obligation_method.prepend_arg(
             self._obligation_info.residue_level.decl)
@@ -179,7 +179,7 @@ class ObligationMethodNodeConstructor:
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
         preconditions = []
-        if not obligation_config.disable_vars:
+        if not obligation_config.disable_all:
             cthread_var = self._obligation_info.current_thread_var
             cthread = sil.RefVar(cthread_var)
             preconditions.append(cthread != None)
@@ -200,7 +200,7 @@ class ObligationMethodNodeConstructor:
             precondition.translate(
                 self._translator, self._ctx, position, self._info)
             for precondition in preconditions]
-        if not obligation_config.disable_vars:
+        if not obligation_config.disable_all:
             translated.append(self._translator.var_type_check(
                 cthread_var.sil_name, cthread_var.type, self._position,
                 self._ctx))
