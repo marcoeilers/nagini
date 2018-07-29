@@ -140,6 +140,10 @@ REASONS = {
         lambda n: "Thread's target method may not be listed in start statement.",
     'missing.start.permission':
         lambda n: 'May not have permission to start thread.',
+    'sif.fold':
+        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0])),
+    'sif.unfold':
+        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0]))
 }
 
 VAGUE_REASONS = {

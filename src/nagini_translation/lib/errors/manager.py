@@ -103,6 +103,8 @@ class ErrorManager:
     def _convert_error(
             self, error: 'AbstractVerificationError',
             jvm: Optional[JVM]) -> Error:
+        # TODO: Is this the best place to do the error transformation? Does it break anything?
+        error = error.transformedError()
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
         position = error.pos()
