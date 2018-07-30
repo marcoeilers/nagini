@@ -68,6 +68,15 @@ class InvalidProgramException(Exception):
         self.message = message
 
 
+class ConsistencyException(Exception):
+    """
+    Exception reporting that the translated AST has a consistency error
+    """
+
+    def __init__(self, message: str = None) -> None:
+        self.message = message
+
+
 class AssignCollector(ast.NodeVisitor):
     """
     Collects all assignment targets within a given (partial) AST.

@@ -117,7 +117,12 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
-    'm'     # used in a quantifier in measures.sil
+    'm',     # used in a quantifier in measures.sil
+    'X',
+    'Y',
+    'id',
+    't',
+    'g'
 ]
 
 VIPER_KEYWORDS = [
