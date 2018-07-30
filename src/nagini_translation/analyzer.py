@@ -785,7 +785,6 @@ class Analyzer(ast.NodeVisitor):
         assert self.current_function
         name = construct_lambda_prefix(node.lineno, node.col_offset)
         self.current_scopes.append(name)
-        assert not self._aliases
         for arg in node.args.args:
             # For IO operation arguments, we want parameters to be primitive
             # b/c primitive equality is simpler than boxed reference equality,
@@ -808,7 +807,8 @@ class Analyzer(ast.NodeVisitor):
         self._is_io_existential = False
         self.visit(node.body, node)
         self.current_scopes.pop()
-        self._aliases.clear()
+        for arg in node.args.args:
+            self._aliases.pop(arg.arg, None)
 
     def visit_arg(self, node: ast.arg) -> None:
         assert self.current_function is not None
