@@ -265,17 +265,19 @@ class CallTranslator(CommonTranslator):
         if self._is_lock_subtype(target_class):
             # For locks, fold the invariant predicate before actually calling the
             # constructor (which requires the predicate in its precondition).
+            lock_pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
             lock_class = self._is_lock_subtype(target_class)
             locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
-                                                [None], node, ctx, pos)
-            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
-            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+                                                [None], node, ctx, lock_pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], lock_pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, lock_pos, info))
             invariant_pred = lock_class.get_predicate('invariant')
-            full_perm = self.viper.FullPerm(pos, info)
+            full_perm = self.viper.FullPerm(lock_pos, info)
             pred_acc = self.viper.PredicateAccess([res_var.ref()],
-                                                  invariant_pred.sil_name, pos, info)
-            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
-            stmts.append(self.viper.Fold(acc_pred, pos, info))
+                                                  invariant_pred.sil_name, lock_pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm,
+                                                           lock_pos, info)
+            stmts.append(self.viper.Fold(acc_pred, lock_pos, info))
 
         target = target_class.get_method('__init__')
         if target:
@@ -481,6 +483,39 @@ class CallTranslator(CommonTranslator):
                                position: 'silver.ast.Position', node: ast.AST,
                                ctx: Context) -> StmtsAndExpr:
         """
+        Translates a call to an impure method, and performs any additional steps around
+        it that might be necessary (e.g., folding/unfolding invariant predicates if the
+        call is a lock release/acquire).
+        """
+        stmts = arg_stmts
+        receiver = args[0]
+        call_stmt, res = self._only_translate_method_call(target, args, position, node,
+                                                          ctx)
+        if target.name in ('acquire', 'release'):
+            if (target.cls and target.cls.name == 'Lock' and
+                        target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                target_name = target.cls.get_predicate('invariant').sil_name
+                pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
+                info = self.no_info(ctx)
+                pa = self.viper.PredicateAccess([receiver], target_name, pos, info)
+                full_perm = self.viper.FullPerm(pos, info)
+                pap = self.viper.PredicateAccessPredicate(pa, full_perm, pos, info)
+                if target.name == 'acquire':
+                    stmts.extend(call_stmt)
+                    unfold = self.viper.Unfold(pap, pos, info)
+                    stmts.append(unfold)
+                else:
+                    fold = self.viper.Fold(pap, pos, info)
+                    stmts.append(fold)
+                    stmts.extend(call_stmt)
+        else:
+            stmts.extend(call_stmt)
+        return stmts, res
+
+    def _only_translate_method_call(self, target: PythonMethod, args: List[Expr],
+                                    position: 'silver.ast.Position', node: ast.AST,
+                                    ctx: Context) -> StmtsAndExpr:
+        """
         Translates a call to an impure method.
         """
         targets = []
@@ -506,7 +541,7 @@ class CallTranslator(CommonTranslator):
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
-        return (arg_stmts + defined_check + call,
+        return (defined_check + call,
                 result_var.ref() if result_var else None)
 
     def _add_dependencies(self, reference: ast.AST, target: PythonMethod,

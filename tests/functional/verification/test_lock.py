@@ -1,6 +1,6 @@
 from nagini_contracts.lock import Lock
 from nagini_contracts.contracts import *
-from nagini_contracts.obligations import Level, WaitLevel
+from nagini_contracts.obligations import Level, WaitLevel, MustTerminate
 
 
 class Cell:
@@ -33,18 +33,7 @@ class CellMonitor:
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
-        self.l.release()
-
-    def fold_missing(self) -> None:
-        Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
-        Requires(WaitLevel() < Level(self.l))
-        self.l.acquire()
-        Unfold(self.l.invariant())
-        self.c.value += 2
-        #:: ExpectedOutput(call.precondition:insufficient.permission)
         self.l.release()
 
     def unspecified_locked_object(self) -> None:
@@ -52,10 +41,8 @@ class CellMonitor:
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         self.l.acquire()
-        Unfold(self.l.invariant())
         #:: ExpectedOutput(assignment.failed:insufficient.permission)
         self.c.value += 2
-        Fold(self.l.invariant())
         self.l.release()
 
     def unspecified_waitlevel(self) -> None:
@@ -63,9 +50,7 @@ class CellMonitor:
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         #:: ExpectedOutput(call.precondition:assertion.false)
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
         self.l.release()
 
     #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
@@ -74,19 +59,23 @@ class CellMonitor:
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
 
-    def no_acquire(self) -> None:
-        Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
+    def release_fails_permission(self) -> None:
+        Requires(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
-        #:: ExpectedOutput(unfold.failed:insufficient.permission)
-        Unfold(self.l.invariant())
+        self.l.acquire()
         self.c.value += 2
-        Fold(self.l.invariant())
+        leak_permission(self.c)
+        #:: ExpectedOutput(lock.invariant.not.established:insufficient.permission)
         self.l.release()
+
+
+def leak_permission(c: Cell) -> None:
+    Requires(Acc(c.value))
+    Requires(MustTerminate(1))
+    pass
 
 
 def client_1() -> None:
@@ -103,11 +92,61 @@ def client_2() -> None:
 
 class NCell:
     def __init__(self, val: int) -> None:
-        Ensures(Acc(self.n) and self.n == 0)
-        self.n = 0  # type: int
+        Ensures(Acc(self.n) and self.n == val)
+        self.n = val  # type: int
 
 
 class NCellLock(Lock[NCell]):
     @Predicate
     def invariant(self) -> bool:
         return Acc(self.get_locked().n) and self.get_locked().n >= 0
+
+
+def ncell_correct(c: NCell, l: NCellLock) -> None:
+    Requires(l.get_locked() is c)
+    Requires(WaitLevel() < Level(l))
+    l.acquire()
+    c.n += 12
+    l.release()
+
+
+def release_fails_assertion(c: NCell, l: NCellLock) -> None:
+    Requires(l.get_locked() is c)
+    Requires(WaitLevel() < Level(l))
+    l.acquire()
+    c.n -= 2
+    #:: ExpectedOutput(lock.invariant.not.established:assertion.false)
+    l.release()
+
+
+def ncell_client_correct() -> None:
+    c = NCell(3)
+    l = NCellLock(c)
+    l.acquire()
+    assert c.n >= 0
+    l.release()
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert False
+
+
+def ncell_share_invariant_fail() -> None:
+    c = NCell(-3)
+    #:: ExpectedOutput(lock.invariant.not.established:assertion.false)
+    l = NCellLock(c)
+
+
+def ncell_share_permission_lost() -> None:
+    c = NCell(3)
+    l = NCellLock(c)
+    #:: ExpectedOutput(assert.failed:insufficient.permission)
+    assert c.n >= 0
+
+
+def ncell_share_havoc() -> None:
+    c = NCell(3)
+    assert c.n == 3
+    l = NCellLock(c)
+    l.acquire()
+    assert c.n >= 0
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert c.n == 3
