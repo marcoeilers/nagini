@@ -100,11 +100,19 @@ class ErrorManager:
                     self._try_get_rules_workaround(node.right(), jvm))
         return
 
+    def transformError(self, error: 'AbstractVerificationError') -> 'AbstractVerificationError':
+        """ ransform silver error to a fixpoint. """
+        old_error = None
+        while old_error != error:
+            old_error = error
+            error = error.transformedError()
+        return error
+
     def _convert_error(
             self, error: 'AbstractVerificationError',
             jvm: Optional[JVM]) -> Error:
         # TODO: Is this the best place to do the error transformation? Does it break anything?
-        error = error.transformedError()
+        error = self.transformError(error)
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
         position = error.pos()

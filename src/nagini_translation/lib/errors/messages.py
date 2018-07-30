@@ -143,7 +143,14 @@ REASONS = {
     'sif.fold':
         lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0])),
     'sif.unfold':
-        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0]))
+        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0])),
+    'sif_termination.condition_not_low':
+        lambda n: 'Termination condition {} might not be low.'.format(pprint(n.args[0])),
+    'sif_termination.not_lowevent':
+        lambda n: ('Termination condition {} evaluating to false might not imply that '
+                   'both executions don\'t terminate.').format(pprint(n.args[0])),
+    'sif_termination.condition_not_tight':
+        lambda n: 'Termination condition {} might not be tight_'.format(pprint(n.args[0])),
 }
 
 VAGUE_REASONS = {

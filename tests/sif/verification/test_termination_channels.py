@@ -9,7 +9,7 @@ def loop_no_lowevent(h: int) -> None:
     while x != 0:
         Invariant(x <= h)
         Invariant(Implies(h >= 0, x >= 0))
-        #::ExpectedOutput(assert.failed:assertion.false)
+        #:: ExpectedOutput(assert.failed:sif_termination.not_lowevent)
         Invariant(TerminatesSif(h >= 0, x))
         x -= 1
 
@@ -19,8 +19,19 @@ def loop_termcond_high(h: int) -> None:
     while x != 0:
         Invariant(x <= h)
         Invariant(Implies(h >= 0, x >= 0))
-        #::ExpectedOutput(assert.failed:assertion.false)
+        #:: ExpectedOutput(assert.failed:sif_termination.condition_not_low)
         Invariant(TerminatesSif(h >= 0, x))
+        x -= 1
+
+def loop_termcond_not_tight(h: int) -> None:
+    Requires(LowEvent())
+    Requires(Low(h))
+    x = h
+    while x != 0:
+        Invariant(x <= h)
+        Invariant(Implies(h > 0, x >= 0))
+        #:: ExpectedOutput(invariant.not.established:sif_termination.condition_not_tight)
+        Invariant(TerminatesSif(h > 0, x))
         x -= 1
 
 def loop_fixed(l: int) -> None:
@@ -35,7 +46,7 @@ def loop_fixed(l: int) -> None:
 
 def continue_infinite() -> None:
     x = 10
-    #::ExpectedOutput(assert.failed:assertion.false)
+    #:: ExpectedOutput(leak_check.failed:must_terminate.loop_promise_not_kept)
     while x > 0:
         Invariant(x >= 0 and x <= 10)
         Invariant(TerminatesSif(True, x))
@@ -57,7 +68,7 @@ def nested(h: int) -> None:
     while x1 != 0:
         Invariant(x1 <= h)
         Invariant(Implies(h >= 0, x1 >= 0))
-        #::ExpectedOutput(assert.failed:assertion.false)
+        #:: ExpectedOutput(assert.failed:sif_termination.condition_not_low)
         Invariant(TerminatesSif(h >= 0, x1))
         x2 = 10
         while x2 != 0:
@@ -99,4 +110,3 @@ def cycle_2(h: int) -> None:
     #:: ExpectedOutput(call.precondition:assertion.false)
     Requires(TerminatesSif(True, h))
     cycle_1(h)
-
