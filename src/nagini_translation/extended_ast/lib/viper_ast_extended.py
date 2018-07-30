@@ -84,3 +84,12 @@ class ViperASTExtended(ViperAST):
 
     def AssertNoException(self, position: Position, info: Info):
         return self.ast_extensions.SIFAssertNoException(position, info, self.NoTrafos)
+
+    def TerminatesSif(self, cond: Expr, position: Position, info: Info):
+        return self.ast_extensions.SIFTerminatesExp(cond, position, info, self.NoTrafos)
+
+    def SIFInfo(self, comments: List[str],
+                continue_unaware: bool = False,
+                obligation_var: bool = False) -> 'silver.sif.SIFInfo':
+        return self.ast_extensions.SIFInfo(
+            self.to_seq(comments), continue_unaware, obligation_var)
