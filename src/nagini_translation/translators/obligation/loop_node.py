@@ -11,6 +11,7 @@ import ast
 
 from typing import List, Union
 
+from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib.context import Context
@@ -231,7 +232,11 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
         assertion = sil.Assert(check)
         position = self._to_position(
             conversion_rules=rules.OBLIGATION_LOOP_TERMINATION_PROMISE_FAIL)
-        info = self._to_info('Check if loop continues to terminate.')
+        comment = 'Check if loop continues to terminate.'
+        if isinstance(self._viper, ViperASTExtended):
+            info = self._viper.SIFInfo([comment], continue_unaware=True)
+        else:
+            info = self._to_info(comment)
         statement = assertion.translate(
             self._translator, self._ctx, position, info)
         self._obligation_loop.append_body(statement)

@@ -15,3 +15,8 @@ def m3(secret: bool) -> int:
         return 0
     else:
         return 1
+
+def m4() -> int:
+    Ensures(Result() == 1)
+    return 1
+    return 12

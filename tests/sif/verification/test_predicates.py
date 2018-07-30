@@ -25,7 +25,7 @@ def setValMethod(l: ListClass, v: int) -> None:
     Ensures(getVal(l) == v)
     Unfold(accVal(l))
     l.val = v
-    #:: ExpectedOutput(assert.failed:assertion.false)
+    #:: ExpectedOutput(fold.failed:sif.fold)
     Fold(accVal(l))
 
 def setValMethod2(l: ListClass, v: int) -> None:
@@ -40,6 +40,11 @@ def setValMethod2(l: ListClass, v: int) -> None:
 @Predicate
 def MyList(l: Optional[ListClass]) -> bool:
     return Implies(l is not None, Acc(l.val) and Acc(l.next) and MyList(l.next))
+
+@Predicate
+def MyListLow(l: Optional[ListClass]) -> bool:
+    return Implies(l is not None, Acc(l.val) and Acc(l.next) and Low(l.val) and Low(l.next) and
+                   MyListLow(l.next))
 
 @Pure
 def size(l: Optional[ListClass]) -> int:
@@ -57,3 +62,28 @@ def m1() -> ListClass:
     new_list.next = next_list
     Fold(MyList(new_list))
     return new_list
+
+def getHead(l: Optional[ListClass]) -> Optional[int]:
+    Requires(Implies(l is not None, MyList(l)))
+    Ensures(Implies(l is not None, MyList(l)))
+    if l is None:
+        return None
+    Unfold(MyList(l))
+    res = l.val
+    Fold(MyList(l))
+    return res
+
+def contains(l: Optional[ListClass], key: int, perm: int) -> bool:
+    Requires(perm > 0)
+    Requires(Implies(l is not None, Acc(MyListLow(l), 1/perm)))
+    Ensures(Implies(l is not None, Acc(MyListLow(l), 1/perm)))
+    if l is None:
+        return False
+    Unfold(Acc(MyListLow(l), 1/perm))
+    if l.val == key:
+        res = True
+    else:
+        Assert(Acc(MyListLow(l.next), 1/perm))
+        res = contains(l.next, key, perm * 2)
+    Fold(Acc(MyListLow(l), 1/perm))
+    return res

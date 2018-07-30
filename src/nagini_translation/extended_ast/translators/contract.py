@@ -85,7 +85,7 @@ class ExtendedASTContractTranslator(ContractTranslator):
         """
         Translates a call to the LowEvent() contract function.
         """
-        # TODO: check that lowevent can only be in precondition
+        # TODO: check that lowevent can only be in precondition (or only do the dyn. bound check then)
         if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
             self_type = self.type_factory.typeof(
                 next(iter(ctx.actual_function.args.values())).ref(), ctx)
@@ -102,3 +102,14 @@ class ExtendedASTContractTranslator(ContractTranslator):
             raise InvalidProgramException(node, 'purity.violated')
         return [self.viper.Declassify(
             expr, self.to_position(node, ctx), self.no_info(ctx))], None
+
+    def translate_terminates_sif(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the TerminatesSif() contract function.
+        """
+        cond_stmts, cond = self.translate_expr(node.args[0], ctx, target_type=self.viper.Bool)
+        # rank_stmts, rank = self.translate_expr(node.args[1], ctx, target_type=self.viper.Int)
+        if cond_stmts: # or rank_stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        return [], self.viper.TerminatesSif(
+            cond, self.to_position(node, ctx), self.no_info(ctx))

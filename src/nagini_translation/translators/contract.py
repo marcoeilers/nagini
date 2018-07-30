@@ -500,6 +500,17 @@ class ContractTranslator(CommonTranslator):
         """
         return [self.translate_block([], self.no_position(ctx), self.no_info(ctx))], None
 
+    def translate_terminates_sif(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the TerminatesSif() contract function.
+        """
+        cond_stmts, cond = self.translate_expr(node.args[0], ctx)
+        rank_stmts, rank = self.translate_expr(node.args[1], ctx)
+        if cond_stmts or rank_stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        
+        return self.translator.obligation_translator._translate_must_terminate(node, ctx)
+
     def _translate_triggers(self, body: ast.AST, node: ast.Call,
                             ctx: Context) -> List['silver.ast.Trigger']:
         """
@@ -833,6 +844,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_lowevent(node, ctx)
         elif func_name == 'Declassify':
             return self.translate_declassify(node, ctx)
+        elif func_name == 'TerminatesSif':
+            return self.translate_terminates_sif(node, ctx)
         elif func_name == 'Forall':
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Previous':

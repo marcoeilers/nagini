@@ -24,10 +24,10 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'Acc', 'Rd', 'Fold',
-                  'Unfold', 'Unfolding', 'Previous', 'RaisedException', 'Sequence', 'PSet',
-                  'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg',
-                  'Joinable', 'MayStart',]
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif', 'Acc',
+                  'Rd', 'Fold', 'Unfold', 'Unfolding', 'Previous', 'RaisedException',
+                  'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg',
+                  'getOld', 'arg', 'Joinable', 'MayStart',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -102,12 +102,29 @@ def Low(*args) -> bool:
     pass
 
 def LowVal(expr: T) -> bool:
+    """
+    Predicate to indicate that an expression has to be low, using value equality if the
+    expression is a primitive.
+    """
     pass
 
 def LowEvent() -> bool:
+    """
+    Predicate that states that either both executions reach this point or none of them.
+    """
     pass
 
 def Declassify(expr: T) -> bool:
+    """
+    Declassify an expression. Assumes expression to be low.
+    """
+    pass
+
+def TerminatesSif(cond: bool, rank: int) -> bool:
+    """
+    Verify absence of termination channels. Gives surrounding loop/call a
+    termination condition and a ranking function.
+    """
     pass
 
 class Sequence(Generic[T], Sized, Iterable[T]):
@@ -385,6 +402,7 @@ __all__ = [
         'LowVal',
         'LowEvent',
         'Declassify',
+        'TerminatesSif',
         'AllLow',
         'PreservesLow',
         'Acc',
