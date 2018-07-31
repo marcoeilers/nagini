@@ -85,7 +85,6 @@ class ExtendedASTContractTranslator(ContractTranslator):
         """
         Translates a call to the LowEvent() contract function.
         """
-        # TODO: check that lowevent can only be in precondition (or only do the dyn. bound check then)
         if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
             self_type = self.type_factory.typeof(
                 next(iter(ctx.actual_function.args.values())).ref(), ctx)

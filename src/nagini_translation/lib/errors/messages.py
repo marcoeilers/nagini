@@ -150,7 +150,7 @@ REASONS = {
         lambda n: ('Termination condition {} evaluating to false might not imply that '
                    'both executions don\'t terminate.').format(pprint(n.args[0])),
     'sif_termination.condition_not_tight':
-        lambda n: 'Termination condition {} might not be tight_'.format(pprint(n.args[0])),
+        lambda n: 'Termination condition {} might not be tight.'.format(pprint(n.args[0])),
 }
 
 VAGUE_REASONS = {

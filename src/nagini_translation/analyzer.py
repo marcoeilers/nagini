@@ -49,6 +49,7 @@ from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
+    contains_stmt,
     get_func_name,
     get_parent_of_type,
     InvalidProgramException,
@@ -876,6 +877,10 @@ class Analyzer(ast.NodeVisitor):
             return
         if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
             return
+        if isinstance(node.func, ast.Name) and node.func.id == 'LowEvent':
+            preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
+            if not contains_stmt(preconditions, node):
+                raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
