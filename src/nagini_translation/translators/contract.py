@@ -508,7 +508,6 @@ class ContractTranslator(CommonTranslator):
         rank_stmts, rank = self.translate_expr(node.args[1], ctx)
         if cond_stmts or rank_stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        
         return self.translator.obligation_translator._translate_must_terminate(node, ctx)
 
     def _translate_triggers(self, body: ast.AST, node: ast.Call,

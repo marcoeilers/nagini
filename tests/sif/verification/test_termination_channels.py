@@ -55,10 +55,11 @@ def continue_infinite() -> None:
         x -= 1
 
 def return_ok() -> None:
+    Requires(LowEvent())
     x = 10
     while True:
         Invariant(x >= 0 and x <= 10)
-        Invariant(TerminatesSif(True, x))
+        Invariant(TerminatesSif(True, x + 1))
         if x == 0:
             return
         x -= 1
@@ -84,17 +85,17 @@ def terminates(x: int) -> int:
     return x
 
 def recursion(h: int) -> int:
-    Requires(TerminatesSif(h >= 0, h + 1))
+    Requires(TerminatesSif(h >= 0, h + 2))
     Ensures(Result() == 1)
     x = terminates(h)
     if x == 0:
         return 1
-    #:: ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:sif_termination.not_lowevent)
     return recursion(x - 1)
 
 def recursion_fixed(h: int) -> int:
     Requires(Low(h))
-    Requires(TerminatesSif(h >= 0, h + 1))
+    Requires(TerminatesSif(h >= 0, h + 2))
     Ensures(Result() == 1)
     x = terminates(h)
     if x == 0:
@@ -102,11 +103,11 @@ def recursion_fixed(h: int) -> int:
     return recursion_fixed(x - 1)
 
 def cycle_1(h: int) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)
     Requires(TerminatesSif(True, h))
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     cycle_2(h)
 
 def cycle_2(h: int) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)
     Requires(TerminatesSif(True, h))
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     cycle_1(h)

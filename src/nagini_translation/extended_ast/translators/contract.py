@@ -110,5 +110,9 @@ class ExtendedASTContractTranslator(ContractTranslator):
         # rank_stmts, rank = self.translate_expr(node.args[1], ctx, target_type=self.viper.Int)
         if cond_stmts: # or rank_stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        return [], self.viper.TerminatesSif(
-            cond, self.to_position(node, ctx), self.no_info(ctx))
+        must_terminate = super().translate_terminates_sif(node, ctx)
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        implication = self.viper.Implies(cond, must_terminate[1], pos, info)
+        terminates_exp = self.viper.TerminatesSif(cond, pos, info)
+        return must_terminate[0], self.viper.And(implication, terminates_exp, pos, info)
