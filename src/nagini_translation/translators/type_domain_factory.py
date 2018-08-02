@@ -425,9 +425,14 @@ class TypeDomainFactory:
         args = self.viper.to_list(super.args())
         if not position:
             position = self.no_position(ctx)
-        return self.viper.DomainFuncApp('issubtype' + super.funcname(), [sub] + args,
-                                        self.viper.Bool, position,
-                                        self.no_info(ctx), self.type_domain)
+        if super.funcname().endswith('_arg'):
+            return self.viper.DomainFuncApp('issubtype', [sub, super],
+                                            self.viper.Bool, position,
+                                            self.no_info(ctx), self.type_domain)
+        else:
+            return self.viper.DomainFuncApp('issubtype' + super.funcname(), [sub] + args,
+                                            self.viper.Bool, position,
+                                            self.no_info(ctx), self.type_domain)
 
     def _extends(self, sub: Expr, super: Expr, ctx: Context,
                  position=None) -> 'silver.ast.DomainFuncApp':
