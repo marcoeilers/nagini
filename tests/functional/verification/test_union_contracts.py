@@ -167,3 +167,14 @@ def test_19(o: Union[A, B]) -> None:
 def test_20(o: Union[A, B]) -> None:
     Requires(Acc(o.field))
     o.field = 5
+
+
+# Same class, different type
+def client1(a: Union[List[int], List[bool]]) -> None:
+    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    b = a[0]
+
+
+def client2(a: Union[List[int], List[bool]]) -> None:
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    a.append(True)

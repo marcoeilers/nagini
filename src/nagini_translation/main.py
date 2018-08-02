@@ -295,6 +295,7 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args, print=print):
     try:
+        start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
@@ -326,6 +327,8 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
+        duration = '{:.2f}'.format(time.time() - start)
+        print('Verification took ' + duration + ' seconds.')
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):

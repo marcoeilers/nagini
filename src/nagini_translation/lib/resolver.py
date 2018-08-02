@@ -241,6 +241,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                     raise InvalidProgramException(node, error)
             return target
     if isinstance(node, (ast.Attribute, ast.Name)):
+        if isinstance(node, ast.Attribute):
+            lhs = _do_get_type(node.value, containers, container)
+            if isinstance(lhs, UnionType) and not isinstance(lhs, OptionalType):
+                candidates = [find_entry(node.attr, False, [t]) for t in lhs.type_args]
+                if all(isinstance(c, (PythonField, PythonVarBase)) for c in candidates):
+                    return common_supertype([c.type for c in candidates])
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
@@ -367,6 +373,16 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     if func_name == PSET_TYPE:
         return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
                                             containers, container)
+    if func_name == 'enumerate':
+        if len(node.args) != 1:
+            raise UnsupportedException(node, 'enumerate only supported with single arg.')
+        list_type = module.global_module.classes[LIST_TYPE]
+        int_type = module.global_module.classes[INT_TYPE]
+        tuple_type = module.global_module.classes[TUPLE_TYPE]
+        arg_type = get_type(node.args[0], containers, container)
+        iterable_type = _get_iteration_type(arg_type, module, node)
+        return GenericType(list_type, [GenericType(tuple_type,
+                                                   [int_type, iterable_type])])
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
             if node.func.id == 'Result':
@@ -392,11 +408,16 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return GenericType(seq_class, [content_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
-                list_class = module.global_module.classes[LIST_TYPE]
+                list_class = module.global_module.classes[SEQ_TYPE]
                 return GenericType(list_class, [arg_type])
             elif node.func.id in ('getArg', 'getOld', 'getMethod'):
                 object_class = module.global_module.classes[OBJECT_TYPE]
                 return object_class
+            elif node.func.id == 'Let':
+                body_type = get_target(node.args[1], containers, container)
+                if isinstance(body_type, PythonType):
+                    return body_type
+                raise InvalidProgramException(node, 'invalid.let')
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:

@@ -87,6 +87,8 @@ class ObligationMethodCallNodeConstructor(StatementNodeConstructorBase):
 
     def _add_additional_arguments(self) -> None:
         """Add current thread and caller measure map arguments."""
+        if obligation_config.disable_all:
+            return
         if self._ctx.obligation_context.is_translating_loop():
             loop_info = self._ctx.obligation_context.current_loop_info
             residue_level = loop_info.residue_level

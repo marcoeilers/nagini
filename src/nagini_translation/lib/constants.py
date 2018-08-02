@@ -21,7 +21,8 @@ BUILTINS = ['cast',
             'super',
             'range',
             'type',
-            'list']
+            'list',
+            'enumerate']
 
 THREADING = ['Thread']
 

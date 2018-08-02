@@ -11,10 +11,17 @@ test suite.
 
 from nagini_contracts.contracts import (
     Assert,
+    Predicate,
     Requires,
 )
 from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
+
+
+class ObjectLock(Lock[object]):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
 
 
 def t() -> None:
@@ -25,48 +32,43 @@ def s() -> None:
     Requires(MustTerminate(1))
 
 
-def g(a: Lock[object]) -> None:
+def g(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     t()
     a.release()
 
 
-def g1(a: Lock[object]) -> None:
+def g1(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     s()
     a.release()
 
 
-def g2(a: Lock[object]) -> None:
+def g2(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     a.release()
     t()
 
 
-def g3(a: Lock[object]) -> None:
+def g3(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     s()
     a.release()
     t()
 
 
-def h1(a: Lock[object]) -> None:
+def h1(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     t()
@@ -74,7 +76,7 @@ def h1(a: Lock[object]) -> None:
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def h2(a: Lock[object]) -> None:
+def h2(a: ObjectLock) -> None:
     Requires(MustTerminate(5))
     Requires(a is not None)
     Requires(MustRelease(a, 2))
@@ -82,10 +84,9 @@ def h2(a: Lock[object]) -> None:
     s()
 
 
-def h3(a: Lock[object]) -> None:
+def h3(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
 
     #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)
     t()

@@ -107,6 +107,16 @@ THREAD_JOIN_JOINABLE = {
     ('assert.failed', 'assertion.false'):
         ('thread.join.failed', 'thread.not.joinable')
 }
+INHALE_TO_CALL = {
+    ('inhale.failed', 'insufficient.permission'):
+        ('call.precondition', 'insufficient.permission')
+}
+LOCK_RELEASE_INVARIANT = {
+    ('fold.failed', 'insufficient.permission'):
+        ('lock.invariant.not.established', 'insufficient.permission'),
+    ('fold.failed', 'assertion.false'):
+        ('lock.invariant.not.established', 'assertion.false')
+}
 
 __all__ = (
     'Rules',

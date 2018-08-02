@@ -212,8 +212,10 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             elif name in module.methods:
                 return module.methods[name]
 
-    def get_type(self, prefixes: List[str],
-                 name: str) -> Tuple[str, Dict[Tuple[int, int], str]]:
+    def get_type(self, prefixes: List[str], name: str,
+                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str,
+                                                                     Dict[Tuple[int, int],
+                                                                          str]]:
         """
         Returns the main type and the alternative types of the element
         identified by this name found under this prefix in the current module
@@ -221,13 +223,15 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         E.g., the type of local variable 'a' from method 'm' in class 'C'
         will be returned for the input (['C', 'm'], 'a').
         """
+        if self in previous:
+            return None, None
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
         local_type, local_alts = self.types.get_type(actual_prefix, name)
         if local_type is not None:
             return local_type, local_alts
         for module in self.from_imports:
-            module_result = module.get_type(prefixes, name)
+            module_result = module.get_type(prefixes, name, previous + (self,))
             if module_result != (None, None):
                 return module_result
         return None, None
@@ -488,7 +492,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type, type)
+            assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
             assert self.types_match(field.type, type)
@@ -1862,7 +1866,8 @@ def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
     Receives a list of tuples each one containing a guard and a guarded
     expression and produces an equivalent chain of conditional expressions.
     """
-    assert(len(guarded_expr) >= 2)
+    if len(guarded_expr) == 1:
+        return guarded_expr[0][1]
     guard, then_exp = guarded_expr[0]
     if len(guarded_expr) == 2:
         _, else_exp = guarded_expr[1]
