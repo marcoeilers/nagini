@@ -26,7 +26,11 @@ from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
-from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
+from nagini_translation.lib.util import (
+    ConsistencyException,
+    InvalidProgramException,
+    UnsupportedException,
+)
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.sif_analyzer import SIFAnalyzer
 from nagini_translation.sif_translator import SIFTranslator
@@ -113,6 +117,14 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
+
+    # Run consistency check in translated AST
+    consistency_errors = viperast.to_list(prog.checkTransitively())
+    for error in consistency_errors:
+        print(error.toString())
+    if consistency_errors:
+        raise ConsistencyException('consistency.error')
+
     return prog
 
 
@@ -348,6 +360,9 @@ def translate_and_verify(python_file, jvm, args, print=print):
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
                 else:
                     print(msg)
+    except ConsistencyException as e:
+        print(e.message + ': Translated AST contains inconsistencies.')
+
     except JavaException as e:
         print(e.stacktrace())
         raise e

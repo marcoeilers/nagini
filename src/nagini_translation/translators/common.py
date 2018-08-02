@@ -735,8 +735,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 guard = self.type_check(args[0], cls, position, ctx)
 
                 # Translate the method call on this particular receiver's class
-                method = self._get_method_call(cls, func_name, args, arg_types,
-                                               targets, node, ctx)
+                method = self._get_method_call(cls, func_name, list(args), arg_types,
+                                               list(targets), node, ctx)
 
                 # Translated method call into a block
                 block = self.translate_block(method, position, info)
