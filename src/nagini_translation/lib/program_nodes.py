@@ -213,7 +213,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
                 return module.methods[name]
 
     def get_type(self, prefixes: List[str], name: str,
-                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str, Dict[Tuple[int, int], str]]:
+                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str,
+                                                                     Dict[Tuple[int, int],
+                                                                          str]]:
         """
         Returns the main type and the alternative types of the element
         identified by this name found under this prefix in the current module

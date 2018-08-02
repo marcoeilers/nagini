@@ -142,6 +142,7 @@ def ncell_share_permission_lost() -> None:
     assert c.n >= 0
 
 
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def ncell_share_havoc() -> None:
     c = NCell(3)
     assert c.n == 3

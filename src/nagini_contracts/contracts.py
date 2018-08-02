@@ -79,6 +79,8 @@ def Implies(p: bool, q: bool) -> bool:
 
 def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
+    Allows defining an alias for a (pure) expression e1 to use in
+    another expression or assertion e2.
     Let(5, int, lambda x : x + 34) means let x = 5 in x + 34
     """
     pass
@@ -219,7 +221,7 @@ def ToSeq(l: Iterable[T]) -> Sequence[T]:
 
 def Previous(it: T) -> Sequence[T]:
     """
-    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
     the values of x in previous loop iterations.
     """
     pass

@@ -11,13 +11,17 @@ from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
+    DICT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    LIST_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    SEQ_TYPE,
+    SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
 )
@@ -542,16 +546,27 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return [], None
 
-    def get_quantifier_lhs(self, receiver, arg, node, ctx, position):
+    def get_quantifier_lhs(self, receiver: PythonType, arg: Expr, node: ast.AST,
+                           ctx: Context, position: Position) -> Expr:
+        """
+        Returns an expression of type Seq or Set representing the contents of arg.
+        To be used on the left hand side of quantifiers (and in the corresponding
+        triggers):
+        Forall(iter, lambda x: e)
+        becomes
+        forall x: x in <quantifier_lhs> ==> e
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
-            if receiver.name == 'dict':
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == DICT_TYPE:
                 set_ref = self.viper.SetType(self.viper.Ref)
                 field = self.viper.Field('dict_acc', set_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
-            if receiver.name == 'set':
+            if receiver.name == SET_TYPE:
                 set_ref = self.viper.SetType(self.viper.Ref)
                 field = self.viper.Field('set_acc', set_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
@@ -561,15 +576,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,
                      position: Position = None) -> Expr:
+        """
+        Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
-            if receiver.name == 'list':
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == LIST_TYPE:
                 seq_ref = self.viper.SeqType(self.viper.Ref)
                 field = self.viper.Field('list_acc', seq_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
-            if receiver.name == 'Sequence':
+            if receiver.name == SEQ_TYPE:
                 if (isinstance(arg, self.viper.ast.FuncApp) and
                             arg.funcname() == 'Sequence___create__'):
                     args = self.viper.to_list(arg.args())

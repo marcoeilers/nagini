@@ -315,7 +315,8 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
-        print(time.time() - start)
+        duration = '{:.2f}'.format(time.time() - start)
+        print('Verification took ' + duration + ' seconds.')
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):

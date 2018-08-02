@@ -11,6 +11,7 @@ from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
+    DICT_TYPE,
     GET_ARG_FUNC,
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
@@ -21,6 +22,7 @@ from nagini_translation.lib.constants import (
     PSET_TYPE,
     RANGE_TYPE,
     SEQ_TYPE,
+    SET_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -559,24 +561,11 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(domain_node, ctx)
         info = self.no_info(ctx)
 
-        # if isinstance(domain_node, ast.Call) and get_func_name(domain_node) == 'range':
-        #     if not len(domain_node.args) == 2:
-        #         msg = 'range() is currently only supported with two args.'
-        #         raise UnsupportedException(domain_node, msg)
-        #     arg1_stmt, arg1 = self.translate_expr(domain_node.args[0], ctx,
-        #                                           target_type = self.viper.Int)
-        #     arg2_stmt, arg2 = self.translate_expr(domain_node.args[1], ctx,
-        #                                           target_type = self.viper.Int)
-        #     int_var = self.to_int(ref_var, ctx)
-        #     condition = self.viper.And(self.viper.GeCmp(int_var, arg1, pos, info),
-        #                                self.viper.LtCmp(int_var, arg2, pos, info),
-        #                                pos, info)
-        #     return arg1_stmt + arg2_stmt, condition, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        if dom_type.name in ('set', 'dict'):
+        if dom_type.name in (SET_TYPE, DICT_TYPE):
             set_ref = self.viper.SetType(self.viper.Ref)
-            if dom_type.name == 'set':
+            if dom_type.name == SET_TYPE:
                 field = self.viper.Field('set_acc', set_ref, pos, info)
             else:
                 field = self.viper.Field('dict_acc', set_ref, pos, info)

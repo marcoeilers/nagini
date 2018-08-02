@@ -418,13 +418,11 @@ class StatementTranslator(CommonTranslator):
             invariant acc(iter.list_acc, 1 / 20)
             invariant iter.list_acc == list___sil_seq__(a)
             invariant acc(iter.__iter_index, write)
-            invariant acc(iter.__previous, 1 / 20)
-            invariant acc(iter.__previous.list_acc, write)
-            invariant issubtype(typeof(iter.__previous), list()) && ...
+            invariant acc(iter.__previous, write)
             invariant iter_err == null ==>
-                      iter.__iter_index - 1 == list___len__(iter.__previous)
+                      iter.__iter_index - 1 == |iter.__previous|
             invariant iter_err != null ==>
-                      iter.__iter_index == list___len__(iter.__previous)
+                      iter.__iter_index == |iter.__previous|
             invariant iter.__iter_index >= 0 &&
                       iter.__iter_index <= |iter.list_acc|
             invariant |iter.list_acc| > 0 ==>
@@ -434,19 +432,18 @@ class StatementTranslator(CommonTranslator):
                        as given in ``assign_expr``)
             invariant |iter.list_acc| > 0 ==> (c in iter.list_acc)
             invariant iter_err == null ==>
-                          iter.__previous.list_acc ==
+                          iter.__previous ==
                           iter.list_acc[..iter.__iter_index - 1]
             invariant |iter.list_acc| > 0 ==>
                       issubtype(typeof(c), list()) && ...
             invariant iter_err != null ==>
-                      iter.__previous.list_acc == iter.list_acc
+                      iter.__previous == iter.list_acc
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
 
-        param = self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)
         iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
         full_perm = self.viper.FullPerm(pos, info)
 
@@ -491,32 +488,16 @@ class StatementTranslator(CommonTranslator):
                                                               info)
         invariant.append(iter_index_acc_pred)
 
-        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
-                                          pos, info)
+        previous_field = self.viper.Field('__previous', seq_ref, pos, info)
         previous_list_acc = self.viper.FieldAccess(iter_var.ref(),
                                                    previous_field,
                                                    pos, info)
-        #iter_previous_acc_pred = self.viper.FieldAccessPredicate(
-        #    iter_previous_acc, frac_perm_120, pos, info)
-        #invariant.append(iter_previous_acc_pred)
-
-        #previous_list_acc = self.viper.FieldAccess(iter_previous_acc,
-        #                                           list_acc_field, pos, info)
         previous_list_acc_pred = self.viper.FieldAccessPredicate(
             previous_list_acc, full_perm, pos, info)
         invariant.append(previous_list_acc_pred)
-        list_class = ctx.module.global_module.classes[LIST_TYPE]
-
-        #previous_type = GenericType(list_class, [target_var.type])
-        #invariant.append(self.type_check(iter_previous_acc, previous_type, pos,
-        #                                 ctx))
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
-        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
 
-        #previous_len = self.get_function_call(list_class, '__len__',
-        #                                      [iter_previous_acc],
-        #                                      [object_class], None, ctx)
         previous_len = self.viper.SeqLength(previous_list_acc, pos, info)
         no_error_previous_len_eq = self.viper.EqCmp(index_minus_one,
                                                     previous_len, pos, info)
@@ -773,16 +754,6 @@ class StatementTranslator(CommonTranslator):
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
 
-        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
-                                          position, info)
-        previous_acc = self.viper.FieldAccess(iter_var.ref(), previous_field, position,
-                                              info)
-        old_previous = self.viper.LabelledOld(previous_acc, end_label, position, info)
-        target_seq = self.viper.ExplicitSeq([target_var.ref()], position, info)
-        updated_seq = self.viper.SeqAppend(old_previous, target_seq, position, info)
-        previous_is_updated = self.viper.EqCmp(previous_acc, updated_seq, position, info)
-        # body.append(self.viper.Assert(previous_is_updated, position, info))
-
         body.extend(assign_stmt)
 
         loop = global_stmts + self.create_while_node(
@@ -948,6 +919,8 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
+            # Call translate_Call directly to preserve information that this is
+            # a top-level contract statement (those aren't allowed in most places).
             stmt, val = self.translate_Call(node.value, ctx, statement=True)
             if val is not None:
                 pos = self.to_position(node, ctx)

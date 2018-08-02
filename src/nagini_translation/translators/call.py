@@ -401,6 +401,11 @@ class CallTranslator(CommonTranslator):
         return start_stmt + end_stmt, call
 
     def _translate_enumerate(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translate a call to enumerate(iterable) to a creation of a new list-object,
+        an inhale about its type, and an inhale defining the contents of the new
+        list.
+        """
         if len(node.args) != 1:
             msg = 'enumerate() is currently only supported with one args.'
             raise UnsupportedException(node, msg)
@@ -491,12 +496,15 @@ class CallTranslator(CommonTranslator):
         if target.name in ('acquire', 'release'):
             if (target.cls and target.cls.name == 'Lock' and
                         target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                # Store receiver for later use (contents of args list get changed by
+                # subsequent call).
                 receiver = args[0]
         call_stmt, res = self._only_translate_method_call(target, args, position, node,
                                                           ctx)
         if target.name in ('acquire', 'release'):
             if (target.cls and target.cls.name == 'Lock' and
                         target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                # Automatically fold/unfold the invariant predicate.
                 target_name = target.cls.get_predicate('invariant').sil_name
                 pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
                 info = self.no_info(ctx)
@@ -1164,6 +1172,8 @@ class CallTranslator(CommonTranslator):
         like Assert, a builtin Python function like isinstance, a
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
+        Top-level contract statements like Assert are only allowed if the
+        'statement' flag is set.
         """
         is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)

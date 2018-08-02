@@ -1073,7 +1073,8 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript) and
                 not (isinstance(node.value, ast.Call) and
                          isinstance(node.ctx, ast.Load))):
-            target = self.get_target(node.value, self.current_function if self.current_function else self.module)
+            container = self.current_function if self.current_function else self.module
+            target = self.get_target(node.value, container)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
                 if isinstance(real_target, PythonGlobalVar):
@@ -1113,6 +1114,7 @@ class Analyzer(ast.NodeVisitor):
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
                 if mypy_type.type.name() == 'enumerate':
+                    # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
                     int_type = self.module.global_module.classes[INT_TYPE]
                     tuple_class = self.module.global_module.classes[TUPLE_TYPE]
@@ -1156,6 +1158,7 @@ class Analyzer(ast.NodeVisitor):
         prefix = mypy_type._fullname
         name = mypy_type.name()
         if prefix == 'builtins.enumerate':
+            # We cheat and represent type enumerate as a list of pairs.
             prefix = 'builtins.list'
             name = 'list'
         if prefix.endswith('.' + name):

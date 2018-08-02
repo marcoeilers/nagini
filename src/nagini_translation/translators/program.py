@@ -675,27 +675,33 @@ class ProgramTranslator(CommonTranslator):
 
     def _get_adt_cons_params_decl(self, cons: PythonClass, adt_name: str,
                                   adt_type: DomainType, pos: Position,
-                                 info: Info, ctx) -> List[VarDecl]:
+                                 info: Info, ctx: Context) -> List[VarDecl]:
         """
         Returns the parameters of the ADT constructor as a list of variable
         declarations.
         """
         arguments = []
         for arg_name, arg_type in cons.fields.items():
-            argument_type = adt_type if arg_type.type.name == adt_name else self.translate_type(arg_type.type, ctx)
+            if arg_type.type.name == adt_name:
+                argument_type = adt_type
+            else:
+                argument_type = self.translate_type(arg_type.type, ctx)
             argument = self.viper.LocalVarDecl(arg_name, argument_type, pos, info)
             arguments.append(argument)
         return arguments
 
     def _get_adt_cons_params_use(self, cons: PythonClass, adt_name: str,
                                  adt_type: DomainType, pos: Position,
-                                 info: Info, ctx) -> List[Var]:
+                                 info: Info, ctx: Context) -> List[Var]:
         """
         Returns the parameters of the ADT constructor as a list of variables.
         """
         arguments = []
         for arg_name, arg_type in cons.fields.items():
-            argument_type = adt_type if arg_type.type.name == adt_name else self.translate_type(arg_type.type, ctx)
+            if arg_type.type.name == adt_name:
+                argument_type = adt_type
+            else:
+                argument_type = self.translate_type(arg_type.type, ctx)
             argument = self.viper.LocalVar(arg_name, argument_type, pos, info)
             arguments.append(argument)
         return arguments
@@ -715,26 +721,32 @@ class ProgramTranslator(CommonTranslator):
                self._disjoin(eqs[1:], pos, info), pos, info)
 
     def _create_adt_func_constructors(self, adt: PythonClass, adt_type: DomainType,
-                                      pos: Position, info: Info, ctx) -> List[DomainFunc]:
+                                      pos: Position, info: Info,
+                                      ctx: Context) -> List[DomainFunc]:
         """
         Create domain functions representing constructors of the ADT.
         """
         assert adt.all_subclasses[0] == adt
         for cons in adt.all_subclasses[1:]:
-            arguments = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos, info, ctx)
+            arguments = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos,
+                                                       info, ctx)
             yield self.viper.DomainFunc(adt.fresh(adt.adt_prefix + cons.name),
                                         arguments, adt_type, False, pos, info,
                                         adt.adt_domain_name)
     
     def _create_adt_func_deconstructors(self, adt: PythonClass, adt_type: DomainType,
-                                        pos: Position, info: Info, ctx) -> List[DomainFunc]:
+                                        pos: Position, info: Info,
+                                        ctx: Context) -> List[DomainFunc]:
         """
         Create domain functions representing deconstructors of the ADT.
         """
         adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
         for cons in adt.all_subclasses[1:]:
             for arg_name, arg_type in cons.fields.items():
-                function_type = adt_type if arg_type.type.name == adt.name else self.translate_type(arg_type.type, ctx)
+                if arg_type.type.name == adt.name:
+                    function_type = adt_type
+                else:
+                    function_type = self.translate_type(arg_type.type, ctx)
                 yield self.viper.DomainFunc(adt.fresh(adt.adt_prefix + cons.name
                                             + '_' + arg_name), [adt_obj_decl],
                                             function_type, False, pos, info,
@@ -766,14 +778,15 @@ class ProgramTranslator(CommonTranslator):
 
     def _create_adt_axiom_deconstructors_over_constructors(self, adt: PythonClass,
                                       adt_type: DomainType, pos: Position,
-                                      info: Info, ctx) -> List[DomainAxiom]:
+                                      info: Info, ctx: Context) -> List[DomainAxiom]:
         """
         Create domain axiom representing the distribution of deconstructors over
         constructors.
         """
         for cons in adt.all_subclasses[1:]:
             args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos, info, ctx)
-            args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos, info, ctx)
+            args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos,
+                                                       info, ctx)
             if len(args) > 0:
                 cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                      cons.name), args, adt_type,
@@ -797,7 +810,7 @@ class ProgramTranslator(CommonTranslator):
 
     def _create_adt_axiom_constructors_over_deconstructors(self, adt: PythonClass,
                                       adt_type: DomainType, pos: Position,
-                                      info: Info, ctx) -> List[DomainAxiom]:
+                                      info: Info, ctx: Context) -> List[DomainAxiom]:
         """
         Create domain axiom representing the distribution of constructors over
         deconstructors.
@@ -806,7 +819,8 @@ class ProgramTranslator(CommonTranslator):
         adt_obj_decl = self.viper.LocalVarDecl('obj', adt_type, pos, info)
         for cons in adt.all_subclasses[1:]:
             if len(cons.fields.items()) > 0:
-                args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos, info, ctx)
+                args = self._get_adt_cons_params_use(cons, adt.name, adt_type, pos, info,
+                                                     ctx)
                 triggers, decons_calls = [], []
                 is_cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix
                                                         + 'is_' + cons.name),
@@ -835,7 +849,7 @@ class ProgramTranslator(CommonTranslator):
 
     def _create_adt_axiom_associate_cons_type_with_const(self, adt: PythonClass,
                                       adt_type: DomainType, pos: Position,
-                                      info: Info, ctx) -> List[DomainAxiom]:
+                                      info: Info, ctx: Context) -> List[DomainAxiom]:
         """
         Create domain axiom associating each construtor type with a
         respective constant.
@@ -858,7 +872,8 @@ class ProgramTranslator(CommonTranslator):
             if len(cons.fields.items()) == 0:
                 forall = eq
             else:
-                args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos, info, ctx)
+                args_decl = self._get_adt_cons_params_decl(cons, adt.name, adt_type, pos,
+                                                           info, ctx)
                 trigger = self.viper.Trigger([cons_call], pos, info)
                 forall = self.viper.Forall(args_decl, [trigger], eq, pos, info)
             yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
@@ -1321,7 +1336,8 @@ class ProgramTranslator(CommonTranslator):
         domains.append(self.create_thread_domain(ctx))
         domains.append(self.create_functions_domain(func_constants, ctx))
         domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
-        adts_domains, adts_functions = self.create_adts_domains_and_functions(adt_list, ctx)
+        adts_domains, adts_functions = self.create_adts_domains_and_functions(adt_list,
+                                                                              ctx)
         domains.extend(adts_domains)
         functions.extend(adts_functions)
 

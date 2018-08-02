@@ -66,6 +66,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(rectype, mypy.types.AnyType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
             if isinstance(rectype, mypy.types.UnionType):
+                # Collext all non-None elements of the union,
+                # taking nested unions into account.
                 utypes = [rectype]
                 uindex = 0
                 types = []
