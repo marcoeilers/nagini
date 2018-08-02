@@ -492,32 +492,33 @@ class StatementTranslator(CommonTranslator):
                                                               info)
         invariant.append(iter_index_acc_pred)
 
-        previous_field = self.viper.Field('__previous', self.viper.Ref, pos,
-                                          info)
-        iter_previous_acc = self.viper.FieldAccess(iter_var.ref(),
+        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
+                                          pos, info)
+        previous_list_acc = self.viper.FieldAccess(iter_var.ref(),
                                                    previous_field,
                                                    pos, info)
-        iter_previous_acc_pred = self.viper.FieldAccessPredicate(
-            iter_previous_acc, frac_perm_120, pos, info)
-        invariant.append(iter_previous_acc_pred)
+        #iter_previous_acc_pred = self.viper.FieldAccessPredicate(
+        #    iter_previous_acc, frac_perm_120, pos, info)
+        #invariant.append(iter_previous_acc_pred)
 
-        previous_list_acc = self.viper.FieldAccess(iter_previous_acc,
-                                                   list_acc_field, pos, info)
+        #previous_list_acc = self.viper.FieldAccess(iter_previous_acc,
+        #                                           list_acc_field, pos, info)
         previous_list_acc_pred = self.viper.FieldAccessPredicate(
             previous_list_acc, full_perm, pos, info)
         invariant.append(previous_list_acc_pred)
         list_class = ctx.module.global_module.classes[LIST_TYPE]
 
-        previous_type = GenericType(list_class, [target_var.type])
-        invariant.append(self.type_check(iter_previous_acc, previous_type, pos,
-                                         ctx))
+        #previous_type = GenericType(list_class, [target_var.type])
+        #invariant.append(self.type_check(iter_previous_acc, previous_type, pos,
+        #                                 ctx))
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
         object_class = ctx.module.global_module.classes[OBJECT_TYPE]
 
-        previous_len = self.get_function_call(list_class, '__len__',
-                                              [iter_previous_acc],
-                                              [object_class], None, ctx)
+        #previous_len = self.get_function_call(list_class, '__len__',
+        #                                      [iter_previous_acc],
+        #                                      [object_class], None, ctx)
+        previous_len = self.viper.SeqLength(previous_list_acc, pos, info)
         no_error_previous_len_eq = self.viper.EqCmp(index_minus_one,
                                                     previous_len, pos, info)
         error_previous_len_eq = self.viper.EqCmp(iter_index_acc, previous_len,
@@ -772,6 +773,17 @@ class StatementTranslator(CommonTranslator):
         # Label for continue to jump to
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
+
+        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
+                                          position, info)
+        previous_acc = self.viper.FieldAccess(iter_var.ref(), previous_field, position,
+                                              info)
+        old_previous = self.viper.LabelledOld(previous_acc, end_label, position, info)
+        target_seq = self.viper.ExplicitSeq([target_var.ref()], position, info)
+        updated_seq = self.viper.SeqAppend(old_previous, target_seq, position, info)
+        previous_is_updated = self.viper.EqCmp(previous_acc, updated_seq, position, info)
+        # body.append(self.viper.Assert(previous_is_updated, position, info))
+
         body.extend(assign_stmt)
 
         loop = global_stmts + self.create_while_node(
@@ -1193,7 +1205,7 @@ class StatementTranslator(CommonTranslator):
                                               list_type, position, ctx),
                               position, info))
         # Set list contents to segment of rhs from rhs_index until rhs_end
-        seq = self.get_sequence(rhs_type, rhs, None, node, ctx)
+        seq = self.get_sequence(rhs_type, rhs, None, node, ctx, position)
 
         seq_until = self.viper.SeqTake(seq, rhs_end, position, info)
         seq_from = self.viper.SeqDrop(seq_until, rhs_lit, position, info)
