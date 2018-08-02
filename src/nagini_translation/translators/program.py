@@ -445,7 +445,7 @@ class ProgramTranslator(CommonTranslator):
         fields.append(self.viper.Field('__iter_index', self.viper.Int,
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
-        fields.append(self.viper.Field('__previous', self.viper.Ref,
+        fields.append(self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('list_acc',
@@ -1207,8 +1207,8 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not (func_name in ('__str__', '__bool__') and
-                                               func.overrides.cls.name == 'object'):
+                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
+                                               func.overrides.cls.name == 'object') or (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
                         # We allow overriding certain methods, since the basic versions
                         # in object are already minimal.
                         raise InvalidProgramException(func.node,

@@ -125,9 +125,8 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures _res.list_acc == self.list_acc
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
-  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
   ensures issubtypeIterator(typeof(_res), list_arg(typeof(self), 0))
-  ensures issubtypelist(typeof(_res.__previous), list_arg(typeof(self), 0))
 {
   inhale false
 }

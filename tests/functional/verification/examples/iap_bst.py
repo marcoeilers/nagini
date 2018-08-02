@@ -1,4 +1,3 @@
-#:: IgnoreFile(107)
 
 from typing import Optional
 from nagini_contracts.contracts import *
@@ -54,10 +53,9 @@ def tree(n : TreeNode) -> bool:
     return (Acc(n.key) and Acc(n.payload) and Acc(n.leftChild) and Acc(n.rightChild) and
             Acc(n.parent) and
             Implies(n.leftChild is not None, tree(n.leftChild) and
-                    Unfolding(tree(n.leftChild), n.leftChild.parent is n)) and
+                    getParent(n.leftChild) is n) and
             Implies(n.rightChild is not None, tree(n.rightChild) and
-                    Unfolding(tree(n.rightChild), n.rightChild.parent is n)))
-
+                    getParent(n.rightChild) is n))
 
 
 @Pure
@@ -68,6 +66,11 @@ def sorted(n: TreeNode, upper: Optional[int], lower: Optional[int]) -> bool:
             Implies(lower is not None, n.key > lower) and
             Implies(n.leftChild is not None, sorted(n.leftChild, n.key, lower)) and
             Implies(n.rightChild is not None, sorted(n.rightChild, upper, n.key))))
+
+@Pure
+def getParent(node: TreeNode) -> Optional['TreeNode']:
+    Requires(tree(node))
+    return Unfolding(tree(node), node.parent)
 
 
 class BinarySearchTree:
@@ -98,8 +101,8 @@ class BinarySearchTree:
         Requires(Implies(upper is not None, key < upper))
         Requires(Implies(lower is not None, key > lower))
         Ensures(tree(currentNode) and sorted(currentNode, upper, lower))
-        Ensures(Unfolding(tree(currentNode), currentNode.parent) is
-                Old(Unfolding(tree(currentNode), currentNode.parent)))
+        Ensures(getParent(currentNode) is
+                Old(getParent(currentNode)))
         Unfold(tree(currentNode))
         res = True
         if key < currentNode.key:

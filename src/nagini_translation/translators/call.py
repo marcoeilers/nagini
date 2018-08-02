@@ -118,7 +118,7 @@ class CallTranslator(CommonTranslator):
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
-        arg_type = self.get_type(node.args[0], ctx)
+        arg_type = self.get_type(node.args[0], ctx).try_box()
         len_stmt, len_val = self.get_func_or_method_call(arg_type, '__len__', [target],
                                                          [None], node, ctx)
         return stmt + len_stmt, len_val
@@ -330,8 +330,8 @@ class CallTranslator(CommonTranslator):
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
-            arg_seq = self.get_sequence(arg_type, contents, None, node, ctx)
-            res_seq = self.get_sequence(set_type, result_var, None, node, ctx)
+            arg_seq = self.get_sequence(arg_type, contents, None, node, ctx, position)
+            res_seq = self.get_sequence(set_type, result_var, None, node, ctx, position)
             seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var
@@ -1054,7 +1054,7 @@ class CallTranslator(CommonTranslator):
                 receiver_class = None
                 is_predicate = target.predicate
             elif (isinstance(node.func.value, ast.Call) and
-                        get_func_name(node.func.value) == 'super'):
+                        get_func_name(node.func.value) == 'super' and not (target.cls and target.cls.name == 'dict')):
                     # Super call
                     return self._inline_call(target, node, True, 'static call',
                                              ctx)
