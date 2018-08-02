@@ -3,6 +3,7 @@ from nagini_contracts.contracts import (
     Assert,
     Implies,
     Invariant,
+    Predicate,
     Requires,
     Ensures,
 )
@@ -13,7 +14,13 @@ from nagini_contracts.lock import Lock
 # Positive examples.
 
 
-def await_1(l: Lock[object]) -> None:
+class ObjectLock(Lock[object]):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
+
+
+def await_1(l: ObjectLock) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
@@ -21,14 +28,13 @@ def await_1(l: Lock[object]) -> None:
     while i > 0:
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
-        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
     l.release()
 
 
-def await_2(l: Lock[object]) -> None:
+def await_2(l: ObjectLock) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     Ensures(MustRelease(l))
@@ -37,7 +43,6 @@ def await_2(l: Lock[object]) -> None:
     while i > 0:
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
-        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
@@ -49,14 +54,12 @@ def await_2(l: Lock[object]) -> None:
 def await_3(l: Lock[object]) -> None:
     Requires(MustRelease(l))
     Requires(WaitLevel() < Level(l))
-    Requires(l.invariant())
     Ensures(MustRelease(l))
     i = 5
     while i > 0:
         #:: ExpectedOutput(invariant.not.established:insufficient.permission)
         Invariant(MustRelease(l))
         Invariant(WaitLevel() < Level(l))
-        Invariant(l.invariant())
         l.release()
         l.acquire()
         i -= 1
@@ -86,18 +89,15 @@ def infinite_recursion(l: Lock[object]) -> None:
 def no_obligation_1(l: Lock[object]) -> None:
     Requires(Implies(False, MustRelease(l)))
     Requires(l is not None)
-    Requires(l.invariant())
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     l.release()
 
 
 def no_obligation_2(l: Lock[object]) -> None:
     Requires(l is not None)
-    Requires(l.invariant())
     i = 5
     while i > 0:
         Invariant(Implies(False, MustRelease(l)))
-        Invariant(l.invariant())
         #:: ExpectedOutput(call.precondition:insufficient.permission)
         l.release()
         i -= 1
@@ -110,7 +110,6 @@ class A:
 
     def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
-        Requires(l.invariant())
         l.release()
 
 
@@ -118,7 +117,6 @@ class ASub(A):
 
     def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
-        Requires(l.invariant())
         l.release()
 
 
@@ -127,7 +125,6 @@ class B:
     #:: Label(B_release)
     def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l, 2))
-        Requires(l.invariant())
         l.release()
 
 
@@ -136,5 +133,4 @@ class BSub(B):
     #:: ExpectedOutput(call.precondition:insufficient.permission, B_release)
     def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
-        Requires(l.invariant())
         l.release()

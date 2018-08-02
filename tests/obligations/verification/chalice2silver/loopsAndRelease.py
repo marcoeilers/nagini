@@ -8,27 +8,32 @@ suite.
 from nagini_contracts.contracts import (
     Assert,
     Invariant,
+    Predicate,
     Requires,
 )
 from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock
 
 
-def rel_now(a: Lock[object]) -> None:
+class ObjectLock(Lock[object]):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
+
+
+def rel_now(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 2))
-    Requires(a.invariant())
     a.release()
 
 
-def rel_later(a: Lock[object]) -> None:
+def rel_later(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(MustRelease(a, 10))
-    Requires(a.invariant())
     a.release()
 
 
-def f(a: Lock[object]) -> None:
+def f(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 
@@ -42,7 +47,7 @@ def f(a: Lock[object]) -> None:
 
 
 #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
-def f_leak(a: Lock[object]) -> None:
+def f_leak(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 
@@ -54,7 +59,7 @@ def f_leak(a: Lock[object]) -> None:
         i += 1
 
 
-def f_leak2(a: Lock[object]) -> None:
+def f_leak2(a: ObjectLock) -> None:
     Requires(a is not None)
     Requires(WaitLevel() < Level(a))
 

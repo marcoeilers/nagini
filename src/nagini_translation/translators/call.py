@@ -488,7 +488,10 @@ class CallTranslator(CommonTranslator):
         call is a lock release/acquire).
         """
         stmts = arg_stmts
-        receiver = args[0]
+        if target.name in ('acquire', 'release'):
+            if (target.cls and target.cls.name == 'Lock' and
+                        target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                receiver = args[0]
         call_stmt, res = self._only_translate_method_call(target, args, position, node,
                                                           ctx)
         if target.name in ('acquire', 'release'):

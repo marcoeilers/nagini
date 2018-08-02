@@ -429,12 +429,16 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
+        elif isinstance(node, ast.Str):
+            return self.find_or_create_class(node.s)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            elif isinstance(node.slice.value, ast.Str):
                 ast_args = [node.slice.value]
             else:
                 ast_args = node.slice.value.elts

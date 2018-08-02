@@ -56,11 +56,9 @@ class WatchDog:
             Invariant(Acc(d.lock, 1/2) and d.lock.get_locked() is d)
             Invariant(MustRelease(d.lock, 1))
             Invariant(WaitLevel() < Level(d.lock))  # guarantees deadlock freedom
-            Invariant(d.lock.invariant())
-            Unfold(d.lock.invariant())
+            Invariant(Acc(d.d) and d.d % 2 == 0)
             # We can check that the invariant holds.
             assert d.d % 2 == 0
-            Fold(d.lock.invariant())
             d.lock.release()
             # Others may acquire the lock and modify d
             self.delay(5)
@@ -75,7 +73,6 @@ def main() -> None:
     # Spawn the watchdog thread
     wthread.start(w.watch)
     data.lock.acquire()
-    Unfold(data.lock.invariant())
     data.d = 0
     while True:
         Invariant(Acc(data.lock, 1/4))
@@ -87,9 +84,7 @@ def main() -> None:
         # Modify the locked data in a legal way
         data.d = data.d + 2
 
-        Fold(data.lock.invariant())
         data.lock.release()
         # Others may acquire the lock
         data.lock.acquire()
-        Unfold(data.lock.invariant())
 

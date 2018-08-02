@@ -11,6 +11,7 @@ from nagini_contracts.contracts import (
     Ensures,
     Implies,
     Invariant,
+    Predicate,
     Requires,
 )
 from nagini_contracts.obligations import *
@@ -18,15 +19,19 @@ from nagini_contracts.lock import Lock
 from typing import Optional
 
 
+class ObjectLock(Lock['A']):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
+
 class A:
 
     def __init__(self) -> None:
-        self.x = None   # type: Optional[Lock[A]]
+        self.x = None   # type: Optional[ObjectLock]
         self.y = 0
 
     def m1_hide(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
         while x < 5:
@@ -35,7 +40,6 @@ class A:
 
     def m2_hide(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         while x < 5:
             Invariant(MustTerminate(10-x))
@@ -44,35 +48,29 @@ class A:
 
     def m2_transfer_rel(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(Implies(x < 5, MustRelease(self.x, 10-x)))
-            Invariant(Implies(x < 5, self.x.invariant()))
             x += 1
             if x >= 5:
                 self.x.release()
 
     def m2_borrow_rel(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(MustRelease(self.x, 10-x))
-            Invariant(self.x.invariant())
             x += 1
         self.x.release()
 
     def nested1(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         y = 1
         while x < 5:
             Invariant(Acc(self.x) and MustRelease(self.x, 10 - x))
-            Invariant(self.x.invariant())
             x += 1
             #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
             while y < 5:
@@ -81,13 +79,11 @@ class A:
 
     def nested1_after_inner(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         y = 1
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(Implies(x < 5, MustRelease(self.x, 10 - x)))
-            Invariant(Implies(x < 5, self.x.invariant()))
             x += 1
             #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
             while y < 5:
@@ -97,13 +93,11 @@ class A:
 
     def nested2(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         y = 1
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(MustRelease(self.x, 10 - x))
-            Invariant(self.x.invariant())
             x += 1
             while y < 5:
                 Invariant(MustTerminate(20 - y))
@@ -112,13 +106,11 @@ class A:
 
     def nested2_after_inner(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         x = 1
         y = 1
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(Implies(x < 5, MustRelease(self.x, 10 - x)))
-            Invariant(Implies(x < 5, self.x.invariant()))
             x += 1
             while y < 5:
                 Invariant(MustTerminate(20 - y))
@@ -129,14 +121,12 @@ class A:
     def nested3(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
         Requires(WaitLevel() < Level(self.x))
-        Requires(self.x.invariant())
         x = 1
         y = 1
         self.x.acquire()
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(MustRelease(self.x, 10 - x))
-            Invariant(self.x.invariant())
             x += 1
             #:: ExpectedOutput(leak_check.failed:loop_context.has_unsatisfied_obligations)
             while y < 5:
@@ -146,19 +136,16 @@ class A:
     def nested4(self) -> None:
         Requires(Acc(self.x) and self.x is not None)
         Requires(WaitLevel() < Level(self.x))
-        Requires(self.x.invariant())
         x = 1
         self.x.acquire()
         while x < 5:
             Invariant(Acc(self.x))
             Invariant(Implies(x < 5, MustRelease(self.x, 10 - x)))
-            Invariant(Implies(x < 5, self.x.invariant()))
             x += 1
             y = 1
             while y < 5:
                 Invariant(Acc(self.x))
                 Invariant(Implies(y < 5 or x < 5, MustRelease(self.x, 10 - y)))
-                Invariant(Implies(y < 5 or x < 5, self.x.invariant()))
                 y += 1
                 if y == 5 and x == 5:
                     self.x.release()
