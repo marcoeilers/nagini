@@ -3,16 +3,17 @@ from typing import Optional
 
 class ListClass():
     def __init__(self, v: int) -> None:
-        Ensures(MyList(self))
-        Ensures(size(self) == 1)
         self.val = v
         self.next = None #type: Optional[ListClass]
         Fold(MyList(self.next))
         Fold(MyList(self))
+        Ensures(MyList(self))
+        Ensures(size(self) == 1)
+        Ensures(Unfolding(MyList(self), self.val == v))
 
 @Predicate
 def accVal(l: ListClass) -> bool:
-    return Acc(l.val) and Low(l.val)
+    return Acc(l.val) and LowVal(l.val)
 
 @Pure
 def getVal(l: ListClass) -> int:
@@ -36,6 +37,18 @@ def setValMethod2(l: ListClass, v: int) -> None:
     Unfold(accVal(l))
     l.val = v
     Fold(accVal(l))
+
+def unfold_fail(secret: bool) -> None:
+    if secret:
+        l = ListClass(0)
+        Unfold(MyList(l))
+        Fold(accVal(l))
+    else:
+        l = ListClass(1)
+        Unfold(MyList(l))
+        Fold(accVal(l))
+    #:: ExpectedOutput(unfold.failed:sif.unfold)
+    Unfold(accVal(l))
 
 @Predicate
 def MyList(l: Optional[ListClass]) -> bool:

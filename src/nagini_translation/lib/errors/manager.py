@@ -101,7 +101,7 @@ class ErrorManager:
         return
 
     def transformError(self, error: 'AbstractVerificationError') -> 'AbstractVerificationError':
-        """ ransform silver error to a fixpoint. """
+        """ Transform silver error to a fixpoint. """
         old_error = None
         while old_error != error:
             old_error = error
@@ -111,7 +111,6 @@ class ErrorManager:
     def _convert_error(
             self, error: 'AbstractVerificationError',
             jvm: Optional[JVM]) -> Error:
-        # TODO: Is this the best place to do the error transformation? Does it break anything?
         error = self.transformError(error)
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)

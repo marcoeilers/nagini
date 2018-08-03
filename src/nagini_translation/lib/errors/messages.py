@@ -72,6 +72,8 @@ ERRORS = {
         lambda n: 'Thread start may fail.',
     'thread.join.failed':
         lambda n: 'Thread join may fail.',
+    'termination_channel_check.failed':
+        lambda n: 'Termination channel might exist.',
 }
 
 REASONS = {
@@ -141,9 +143,11 @@ REASONS = {
     'missing.start.permission':
         lambda n: 'May not have permission to start thread.',
     'sif.fold':
-        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0])),
+        lambda n: 'The low parts of predicate {} might not hold.'.format(
+            get_target_name(n.args[0])),
     'sif.unfold':
-        lambda n: 'Cannot prove the low parts of predicate {}.'.format(get_target_name(n.args[0])),
+        lambda n: 'The low parts of predicate {} might not hold.'.format(
+            get_target_name(n.args[0])),
     'sif_termination.condition_not_low':
         lambda n: 'Termination condition {} might not be low.'.format(pprint(n.args[0])),
     'sif_termination.not_lowevent':

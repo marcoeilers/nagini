@@ -9,7 +9,7 @@ def loop_no_lowevent(h: int) -> None:
     while x != 0:
         Invariant(x <= h)
         Invariant(Implies(h >= 0, x >= 0))
-        #:: ExpectedOutput(assert.failed:sif_termination.not_lowevent)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.not_lowevent)
         Invariant(TerminatesSif(h >= 0, x))
         x -= 1
 
@@ -19,7 +19,7 @@ def loop_termcond_high(h: int) -> None:
     while x != 0:
         Invariant(x <= h)
         Invariant(Implies(h >= 0, x >= 0))
-        #:: ExpectedOutput(assert.failed:sif_termination.condition_not_low)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)
         Invariant(TerminatesSif(h >= 0, x))
         x -= 1
 
@@ -30,7 +30,7 @@ def loop_termcond_not_tight(h: int) -> None:
     while x != 0:
         Invariant(x <= h)
         Invariant(Implies(h > 0, x >= 0))
-        #:: ExpectedOutput(invariant.not.established:sif_termination.condition_not_tight)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_tight)
         Invariant(TerminatesSif(h > 0, x))
         x -= 1
 
@@ -66,10 +66,11 @@ def return_ok() -> None:
 
 def nested(h: int) -> None:
     x1 = h
+    #:: ExpectedOutput(carbon)(leak_check.failed:must_terminate.loop_promise_not_kept)
     while x1 != 0:
         Invariant(x1 <= h)
         Invariant(Implies(h >= 0, x1 >= 0))
-        #:: ExpectedOutput(assert.failed:sif_termination.condition_not_low)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)|ExpectedOutput(carbon)(termination_channel_check.failed:sif_termination.not_lowevent)
         Invariant(TerminatesSif(h >= 0, x1))
         x2 = 10
         while x2 != 0:
@@ -85,22 +86,27 @@ def terminates(x: int) -> int:
     return x
 
 def recursion(h: int) -> int:
-    Requires(TerminatesSif(h >= 0, h + 2))
+    #:: ExpectedOutput(carbon)(termination_channel_check.failed:sif_termination.condition_not_tight)
+    Requires(TerminatesSif(h > 0, h + 2))
     Ensures(Result() == 1)
     x = terminates(h)
     if x == 0:
         return 1
-    #:: ExpectedOutput(call.precondition:sif_termination.not_lowevent)
+    #:: ExpectedOutput(leak_check.failed:caller.has_unsatisfied_obligations)|ExpectedOutput(carbon)(call.precondition:assertion.false)
     return recursion(x - 1)
 
 def recursion_fixed(h: int) -> int:
-    Requires(Low(h))
     Requires(TerminatesSif(h >= 0, h + 2))
     Ensures(Result() == 1)
     x = terminates(h)
     if x == 0:
         return 1
     return recursion_fixed(x - 1)
+
+def test_recursion(secret: int) -> int:
+    #TODO how to get this? :: ExpectedOutput(termination_channel_check.failed:sif_termination.not_lowevent)
+    #:: ExpectedOutput(call.precondition:assertion.false)
+    return recursion_fixed(secret)
 
 def cycle_1(h: int) -> None:
     Requires(TerminatesSif(True, h))

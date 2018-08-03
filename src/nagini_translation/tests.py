@@ -37,7 +37,6 @@ import abc
 import io
 import os
 import re
-import time
 import tokenize
 
 import pytest
@@ -48,6 +47,7 @@ import nagini_translation.mypy_patches.optional_patch
 
 from typing import Any, Dict, List, Optional
 from collections import Counter
+from timeit import default_timer as timer
 
 from nagini_translation.conftest import write_sif_performance_log_file, _pytest_config
 from nagini_translation.lib import config, jvmaccess
@@ -651,9 +651,9 @@ class SIFPerformanceTest(AnnotatedTest):
     """Test the performance loss of SIF verification vs. normal verification."""
 
     def timed(self, function, *args, **kwargs):
-        before = time.clock()
+        before = timer()
         result = function(*args, **kwargs)
-        after = time.clock()
+        after = timer()
         return after - before, result
 
     def test_file(self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
@@ -674,10 +674,10 @@ class SIFPerformanceTest(AnnotatedTest):
         assert prog is not None
         # measure MPP transformation
         configure_mpp_transformation(jvm,
-                                     ctrl_opt=False,
-                                     seq_opt=False,
-                                     act_opt=False,
-                                     func_opt=False)
+                                     ctrl_opt=True,
+                                     seq_opt=True,
+                                     act_opt=True,
+                                     func_opt=True)
         mpp_trafo_time, prog = self.timed(
             jvm.viper.silver.sif.SIFExtendedTransformer.transform, prog, False)
         # measure verification of MPP
