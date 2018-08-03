@@ -66,7 +66,7 @@ def enroll_all(students: Set[Student], course_name: str) -> None:
         Invariant(Forall(students, lambda s: (
         Implies(s not in Previous(student), s.undecided()), [])) and
                   Forall(Previous(student),
-                         lambda s: (s.enrolled(course_name), [])))
+                         lambda s: (s.enrolled(course_name), [[s in students]])))
         student.enroll(course_name)
 
 
