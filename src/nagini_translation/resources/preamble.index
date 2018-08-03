@@ -286,6 +286,10 @@
             "type": "__prim__bool",
             "requires": ["int___bool__", "int___unbox__"]
         },
+        "__int__": {
+            "args": ["float"],
+            "type": "int"
+        },
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
