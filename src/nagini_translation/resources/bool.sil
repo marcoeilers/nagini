@@ -122,7 +122,7 @@ function float___bool__(self: Ref): Bool
     ensures issubtypeint(typeof(self)) ==> (result == int___bool__(self))
 
 function float___int__(self: Ref): Ref
-    requires issubtype(typeof(self), float())
+    requires issubtypefloat(typeof(self))
     ensures typeof(result) == int()
 
 function float___ge__(self: Ref, other: Ref): Bool
