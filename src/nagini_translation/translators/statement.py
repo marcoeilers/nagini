@@ -1342,12 +1342,10 @@ class StatementTranslator(CommonTranslator):
         parent = node
         # Find the loop surrounding this node.
         while not isinstance(parent._parent, (ast.While, ast.For)):
-            # If we find, on the way, that we're in a try block
-            if isinstance(parent._parent, ast.Try):
-                # namely, in the finally branch
-                if parent in parent._parent.finalbody:
-                    # this is illegal in Python any mypy doesn't check it.
-                    raise InvalidProgramException(node, 'continue.in.finally')
+            # If we find, on the way, that we're in a try block, namely in the finally branch
+            if isinstance(parent._parent, ast.Try) and parent in parent._parent.finalbody:
+                # this is illegal in Python any mypy doesn't check it.
+                raise InvalidProgramException(node, 'continue.in.finally')
             else:
                 parent = parent._parent
 

@@ -116,3 +116,55 @@ def m7(i: int, c: Container) -> None:
         c.value += 8
     except MyException2:
         c.value += 18
+
+def m8() -> int:
+    Ensures(Result() == 6)
+    i = 0
+    while True:
+        Invariant(i >= 0 and i <= 7 and i % 2 == 0)
+        if i > 5:
+            break
+        try:
+            i += 1
+        finally:
+            i += 1
+    return i
+
+def m9() -> int:
+    Ensures(Result() == 5)
+    i = 0
+    while i < 5:
+        Invariant(i >= 0 and i <= 5)
+        try:
+            continue
+        finally:
+            i += 1
+    return i
+
+def m10() -> int:
+    Ensures(Result() == 5)
+    i = 0
+    while i < 5:
+        Invariant(i >= 0 and i <= 5)
+        try:
+            pass
+        except Exception:
+            pass
+        else:
+            continue
+        finally:
+            i += 1
+    return i
+
+def m11() -> int:
+    Ensures(Result() == 5)
+    i = 0
+    while i < 5:
+        Invariant(i >= 0 and i <= 5)
+        try:
+            raise MyException()
+        except MyException:
+            continue
+        finally:
+            i += 1
+    return i
