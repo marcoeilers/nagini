@@ -85,19 +85,21 @@ class ExtendedASTStatementTranslator(StatementTranslator):
         try_block = self._get_try_block(node, ctx)
         assert try_block
         body = flatten([self.translate_stmt(stmt, ctx) for stmt in node.body])
-        else_block = []
         if try_block.else_block:
             else_block = flatten([self.translate_stmt(stmt, ctx)
                                   for stmt in try_block.else_block.body])
-        finally_block = []
+            else_block = self.viper.Seqn(else_block, no_pos, no_info)
+        else:
+            else_block = None
         if try_block.finally_block:
             finally_block = flatten([self.translate_stmt(stmt, ctx)
                                      for stmt in try_block.finally_block])
+            finally_block = self.viper.Seqn(finally_block, no_pos, no_info)
+        else:
+            finally_block = None
         catch_blocks = self._create_try_handlers(node, try_block, ctx)
         return [self.viper.Try(self.viper.Seqn(body, no_pos, no_info),
-                               catch_blocks,
-                               self.viper.Seqn(else_block, no_pos, no_info),
-                               self.viper.Seqn(finally_block, no_pos, no_info),
+                               catch_blocks, else_block, finally_block,
                                self.to_position(node, ctx), no_info)]
 
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
