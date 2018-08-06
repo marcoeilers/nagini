@@ -534,6 +534,18 @@ class ContractTranslator(CommonTranslator):
                 if not isinstance(el, ast.List):
                     raise InvalidProgramException(el, 'invalid.trigger')
                 for inner in el.elts:
+                    if (isinstance(inner, ast.Compare) and len(inner.ops) == 1 and
+                            isinstance(inner.ops[0], ast.In)):
+                        # Use the less complex and more efficient trigger translation we
+                        # also use for the domain of the forall quantifier.
+                        assert len(inner.comparators) == 1
+                        lhs_stmt, lhs = self.translate_expr(inner.left, ctx)
+                        part_stmt, part, valid = self._create_quantifier_contains_expr(
+                            lhs, inner.comparators[0], ctx)
+                        if valid and not part_stmt and not lhs_stmt:
+                            trigger.append(part)
+                            continue
+
                     part_stmt, part = self.translate_expr(inner, ctx)
                     if part_stmt:
                         raise InvalidProgramException(inner,
@@ -545,19 +557,19 @@ class ContractTranslator(CommonTranslator):
                 triggers.append(trigger)
         return triggers
 
-    def _create_quantifier_contains_expr(self, var: PythonVar,
+    def _create_quantifier_contains_expr(self, e: Expr,
                                          domain_node: ast.AST,
                                          ctx: Context) -> Tuple[List[Stmt], Expr, bool]:
         """
         Creates the left hand side of the implication in a quantifier
-        expression, which says that var is an element of the given domain.
+        expression, which says that e is an element of the given domain.
         """
         domain_old = False
         if (isinstance(domain_node, ast.Call) and
                     get_func_name(domain_node) == 'Old'):
             domain_old = True
             domain_node = domain_node.args[0]
-        ref_var = self.to_ref(var.ref(), ctx)
+        ref_var = self.to_ref(e, ctx)
         pos = self.to_position(domain_node, ctx)
         info = self.no_info(ctx)
 
@@ -742,7 +754,7 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var,
+        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var.ref(),
                                                                           domain_node,
                                                                           ctx)
         lhs = self.unwrap(lhs)
