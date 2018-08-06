@@ -12,6 +12,8 @@ from nagini_contracts.contracts import (
     ContractOnly,
     Ensures,
     Implies,
+    Low,
+    LowEvent,
     Predicate,
     Pure,
     Requires,
@@ -71,6 +73,8 @@ class Lock(BaseLock, Generic[T]):
         """Acquire the lock."""
         Requires(MustTerminate(1))
         Requires(WaitLevel() < Level(self))
+        Requires(Low(self))
+        Requires(LowEvent())
         Ensures(self.invariant())
         Ensures(MustRelease(self))
 
@@ -80,3 +84,5 @@ class Lock(BaseLock, Generic[T]):
         Requires(MustTerminate(1))
         Requires(MustRelease(self, 1))
         Requires(self.invariant())
+        Requires(Low(self))
+        Requires(LowEvent())
