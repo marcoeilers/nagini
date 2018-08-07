@@ -6,6 +6,8 @@ class A:
 
 
 def test_pset() -> None:
+    no_ints = PSet()  # type: PSet[int]
+    assert len(no_ints) == 0
     ints = PSet(1, 2, 3)
     four = PSet(4)
     a = A()

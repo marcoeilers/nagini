@@ -14,7 +14,7 @@ class Super:
 
 @Predicate
 def some_pred(r: Super, a: int, b: int) -> bool:
-    return (Acc(r.field) and Acc(r.field2)) and (r.field == a and r.field2 == b)
+    return (Acc(r.field, 1) and Acc(r.field2)) and (r.field == a and r.field2 == b)
 
 @Predicate
 def other_pred(r: Super) -> bool:

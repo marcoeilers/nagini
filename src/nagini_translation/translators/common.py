@@ -546,32 +546,35 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return [], None
 
-    def get_quantifier_lhs(self, receiver: PythonType, arg: Expr, node: ast.AST,
-                           ctx: Context, position: Position) -> Expr:
+    def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
+                           node: ast.AST, ctx: Context, position: Position) -> Expr:
         """
-        Returns an expression of type Seq or Set representing the contents of arg.
+        Returns a contains-expression representing whether in_expr is in dom_arg.
         To be used on the left hand side of quantifiers (and in the corresponding
         triggers):
         Forall(iter, lambda x: e)
         becomes
-        forall x: x in <quantifier_lhs> ==> e
-        Defaults to type___sil_seq__, but used simpler expressions for known types
-        to improve performance/triggering.
+        forall x: <quantifier_lhs> ==> e
+        Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
+        types to improve performance/triggering.
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
-            if receiver.name == DICT_TYPE:
+        if (not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType))
+                and dom_type.name in (DICT_TYPE, SET_TYPE)):
+            contains_constructor = self.viper.AnySetContains
+            if dom_type.name == DICT_TYPE:
                 set_ref = self.viper.SetType(self.viper.Ref)
                 field = self.viper.Field('dict_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(arg, field, position, info)
-                return res
-            if receiver.name == SET_TYPE:
+                res = self.viper.FieldAccess(dom_arg, field, position, info)
+            if dom_type.name == SET_TYPE:
                 set_ref = self.viper.SetType(self.viper.Ref)
                 field = self.viper.Field('set_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(arg, field, position, info)
-                return res
-        return self.get_sequence(receiver, arg, None, node, ctx, position)
+                res = self.viper.FieldAccess(dom_arg, field, position, info)
+        else:
+            contains_constructor = self.viper.SeqContains
+            res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
+        return contains_constructor(in_expr, res, position, info)
 
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,

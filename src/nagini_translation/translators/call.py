@@ -140,19 +140,12 @@ class CallTranslator(CommonTranslator):
         return stmt + bool_stmt, bool_val
 
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        if len(node.args) == 2:
-            if self.is_valid_super_call(node, ctx):
-                return self.translate_expr(node.args[1], ctx)
-            else:
-                raise InvalidProgramException(node, 'invalid.super.call')
-        elif not node.args:
-            arg_name = next(iter(ctx.actual_function.args))
-            if arg_name in ctx.var_aliases:
-                replacement = ctx.var_aliases[arg_name]
-                return replacement.ref(node, ctx)
-            return [], ctx.current_function.args[arg_name].ref(node, ctx)
-        else:
-            raise InvalidProgramException(node, 'invalid.super.call')
+        """
+        This will only be called if super() is called in some place that is not the
+        receiver of a method call. Who knows what happens when you interact with that;
+        we do not support it.
+        """
+        raise InvalidProgramException(node, 'invalid.super.call')
 
     def translate_adt_cons(self, cons: PythonClass, args: List[FuncApp],
                            pos: Position, ctx: Context) -> Expr:

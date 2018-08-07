@@ -575,17 +575,7 @@ class ContractTranslator(CommonTranslator):
 
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        if dom_type.name in (SET_TYPE, DICT_TYPE):
-            set_ref = self.viper.SetType(self.viper.Ref)
-            if dom_type.name == SET_TYPE:
-                field = self.viper.Field('set_acc', set_ref, pos, info)
-            else:
-                field = self.viper.Field('dict_acc', set_ref, pos, info)
-            field_acc = self.viper.FieldAccess(domain, field, pos, info)
-            result = self.viper.AnySetContains(ref_var, field_acc, pos, info)
-        else:
-            domain_set = self.get_sequence(dom_type, domain, None, domain_node, ctx, pos)
-            result = self.viper.SeqContains(ref_var, domain_set, pos, info)
+        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos)
         if domain_old:
             result = self.viper.Old(result, pos, info)
         return dom_stmt, result, True

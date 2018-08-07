@@ -564,26 +564,6 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context,
-                          expression: bool = False) -> StmtsAndExpr:
-        """
-        Translates node as a normal expression, then applies Python's auto-
-        conversion to a boolean value (using the __bool__ function)
-        """
-        stmt, res = self.translate_expr(node, ctx, expression)
-        type = self.get_type(node, ctx)
-        bool_class = ctx.module.global_module.classes[BOOL_TYPE]
-        if type is not bool_class:
-            args = [res]
-            arg_type = self.get_type(node, ctx)
-            arg_types = [arg_type]
-            res = self.get_function_call(arg_type, '__bool__', args, arg_types,
-                                         node, ctx)
-        if res.typ() != self.viper.Bool:
-            res = self.get_function_call(bool_class, '__unbox__', [res], [None],
-                                         node, ctx)
-        return stmt, res
-
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
@@ -901,7 +881,7 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        if op not in self._primitive_operations:
+        if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
