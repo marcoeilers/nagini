@@ -14,6 +14,7 @@ from nagini_contracts.contracts import (
 )
 from nagini_contracts.io import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
+from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
@@ -880,7 +881,7 @@ class CallTranslator(CommonTranslator):
             stmts, expr = self.translate_normal_call(
                 type.get_func_or_method(node.func.attr), arg_stmts, args,
                 arg_types, node, ctx, impure)
-            
+
             # Stores guard and translated method call as tuple
             guard_stmts_expr.append((guard, stmts, expr))
 
@@ -1329,6 +1330,12 @@ class CallTranslator(CommonTranslator):
                         not target.predicate):
                 raise InvalidProgramException(node, 'invalid.thread.join')
             method_options.append(target)
+
+        # If we are doing SIF verification, add assertions, LowEvent and Low(thread)
+        if isinstance(self.viper, ViperASTExtended):
+            stmts.append(self.viper.Assert(self.viper.LowEvent(None, pos, info), pos, info))
+            stmts.append(self.viper.Assert(
+                self.viper.Low(thread, None, None, pos, info), pos, info))
 
         # Conditionally inhale postconditions of target methods.
         for method in method_options:

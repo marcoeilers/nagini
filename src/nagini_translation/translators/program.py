@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from collections import OrderedDict
+from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
@@ -630,6 +631,9 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.Ref, False, pos, info, THREAD_DOMAIN)
         domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
                                    pos, info)
+        if isinstance(self.viper, ViperASTExtended):
+            self.viper.ast_extensions.SIFExtendedTransformer.addDomainFuncToDuplicate(
+                self.viper.to_seq([get_method, get_arg, get_old]))
         return domain
 
     def create_definedness_functions(self, ctx: Context) -> List['silver.ast.Function']:
