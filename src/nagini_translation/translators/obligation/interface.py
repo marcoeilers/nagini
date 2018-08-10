@@ -99,6 +99,8 @@ class ObligationTranslator(CommonTranslator):
             return self._translate_must_terminate(node, ctx)
         elif func_name == 'MustRelease':
             return self._translate_must_release(node, ctx)
+        elif func_name == 'MeasureAbove':
+            return self._translate_measure_below(node, ctx)
         elif func_name == 'WaitLevel':
             raise InvalidProgramException(
                 node, 'invalid.wait_level.use')
@@ -181,6 +183,12 @@ class ObligationTranslator(CommonTranslator):
             return self._loop_translator.translate_must_release(node, ctx)
         else:
             return self._method_translator.translate_must_release(node, ctx)
+
+    def _translate_measure_below(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        if ctx.obligation_context.is_translating_loop():
+            return self._loop_translator.translate_measure_below(node, ctx)
+        else:
+            return self._method_translator.translate_measure_below(node, ctx)
 
     def get_obligation_preamble(
             self,
