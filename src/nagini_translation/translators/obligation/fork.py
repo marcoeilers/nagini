@@ -169,11 +169,6 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
             old_info = self._remember_old_expressions(method, collector)
             stmts.append(self.viper.Inhale(old_info, self._position, self._info))
 
-            # In case we do SIF verification, assert lowEvent here
-            if isinstance(self.viper, ViperASTExtended):
-                stmts.append(self.viper.Assert(self.viper.LowEvent(
-                    None, self._position, self._info), self._position, self._info))
-
             # Translate the actual precondition.
             pre_assertion = self.viper.TrueLit(self._position, self._info)
             for pre, _ in method.precondition:
@@ -184,11 +179,11 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
             stmts.append(self.viper.Exhale(pre_assertion.whenExhaling(), self._position,
                                            self._info))
 
-            # In case we do SIF verification, inhale Low(thread) here.
-            if isinstance(self.viper, ViperASTExtended):
-                stmts.append(self.viper.Inhale(self.viper.Low(
-                    self._thread, None, None, self._position, self._info),
-                    self._position, self._info))
+            # # In case we do SIF verification, inhale Low(thread) here.
+            # if isinstance(self.viper, ViperASTExtended):
+            #     stmts.append(self.viper.Inhale(self.viper.Low(
+            #         self._thread, None, None, self._position, self._info),
+            #         self._position, self._info))
 
             # Inhale join permission.
             joinable = self._create_join_permission(method)

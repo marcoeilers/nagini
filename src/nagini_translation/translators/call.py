@@ -1332,10 +1332,10 @@ class CallTranslator(CommonTranslator):
             method_options.append(target)
 
         # If we are doing SIF verification, add assertions, LowEvent and Low(thread)
-        if isinstance(self.viper, ViperASTExtended):
-            stmts.append(self.viper.Assert(self.viper.LowEvent(None, pos, info), pos, info))
-            stmts.append(self.viper.Assert(
-                self.viper.Low(thread, None, None, pos, info), pos, info))
+        # if isinstance(self.viper, ViperASTExtended):
+        #     stmts.append(self.viper.Assert(self.viper.LowEvent(None, pos, info), pos, info))
+        #     stmts.append(self.viper.Assert(
+        #         self.viper.Low(thread, None, None, pos, info), pos, info))
 
         # Conditionally inhale postconditions of target methods.
         for method in method_options:
@@ -1409,7 +1409,7 @@ class CallTranslator(CommonTranslator):
 
         # Translate postcondition
         for post, _ in method.postcondition:
-            _, post_val = self.translate_expr(post, ctx, impure=True)
+            _, post_val = self.translate_expr(post, ctx, target_type=self.viper.Bool, impure=True)
             post_assertion = self.viper.And(post_assertion, post_val, pos, info)
 
         ctx.inlined_calls.pop()
