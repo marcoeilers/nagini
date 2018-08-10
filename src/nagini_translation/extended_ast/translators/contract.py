@@ -7,6 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 from typing import Optional
 
+from nagini_translation.extended_ast.lib.util import in_postcondition_of_dyn_bound_call
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     FLOAT_TYPE,
@@ -29,25 +30,6 @@ class ExtendedASTContractTranslator(ContractTranslator):
     Extended AST version of the contract translator.
     """
 
-    def _is_in_postcondition(self, node: ast.Expr, func: PythonMethod) -> bool:
-        post = func.postcondition
-        for cond in post:
-            for cond_node in ast.walk(cond[0]):
-                if cond_node is node:
-                    return True
-        return False
-
-    def _in_postcondition_of_dyn_bound_call(self, ctx: Context) -> Optional[DomainFuncApp]:
-        """
-        Determine if we are in a postcondition of a dynamically bound method.
-        """
-        if (ctx.current_class and
-                ctx.current_function.method_type == MethodType.normal and
-                ctx.obligation_context.is_translating_posts):
-            return self.type_factory.typeof(
-                next(iter(ctx.actual_function.args.values())).ref(), ctx)
-        return None
-
     def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Low() contract function.
@@ -57,7 +39,7 @@ class ExtendedASTContractTranslator(ContractTranslator):
         stmts, expr = self.translate_expr(node.args[0], ctx)
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        self_type = self._in_postcondition_of_dyn_bound_call(ctx)
+        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
         return [], self.viper.Low(
             expr, None, self_type, self.to_position(node, ctx), self.no_info(ctx))
 
@@ -68,7 +50,7 @@ class ExtendedASTContractTranslator(ContractTranslator):
         stmts, expr = self.translate_expr(node.args[0], ctx)
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        self_type = self._in_postcondition_of_dyn_bound_call(ctx)
+        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
         # determine the comparator function to use
         expr_type = self.get_type(node.args[0], ctx)
         low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, SEQ_TYPE,

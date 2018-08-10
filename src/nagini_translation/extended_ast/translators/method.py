@@ -37,6 +37,8 @@ class ExtendedASTMethodTranslator(MethodTranslator):
         return []
 
     def translate_method(self, method: PythonMethod, ctx: Context) -> Method:
+        self.viper.ctx = ctx
+        self.viper.type_factory = self.type_factory
         if method.all_low:
             self.viper.all_low_methods.add(method.sil_name)
         elif method.preserves_low:

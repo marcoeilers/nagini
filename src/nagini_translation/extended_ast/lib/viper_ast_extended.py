@@ -6,6 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from typing import List, Optional
 
+from nagini_translation.extended_ast.lib.util import in_postcondition_of_dyn_bound_call
 from nagini_translation.lib.typedefs import (
     Expr, Info, Position, Seqn, Stmt, Var, VarAssign
 )
@@ -23,6 +24,8 @@ class ViperASTExtended(ViperAST):
         self.all_low_methods = set()
         self.preserves_low_methods = set()
         self.equality_comp_functions = set()
+        self.ctx = None
+        self.type_factory = None
 
     def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
         expr_opt = self.scala.Some(expr) if expr is not None else self.none
@@ -64,7 +67,7 @@ class ViperASTExtended(ViperAST):
         return self.ast_extensions.SIFTryCatchStmt(
             body, catch_blocks_seq, else_opt, fin_opt, position, info, self.NoTrafos)
 
-    def Low(self, expr: Expr, comp: Optional[str] ,self_check: Optional[Expr],
+    def Low(self, expr: Expr, comp: Optional[str], self_check: Optional[Expr],
             position: Position, info: Info):
         if comp:
             self.used_names.add(comp)
@@ -88,8 +91,18 @@ class ViperASTExtended(ViperAST):
     def TerminatesSif(self, cond: Expr, position: Position, info: Info):
         return self.ast_extensions.SIFTerminatesExp(cond, position, info, self.NoTrafos)
 
+    def PredicateAccessPredicate(self, loc, perm, position, info):
+        if self.ctx and self.type_factory:
+            dyn_check = in_postcondition_of_dyn_bound_call(self.type_factory, self.ctx)
+            if dyn_check:
+                info = self.ConsInfo(self.SIFDynCheckInfo([], dyn_check), info)
+        return super().PredicateAccessPredicate(loc, perm, position, info)
+
     def SIFInfo(self, comments: List[str],
                 continue_unaware: bool = False,
                 obligation_var: bool = False) -> 'silver.sif.SIFInfo':
         return self.ast_extensions.SIFInfo(
             self.to_seq(comments), continue_unaware, obligation_var)
+
+    def SIFDynCheckInfo(self, comments: List[str], dyn_check: Expr) -> 'silver.sif.SIFDynCheckInfo':
+        return self.ast_extensions.SIFDynCheckInfo(self.to_seq(comments), dyn_check)

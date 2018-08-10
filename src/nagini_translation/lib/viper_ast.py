@@ -486,6 +486,9 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
+    def ConsInfo(self, head, tail):
+        return self.ast.ConsInfo(head, tail)
+
     def to_position(self, expr, vias, error_string: str=None,
                     rules: Rules=None, file: str = None):
         if expr is None:

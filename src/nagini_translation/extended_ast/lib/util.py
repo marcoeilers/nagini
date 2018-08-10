@@ -4,6 +4,13 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
+from typing import Optional
+
+from nagini_translation.lib.context import Context
+from nagini_translation.lib.program_nodes import MethodType
+from nagini_translation.lib.typedefs import DomainFuncApp
+from nagini_translation.translators.type_domain_factory import TypeDomainFactory
+
 def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
                                  act_opt: bool, func_opt: bool) -> None:
     """
@@ -47,3 +54,16 @@ def set_equality_comp_functions(jvm, names: set) -> None:
         names_seq.update(i, (elem, elem))
     hash_map = names_seq.toMap()
     jvm.viper.silver.sif.SIFExtendedTransformer.equalityCompFunctions = hash_map
+
+def in_postcondition_of_dyn_bound_call(type_factory: TypeDomainFactory,
+                                       ctx: Context) -> Optional[DomainFuncApp]:
+    """
+    Determine if we are in a postcondition of a dynamically bound method. If so return the
+    function application representing the type of self. Else return None.
+    """
+    if (ctx.current_class and
+            ctx.current_function.method_type == MethodType.normal and
+            ctx.obligation_context.is_translating_posts):
+        return type_factory.typeof(
+            next(iter(ctx.actual_function.args.values())).ref(), ctx)
+    return None
