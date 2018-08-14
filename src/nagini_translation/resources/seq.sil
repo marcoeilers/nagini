@@ -6,6 +6,8 @@
 
 function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
     ensures typeof(result) == Sequence(cont_type)
+    // ugly fix for a problem of the new type system encoding, Viper cannot prove this on its own:
+    ensures issubtypeSequence(typeof(result), cont_type)
     ensures Sequence___sil_seq__(result) == prim
 
 function Sequence___sil_seq__(box: Ref): Seq[Ref]

@@ -523,7 +523,7 @@ class TypeDomainFactory:
                 subclass_body = self.viper.Forall(type_arg_decls + subclass_arg_decls, [subclass_trigger], subclass_body, position, info)
             body = self.viper.And(body, subclass_body, position, info)
 
-        res= [self.viper.DomainAxiom('___selfsub' + type.name, body, position, info, self.type_domain)]
+        res= [self.viper.DomainAxiom('___selfsub' + type.sil_name, body, position, info, self.type_domain)]
 
         t_decl = self.viper.LocalVarDecl('_______t', self.type_type(), position, info)
         t = self.viper.LocalVar('_______t', self.type_type(), position, info)
@@ -541,7 +541,7 @@ class TypeDomainFactory:
 
 
 
-        res.append(self.viper.DomainAxiom('___issubtype_' + type.name, body, position, info, self.type_domain))
+        res.append(self.viper.DomainAxiom('___issubtype_' + type.sil_name, body, position, info, self.type_domain))
         return res
 
     def create_subtype_axiom(self, type: PythonType, other_type: PythonType,
@@ -643,7 +643,7 @@ class TypeDomainFactory:
             not_other = self.viper.Not(other, position, info)
             either = self.viper.Or(not_one, not_other, position, info)
             body = self.viper.Forall([t_decl] + type_arg_decls + other_type_arg_decls, [trigger], either, position, info)
-        return self.viper.DomainAxiom('___subtype_' + type.name + '_' + other_type.name, body, position, info, self.type_domain)
+        return self.viper.DomainAxiom('___subtype_' + type.sil_name + '_' + other_type.sil_name, body, position, info, self.type_domain)
 
 
 
