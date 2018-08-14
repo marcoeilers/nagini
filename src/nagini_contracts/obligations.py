@@ -14,6 +14,7 @@ from nagini_contracts.thread import Thread
 
 
 OBLIGATION_CONTRACT_FUNCS = [
+    'MeasureAbove',
     'MustTerminate',
     'MustRelease',
     'Level',
@@ -38,6 +39,10 @@ def WaitLevel() -> LevelType:
 
 def Level(l: Union[BaseLock, Thread]) -> LevelType:
     """Level of the given lock or thread."""
+
+
+def MeasureAbove(o: object, i: int) -> bool:
+    """Specifies that the measure of obligation o is above i."""
 
 
 def MustRelease(lock: BaseLock, measure: int = None) -> bool:

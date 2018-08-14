@@ -778,22 +778,50 @@ class ProgramTranslator(CommonTranslator):
                 cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                      cons.name), args, adt_type,
                                                      pos, info, adt.adt_domain_name)
-                triggers = []
-                eqs = []
+                foralls = []
                 for (arg_name, _), arg in zip(cons.fields.items(), args):
                     decons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
                                                            cons.name + '_' + arg_name),
                                                            [cons_call], arg.typ(), pos,
                                                            info, adt.adt_domain_name)
                     eq = self.viper.EqCmp(decons_call, arg, pos, info)
-                    eqs.append(eq)
                     trigger = self.viper.Trigger([decons_call], pos, info)
-                    triggers.append(trigger)
-                body = self._conjoin(eqs, pos, info)
-                forall = self.viper.Forall(args_decl, triggers, body, pos, info)
+                    forall = self.viper.Forall(args_decl, [trigger], eq, pos, info)
+                    foralls.append(forall)
+                body = self._conjoin(foralls, pos, info)
+
                 yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
                                              'decons_over_cons_' + cons.name),
-                                             forall, pos, info, adt.adt_domain_name)
+                                             body, pos, info, adt.adt_domain_name)
+
+    def _create_adt_axiom_deconstructor_types(self, adt: PythonClass,
+                                              adt_type: DomainType, pos: Position,
+                                              info: Info, ctx) -> List[DomainAxiom]:
+        for cons in adt.all_subclasses[1:]:
+            arg_decl = self.viper.LocalVarDecl('_adt', adt_type, pos, info)
+            arg_val = self.viper.LocalVar('_adt', adt_type, pos, info)
+            foralls = []
+            for arg_name, arg_field in cons.fields.items():
+                if (isinstance(arg_field.type, PythonClass) and
+                        (arg_field.type.name in PRIMITIVES or arg_field.type is adt)):
+                    continue
+                arg_type = self.translate_type(arg_field.type, ctx)
+                decons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix +
+                                                                 cons.name + '_' + arg_name),
+                                                       [arg_val], arg_type, pos,
+                                                       info, adt.adt_domain_name)
+
+                trigger = self.viper.Trigger([decons_call], pos, info)
+                check = self.type_check(decons_call, arg_field.type, pos, ctx, False)
+                forall = self.viper.Forall([arg_decl], [trigger], check, pos, info)
+                foralls.append(forall)
+            if not foralls:
+                continue
+            body = self._conjoin(foralls, pos, info)
+
+            yield self.viper.DomainAxiom(adt.fresh(adt.adt_prefix +
+                                                   'decons_types_' + cons.name),
+                                         body, pos, info, adt.adt_domain_name)
 
     def _create_adt_axiom_constructors_over_deconstructors(self, adt: PythonClass,
                                       adt_type: DomainType, pos: Position,
@@ -1057,6 +1085,10 @@ class ProgramTranslator(CommonTranslator):
             ## Destructors over constructors
             axioms.extend(self._create_adt_axiom_deconstructors_over_constructors(
                           adt, adt_type, pos, info, ctx))
+
+            ## Destructors over constructors
+            axioms.extend(self._create_adt_axiom_deconstructor_types(
+                adt, adt_type, pos, info, ctx))
 
             ## Constructors over destructors
             axioms.extend(self._create_adt_axiom_constructors_over_deconstructors(

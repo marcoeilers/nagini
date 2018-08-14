@@ -118,3 +118,14 @@ class MethodObligationTranslator(CommonObligationTranslator):
 
         constructor.construct_fork()
         return constructor.get_statements()
+
+    def translate_measure_below(
+            self, node: ast.Call, ctx: Context) -> 'StmtsAndExpr':
+        measures = self._get_obligation_info(ctx).method_measure_map
+        obl = sil.PythonRefExpression(node.args[0])
+        bound = sil.PythonIntExpression(node.args[1])
+        check = measures.check(obl, bound)
+        info = self.no_info(ctx)
+        pos = self.to_position(node, ctx)
+        e = check.translate(self, ctx, pos, info)
+        return [], e
