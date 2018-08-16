@@ -500,6 +500,8 @@ class ContractTranslator(CommonTranslator):
         if pred_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         expr_stmt, expr = self.translate_expr(node.args[1], ctx)
+        if expr_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
         expr = self.unwrap(expr)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
