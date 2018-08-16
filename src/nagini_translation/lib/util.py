@@ -365,6 +365,8 @@ class OldExpressionCollector(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id == 'Old':
             assert len(node.args) == 1
             self.expressions.append(node.args[0])
+        else:
+            self.generic_visit(node)
 
 
 class OldExpressionTransformer(ast.NodeTransformer):

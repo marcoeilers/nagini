@@ -881,6 +881,9 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
+        # This is disabled for the moment because using the functions is advantageous
+        # when using operations as triggers
+        return False
         if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
