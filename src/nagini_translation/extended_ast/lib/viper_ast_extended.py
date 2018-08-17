@@ -6,7 +6,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from typing import List, Optional
 
-from nagini_translation.extended_ast.lib.util import in_postcondition_of_dyn_bound_call
+from nagini_translation.extended_ast.lib.util import (
+    in_postcondition_of_dyn_bound_call, in_override_check
+)
 from nagini_translation.lib.typedefs import (
     Expr, Info, Position, Seqn, Stmt, Var, VarAssign
 )
@@ -67,20 +69,17 @@ class ViperASTExtended(ViperAST):
         return self.ast_extensions.SIFTryCatchStmt(
             body, catch_blocks_seq, else_opt, fin_opt, position, info, self.NoTrafos)
 
-    def Low(self, expr: Expr, comp: Optional[str], self_check: Optional[Expr],
-            position: Position, info: Info):
+    def Low(self, expr: Expr, comp: Optional[str], position: Position, info: Info):
         if comp:
             self.used_names.add(comp)
             comp_opt = self.scala.Some(comp)
         else:
             comp_opt = self.none
-        check_opt = self.scala.Some(self_check) if self_check is not None else self.none
         return self.ast_extensions.SIFLowExp(
-            expr, comp_opt, check_opt, position, info, self.NoTrafos)
+            expr, comp_opt, position, info, self.NoTrafos)
 
-    def LowEvent(self, self_check: Optional[Expr], position: Position, info: Info):
-        check_opt = self.scala.Some(self_check) if self_check is not None else self.none
-        return self.ast_extensions.SIFLowEventExp(check_opt, position, info, self.NoTrafos)
+    def LowEvent(self, position: Position, info: Info):
+        return self.ast_extensions.SIFLowEventExp(position, info, self.NoTrafos)
 
     def Declassify(self, expr: Expr, position: Position, info: Info):
         return self.ast_extensions.SIFDeclassifyStmt(expr, position, info, self.NoTrafos)
@@ -95,7 +94,8 @@ class ViperASTExtended(ViperAST):
         if self.ctx and self.type_factory:
             dyn_check = in_postcondition_of_dyn_bound_call(self.type_factory, self.ctx)
             if dyn_check:
-                info = self.ConsInfo(self.SIFDynCheckInfo([], dyn_check), info)
+                info = self.ConsInfo(
+                    self.SIFDynCheckInfo([], dyn_check, in_override_check(self.ctx)), info)
         return super().PredicateAccessPredicate(loc, perm, position, info)
 
     def SIFInfo(self, comments: List[str],
@@ -104,5 +104,7 @@ class ViperASTExtended(ViperAST):
         return self.ast_extensions.SIFInfo(
             self.to_seq(comments), continue_unaware, obligation_var)
 
-    def SIFDynCheckInfo(self, comments: List[str], dyn_check: Expr) -> 'silver.sif.SIFDynCheckInfo':
-        return self.ast_extensions.SIFDynCheckInfo(self.to_seq(comments), dyn_check)
+    def SIFDynCheckInfo(self, comments: List[str],
+                        dyn_check: Expr,
+                        dyn_check_only: bool = False) -> 'silver.sif.SIFDynCheckInfo':
+        return self.ast_extensions.SIFDynCheckInfo(self.to_seq(comments), dyn_check, dyn_check_only)

@@ -67,3 +67,7 @@ def in_postcondition_of_dyn_bound_call(type_factory: TypeDomainFactory,
         return type_factory.typeof(
             next(iter(ctx.actual_function.args.values())).ref(), ctx)
     return None
+
+def in_override_check(ctx: Context) -> bool:
+    exceptional_positions = ['inheritance', 'override']
+    return any(map(lambda tuple: tuple[0] in exceptional_positions, ctx.position))

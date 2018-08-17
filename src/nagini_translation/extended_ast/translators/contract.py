@@ -7,7 +7,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 from typing import Optional
 
-from nagini_translation.extended_ast.lib.util import in_postcondition_of_dyn_bound_call
+from nagini_translation.extended_ast.lib.util import (
+    in_postcondition_of_dyn_bound_call, in_override_check
+)
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     FLOAT_TYPE,
@@ -18,7 +20,7 @@ from nagini_translation.lib.constants import (
     TUPLE_TYPE
 )
 from nagini_translation.lib.program_nodes import PythonMethod, MethodType
-from nagini_translation.lib.typedefs import StmtsAndExpr, DomainFuncApp
+from nagini_translation.lib.typedefs import StmtsAndExpr, DomainFuncApp, Info
 from nagini_translation.lib.util import (InvalidProgramException,
                                          UnsupportedException)
 from nagini_translation.translators.abstract import Context
@@ -29,6 +31,17 @@ class ExtendedASTContractTranslator(ContractTranslator):
     """
     Extended AST version of the contract translator.
     """
+    def _create_dyn_check_info(self, ctx: Context) -> Info:
+        """
+        Check if we are in the postcondition of a method which calls will be dynamically bound,
+        if so create a SIFDynCheckInfo, else NoInfo.
+        If we are in a override check method, only do the version with dynamic call check.
+        """
+        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
+        if self_type:
+            return self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
+        return self.no_info(ctx)
+
 
     def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -39,9 +52,9 @@ class ExtendedASTContractTranslator(ContractTranslator):
         stmts, expr = self.translate_expr(node.args[0], ctx)
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
+        info = self._create_dyn_check_info(ctx)
         return [], self.viper.Low(
-            expr, None, self_type, self.to_position(node, ctx), self.no_info(ctx))
+            expr, None, self.to_position(node, ctx), info)
 
     def translate_lowval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -50,7 +63,7 @@ class ExtendedASTContractTranslator(ContractTranslator):
         stmts, expr = self.translate_expr(node.args[0], ctx)
         if stmts:
             raise InvalidProgramException(node, 'purity.violated')
-        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
+        info = self._create_dyn_check_info(ctx)
         # determine the comparator function to use
         expr_type = self.get_type(node.args[0], ctx)
         low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, SEQ_TYPE,
@@ -61,7 +74,7 @@ class ExtendedASTContractTranslator(ContractTranslator):
         else:
             comparator = None
         return [], self.viper.Low(
-            expr, comparator, self_type, self.to_position(node, ctx), self.no_info(ctx))
+            expr, comparator, self.to_position(node, ctx), info)
 
     def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -70,9 +83,10 @@ class ExtendedASTContractTranslator(ContractTranslator):
         if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
             self_type = self.type_factory.typeof(
                 next(iter(ctx.actual_function.args.values())).ref(), ctx)
+            info = self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
         else:
-            self_type = None
-        return [], self.viper.LowEvent(self_type, self.to_position(node, ctx), self.no_info(ctx))
+            info = self.no_info(ctx)
+        return [], self.viper.LowEvent(self.to_position(node, ctx), info)
 
     def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
