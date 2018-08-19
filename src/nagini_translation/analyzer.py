@@ -590,7 +590,7 @@ class Analyzer(ast.NodeVisitor):
             return
         self.visited_modules.append(module)
         old_contract_only = self.contract_only
-        self.contract_only = True
+        self.contract_only = not self.selected
         old_module = self.module
         self.module = module
         self.visit_module(module)
