@@ -18,7 +18,7 @@ def main(a: List[int], secret: int) -> int:
         Invariant(list_pred(a))
         Invariant(Low(len(a)))
         Invariant(0 <= i and i <= len(a))
-        #:: ExpectedOutput(invariant.not.preserved:assertion.false)
+        #:: ExpectedOutput(invariant.not.established:assertion.false)
         Invariant(Forall(range(0, len(a)), lambda el: Low(a[el])))
         Invariant(Low(i))
         if a[i] == 1:

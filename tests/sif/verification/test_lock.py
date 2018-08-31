@@ -16,6 +16,7 @@ class CellLock(Lock[Cell]):
         return Acc(self.get_locked().value) and LowVal(self.get_locked().value)
 
 def client(secret: bool) -> None:
+    Requires(LowEvent())
     c = Cell(1)
     l = CellLock(c)
     l.acquire()

@@ -80,18 +80,31 @@ def int_constant(secret: bool) -> int:
         return 1
     return 1
 
-def int_unchanged_low(secret: bool, x: int) -> int:
+def int_unchanged_low(secret: int, x: int) -> int:
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(Low(x), Low(Result())))
-    if secret:
-        return x + 0
+    if secret == 0:
+        return x + secret
     return x
 
-def int_unchanged_lowval(secret: bool, x: int) -> int:
+def int_unchanged_lowval(secret: int, x: int) -> int:
     Ensures(Implies(Low(x), LowVal(Result())))
-    if secret:
-        return x + 0
+    if secret == 0:
+        return x + secret
     return x
+
+def bool_int(secret: bool) -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(Low(Result()))
+    if secret:
+        return 1
+    return True
+
+def bool_int_lowval(secret: bool) -> int:
+    Ensures(LowVal(Result()))
+    if secret:
+        return 1
+    return True
 
 def string_container_low(secret: bool, x: str) -> str:
     #:: ExpectedOutput(postcondition.violated:assertion.false)

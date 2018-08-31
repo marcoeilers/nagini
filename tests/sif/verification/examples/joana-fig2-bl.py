@@ -16,6 +16,7 @@ def f(x: int) -> int:
     return x + 42
 
 def main(h: int) -> None:
+    Requires(LowEvent())
     l = 2
     x = f(h)
     y = f(l)

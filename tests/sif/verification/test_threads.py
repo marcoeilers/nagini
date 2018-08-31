@@ -40,13 +40,19 @@ def printOne() -> None:
     Requires(LowEvent())
     sif_print(1)
 
-def zero() -> int:
-    Ensures(Low(Result()))
-    return 0
+def zero(c: Cell) -> None:
+    Requires(MustTerminate(1))
+    Requires(Acc(c.val))
+    Ensures(Acc(c.val))
+    Ensures(Low(c.val))
+    c.val = 0
 
-def one() -> int:
-    Ensures(Low(Result()))
-    return 1
+def one(c: Cell) -> None:
+    Requires(MustTerminate(1))
+    Requires(Acc(c.val))
+    Ensures(Acc(c.val))
+    Ensures(Low(c.val))
+    c.val = 1
 
 def client(secret: bool) -> None:
     c1 = Cell()
@@ -73,13 +79,15 @@ def fork_lowevent(secret: bool) -> None:
     t.start(printZero, printOne)
 
 def join_low(secret: bool) -> None:
+    c = Cell()
     if secret:
-        t = Thread(target=zero, args=())
+        t = Thread(target=zero, args=(c,))
     else:
-        t = Thread(target=one, args=())
+        t = Thread(target=one, args=(c,))
     t.start(zero, one)
-    #:: ExpectedOutput(thread.join.failed:thread.not.joinable)
     t.join(zero, one)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(Low(c.val))
 
 class A:
     def foo(self) -> int:

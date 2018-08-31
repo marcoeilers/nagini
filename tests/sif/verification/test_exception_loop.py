@@ -4,8 +4,8 @@ from typing import Optional
 
 class Container:
     def __init__(self) -> None:
-        Ensures(Acc(self.value) and self.value == 0)  # type: ignore
         self.value = 0
+        Ensures(Acc(self.value) and self.value == 0)
 
 
 def break_out_exception(c: Container, b: bool) -> None:

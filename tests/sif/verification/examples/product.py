@@ -7,7 +7,7 @@ Dufay, G., Felty, A., & Matwin, S.
 International Conference on Automated Deduction 2005
 """
 
-from typing import List
+from typing import List, Optional
 
 from nagini_contracts.contracts import *
 
@@ -26,25 +26,29 @@ class Combined:
         self.payroll = payroll
         self.employee = employee
 
-def check_join_and_find_employee(psi: Payroll, es: List[Employee]) -> Combined:
+def check_join_and_find_employee(psi: Payroll, es: List[Employee]) -> Optional[Combined]:
     Requires(list_pred(es))
-    Requires(Low(es))
+    Requires(Low(es) and Low(len(es)))
     Requires(Acc(psi.joinInd, 1/4) and Low(psi.joinInd))
     Requires(Acc(psi.PID, 1/4) and Low(psi.PID))
-    Requires(Forall(es, lambda e: Acc(e.EID, 1/4) and Low(e.EID)))
+    Requires(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4) and Low(es[i].EID)))
     Ensures(list_pred(es))
     Ensures(Acc(psi.PID, 1/4))
     Ensures(Acc(psi.joinInd, 1/4))
-    Ensures(Forall(es, lambda e: Acc(e.EID, 1/4)))
+    Ensures(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4)))
     Ensures(Low(Result()))
 
     if psi.joinInd:
         j = 0
         while j < len(es):
             Invariant(list_pred(es))
+            Invariant(Low(es) and Low(len(es)))
             Invariant(Acc(psi.PID, 1/8) and Low(psi.PID))
             Invariant(j >= 0 and j <= len(es) and Low(j))
-            Invariant(Forall(es, lambda e: Acc(e.EID, 1/4) and Low(e.EID)))
+            Invariant(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4) and Low(es[i].EID)))
+            Assert(Low(es[j].EID))
+            Assert(Low(psi.PID == es[j].EID))
             if psi.PID == es[j].EID:
                 return Combined(psi, es[j])
             j += 1
+    return None

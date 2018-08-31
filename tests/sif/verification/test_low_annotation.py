@@ -44,6 +44,20 @@ def inc_preserving(c: Container) -> None:
     Ensures(c.f == Old(c.f) + 1)
     c.f = c.f + 1
 
+@PreservesLow
+def add_loop_preserving(amount: int, c: Container) -> None:
+    Requires(Acc(c.f))
+    Requires(amount >= 0)
+    Ensures(Acc(c.f))
+    Ensures(c.f == Old(c.f) + amount)
+    i = 0
+    while i < amount:
+        Invariant(Acc(c.f))
+        Invariant(0 <= i and i <= amount)
+        Invariant(c.f == Old(c.f) + i)
+        inc_preserving(c)
+        i += 1
+
 @AllLow
 def incPred(c: Container) -> None:
     Requires(contPred(c))
