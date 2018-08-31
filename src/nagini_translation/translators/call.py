@@ -847,7 +847,8 @@ class CallTranslator(CommonTranslator):
                                                    optional_error_var, ctx)
         ctx.ignore_family_folds = old_fold
         stmts += inline_stmts
-        stmts.append(end_lbl)
+        if end_lbl:
+            stmts.append(end_lbl)
         if method.declared_exceptions:
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
