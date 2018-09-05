@@ -687,6 +687,9 @@ class SIFPerformanceTest(AnnotatedTest):
         except AssertionError as error:
             result = 'FAILED'
             raise error
+        except AttributeError as error:
+            result = 'FAILED'
+            raise error
         else:
             result = 'PASSED'
         finally:

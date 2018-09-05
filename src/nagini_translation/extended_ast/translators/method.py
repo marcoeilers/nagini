@@ -45,6 +45,40 @@ class ExtendedASTMethodTranslator(MethodTranslator):
             self.viper.preserves_low_methods.add(method.sil_name)
         return super().translate_method(method, ctx)
 
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List[Method]:
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+
+        main = self._get_main_module(modules)
+        main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
+        method_name = main_method.sil_name
+
+        # Create an error variable
+        error_var = self.create_method_error_var(ctx)
+        main_method.error_var = error_var
+        locals.append(error_var.decl)
+        stmts.append(self.viper.LocalVarAssign(
+            error_var.ref(),
+            self.viper.NullLit(no_pos, no_info), no_pos, no_info))
+
+        # Translate statements in main module. When an import statement is encountered,
+        # the translation will include executing the statements in the imported module.
+        for stmt in main.node.body:
+            stmts.extend(self.translate_stmt(stmt, ctx))
+
+        stmts += self._method_body_postamble(main_method, ctx)
+        stmts += self._create_method_epilog(main_method, ctx)
+
+        main_locals = [local.decl for local in main_method.get_locals()
+                       if not local.name.startswith('lambda')]
+        res = self.create_method_node(ctx, method_name, [], [], [], [],
+                                      main_locals + locals, stmts, no_pos,
+                                      no_info, method=ctx.current_function)
+        ctx.current_function = None
+        return main_method, res
+
+
     # def translate_function(self, func: PythonMethod, ctx: Context) -> Function:
     #     if func.cls and func.name == '__eq__':
     #         self.viper.equality_comp_functions.add(func.sil_name)

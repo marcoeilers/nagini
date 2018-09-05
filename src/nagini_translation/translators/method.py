@@ -475,6 +475,12 @@ class MethodTranslator(CommonTranslator):
         postamble += self.add_handlers_for_inlines(ctx)
         return postamble
 
+    def create_method_error_var(self, ctx: Context) -> PythonVar:
+        error_var = PythonVar(ERROR_NAME, None,
+                              ctx.module.global_module.classes['Exception'])
+        error_var.process(ERROR_NAME, self.translator)
+        return error_var
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -487,9 +493,7 @@ class MethodTranslator(CommonTranslator):
         self.bind_type_vars(method, ctx)
 
         results = [res.decl for res in method.get_results()]
-        error_var = PythonVar(ERROR_NAME, None,
-                              ctx.module.global_module.classes['Exception'])
-        error_var.process(ERROR_NAME, self.translator)
+        error_var = self.create_method_error_var(ctx)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()
         method.error_var = error_var
@@ -848,18 +852,13 @@ class MethodTranslator(CommonTranslator):
                 stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
         return locals, stmts
 
-    def translate_main_method(self, modules: List[PythonModule],
-                              ctx: Context) -> List['silver.ast.Method']:
-        """
-        Translates the global statements of the program to a single method.
-        """
-        main = [m for m in modules if m.type_prefix == '__main__'][0]
-        stmts = []
-        no_pos = self.no_position(ctx)
-        no_info = self.no_info(ctx)
-        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
+    def _get_main_module(self, modules: List[PythonModule]) -> PythonModule:
+        return [m for m in modules if m.type_prefix == '__main__'][0]
 
-        stmts.extend(init_stmts)
+    def _create_main_method_setup(self, modules: List[PythonModule],
+                                  ctx: Context) -> Tuple[PythonMethod, List[VarDecl], List[Stmt]]:
+        main = self._get_main_module(modules)
+        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
 
         # Create artificial main PythonMethod that contains the execution of global
         # statements.
@@ -876,6 +875,19 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function.loop_invariants = main.loop_invariants
         ctx.current_function.process(method_name, self.translator)
         ctx.module = main
+        return main_method, locals, init_stmts
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List['silver.ast.Method']:
+        """
+        Translates the global statements of the program to a single method.
+        """
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+
+        main = self._get_main_module(modules)
+        main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
+        method_name = main_method.sil_name
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
