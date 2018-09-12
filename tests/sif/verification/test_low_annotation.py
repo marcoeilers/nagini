@@ -5,6 +5,9 @@ class Container:
         self.f = 0
         Ensures(Acc(self.f))
 
+def get_secret() -> int:
+    return 12
+
 @Predicate
 def contPred(c: Container) -> bool:
     return Acc(c.f)
@@ -89,6 +92,22 @@ def addPred(amount: int, c: Container) -> None:
     c.f += amount
     Fold(contPred(c))
 
+@PreservesLow
+def addPred_preserving(amount: int, c: Container) -> None:
+    Requires(contPred(c))
+    Ensures(contPred(c))
+    Unfold(contPred(c))
+    c.f += amount
+    Fold(contPred(c))
+
+@PreservesLow
+def pred_assert_low(amount: int, c: Container) -> None:
+    Requires(contPred(c))
+    Assert(contPred(c))
+    Unfold(contPred(c))
+    c.f = get_secret()
+    #:: ExpectedOutput(fold.failed:sif.fold)
+    Fold(contPred(c))
 
 @AllLow
 def low_m(a: int) -> int:
