@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Requires, Predicate, Result
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 #:: ExpectedOutput(invalid.program:invalid.io_operation.return_type_not_bool)

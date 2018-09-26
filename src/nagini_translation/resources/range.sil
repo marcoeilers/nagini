@@ -43,9 +43,8 @@ function range___getitem_slice__(self: Ref, index: Ref): Ref
 function range___sil_seq__(self: Ref): Seq[Ref]
   requires issubtype(typeof(self), range())
   ensures |result| == range___len__(self)
-  ensures (forall i: Int :: {result[i]} i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
+  ensures (forall i: Int :: { result[i] } i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
   ensures (forall i: Ref :: { (i in result) } (i in result) == (typeof(i) == int() && (int___unbox__(i) in range___val__(self))))
-  ensures (forall i: Int, j: Int :: {result[i], result[j]} (i >= 0 && j >= 0 && i < |result| && j < |result|) ==> (result[i] == result[j] <==> i == j))
 
 
 function range___eq__(self: Ref, other: Ref): Bool

@@ -14,7 +14,7 @@ class Super:
 
 @Predicate
 def some_pred(r: Super, a: int, b: int) -> bool:
-    return (Acc(r.field) and Acc(r.field2)) and (r.field == a and r.field2 == b)
+    return (Acc(r.field, 1) and Acc(r.field2)) and (r.field == a and r.field2 == b)
 
 @Predicate
 def other_pred(r: Super) -> bool:
@@ -31,7 +31,7 @@ def main() -> None:
 
 def main_2() -> None:
     s = Super(34, 99)
-    #:: ExpectedOutput(assert.failed:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    #:: ExpectedOutput(assert.failed:insufficient.permission)
     Assert(s.field == 34)
     Assert(s.field2 == 12)
     Assert(s.field3 == 99)

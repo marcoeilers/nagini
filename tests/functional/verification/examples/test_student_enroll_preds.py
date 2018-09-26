@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 from typing import Set
 
 
@@ -66,7 +66,7 @@ def enroll_all(students: Set[Student], course_name: str) -> None:
         Invariant(Forall(students, lambda s: (
         Implies(s not in Previous(student), s.undecided()), [])) and
                   Forall(Previous(student),
-                         lambda s: (s.enrolled(course_name), [])))
+                         lambda s: (s.enrolled(course_name), [[s in students]])))
         student.enroll(course_name)
 
 

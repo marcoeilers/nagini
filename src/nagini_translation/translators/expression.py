@@ -199,7 +199,8 @@ class ExpressionTranslator(CommonTranslator):
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
         iter_type = self.get_type(node.generators[0].iter, ctx)
-        sil_seq = self.get_sequence(iter_type, iter, None, node, ctx, position)
+        sil_seq = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+                                    position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
                                      info)
@@ -563,26 +564,6 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context,
-                          expression: bool = False) -> StmtsAndExpr:
-        """
-        Translates node as a normal expression, then applies Python's auto-
-        conversion to a boolean value (using the __bool__ function)
-        """
-        stmt, res = self.translate_expr(node, ctx, expression)
-        type = self.get_type(node, ctx)
-        bool_class = ctx.module.global_module.classes[BOOL_TYPE]
-        if type is not bool_class:
-            args = [res]
-            arg_type = self.get_type(node, ctx)
-            arg_types = [arg_type]
-            res = self.get_function_call(arg_type, '__bool__', args, arg_types,
-                                         node, ctx)
-        if res.typ() != self.viper.Bool:
-            res = self.get_function_call(bool_class, '__unbox__', [res], [None],
-                                         node, ctx)
-        return stmt, res
-
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
@@ -741,30 +722,32 @@ class ExpressionTranslator(CommonTranslator):
         if the projected component's type is ADT (recursive composition).
         """
         info = self.no_info(ctx)
-        adt_name = decons.adt_domain_name
-        adt_prefix = decons.adt_def.name + '_'
-        adt_type = self.viper.DomainType(adt_name, {}, [])
+        adt_type = self.viper.DomainType(decons.adt_domain_name, {}, [])
 
         # Translate receiver
         stmt, adt_obj = self.translate_expr(node.value, ctx)
 
         # Unbox ADT to be deconstructed
-        unbox_func = self.viper.FuncApp('unbox_' + adt_name, [adt_obj], pos,
-                                        info, adt_type)
+        unbox_func = self.viper.FuncApp(decons.fresh('unbox_' +
+                                        decons.adt_domain_name),
+                                        [adt_obj], pos, info, adt_type)
 
         # Calculate return type
         decons_type = (adt_type if decons.fields[node.attr].type == decons.adt_def
-                       else self.viper.Ref)
+                       else self.translate_type(decons.fields[node.attr].type, ctx))
 
         # Translate deconstruction call
-        decons_call = self.viper.DomainFuncApp(adt_prefix + decons.name + '_'
-                                               + node.attr, [unbox_func],
-                                               decons_type, pos, info, adt_name)
+        decons_call = self.viper.DomainFuncApp(decons.fresh(decons.adt_prefix +
+                                               decons.name + '_' + node.attr),
+                                               [unbox_func], decons_type, pos,
+                                               info, decons.adt_domain_name)
 
         # If returned type is ADT type, box it
         if decons_type == adt_type:
-            decons_call = self.viper.FuncApp('box_' + adt_name, [decons_call],
-                                             pos, info, self.viper.Ref)
+            decons_call = self.viper.FuncApp(decons.fresh('box_' +
+                                             decons.adt_domain_name),
+                                             [decons_call], pos, info,
+                                             self.viper.Ref)
 
         return stmt, decons_call
 
@@ -784,7 +767,8 @@ class ExpressionTranslator(CommonTranslator):
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
             return [], field_func
-        elif (target is not None and isinstance(target.type, UnionType) and
+        elif (target is not None and hasattr(target, 'type') and
+                  isinstance(target.type, UnionType) and
                   not isinstance(target.type, OptionalType)):
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
@@ -794,9 +778,17 @@ class ExpressionTranslator(CommonTranslator):
                 field_guard = self.var_type_check(target.sil_name, recv_type, position, ctx)
 
                 # Access the field of the specific type
-                field = recv_type.get_field(node.attr).actual_field
-                field_access = self.viper.FieldAccess(receiver, field.sil_field,
-                                                      position, self.no_info(ctx))
+                field = recv_type.get_field(node.attr)
+                if isinstance(field, PythonField):
+                    field_access = self.viper.FieldAccess(receiver,
+                                                          field.actual_field.sil_field,
+                                                          position, self.no_info(ctx))
+                elif isinstance(field, PythonMethod):
+                    assert False  # too lazy to implement now
+                else:
+                    field = recv_type.get_static_field(node.attr)
+                    field_access = self.translate_static_field_access(field, receiver,
+                                                                      node, ctx)
 
                 guarded_field_access.append((field_guard, field_access))
             if len(guarded_field_access) == 1:
@@ -889,7 +881,10 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        if op not in self._primitive_operations:
+        # This is disabled for the moment because using the functions is advantageous
+        # when using operations as triggers
+        return False
+        if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()

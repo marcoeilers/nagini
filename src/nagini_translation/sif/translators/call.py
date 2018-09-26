@@ -207,7 +207,7 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
         return recv_stmts + [assign], [recv, recv_p], [recv_type, recv_type]
 
     def translate_Call(self, node: ast.Call, ctx: SIFContext,
-                       impure=False) -> StmtsAndExpr:
+                       impure=False, statement=False) -> StmtsAndExpr:
         """
         First checks in self.translated_calls if the call was already
         translated (returning the next result). Calls super().translate_Call
@@ -217,4 +217,4 @@ class SIFCallTranslator(CallTranslator, ExprCacheMixin):
         if call_expr:
             return [], call_expr
 
-        return super().translate_Call(node, ctx, impure)
+        return super().translate_Call(node, ctx, impure, statement)

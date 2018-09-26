@@ -14,6 +14,7 @@ from typing import (
     List, Set,
     Sized,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -24,10 +25,10 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif', 'Acc',
-                  'Rd', 'Fold', 'Unfold', 'Unfolding', 'Previous', 'RaisedException',
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
+                  'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding', 'Previous', 'RaisedException',
                   'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg',
-                  'getOld', 'arg', 'Joinable', 'MayStart',]
+                  'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -65,7 +66,7 @@ def Result() -> Any:
     pass
 
 
-def RaisedException() -> Exception:
+def RaisedException() -> Any:
     pass
 
 
@@ -75,6 +76,14 @@ def Implies(p: bool, q: bool) -> bool:
     """
     pass
 
+
+def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
+    """
+    Allows defining an alias for a (pure) expression e1 to use in
+    another expression or assertion e2.
+    Let(5, int, lambda x : x + 34) means let x = 5 in x + 34
+    """
+    pass
 
 def Forall(domain: Iterable[T],
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
@@ -237,7 +246,7 @@ def ToSeq(l: Iterable[T]) -> Sequence[T]:
 
 def Previous(it: T) -> Sequence[T]:
     """
-    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
     the values of x in previous loop iterations.
     """
     pass
@@ -398,6 +407,7 @@ __all__ = [
         'Implies',
         'Forall',
         'Exists',
+        'Let',
         'Low',
         'LowVal',
         'LowEvent',

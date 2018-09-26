@@ -26,7 +26,11 @@ from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
-from nagini_translation.lib.util import InvalidProgramException, UnsupportedException
+from nagini_translation.lib.util import (
+    ConsistencyException,
+    InvalidProgramException,
+    UnsupportedException,
+)
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.extended_ast.lib.util import (
@@ -104,9 +108,6 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if not type_correct:
         return None
 
-    # if sif:
-    #     analyzer = SIFAnalyzer(types, path, selected)
-    # else:
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
@@ -127,6 +128,12 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if sif:
         set_all_low_methods(jvm, viperast.all_low_methods)
         set_preserves_low_methods(jvm, viperast.preserves_low_methods)
+    # Run consistency check in translated AST
+    consistency_errors = viperast.to_list(prog.checkTransitively())
+    for error in consistency_errors:
+        print(error.toString())
+    if consistency_errors:
+        raise ConsistencyException('consistency.error')
     return prog
 
 
@@ -297,6 +304,7 @@ def main() -> None:
 
 def translate_and_verify(python_file, jvm, args, print=print):
     try:
+        start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
@@ -337,6 +345,8 @@ def translate_and_verify(python_file, jvm, args, print=print):
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
+        duration = '{:.2f}'.format(time.time() - start)
+        print('Verification took ' + duration + ' seconds.')
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
@@ -368,6 +378,9 @@ def translate_and_verify(python_file, jvm, args, print=print):
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
                 else:
                     print(msg)
+    except ConsistencyException as e:
+        print(e.message + ': Translated AST contains inconsistencies.')
+
     except JavaException as e:
         print(e.stacktrace())
         raise e

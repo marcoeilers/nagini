@@ -10,7 +10,7 @@ import ast
 from abc import ABCMeta
 from collections import OrderedDict
 from enum import Enum
-from nagini_contracts.io import BUILTIN_IO_OPERATIONS
+from nagini_contracts.io_contracts import BUILTIN_IO_OPERATIONS
 from nagini_translation.lib.constants import (
     BOXED_PRIMITIVES,
     CALLABLE_TYPE,
@@ -33,6 +33,7 @@ from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     get_column,
     InvalidProgramException,
+    SingletonFreshName,
 )
 from nagini_translation.lib.views import (
     CombinedDict,
@@ -211,8 +212,10 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
             elif name in module.methods:
                 return module.methods[name]
 
-    def get_type(self, prefixes: List[str],
-                 name: str) -> Tuple[str, Dict[Tuple[int, int], str]]:
+    def get_type(self, prefixes: List[str], name: str,
+                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str,
+                                                                     Dict[Tuple[int, int],
+                                                                          str]]:
         """
         Returns the main type and the alternative types of the element
         identified by this name found under this prefix in the current module
@@ -220,13 +223,15 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         E.g., the type of local variable 'a' from method 'm' in class 'C'
         will be returned for the input (['C', 'm'], 'a').
         """
+        if self in previous:
+            return None, None
         actual_prefix = self.type_prefix.split('.') if self.type_prefix else []
         actual_prefix.extend(prefixes)
         local_type, local_alts = self.types.get_type(actual_prefix, name)
         if local_type is not None:
             return local_type, local_alts
         for module in self.from_imports:
-            module_result = module.get_type(prefixes, name)
+            module_result = module.get_type(prefixes, name, previous + (self,))
             if module_result != (None, None):
                 return module_result
         return None, None
@@ -383,8 +388,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
     @property
     def is_defining_adt(self) -> bool:
         """
-        Returns true if class is defining the ADT's name.
+        Returns true if the class is defining an algebraic data type. This class
+        defines the name of the ADT and should be directly inherited by the
+        classes defining the ADT's constructors.
         """
+        assert self.is_adt
         if self.superclass:
             return self.superclass.name == 'ADT'
         return False
@@ -394,6 +402,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         Returns the class that defines the ADT.
         """
+        assert self.is_adt
         if self.is_defining_adt:
             return self
         else:
@@ -404,9 +413,17 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         Returns the domain name where the ADT is defined.
         """
-        if not hasattr(self.adt_def, '_adt_domain_name'):
-            self.adt_def._adt_domain_name = self.adt_def.get_fresh_name(self.adt_def.name)
-        return self.adt_def._adt_domain_name
+        assert self.is_adt
+        return self.fresh(self.adt_def.name)
+
+    @property
+    def adt_prefix(self) -> str:
+        """
+        Returns the prefix of the domain name where the ADT is defined.
+        Prefixes are used in defining domain functions and axioms.
+        """
+        assert self.is_adt
+        return self.adt_def.name + '_'
 
     @property
     def all_subclasses(self) -> List['PythonClass']:
@@ -445,6 +462,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         result |= set(self.static_fields)
         return result
 
+    def fresh(self, name: str) -> str:
+        assert self.is_adt
+        if not hasattr(self.adt_def, '_fresh'):
+            self.adt_def._fresh = SingletonFreshName(self.module)
+        return self.adt_def._fresh(name)
+
     def types_match(self, type_a: 'PythonType', type_b: 'PythonType') -> bool:
         """
         Checks if types are either the same or, if one of them is an union, checks
@@ -469,7 +492,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         """
         if name in self.fields:
             field = self.fields[name]
-            assert self.types_match(field.type, type)
+            assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
             assert self.types_match(field.type, type)
@@ -514,6 +537,14 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return self.superclass.get_method(name)
         else:
             return None
+
+    def has_function(self, name: str) -> bool:
+        """
+        Check the function with the given name exists this class or
+        superclass.
+        """
+        return name in self.functions or (self.superclass.has_function(name)
+               if self.superclass is not None else False)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
@@ -742,6 +773,20 @@ class GenericType(PythonType):
         Returns the method with the given name in this class or a superclass.
         """
         return self.python_class.get_method(name)
+
+    def has_function(self, name: str) -> bool:
+        """
+        Check if all types of the generic type have a function with the given
+        name.
+        """
+        if isinstance(self, UnionType):
+            types_set = self.get_types() - {None}
+            result = len(types_set) > 0
+            for type in types_set:
+                result = result and type.has_function(name)
+            return result
+        else:
+            return self.cls.has_function(name)
 
     def get_function(self, name: str) -> Optional['PythonMethod']:
         """
@@ -1823,7 +1868,8 @@ def chain_cond_exp(guarded_expr: List[Tuple[Expr, Expr]],
     Receives a list of tuples each one containing a guard and a guarded
     expression and produces an equivalent chain of conditional expressions.
     """
-    assert(len(guarded_expr) >= 2)
+    if len(guarded_expr) == 1:
+        return guarded_expr[0][1]
     guard, then_exp = guarded_expr[0]
     if len(guarded_expr) == 2:
         _, else_exp = guarded_expr[1]

@@ -74,6 +74,8 @@ ERRORS = {
         lambda n: 'Thread join may fail.',
     'termination_channel_check.failed':
         lambda n: 'Termination channel might exist.',
+    'lock.invariant.not.established':
+        lambda n: 'Lock invariant might not hold.',
 }
 
 REASONS = {
@@ -114,7 +116,7 @@ REASONS = {
         lambda n: ('Callee {} might not take all unsatisfied obligations '
                    'from the caller.'.format(get_target_name(n))),
     'method_body.leaks_obligations':
-        lambda n: ('Method {} body might leak '
+        lambda n: ('Body of method {} might leak '
                    'obligations.'.format(get_target_name(n))),
     'loop_context.has_unsatisfied_obligations':
         lambda n: ('Loop might not take all unsatisfied obligations '

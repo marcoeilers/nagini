@@ -143,10 +143,11 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
-                               self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info,
-                               self.NoTrafos)
+        method = getobject(self.ast, "MethodWithLabelsInScope")
+        return method.apply(name, self.to_seq(args), self.to_seq(returns),
+                            self.to_seq(pres), self.to_seq(posts),
+                            body_with_locals, position, info,
+                            self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -284,11 +285,11 @@ class ViperAST:
     def CurrentPerm(self, location, position, info):
         return self.ast.CurrentPerm(location, position, info, self.NoTrafos)
 
-    def ForPerm(self, variable, access_list, body, position, info):
-        for acc in access_list:
-            if isinstance(acc, self.ast.Predicate):
-                self.used_names.add(acc.name())
-        return self.ast.ForPerm(variable, self.to_seq(access_list), body,
+    def ForPerm(self, variable, access, body, position, info):
+        if isinstance(access, self.ast.Predicate):
+            self.used_names.add(access.name())
+        variables = self.to_seq([variable])
+        return self.ast.ForPerm(variables, access, body,
                                 position, info, self.NoTrafos)
 
     def PermMinus(self, exp, position, info):

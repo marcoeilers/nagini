@@ -5,7 +5,7 @@ from nagini_contracts.contracts import (
     Result,
     Requires,
 )
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 from nagini_contracts.io_builtins import (
     gap_io,
     Gap,

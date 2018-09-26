@@ -11,7 +11,7 @@ def find_divisor(product: int) -> int:
     i = 2
     while i < product:
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [])))
+        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [[product % x]])))
         if product % i == 0:
             break
         i += 1
@@ -30,7 +30,7 @@ def find_divisor_else(product: int) -> int:
     i = 2
     while i < product:
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [])))
+        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [[product % x]])))
         if product % i == 0:
             break
         i += 1
@@ -42,18 +42,16 @@ def find_divisor_else(product: int) -> int:
 def find_divisor_for(product: int) -> int:
     Requires(product > 2)
     Ensures(Result() >= 2 and Result() <= product)
-    Ensures(Forall(ToSeq(range(2, Result())), lambda x: (product % x != 0, [])))
+    Ensures(Forall(range(2, Result()), lambda x: (product % x != 0, [])))
     Ensures(Implies(Result() != product, product % Result() == 0))
     for i in range(2, product):
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(ToSeq(Previous(i)), lambda x: (product % x != 0, [])))
+        Invariant(Forall(Previous(i), lambda x: (product % x != 0, [[product % x]])))
         if product % i == 0:
-            Assert(ToSeq(Previous(i)) == ToSeq(range(2, i)))
-            Assert(Forall(ToSeq(range(2, i)), lambda x: (product % x != 0, [])))
+            Assert(Previous(i) == ToSeq(range(2, i)))
             break
     else:
         i = product
-        Assert(Forall(range(2, i), lambda x: (product % x != 0, [])))
     return i
 
 
@@ -63,8 +61,7 @@ def find_divisor_for_2(product: int) -> int:
     Ensures(False)
     for i in range(2, product):
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(Previous(i), lambda x: (product % x != 0, [])))
-        Invariant(Forall(ToSeq(Previous(i)), lambda x: (product % x != 0, [])))
+        Invariant(Forall(Previous(i), lambda x: (product % x != 0, [[product % x]])))
         if product % i == 0:
             break
     else:

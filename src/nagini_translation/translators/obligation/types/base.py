@@ -109,7 +109,7 @@ class Obligation(abc.ABC):
         """Create a ForPerm expression with predicate for use in leak check."""
         return sil.ForPerm(
             var_name,
-            [sil.Predicate(predicate_name, var_name)],
+            sil.Predicate(predicate_name, var_name),
             sil.FalseLit())
 
     def _create_field_for_perm(
@@ -117,7 +117,7 @@ class Obligation(abc.ABC):
         """Create a ForPerm expression with field for use in leak check."""
         return sil.ForPerm(
             var_name,
-            [sil.Field(field_name, sil.INT)],
+            sil.Field(field_name, sil.INT),
             sil.FalseLit())
 
     def create_predicates(

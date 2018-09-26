@@ -68,6 +68,15 @@ class InvalidProgramException(Exception):
         self.message = message
 
 
+class ConsistencyException(Exception):
+    """
+    Exception reporting that the translated AST has a consistency error
+    """
+
+    def __init__(self, message: str = None) -> None:
+        self.message = message
+
+
 class AssignCollector(ast.NodeVisitor):
     """
     Collects all assignment targets within a given (partial) AST.
@@ -356,6 +365,8 @@ class OldExpressionCollector(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id == 'Old':
             assert len(node.args) == 1
             self.expressions.append(node.args[0])
+        else:
+            self.generic_visit(node)
 
 
 class OldExpressionTransformer(ast.NodeTransformer):
@@ -373,3 +384,24 @@ class OldExpressionTransformer(ast.NodeTransformer):
                             args=[ast.Num(n=index)],
                             keywords=[])
         return node
+
+
+class SingletonFreshName:
+    """
+    This class wraps the fresh name facility in scope by using it only when
+    a new name is given. It is designed to store and retrieve the fresh name
+    based on the original name given.
+    """
+
+    def __init__(self, scope: 'PythonScope') -> None:
+        self._fresh_name_dict = {}
+        self._scope = scope
+
+    def __call__(self, name: str) -> str:
+        """
+        Returns a fresh name for a given name and scope if enquired for the
+        first time, otherwise returns the previously given fresh name.
+        """
+        if name not in self._fresh_name_dict:
+            self._fresh_name_dict[name] = self._scope.get_fresh_name(name)
+        return self._fresh_name_dict[name]

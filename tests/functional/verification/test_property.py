@@ -64,7 +64,7 @@ def read() -> None:
 
 
 def read_no_perm(a: A) -> None:
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
     o = a.vtt  # type: object
 
 

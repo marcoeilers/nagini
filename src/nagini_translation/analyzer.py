@@ -11,13 +11,15 @@ import nagini_contracts.io_builtins
 import nagini_contracts.lock
 import tokenize
 
+from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
     IGNORED_IMPORTS,
+    INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
@@ -82,7 +84,8 @@ class Analyzer(ast.NodeVisitor):
         self.current_scopes = []
         self.contract_only = False
         self.module_paths = [os.path.abspath(path)]
-        self.modules = {os.path.abspath(path): self.module}
+        self.modules = OrderedDict()
+        self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
         self.io_operation_analyzer = IOOperationAnalyzer(
             self, self.node_factory)
@@ -365,6 +368,17 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        node._parent = parent
+        for field in node._fields:
+            fieldval = getattr(node, field)
+            if isinstance(fieldval, ast.AST):
+                self.visit_but_ignore(fieldval, node)
+            elif isinstance(fieldval, list):
+                for item in fieldval:
+                    if isinstance(item, ast.AST):
+                        self.visit_but_ignore(item, node)
+
     def get_target(self, node: ast.AST,
                    container: ContainerInterface) -> PythonNode:
         """
@@ -416,12 +430,16 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
+        elif isinstance(node, ast.Str):
+            return self.find_or_create_class(node.s)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            elif isinstance(node.slice.value, ast.Str):
                 ast_args = [node.slice.value]
             else:
                 ast_args = node.slice.value.elts
@@ -493,7 +511,7 @@ class Analyzer(ast.NodeVisitor):
             for field_decl in actual_bases[1].args[1].elts:
                 field_name, field_type = field_decl.elts
                 cls.add_field(field_name.s, field_decl,
-                    self.get_target(field_type, self.module))
+                    self.get_target(field_type, self.module).try_unbox())
             # Consider ADTs as a special case of single inheritance
             actual_bases = [actual_bases[0]]
         return actual_bases
@@ -766,6 +784,7 @@ class Analyzer(ast.NodeVisitor):
         var = self.node_factory.create_python_var(
             target.id, target, self.typeof(target))
         self.current_function.special_vars[local_name] = var
+        self.visit_but_ignore(node, node._parent)
         return
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
@@ -1061,7 +1080,8 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript) and
                 not (isinstance(node.value, ast.Call) and
                          isinstance(node.ctx, ast.Load))):
-            target = self.get_target(node.value, self.module)
+            container = self.current_function if self.current_function else self.module
+            target = self.get_target(node.value, container)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
                 if isinstance(real_target, PythonGlobalVar):
@@ -1100,6 +1120,13 @@ class Analyzer(ast.NodeVisitor):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                if mypy_type.type.name() == 'enumerate':
+                    # We cheat and represent type enumerate as a list of pairs.
+                    assert len(args) == 1
+                    int_type = self.module.global_module.classes[INT_TYPE]
+                    tuple_class = self.module.global_module.classes[TUPLE_TYPE]
+                    arg = GenericType(tuple_class, [int_type, args[0]])
+                    args = [arg]
                 result = GenericType(result, args)
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
@@ -1136,14 +1163,19 @@ class Analyzer(ast.NodeVisitor):
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
         prefix = mypy_type._fullname
-        if prefix.endswith('.' + mypy_type.name()):
-            prefix = prefix[:-(len(mypy_type.name()) + 1)]
+        name = mypy_type.name()
+        if prefix == 'builtins.enumerate':
+            # We cheat and represent type enumerate as a list of pairs.
+            prefix = 'builtins.list'
+            name = 'list'
+        if prefix.endswith('.' + name):
+            prefix = prefix[:-(len(name) + 1)]
         target_module = self.module
         for module in self.modules.values():
             if module.type_prefix == prefix:
                 target_module = module
                 break
-        result = self.find_or_create_class(mypy_type.name(),
+        result = self.find_or_create_class(name,
                                            module=target_module)
         return result
 
@@ -1264,10 +1296,14 @@ class Analyzer(ast.NodeVisitor):
             type, _ = self.module.get_type(context, node.arg)
             return self.convert_type(type, node)
         elif (isinstance(node, ast.Call) and
-              isinstance(node.func, ast.Name) and
-              node.func.id in CONTRACT_FUNCS):
-            if node.func.id == 'Result':
-                return self.current_function.type
+              isinstance(node.func, ast.Name)):
+            if node.func.id in CONTRACT_FUNCS:
+                if node.func.id == 'Result':
+                    return self.current_function.type
+                else:
+                    raise UnsupportedException(node)
+            elif node.func.id == 'cast':
+                return self.find_or_create_target_class(node.args[0])
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,

@@ -21,7 +21,8 @@ BUILTINS = ['cast',
             'super',
             'range',
             'type',
-            'list']
+            'list',
+            'enumerate']
 
 THREADING = ['Thread']
 
@@ -117,7 +118,12 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
-    'm'     # used in a quantifier in measures.sil
+    'm',     # used in a quantifier in measures.sil
+    'X',
+    'Y',
+    'id',
+    't',
+    'g'
 ]
 
 VIPER_KEYWORDS = [
@@ -277,7 +283,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'builtins',
                    'nagini_contracts',
                    'nagini_contracts.contracts',
-                   'nagini_contracts.io',
+                   'nagini_contracts.io_contracts',
                    'nagini_contracts.obligations',
                    'nagini_contracts.thread',
                    'sys',
@@ -291,7 +297,7 @@ IGNORED_MODULE_NAMES = {
     'builtins': [],
     'nagini_contracts': [],
     'nagini_contracts.contracts': [],
-    'nagini_contracts.io': [],
+    'nagini_contracts.io_contracts': [],
     'nagini_contracts.obligations': ['BaseLock'],
     'sys': [],
     'types': [],

@@ -36,11 +36,11 @@ class F:
     def some_int(self) -> int:
         return 7
 
-class X:
+class G:
     def some_val(self) -> str:
         return 'test'
 
-class Y:
+class H:
     def some_val(self) -> int:
         return 1
 
@@ -70,5 +70,5 @@ def test_absence_of_name_clashes(a: Union[A, B], b: Union[C, D],
     b.some_val()
     c.some_int()
 
-def test_union_mixing_return_types(u: Union[X, Y]) -> Union[int, str]:
+def test_union_mixing_return_types(u: Union[G, H]) -> Union[int, str]:
     return u.some_val()

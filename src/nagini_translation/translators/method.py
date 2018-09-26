@@ -265,9 +265,11 @@ class MethodTranslator(CommonTranslator):
         # Create typeof preconditions
         pres = self._create_typeof_pres(func, False, ctx) + pres
         if func.type.name not in PRIMITIVES:
+            res_type_pos = self.to_position(func.node, ctx,
+                                            '"return type is correct"')
             res_type = self.translate_type(func.type, ctx)
-            result = self.viper.Result(res_type, pos, self.no_info(ctx))
-            check = self.type_check(result, func.type, pos, ctx)
+            result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+            check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
         statements = func.node.body

@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Acc
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 class C:
