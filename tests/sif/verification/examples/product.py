@@ -31,11 +31,11 @@ def check_join_and_find_employee(psi: Payroll, es: List[Employee]) -> Optional[C
     Requires(Low(es) and Low(len(es)))
     Requires(Acc(psi.joinInd, 1/4) and Low(psi.joinInd))
     Requires(Acc(psi.PID, 1/4) and Low(psi.PID))
-    Requires(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4) and Low(es[i].EID)))
+    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(es), Acc(es[i].EID, 1/4) and Low(es[i].EID)), [[es[i]]])))
     Ensures(list_pred(es))
     Ensures(Acc(psi.PID, 1/4))
     Ensures(Acc(psi.joinInd, 1/4))
-    Ensures(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4)))
+    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(es), Acc(es[i].EID, 1/4)), [[es[i]]])))
     Ensures(Low(Result()))
 
     if psi.joinInd:
@@ -45,7 +45,7 @@ def check_join_and_find_employee(psi: Payroll, es: List[Employee]) -> Optional[C
             Invariant(Low(es) and Low(len(es)))
             Invariant(Acc(psi.PID, 1/8) and Low(psi.PID))
             Invariant(j >= 0 and j <= len(es) and Low(j))
-            Invariant(Forall(range(0, len(es)), lambda i: Acc(es[i].EID, 1/4) and Low(es[i].EID)))
+            Invariant(Forall(int, lambda i: (Implies(i >= 0 and i < len(es), Acc(es[i].EID, 1/4) and Low(es[i].EID)), [[es[i]]])))
             Assert(Low(es[j].EID))
             Assert(Low(psi.PID == es[j].EID))
             if psi.PID == es[j].EID:

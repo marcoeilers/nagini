@@ -17,7 +17,7 @@ def is_female(person: int) -> int:
 def main(people: List[int]) -> int:
     Requires(list_pred(people))
     Requires(Low(len(people)))
-    Requires(Forall(range(0, len(people)), lambda i: Low(people[i] % 2)))
+    Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(people), Low(people[i] % 2)), [[people[i]]])))
     Ensures(Low(Result()))
 
     i = 0
@@ -28,7 +28,7 @@ def main(people: List[int]) -> int:
         Invariant(Low(i))
         Invariant(Low(count))
         Invariant(Low(len(people)))
-        Invariant(Forall(range(0, len(people)), lambda i: Low(people[i] % 2)))
+        Invariant(Forall(int, lambda i: (Implies(i >= 0 and i < len(people), Low(people[i] % 2)), [[people[i]]])))
         current = people[i]
         female = is_female(current)
         count += female

@@ -18,7 +18,6 @@ from typing import List
 
 _TRANSLATION_TEST_FUNCTION_NAME = 'test_translation'
 _VERIFICATION_TEST_FUNCTION_NAME = 'test_verification'
-_SIF_PERFORMANCE_TEST_FUNCTION_NAME = 'test_sif_performance'
 
 _TRANSLATION_TESTS_SUFFIX = 'translation'
 _VERIFICATION_TESTS_SUFFIX = 'verification'
@@ -36,8 +35,7 @@ class PyTestConfig:
         self.verification_test_dirs = []
         self.single_test = None
         self.verifiers = []
-        self.sif_performance = None
-        
+
         self.init_from_config_file()
 
     def init_from_config_file(self):
@@ -122,7 +120,6 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
                      action='store_true')
     parser.addoption('--silicon', dest='silicon', action='store_true')
     parser.addoption('--carbon', dest='carbon', action='store_true')
-    parser.addoption('--sif-performance', dest='sif_performance', action='store', default=None)
 
 
 def pytest_configure(config: 'pytest.config.Config'):
@@ -140,9 +137,6 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('io')
         if config.option.obligations:
             tests.append('obligations')
-    if config.option.sif_performance:
-        tests = ['functional']
-        _pytest_config.sif_performance = config.option.sif_performance
     if tests:
         # Overwrite config file options.
         _pytest_config.clear_tests()
@@ -178,66 +172,29 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
     reload_triggers = set()
     params = []
     if func_name == _TRANSLATION_TEST_FUNCTION_NAME:
-        if not _pytest_config.sif_performance:
-            for test_dir in _pytest_config.translation_test_dirs:
-                files = _test_files(test_dir)
-                test_files.extend(files)
-                reload_triggers.add(files[0])
-            if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
-                test_files.append(_pytest_config.single_test)
-            for file in test_files:
-                sif = 'sif' in file
-                reload_resources = file in reload_triggers
-                params.append((file, sif, reload_resources))
+        for test_dir in _pytest_config.translation_test_dirs:
+            files = _test_files(test_dir)
+            test_files.extend(files)
+            reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
+        for file in test_files:
+            sif = 'sif' in file
+            reload_resources = file in reload_triggers
+            params.append((file, sif, reload_resources))
         metafunc.parametrize('path,sif,reload_resources', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
-        if not _pytest_config.sif_performance:
-            for test_dir in _pytest_config.verification_test_dirs:
-                files = _test_files(test_dir)
-                test_files.extend(files)
-                reload_triggers.add(files[0])
-            if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
-                test_files.append(_pytest_config.single_test)
-            for file in test_files:
-                sif = 'sif' in file
-                reload_resources = file in reload_triggers
-                params.extend([(file, verifier, sif, reload_resources) for verifier
-                               in _pytest_config.verifiers])
+        for test_dir in _pytest_config.verification_test_dirs:
+            files = _test_files(test_dir)
+            test_files.extend(files)
+            reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
+        for file in test_files:
+            sif = 'sif' in file
+            reload_resources = file in reload_triggers
+            params.extend([(file, verifier, sif, reload_resources) for verifier
+                           in _pytest_config.verifiers])
         metafunc.parametrize('path,verifier,sif,reload_resources', params)
-    elif func_name == _SIF_PERFORMANCE_TEST_FUNCTION_NAME:
-        if _pytest_config.sif_performance:
-            for test_dir in _pytest_config.verification_test_dirs:
-                files = _test_files(test_dir)
-                test_files.extend(files)
-                reload_triggers.add(files[0])
-            for file in test_files:
-                reload_resources = file in reload_triggers
-                params.extend([(file, verifier, reload_resources, _pytest_config.sif_performance)
-                            for verifier in _pytest_config.verifiers])
-            # set up the log file
-            write_sif_performance_log_file('w', name='File', verifier='Verifier',
-                                           trans_time='Translation', std_time='Std Time',
-                                           sif_trans_time='SIF Translation',
-                                           mpp_time='MPP Trafo', sif_time='SIF Time',
-                                           passed='Result')
-        metafunc.parametrize('path, verifier, reload_resources, log_file', params)
     else:
         pytest.exit('Unrecognized test function.')
-
-
-def write_sif_performance_log_file(mode, name, verifier, trans_time, sif_trans_time,
-                                   std_time, mpp_time, sif_time, passed):
-    """Write a formatted line to the log file"""
-    with open(_pytest_config.sif_performance, mode) as lf:
-        name_w = 40
-        number_w = 15
-        if mode == 'a': # after first line, format last three as numbers
-            lf.write('{:{name_width}} | {:{width}} | {:{width}f} | {:{width}f} | {:{width}f} | '
-                     '{:{width}f} | {:{width}f} | {:{width}}\n'.format(
-                         name, verifier, trans_time, std_time, sif_trans_time, mpp_time, sif_time,
-                         passed, name_width=name_w, width=number_w))
-        else:
-            lf.write('{:{name_width}} | {:{width}} | {:{width}} | {:{width}} | {:{width}} | '
-                     '{:{width}} | {:{width}} | {:{width}}\n'.format(
-                         name, verifier, trans_time, std_time, sif_trans_time, mpp_time, sif_time,
-                         passed, name_width=name_w, width=number_w))

@@ -573,6 +573,9 @@ class ContractTranslator(CommonTranslator):
                         lhs_stmt, lhs = self.translate_expr(inner.left, ctx)
                         part_stmt, part, valid = self._create_quantifier_contains_expr(
                             lhs, inner.comparators[0], ctx)
+                        if part_stmt:
+                            raise InvalidProgramException(inner,
+                                                          'purity.violated')
                         if valid and not part_stmt and not lhs_stmt:
                             trigger.append(part)
                             continue
@@ -590,7 +593,8 @@ class ContractTranslator(CommonTranslator):
 
     def _create_quantifier_contains_expr(self, e: Expr,
                                          domain_node: ast.AST,
-                                         ctx: Context) -> Tuple[List[Stmt], Expr, bool]:
+                                         ctx: Context,
+                                         trigger=False) -> Tuple[List[Stmt], Expr, bool]:
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that e is an element of the given domain.
@@ -604,9 +608,15 @@ class ContractTranslator(CommonTranslator):
         pos = self.to_position(domain_node, ctx)
         info = self.no_info(ctx)
 
+        dom_target = self.get_target(domain_node, ctx)
+
+        if isinstance(dom_target, PythonType):
+            result = self.type_check(ref_var, dom_target, pos, ctx, False)
+            return [], result, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
-        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos)
+        result = self.get_quantifier_lhs(ref_var, dom_type, domain, domain_node, ctx, pos,
+                                         trigger)
         if domain_old:
             result = self.viper.Old(result, pos, info)
         return dom_stmt, result, True
@@ -775,14 +785,17 @@ class ContractTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs, is_trigger = self._create_quantifier_contains_expr(var.ref(),
+        dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
                                                                           domain_node,
                                                                           ctx)
+        if dom_stmt:
+            raise InvalidProgramException(domain_node,
+                                          'purity.violated')
         lhs = self.unwrap(lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
-        if is_trigger:
+        if always_use or not triggers:
             # Add lhs of the implication, which the user cannot write directly
             # in this exact form.
             # If we always do this, we apparently deactivate the automatically

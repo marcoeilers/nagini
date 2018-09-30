@@ -6,114 +6,108 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.constants import BUILTIN_PREDICATES
-from nagini_translation.lib.typedefs import Expr
-from nagini_translation.lib.util import (
-    InvalidProgramException,
-    UnsupportedException,
+from nagini_translation.lib.constants import (
+    BOOL_TYPE,
+    FLOAT_TYPE,
+    INT_TYPE,
+    PSET_TYPE,
+    SEQ_TYPE,
+    STRING_TYPE,
+    TUPLE_TYPE
 )
-from nagini_translation.sif.lib.context import SIFContext
-from nagini_translation.sif.translators.func_triple_domain_factory import (
-    FuncTripleDomainFactory as FTDF,
+from nagini_translation.lib.program_nodes import MethodType
+from nagini_translation.lib.typedefs import StmtsAndExpr, Info
+from nagini_translation.lib.util import (InvalidProgramException,
+                                         UnsupportedException)
+from nagini_translation.sif.lib.util import (
+    in_postcondition_of_dyn_bound_call, in_override_check
 )
-from nagini_translation.translators.abstract import StmtsAndExpr
+from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.contract import ContractTranslator
-from typing import List
 
 
 class SIFContractTranslator(ContractTranslator):
     """
-    SIF version of the ContractTranslator.
+    Extended AST version of the contract translator.
     """
-    def translate_result(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
+    def _create_dyn_check_info(self, ctx: Context) -> Info:
+        """
+        Check if we are in the postcondition of a method which calls will be dynamically bound,
+        if so create a SIFDynCheckInfo, else NoInfo.
+        If we are in a override check method, only do the version with dynamic call check.
+        """
+        self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
+        if self_type:
+            return self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
+        return self.no_info(ctx)
+
+
+    def translate_low(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Low() contract function.
+        """
+        if len(node.args) != 1:
+            raise UnsupportedException(node, "Low() requires exactly one argument")
+        stmts, expr = self.translate_expr(node.args[0], ctx)
+        if stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        info = self._create_dyn_check_info(ctx)
+        return [], self.viper.Low(
+            expr, None, self.to_position(node, ctx), info)
+
+    def translate_lowval(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Low() contract function.
+        """
+        stmts, expr = self.translate_expr(node.args[0], ctx)
+        if stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        info = self._create_dyn_check_info(ctx)
+        # determine the comparator function to use
+        expr_type = self.get_type(node.args[0], ctx)
+        low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, SEQ_TYPE,
+                         STRING_TYPE, TUPLE_TYPE]
+        if expr_type.name in low_val_types:
+            comparator = expr_type.get_function('__eq__')
+            comparator = comparator.sil_name
+        else:
+            comparator = None
+        return [], self.viper.Low(
+            expr, comparator, self.to_position(node, ctx), info)
+
+    def translate_lowevent(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowEvent() contract function.
+        """
+        if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
+            self_type = self.type_factory.typeof(
+                next(iter(ctx.actual_function.args.values())).ref(), ctx)
+            info = self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
+        else:
+            info = self.no_info(ctx)
+        return [], self.viper.LowEvent(self.to_position(node, ctx), info)
+
+    def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the Declassify() contract function.
+        """
+        stmts, expr = self.translate_expr(node.args[0], ctx)
+        if stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        return [self.viper.Declassify(
+            expr, self.to_position(node, ctx), self.no_info(ctx))], None
+
+    def translate_terminates_sif(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the TerminatesSif() contract function.
+        """
+        cond_stmts, cond = self.translate_expr(node.args[0], ctx, target_type=self.viper.Bool)
+        # rank_stmts, rank = self.translate_expr(node.args[1], ctx, target_type=self.viper.Int)
+        if cond_stmts: # or rank_stmts:
+            raise InvalidProgramException(node, 'purity.violated')
+        must_terminate = super().translate_terminates_sif(node, ctx)
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if ctx.current_function.pure:
-            type_ = self.config.func_triple_factory.get_type(
-                ctx.current_function.type, ctx)
-            result = self.viper.Result(type_, pos, info)
-            if not ctx.use_prime:
-                result = self.config.func_triple_factory.get_call(FTDF.GET,
-                    [result], ctx.current_function.type, pos, info, ctx)
-            else:
-                result = self.config.func_triple_factory.get_call(
-                    FTDF.GET_PRIME, [result], ctx.current_function.type, pos,
-                    info, ctx)
-        else:
-            if not ctx.use_prime:
-                result = ctx.current_function.result.ref()
-            else:
-                result = ctx.current_function.result.var_prime.ref()
-
-        return [], result
-
-    def translate_acc_predicate(self, node: ast.Call, perm: Expr,
-                                ctx: SIFContext) -> StmtsAndExpr:
-        # TODO(shitz): This currently only handles the special case of
-        # list_pred. In general, we only have one predicate call with doubled
-        # parameters and contents. This needs to be revised.
-        if (not isinstance(node.args[0].func, ast.Name) or
-                node.args[0].func.id not in BUILTIN_PREDICATES):
-            raise UnsupportedException(
-                node, "Only list access predicates supported.")
-        stmt, acc = super().translate_acc_predicate(node, perm, ctx)
-        with ctx.prime_ctx():
-            stmt_p, acc_p = super().translate_acc_predicate(node, perm, ctx)
-        # Acc(obj) && Acc(obj_p)
-        and_accs = self.viper.And(acc, acc_p, self.to_position(node, ctx),
-                                  self.no_info(ctx))
-        return [], and_accs
-
-    def translate_acc_field(self, node: ast.Call, perm: Expr,
-                            ctx: SIFContext):
-        """
-        Translates a Acc(field). Needs to generate Acc(field_p) as well.
-        """
-        stmt, acc = super().translate_acc_field(node, perm, ctx)
-        with ctx.prime_ctx():
-            stmt_p, acc_p = super().translate_acc_field(node, perm, ctx)
-        # Acc(field) && Acc(field_p)
-        and_accs = self.viper.And(acc, acc_p, self.to_position(node, ctx),
-                                  self.no_info(ctx))
-
-        return [], and_accs
-
-    def translate_builtin_predicate(self, node: ast.Call, perm: Expr,
-                                    args: List[Expr], ctx: SIFContext) -> Expr:
-        position = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        name = node.func.id
-        seq_ref = self.viper.SeqType(self.viper.Ref)
-        if name == 'list_pred':
-            field_name = 'list_acc_p' if ctx.use_prime else 'list_acc'
-            field = self.viper.Field(
-                field_name, seq_ref, self.no_position(ctx), self.no_info(ctx))
-        else:
-            raise UnsupportedException(node, "Only lists supported for Accs.")
-        field_acc = self.viper.FieldAccess(args[0], field, position, info)
-        pred = self.viper.FieldAccessPredicate(field_acc, perm, position, info)
-        return pred
-
-    def translate_low(self, node: ast.Call, ctx: SIFContext) -> StmtsAndExpr:
-        if len(node.args) > 1:
-            raise UnsupportedException(node, "Only 0 or 1 arguments are "
-                                             "supported for Low().")
-        pos = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-
-        if ctx.use_prime:
-            return [], self.viper.TrueLit(pos, info)
-
-        not_tl = self.viper.Not(ctx.current_tl_var_expr, pos, info)
-        if node.args:
-            stmts, expr = self.translate_expr(node.args[0], ctx)
-            with ctx.prime_ctx():
-                stmts_p, expr_p = self.translate_expr(node.args[0], ctx)
-
-            if stmts or stmts_p:
-                raise InvalidProgramException(node, 'purity.violated')
-
-            expr_cmp = self.viper.EqCmp(expr, expr_p, pos, info)
-            return [], self.viper.And(not_tl, expr_cmp, pos, info)
-        else:
-            return [], not_tl
+        implication = self.viper.Implies(cond, must_terminate[1], pos, info)
+        terminates_exp = self.viper.TerminatesSif(cond, pos, info)
+        return must_terminate[0], self.viper.And(implication, terminates_exp, pos, info)

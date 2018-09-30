@@ -62,7 +62,6 @@ def while4() -> int:
     return sum
 
 
-@NotPreservingTL
 def while5() -> None:
     """Nested while."""
     h = input_high()

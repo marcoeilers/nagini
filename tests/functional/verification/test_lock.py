@@ -25,13 +25,10 @@ class CellMonitor:
         self.c.value = 16
         Ensures(Acc(self.c) and Acc(self.l) and self.l.get_locked() is self.c)
         Ensures(WaitLevel() < Level(self.l))
-        Ensures(Low(self.l))
 
     def acquire_release_correct(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
-        Requires(LowEvent())
-        Requires(Low(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
@@ -42,8 +39,6 @@ class CellMonitor:
     def unspecified_locked_object(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2))
         Requires(WaitLevel() < Level(self.l))
-        Requires(LowEvent())
-        Requires(Low(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         self.l.acquire()
         #:: ExpectedOutput(assignment.failed:insufficient.permission)
@@ -52,8 +47,6 @@ class CellMonitor:
 
     def unspecified_waitlevel(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
-        Requires(LowEvent())
-        Requires(Low(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         #:: ExpectedOutput(call.precondition:assertion.false)
         self.l.acquire()
@@ -64,8 +57,6 @@ class CellMonitor:
     def no_release(self) -> None:
         Requires(Acc(self.l, 1/2) and Acc(self.c, 1/2) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
-        Requires(LowEvent())
-        Requires(Low(self.l))
         Ensures(Acc(self.l, 1 / 2) and Acc(self.c, 1 / 2))
         self.l.acquire()
         self.c.value += 2
@@ -88,7 +79,6 @@ def leak_permission(c: Cell) -> None:
 
 
 def client_1() -> None:
-    Requires(LowEvent())
     twc = CellMonitor()
     twc.l.acquire()
     twc.l.release()
@@ -96,7 +86,6 @@ def client_1() -> None:
 
 
 def client_2() -> None:
-    Requires(LowEvent())
     twc = CellMonitor()
     twc.acquire_release_correct()
 

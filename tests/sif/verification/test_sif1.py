@@ -2,7 +2,6 @@ from nagini_contracts.contracts import *
 from resources.sif_utils import input_high, input_low, sif_print
 
 
-@NotPreservingTL
 def fig1a() -> None:
     x = input_high()
     if x < 1234:
@@ -21,7 +20,6 @@ def fig1a_low() -> None:
     sif_print(y)
 
 
-@NotPreservingTL
 def fig2a() -> None:
     x = input_high()
     if x == 1:

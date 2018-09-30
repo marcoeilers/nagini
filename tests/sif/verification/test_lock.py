@@ -20,15 +20,11 @@ def client(secret: bool) -> None:
     c = Cell(1)
     l = CellLock(c)
     l.acquire()
-    Unfold(l.invariant())
     c.value = 4
     if secret:
-        Fold(l.invariant())
         #:: ExpectedOutput(call.precondition:assertion.false)
         l.release()
         l.acquire()
-        Unfold(l.invariant())
     c.value = 5
-    Fold(l.invariant())
     l.release()
 

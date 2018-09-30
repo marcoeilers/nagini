@@ -38,6 +38,9 @@ import io
 import os
 import re
 import tokenize
+from collections import Counter
+from timeit import default_timer as timer
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -45,18 +48,15 @@ import pytest
 import nagini_translation.mypy_patches.column_info_patch
 import nagini_translation.mypy_patches.optional_patch
 
-from typing import Any, Dict, List, Optional
-from collections import Counter
-from timeit import default_timer as timer
-
-from nagini_translation.conftest import write_sif_performance_log_file, _pytest_config
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException
-from nagini_translation.extended_ast.lib.util import configure_mpp_transformation
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
+from nagini_translation.sif.lib.util import configure_mpp_transformation
 from nagini_translation.verifier import VerificationResult, ViperVerifier
+
+# These imports monkey-patch mypy and should happen as early as possible.
 
 os.environ['MYPYPATH'] = config.mypy_path
 
@@ -645,61 +645,3 @@ _TRANSLATION_TESTER = TranslationTest()
 def test_translation(path, sif, reload_resources):
     """Execute provided translation test."""
     _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources)
-
-
-class SIFPerformanceTest(AnnotatedTest):
-    """Test the performance loss of SIF verification vs. normal verification."""
-
-    def timed(self, function, *args, **kwargs):
-        before = timer()
-        result = function(*args, **kwargs)
-        after = timer()
-        return after - before, result
-
-    def test_file(self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-                  reload_resources: bool, log_file: io.IOBase):
-        """Test specific Python file."""
-        annotation_manager = self.get_annotation_manager(path, verifier.name)
-        if annotation_manager.ignore_file():
-            pytest.skip('Ignored')
-        path = os.path.abspath(path)
-        # do standard verification as reference
-        trans_time, prog = self.timed(
-            translate, path, jvm, sif=False, reload_resources=reload_resources)
-        assert prog is not None
-        std_time, _ = self.timed(verify, prog, path, jvm, verifier)
-        # sif verification -> translate to extended ast
-        trans_time_sif, prog = self.timed(
-            translate, path, jvm, sif=True, reload_resources=reload_resources)
-        assert prog is not None
-        # measure MPP transformation
-        configure_mpp_transformation(jvm,
-                                     ctrl_opt=True,
-                                     seq_opt=True,
-                                     act_opt=True,
-                                     func_opt=True)
-        mpp_trafo_time, prog = self.timed(
-            jvm.viper.silver.sif.SIFExtendedTransformer.transform, prog, False)
-        # measure verification of MPP
-        sif_time, vresult = self.timed(verify, prog, path, jvm, verifier)
-        try:
-            _VERIFICATION_TESTER._evaluate_result(vresult, annotation_manager, jvm, True)
-        except AssertionError as error:
-            result = 'FAILED'
-            raise error
-        except AttributeError as error:
-            result = 'FAILED'
-            raise error
-        else:
-            result = 'PASSED'
-        finally:
-            write_sif_performance_log_file('a', os.path.basename(path), verifier.name, trans_time,
-                                           trans_time_sif, std_time, mpp_trafo_time,
-                                           sif_time, result)
-
-_SIF_PERFORMANCE_TESTER = SIFPerformanceTest()
-
-
-def test_sif_performance(path, verifier, reload_resources, log_file):
-    """Execute provided """
-    _SIF_PERFORMANCE_TESTER.test_file(path, _JVM, verifier, reload_resources, log_file)

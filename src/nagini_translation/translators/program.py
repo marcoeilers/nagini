@@ -5,20 +5,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import ast
-
 from collections import OrderedDict
-from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
+from typing import List, Set, Tuple
+
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     CHECK_DEFINED_FUNC,
-    COMBINE_NAME_FUNC,
     ERROR_NAME,
     FUNCTION_DOMAIN_NAME,
     GET_ARG_FUNC,
     GET_METHOD_FUNC,
     GET_OLD_FUNC,
-    GLOBAL_CHECK_DEFINED_FUNC,
     GLOBAL_VAR_FIELD,
     IS_DEFINED_FUNC,
     JOINABLE_FUNC,
@@ -26,7 +24,6 @@ from nagini_translation.lib.constants import (
     METHOD_ID_DOMAIN,
     PRIMITIVES,
     RESULT_NAME,
-    STRING_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -60,9 +57,10 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     InvalidProgramException,
 )
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Set, Tuple
+
 
 class ProgramTranslator(CommonTranslator):
     def __init__(self, config: 'TranslatorConfig', jvm: 'JVM', source_file: str,

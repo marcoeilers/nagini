@@ -85,11 +85,16 @@ def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
     pass
 
-def Forall(domain: Iterable[T],
+def Forall(domain: Union[Iterable[T], Type[T]],
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """
+    pass
+
+
+def ForallType(type: Type[T],
+               predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     pass
 
 
@@ -104,8 +109,6 @@ def Low(*args) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
 
-    +    Calling with 0 args translates to ``!tl``.
-    +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
     +    Ignored when not verifying information flow.
     """
     pass
@@ -320,14 +323,6 @@ def Ghost(func: T) -> T:
     """
     return func
 
-
-def NotPreservingTL(func: T) -> T:
-    """
-    Decorator indicating that this method/function does not (necessarily)
-    preserve the timelevel.
-    """
-    return func
-
 def AllLow(func: T) -> T:
     """
     Decorator indicating that everything this method does is low.
@@ -423,7 +418,6 @@ __all__ = [
         'Pure',
         'Predicate',
         'Ghost',
-        'NotPreservingTL',
         'ContractOnly',
         'GhostReturns',
         'list_pred',

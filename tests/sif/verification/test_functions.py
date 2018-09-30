@@ -41,7 +41,6 @@ def func6(a: int) -> bool:
 
 
 @Pure
-@NotPreservingTL
 def func7(a: int) -> int:
     Requires(a > 3)
     Ensures(Result() > 42)
@@ -57,7 +56,6 @@ def func7(a: int) -> int:
 
 
 @Pure
-@NotPreservingTL
 def func8(a: int) -> int:
     Requires(a > 3)
     Ensures(Result() > 42)

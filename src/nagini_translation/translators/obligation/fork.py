@@ -1,10 +1,8 @@
 import ast
 import copy
 import operator
-
 from typing import List
 
-from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     GET_ARG_FUNC,

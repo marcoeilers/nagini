@@ -44,7 +44,6 @@ def thread_join(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t)))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     Ensures(Joinable(t))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(False)
@@ -89,7 +88,6 @@ def thread_join_wrong_level(t: Thread, cl: Cell) -> None:
     Requires(getArg(t, 1) is 7)
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t)))
-    Requires(LowEvent() and Low(t))
     #:: ExpectedOutput(thread.join.failed:wait.level.invalid)
     t.join(Cell.incr, decr)
 
@@ -101,7 +99,6 @@ def thread_join_wrong_method(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t)))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     t.join(decr)
     #:: ExpectedOutput(assert.failed:insufficient.permission)
     assert cl.val == 116
@@ -110,7 +107,6 @@ def thread_join_wrong_method(t: Thread, cl: Cell) -> None:
 def thread_join_minimal(t: Thread, cl: Cell) -> None:
     Requires(Joinable(t))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     t.join(Cell.incr, decr)
     #:: ExpectedOutput(assert.failed:insufficient.permission)
     assert cl.val == 116
@@ -123,7 +119,6 @@ def thread_join_no_post_perm(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Joinable(t))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     t.join(Cell.incr, decr)
     #:: ExpectedOutput(assert.failed:insufficient.permission)
     assert cl.val == 116
@@ -136,7 +131,6 @@ def thread_join_part_perm(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t), 1/2))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     t.join(Cell.incr, decr)
     assert cl.val == 116
     #:: ExpectedOutput(assignment.failed:insufficient.permission)
@@ -150,7 +144,6 @@ def thread_join_part_perm_twice(t: Thread, cl: Cell) -> None:
     Requires(getOld(t, arg(0).val) is 123)
     Requires(Acc(ThreadPost(t), 1/2))
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     t.join(Cell.incr, decr)
     assert cl.val == 116
     t.join(Cell.incr, decr)
@@ -164,6 +157,5 @@ def thread_join_not_joinable(t: Thread, cl: Cell) -> None:
     Requires(getArg(t, 1) is 7)
     Requires(getOld(t, arg(0).val) is 123)
     Requires(WaitLevel() < Level(t))
-    Requires(LowEvent() and Low(t))
     #:: ExpectedOutput(thread.join.failed:thread.not.joinable)
     t.join(Cell.incr, decr)

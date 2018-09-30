@@ -6,15 +6,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 import copy
-
 from collections import OrderedDict
+from typing import Dict, List, Tuple, Union
+
 from nagini_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
 )
 from nagini_contracts.io_contracts import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
-from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
@@ -76,7 +76,6 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import Dict, List, Tuple, Union, Set
 
 
 class CallTranslator(CommonTranslator):

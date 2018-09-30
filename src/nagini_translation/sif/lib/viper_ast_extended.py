@@ -6,13 +6,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from typing import List, Optional
 
-from nagini_translation.extended_ast.lib.util import (
-    in_postcondition_of_dyn_bound_call, in_override_check
-)
 from nagini_translation.lib.typedefs import (
     Expr, Info, Position, Seqn, Stmt, Var, VarAssign
 )
 from nagini_translation.lib.viper_ast import ViperAST
+from nagini_translation.sif.lib.util import (
+    in_postcondition_of_dyn_bound_call, in_override_check
+)
 
 
 class ViperASTExtended(ViperAST):

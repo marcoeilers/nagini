@@ -25,7 +25,6 @@ def test_high_data() -> None:
     sif_print(l[2])
 
 
-@NotPreservingTL
 def test_contains() -> None:
     Requires(LowEvent())
     x = input_high()

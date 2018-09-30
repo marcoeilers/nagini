@@ -20,11 +20,8 @@ def m(x: int, secret: int, l: List[Node]) -> None:
     Requires(Low(x))
     Requires(Forall(cast(NodeList, l), lambda e: (Acc(e.val), [[e in l]])))
     Ensures(list_pred(l))
-
     Ensures(Forall(cast(NodeList, l), lambda e: (Acc(e.val), [[e in l]])))
-
-    # Ensures(Forall(range(0, len(l)), lambda k: l[k] in l and l[k].val == x))
-    Ensures(Forall(range(0, len(l)), lambda k: l[k] in l and Low(l[k].val)))
+    Ensures(Forall(int, lambda k: (Implies(k >= 0 and k < len(l), l[k] in l and Low(l[k].val)), [[l[k]]])))
     i = 0
     while i < 10:
         Invariant(list_pred(l))
@@ -32,7 +29,9 @@ def m(x: int, secret: int, l: List[Node]) -> None:
         Invariant(Low(i))
         Invariant(Forall(cast(NodeList, l), lambda e: Acc(e.val)))
         Invariant(Low(x))
-        # Invariant(Forall(range(0, i), lambda k: (l[k] in l and l[k].val == x, [[l[k]]])))
-        Invariant(Forall(range(0, i), lambda k: (l[k] in l and Low(l[k].val), [[l[k]]])))
+        # TODO: this is unfortunate, it should not be necessary
+        Invariant(Forall(int, lambda k: (Implies(k >= 0 and k < i, l[k] in l and l[k].val is x), [[l[k]]])))
+        Invariant(Forall(int, lambda k: (Implies(k >= 0 and k < i, l[k] in l and Low(l[k].val)), [[l[k]]])))
+        assert l[i] in l
         l[i].val = x
         i += 1

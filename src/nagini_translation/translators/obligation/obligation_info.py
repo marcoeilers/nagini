@@ -9,10 +9,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import abc
 import ast
-
 from typing import List
 
-from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib.constants import PRIMITIVE_BOOL_TYPE
@@ -28,6 +26,7 @@ from nagini_translation.lib.typedefs import (
     Expr,
     Stmt,
 )
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -37,7 +36,6 @@ from nagini_translation.translators.obligation.measures import (
 from nagini_translation.translators.obligation.types.base import (
     ObligationInstance,
 )
-
 
 CURRENT_THREAD_NAME = '_cthread'
 RESIDUE_LEVEL_METHOD_NAME = '_residue'

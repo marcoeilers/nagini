@@ -149,7 +149,7 @@ def test_inc_predicate(secret: bool, c: Container) -> None:
 def test_add_predicate(secret: int, c: Container) -> None:
     Requires(contPred(c))
     Ensures(contPred(c))
-    #:: ExpectedOutput(call.precondition:assertion.false)
+    #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(call.precondition:assertion.false)
     addPred(secret, c)
 
 def test_add_preserving(secret: int, c: Container) -> None:

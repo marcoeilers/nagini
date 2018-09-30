@@ -8,7 +8,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 import ast
-
 from typing import List, Optional
 
 from nagini_translation.lib import silver_nodes as sil
@@ -28,7 +27,7 @@ from nagini_translation.lib.typedefs import (
     VarDecl,
 )
 from nagini_translation.lib.viper_ast import ViperAST
-from nagini_translation.extended_ast.lib.viper_ast_extended import ViperASTExtended
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.obligation.manager import (
     ObligationManager,
 )
