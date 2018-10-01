@@ -360,7 +360,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         if len(node.args) == 2:
             return module.classes[node.args[0].id].superclass
         elif not node.args:
-            return current_class.superclass
+            return container.cls.superclass
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':

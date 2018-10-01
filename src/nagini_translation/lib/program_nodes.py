@@ -249,7 +249,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if local_result is not None:
             return local_result
         for module in self.from_imports:
-            module_result = module.get_func_type(prefix)
+            module_result = module.get_func_type(path)
             if module_result is not None:
                 return module_result
         return None

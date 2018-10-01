@@ -8,7 +8,7 @@ def baz() -> B:
     return B()
 
 #:: ExpectedOutput(assert.failed:assertion.false)
-def bar() -> A:
+def bar() -> A:  # noqa: F821
     return A()
 
 class A:
