@@ -11,7 +11,7 @@ domain SIFDomain[T] {
 import "../../resources/bool.sil"
 import "../../resources/bytes.sil"
 import "../../resources/iterator.sil"
-import "list.sil"
+import "../../resources/list.sil"
 import "../../resources/lock.sil"
 import "../../resources/measures.sil"
 import "../../resources/pytype.sil"

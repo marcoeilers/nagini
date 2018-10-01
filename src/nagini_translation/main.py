@@ -99,9 +99,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     resources_path = os.path.join(current_path, 'resources')
 
     if sif:
-        viperast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
+        viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
     else:
-        viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+        viper_ast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
     type_correct = types.check(path)
     if not type_correct:
@@ -115,9 +115,9 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
-        translator = SIFTranslator(jvm, path, types, viperast)
+        translator = SIFTranslator(jvm, path, types, viper_ast)
     else:
-        translator = Translator(jvm, path, types, viperast)
+        translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
@@ -125,10 +125,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
     if sif:
-        set_all_low_methods(jvm, viperast.all_low_methods)
-        set_preserves_low_methods(jvm, viperast.preserves_low_methods)
+        set_all_low_methods(jvm, viper_ast.all_low_methods)
+        set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
     # Run consistency check in translated AST
-    consistency_errors = viperast.to_list(prog.checkTransitively())
+    consistency_errors = viper_ast.to_list(prog.checkTransitively())
     for error in consistency_errors:
         print(error.toString())
     if consistency_errors:

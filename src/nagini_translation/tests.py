@@ -34,15 +34,13 @@ Supported annotation types are:
 
 
 import abc
-import io
 import os
+import pytest
 import re
 import tokenize
 from collections import Counter
-from timeit import default_timer as timer
 from typing import Any, Dict, List, Optional
 
-import pytest
 
 # These imports monkey-patch mypy and should happen as early as possible.
 import nagini_translation.mypy_patches.column_info_patch
@@ -53,10 +51,8 @@ from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
 from nagini_translation.lib.util import InvalidProgramException
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
-from nagini_translation.sif.lib.util import configure_mpp_transformation
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
-# These imports monkey-patch mypy and should happen as early as possible.
 
 os.environ['MYPYPATH'] = config.mypy_path
 
@@ -590,13 +586,14 @@ class VerificationTest(AnnotatedTest):
             actual_errors = [
                 VerificationError(error) for error in vresult.errors]
             if sif:
-                # carbon will report all functional errors twice, as we model two executions,
-                # therefore we filter duplicated errors here. (Note: we don't make errors unique,
-                # just remove one duplicate)
+                # carbon will report all functional errors twice, as we model two
+                # executions, therefore we filter duplicated errors here.
+                # (Note: we don't make errors unique, just remove one duplicate)
                 distinct = []
                 reprs = map(lambda e: e.__repr__(), actual_errors)
                 repr_counts = Counter(reprs)
-                repr_counts = dict(map(lambda rc: (rc[0], -(-rc[1] // 2)), repr_counts.items()))
+                repr_counts = dict(map(lambda rc: (rc[0], -(-rc[1] // 2)),
+                                       repr_counts.items()))
                 for err in actual_errors:
                     if repr_counts[err.__repr__()] > 0:
                         distinct.append(err)

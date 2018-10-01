@@ -25,6 +25,7 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.typedefs import (
     Expr,
     Stmt,
+    Type,
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.obligation.manager import (
@@ -182,7 +183,7 @@ class BaseObligationInfo(GuardCollectingVisitor):
 
     def _create_silver_var(
             self, name: str, translator: 'AbstractTranslator',
-            typ: 'viper_ast.Type', local: bool = False) -> SilverVar:
+            typ: Type, local: bool = False) -> SilverVar:
         sil_name = self._method.get_fresh_name(name)
         if isinstance(translator.viper, ViperASTExtended):
             info = translator.viper.SIFInfo([], obligation_var=True)

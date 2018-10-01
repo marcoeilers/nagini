@@ -177,12 +177,6 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
             stmts.append(self.viper.Exhale(pre_assertion.whenExhaling(), self._position,
                                            self._info))
 
-            # # In case we do SIF verification, inhale Low(thread) here.
-            # if isinstance(self.viper, ViperASTExtended):
-            #     stmts.append(self.viper.Inhale(self.viper.Low(
-            #         self._thread, None, None, self._position, self._info),
-            #         self._position, self._info))
-
             # Inhale join permission.
             joinable = self._create_join_permission(method)
             stmts.append(self.viper.Inhale(joinable, self._position, self._info))

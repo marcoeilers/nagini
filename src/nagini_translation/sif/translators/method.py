@@ -77,9 +77,3 @@ class SIFMethodTranslator(MethodTranslator):
                                       no_info, method=ctx.current_function)
         ctx.current_function = None
         return main_method, res
-
-
-    # def translate_function(self, func: PythonMethod, ctx: Context) -> Function:
-    #     if func.cls and func.name == '__eq__':
-    #         self.viper.equality_comp_functions.add(func.sil_name)
-    #     return super().translate_function(func, ctx)

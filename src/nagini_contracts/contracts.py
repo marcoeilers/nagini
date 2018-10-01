@@ -93,11 +93,6 @@ def Forall(domain: Union[Iterable[T], Type[T]],
     pass
 
 
-def ForallType(type: Type[T],
-               predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
-    pass
-
-
 def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     """
     exists x in domain: predicate(x)
@@ -105,18 +100,17 @@ def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     pass
 
 
-def Low(*args) -> bool:
+def Low(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
-
-    +    Ignored when not verifying information flow.
+    Ignored when not verifying information flow.
     """
     pass
 
 def LowVal(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be low, using value equality if the
-    expression is a primitive.
+    expression is a primitive. Ignored when not verifying information flow.
     """
     pass
 

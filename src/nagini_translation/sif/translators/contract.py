@@ -17,10 +17,13 @@ from nagini_translation.lib.constants import (
 )
 from nagini_translation.lib.program_nodes import MethodType
 from nagini_translation.lib.typedefs import StmtsAndExpr, Info
-from nagini_translation.lib.util import (InvalidProgramException,
-                                         UnsupportedException)
+from nagini_translation.lib.util import (
+    InvalidProgramException,
+    UnsupportedException,
+)
 from nagini_translation.sif.lib.util import (
-    in_postcondition_of_dyn_bound_call, in_override_check
+    in_override_check,
+    in_postcondition_of_dyn_bound_call,
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.contract import ContractTranslator
@@ -32,13 +35,14 @@ class SIFContractTranslator(ContractTranslator):
     """
     def _create_dyn_check_info(self, ctx: Context) -> Info:
         """
-        Check if we are in the postcondition of a method which calls will be dynamically bound,
-        if so create a SIFDynCheckInfo, else NoInfo.
+        Check if we are in the postcondition of a method which calls will be dynamically
+        bound, if so create a SIFDynCheckInfo, else NoInfo.
         If we are in a override check method, only do the version with dynamic call check.
         """
         self_type = in_postcondition_of_dyn_bound_call(self.type_factory, ctx)
         if self_type:
-            return self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
+            return self.viper.SIFDynCheckInfo([], self_type,
+                                              dyn_check_only=in_override_check(ctx))
         return self.no_info(ctx)
 
 
@@ -82,7 +86,8 @@ class SIFContractTranslator(ContractTranslator):
         if ctx.current_class and ctx.current_function.method_type == MethodType.normal:
             self_type = self.type_factory.typeof(
                 next(iter(ctx.actual_function.args.values())).ref(), ctx)
-            info = self.viper.SIFDynCheckInfo([], self_type, dyn_check_only=in_override_check(ctx))
+            info = self.viper.SIFDynCheckInfo([], self_type,
+                                              dyn_check_only=in_override_check(ctx))
         else:
             info = self.no_info(ctx)
         return [], self.viper.LowEvent(self.to_position(node, ctx), info)
@@ -101,9 +106,9 @@ class SIFContractTranslator(ContractTranslator):
         """
         Translates a call to the TerminatesSif() contract function.
         """
-        cond_stmts, cond = self.translate_expr(node.args[0], ctx, target_type=self.viper.Bool)
-        # rank_stmts, rank = self.translate_expr(node.args[1], ctx, target_type=self.viper.Int)
-        if cond_stmts: # or rank_stmts:
+        cond_stmts, cond = self.translate_expr(node.args[0], ctx,
+                                               target_type=self.viper.Bool)
+        if cond_stmts:
             raise InvalidProgramException(node, 'purity.violated')
         must_terminate = super().translate_terminates_sif(node, ctx)
         pos = self.to_position(node, ctx)

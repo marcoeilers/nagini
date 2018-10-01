@@ -27,7 +27,8 @@ class SIFStatementTranslator(StatementTranslator):
         if node.value:
             rhs_stmt, rhs = self.translate_expr(node.value, ctx)
         else:
-            rhs_stmt, rhs = [], self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+            rhs_stmt, rhs = [], self.viper.NullLit(self.no_position(ctx),
+                                                   self.no_info(ctx))
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         if ctx.result_var:
@@ -46,10 +47,12 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Continue(self, node: ast.Continue, ctx: Context) -> List[Stmt]:
         return [self.viper.Continue(self.to_position(node, ctx), self.no_info(ctx))]
 
-    def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
+    def _while_postamble(self, node: ast.While, post_label: str,
+                         ctx: Context) -> List[Stmt]:
         return self._set_result_none(ctx)
 
-    def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
+    def _translate_while_body(self, node: ast.While, ctx: Context,
+                              end_label: str) -> List[Stmt]:
         start, end = get_body_indices(node.body)
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
@@ -63,15 +66,16 @@ class SIFStatementTranslator(StatementTranslator):
         error_var = self.get_error_var(node, ctx)
         for handler in try_block.handlers:
             error_type_check = self.type_check(
-                error_var.ref(), handler.exception, self.to_position(handler.node, ctx), ctx,
-                inhale_exhale=False)
+                error_var.ref(), handler.exception, self.to_position(handler.node, ctx),
+                ctx, inhale_exhale=False)
             handler_body = []
             if handler.exception_name:
                 ctx.var_aliases[handler.exception_name] = error_var
 
                 error_var.type = handler.exception
                 handler_body.append(self.set_var_defined(error_var, no_pos, no_info))
-            handler_body += flatten([self.translate_stmt(stmt, ctx) for stmt in handler.body])
+            handler_body += flatten([self.translate_stmt(stmt, ctx)
+                                     for stmt in handler.body])
             handler_body_seqn = self.viper.Seqn(handler_body, no_pos, no_info)
             catch_blocks.append(self.viper.SIFExceptionHandler(
                 error_var.ref(), error_type_check, handler_body_seqn))
@@ -134,7 +138,8 @@ class SIFStatementTranslator(StatementTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         no_exc_name = ctx.current_function.get_fresh_name('exc')
-        no_exc_decl = self.viper.LocalVarDecl(no_exc_name, self.viper.Bool, no_pos, no_info)
+        no_exc_decl = self.viper.LocalVarDecl(no_exc_name, self.viper.Bool, no_pos,
+                                              no_info)
         no_exc = self.viper.LocalVar(no_exc_name, self.viper.Bool, no_pos, no_info)
         return no_exc_decl, no_exc
 
@@ -145,8 +150,9 @@ class SIFStatementTranslator(StatementTranslator):
         return self.type_check(error_var, exception_class,
                                self.no_position(ctx), ctx, inhale_exhale=False)
 
-    def _create_With_exception_handler(self, try_block: PythonTryBlock, exit_res: PythonVar,
-                                       no_exc: 'viper.ast.LocalVar', ctx: Context) -> Seqn:
+    def _create_With_exception_handler(self, try_block: PythonTryBlock,
+                                       exit_res: PythonVar, no_exc: 'viper.ast.LocalVar',
+                                       ctx: Context) -> Seqn:
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         ctx_type = self.get_type(try_block.with_item.context_expr, ctx)
@@ -154,7 +160,8 @@ class SIFStatementTranslator(StatementTranslator):
         err_type_arg = self.type_factory.typeof(error_var, ctx)
 
         tb_class = ctx.module.global_module.classes['traceback']
-        traceback_var = ctx.actual_function.create_variable('tb', tb_class, self.translator)
+        traceback_var = ctx.actual_function.create_variable('tb', tb_class,
+                                                            self.translator)
         tb_type = self.type_check(traceback_var.ref(), tb_class, no_pos, ctx)
         inhale_types = self.viper.Inhale(tb_type, no_pos, no_info)
 
@@ -197,7 +204,8 @@ class SIFStatementTranslator(StatementTranslator):
         exit_call_no_err = self.get_method_call(try_block.with_var.type, '__exit__',
                                                 [try_block.with_var.ref(),
                                                  self.type_factory.typeof(
-                                                     self.viper.NullLit(no_pos, no_info), ctx),
+                                                     self.viper.NullLit(no_pos, no_info),
+                                                     ctx),
                                                  null, null],
                                                 [try_block.with_var.type, None, None, None],
                                                 [exit_res.ref()],
@@ -267,11 +275,14 @@ class SIFStatementTranslator(StatementTranslator):
         error_type_check = self._create_With_exception_handler_type_check(try_block, ctx)
         exception_handler = self.viper.SIFExceptionHandler(
             self.get_error_var(node, ctx).ref(), error_type_check, handler)
-        inner_try = self._translate_With_inner_try(try_block, enter_res, exception_handler, ctx)
+        inner_try = self._translate_With_inner_try(try_block, enter_res, exception_handler,
+                                                   ctx)
         # Create outer try block
         finally_block = self.translate_With_finally_block(try_block, exit_res, no_exc, ctx)
         outer_try = self.viper.Try(self.viper.Seqn([inner_try], no_pos, no_info), [], None,
-                                   self.viper.Seqn([finally_block], no_pos, no_info), pos, no_info)
+                                   self.viper.Seqn([finally_block], no_pos, no_info), pos,
+                                   no_info)
 
-        return [self.viper.Seqn(ctx_stmt + [ctx_assign] + enter_call + [exc_assign, outer_try],
+        return [self.viper.Seqn(ctx_stmt + [ctx_assign] +
+                                enter_call + [exc_assign, outer_try],
                                 pos, no_info, locals=[no_exc_decl])]

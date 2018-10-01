@@ -536,12 +536,11 @@ class MethodTranslator(CommonTranslator):
             else:
                 locals = [error_var_decl]
             body += self._translate_method_body(method, ctx)
-            # TODO: What does the remove_alias do?
             for arg in method.get_args():
                 ctx.remove_alias(arg.name)
             body += self._method_body_postamble(method, ctx)
             locals += [local.decl for local in method.get_locals()
-                    if not local.name.startswith('lambda')]
+                       if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         name = method.sil_name
         nodes = self.create_method_node(

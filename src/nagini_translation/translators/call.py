@@ -241,12 +241,13 @@ class CallTranslator(CommonTranslator):
         defined_check = []
         if target_class.module is not target_class.module.global_module:
             # Mark the current function as depending on the called class. If we're in
-            # a global context, assert that the called class and its dependencies are defined.
+            # a global context, assert that the called class and its dependencies are
+            # defined.
             func_node = node.func if isinstance(node, ast.Call) else node
             self._add_dependencies(func_node, target_class, ctx)
             if self.is_main_method(ctx):
-                defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
-                                                           ctx)
+                defined_check = self.assert_global_defined(target_class, ctx.module,
+                                                           node.func, ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -319,7 +320,8 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_seq = self.viper.SeqType(self.viper.Ref)
             ref_seq = SilverType(sil_ref_seq, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq, self.translator)
+            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq,
+                                                            self.translator)
             seq_field = self.viper.Field('list_acc', sil_ref_seq, position, info)
             content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
@@ -360,21 +362,28 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_set = self.viper.SetType(self.viper.Ref)
             ref_set = SilverType(sil_ref_set, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set, self.translator)
+            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set,
+                                                            self.translator)
             set_field = self.viper.Field('set_acc', sil_ref_set, position, info)
             content_field = self.viper.FieldAccess(result_var, set_field, position, info)
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
             quant_var_name = ctx.actual_function.get_fresh_name('item')
-            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position, info)
-            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref, position,
-                                                     info)
-            arg_contains = self.get_function_call(arg_type, '__contains__', [contents, quant_var], [None, None], node, ctx)
-            res_contains = self.get_function_call(set_type, '__contains__', [result_var, quant_var], [None, None], node, ctx)
+            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position,
+                                            info)
+            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref,
+                                                     position, info)
+            arg_contains = self.get_function_call(arg_type, '__contains__',
+                                                  [contents, quant_var], [None, None],
+                                                  node, ctx)
+            res_contains = self.get_function_call(set_type, '__contains__',
+                                                  [result_var, quant_var], [None, None],
+                                                  node, ctx)
             contain_equal = self.viper.EqCmp(arg_contains, res_contains, position, info)
             trigger = self.viper.Trigger([res_contains], position, info)
-            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal, position, info)
+            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal,
+                                           position, info)
             stmts.append(self.viper.Inhale(quantifier, position, info))
         return stmts, result_var
 
@@ -538,7 +547,8 @@ class CallTranslator(CommonTranslator):
             # defined.
             self._add_dependencies(node.func, target, ctx)
             if self.is_main_method(ctx) and not target.cls:
-                defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+                defined_check = self.assert_global_defined(target, ctx.module, node.func,
+                                                           ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
@@ -1428,12 +1438,6 @@ class CallTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'invalid.thread.join')
             method_options.append(target)
 
-        # If we are doing SIF verification, add assertions, LowEvent and Low(thread)
-        # if isinstance(self.viper, ViperASTExtended):
-        #     stmts.append(self.viper.Assert(self.viper.LowEvent(pos, info), pos, info))
-        #     stmts.append(self.viper.Assert(
-        #         self.viper.Low(thread, None, pos, info), pos, info))
-
         # Conditionally inhale postconditions of target methods.
         for method in method_options:
             stmts.append(self._inhale_possible_thread_post(method, thread, res_var,
@@ -1506,7 +1510,8 @@ class CallTranslator(CommonTranslator):
 
         # Translate postcondition
         for post, _ in method.postcondition:
-            _, post_val = self.translate_expr(post, ctx, target_type=self.viper.Bool, impure=True)
+            _, post_val = self.translate_expr(post, ctx, target_type=self.viper.Bool,
+                                              impure=True)
             post_assertion = self.viper.And(post_assertion, post_val, pos, info)
 
         ctx.inlined_calls.pop()

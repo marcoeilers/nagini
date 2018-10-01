@@ -1284,8 +1284,6 @@ class StatementTranslator(CommonTranslator):
         loop = global_stmts + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
-        # TODO:(meiersev) can we get rid of this? happens in postamble (all tests pass without it)
-        # loop += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])

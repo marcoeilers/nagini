@@ -598,6 +598,8 @@ class ContractTranslator(CommonTranslator):
         """
         Creates the left hand side of the implication in a quantifier
         expression, which says that e is an element of the given domain.
+        The last return value specifies if the returned expression is
+        recommended to be used as a trigger.
         """
         domain_old = False
         if (isinstance(domain_node, ast.Call) and
@@ -612,6 +614,8 @@ class ContractTranslator(CommonTranslator):
 
         if isinstance(dom_target, PythonType):
             result = self.type_check(ref_var, dom_target, pos, ctx, False)
+            # Not recommended as a trigger, since it's very broad and will get triggered
+            # a lot.
             return [], result, False
         dom_stmt, domain = self.translate_expr(domain_node, ctx)
         dom_type = self.get_type(domain_node, ctx)
