@@ -32,7 +32,7 @@ def func5(a: int, b: int, c: bool) -> bool:
 
 @Pure
 def func6(a: int) -> bool:
-    Requires(Low(a))
+    # Requires(Low(a))
     b = a + 42
     if b > 50:
         c = b < 100
@@ -41,7 +41,6 @@ def func6(a: int) -> bool:
 
 
 @Pure
-@NotPreservingTL
 def func7(a: int) -> int:
     Requires(a > 3)
     Ensures(Result() > 42)
@@ -57,7 +56,6 @@ def func7(a: int) -> int:
 
 
 @Pure
-@NotPreservingTL
 def func8(a: int) -> int:
     Requires(a > 3)
     Ensures(Result() > 42)
@@ -73,10 +71,8 @@ def square(a: int) -> int:
 
 @Pure
 def foo(a: int) -> int:
-    Requires(Low(a))
     Ensures(Implies(a != 0, Result() > 0))
     Ensures(Implies(a < 0, Result() == square(square(a))))
-    Ensures(Low(a))
     if a < 0:
         b = square(square(a))
     else:
@@ -87,7 +83,5 @@ def foo(a: int) -> int:
 def bar(a: int) -> int:
     Requires(a > 0)
     Requires(not func2())
-    Requires(Low(a))
     Ensures(Result() > 0)
-    Ensures(Low(a))
     return foo(a)

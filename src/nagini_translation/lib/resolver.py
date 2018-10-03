@@ -395,8 +395,10 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
             elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
-                                  'MaySet'):
+                                  'MaySet', 'Low', 'LowVal', 'LowEvent'):
                 return module.global_module.classes[BOOL_TYPE]
+            elif node.func.id == 'Declassify':
+                return None
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)
             elif node.func.id == 'Unfolding':

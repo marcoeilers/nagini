@@ -17,6 +17,8 @@ Var = 'silver.ast.LocalVar'
 
 VarDecl = 'silver.ast.LocalVarDecl'
 
+VarAssign = 'silver.ast.LocalVarAssign'
+
 Domain = 'silver.ast.Domain'
 
 DomainAxiom = 'silver.ast.DomainAxiom'
@@ -48,3 +50,5 @@ Position = 'silver.ast.Position'
 Info = 'silver.ast.Info'
 
 Node = 'silver.ast.Node'
+
+Seqn = 'silver.ast.Seqn'

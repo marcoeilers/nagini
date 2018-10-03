@@ -10,6 +10,7 @@ method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()
     ensures typeof(res) == list(list_arg(typeof(res), 0))
+    ensures Low(res)
 {
     assume false
 }
@@ -60,6 +61,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[key := item]
+    ensures (Low(key) && Low(item)) ==> (forall i: Ref :: {list___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self) && Low(old(list___getitem__(self, i)))) ==> Low(list___getitem__(self, i))))
 {
     assume false
 }

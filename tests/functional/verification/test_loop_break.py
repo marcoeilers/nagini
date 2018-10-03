@@ -4,14 +4,14 @@ from nagini_contracts.contracts import *
 def find_divisor(product: int) -> int:
     Requires(product >= 2)
     Ensures(Result() >= 2 and Result() <= product)
-    Ensures(Forall(range(2, Result()), lambda x: (product % x != 0, [])))
+    Ensures(Forall(int, lambda x: (Implies(x >= 2 and x < Result(), product % x != 0), [[product % x]])))
     Ensures(Implies(Result() != product, product % Result() == 0))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(False)
     i = 2
     while i < product:
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [[product % x]])))
+        Invariant(Forall(int, lambda x: (Implies(x >= 2 and x < i, product % x != 0), [[product % x]])))
         if product % i == 0:
             break
         i += 1
@@ -21,16 +21,15 @@ def find_divisor(product: int) -> int:
 def find_divisor_else(product: int) -> int:
     Requires(product >= 2)
     Ensures(Result() == -1 or (Result() >= 2 and Result() <= product))
-    Ensures(Implies(Result() > 0, Forall(range(2, Result()), lambda x: (product % x != 0, []))))
-    Ensures(Implies(Result() == -1, Forall(range(2, product),
-                                           lambda x: (product % x != 0, []))))
+    Ensures(Implies(Result() > 0, Forall(int, lambda x: (Implies(x >= 2 and x < Result(), product % x != 0), [[product % x]]))))
+    Ensures(Implies(Result() == -1, Forall(int, lambda x: (Implies(x >= 2 and x < product, product % x != 0), [[product % x]]))))
     Ensures(Implies(Result() > 0, product % Result() == 0))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(False)
     i = 2
     while i < product:
         Invariant(i >= 2 and i <= product)
-        Invariant(Forall(range(2, i), lambda x: (product % x != 0, [[product % x]])))
+        Invariant(Forall(int, lambda x: (Implies(x >= 2 and x < i, product % x != 0), [[product % x]])))
         if product % i == 0:
             break
         i += 1
@@ -42,7 +41,7 @@ def find_divisor_else(product: int) -> int:
 def find_divisor_for(product: int) -> int:
     Requires(product > 2)
     Ensures(Result() >= 2 and Result() <= product)
-    Ensures(Forall(range(2, Result()), lambda x: (product % x != 0, [])))
+    Ensures(Forall(int, lambda x: (Implies(x >= 2 and x < Result(), product % x != 0), [[product % x]])))
     Ensures(Implies(Result() != product, product % Result() == 0))
     for i in range(2, product):
         Invariant(i >= 2 and i <= product)

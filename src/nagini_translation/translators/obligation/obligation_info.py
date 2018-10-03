@@ -9,7 +9,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import abc
 import ast
-
 from typing import List
 
 from nagini_translation.lib import silver_nodes as sil
@@ -26,7 +25,9 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.typedefs import (
     Expr,
     Stmt,
+    Type,
 )
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -36,7 +37,6 @@ from nagini_translation.translators.obligation.measures import (
 from nagini_translation.translators.obligation.types.base import (
     ObligationInstance,
 )
-
 
 CURRENT_THREAD_NAME = '_cthread'
 RESIDUE_LEVEL_METHOD_NAME = '_residue'
@@ -122,8 +122,12 @@ class BaseObligationInfo(GuardCollectingVisitor):
             obligation_instance = obligation.check_node(
                 node, self, self._method)
             if obligation_instance:
+                guard = self.current_guard[:]
+                if (isinstance(node.func, ast.Name) and
+                        node.func.id == "TerminatesSif"):
+                    guard.append(node.args[0])
                 instance = GuardedObligationInstance(
-                    self.current_guard[:], obligation_instance)
+                    guard, obligation_instance)
                 self._current_instance_map[obligation.identifier()].append(
                     instance)
                 self._all_instances[node] = instance
@@ -179,11 +183,14 @@ class BaseObligationInfo(GuardCollectingVisitor):
 
     def _create_silver_var(
             self, name: str, translator: 'AbstractTranslator',
-            typ: 'viper_ast.Type', local: bool = False) -> SilverVar:
+            typ: Type, local: bool = False) -> SilverVar:
         sil_name = self._method.get_fresh_name(name)
+        if isinstance(translator.viper, ViperASTExtended):
+            info = translator.viper.SIFInfo([], obligation_var=True)
+        else:
+            info = translator.viper.NoInfo
         decl = translator.viper.LocalVarDecl(
-            sil_name, typ, translator.viper.NoPosition,
-            translator.viper.NoInfo)
+            sil_name, typ, translator.viper.NoPosition, info)
         ref = translator.viper.LocalVar(
             sil_name, typ, translator.viper.NoPosition,
             translator.viper.NoInfo)

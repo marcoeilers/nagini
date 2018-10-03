@@ -33,6 +33,7 @@ class PyTestConfig:
     def __init__(self):
         self.translation_test_dirs = []
         self.verification_test_dirs = []
+        self.single_test = None
         self.verifiers = []
 
         self.init_from_config_file()
@@ -48,7 +49,7 @@ class PyTestConfig:
 
     def add_test(self, test: str):
         if test == 'functional':
-                self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+            self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
         elif test == 'sif':
             self._add_test_dir(_SIF_TESTS_DIR)
         elif test == 'io':
@@ -109,6 +110,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     # Preferably, we could specify the tests and verifiers as a list, but
     # unfortunately, pytest_parser.addoption does not play well with
     # action='append'.
+    parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
     parser.addoption('--sif', dest='sif', action='store_true')
@@ -140,7 +142,10 @@ def pytest_configure(config: 'pytest.config.Config'):
         _pytest_config.clear_tests()
         for test in tests:
             _pytest_config.add_test(test)
-    if not _pytest_config.translation_test_dirs:
+    elif config.option.single_test:
+        _pytest_config.clear_tests()
+        _pytest_config.single_test = config.option.single_test
+    if not _pytest_config.translation_test_dirs and not _pytest_config.single_test:
         pytest.exit('No test sets specified.')
     # Setup verifiers.
     verifiers = []
@@ -171,6 +176,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers
@@ -181,6 +188,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers

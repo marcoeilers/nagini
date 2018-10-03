@@ -4,11 +4,23 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-import "bool.sil"
+domain SIFDomain[T] {
+    function Low(x: T): Bool
+}
+
+import "../../resources/bool.sil"
+import "../../resources/bytes.sil"
+import "../../resources/iterator.sil"
+import "../../resources/list.sil"
 import "../../resources/lock.sil"
 import "../../resources/measures.sil"
 import "../../resources/pytype.sil"
-import "../../resources/name_domain.sil"
+import "../../resources/range.sil"
+import "../../resources/seq.sil"
+import "../../resources/pset.sil"
+import "../../resources/set_dict.sil"
+import "../../resources/slice.sil"
 import "../../resources/str.sil"
-import "func_triple.sil"
-import "list.sil"
+import "../../resources/tuple.sil"
+import "../../resources/name_domain.sil"
+

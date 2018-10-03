@@ -21,3 +21,11 @@ def foo(a: int) -> int:
 def inc(a: int) -> int:
     Ensures(Result() == a + 1)
     return a + 1
+
+
+def low(a: int, secret: bool) -> None:
+    Requires(Low(a))
+    if secret:
+        a = 0
+        return
+    Assert(Low(a))

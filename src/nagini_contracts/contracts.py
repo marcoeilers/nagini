@@ -25,10 +25,10 @@ GHOST_PREFIX = "_gh_"
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
-                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'Joinable',
-                  'MayStart', 'Let',]
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
+                  'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding', 'Previous', 'RaisedException',
+                  'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg',
+                  'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -85,7 +85,7 @@ def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
     pass
 
-def Forall(domain: Iterable[T],
+def Forall(domain: Union[Iterable[T], Type[T]],
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
@@ -100,16 +100,38 @@ def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     pass
 
 
-def Low(*args) -> bool:
+def Low(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
-
-    +    Calling with 0 args translates to ``!tl``.
-    +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
-    +    Ignored when not verifying information flow.
+    Ignored when not verifying information flow.
     """
     pass
 
+def LowVal(expr: T) -> bool:
+    """
+    Predicate to indicate that an expression has to be low, using value equality if the
+    expression is a primitive. Ignored when not verifying information flow.
+    """
+    pass
+
+def LowEvent() -> bool:
+    """
+    Predicate that states that either both executions reach this point or none of them.
+    """
+    pass
+
+def Declassify(expr: T) -> bool:
+    """
+    Declassify an expression. Assumes expression to be low.
+    """
+    pass
+
+def TerminatesSif(cond: bool, rank: int) -> bool:
+    """
+    Verify absence of termination channels. Gives surrounding loop/call a
+    termination condition and a ranking function.
+    """
+    pass
 
 class Sequence(Generic[T], Sized, Iterable[T]):
     """
@@ -295,14 +317,21 @@ def Ghost(func: T) -> T:
     """
     return func
 
-
-def NotPreservingTL(func: T) -> T:
+def AllLow(func: T) -> T:
     """
-    Decorator indicating that this method/function does not (necessarily)
-    preserve the timelevel.
+    Decorator indicating that everything this method does is low.
+    Requires all inputs to be low, ensures all state it has access to and
+    all return values are low.
     """
     return func
 
+def PreservesLow(func: T) -> T:
+    """
+    Decorator indicating that everything this method does preserves lowness.
+    Given that all the state it gets to work on is low to begin with, all state and
+    return values will remain low.
+    """
+    return func
 
 def ContractOnly(func: T) -> T:
     """
@@ -310,7 +339,7 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
-    
+
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
     Decorator for functions which specifies which return values are ghost
@@ -369,6 +398,12 @@ __all__ = [
         'Exists',
         'Let',
         'Low',
+        'LowVal',
+        'LowEvent',
+        'Declassify',
+        'TerminatesSif',
+        'AllLow',
+        'PreservesLow',
         'Acc',
         'Rd',
         'Fold',
@@ -377,7 +412,6 @@ __all__ = [
         'Pure',
         'Predicate',
         'Ghost',
-        'NotPreservingTL',
         'ContractOnly',
         'GhostReturns',
         'list_pred',

@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    RANGE_TYPE,
     SEQ_TYPE,
     SET_TYPE,
     SINGLE_NAME,
@@ -547,7 +548,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return [], None
 
     def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
-                           node: ast.AST, ctx: Context, position: Position) -> Expr:
+                           node: ast.AST, ctx: Context, position: Position,
+                           force_trigger=False) -> Expr:
         """
         Returns a contains-expression representing whether in_expr is in dom_arg.
         To be used on the left hand side of quantifiers (and in the corresponding
@@ -560,18 +562,36 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if (not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType))
-                and dom_type.name in (DICT_TYPE, SET_TYPE)):
-            contains_constructor = self.viper.AnySetContains
-            if dom_type.name == DICT_TYPE:
-                set_ref = self.viper.SetType(self.viper.Ref)
-                field = self.viper.Field('dict_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(dom_arg, field, position, info)
-            if dom_type.name == SET_TYPE:
-                set_ref = self.viper.SetType(self.viper.Ref)
-                field = self.viper.Field('set_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(dom_arg, field, position, info)
-        else:
+        res = None
+        if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
+            if dom_type.name in (DICT_TYPE, SET_TYPE):
+                contains_constructor = self.viper.AnySetContains
+                if dom_type.name == DICT_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('dict_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                if dom_type.name == SET_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('set_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+            if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
+                        node.func.id == 'range'):
+                left = node.args[0]
+                right = node.args[1]
+                _, left_expr = self.translate_expr(left, ctx)
+                _, right_expr = self.translate_expr(right, ctx)
+                int_class = ctx.module.global_module.classes[INT_TYPE]
+                left_bound = self.get_function_call(int_class, '__ge__',
+                                                    [in_expr, left], [None, None],
+                                                    node, ctx, position)
+                right_bound = self.get_function_call(int_class, '__lt__',
+                                                    [in_expr, right], [None, None],
+                                                    node, ctx, position)
+                if force_trigger:
+                    return None
+                else:
+                    return self.viper.And(left_bound, right_bound, position, info)
+        if res is None:
             contains_constructor = self.viper.SeqContains
             res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
         return contains_constructor(in_expr, res, position, info)
@@ -599,7 +619,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     return args[0]
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
                                       node, ctx, position)
-
 
     def _get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],

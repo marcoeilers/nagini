@@ -433,6 +433,56 @@ class MethodTranslator(CommonTranslator):
                                                                self.no_position(ctx), ctx)
             ctx.bound_type_vars[('V',)] = literal
 
+    def _check_self_type(self, method: PythonMethod, ctx: Context) -> Stmt:
+        """
+        Return an statement checking the type of the 'self' variable (only for methods in classes).
+        """
+        type_check = self.type_factory.type_check(
+                next(iter(method.args.values())).ref(), method.cls, self.no_position(ctx), ctx,
+                concrete=True)
+        return self.viper.Inhale(type_check, self.no_position(ctx),
+                                            self.no_info(ctx))
+
+    def _translate_method_body(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        body = []
+        statements = method.node.body
+        body_start, body_end = get_body_indices(statements)
+        # Create local variables for parameters
+        body.extend(self._create_local_vars_for_params(method, ctx))
+        body += flatten(
+            [self.translate_stmt(stmt, ctx) for stmt in
+                method.node.body[body_start:body_end]])
+        return body
+
+    def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        """
+        Translates the handlers of all try blocks, as well as finally blocks.
+        """
+        stmts = []
+        for block in method.try_blocks:
+            for handler in block.handlers:
+                stmts += self.translate_handler(handler, ctx)
+            if block.else_block:
+                stmts += self.translate_handler(block.else_block, ctx)
+            if block.finally_block or block.with_item:
+                stmts += self.translate_finally(block, ctx)
+        return stmts
+
+    def _method_body_postamble(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
+        postamble = []
+        end_label = ctx.get_label_name(END_LABEL)
+        postamble.append(self.viper.Goto(end_label, self.no_position(ctx), self.no_info(ctx)))
+        assert not ctx.var_aliases
+        postamble += self._translate_try_handlers(method, ctx)
+        postamble += self.add_handlers_for_inlines(ctx)
+        return postamble
+
+    def create_method_error_var(self, ctx: Context) -> PythonVar:
+        error_var = PythonVar(ERROR_NAME, None,
+                              ctx.module.global_module.classes['Exception'])
+        error_var.process(ERROR_NAME, self.translator)
+        return error_var
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -445,9 +495,7 @@ class MethodTranslator(CommonTranslator):
         self.bind_type_vars(method, ctx)
 
         results = [res.decl for res in method.get_results()]
-        error_var = PythonVar(ERROR_NAME, None,
-                              ctx.module.global_module.classes['Exception'])
-        error_var.process(ERROR_NAME, self.translator)
+        error_var = self.create_method_error_var(ctx)
         error_var_decl = error_var.decl
         error_var_ref = error_var.ref()
         method.error_var = error_var
@@ -463,12 +511,7 @@ class MethodTranslator(CommonTranslator):
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
-            type_check = self.type_factory.type_check(
-                next(iter(method.args.values())).ref(), method.cls, no_pos, ctx,
-                concrete=True)
-            inhale_type = self.viper.Inhale(type_check, self.no_position(ctx),
-                                            self.no_info(ctx))
-            body.append(inhale_type)
+            body.append(self._check_self_type(method, ctx))
         if method.type:
             # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),
@@ -484,34 +527,20 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
-            statements = method.node.body
-            body_start, body_end = get_body_indices(statements)
+            body.append(self.viper.LocalVarAssign(error_var_ref,
+                self.viper.NullLit(self.no_position(ctx),
+                                    self.no_info(ctx)),
+                self.no_position(ctx), self.no_info(ctx)))
             if method.declared_exceptions:
-                body.append(self.viper.LocalVarAssign(error_var_ref,
-                    self.viper.NullLit(self.no_position(ctx),
-                                       self.no_info(ctx)),
-                    self.no_position(ctx), self.no_info(ctx)))
-            # Create local variables for parameters
-            body.extend(self._create_local_vars_for_params(method, ctx))
-            body += flatten(
-                [self.translate_stmt(stmt, ctx) for stmt in
-                 method.node.body[body_start:body_end]])
+                locals = []
+            else:
+                locals = [error_var_decl]
+            body += self._translate_method_body(method, ctx)
             for arg in method.get_args():
                 ctx.remove_alias(arg.name)
-            end_label = ctx.get_label_name(END_LABEL)
-            body.append(self.viper.Goto(end_label, self.no_position(ctx),
-                                        self.no_info(ctx)))
-            assert not ctx.var_aliases
-            for block in method.try_blocks:
-                for handler in block.handlers:
-                    body += self.translate_handler(handler, ctx)
-                if block.else_block:
-                    body += self.translate_handler(block.else_block, ctx)
-                if block.finally_block or block.with_item:
-                    body += self.translate_finally(block, ctx)
-            body += self.add_handlers_for_inlines(ctx)
-            locals = [local.decl for local in method.get_locals()
-                      if not local.name.startswith('lambda')]
+            body += self._method_body_postamble(method, ctx)
+            locals += [local.decl for local in method.get_locals()
+                       if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
         name = method.sil_name
         nodes = self.create_method_node(
@@ -824,18 +853,13 @@ class MethodTranslator(CommonTranslator):
                 stmts.append(self.viper.Inhale(field_pred, no_pos, no_info))
         return locals, stmts
 
-    def translate_main_method(self, modules: List[PythonModule],
-                              ctx: Context) -> List['silver.ast.Method']:
-        """
-        Translates the global statements of the program to a single method.
-        """
-        main = [m for m in modules if m.type_prefix == '__main__'][0]
-        stmts = []
-        no_pos = self.no_position(ctx)
-        no_info = self.no_info(ctx)
-        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
+    def _get_main_module(self, modules: List[PythonModule]) -> PythonModule:
+        return [m for m in modules if m.type_prefix == '__main__'][0]
 
-        stmts.extend(init_stmts)
+    def _create_main_method_setup(self, modules: List[PythonModule],
+                                  ctx: Context) -> Tuple[PythonMethod, List[VarDecl], List[Stmt]]:
+        main = self._get_main_module(modules)
+        locals, init_stmts = self._initialize_main_state(modules, main, ctx)
 
         # Create artificial main PythonMethod that contains the execution of global
         # statements.
@@ -852,27 +876,26 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function.loop_invariants = main.loop_invariants
         ctx.current_function.process(method_name, self.translator)
         ctx.module = main
+        return main_method, locals, init_stmts
+
+    def translate_main_method(self, modules: List[PythonModule],
+                              ctx: Context) -> List['silver.ast.Method']:
+        """
+        Translates the global statements of the program to a single method.
+        """
+        no_pos = self.no_position(ctx)
+        no_info = self.no_info(ctx)
+
+        main = self._get_main_module(modules)
+        main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
+        method_name = main_method.sil_name
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
 
-        end_label = ctx.get_label_name(END_LABEL)
-        stmts.append(self.viper.Goto(end_label, self.no_position(ctx),
-                                    self.no_info(ctx)))
-
-        # Append blocks for exception handling etc.
-        assert not ctx.var_aliases
-        for block in main_method.try_blocks:
-            for handler in block.handlers:
-                stmts += self.translate_handler(handler, ctx)
-            if block.else_block:
-                stmts += self.translate_handler(block.else_block, ctx)
-            if block.finally_block or block.with_item:
-                stmts += self.translate_finally(block, ctx)
-        stmts += self.add_handlers_for_inlines(ctx)
-
+        stmts += self._method_body_postamble(main_method, ctx)
         stmts += self._create_method_epilog(main_method, ctx)
 
         main_locals = [local.decl for local in main_method.get_locals()

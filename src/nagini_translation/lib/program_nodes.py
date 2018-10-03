@@ -997,6 +997,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
         self.predicate = False
+        self.all_low = False
+        self.preserves_low = False
         self.contract_only = contract_only
         self.interface = interface
         self.interface_name = None  # Name to be used in error messages, if different from

@@ -72,6 +72,8 @@ ERRORS = {
         lambda n: 'Thread start may fail.',
     'thread.join.failed':
         lambda n: 'Thread join may fail.',
+    'termination_channel_check.failed':
+        lambda n: 'Termination channel might exist.',
     'lock.invariant.not.established':
         lambda n: 'Lock invariant might not hold.',
 }
@@ -132,6 +134,8 @@ REASONS = {
         lambda n: 'Global dependencies may not be defined.',
     'internal':
         lambda n: 'Internal Viper error.',
+    'receiver.not.injective':
+        lambda n: 'Receiver expression of quantified permission is not injective.',
     'wait.level.invalid':
         lambda n: 'Thread level may not be lower than current thread.',
     'thread.not.joinable':
@@ -142,6 +146,19 @@ REASONS = {
         lambda n: "Thread's target method may not be listed in start statement.",
     'missing.start.permission':
         lambda n: 'May not have permission to start thread.',
+    'sif.fold':
+        lambda n: 'The low parts of predicate {} might not hold.'.format(
+            get_target_name(n.args[0])),
+    'sif.unfold':
+        lambda n: 'The low parts of predicate {} might not hold.'.format(
+            get_target_name(n.args[0])),
+    'sif_termination.condition_not_low':
+        lambda n: 'Termination condition {} might not be low.'.format(pprint(n.args[0])),
+    'sif_termination.not_lowevent':
+        lambda n: ('Termination condition {} evaluating to false might not imply that '
+                   'both executions don\'t terminate.').format(pprint(n.args[0])),
+    'sif_termination.condition_not_tight':
+        lambda n: 'Termination condition {} might not be tight.'.format(pprint(n.args[0])),
 }
 
 VAGUE_REASONS = {

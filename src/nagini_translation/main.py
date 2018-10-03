@@ -18,8 +18,10 @@ import traceback
 import nagini_translation.mypy_patches.column_info_patch
 import nagini_translation.mypy_patches.optional_patch
 
+
 from jpype import JavaException
 from nagini_translation.analyzer import Analyzer
+from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
@@ -32,8 +34,12 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 from nagini_translation.lib.viper_ast import ViperAST
-from nagini_translation.sif_analyzer import SIFAnalyzer
-from nagini_translation.sif_translator import SIFTranslator
+from nagini_translation.sif.lib.util import (
+    configure_mpp_transformation,
+    set_all_low_methods,
+    set_preserves_low_methods
+)
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translator import Translator
 from nagini_translation.verifier import (
     Carbon,
@@ -74,9 +80,10 @@ def parse_sil_file(sil_path: str, jvm):
 
 def load_sil_files(jvm: JVM, sif: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
-    resources_path = os.path.join(current_path, 'resources')
     if sif:
-        resources_path = os.path.join(current_path, 'sif/resources')
+        resources_path = os.path.join(current_path, 'sif', 'resources')
+    else:
+        resources_path = os.path.join(current_path, 'resources')
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
 
 
@@ -91,16 +98,16 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     current_path = os.path.dirname(inspect.stack()[0][1])
     resources_path = os.path.join(current_path, 'resources')
 
-    viperast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    if sif:
+        viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    else:
+        viper_ast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
     types = TypeInfo()
     type_correct = types.check(path)
     if not type_correct:
         return None
 
-    if sif:
-        analyzer = SIFAnalyzer(types, path, selected)
-    else:
-        analyzer = Analyzer(types, path, selected)
+    analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
@@ -108,23 +115,24 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
-        translator = SIFTranslator(jvm, path, types, viperast)
+        translator = SIFTranslator(jvm, path, types, viper_ast)
     else:
-        translator = Translator(jvm, path, types, viperast)
+        translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
-
+    if sif:
+        set_all_low_methods(jvm, viper_ast.all_low_methods)
+        set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
     # Run consistency check in translated AST
-    consistency_errors = viperast.to_list(prog.checkTransitively())
+    consistency_errors = viper_ast.to_list(prog.checkTransitively())
     for error in consistency_errors:
         print(error.toString())
     if consistency_errors:
         raise ConsistencyException('consistency.error')
-
     return prog
 
 
@@ -300,6 +308,15 @@ def translate_and_verify(python_file, jvm, args, print=print):
         prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
         if args.verbose:
             print('Translation successful.')
+        if args.sif:
+            configure_mpp_transformation(jvm,
+                                         ctrl_opt=True,
+                                         seq_opt=True,
+                                         act_opt=True,
+                                         func_opt=True)
+            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+            if args.verbose:
+                print('Transformation to MPP successful.')
         if args.print_silver:
             if args.verbose:
                 print('Result:')

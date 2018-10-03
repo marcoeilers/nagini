@@ -1,7 +1,6 @@
 import ast
 import copy
 import operator
-
 from typing import List
 
 from nagini_translation.lib import silver_nodes as sil
