@@ -460,7 +460,7 @@ class ViperAST:
         if res.isPure():
             return res
         else:
-            desugared = self.to_list(self.QPs.desugareSourceSyntax(res))
+            desugared = self.to_list(self.QPs.desugarSourceQuantifiedPermissionSyntax(res))
             result = self.TrueLit(position, info)
             for qp in desugared:
                 result = self.And(result, qp, position, info)

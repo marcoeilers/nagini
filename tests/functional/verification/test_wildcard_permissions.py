@@ -56,7 +56,7 @@ def client() -> None:
     c.v = 1
     Unfold(c.P())
     Fold(c.P())
-    rd_client(c)
+    wildcard_client(c)
     #:: ExpectedOutput(assignment.failed:insufficient.permission)
     c.v = 1
 
