@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from typing import Union
+from typing import List, Union
 
 class A:
     def __init__(self) -> None:
@@ -94,17 +94,29 @@ class Base:
         Ensures(Result() > 3)
         return 4
 
+    @Predicate
+    def test_pred(self, i: int) -> bool:
+        return i > 0
+
 class DerivedLeft (Base):
     def foo(self, i: int) -> int:
         Requires(i > 2)
         Ensures(Result() > 5)
         return 6
 
+    @Predicate
+    def test_pred(self, i: int) -> bool:
+        return i > 6
+
 class DerivedRight (Base):
     def foo(self, i: int) -> int:
         Requires(i > 2)
         Ensures(Result() > 5)
         return 6
+
+    @Predicate
+    def test_pred(self, i: int) -> bool:
+        return i < 4
 
 class SingleInheritanceLeft(DerivedRight):
     def foo(self, i: int) -> int:
@@ -127,6 +139,15 @@ def test_16(o: Union[DerivedLeft, Base]) -> None:
 def test_17(o: Union[DerivedLeft, DerivedRight, Base, SingleInheritanceLeft]) -> None:
     x = o.foo(5)
 
+def test_union_predicate(o: Union[DerivedLeft, DerivedRight], j: int) -> None:
+    Requires(o.test_pred(j))
+    Unfold(o.test_pred(j))
+    assert j > 0
+    if isinstance(o, DerivedRight):
+        assert j < 4
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert j < 4
+
 class DataStructure:
     def append(self, item: int) -> None:
         pass
@@ -146,3 +167,14 @@ def test_19(o: Union[A, B]) -> None:
 def test_20(o: Union[A, B]) -> None:
     Requires(Acc(o.field))
     o.field = 5
+
+
+# Same class, different type
+def client1(a: Union[List[int], List[bool]]) -> None:
+    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    b = a[0]
+
+
+def client2(a: Union[List[int], List[bool]]) -> None:
+    #:: ExpectedOutput(call.precondition:insufficient.permission)
+    a.append(True)

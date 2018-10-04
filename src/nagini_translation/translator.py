@@ -86,14 +86,16 @@ class Translator:
         self.expr_translator = config.expr_translator
 
     def translate_program(self, modules: List[PythonModule], sil_progs: List,
-                          selected: Set[str] = None, arp: bool = False) -> 'silver.ast.Program':
+                          selected: Set[str] = None,
+                          ignore_global: bool = False,
+                          arp: bool = False) -> 'silver.ast.Program':
         ctx = Context()
         ctx.current_class = None
         ctx.current_function = None
         ctx.module = modules[0]
         ctx.arp = arp
         return self.prog_translator.translate_program(modules, sil_progs, ctx,
-                                                      selected)
+                                                      selected, ignore_global)
 
     def translate_pythonvar_decl(self, var: PythonVar,
             module: PythonModule) -> 'silver.ast.LocalVarDecl':

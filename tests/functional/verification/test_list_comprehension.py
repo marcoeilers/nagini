@@ -7,7 +7,8 @@ def m(l: List[int]) -> List[bool]:
     Ensures(Acc(list_pred(l)))
     Ensures(Acc(list_pred(Result())))
     Ensures(len(Result()) == len(l))
-    Ensures(Forall(range(0, len(Result())), lambda i: (Result()[i] == (l[i] != 5) , [])))
+    Ensures(Forall(int, lambda i: (
+    Implies(i >= 0 and i < len(Result()), Result()[i] == (l[i] != 5)), [[l[i]]])))
     return [e != 5 for e in l]
 
 
@@ -17,7 +18,8 @@ def m2(l: List[int]) -> List[bool]:
     Ensures(Acc(list_pred(Result())))
     Ensures(len(Result()) == len(l))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(Forall(range(0, len(Result())), lambda i: (Result()[i] == (l[i] != 4) , [])))
+    Ensures(Forall(int, lambda i: (
+    Implies(i >= 0 and i < len(Result()), Result()[i] == (l[i] != 4)), [[l[i]]])))
     return [e != 5 for e in l]
 
 

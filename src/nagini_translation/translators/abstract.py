@@ -115,8 +115,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                        ctx: Context) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
-        return self.config.call_translator.translate_Call(node, ctx, impure)
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False,
+                       statement=False) -> StmtsAndExpr:
+        return self.config.call_translator.translate_Call(node, ctx, impure, statement)
 
     def translate_constructor_call(self, target_class: PythonClass,
                                    node: ast.Call, args: List, arg_stmts: List,
@@ -199,9 +200,10 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                          ctx)
 
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
-                                    impure=False) -> StmtsAndExpr:
+                                    impure=False, statement=False) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node, ctx,
-                                                                           impure)
+                                                                           impure,
+                                                                           statement)
 
     def translate_normal_call(self, target: PythonMethod, arg_stmts: List[Stmt],
                               args: List[Expr], arg_types: List[PythonType],
@@ -316,7 +318,7 @@ class AbstractTranslator(metaclass=ABCMeta):
                            target_node: ast.Call = None) -> List[Stmt]:
         translator = self.config.obligation_translator
         return translator.create_method_fork(ctx, targets, thread, position, info,
-            target_node)
+                                             target_node)
 
     def enter_loop_translation(
             self, node: Union[ast.While, ast.For], ctx: Context,

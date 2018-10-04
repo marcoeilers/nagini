@@ -75,7 +75,7 @@ def get_target(node: ast.AST,
             # Return the type of the current method's superclass
             return container.cls.superclass
         elif func_name == 'cast':
-            return get_target(node.args[0], containers, container)
+            return None
         return get_target(node.func, containers, container)
     elif isinstance(node, ast.Attribute):
         # Find the type of the LHS, so that we can look through its members.
@@ -218,10 +218,15 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return result
         if isinstance(target, PythonIOOperation):
             return module.global_module.classes[BOOL_TYPE]
+<<<<<<< HEAD
         # If this is a Sequence(...) call, target will be the Sequence class
         # but won't have generic type information. So we don't return here
         # and let the code below take care of the call.
         if not isinstance(target, PythonType) or target.name != SEQ_TYPE or target.name != PSET_TYPE:
+=======
+
+        if isinstance(target, (PythonType, PythonModule)):
+>>>>>>> master
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
@@ -233,15 +238,29 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
+<<<<<<< HEAD
                 elif (target.name in ('PSet', 'Sequence') and
                           isinstance(node, ast.Call) and node.args):
                     arg_type = get_type(node.args[0], containers, container)
                     return GenericType(target, [arg_type])
+=======
+                elif (target.name in (SEQ_TYPE, PSET_TYPE) and
+                          isinstance(node, ast.Call) and node.args):
+                    arg_types = [get_type(arg, containers, container)
+                                 for arg in node.args]
+                    return GenericType(target, [common_supertype(arg_types)])
+>>>>>>> master
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
             return target
     if isinstance(node, (ast.Attribute, ast.Name)):
+        if isinstance(node, ast.Attribute):
+            lhs = _do_get_type(node.value, containers, container)
+            if isinstance(lhs, UnionType) and not isinstance(lhs, OptionalType):
+                candidates = [find_entry(node.attr, False, [t]) for t in lhs.type_args]
+                if all(isinstance(c, (PythonField, PythonVarBase)) for c in candidates):
+                    return common_supertype([c.type for c in candidates])
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
@@ -252,7 +271,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return GenericType(module.global_module.classes[TUPLE_TYPE],
                            args)
     elif isinstance(node, ast.Subscript):
-        return _get_subscript_type(node, module, containers, container)
+        return get_subscript_type(node, module, containers, container)
     elif isinstance(node, ast.Str):
         return module.global_module.classes[STRING_TYPE]
     elif isinstance(node, ast.Bytes):
@@ -355,19 +374,35 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         if len(node.args) == 2:
             return module.classes[node.args[0].id].superclass
         elif not node.args:
-            return current_class.superclass
+            return container.cls.superclass
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
-    if func_name == 'Sequence':
+    if func_name == SEQ_TYPE:
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
                                             containers, container)
+<<<<<<< HEAD
     if func_name == 'PSet':
         return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
                                             containers, container)
+=======
+    if func_name == PSET_TYPE:
+        return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
+                                            containers, container)
+    if func_name == 'enumerate':
+        if len(node.args) != 1:
+            raise UnsupportedException(node, 'enumerate only supported with single arg.')
+        list_type = module.global_module.classes[LIST_TYPE]
+        int_type = module.global_module.classes[INT_TYPE]
+        tuple_type = module.global_module.classes[TUPLE_TYPE]
+        arg_type = get_type(node.args[0], containers, container)
+        iterable_type = _get_iteration_type(arg_type, module, node)
+        return GenericType(list_type, [GenericType(tuple_type,
+                                                   [int_type, iterable_type])])
+>>>>>>> master
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
             if node.func.id in ('Result', 'TypedResult'):
@@ -379,9 +414,16 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
+<<<<<<< HEAD
             elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists',
                                   'MayCreate', 'MaySet'):
+=======
+            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
+                                  'MaySet', 'Low', 'LowVal', 'LowEvent'):
+>>>>>>> master
                 return module.global_module.classes[BOOL_TYPE]
+            elif node.func.id == 'Declassify':
+                return None
             elif node.func.id == 'Old':
                 return get_type(node.args[0], containers, container)
             elif node.func.id == 'Unfolding':
@@ -389,11 +431,17 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
+<<<<<<< HEAD
                 return GenericType(seq_class, [_get_content_type(arg_type, module, node)])
+=======
+                content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(seq_class, [content_type])
+>>>>>>> master
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
-                list_class = module.global_module.classes[LIST_TYPE]
+                list_class = module.global_module.classes[SEQ_TYPE]
                 return GenericType(list_class, [arg_type])
+<<<<<<< HEAD
             elif node.func.id == 'getArg':
                 object_class = module.global_module.classes[OBJECT_TYPE]
                 return object_class
@@ -403,6 +451,16 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'getMethod':
                 object_class = module.global_module.classes[OBJECT_TYPE]
                 return object_class
+=======
+            elif node.func.id in ('getArg', 'getOld', 'getMethod'):
+                object_class = module.global_module.classes[OBJECT_TYPE]
+                return object_class
+            elif node.func.id == 'Let':
+                body_type = get_target(node.args[1], containers, container)
+                if isinstance(body_type, PythonType):
+                    return body_type
+                raise InvalidProgramException(node, 'invalid.let')
+>>>>>>> master
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
@@ -426,6 +484,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                                    for type in set_of_classes}
             if len(set_of_return_types) == 1:
                 return set_of_return_types.pop()
+            elif len(set_of_return_types) == 2 and None in set_of_return_types:
+                return OptionalType((set_of_return_types - {None}).pop())
             else:
                 return UnionType(list(set_of_return_types))
         elif isinstance(rectype, PythonType):
@@ -438,7 +498,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         raise UnsupportedException(node)
 
 
-def _get_subscript_type(node: ast.Subscript, module: PythonModule,
+def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
     if (node._parent and isinstance(node._parent, ast.Assign) and
@@ -449,22 +509,30 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return get_type(node._parent.targets[0], containers,
                         container)
     value_type = get_type(node.value, containers, container)
+    return _get_subscript_type(value_type, module, node)
+
+
+def _get_subscript_type(value_type: PythonType, module: PythonModule,
+                        node: ast.AST) -> PythonType:
     if isinstance(value_type, OptionalType):
         value_type = value_type.cls
     if value_type.name == TUPLE_TYPE:
-        if isinstance(node.slice, ast.Slice):
-            raise UnsupportedException(node, 'tuple slicing')
-        if len(value_type.type_args) == 1:
-            return value_type.type_args[0]
-        if isinstance(node.slice.value, ast.UnaryOp):
-            if (isinstance(node.slice.value.op, ast.USub) and
-                    isinstance(node.slice.value.operand, ast.Num)):
-                index = -node.slice.value.operand.n
-            else:
-                raise UnsupportedException(node, 'dynamic subscript type')
-        elif isinstance(node.slice.value, ast.Num):
-            index = node.slice.value.n
-        return value_type.type_args[index]
+        if isinstance(node, ast.Subscript):
+            if isinstance(node.slice, ast.Slice):
+                raise UnsupportedException(node, 'tuple slicing')
+            if len(value_type.type_args) == 1:
+                return value_type.type_args[0]
+            if isinstance(node.slice.value, ast.UnaryOp):
+                if (isinstance(node.slice.value.op, ast.USub) and
+                        isinstance(node.slice.value.operand, ast.Num)):
+                    index = -node.slice.value.operand.n
+                else:
+                    raise UnsupportedException(node, 'dynamic subscript type')
+            elif isinstance(node.slice.value, ast.Num):
+                index = node.slice.value.n
+            return value_type.type_args[index]
+        else:
+            return common_supertype(value_type.type_args)
     elif value_type.name == LIST_TYPE:
         return value_type.type_args[0]
     elif value_type.name == SET_TYPE:
@@ -481,6 +549,7 @@ def _get_subscript_type(node: ast.Subscript, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.python_class.get_func_or_method('__getitem__'):
         return value_type.python_class.get_func_or_method('__getitem__').type
+<<<<<<< HEAD
     else:
         raise UnsupportedException(node)
 
@@ -503,8 +572,22 @@ def _get_content_type(value_type: PythonType, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.python_class.get_func_or_method('__getitem__'):
         return value_type.python_class.get_func_or_method('__getitem__').type
+=======
+>>>>>>> master
     else:
         raise UnsupportedException(node)
+
+
+def _get_iteration_type(value_type: PythonType, module: PythonModule,
+                        node: ast.AST) -> PythonType:
+    # Assuming that value_type is some sort of container which supports iteration,
+    # returns the type of the iterator.
+    if value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+        # FIXME: This is very unfortunate, but right now we cannot handle this
+        # generically, so we have to hard code these two cases for the moment.
+        return value_type.type_args[0]
+    else:
+        return _get_subscript_type(value_type, module, node)
 
 
 def common_supertype(types: List[PythonType]) -> Optional[PythonType]:

@@ -4,6 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+domain SIFDomain[T] {
+    function Low(x: T): Bool
+    axiom low_true {
+        forall x: T :: {Low(x)} Low(x)
+    }
+}
+
+
 import "bool.sil"
 import "bytes.sil"
 import "iterator.sil"
@@ -13,6 +21,7 @@ import "measures.sil"
 import "pytype.sil"
 import "range.sil"
 import "seq.sil"
+import "pset.sil"
 import "set_dict.sil"
 import "slice.sil"
 import "str.sil"

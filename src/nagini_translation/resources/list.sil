@@ -10,6 +10,7 @@ method list___init__() returns (res: Ref)
     ensures acc(res.list_acc)
     ensures res.list_acc == Seq[Ref]()
     ensures typeof(res) == list(list_arg(typeof(res), 0))
+    ensures Low(res)
 {
     assume false
 }
@@ -20,9 +21,10 @@ function list___contains__(self: Ref, item: Ref): Bool
     ensures result == (item in self.list_acc)
 
 function list___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-    requires acc(self.list_acc, wildcard)
-    ensures result == (|self.list_acc| != 0)
+    requires self != null ==> issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires self != null ==> acc(self.list_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.list_acc| != 0)
 
 function list___len__(self: Ref) : Int
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -59,6 +61,7 @@ method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[key := item]
+    ensures (Low(key) && Low(item)) ==> (forall i: Ref :: {list___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self) && Low(old(list___getitem__(self, i)))) ==> Low(list___getitem__(self, i))))
 {
     assume false
 }
@@ -123,9 +126,8 @@ method list___iter__(self: Ref) returns (_res: Ref)
   ensures _res.list_acc == self.list_acc
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
-  ensures acc(_res.__previous, write) && ((_res.__previous != _res) && ((_res.__previous != self) && (acc(_res.__previous.list_acc, write) && (_res.__previous.list_acc == Seq[Ref]()))))
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
   ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
-  ensures issubtype(typeof(_res.__previous), list(list_arg(typeof(self), 0)))
 {
   inhale false
 }

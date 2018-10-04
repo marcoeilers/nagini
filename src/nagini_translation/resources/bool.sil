@@ -18,11 +18,15 @@ function NoneType___bool__(self: Ref) : Bool
 function object___str__(self: Ref) : Ref
     ensures issubtype(typeof(result), str())
 
-function bool___bool__(self: Bool) : Bool
-    ensures result == self
+function bool___bool__(self: Ref) : Bool
+    requires self != null ==> issubtype(typeof(self), bool())
+    ensures self == null ==> !result
+    ensures self != null ==> result == bool___unbox__(self)
 
-function int___bool__(self: Int) : Bool
-    ensures result == (self != 0)
+function int___bool__(self: Ref) : Bool
+    requires self != null ==> issubtype(typeof(self), int())
+    ensures self == null ==> !result
+    ensures self != null ==> result == (int___unbox__(self) != 0)
 
 function __prim__int___box__(prim: Int): Ref
     ensures typeof(result) == int()
@@ -113,8 +117,9 @@ function float___create__(i: Int): Ref
     ensures typeof(result) == float()
 
 function float___bool__(self: Ref): Bool
-    requires issubtype(typeof(self), float())
-    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(int___unbox__(self)))
+    requires self != null ==> issubtype(typeof(self), float())
+    ensures self == null ==> !result
+    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
 
 function float___ge__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), float())
@@ -193,12 +198,14 @@ function max(a: Ref, b: Ref): Int
              (issubtype(typeof(a), list(int())) && b == null)
     requires issubtype(typeof(a), list(int())) ==> acc(a.list_acc, 1/100) && list___len__(a) > 0
     ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(a) : int___unbox__(b))
+    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
 
 function min(a: Ref, b: Ref): Int
     requires (issubtype(typeof(a), int()) && issubtype(typeof(b), int())) ||
              (issubtype(typeof(a), list(int())) && b == null)
     requires issubtype(typeof(a), list(int())) ==>  acc(a.list_acc, 1/100) && list___len__(a) > 0
     ensures issubtype(typeof(a), int()) ==> result == ((int___unbox__(a) > int___unbox__(b)) ? int___unbox__(b) : int___unbox__(a))
+    ensures issubtype(typeof(a), list(int())) ==> list___contains__(a, __prim__int___box__(result))
 
 function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)

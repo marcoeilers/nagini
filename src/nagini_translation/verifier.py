@@ -32,7 +32,7 @@ class Success(VerificationResult):
     def __bool__(self):
         return True
 
-    def to_string(self, ide_mode: bool) -> str:
+    def to_string(self, ide_mode: bool, show_viper_errors: bool) -> str:
         return "Verification successful"
 
 
@@ -49,8 +49,8 @@ class Failure(VerificationResult):
     def __bool__(self):
         return False
 
-    def to_string(self, ide_mode: bool) -> str:
-        all_errors = [error.string(ide_mode) for error in self.errors]
+    def to_string(self, ide_mode: bool, show_viper_errors: bool) -> str:
+        all_errors = [error.string(ide_mode, show_viper_errors) for error in self.errors]
         unique_errors = []
         for e in all_errors:
             if e not in unique_errors:
@@ -83,14 +83,14 @@ class Silicon:
     def __init__(self, jvm: JVM, filename: str):
         self._jvm = jvm
         self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.silicon.Silicon):
+            raise Exception('Silicon backend not found on classpath.')
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(6)
+        args = jvm.scala.collection.mutable.ArraySeq(4)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
         args.update(2, '--disableCatchingExceptions')
-        args.update(3, '--numberOfParallelVerifiers')
-        args.update(4, '1')
-        args.update(5, filename)
+        args.update(3, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.arpplugin = ARPPlugin(jvm)
@@ -119,7 +119,8 @@ class Silicon:
             return Success()
 
     def __del__(self):
-        self.silicon.stop()
+        if hasattr(self, 'silicon') and self.silicon:
+            self.silicon.stop()
 
 
 class Carbon:
@@ -129,6 +130,8 @@ class Carbon:
 
     def __init__(self, jvm: JVM, filename: str):
         self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.carbon.CarbonVerifier):
+            raise Exception('Carbon backend not found on classpath.')
         self.carbon = jvm.viper.carbon.CarbonVerifier()
         args = jvm.scala.collection.mutable.ArraySeq(5)
         args.update(0, '--boogieExe')

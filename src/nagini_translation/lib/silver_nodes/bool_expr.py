@@ -17,6 +17,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.silver_nodes.call import CallMixin
 from nagini_translation.lib.silver_nodes.expression import Expression
+from nagini_translation.lib.silver_nodes.program import Field
 from nagini_translation.lib.silver_nodes.types import BOOL
 from nagini_translation.lib.typedefs import (
     Expr,
@@ -80,22 +81,25 @@ class ForPerm(BoolExpression):
     """ForPerm expression."""
 
     def __init__(
-            self, var_name: str, targets: List['Predicate'],
+            self, var_name: str, target: 'Predicate',
             body: BoolExpression) -> None:
         self._var_name = var_name
-        self._targets = targets
+        self._target = target
         self._body = body
 
     def translate(self, translator: 'AbstractTranslator', ctx: 'Context',
                   position: Position, info: Info) -> Expr:
         var = translator.viper.LocalVarDecl(
             self._var_name, translator.viper.Ref, position, info)
-        targets = [
-            target.translate(translator, ctx, position, info)
-            for target in self._targets]
+        if isinstance(self._target, Field):
+            target = self._target.translate(translator, ctx, position, info)
+            access = translator.viper.FieldAccess(var.localVar(), target, position, info)
+        else:
+            access = translator.viper.PredicateAccess([var.localVar()],
+                                                      self._target._name, position, info)
         body = self._body.translate(translator, ctx, position, info)
         return translator.viper.ForPerm(
-            var, targets, body, position, info)
+            var, access, body, position, info)
 
 
 class PythonBoolExpression(BoolExpression):

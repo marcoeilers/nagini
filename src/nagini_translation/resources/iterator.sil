@@ -6,23 +6,28 @@
 
 field __container : Ref
 field __iter_index : Int
-field __previous: Ref
+field __previous: Seq[Ref]
 
 method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   requires acc(self.list_acc, 1 / 40)
   requires acc(self.__iter_index, write)
-  requires acc(self.__previous, 1 / 40) && acc(self.__previous.list_acc, write)
+  requires acc(self.__previous, write)
   ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
   ensures acc(self.__iter_index, write)
   ensures self.__iter_index <= |self.list_acc|
   ensures old(self.__iter_index == |self.list_acc|) <==> _err != null
-  ensures acc(self.__previous, 1 / 40) && (self.__previous == old(self.__previous)) && acc(self.__previous.list_acc, write)
+  ensures acc(self.__previous, write)
   ensures _err == null ==> (self.__iter_index == old(self.__iter_index) + 1)
   ensures _err == null ==> self.__iter_index > 0
-  ensures _err == null ==> self.__previous.list_acc == self.list_acc[..self.__iter_index - 1]
+  ensures _err == null ==> self.__previous == self.list_acc[..self.__iter_index - 1]
+  ensures forall r : Ref :: {r in self.__previous}
+                             r in self.__previous == ((r in old(self.__previous)) ||
+                                                      (old(self.__iter_index) > 1 &&
+                                                      old(self.__iter_index) != |self.list_acc| &&
+                                                      r == old(self.list_acc[self.__iter_index - 1])))
   ensures |self.list_acc| > 0 ==> self.__iter_index > 0
   ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
-  ensures _err != null ==> self.__previous.list_acc == self.list_acc
+  ensures _err != null ==> self.__previous == self.list_acc
   ensures _err != null ==> self.__iter_index == |self.list_acc|
   ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
 {

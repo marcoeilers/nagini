@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Ensures, Implies
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 class C:

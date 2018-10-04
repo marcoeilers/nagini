@@ -11,19 +11,27 @@ from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
+    DICT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    LIST_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    RANGE_TYPE,
+    SEQ_TYPE,
+    SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
 )
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
+    chain_cond_exp,
+    chain_if_stmts,
+    OptionalType,
     PythonClass,
     PythonField,
     PythonIOOperation,
@@ -32,6 +40,8 @@ from nagini_translation.lib.program_nodes import (
     PythonNode,
     PythonType,
     PythonVar,
+    toposort_classes,
+    UnionType,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -95,6 +105,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(e, (self.viper.ast.And, self.viper.ast.Or)):
             return self._is_pure(e.left()) and self._is_pure(e.right())
         return e.isPure()
+
+    def to_type(self, e: Expr, t, ctx) -> Expr:
+        if t is self.viper.Ref:
+            return self.to_ref(e, ctx)
+        if t is self.viper.Int:
+            return self.to_int(e, ctx)
+        if t is self.viper.Bool:
+            return self.to_bool(e, ctx)
+        return e
 
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
         """
@@ -257,15 +276,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc = self.viper.PredicateAccessPredicate(pred, full_perm, pos, info)
         return pred_acc
 
+    def check_var_defined(self, target: PythonVar, position: Position,
+                        info: Info) -> Expr:
+        id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
+        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
+        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
+                                        self.viper.Bool, [id_param_decl])
+        return is_defined
+
     def set_var_defined(self, target: PythonVar, position: Position,
                         info: Info) -> Stmt:
         """
         Returns an inhale which assumes that the given local variable is now defined.
         """
-        id = self.viper.IntLit(self._get_string_value(target.sil_name), position, info)
-        id_param_decl = self.viper.LocalVarDecl('id', self.viper.Int, position, info)
-        is_defined = self.viper.FuncApp(IS_DEFINED_FUNC, [id], position, info,
-                                        self.viper.Bool, [id_param_decl])
+        is_defined = self.check_var_defined(target, position, info)
         return self.viper.Inhale(is_defined, position, info)
 
     def set_global_defined(self, declaration: PythonNode, module: PythonModule,
@@ -509,7 +533,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
     def get_func_or_method_call(self, receiver: PythonType, func_name: str,
                                 args: List[Expr], arg_types: List[Expr],
                                 node: ast.AST, ctx: Context) -> StmtsAndExpr:
-        if receiver.get_function(func_name):
+        if receiver.has_function(func_name):
             call = self.get_function_call(receiver, func_name, args, arg_types, node, ctx)
             return [], call
         method = receiver.get_method(func_name)
@@ -521,9 +545,82 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
                                         ctx)
             return call, val
-        return None
+        return [], None
 
-    def get_function_call(self, receiver: PythonType,
+    def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
+                           node: ast.AST, ctx: Context, position: Position,
+                           force_trigger=False) -> Expr:
+        """
+        Returns a contains-expression representing whether in_expr is in dom_arg.
+        To be used on the left hand side of quantifiers (and in the corresponding
+        triggers):
+        Forall(iter, lambda x: e)
+        becomes
+        forall x: <quantifier_lhs> ==> e
+        Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
+        types to improve performance/triggering.
+        """
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        res = None
+        if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
+            if dom_type.name in (DICT_TYPE, SET_TYPE):
+                contains_constructor = self.viper.AnySetContains
+                if dom_type.name == DICT_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('dict_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                if dom_type.name == SET_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('set_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+            if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
+                        node.func.id == 'range'):
+                left = node.args[0]
+                right = node.args[1]
+                _, left_expr = self.translate_expr(left, ctx)
+                _, right_expr = self.translate_expr(right, ctx)
+                int_class = ctx.module.global_module.classes[INT_TYPE]
+                left_bound = self.get_function_call(int_class, '__ge__',
+                                                    [in_expr, left], [None, None],
+                                                    node, ctx, position)
+                right_bound = self.get_function_call(int_class, '__lt__',
+                                                    [in_expr, right], [None, None],
+                                                    node, ctx, position)
+                if force_trigger:
+                    return None
+                else:
+                    return self.viper.And(left_bound, right_bound, position, info)
+        if res is None:
+            contains_constructor = self.viper.SeqContains
+            res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
+        return contains_constructor(in_expr, res, position, info)
+
+    def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
+                     node: ast.AST, ctx: Context,
+                     position: Position = None) -> Expr:
+        """
+        Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        """
+        position = position if position else self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == LIST_TYPE:
+                seq_ref = self.viper.SeqType(self.viper.Ref)
+                field = self.viper.Field('list_acc', seq_ref, position, info)
+                res = self.viper.FieldAccess(arg, field, position, info)
+                return res
+            if receiver.name == SEQ_TYPE:
+                if (isinstance(arg, self.viper.ast.FuncApp) and
+                            arg.funcname() == 'Sequence___create__'):
+                    args = self.viper.to_list(arg.args())
+                    return args[0]
+        return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
+                                      node, ctx, position)
+
+    def _get_function_call(self, receiver: PythonType,
                           func_name: str, args: List[Expr],
                           arg_types: List[PythonType], node: ast.AST,
                           ctx: Context,
@@ -531,7 +628,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         Creates a function application of the function called func_name, with
         the given receiver and arguments. Boxes arguments if necessary, and
-        unboxed the result if needed as well.
+        unboxed the result if needed as well. This method only handles receivers
+        of non-union types.
         """
         if receiver:
             target_cls = receiver
@@ -567,15 +665,53 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   self.no_info(ctx), type, formal_args)
         return call
 
-    def get_method_call(self, receiver: PythonType,
+    def get_function_call(self, receiver: PythonType,
+                          func_name: str, args: List[Expr],
+                          arg_types: List[PythonType], node: ast.AST,
+                          ctx: Context,
+                          position: Position = None) -> FuncApp:
+        """
+        Creates a function application of the function called func_name, with
+        the given receiver and arguments. Boxes arguments if necessary, and
+        unboxed the result if needed as well. When the receiver is of union
+        type, a function call application is created for each type in the
+        union with its respective guard.
+        """
+        if receiver and type(receiver) is UnionType:
+            position = self.to_position(node, ctx) if position is None else position
+            guarded_functions = []
+            for cls in toposort_classes(receiver.get_types() - {None}):
+
+                # Create guard checking if receiver is an instance of this class
+                guard = self.type_check(args[0], cls, position, ctx)
+
+                # Translate the function call on this particular receiver's class
+                function = self._get_function_call(cls, func_name, args,
+                                                   arg_types, node, ctx,
+                                                   position)
+
+                # Stores guard and translated function call as tuple in a list
+                guarded_functions.append((guard, function))
+
+            # Chain list of guard and function call tuples in an if-then-else
+            # expression
+            return chain_cond_exp(guarded_functions, self.viper, position,
+                                  self.no_info(ctx), ctx)
+        else:
+            # Pass-through
+            return self._get_function_call(receiver, func_name, args,
+                                           arg_types, node, ctx, position)
+
+    def _get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],
                         arg_types: List[PythonType],
                         targets: List['silver.ast.LocalVarRef'],
                         node: ast.AST,
                         ctx: Context) -> List[Stmt]:
         """
-        Creates a method call to the methoc called func_name, with
-        the given receiver and arguments. Boxes arguments if necessary.
+        Creates a method call to the method called func_name, with the given
+        receiver and arguments. Boxes arguments if necessary. This method only
+        handles receivers of non-union types.
         """
         if receiver:
             target_cls = receiver
@@ -585,7 +721,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if not func:
             raise InvalidProgramException(node, 'unknown.method.called')
         actual_args = []
-        for arg, param, type in zip(args, func.get_args(), arg_types):
+        for arg, param, _ in zip(args, func.get_args(), arg_types):
             if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
             elif param.type.name == '__prim__int':
@@ -598,6 +734,45 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             ctx, sil_name, actual_args, targets, self.to_position(node, ctx),
             self.no_info(ctx), target_method=func, target_node=node)
         return call
+
+    def get_method_call(self, receiver: PythonType,
+                        func_name: str, args: List[Expr],
+                        arg_types: List[PythonType],
+                        targets: List['silver.ast.LocalVarRef'],
+                        node: ast.AST,
+                        ctx: Context) -> List[Stmt]:
+        """
+        Creates a method call to the method called func_name, with the given
+        receiver and arguments. Boxes arguments if necessary. When the receiver
+        is of union type, a method call is created for each type in the union
+        with its respective guard.
+        """
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        if receiver and type(receiver) is UnionType:
+            guarded_methods = []
+            for cls in toposort_classes(receiver.get_types() - {None}):
+
+                # Create guard checking if receiver is an instance of this class
+                guard = self.type_check(args[0], cls, position, ctx)
+
+                # Translate the method call on this particular receiver's class
+                method = self._get_method_call(cls, func_name, list(args), arg_types,
+                                               list(targets), node, ctx)
+
+                # Translated method call into a block
+                block = self.translate_block(method, position, info)
+
+                # Stores guard and translated method call as tuple in a list
+                guarded_methods.append((guard, block))
+
+            # Chain list of guard and function call tuples in an if-then-else
+            # statement
+            return [chain_if_stmts(guarded_methods, self.viper, position, info, ctx)]
+        else:
+            # Pass-through
+            return self._get_method_call(receiver, func_name, args, arg_types,
+                                         targets, node, ctx)
 
     def get_error_var(self, stmt: ast.AST,
                       ctx: Context) -> 'silver.ast.LocalVarRef':

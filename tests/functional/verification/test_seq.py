@@ -6,6 +6,8 @@ class A:
 
 
 def test_seq() -> None:
+    no_ints = Sequence()  # type: Sequence[int]
+    assert len(no_ints) == 0
     ints = Sequence(1, 2, 3)
     a = A()
     ass = Sequence(a)

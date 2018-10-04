@@ -19,8 +19,9 @@ function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
 	ensures bytes___val__(result) == value
 
 function bytes___bool__(self: Ref) : Bool
-    requires issubtype(typeof(self), bytes())
-	ensures result == bytes___len__(self) != 0
+    requires self != null ==> issubtype(typeof(self), bytes())
+    ensures self == null ==> !result
+	ensures self != null ==> result == (bytes___len__(self) != 0)
 
 function bytes___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), bytes())
@@ -49,7 +50,7 @@ function bytes___mul__(self: Ref, factor: Int): Ref
 // Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
   requires factor >= 0
-  ensures (forall e: Ref :: (e in result) ==> (e in seq))
+  ensures (forall e: Ref :: {e in result} {e in seq} (e in result) ==> (e in seq))
   ensures |result| == factor * |seq|
 {
   (factor == 0 ? Seq[Ref]() : (factor == 1 ? seq : bytes___mul__helper(seq, factor - 1) ++ seq))

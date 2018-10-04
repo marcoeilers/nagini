@@ -45,12 +45,12 @@ def test_dict_2() -> None:
     Assert(Forall(r, lambda i: (i > 4, [])))
 
 
-def test_dict_values() -> None:
-    r = {3 : 7, 4: 8,5: 9}
-    Assert(Forall(r.values(), lambda i: (i > 5, [])))
+def test_type_quantification() -> None:
+    r = [3, 4, 5]
+    Assert(Forall(int, lambda i: Implies(i >= 0 and i < len(r), r[i] > 1)))
 
 
-def test_dict_values_2() -> None:
-    r = {3: 7, 4: 8, 5: 9}
+def test_type_quantification_2() -> None:
+    r = [3, 4, 5]
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(Forall(r.values(), lambda i: (i > 7, [])))
+    Assert(Forall(int, lambda i: Implies(i >= 0 and i < len(r), r[i] > 3)))

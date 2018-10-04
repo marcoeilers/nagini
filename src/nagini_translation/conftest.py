@@ -12,6 +12,7 @@ import os
 import pytest
 
 from nagini_translation.lib import config
+from nagini_translation.tests import _JVM as jvm
 from nagini_translation.verifier import ViperVerifier
 from typing import List
 
@@ -34,6 +35,7 @@ class PyTestConfig:
     def __init__(self):
         self.translation_test_dirs = []
         self.verification_test_dirs = []
+        self.single_test = None
         self.verifiers = []
 
         self.init_from_config_file()
@@ -49,7 +51,7 @@ class PyTestConfig:
 
     def add_test(self, test: str):
         if test == 'functional':
-                self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+            self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
         elif test == 'sif':
             self._add_test_dir(_SIF_TESTS_DIR)
         elif test == 'io':
@@ -112,6 +114,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     # Preferably, we could specify the tests and verifiers as a list, but
     # unfortunately, pytest_parser.addoption does not play well with
     # action='append'.
+    parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
     parser.addoption('--sif', dest='sif', action='store_true')
@@ -146,8 +149,21 @@ def pytest_configure(config: 'pytest.config.Config'):
         _pytest_config.clear_tests()
         for test in tests:
             _pytest_config.add_test(test)
-    if not _pytest_config.translation_test_dirs:
-        pytest.exit('No test sets specified.')
+        if 'sif' in tests:
+            if not jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+                pytest.exit('Viper SIF extension not avaliable on the classpath.')
+    elif config.option.single_test:
+        _pytest_config.clear_tests()
+        _pytest_config.single_test = config.option.single_test
+    if not _pytest_config.translation_test_dirs and not _pytest_config.single_test:
+        # Default: all tests that are available, SIF tests only if the extension is
+        # present.
+        if jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+            tests = ['functional', 'sif', 'io', 'obligations']
+        else:
+            tests = ['functional', 'io', 'obligations']
+        for test in tests:
+            _pytest_config.add_test(test)
     # Setup verifiers.
     verifiers = []
     if config.option.all_verifiers:
@@ -163,7 +179,16 @@ def pytest_configure(config: 'pytest.config.Config'):
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
     if not _pytest_config.verifiers:
-        pytest.exit('No verifiers specified.')
+        # Default: all available verifiers.
+        verifiers = []
+        if jvm.is_known_class(jvm.viper.silicon.SiliconRunner):
+            verifiers.append('silicon')
+        if jvm.is_known_class(jvm.viper.carbon.Carbon):
+            verifiers.append('carbon')
+        if not verifiers:
+            pytest.exit('No backend verifiers avaliable on the classpath.')
+        for verifier in verifiers:
+            _pytest_config.add_verifier(verifier)
 
 
 def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
@@ -177,6 +202,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers
@@ -188,6 +215,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers

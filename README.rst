@@ -1,13 +1,14 @@
 
-Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
+Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_. See `here <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
+
+You can try a (rather slow) online version of Nagini `here <http://viper.ethz.ch/nagini-examples>`_.
 
 For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com/marcoeilers/nagini-pycharm>`_.
 
 Getting Started (Ubuntu Linux only)
 ===================================
 
-0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.5 (64 bit) and the required
-    libraries::
+0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
 
         sudo apt-get install python3-dev libzmq3-dev
 
@@ -52,8 +53,13 @@ Getting Started on Windows
 
         git clone https://github.com/marcoeilers/nagini.git
         cd nagini
-        python bootstrap.py
-        bin\buildout.exe
+        mkdir -p .virtualenv
+        wget -c https://pypi.python.org/packages/d4/0c/9840c08189e030873387a73b90ada981885010dd9aea134d6de30cd24cb8/virtualenv-15.1.0.tar.gz#md5=44e19f4134906fe2d75124427dc9b716 -O .virtualenv\archive.tar.gz
+        tar -xvf .virtualenv\archive.tar.gz
+        mv virtualenv-* .virtualenv\source
+        python3 .virtualenv\source\virtualenv.py env
+        env\Scripts\pip.exe install -r requirements.txt
+        env\Scripts\pip.exe install -e .
 
 4.  Download and extract `ViperToolsWin <http://viper.ethz.ch/downloads/ViperToolsWin.zip>`_ to the nagini directory
 
@@ -67,15 +73,21 @@ Getting Started on Windows
 
 6.  To run the tests, do the following::
 
-        bin\py.test --all-tests --all-verifiers -v src/nagini_translation/tests.py
+        env\Scripts\pytest.exe --all-tests --all-verifiers -v src\nagini_translation\tests.py
 
 
 Command Line Usage
 ==================
 
-To verify a specific file from the nagini directory, run e.g.::
+To verify a specific file from the nagini directory, run::
 
     ./env/bin/nagini [OPTIONS] path-to-file.py
+
+on Linux or ::
+
+    env\Scripts\nagini.exe [OPTIONS] path-to-file.py
+
+on Windows.
 
 The following command line options are available::
 
@@ -130,10 +142,10 @@ To run doctests::
 
     make doctest
 
-Windows Troubleshooting
+Troubleshooting
 =======================
 
-1.  While running ``bin\buildout.exe``, you get an error like ``Microsoft Visual C++ 14.0 is required.`` or ``Unable to fnd vcvarsall.bat``: 
+1.  On Windows: During the setup, you get an error like ``Microsoft Visual C++ 14.0 is required.`` or ``Unable to fnd vcvarsall.bat``: 
 
     Python cannot find the required Visual Studio 2015 C++ installation, make sure you have either installed the Build Tools or checked the "Common Tools" option in your regular VS 2015 installation (see above).
 
@@ -145,7 +157,11 @@ Windows Troubleshooting
 
     Same problem as the previous one, but the paths for Boogie and/or Z3 are either not set or invalid.
 
-4.  When using Carbon, Boogie crashes:
+4.  While running the tests or verifying a single file, you get a stack trace ending with something like ``No matching overloads found``:
+
+    The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
+
+5.  When using Carbon, Boogie crashes:
 
     The Boogie binaries in ViperToolsWin don't seem to work on all systems; in this case, compile Boogie from scratch and set the Boogie path point to the new (or an existing) Boogie installation.
 

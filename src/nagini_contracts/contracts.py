@@ -24,11 +24,11 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'TypedResult', 'Implies', 'Forall',
-                  'Exists', 'Low', 'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding',
-                  'Previous', 'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet',
-                  'MayCreate', 'getMethod', 'getArg', 'getOld', 'arg', 'MayJoin',
-                  'MayStart']
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
+                  'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
+                  'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
+                  'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
+                  'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -66,11 +66,7 @@ def Result() -> Any:
     pass
 
 
-def TypedResult(t: Type[T]) -> T:
-    pass
-
-
-def RaisedException() -> Exception:
+def RaisedException() -> Any:
     pass
 
 
@@ -81,9 +77,16 @@ def Implies(p: bool, q: bool) -> bool:
     pass
 
 
-def Forall(domain: Iterable[T],
-           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]],
-           tp: Type[T] = None) -> bool:
+def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
+    """
+    Allows defining an alias for a (pure) expression e1 to use in
+    another expression or assertion e2.
+    Let(5, int, lambda x : x + 34) means let x = 5 in x + 34
+    """
+    pass
+
+def Forall(domain: Union[Iterable[T], Type[T]],
+           predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
     """
@@ -97,16 +100,38 @@ def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     pass
 
 
-def Low(*args) -> bool:
+def Low(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
-
-    +    Calling with 0 args translates to ``!tl``.
-    +    Calling with 1 arg translates to ``!tl &amp;&amp; expr == expr_p``.
-    +    Ignored when not verifying information flow.
+    Ignored when not verifying information flow.
     """
     pass
 
+def LowVal(expr: T) -> bool:
+    """
+    Predicate to indicate that an expression has to be low, using value equality if the
+    expression is a primitive. Ignored when not verifying information flow.
+    """
+    pass
+
+def LowEvent() -> bool:
+    """
+    Predicate that states that either both executions reach this point or none of them.
+    """
+    pass
+
+def Declassify(expr: T) -> bool:
+    """
+    Declassify an expression. Assumes expression to be low.
+    """
+    pass
+
+def TerminatesSif(cond: bool, rank: int) -> bool:
+    """
+    Verify absence of termination channels. Gives surrounding loop/call a
+    termination condition and a ranking function.
+    """
+    pass
 
 class Sequence(Generic[T], Sized, Iterable[T]):
     """
@@ -216,11 +241,59 @@ class PSet(Generic[T], Sized, Iterable[T]):
         """
 
 
+class PSet(Generic[T], Sized, Iterable[T]):
+    """
+    A PSet[T] represents a pure set of instances of subtypes of T, and is translated to
+    native Viper sets.
+    """
+
+    def __init__(self, *args: T) -> None:
+        """
+        ``PSet(a, b, c)`` creates a set instance containing the objects
+        a, b and c.
+        """
+
+    def __contains__(self, item: object) -> bool:
+        """
+        True iff this set contains the given object (not taking ``__eq__``
+        into account).
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the cardinality of this set.
+        """
+
+    def __add__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Returns the union of this set and the other.
+        """
+
+    def __sub__(self, other: 'PSet[T]') -> 'PSet[T]':
+        """
+        Returns the difference between this set and the other,
+        """
+
+    def __iter__(self) -> Iterator[T]:
+        """
+        Sets can be quantified over; this is only here so that sets
+        can be used as arguments for Forall.
+        """
+
+
 def ToSeq(l: Iterable[T]) -> Sequence[T]:
     """
     Converts the given iterable of a built-in type (list, set, dict, range) to
     a pure Sequence.
     """
+
+
+def Previous(it: T) -> Sequence[T]:
+    """
+    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
+    the values of x in previous loop iterations.
+    """
+    pass
 
 
 # The following annotations have no runtime semantics. They are only used for
@@ -311,14 +384,21 @@ def Ghost(func: T) -> T:
     """
     return func
 
-
-def NotPreservingTL(func: T) -> T:
+def AllLow(func: T) -> T:
     """
-    Decorator indicating that this method/function does not (necessarily)
-    preserve the timelevel.
+    Decorator indicating that everything this method does is low.
+    Requires all inputs to be low, ensures all state it has access to and
+    all return values are low.
     """
     return func
 
+def PreservesLow(func: T) -> T:
+    """
+    Decorator indicating that everything this method does preserves lowness.
+    Given that all the state it gets to work on is low to begin with, all state and
+    return values will remain low.
+    """
+    return func
 
 def ContractOnly(func: T) -> T:
     """
@@ -326,7 +406,7 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
-    
+
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
     Decorator for functions which specifies which return values are ghost
@@ -384,7 +464,14 @@ __all__ = [
         'Implies',
         'Forall',
         'Exists',
+        'Let',
         'Low',
+        'LowVal',
+        'LowEvent',
+        'Declassify',
+        'TerminatesSif',
+        'AllLow',
+        'PreservesLow',
         'Acc',
         'Rd',
         'ARP',
@@ -396,13 +483,13 @@ __all__ = [
         'Pure',
         'Predicate',
         'Ghost',
-        'NotPreservingTL',
         'ContractOnly',
         'GhostReturns',
         'list_pred',
         'dict_pred',
         'set_pred',
         'Sequence',
+        'PSet',
         'ToSeq',
         'PSet',
         'MaySet',

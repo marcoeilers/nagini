@@ -70,6 +70,12 @@ class ViperAST:
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
 
+    def is_available(self) -> bool:
+        """
+        Checks if the Viper AST is available, i.e., silver is on the Java classpath.
+        """
+        return self.jvm.is_known_class(self.ast.Program)
+
     def function_domain_type(self):
         return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
 
@@ -143,10 +149,11 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
-                               self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info,
-                               self.NoTrafos)
+        method = getobject(self.ast, "MethodWithLabelsInScope")
+        return method.apply(name, self.to_seq(args), self.to_seq(returns),
+                            self.to_seq(pres), self.to_seq(posts),
+                            body_with_locals, position, info,
+                            self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -254,6 +261,9 @@ class ViperAST:
     def Old(self, expr, position, info):
         return self.ast.Old(expr, position, info, self.NoTrafos)
 
+    def LabelledOld(self, expr, label, position, info):
+        return self.ast.LabelledOld(expr, label, position, info, self.NoTrafos)
+
     def Inhale(self, expr, position, info):
         return self.ast.Inhale(expr, position, info, self.NoTrafos)
 
@@ -281,11 +291,11 @@ class ViperAST:
     def CurrentPerm(self, location, position, info):
         return self.ast.CurrentPerm(location, position, info, self.NoTrafos)
 
-    def ForPerm(self, variable, access_list, body, position, info):
-        for acc in access_list:
-            if isinstance(acc, self.ast.Predicate):
-                self.used_names.add(acc.name())
-        return self.ast.ForPerm(variable, self.to_seq(access_list), body,
+    def ForPerm(self, variable, access, body, position, info):
+        if isinstance(access, self.ast.Predicate):
+            self.used_names.add(access.name())
+        variables = self.to_seq([variable])
+        return self.ast.ForPerm(variables, access, body,
                                 position, info, self.NoTrafos)
 
     def PermMinus(self, exp, position, info):
@@ -486,6 +496,9 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
+    def ConsInfo(self, head, tail):
+        return self.ast.ConsInfo(head, tail)
+
     def to_position(self, expr, vias, error_string: str=None,
                     rules: Rules=None, file: str = None):
         if expr is None:
@@ -513,6 +526,7 @@ class ViperAST:
     def is_heap_dependent(self, expr) -> bool:
         """
         Checks if the given expression contains an access to a heap location.
+        Does NOT check for calls to heap-dependent functions.
         """
         for n in [expr] + self.to_list(expr.subnodes()):
             if isinstance(n, self.ast.LocationAccess):

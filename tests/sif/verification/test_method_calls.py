@@ -35,7 +35,6 @@ class A:
 
 
 def main() -> None:
-    Requires(Low())
     x = 25 * foo(bar(5))
     a = A(x)
     b = a.m2(a.m1(x))

@@ -44,6 +44,7 @@ class Null(RefExpression):
 
 
 class RefExpr(RefExpression):
+    """A wrapper around an already-translated Silver expression of type Ref."""
 
     def __init__(self, e: Expr) -> None:
         self.e = e

@@ -35,16 +35,16 @@ Supported annotation types are:
 
 import abc
 import os
+import pytest
 import re
 import tokenize
+from collections import Counter
+from typing import Any, Dict, List, Optional
 
-import pytest
 
 # These imports monkey-patch mypy and should happen as early as possible.
 import nagini_translation.mypy_patches.column_info_patch
 import nagini_translation.mypy_patches.optional_patch
-
-from typing import Any, Dict, List, Optional
 
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
@@ -53,9 +53,9 @@ from nagini_translation.lib.util import InvalidProgramException
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
+
 os.environ['MYPYPATH'] = config.mypy_path
 
-assert config.classpath
 _JVM = jvmaccess.JVM(config.classpath)
 
 
@@ -567,12 +567,14 @@ class VerificationTest(AnnotatedTest):
         path = os.path.abspath(path)
         prog = translate(path, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
         assert prog is not None
+        if sif:
+            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
         vresult = verify(prog, path, jvm, verifier, arp=arp)
-        self._evaluate_result(vresult, annotation_manager, jvm)
+        self._evaluate_result(vresult, annotation_manager, jvm, sif)
 
     def _evaluate_result(
             self, vresult: VerificationResult,
-            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM):
+            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM, sif: bool = False):
         """Evaluate verification result with regard to test annotations."""
         if vresult:
             actual_errors = []
@@ -582,6 +584,20 @@ class VerificationTest(AnnotatedTest):
                 for error in vresult.errors)
             actual_errors = [
                 VerificationError(error) for error in vresult.errors]
+            if sif:
+                # carbon will report all functional errors twice, as we model two
+                # executions, therefore we filter duplicated errors here.
+                # (Note: we don't make errors unique, just remove one duplicate)
+                distinct = []
+                reprs = map(lambda e: e.__repr__(), actual_errors)
+                repr_counts = Counter(reprs)
+                repr_counts = dict(map(lambda rc: (rc[0], -(-rc[1] // 2)),
+                                       repr_counts.items()))
+                for err in actual_errors:
+                    if repr_counts[err.__repr__()] > 0:
+                        distinct.append(err)
+                        repr_counts[err.__repr__()] -= 1
+                actual_errors = distinct
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')

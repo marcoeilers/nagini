@@ -38,8 +38,12 @@ class PredicateTranslator(CommonTranslator):
         if len(pred.node.body) != 1:
             raise InvalidProgramException(pred.node,
                                           'invalid.predicate')
+
+        content = pred.node.body[0]
+        if isinstance(content, ast.Return):
+            content = content.value
         stmt, body = self.translate_expr(
-            pred.node.body[0],
+            content,
             ctx, impure=True,
             target_type=self.viper.Bool)
         if stmt:
@@ -99,11 +103,20 @@ class PredicateTranslator(CommonTranslator):
                     root_var = copy.copy(root_var)
                     root_var.type = instance.cls
                 ctx.set_alias(current_name, root_var)
-            if len(instance.node.body) != 1:
+            actual_body_start = 0
+            while (actual_body_start < len(instance.node.body) and
+                       isinstance(instance.node.body[actual_body_start], ast.Expr) and
+                    isinstance(instance.node.body[actual_body_start].value, ast.Str)):
+                actual_body_start += 1
+            if len(instance.node.body[actual_body_start:]) != 1:
                 raise InvalidProgramException(instance.node,
                                               'invalid.predicate')
+            content = instance.node.body[actual_body_start]
+            if isinstance(content, ast.Return):
+                content = content.value
+
             stmt, current = self.translate_expr(
-                    instance.node.body[0],
+                    content,
                     ctx, impure=True,
                     target_type=self.viper.Bool)
             if stmt:
