@@ -56,7 +56,6 @@ from nagini_translation.verifier import VerificationResult, ViperVerifier
 
 os.environ['MYPYPATH'] = config.mypy_path
 
-assert config.classpath
 _JVM = jvmaccess.JVM(config.classpath)
 
 

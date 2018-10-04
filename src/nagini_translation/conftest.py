@@ -12,6 +12,7 @@ import os
 import pytest
 
 from nagini_translation.lib import config
+from nagini_translation.tests import _JVM as jvm
 from nagini_translation.verifier import ViperVerifier
 from typing import List
 
@@ -142,11 +143,21 @@ def pytest_configure(config: 'pytest.config.Config'):
         _pytest_config.clear_tests()
         for test in tests:
             _pytest_config.add_test(test)
+        if 'sif' in tests:
+            if not jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+                pytest.exit('Viper SIF extension not avaliable on the classpath.')
     elif config.option.single_test:
         _pytest_config.clear_tests()
         _pytest_config.single_test = config.option.single_test
     if not _pytest_config.translation_test_dirs and not _pytest_config.single_test:
-        pytest.exit('No test sets specified.')
+        # Default: all tests that are available, SIF tests only if the extension is
+        # present.
+        if jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+            tests = ['functional', 'sif', 'io', 'obligations']
+        else:
+            tests = ['functional', 'io', 'obligations']
+        for test in tests:
+            _pytest_config.add_test(test)
     # Setup verifiers.
     verifiers = []
     if config.option.all_verifiers:
@@ -162,7 +173,16 @@ def pytest_configure(config: 'pytest.config.Config'):
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
     if not _pytest_config.verifiers:
-        pytest.exit('No verifiers specified.')
+        # Default: all available verifiers.
+        verifiers = []
+        if jvm.is_known_class(jvm.viper.silicon.SiliconRunner):
+            verifiers.append('silicon')
+        if jvm.is_known_class(jvm.viper.carbon.Carbon):
+            verifiers.append('carbon')
+        if not verifiers:
+            pytest.exit('No backend verifiers avaliable on the classpath.')
+        for verifier in verifiers:
+            _pytest_config.add_verifier(verifier)
 
 
 def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):

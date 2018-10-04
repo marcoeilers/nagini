@@ -29,7 +29,15 @@ class ViperASTExtended(ViperAST):
         self.ctx = None
         self.type_factory = None
 
-    def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position, info: Info):
+    def is_extension_available(self) -> bool:
+        """
+        Checks if the extended AST is available, i.e., the SIF AST extension is on the
+        Java classpath.
+        """
+        return self.jvm.is_known_class(self.ast_extensions.SIFReturnStmt)
+
+    def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position,
+               info: Info):
         expr_opt = self.scala.Some(expr) if expr is not None else self.none
         res_var_opt = self.scala.Some(res_var) if res_var is not None else self.none
         return self.ast_extensions.SIFReturnStmt(expr_opt, res_var_opt,
@@ -65,7 +73,8 @@ class ViperASTExtended(ViperAST):
             position: Position, info: Info):
         catch_blocks_seq = self.to_seq(catch_blocks)
         else_opt = self.scala.Some(else_block) if else_block is not None else self.none
-        fin_opt = self.scala.Some(finally_block) if finally_block is not None else self.none
+        fin_opt = (self.scala.Some(finally_block)
+                   if finally_block is not None else self.none)
         return self.ast_extensions.SIFTryCatchStmt(
             body, catch_blocks_seq, else_opt, fin_opt, position, info, self.NoTrafos)
 
@@ -98,7 +107,8 @@ class ViperASTExtended(ViperAST):
             dyn_check = in_postcondition_of_dyn_bound_call(self.type_factory, self.ctx)
             if dyn_check:
                 info = self.ConsInfo(
-                    self.SIFDynCheckInfo([], dyn_check, in_override_check(self.ctx)), info)
+                    self.SIFDynCheckInfo([], dyn_check, in_override_check(self.ctx)),
+                    info)
         return super().PredicateAccessPredicate(loc, perm, position, info)
 
     def SIFInfo(self, comments: List[str],
@@ -110,4 +120,5 @@ class ViperASTExtended(ViperAST):
     def SIFDynCheckInfo(self, comments: List[str],
                         dyn_check: Expr,
                         dyn_check_only: bool = False) -> 'silver.sif.SIFDynCheckInfo':
-        return self.ast_extensions.SIFDynCheckInfo(self.to_seq(comments), dyn_check, dyn_check_only)
+        return self.ast_extensions.SIFDynCheckInfo(self.to_seq(comments), dyn_check,
+                                                   dyn_check_only)

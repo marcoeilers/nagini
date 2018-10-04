@@ -70,6 +70,12 @@ class ViperAST:
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
 
+    def is_available(self) -> bool:
+        """
+        Checks if the Viper AST is available, i.e., silver is on the Java classpath.
+        """
+        return self.jvm.is_known_class(self.ast.Program)
+
     def function_domain_type(self):
         return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
 

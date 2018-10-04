@@ -66,6 +66,8 @@ class Silicon:
     def __init__(self, jvm: JVM, filename: str):
         self._jvm = jvm
         self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.silicon.Silicon):
+            raise Exception('Silicon backend not found on classpath.')
         self.silicon = jvm.viper.silicon.Silicon()
         args = jvm.scala.collection.mutable.ArraySeq(4)
         args.update(0, '--z3Exe')
@@ -94,7 +96,8 @@ class Silicon:
             return Success()
 
     def __del__(self):
-        self.silicon.stop()
+        if hasattr(self, 'silicon') and self.silicon:
+            self.silicon.stop()
 
 
 class Carbon:
@@ -104,6 +107,8 @@ class Carbon:
 
     def __init__(self, jvm: JVM, filename: str):
         self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.carbon.CarbonVerifier):
+            raise Exception('Carbon backend not found on classpath.')
         self.carbon = jvm.viper.carbon.CarbonVerifier()
         args = jvm.scala.collection.mutable.ArraySeq(5)
         args.update(0, '--boogieExe')

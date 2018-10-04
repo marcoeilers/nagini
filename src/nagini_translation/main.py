@@ -102,6 +102,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
     else:
         viper_ast = ViperAST(jvm, jvm.java, jvm.scala, jvm.viper, path)
+    if not viper_ast.is_available():
+        raise Exception('Viper not found on classpath.')
+    if sif and not viper_ast.is_extension_available():
+        raise Exception('Viper AST SIF extension not found on classpath.')
     types = TypeInfo()
     type_correct = types.check(path)
     if not type_correct:

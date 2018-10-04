@@ -120,13 +120,13 @@ class TestConfig(SectionConfig):
 
         verifiers_value = self._info.get('verifiers')
         if not verifiers_value:
-            self.verifiers = ['silicon', 'carbon']
+            self.verifiers = []
         else:
             self.verifiers = verifiers_value.strip().split()
 
         tests_value = self._info.get('tests')
         if not tests_value:
-            self.tests = ['functional', 'sif', 'io', 'obligations']
+            self.tests = []
         else:
             self.tests = tests_value.strip().split()
 
@@ -167,7 +167,7 @@ def _construct_classpath(verifier : str = None):
             return os.pathsep.join(
                 glob.glob('/usr/lib/viper/*.jar'))
 
-    return None
+    return ''
 
 
 def _get_boogie_path():
