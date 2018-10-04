@@ -7,6 +7,6 @@ class C:
 
 class D:
     #:: ExpectedOutput(expression.undefined:undefined.global.name)
-    baz = b_bar
+    baz = b_bar  # noqa: F821
 
 b_bar = 12

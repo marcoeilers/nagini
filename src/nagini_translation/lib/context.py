@@ -43,8 +43,21 @@ class Context:
         self._current_alias_context = []
         self.bound_type_vars = {}
         self._global_counter = 0
-        self.perm_factor = None
-        self._old_aliases = {}
+        self.perm_factor = None     # If this is set, all translated permission amounts
+                                    # are multiplied by this factor.
+        self._old_aliases = {}      # Keys are pretty-printed Python expressions,
+                                    # values are Silver expressions they should be
+                                    # translated to.
+        self.ignore_waitlevel_constraints = False      # If this is set, all encountered
+                                                       # WaitLevel() < e constraints will
+                                                       # be translated to true.
+        # Whether Abstract Read Permissions may be used
+        self.arp = False
+        # Stores the thread object for which the contracts are currently translated.
+        self.current_thread_object = None
+        # True iff contracts for a thread start are translated.
+        # Used to differentiate fresh token from old token permission.
+        self.is_thread_start = False
 
     def get_fresh_int(self) -> int:
         """

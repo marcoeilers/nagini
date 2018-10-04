@@ -8,8 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
 import ast
-
-from typing import List
+from typing import List, Optional
 
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.config import obligation_config
@@ -28,6 +27,7 @@ from nagini_translation.lib.typedefs import (
     VarDecl,
 )
 from nagini_translation.lib.viper_ast import ViperAST
+from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.obligation.manager import (
     ObligationManager,
 )
@@ -54,12 +54,18 @@ class ObligationMethod:
         self.local_vars = local_vars
         self.body = body
 
-    def prepend_arg(self, arg: VarDecl) -> None:
+    def prepend_arg(self, arg: VarDecl, viper: Optional[ViperASTExtended] = None) -> None:
         """Prepend ``arg`` to the argument list."""
+        if viper:
+            info = viper.SIFInfo([], obligation_var=True)
+            arg = viper.LocalVarDecl(arg.name(), arg.typ(), arg.pos(), info)
         self.args.insert(0, arg)
 
-    def prepend_return(self, arg: VarDecl) -> None:
+    def prepend_return(self, arg: VarDecl, viper: Optional[ViperASTExtended]) -> None:
         """Prepend ``arg`` to the return list."""
+        if viper:
+            info = viper.SIFInfo([], obligation_var=True)
+            arg = viper.LocalVarDecl(arg.name(), arg.typ(), arg.pos(), info)
         self.returns.insert(0, arg)
 
     def prepend_body(self, statements: List[Stmt]) -> None:
@@ -117,10 +123,11 @@ class ObligationMethodNodeConstructor:
             # Convert body to Scala.
             body_block = self._translator.translate_block(
                 body, self._position, self._info)
-        return self._viper.Method(
+        res = self._viper.Method(
             method.name, method.args, method.returns,
             method.pres, method.posts, method.local_vars, body_block,
             self._position, self._info)
+        return res
 
     def add_obligations(self) -> None:
         """Add obligation stuff to Method."""
@@ -151,20 +158,24 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_parameters(self) -> None:
         """Add current thread, caller measures, and residue parameters."""
+        if obligation_config.disable_all:
+            return
+        viper = self._viper if isinstance(self._viper, ViperASTExtended) else None
         self._obligation_method.prepend_arg(
             self._obligation_info.residue_level.decl)
         if not obligation_config.disable_measures:
             self._obligation_method.prepend_arg(
-                self._obligation_info.caller_measure_map.get_var().decl)
+                self._obligation_info.caller_measure_map.get_var().decl, viper)
         self._obligation_method.prepend_arg(
-            self._obligation_info.current_thread_var.decl)
+            self._obligation_info.current_thread_var.decl, viper)
 
     def _add_additional_returns(self) -> None:
         """Add current wait level ghost return."""
         if obligation_config.disable_waitlevel_check:
             return
+        viper = self._viper if isinstance(self._viper, ViperASTExtended) else None
         self._obligation_method.prepend_return(
-            self._obligation_info.current_wait_level.decl)
+            self._obligation_info.current_wait_level.decl, viper)
 
     def _add_additional_variables(self) -> None:
         """Add current wait level ghost target."""
@@ -175,11 +186,12 @@ class ObligationMethodNodeConstructor:
 
     def _add_additional_preconditions(self) -> None:
         """Add preconditions about current thread and caller measures."""
-        cthread_var = self._obligation_info.current_thread_var
-        cthread = sil.RefVar(cthread_var)
-        preconditions = [
-            cthread != None,        # noqa: E711
-        ]
+        preconditions = []
+        if not obligation_config.disable_all:
+            cthread_var = self._obligation_info.current_thread_var
+            cthread = sil.RefVar(cthread_var)
+            preconditions.append(cthread != None)
+        position = self._position
         if (self._is_body_native_silver() and
                 not obligation_config.disable_termination_check):
             # Add obligations described in interface_dict.
@@ -189,13 +201,17 @@ class ObligationMethodNodeConstructor:
                     obligation.generate_axiomatized_preconditions(
                         self._obligation_info,
                         self._python_method.interface_dict))
+            func_node = self.get_function_node()
+            position = self._translator.to_position(func_node, self._ctx,
+                rules=rules.OBLIGATION_CALL_LEAK_CHECK_FAIL)
         translated = [
             precondition.translate(
-                self._translator, self._ctx, self._position, self._info)
+                self._translator, self._ctx, position, self._info)
             for precondition in preconditions]
-        translated.append(self._translator.var_type_check(
-            cthread_var.sil_name, cthread_var.type, self._position,
-            self._ctx))
+        if not obligation_config.disable_all:
+            translated.append(self._translator.var_type_check(
+                cthread_var.sil_name, cthread_var.type, self._position,
+                self._ctx))
         self._obligation_method.prepend_precondition(translated)
         self._obligation_method.append_preconditions(
             self._obligation_info.get_additional_preconditions())
@@ -287,19 +303,31 @@ class ObligationMethodNodeConstructor:
             ])
         check = sil.InhaleExhale(sil.TrueLit(), exhale)
         # Translate to Silver.
-        if self._python_method.node is None:
-            # TODO: Handle interface methods properly.
-            node = ast.AST()
-            node.lineno = 0
-            node.col_offset = 0
-        else:
-            node = self._python_method.node
+        node = self.get_function_node()
         position = self._translator.to_position(
             node, self._ctx, rules=rules.OBLIGATION_CALL_LEAK_CHECK_FAIL)
         info = self._translator.to_info(["Caller side leak check"], self._ctx)
         precondition = check.translate(
             self._translator, self._ctx, position, info)
         self._obligation_method.append_preconditions([precondition])
+
+    def get_function_node(self):
+        """
+        Returns a Python AST node representing the method. If there is no existing one
+        (which is the case for interface methods defined directly in Silver), creates
+        a dummy node with the correct name.
+        """
+        if self._python_method.node is None:
+            node = ast.FunctionDef()
+            if self._python_method.interface_name is not None:
+                node.name = self._python_method.interface_name
+            else:
+                node.name = self._python_method.name
+            node.lineno = 0
+            node.col_offset = 0
+        else:
+            node = self._python_method.node
+        return node
 
     @property
     def _obligation_info(self) -> PythonMethodObligationInfo:

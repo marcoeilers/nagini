@@ -12,6 +12,7 @@ from nagini_contracts.contracts import (
     Fold,
     Implies,
     Invariant,
+    Predicate,
     Requires,
     Unfold,
 )
@@ -20,10 +21,15 @@ from nagini_contracts.lock import Lock
 from typing import Optional
 
 
+class ObjectLock(Lock['A']):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
+
 class A:
 
     def __init__(self) -> None:
-        self.a = None       # type: Optional[Lock[A]]
+        self.a = None       # type: Optional[ObjectLock]
         self.b = 0          # type: int
 
     def m1(self) -> None:
@@ -102,23 +108,19 @@ class A:
     def m8(self) -> None:
         Requires(Acc(self.b) and self.b > 17)
         Requires(Acc(self.a) and MustRelease(self.a, self.b))
-        Requires(self.a.invariant())
 
         while self.b > 2:
             Invariant(Acc(self.b) and MustTerminate(self.b))
             self.b -= 1
-        Fold(self.a.invariant())
         self.a.release()
 
     def m9(self) -> None:
         Requires(Acc(self.b) and self.b > 17)
         Requires(Acc(self.a) and MustRelease(self.a, self.b))
-        Requires(self.a.invariant())
 
         while self.b > 2:
             Invariant(Acc(self.a) and Acc(self.b))
             Invariant(Implies(self.b > 4, MustRelease(self.a, self.b)))
-            Invariant(Implies(self.b > 4, self.a.invariant()))
             if self.b > 4:
                 self.b -= 1
                 if self.b == 4:
@@ -127,22 +129,18 @@ class A:
     def m10(self) -> None:
         Requires(Acc(self.a) and MustRelease(self.a, 2))
         Requires(WaitLevel() < Level(self.a))
-        Requires(self.a.invariant())
         while True:
             Invariant(Acc(self.a) and MustRelease(self.a, 1))
             Invariant(WaitLevel() < Level(self.a))
-            Invariant(self.a.invariant())
             self.a.release()
             self.a.acquire()
 
     def m11(self) -> None:
         Requires(Acc(self.a) and MustRelease(self.a, 2))
         Requires(WaitLevel() < Level(self.a))
-        Requires(self.a.invariant())
         while True:
             Invariant(Acc(self.a) and MustRelease(self.a, 1))
             Invariant(WaitLevel() < Level(self.a))
-            Invariant(self.a.invariant())
             self.a.release()
             self.a.acquire()
             #:: ExpectedOutput(assert.failed:assertion.false)

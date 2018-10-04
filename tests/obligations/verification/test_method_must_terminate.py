@@ -5,7 +5,7 @@ from nagini_contracts.contracts import (
     Implies,
     Assert,
 )
-from nagini_contracts.io import IOExists1
+from nagini_contracts.io_contracts import IOExists1
 from nagini_contracts.obligations import *
 
 

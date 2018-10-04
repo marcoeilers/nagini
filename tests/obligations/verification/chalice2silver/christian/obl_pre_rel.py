@@ -11,6 +11,7 @@ from nagini_contracts.contracts import (
     Ensures,
     Implies,
     Invariant,
+    Predicate,
     Requires,
 )
 from nagini_contracts.obligations import *
@@ -18,21 +19,24 @@ from nagini_contracts.lock import Lock
 from typing import Optional
 
 
+class ObjectLock(Lock['A']):
+    @Predicate
+    def invariant(self) -> bool:
+        return True
+
 class A:
 
     def __init__(self) -> None:
-        self.x = None   # type: Optional[Lock[A]]
+        self.x = None   # type: Optional[ObjectLock]
         self.y = 0
 
     def t(self) -> None:
         Requires(Acc(self.x) and MustRelease(self.x, 2))
-        Requires(self.x.invariant())
         Ensures(Acc(self.x))
         self.x.release()
 
     def mr(self, other: 'A') -> None:
         Requires(Acc(other.x) and MustRelease(other.x, 2))
-        Requires(other.x.invariant())
         Ensures(Acc(other.x))
         other.x.release()
 

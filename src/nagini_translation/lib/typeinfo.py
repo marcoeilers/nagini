@@ -64,11 +64,28 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                 not isinstance(rectype, mypy.types.CallableType) and
                 not isinstance(rectype, str) and
                 not isinstance(rectype, mypy.types.AnyType) and
-                not isinstance(rectype, mypy.types.UnionType) and
                 not isinstance(rectype, mypy.types.TypeVarType)):
-            self.set_type(rectype.type.fullname().split('.') + [node.name],
-                          self.type_of(node),
-                          node.line, col(node))
+            if isinstance(rectype, mypy.types.UnionType):
+                # Collext all non-None elements of the union,
+                # taking nested unions into account.
+                utypes = [rectype]
+                uindex = 0
+                types = []
+                while uindex < len(utypes):
+                    for i in utypes[uindex].items:
+                        if isinstance(i, mypy.types.UnionType):
+                            utypes.append(i)
+                        elif not isinstance(i, mypy.types.NoneTyp):
+                            types.append(i)
+                    uindex += 1
+            else:
+                types = [rectype]
+            for t in types:
+                if not hasattr(t, 'type'): # Work around issue 979 in MyPy
+                    t = t.fallback   # 'TupleType' object has no attribute 'type'
+                self.set_type(t.type.fullname().split('.') + [node.name],
+                              self.type_of(node),
+                              node.line, col(node))
         super().visit_member_expr(node)
 
     def visit_del_stmt(self, node: mypy.nodes.DelStmt):
@@ -189,8 +206,13 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             if key in self.all_types:
                 return self.all_types[key]
         elif isinstance(node, mypy.nodes.CallExpr):
-            if node.callee.name in ('Result', 'TypedResult'):
-                type = self.all_types[tuple(self.prefix)]
+            if node.callee.name == 'Result':
+                key = tuple(self.prefix)
+                for i in range(len(key)):
+                    if key[i].startswith('lambda'):
+                        key = key[:i]
+                        break
+                type = self.all_types[key]
                 return type
         if node in self.type_map:
             result = self.type_map[node]

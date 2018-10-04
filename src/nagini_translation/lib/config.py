@@ -115,17 +115,18 @@ class TestConfig(SectionConfig):
         if not ignore_tests_value:
             self.ignore_tests = set([])
         else:
-            self.ignore_tests = set(ignore_tests_value.strip().splitlines())
+            patterns = ignore_tests_value.strip().splitlines()
+            self.ignore_tests = set([i for pattern in patterns for i in glob.glob(pattern)])
 
         verifiers_value = self._info.get('verifiers')
         if not verifiers_value:
-            self.verifiers = ['silicon', 'carbon']
+            self.verifiers = []
         else:
             self.verifiers = verifiers_value.strip().split()
 
         tests_value = self._info.get('tests')
         if not tests_value:
-            self.tests = ['functional', 'sif', 'io', 'obligations']
+            self.tests = []
         else:
             self.tests = tests_value.strip().split()
 
@@ -140,7 +141,7 @@ class FileConfig:
         self.test_config = TestConfig(self.config)
 
 
-def _construct_classpath():
+def _construct_classpath(verifier : str = None):
     """ Contstructs JAVA classpath.
 
     First tries environment variables ``VIPERJAVAPATH``, ``SILICONJAR``
@@ -151,13 +152,17 @@ def _construct_classpath():
     viper_java_path = os.environ.get('VIPERJAVAPATH')
     silicon_jar = os.environ.get('SILICONJAR')
     carbon_jar = os.environ.get('CARBONJAR')
+    arpplugin_jar = os.environ.get('ARPPLUGINJAR')
 
     if viper_java_path:
         return viper_java_path
 
     if silicon_jar or carbon_jar:
         return os.pathsep.join(
-            jar for jar in (silicon_jar, carbon_jar) if jar)
+            jar for jar, v in ((silicon_jar, 'carbon'),
+                               (carbon_jar, 'silicon'),
+                               (arpplugin_jar, 'arpplugin'))
+            if jar and v != verifier)
 
     if sys.platform.startswith('linux'):
         if os.path.isdir('/usr/lib/viper'):
@@ -165,7 +170,7 @@ def _construct_classpath():
             return os.pathsep.join(
                 glob.glob('/usr/lib/viper/*.jar'))
 
-    return None
+    return ''
 
 
 def _get_boogie_path():
@@ -232,6 +237,13 @@ def _get_mypy_dir():
     return None
 
 
+def set_verifier(v: str):
+    global classpath
+    not_set_by_arg = classpath == _construct_classpath()
+    if not_set_by_arg:
+        classpath = _construct_classpath(v)
+
+
 mypy_dir = _get_mypy_dir()
 """
 Mypy executable dir. Initialized by calling
@@ -290,4 +302,5 @@ __all__ = (
     'mypy_path',
     'mypy_dir',
     'obligation_config',
+    'set_verifier',
 )

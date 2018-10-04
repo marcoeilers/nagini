@@ -21,7 +21,8 @@ BUILTINS = ['cast',
             'super',
             'range',
             'type',
-            'list']
+            'list',
+            'enumerate']
 
 THREADING = ['Thread']
 
@@ -98,6 +99,13 @@ INTERNAL_NAMES = [
     'issubtype_exclusion_2',
     'issubtype_exclusion_propagation',
     'Thread',
+    JOINABLE_FUNC,
+    THREAD_POST_PRED,
+    THREAD_START_PRED,
+    METHOD_ID_DOMAIN,
+    GET_ARG_FUNC,
+    GET_OLD_FUNC,
+    GET_METHOD_FUNC,
     MAY_SET_PRED,
     IS_DEFINED_FUNC,
     CHECK_DEFINED_FUNC,
@@ -110,6 +118,14 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
+    'm',     # the following are used in various
+    'X',     # places in the resources/... files.
+    'Y',
+    'id',
+    't',
+    'g',
+    'x',
+    'Low'
 ]
 
 VIPER_KEYWORDS = [
@@ -196,7 +212,7 @@ LEGAL_MAGIC_METHODS = {
     '__len__',
     '__bool__',
     '__getitem__',
-    '__setitem__'
+    '__setitem__',
 }
 
 RESULT_NAME = '_res'
@@ -245,7 +261,8 @@ OBJECT_TYPE = 'object'
 
 CALLABLE_TYPE = 'Callable'
 
-PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE, PRIMITIVE_SET_TYPE, CALLABLE_TYPE}
+PRIMITIVES = {PRIMITIVE_INT_TYPE, PRIMITIVE_BOOL_TYPE, PRIMITIVE_SEQ_TYPE,
+              PRIMITIVE_SET_TYPE, CALLABLE_TYPE}
 
 BOXED_PRIMITIVES = {INT_TYPE, BOOL_TYPE}
 
@@ -268,7 +285,7 @@ IGNORED_IMPORTS = {'_importlib_modulespec',
                    'builtins',
                    'nagini_contracts',
                    'nagini_contracts.contracts',
-                   'nagini_contracts.io',
+                   'nagini_contracts.io_contracts',
                    'nagini_contracts.obligations',
                    'nagini_contracts.thread',
                    'sys',
@@ -282,7 +299,7 @@ IGNORED_MODULE_NAMES = {
     'builtins': [],
     'nagini_contracts': [],
     'nagini_contracts.contracts': [],
-    'nagini_contracts.io': [],
+    'nagini_contracts.io_contracts': [],
     'nagini_contracts.obligations': ['BaseLock'],
     'sys': [],
     'types': [],

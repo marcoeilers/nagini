@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import Pure, Result
-from nagini_contracts.io import *
+from nagini_contracts.io_contracts import *
 
 
 #:: ExpectedOutput(invalid.program:decorators.incompatible)

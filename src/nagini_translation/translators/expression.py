@@ -31,6 +31,7 @@ from nagini_translation.lib.constants import (
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
+    OptionalType,
     PythonClass,
     PythonField,
     PythonGlobalVar,
@@ -127,10 +128,11 @@ class ExpressionTranslator(CommonTranslator):
         self._as_read = old_as_read
         return stmt, result
 
-    def _translate_only(self, node: ast.AST, ctx: Context, impure=False):
+    def _translate_only(self, node: ast.AST, ctx: Context,
+                        impure = False) -> StmtsAndExpr:
         """
-        Translates an expression, but does so without changing the expression's type in
-        any way.
+        Translates an expression, but does so without changing the expression's
+        type in any way.
         """
         method = 'translate_' + node.__class__.__name__
         visitor = getattr(self, method, self.translate_generic)
@@ -197,8 +199,8 @@ class ExpressionTranslator(CommonTranslator):
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
         iter_type = self.get_type(node.generators[0].iter, ctx)
-        sil_seq = self.get_function_call(iter_type.cls, '__sil_seq__', [iter], [None],
-                                         node, ctx)
+        sil_seq = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+                                    position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
                                      info)
@@ -279,44 +281,61 @@ class ExpressionTranslator(CommonTranslator):
         stmt = constr_call
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
+        content_type = set_type.type_args[0]
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
                                                       set_type, position, ctx),
                                       position, self.no_info(ctx)))
-        for el in node.elts:
-            el_stmt, el_val = self.translate_expr(el, ctx)
-            el_type = self.get_type(el, ctx)
-            args = [res_var.ref(), el_val]
-            arg_types = [None, el_type]
-            append_call = self.get_method_call(set_class, 'add', args,
-                                               arg_types, [], node, ctx)
-            stmt += el_stmt + append_call
-        return stmt, res_var.ref(node, ctx)
+        elements = []
+        assert_pos = self.to_position(node, ctx, error_string='element type is correct')
+        for element in node.elts:
+            el_stmt, el = self.translate_expr(element, ctx)
+            check = self.viper.Assert(self.type_check(el, content_type, assert_pos, ctx,
+                                                      False), assert_pos, info)
+            stmt += el_stmt + [check]
+            elements.append(el)
+        result = res_var.ref(node, ctx)
+        if elements:
+            content_field = self.viper.Field('set_acc', self.viper.SetType(self.viper.Ref),
+                                             position, info)
+            field_acc = self.viper.FieldAccess(result, content_field, position, info)
+            content_seq = self.viper.ExplicitSet(elements, position, info)
+            stmt.append(self.viper.FieldAssign(field_acc, content_seq, position, info))
+        return stmt, result
 
     def translate_List(self, node: ast.List, ctx: Context) -> StmtsAndExpr:
         list_class = ctx.module.global_module.classes[LIST_TYPE]
         res_var = ctx.current_function.create_variable(LIST_TYPE,
             list_class, self.translator)
-        targets = [res_var.ref()]
-
         constr_call = self.get_method_call(list_class, '__init__', [], [],
                                            [res_var.ref()], node, ctx)
         stmt = constr_call
         # Inhale the type of the newly created list (including type arguments)
         list_type = self.get_type(node, ctx)
+        content_type = list_type.type_args[0]
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         stmt.append(self.viper.Inhale(self.type_check(res_var.ref(node, ctx),
                                                       list_type, position, ctx),
                                       position, self.no_info(ctx)))
+        elements = []
+        assert_pos = self.to_position(node, ctx, error_string='element type is correct')
         for element in node.elts:
             el_stmt, el = self.translate_expr(element, ctx)
-            el_type = self.get_type(element, ctx)
-            args = [res_var.ref(), el]
-            arg_types = [None, el_type]
-            append_call = self.get_method_call(list_class, 'append', args,
-                                               arg_types, [], node, ctx)
-            stmt += el_stmt + append_call
-        return stmt, res_var.ref(node, ctx)
+            check = self.viper.Assert(self.type_check(el, content_type, assert_pos, ctx,
+                                                      False), assert_pos, info)
+            stmt += el_stmt + [check]
+            elements.append(el)
+
+        result = res_var.ref(node, ctx)
+        if elements:
+            content_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref),
+                                             position, info)
+            field_acc = self.viper.FieldAccess(result, content_field, position, info)
+            content_seq = self.viper.ExplicitSeq(elements, position, info)
+            stmt.append(self.viper.FieldAssign(field_acc, content_seq, position, info))
+        return stmt, result
 
     def translate_Str(self, node: ast.Str, ctx: Context) -> StmtsAndExpr:
         return [], self.translate_string(node.s, node, ctx)
@@ -555,26 +574,6 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context,
-                          expression: bool = False) -> StmtsAndExpr:
-        """
-        Translates node as a normal expression, then applies Python's auto-
-        conversion to a boolean value (using the __bool__ function)
-        """
-        stmt, res = self.translate_expr(node, ctx, expression)
-        type = self.get_type(node, ctx)
-        bool_class = ctx.module.global_module.classes[BOOL_TYPE]
-        if type is not bool_class:
-            args = [res]
-            arg_type = self.get_type(node, ctx)
-            arg_types = [arg_type]
-            res = self.get_function_call(arg_type, '__bool__', args, arg_types,
-                                         node, ctx)
-        if res.typ() != self.viper.Bool:
-            res = self.get_function_call(bool_class, '__unbox__', [res], [None],
-                                         node, ctx)
-        return stmt, res
-
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
@@ -726,6 +725,42 @@ class ExpressionTranslator(CommonTranslator):
                 ctx.current_function.call_deps.add((node, receiver, ctx.module))
         return res
 
+    def translate_adt_decons(self, decons: PythonClass, node: ast.Attribute,
+                             pos: Position, ctx: Context) -> StmtsAndExpr:
+        """
+        Deconstructs the ADT into the selected component, boxing the result
+        if the projected component's type is ADT (recursive composition).
+        """
+        info = self.no_info(ctx)
+        adt_type = self.viper.DomainType(decons.adt_domain_name, {}, [])
+
+        # Translate receiver
+        stmt, adt_obj = self.translate_expr(node.value, ctx)
+
+        # Unbox ADT to be deconstructed
+        unbox_func = self.viper.FuncApp(decons.fresh('unbox_' +
+                                        decons.adt_domain_name),
+                                        [adt_obj], pos, info, adt_type)
+
+        # Calculate return type
+        decons_type = (adt_type if decons.fields[node.attr].type == decons.adt_def
+                       else self.translate_type(decons.fields[node.attr].type, ctx))
+
+        # Translate deconstruction call
+        decons_call = self.viper.DomainFuncApp(decons.fresh(decons.adt_prefix +
+                                               decons.name + '_' + node.attr),
+                                               [unbox_func], decons_type, pos,
+                                               info, decons.adt_domain_name)
+
+        # If returned type is ADT type, box it
+        if decons_type == adt_type:
+            decons_call = self.viper.FuncApp(decons.fresh('box_' +
+                                             decons.adt_domain_name),
+                                             [decons_call], pos, info,
+                                             self.viper.Ref)
+
+        return stmt, decons_call
+
     def translate_Attribute(self, node: ast.Attribute,
                             ctx: Context) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
@@ -743,7 +778,9 @@ class ExpressionTranslator(CommonTranslator):
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
             return [], field_func
-        elif target is not None and isinstance(target.type, UnionType):
+        elif (target is not None and hasattr(target, 'type') and
+                  isinstance(target.type, UnionType) and
+                  not isinstance(target.type, OptionalType)):
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             guarded_field_access = []
@@ -752,9 +789,17 @@ class ExpressionTranslator(CommonTranslator):
                 field_guard = self.var_type_check(target.sil_name, recv_type, position, ctx)
 
                 # Access the field of the specific type
-                field = recv_type.get_field(node.attr).actual_field
-                field_access = self.viper.FieldAccess(receiver, field.sil_field,
-                                                      position, self.no_info(ctx))
+                field = recv_type.get_field(node.attr)
+                if isinstance(field, PythonField):
+                    field_access = self.viper.FieldAccess(receiver,
+                                                          field.actual_field.sil_field,
+                                                          position, self.no_info(ctx))
+                elif isinstance(field, PythonMethod):
+                    assert False  # too lazy to implement now
+                else:
+                    field = recv_type.get_static_field(node.attr)
+                    field_access = self.translate_static_field_access(field, receiver,
+                                                                      node, ctx)
 
                 guarded_field_access.append((field_guard, field_access))
             if len(guarded_field_access) == 1:
@@ -764,6 +809,11 @@ class ExpressionTranslator(CommonTranslator):
                 return (stmt, chain_cond_exp(guarded_field_access, self.viper,
                                              position, self.no_info(ctx), ctx))
         else:
+            # If the receiver is an ADT, attribute access is translated as deconstruction
+            recv_type = self.get_type(node.value, ctx)
+            if isinstance(recv_type, PythonClass) and recv_type.is_adt:
+                return self.translate_adt_decons(recv_type, node, position, ctx)
+
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
             field = self._lookup_field(node, ctx)
@@ -842,7 +892,10 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        if op not in self._primitive_operations:
+        # This is disabled for the moment because using the functions is advantageous
+        # when using operations as triggers
+        return False
+        if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
@@ -885,8 +938,11 @@ class ExpressionTranslator(CommonTranslator):
                                                        node, ctx)
         return stmt + call_stmt, call
 
-    def is_thread_method_definition(self, node: ast.Compare,
-                                    ctx: Context) -> bool:
+    def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
+        """
+        Checks if the given comparison is a definition of a thread's target method,
+        i.e., getMethod(t) == some_func.
+        """
         if len(node.ops) != 1 or len(node.comparators) != 1:
             return False
         if not isinstance(node.ops[0], (ast.Eq, ast.Is)):
@@ -898,6 +954,11 @@ class ExpressionTranslator(CommonTranslator):
         return False
 
     def is_type_equality(self, node: ast.Compare, ctx: Context) -> bool:
+        """
+        Checks if a comparison checks the equality of the type of an object with
+        something else (e.g., ``type(e1) == e2``), since these comparisons need special
+        treatment.
+        """
         if len(node.ops) != 1 or len(node.comparators) != 1:
             return False
         if not isinstance(node.ops[0], (ast.Eq, ast.Is, ast.NotEq, ast.IsNot)):
@@ -925,15 +986,14 @@ class ExpressionTranslator(CommonTranslator):
         call_stmt, call = self.translate_expr(type_call, ctx)
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
-        type_literal = self.type_factory.translate_type_literal(target.python_class, pos, ctx,
-                                                                alias=call)
+        type_literal = self.type_factory.translate_type_literal(target.python_class,
+                                                                pos, ctx, alias = call)
         if isinstance(node.ops[0], (ast.Is, ast.Eq)):
             func = self.viper.EqCmp
         else:
             func = self.viper.NeCmp
         comp = func(type_literal, call, pos, info)
         return [], comp
-
 
     def translate_thread_method_definition(self, node: ast.Compare,
                                            ctx: Context) -> StmtsAndExpr:

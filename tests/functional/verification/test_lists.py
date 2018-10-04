@@ -98,3 +98,53 @@ def test_append() -> None:
     Assert(mylist[2] == super3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mylist[0] == super4)
+
+def test_extend() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    super4 = Super()
+    mylist = [super1, super2]
+    mylist2 = [super3, super4]
+    mylist.extend(mylist2)
+    assert len(mylist) == 4
+    assert len(mylist2) == 2
+    assert mylist2[0] is super3
+    assert mylist[0] is super1
+    assert mylist[2] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert super1 in mylist2
+
+
+def test_add() -> None:
+    super1 = Super()
+    super2 = Super()
+    super3 = Super()
+    super4 = Super()
+    mylist = [super1, super2]
+    mylist2 = [super3, super4]
+    mylist3 = mylist + mylist2
+    assert len(mylist) == 2
+    assert len(mylist2) == 2
+    assert len(mylist3) == 4
+    assert mylist[0] is super1
+    assert mylist2[0] is super3
+    assert mylist3[0] is super1
+    assert mylist3[2] is super3
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert super3 in mylist
+
+
+def test_mul() -> None:
+    super1 = Super()
+    super2 = Super()
+    mylist = [super1, super2]
+    newlist = mylist * 3
+    assert len(mylist) == 2
+    assert len(newlist) == 6
+    assert mylist[0] is super1
+    assert newlist[0] is super1
+    assert newlist[2] is super1
+    assert newlist[5] is super2
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert mylist[1] is super1

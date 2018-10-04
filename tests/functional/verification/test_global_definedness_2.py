@@ -5,7 +5,7 @@ def foo() -> int:
 foo()
 
 #:: ExpectedOutput(assert.failed:assertion.false)
-bar()
+bar()  # noqa: F821
 
 def bar() -> int:
     return 12

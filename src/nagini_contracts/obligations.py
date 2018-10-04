@@ -37,7 +37,7 @@ def WaitLevel() -> LevelType:
 
 
 def Level(l: Union[BaseLock, Thread]) -> LevelType:
-    """Level of the given lock."""
+    """Level of the given lock or thread."""
 
 
 def MustRelease(lock: BaseLock, measure: int = None) -> bool:

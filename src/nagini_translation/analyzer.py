@@ -11,13 +11,15 @@ import nagini_contracts.io_builtins
 import nagini_contracts.lock
 import tokenize
 
+from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from nagini_contracts.io import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
     CALLABLE_TYPE,
     IGNORED_IMPORTS,
+    INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
@@ -49,11 +51,11 @@ from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
+    contains_stmt,
     get_func_name,
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
-    NoTypeException,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -82,7 +84,8 @@ class Analyzer(ast.NodeVisitor):
         self.current_scopes = []
         self.contract_only = False
         self.module_paths = [os.path.abspath(path)]
-        self.modules = {os.path.abspath(path): self.module}
+        self.modules = OrderedDict()
+        self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
         self.io_operation_analyzer = IOOperationAnalyzer(
             self, self.node_factory)
@@ -185,7 +188,7 @@ class Analyzer(ast.NodeVisitor):
     def add_module(self, abs_path: str, into: str, as_name: Optional[str],
                    node: ast.Module, names: List[Tuple[str, str]] = None) -> None:
         """
-        Adds the module with the given 'abs_path' into the the module with
+        Adds the module with the given 'abs_path' into the module with
         path 'into'. If it's a from-import, 'as_name' should be None and
         'names' may contain rename information for specific imported
         members, otherwise (with a normal import) as_name should contain the
@@ -306,6 +309,8 @@ class Analyzer(ast.NodeVisitor):
         method = node_factory.create_python_method(
             method_name, None, cls, self.module.global_module, pure, False, node_factory,
             interface=True, interface_dict=if_method)
+        if 'display_name' in if_method:
+            method.interface_name = if_method['display_name']
         ctr = 0
         for arg_type in if_method['args']:
             name = 'arg_' + str(ctr)
@@ -363,6 +368,17 @@ class Analyzer(ast.NodeVisitor):
         visitor = getattr(self, method, self.visit_default)
         visitor(child_node)
 
+    def visit_but_ignore(self, node: ast.AST, parent: ast.AST) -> None:
+        node._parent = parent
+        for field in node._fields:
+            fieldval = getattr(node, field)
+            if isinstance(fieldval, ast.AST):
+                self.visit_but_ignore(fieldval, node)
+            elif isinstance(fieldval, list):
+                for item in fieldval:
+                    if isinstance(item, ast.AST):
+                        self.visit_but_ignore(item, node)
+
     def get_target(self, node: ast.AST,
                    container: ContainerInterface) -> PythonNode:
         """
@@ -414,12 +430,16 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
+        elif isinstance(node, ast.Str):
+            return self.find_or_create_class(node.s)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            elif isinstance(node.slice.value, ast.Str):
                 ast_args = [node.slice.value]
             else:
                 ast_args = node.slice.value.elts
@@ -429,6 +449,72 @@ class Analyzer(ast.NodeVisitor):
         else:
             raise UnsupportedException(node,
                                        'class literal has unsupported format')
+
+    def _check_is_adt_well_formed(self, adt: PythonClass,
+                                  actual_bases: List[ast.AST],
+                                  node: ast.AST, ast: ast.AST):
+        """
+        Checks if the ADT is syntactically well-formed, throwing an
+        invalid program exception otherwise.
+        """
+        # ADT classes can have at most two superclasses
+        if len(actual_bases) > 2:
+            raise InvalidProgramException(adt.node, 'malformed.adt',
+                    'malformed algebraic data type: superclasses can only ' +
+                    'be a class optionally followed by one NamedTuple')
+        # ADT classes should have no body
+        if not (len(node.body) == 1 and isinstance(node.body[0], ast.Pass) or
+                len(node.body) == 2 and isinstance(node.body[0], ast.Expr)
+                                    and isinstance(node.body[1], ast.Pass)):
+            raise InvalidProgramException(adt.node, 'malformed.adt',
+                    'malformed algebraic data type: classes cannot have ' +
+                    'body, fields should be defined in NamedTuples instead')
+        elif len(actual_bases) == 2:
+            # ADT classes can only be defined via NamedTuple
+            if not (isinstance(actual_bases[1], ast.Call)
+                and actual_bases[1].func.id == 'NamedTuple'):
+                raise InvalidProgramException(actual_bases[1], 'malformed.adt',
+                    'malformed algebraic data type: only NamedTuple can be ' +
+                    'used to define constructors')
+            # The name of the NamedTuple should match the ADT constructor being
+            # defined
+            if not (adt.name == actual_bases[1].args[0].s):
+                raise InvalidProgramException(actual_bases[1], 'malformed.adt',
+                    'malformed algebraic data type: name of NamedTuple has to ' +
+                    'be the same of the class (ADT Constructor)')
+            # ADT constructor cannot be a direct subclass of 'ADT' since there
+            # should be an intermediary class in the hierarchy defining the ADT
+            # class the ADT constructor should be part of (i.e. subclass of)
+            if adt.superclass.name == 'ADT':
+                raise InvalidProgramException(node, 'malformed.adt',
+                    'malformed algebraic datatype: ADT constructor classes ' +
+                    'cannot inherit directly from ADT class, instead they ' +
+                    'should inherit from their own ADT defining class, which ' +
+                    'should be a direct subclass of ADT')
+        else: # len(actual_bases) == 1
+            # ADT defining classes should inherit directly from ADT class
+            if adt.superclass.name != 'ADT':
+                raise InvalidProgramException(node, 'malformed.adt',
+                    'malformed algebraic datatype: ADT defining classes ' +
+                    'should be direct subclasses of ADT class')
+
+    def _visit_ADT(self, cls: PythonClass, actual_bases: List[ast.AST],
+                   node: ast.AST, ast: ast.AST) -> List[ast.AST]:
+        """
+        Parses an ADT if well-formed, throwing an exception otherwise. The
+        ADT is defined by a class hierarchy (sum) and a NamedTuple (product).
+        """
+        self._check_is_adt_well_formed(cls, actual_bases, node, ast)
+        cls.is_adt = True
+        if len(actual_bases) == 2:
+            # Parse NamedTuple's fields and their respective types
+            for field_decl in actual_bases[1].args[1].elts:
+                field_name, field_type = field_decl.elts
+                cls.add_field(field_name.s, field_decl,
+                    self.get_target(field_type, self.module).try_unbox())
+            # Consider ADTs as a special case of single inheritance
+            actual_bases = [actual_bases[0]]
+        return actual_bases
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.current_function or self.current_class:
@@ -450,7 +536,7 @@ class Analyzer(ast.NodeVisitor):
                 for arg_name in arg_names:
                     assert arg_name in self.module.type_vars
                     var_info = self.module.type_vars[arg_name]
-                    bound = self.convert_type(var_info[0])
+                    bound = self.convert_type(var_info[0], base)
                     var = TypeVar(arg_name, bound, self.module,
                                   target_type=cls, index=current_index)
                     cls.type_vars[arg_name] = var
@@ -461,11 +547,14 @@ class Analyzer(ast.NodeVisitor):
                 if not (isinstance(base, ast.Name) and
                         base.id in MYPY_SUPERCLASSES):
                     actual_bases.append(base)
+
+        if len(actual_bases) > 0:
+            cls.superclass = self.find_or_create_target_class(actual_bases[0])
+            if isinstance(cls.superclass, PythonClass) and cls.superclass.is_adt:
+                actual_bases = self._visit_ADT(cls, actual_bases, node, ast)
         if len(actual_bases) > 1:
             raise UnsupportedException(node, 'multiple inheritance')
-        if len(actual_bases) == 1:
-            cls.superclass = self.find_or_create_target_class(actual_bases[0])
-        else:
+        if len(actual_bases) == 0:
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
@@ -572,6 +661,8 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+        func.all_low = self.is_all_low(node)
+        func.preserves_low = self.preserves_low(node)
 
         # TODO: When we want to support method type parameters, this would be
         # the place to find all type variables used in the parameters which
@@ -584,7 +675,7 @@ class Analyzer(ast.NodeVisitor):
         self.visit(node.args, node)
 
         if not is_property_setter:
-            func.type = self.convert_type(functype)
+            func.type = self.convert_type(functype, node)
 
         for child in node.body:
             if is_io_existential(child):
@@ -633,7 +724,7 @@ class Analyzer(ast.NodeVisitor):
             # If it's a type alias marked by mypy
             if lhs_name in self.types.type_aliases:
                 type_name = self.types.type_aliases[lhs_name]
-                aliased_type = self.convert_type(type_name)
+                aliased_type = self.convert_type(type_name, node)
                 self.module.classes[node.targets[0].id] = aliased_type
                 is_alias = True
             # If it's a type variable marked by mypy
@@ -693,6 +784,7 @@ class Analyzer(ast.NodeVisitor):
         var = self.node_factory.create_python_var(
             target.id, target, self.typeof(target))
         self.current_function.special_vars[local_name] = var
+        self.visit_but_ignore(node, node._parent)
         return
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
@@ -804,6 +896,10 @@ class Analyzer(ast.NodeVisitor):
             return
         if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
             return
+        if isinstance(node.func, ast.Name) and node.func.id == 'LowEvent':
+            preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
+            if not contains_stmt(preconditions, node):
+                raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
@@ -982,27 +1078,27 @@ class Analyzer(ast.NodeVisitor):
         # nothing here.
         if (not isinstance(node._parent, ast.Call) and
                 not isinstance(node.value, ast.Subscript) and
-                not (isinstance(node.value, ast.Call) and isinstance(node.ctx, ast.Load))):
-            target = self.get_target(node.value, self.module)
+                not (isinstance(node.value, ast.Call) and
+                         isinstance(node.ctx, ast.Load))):
+            container = self.current_function if self.current_function else self.module
+            target = self.get_target(node.value, container)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
                 if isinstance(real_target, PythonGlobalVar):
                     self.track_access(node, real_target)
             else:
                 receiver = self.typeof(node.value)
-                if isinstance(receiver, UnionType):
+                if (isinstance(receiver, UnionType) and
+                        not isinstance(receiver, OptionalType)):
                     for type in receiver.get_types() - {None}:
                         field = type.add_field(node.attr, node, self.typeof(node))
                         if isinstance(field, PythonField):
                             self.track_access(node, field)
                 else:
-                    try:
-                        field_type = self.typeof(node)
-                        field = receiver.add_field(node.attr, node, field_type)
-                        if isinstance(field, PythonField):
-                            self.track_access(node, field)
-                    except NoTypeException:
-                        pass
+                    field = receiver.python_class.add_field(node.attr, node,
+                                                            self.typeof(node))
+                    if isinstance(field, PythonField):
+                        self.track_access(node, field)
 
     def visit_Global(self, node: ast.Global) -> None:
         for name in node.names:
@@ -1013,7 +1109,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_Nonlocal(self, node: ast.Nonlocal) -> None:
         raise UnsupportedException(node)
 
-    def convert_type(self, mypy_type, node=None) -> PythonType:
+    def convert_type(self, mypy_type, node) -> PythonType:
         """
         Converts an internal mypy type to a PythonType.
         """
@@ -1024,10 +1120,30 @@ class Analyzer(ast.NodeVisitor):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
+                if mypy_type.type.name() == 'enumerate':
+                    # We cheat and represent type enumerate as a list of pairs.
+                    assert len(args) == 1
+                    int_type = self.module.global_module.classes[INT_TYPE]
+                    tuple_class = self.module.global_module.classes[TUPLE_TYPE]
+                    arg = GenericType(tuple_class, [int_type, args[0]])
+                    args = [arg]
                 result = GenericType(result, args)
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
+            if hasattr(mypy_type, 'fallback'):
+                # Handle ADTs which are typed as tuple and should fallback to class
+                try:
+                    fallback_type = self.convert_type(mypy_type.fallback, node)
+                    if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
+                        return fallback_type
+                except UnsupportedException:
+                    # When attempting to fallback a tuple that is not an ADT
+                    # an exception could be raised (for example trying to fallback
+                    # to Any). In this case we capture the exception and proceed
+                    # without falling back (it is definitely not an ADT).
+                    pass
+            # Regular tuple handling without falling back
             args = [self.convert_type(arg_type, node)
                     for arg_type in mypy_type.items]
             result = GenericType(self.module.global_module.classes[TUPLE_TYPE],
@@ -1041,19 +1157,25 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_callable_type(mypy_type):
             return self._convert_callable_type(mypy_type, node)
         else:
-            raise UnsupportedException(mypy_type)
+            msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
+            raise UnsupportedException(node, desc=msg)
         return result
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
         prefix = mypy_type._fullname
-        if prefix.endswith('.' + mypy_type.name()):
-            prefix = prefix[:-(len(mypy_type.name()) + 1)]
+        name = mypy_type.name()
+        if prefix == 'builtins.enumerate':
+            # We cheat and represent type enumerate as a list of pairs.
+            prefix = 'builtins.list'
+            name = 'list'
+        if prefix.endswith('.' + name):
+            prefix = prefix[:-(len(name) + 1)]
         target_module = self.module
         for module in self.modules.values():
             if module.type_prefix == prefix:
                 target_module = module
                 break
-        result = self.find_or_create_class(mypy_type.name(),
+        result = self.find_or_create_class(name,
                                            module=target_module)
         return result
 
@@ -1091,7 +1213,7 @@ class Analyzer(ast.NodeVisitor):
     def _convert_type_type(self, mypy_type, node) -> PythonType:
         name = 'type'
         type_class = self.module.global_module.classes['type']
-        args = [self.convert_type(mypy_type.item)]
+        args = [self.convert_type(mypy_type.item, node)]
         return GenericType(type_class, args)
 
     def get_alt_types(self, node: ast.AST) -> Dict[int, PythonType]:
@@ -1114,7 +1236,7 @@ class Analyzer(ast.NodeVisitor):
             result = {}
             if alts:
                 for line, type in alts.items():
-                    result[line] = self.convert_type(type)
+                    result[line] = self.convert_type(type, node)
             return result
         else:
             return {}
@@ -1137,30 +1259,26 @@ class Analyzer(ast.NodeVisitor):
             type, alts = self.module.get_type(context, node.id)
             key = (node.lineno, node.col_offset)
             if alts and key in alts:
-                return self.convert_type(alts[key])
-            return self.convert_type(type)
+                return self.convert_type(alts[key], node)
+            return self.convert_type(type, node)
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
-            if isinstance(receiver, UnionType):
-                set_of_types = []
+            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
+                set_of_types = set()
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):
                         context = [type_in_union.optional_type.name]
                     else:
                         context = [type_in_union.name]
                     type, _ = self.module.get_type(context, node.attr)
-                    converted = self.convert_type(type)
-                    if converted not in set_of_types:
-                        set_of_types.append(converted)
-                return UnionType(set_of_types) if len(set_of_types) > 1 else set_of_types[0]
+                    set_of_types.add(self.convert_type(type, node))
+                return UnionType(list(set_of_types)) if len(set_of_types) > 1 else set_of_types.pop()
             if isinstance(receiver, OptionalType):
                 context = [receiver.optional_type.name]
             else:
                 context = [receiver.name]
             type, _ = self.module.get_type(context, node.attr)
-            if type is None:
-                raise NoTypeException
-            return self.convert_type(type)
+            return self.convert_type(type, node)
         elif isinstance(node, ast.arg):
             # Special case for cls parameter of classmethods; for those, we
             # return the type 'type[C]', where C is the class the method
@@ -1178,10 +1296,14 @@ class Analyzer(ast.NodeVisitor):
             type, _ = self.module.get_type(context, node.arg)
             return self.convert_type(type, node)
         elif (isinstance(node, ast.Call) and
-              isinstance(node.func, ast.Name) and
-              node.func.id in CONTRACT_FUNCS):
-            if node.func.id in ('Result', 'TypedResult'):
-                return self.current_function.type
+              isinstance(node.func, ast.Name)):
+            if node.func.id in CONTRACT_FUNCS:
+                if node.func.id == 'Result':
+                    return self.current_function.type
+                else:
+                    raise UnsupportedException(node)
+            elif node.func.id == 'cast':
+                return self.find_or_create_target_class(node.args[0])
             else:
                 raise UnsupportedException(node)
         elif isinstance(node, ast.Call) and isinstance(node.func,
@@ -1267,7 +1389,11 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)))
+                (('property' in decorators) and (len(decorators) != 1)) or
+                (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
+                ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
+                    ('Predicate' in decorators) or ('Pure' in decorators)))
+               )
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """
@@ -1302,41 +1428,29 @@ class Analyzer(ast.NodeVisitor):
             result = result or (not selected)
         return result
 
-    def is_pure(self, func: ast.FunctionDef) -> bool:
+    def has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        return 'Pure' in decorators
+        return decorator in decorators
+
+    def is_pure(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Pure')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'Predicate' in decorators
+        return self.has_decorator(func, 'Predicate')
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'staticmethod' in decorators
+        return self.has_decorator(func, 'staticmethod')
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'classmethod' in decorators
+        return self.has_decorator(func, 'classmethod')
 
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'IOOperation' in decorators
+        return self.has_decorator(func, 'IOOperation')
 
     def is_property_getter(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'property' in decorators
+        return self.has_decorator(func, 'property')
 
     def is_property_setter(self, func: ast.FunctionDef) -> bool:
         setter_decorator = [d for d in func.decorator_list
@@ -1346,3 +1460,9 @@ class Analyzer(ast.NodeVisitor):
         if len(setter_decorator) > 1 or setter_decorator[0].attr != 'setter':
             raise InvalidProgramException(func, 'unknown.decorator')
         return self.current_class.fields[setter_decorator[0].value.id]
+
+    def is_all_low(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'AllLow')
+
+    def preserves_low(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'PreservesLow')

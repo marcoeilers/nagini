@@ -101,11 +101,9 @@ class WaitLevelTranslator(CommonTranslator):
         var = ctx.current_function.create_variable(
             '_r', ctx.module.global_module.classes['object'],
             self.translator, local=False)
-        for_perm = sil.ForPerm(
-            var.sil_name,
-            fields,
-            oper(self.create_level_call(sil.RefVar(var)), expr))
-        return sil.BigAnd([for_perm, oper(residue_level_var, expr)])
+        op = oper(self.create_level_call(sil.RefVar(var)), expr)
+        for_perms = [sil.ForPerm(var.sil_name, f, op) for f in fields]
+        return sil.BigAnd(for_perms + [oper(residue_level_var, expr)])
 
     def create_level_below(
             self, expr: sil.PermExpression,
@@ -195,6 +193,8 @@ class WaitLevelTranslator(CommonTranslator):
         exhale = self._create_level_below_inex(
             guard, expr, obligation_info.residue_level, ctx)
         translated_exhale = exhale.translate(self, ctx, position, info)
+        if ctx.ignore_waitlevel_constraints:
+            return sil.TrueLit()
         if ctx.obligation_context.is_translating_posts:
             obligation_info.add_postcondition(translated_exhale)
             caller_inhale = sil.InhaleExhale(

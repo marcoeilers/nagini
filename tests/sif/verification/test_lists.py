@@ -9,14 +9,13 @@ def high_ref() -> List[int]:
 
 
 def low_ref() -> List[int]:
-    Requires(Low())
     Ensures(Acc(list_pred(Result())))
     Ensures(Low(Result()))
     return [2]
 
 
 def test_high_data() -> None:
-    Requires(Low())
+    Requires(LowEvent())
     x = input_high()
     y = input_low()
     l = [1, y]
@@ -26,9 +25,8 @@ def test_high_data() -> None:
     sif_print(l[2])
 
 
-@NotPreservingTL
 def test_contains() -> None:
-    Requires(Low())
+    Requires(LowEvent())
     x = input_high()
     y = input_low()
     l = [1, 2, 3]
@@ -40,7 +38,7 @@ def test_contains() -> None:
 
 
 def test_contains_2() -> None:
-    Requires(Low())
+    Requires(LowEvent())
     x = input_high()
     l = [1, 2, 3]
     b = x in l
@@ -48,17 +46,17 @@ def test_contains_2() -> None:
 
 
 def test_high_ref() -> None:
-    Requires(Low())
+    Requires(LowEvent())
     h = high_ref()
     l = low_ref()
     l.append(1)
     sif_print(1)
     h.append(2)
-    #:: ExpectedOutput(call.precondition:assertion.false)
     sif_print(2)
 
 
 def test_high_index(low_idx: int, high_idx:int) -> None:
+    Requires(LowEvent())
     Requires(low_idx >=0 and low_idx < 3)
     Requires(Low(low_idx))
     Requires(high_idx >=0 and high_idx < 3)

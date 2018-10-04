@@ -6,6 +6,7 @@ from nagini_contracts.contracts import (
     list_pred,
     Requires,
 )
+from typing import List
 
 
 def test1(a: List[int]) -> None:

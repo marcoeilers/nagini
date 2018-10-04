@@ -265,6 +265,12 @@ class MustTerminateObligation(Obligation):
             instance = MustTerminateObligationInstance(
                 self, node, measure, obligation_info.current_thread_var)
             return instance
+        elif (isinstance(node.func, ast.Name) and
+              node.func.id == "TerminatesSif"):
+              measure = node.args[1]
+              instance = MustTerminateObligationInstance(
+                  self, node, measure, obligation_info.current_thread_var)
+              return instance
         else:
             return None
 

@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, MayJoin, ThreadPost, getOld, arg
+from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, ThreadPost, getOld, arg
 from nagini_contracts.obligations import MustTerminate
 
 
@@ -15,7 +15,7 @@ class Cell:
 
 
 @Pure
-def get(c: Cell, n: int) -> int:
+def get(c: Cell) -> int:
     Requires(Acc(c.val))
     return c.val
 

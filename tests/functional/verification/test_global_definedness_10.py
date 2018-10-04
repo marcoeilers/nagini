@@ -7,7 +7,7 @@ class B(A):
 
 # undefined
 #:: ExpectedOutput(assert.failed:assertion.false)
-class D(C):
+class D(C):  # noqa: F821
     pass
 
 class C:

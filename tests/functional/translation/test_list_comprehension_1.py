@@ -7,7 +7,7 @@ def m(l: List[int]) -> List[bool]:
     Ensures(Acc(list_pred(l)))
     Ensures(Acc(list_pred(Result())))
     Ensures(len(Result()) == len(l))
-    Ensures(Forall(range(0, len(Result())), lambda i: (Result()[i] == (l[i] != 5) , [])))
+    Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(Result()), Result()[i] == (l[i] != 5)), [[l[i]]])))
     #:: ExpectedOutput(invalid.program:impure.list.comprehension.body)
     return [m2(e) for e in l]
 

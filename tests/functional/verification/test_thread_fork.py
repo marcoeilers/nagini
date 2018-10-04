@@ -1,5 +1,5 @@
 from nagini_contracts.contracts import *
-from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, MayJoin, ThreadPost, getOld, arg
+from nagini_contracts.thread import Thread, MayStart, getArg, getMethod, Joinable, ThreadPost, getOld, arg
 from nagini_contracts.obligations import MustTerminate, WaitLevel, Level
 
 
@@ -86,7 +86,7 @@ def client_fork_join_perms(t: Thread, b: bool, cell: Cell) -> None:
     Requires(getMethod(t) == decr)
     Requires(Acc(cell.val))
     Requires(cell is getArg(t, 0))
-    Ensures(MayJoin(t))
+    Ensures(Joinable(t))
     Ensures(Acc(ThreadPost(t)))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(False)
@@ -99,7 +99,7 @@ def client_fork_wrong_mayjoin(t: Thread, b: bool, cell: Cell) -> None:
     Requires(Acc(cell.val))
     Requires(cell is getArg(t, 0))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
-    Ensures(MayJoin(t))
+    Ensures(Joinable(t))
     t.start(decr, Cell.incr)
 
 

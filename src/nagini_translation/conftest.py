@@ -12,6 +12,7 @@ import os
 import pytest
 
 from nagini_translation.lib import config
+from nagini_translation.tests import _JVM as jvm
 from nagini_translation.verifier import ViperVerifier
 from typing import List
 
@@ -26,6 +27,7 @@ _FUNCTIONAL_TESTS_DIR = 'tests/functional/'
 _SIF_TESTS_DIR = 'tests/sif/'
 _IO_TESTS_DIR = 'tests/io/'
 _OBLIGATIONS_TESTS_DIR = 'tests/obligations/'
+_ARP_TESTS_DIR = 'tests/arp/'
 
 
 class PyTestConfig:
@@ -33,6 +35,7 @@ class PyTestConfig:
     def __init__(self):
         self.translation_test_dirs = []
         self.verification_test_dirs = []
+        self.single_test = None
         self.verifiers = []
 
         self.init_from_config_file()
@@ -48,13 +51,15 @@ class PyTestConfig:
 
     def add_test(self, test: str):
         if test == 'functional':
-                self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+            self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
         elif test == 'sif':
             self._add_test_dir(_SIF_TESTS_DIR)
         elif test == 'io':
             self._add_test_dir(_IO_TESTS_DIR)
         elif test == 'obligations':
             self._add_test_dir(_OBLIGATIONS_TESTS_DIR)
+        elif test == 'arp':
+            self._add_test_dir(_ARP_TESTS_DIR)
         else:
             print('Unrecognized test set.')
 
@@ -109,11 +114,13 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     # Preferably, we could specify the tests and verifiers as a list, but
     # unfortunately, pytest_parser.addoption does not play well with
     # action='append'.
+    parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
     parser.addoption('--sif', dest='sif', action='store_true')
     parser.addoption('--io', dest='io', action='store_true')
     parser.addoption('--obligations', dest='obligations', action='store_true')
+    parser.addoption('--arp', dest='arp', action='store_true')
     parser.addoption('--all-verifiers', dest='all_verifiers',
                      action='store_true')
     parser.addoption('--silicon', dest='silicon', action='store_true')
@@ -125,7 +132,7 @@ def pytest_configure(config: 'pytest.config.Config'):
     # Setup tests.
     tests = []
     if config.option.all_tests:
-        tests = ['functional', 'sif', 'io', 'obligations']
+        tests = ['functional', 'sif', 'io', 'obligations', 'arp']
     else:
         if config.option.functional:
             tests.append('functional')
@@ -135,13 +142,29 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('io')
         if config.option.obligations:
             tests.append('obligations')
+        if config.option.arp:
+            tests.append('arp')
     if tests:
         # Overwrite config file options.
         _pytest_config.clear_tests()
         for test in tests:
             _pytest_config.add_test(test)
-    if not _pytest_config.translation_test_dirs:
-        pytest.exit('No test sets specified.')
+        if 'sif' in tests:
+            if not jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+                pytest.exit('Viper SIF extension not avaliable on the classpath.')
+    elif config.option.single_test:
+        _pytest_config.clear_tests()
+        _pytest_config.single_test = config.option.single_test
+    if not _pytest_config.translation_test_dirs and not _pytest_config.single_test:
+        # Default: all tests that are available, SIF tests only if the extension is
+        # present.
+        tests = ['functional', 'io', 'obligations']
+        if jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+            tests.append('sif')
+        if jvm.is_known_class(jvm.viper.silver.plugin.ARPPlugin):
+            tests.append('arp')
+        for test in tests:
+            _pytest_config.add_test(test)
     # Setup verifiers.
     verifiers = []
     if config.option.all_verifiers:
@@ -157,7 +180,16 @@ def pytest_configure(config: 'pytest.config.Config'):
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
     if not _pytest_config.verifiers:
-        pytest.exit('No verifiers specified.')
+        # Default: all available verifiers.
+        verifiers = []
+        if jvm.is_known_class(jvm.viper.silicon.SiliconRunner):
+            verifiers.append('silicon')
+        if jvm.is_known_class(jvm.viper.carbon.Carbon):
+            verifiers.append('carbon')
+        if not verifiers:
+            pytest.exit('No backend verifiers avaliable on the classpath.')
+        for verifier in verifiers:
+            _pytest_config.add_verifier(verifier)
 
 
 def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
@@ -171,21 +203,27 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers
-            params.append((file, sif, reload_resources))
-        metafunc.parametrize('path,sif,reload_resources', params)
+            arp = 'arp' in file
+            params.append((file, sif, reload_resources, arp))
+        metafunc.parametrize('path,sif,reload_resources,arp', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
         for test_dir in _pytest_config.verification_test_dirs:
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+        if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
+            test_files.append(_pytest_config.single_test)
         for file in test_files:
             sif = 'sif' in file
             reload_resources = file in reload_triggers
-            params.extend([(file, verifier, sif, reload_resources) for verifier
+            arp = 'arp' in file
+            params.extend([(file, verifier, sif, reload_resources, arp) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,verifier,sif,reload_resources', params)
+        metafunc.parametrize('path,verifier,sif,reload_resources,arp', params)
     else:
         pytest.exit('Unrecognized test function.')
