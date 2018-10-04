@@ -56,16 +56,15 @@ def client() -> None:
     c.v = 1
     Unfold(c.P())
     Fold(c.P())
-    rd_client(c)
+    wildcard_client(c)
     #:: ExpectedOutput(assignment.failed:insufficient.permission)
     c.v = 1
 
-
-def rd_client(c: Container) -> None:
-    Requires(Rd(c.P()))
-    Requires(Rd(c.v))
-    Ensures(Rd(c.P()))
-    Ensures(Rd(c.v))
+def wildcard_client(c: Container) -> None:
+    Requires(Wildcard(c.P()))
+    Requires(Wildcard(c.v))
+    Ensures(Wildcard(c.P()))
+    Ensures(Wildcard(c.v))
     a = c.needs_pred()
     d = c.needs_field()
     #:: ExpectedOutput(call.precondition:insufficient.permission)

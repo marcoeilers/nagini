@@ -313,6 +313,9 @@ class ViperAST:
     def IntPermMul(self, left, right, position, info):
         return self.ast.IntPermMul(left, right, position, info, self.NoTrafos)
 
+    def PermDiv(self, left, right, position, info):
+        return self.ast.PermDiv(left, right, position, info, self.NoTrafos)
+
     def PermLtCmp(self, left, right, position, info):
         return self.ast.PermLtCmp(left, right, position, info, self.NoTrafos)
 
@@ -457,7 +460,7 @@ class ViperAST:
         if res.isPure():
             return res
         else:
-            desugared = self.to_list(self.QPs.desugareSourceSyntax(res))
+            desugared = self.to_list(self.QPs.desugarSourceQuantifiedPermissionSyntax(res))
             result = self.TrueLit(position, info)
             for qp in desugared:
                 result = self.And(result, qp, position, info)

@@ -11,7 +11,6 @@ from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTIN_PREDICATES,
-    DICT_TYPE,
     GET_ARG_FUNC,
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
@@ -22,7 +21,6 @@ from nagini_translation.lib.constants import (
     PSET_TYPE,
     RANGE_TYPE,
     SEQ_TYPE,
-    SET_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -33,7 +31,6 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonType,
-    PythonVar,
     UnionType,
     toposort_classes,
     chain_cond_exp,
@@ -280,7 +277,7 @@ class ContractTranslator(CommonTranslator):
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
-                                               pos, self.no_info(ctx))
+                                               pos, info)
         # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,
@@ -833,10 +830,12 @@ class ContractTranslator(CommonTranslator):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
-        elif func_name in ('Acc', 'Rd'):
+        elif func_name in ('Acc', 'Rd', 'Wildcard'):
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
+                perm = self.get_arp_for_context(node, ctx)
+            elif func_name == 'Wildcard':
                 perm = self.viper.WildcardPerm(self.to_position(node, ctx),
                                                self.no_info(ctx))
             else:

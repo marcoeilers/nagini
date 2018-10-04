@@ -117,7 +117,6 @@ method list_reverse(self: Ref) returns (res: Ref)
     ensures |res.list_acc| == |self.list_acc|
     ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
 
-
 method list___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires acc(self.list_acc, 1 / 10)

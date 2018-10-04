@@ -762,7 +762,8 @@ class ExpressionTranslator(CommonTranslator):
                 return self.translate_global_var_reference(target, node, ctx)
             else:
                 raise UnsupportedException(node)
-        elif isinstance(target, PythonClass) and func_name != 'Result':
+        elif (isinstance(target, PythonClass) and
+                      func_name != 'Result'):
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)

@@ -26,9 +26,9 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
-                  'Acc', 'Rd', 'Fold', 'Unfold', 'Unfolding', 'Previous', 'RaisedException',
-                  'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate', 'getMethod', 'getArg',
-                  'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
+                  'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
+                  'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
+                  'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -193,6 +193,13 @@ class Sequence(Generic[T], Sized, Iterable[T]):
         can be used as arguments for Forall.
         """
 
+def Previous(it: T) -> Sequence[T]:
+    """
+    Within the body of a loop 'for x in xs', Previous(x) represents the list of
+    the values of x in previous loop iterations.
+    """
+    pass
+
 
 class PSet(Generic[T], Sized, Iterable[T]):
     """
@@ -241,14 +248,6 @@ def ToSeq(l: Iterable[T]) -> Sequence[T]:
     """
 
 
-def Previous(it: T) -> Sequence[T]:
-    """
-    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
-    the values of x in previous loop iterations.
-    """
-    pass
-
-
 # The following annotations have no runtime semantics. They are only used for
 # the Python to Viper translation.
 
@@ -278,6 +277,26 @@ def MaySet(o: object, field_name: str) -> bool:
 def Rd(field) -> bool:
     """
     Read permission to a predicate or field, only to be used in pure contexts.
+    """
+    pass
+
+
+def ARP(counting: int = None) -> float:
+    """
+    Abstract read permission, only to be used in Acc(f, ...).
+    """
+    pass
+
+
+"""
+Permission used in predicates
+"""
+RD_PRED = 1  # type: float
+
+
+def Wildcard(field) -> bool:
+    """
+    Wildcard permission to a predicate or field, only to be used in pure contexts.
     """
     pass
 
@@ -406,6 +425,9 @@ __all__ = [
         'PreservesLow',
         'Acc',
         'Rd',
+        'ARP',
+        'RD_PRED',
+        'Wildcard',
         'Fold',
         'Unfold',
         'Unfolding',

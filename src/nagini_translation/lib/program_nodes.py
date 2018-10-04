@@ -495,7 +495,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -1023,7 +1022,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         add_all_call_deps(self.call_deps, res, prefix)
 
-
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
         Creates fresh Silver names for all parameters and initializes them,
@@ -1180,6 +1178,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):

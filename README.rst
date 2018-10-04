@@ -21,10 +21,10 @@ Getting Started (Ubuntu Linux only)
 2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_ to the nagini directory
 3.  Set paths to Viper (adjust paths if necessary)::
 
-        SILICONJAR=backends\silicon.jar
-        CARBONJAR=backends\carbon.jar
-        Z3_EXE=z3\bin\z3
-        BOOGIE_EXE=boogie\Binaries\Boogie.exe
+        export SILICONJAR=backends/silicon.jar
+        export CARBONJAR=backends/carbon.jar
+        export Z3_EXE=z3/bin/z3
+        export BOOGIE_EXE=boogie/Binaries/Boogie.exe
 
 4.  Install dependencies and run tests::
 

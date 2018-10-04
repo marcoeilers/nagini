@@ -43,6 +43,7 @@ from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translator import Translator
 from nagini_translation.verifier import (
     Carbon,
+    get_arp_plugin,
     Silicon,
     VerificationResult,
     ViperVerifier
@@ -88,8 +89,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
-              sif: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False) -> Program:
+              sif: bool = False, arp: bool = False, ignore_global: bool = False,
+              reload_resources: bool = False, verbose: bool = False) -> Program:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -127,15 +128,32 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected, ignore_global)
+    prog = translator.translate_program(modules, sil_programs, selected,
+                                        arp=arp, ignore_global=ignore_global)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
+    if verbose:
+        print('Translation successful.')
+    if sif:
+        configure_mpp_transformation(jvm,
+                                     ctrl_opt=True,
+                                     seq_opt=True,
+                                     act_opt=True,
+                                     func_opt=True)
+        prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+        if verbose:
+            print('Transformation to MPP successful.')
+    if arp:
+        prog = get_arp_plugin(jvm).before_verify(prog)
+        if verbose:
+            print('ARP transformation successful.')
     # Run consistency check in translated AST
     consistency_errors = viper_ast.to_list(prog.checkTransitively())
     for error in consistency_errors:
         print(error.toString())
     if consistency_errors:
+        print(prog)
         raise ConsistencyException('consistency.error')
     return prog
 
@@ -156,7 +174,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -165,7 +183,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        vresult = verifier.verify(prog)
+        vresult = verifier.verify(prog, arp=arp)
         return vresult
     except JavaException as je:
         print(je.stacktrace())
@@ -236,6 +254,10 @@ def main() -> None:
         action='store_true',
         help='show Viper-level error messages if no Python errors are available')
     parser.add_argument(
+        '--arp',
+        action='store_true',
+        help='Use Abstract Read Permissions')
+    parser.add_argument(
         '--log',
         type=_parse_log_level,
         help='log level',
@@ -299,28 +321,18 @@ def main() -> None:
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response)
+            translate_and_verify(file, jvm, args, add_response, arp=args.arp)
             socket.send_string(response[0])
     else:
-        translate_and_verify(args.python_file, jvm, args)
+        translate_and_verify(args.python_file, jvm, args, arp=args.arp)
 
 
-def translate_and_verify(python_file, jvm, args, print=print):
+def translate_and_verify(python_file, jvm, args, print=print, arp=False):
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
-        prog = translate(python_file, jvm, selected, args.sif, args.ignore_global)
-        if args.verbose:
-            print('Translation successful.')
-        if args.sif:
-            configure_mpp_transformation(jvm,
-                                         ctrl_opt=True,
-                                         seq_opt=True,
-                                         act_opt=True,
-                                         func_opt=True)
-            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
-            if args.verbose:
-                print('Transformation to MPP successful.')
+        prog = translate(python_file, jvm, selected, args.sif,
+                         ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
         if args.print_silver:
             if args.verbose:
                 print('Result:')
@@ -338,13 +350,13 @@ def translate_and_verify(python_file, jvm, args, print=print):
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                prog = translate(python_file, jvm, selected, args.sif)
-                vresult = verify(prog, python_file, jvm, backend=backend)
+                prog = translate(python_file, jvm, selected, args.sif, arp=arp)
+                vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend)
+            vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))

@@ -58,13 +58,53 @@ class Failure(VerificationResult):
         return "Verification failed\nErrors:\n" + '\n'.join(unique_errors)
 
 
+class ARPPlugin:
+    """
+    Provides access to the ARPPlugin
+    """
+
+    def __init__(self, jvm: JVM):
+        self.jvm = jvm
+        self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.silver.plugin.ARPPlugin):
+            raise Exception('ARP plugin not found on classpath.')
+        self.arpplugin = jvm.viper.silver.plugin.ARPPlugin()
+        self.set_ignored_fields()
+
+    def before_verify(self, prog: 'silver.ast.Program') -> 'silver.ast.Program':
+        return self.arpplugin.beforeVerify(prog)
+
+    def map_result(self, result: 'verifier.VerificationResult') -> 'verifier.VerificationResult':
+        return self.arpplugin.mapVerificationResult(result)
+
+    def set_ignored_fields(self) -> None:
+        fields = self.jvm.scala.collection.mutable.ArraySeq(6)
+        fields.update(0, "MustReleaseBounded")
+        fields.update(1, "MustReleaseUnbounded")
+        fields.update(2, "MustTerminate")
+        fields.update(3, "MustInvokeBounded")
+        fields.update(4, "MustInvokeUnbounded")
+        fields.update(5, "MustInvokeCredit")
+        self.arpplugin.setIgnoredFields(fields)
+
+
+_ARP_PLUGIN = None
+
+
+def get_arp_plugin(jvm: JVM) -> ARPPlugin:
+    global _ARP_PLUGIN
+    if not _ARP_PLUGIN:
+        _ARP_PLUGIN = ARPPlugin(jvm)
+    return _ARP_PLUGIN
+
+
 class Silicon:
     """
     Provides access to the Silicon verifier
     """
 
     def __init__(self, jvm: JVM, filename: str):
-        self._jvm = jvm
+        self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
             raise Exception('Silicon backend not found on classpath.')
@@ -78,20 +118,22 @@ class Silicon:
         self.silicon.start()
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
         if not self.ready:
             self.silicon.restart()
         result = self.silicon.verify(prog)
+        if arp:
+            result = get_arp_plugin(self.jvm).map_result(result)
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors, self._jvm)
+            return Failure(errors, self.jvm)
         else:
             return Success()
 
@@ -119,14 +161,17 @@ class Carbon:
         self.carbon.parseCommandLine(args)
         self.carbon.start()
         self.ready = True
+        self.jvm = jvm
 
-    def verify(self, prog: 'silver.ast.Program') -> VerificationResult:
+    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """
         if not self.ready:
             self.carbon.restart()
         result = self.carbon.verify(prog)
+        if arp:
+            result = get_arp_plugin(self.jvm).map_result(result)
         self.ready = False
         if isinstance(result, self.silver.verifier.Failure):
             it = result.errors().toIterator()

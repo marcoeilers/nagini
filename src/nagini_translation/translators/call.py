@@ -80,6 +80,7 @@ from nagini_translation.translators.common import CommonTranslator
 
 class CallTranslator(CommonTranslator):
 
+
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
@@ -1179,6 +1180,7 @@ class CallTranslator(CommonTranslator):
         Top-level contract statements like Assert are only allowed if the
         'statement' flag is set.
         """
+
         is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)
         if is_name:
@@ -1345,6 +1347,7 @@ class CallTranslator(CommonTranslator):
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, True
 
         # Resolve list of possible target methods.
         method_options = []
@@ -1387,6 +1390,7 @@ class CallTranslator(CommonTranslator):
         # Actual fork operation is carried out elsewhere.
         stmts.extend(self.create_method_fork(ctx, method_options, thread, precond_pos,
                                              info, node))
+        ctx.current_thread_object, ctx.is_thread_start = None, False
         return thread_stmt + stmts, None
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -1395,6 +1399,7 @@ class CallTranslator(CommonTranslator):
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, False
         stmts = thread_stmt
 
         # Assert that thread may be joined.
@@ -1449,6 +1454,7 @@ class CallTranslator(CommonTranslator):
                                                         info)
         exhale_pred = self.viper.Exhale(post_pred, pos, info)
         stmts.append(exhale_pred)
+        ctx.current_thread_object, ctx.is_thread_start = None, False
 
         return stmts, None
 

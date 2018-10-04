@@ -385,7 +385,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                                                    [int_type, iterable_type])])
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
-            if node.func.id == 'Result':
+            if node.func.id  == 'Result':
                 return current_function.type
             elif node.func.id == 'RaisedException':
                 ctxs = [cont for cont in containers if
@@ -394,8 +394,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
-                                  'MaySet', 'Low', 'LowVal', 'LowEvent'):
+            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists',
+                                  'MayCreate', 'MaySet', 'Low', 'LowVal', 'LowEvent'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Declassify':
                 return None
