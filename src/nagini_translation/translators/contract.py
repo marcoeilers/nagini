@@ -826,7 +826,7 @@ class ContractTranslator(CommonTranslator):
         Translates calls to contract functions like Result() and Acc()
         """
         func_name = get_func_name(node)
-        if func_name in ('Result', 'TypedResult'):
+        if func_name == 'Result':
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
@@ -836,7 +836,8 @@ class ContractTranslator(CommonTranslator):
             if func_name == 'Rd':
                 perm = self.get_arp_for_context(node, ctx)
             elif func_name == 'Wildcard':
-                perm = self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
+                perm = self.viper.WildcardPerm(self.to_position(node, ctx),
+                                               self.no_info(ctx))
             else:
                 perm = self._get_perm(node, ctx)
             if isinstance(node.args[0], ast.Call):

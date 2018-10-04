@@ -48,7 +48,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
         if isinstance(node, mypy.nodes.CallExpr):
-            if node.callee.name in ('Result', 'TypedResult'):
+            if node.callee.name == 'Result':
                 return True
             if node.callee.name == 'RaisedException':
                 return True

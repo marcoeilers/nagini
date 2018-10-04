@@ -416,16 +416,6 @@ class ExpressionTranslator(CommonTranslator):
             return self._translate_slice_subscript(node, target, target_type,
                                                    target_stmt, ctx)
 
-        # if target_type.python_class.name == 'list':
-        #     index_stmt, index = self.translate_expr(node.slice.value, ctx,
-        #                                             target_type=self.viper.Int)
-        #     pos = self.to_position(node, ctx)
-        #     info = self.no_info(ctx)
-        #     contents_field = self.viper.Field('list_acc', self.viper.SeqType(self.viper.Ref), pos, info)
-        #     field_acc = self.viper.FieldAccess(target, contents_field, pos, info)
-        #     seq_access = self.viper.SeqIndex(field_acc, index, pos, info)
-        #     return target_stmt + index_stmt, seq_access
-
         index_stmt, index = self.translate_expr(node.slice.value, ctx,
                                                 target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
@@ -773,7 +763,7 @@ class ExpressionTranslator(CommonTranslator):
             else:
                 raise UnsupportedException(node)
         elif (isinstance(target, PythonClass) and
-                      func_name not in ('Result', 'TypedResult')):
+                      func_name != 'Result'):
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)

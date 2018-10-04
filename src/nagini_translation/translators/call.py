@@ -190,13 +190,6 @@ class CallTranslator(CommonTranslator):
             return cls
         return self._is_lock_subtype(cls.superclass)
 
-    def _is_lock_subtype(self, cls: PythonClass) -> bool:
-        if cls is None:
-            return False
-        if cls.name == 'Lock':
-            return cls
-        return self._is_lock_subtype(cls.superclass)
-
     def translate_constructor_call(self, target_class: PythonClass,
             node: ast.Call, args: List, arg_stmts: List,
             ctx: Context) -> StmtsAndExpr:
@@ -662,7 +655,7 @@ class CallTranslator(CommonTranslator):
         if called_func.method_type == MethodType.normal:
             if isinstance(node.func, ast.Attribute):
                 called_name = get_func_name(node.func.value)
-                if called_name in ('Result', 'TypedResult'):
+                if called_name == 'Result':
                     return True
                 rec_target = self.get_target(node.func.value, ctx)
                 if isinstance(rec_target, PythonModule):

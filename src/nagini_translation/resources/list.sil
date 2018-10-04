@@ -71,7 +71,7 @@ method list_append(self: Ref, item: Ref) returns ()
     requires acc(self.list_acc)
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
-    ensures list___sil_seq__(self) == old(list___sil_seq__(self)) ++ Seq(item)
+    ensures self.list_acc == old(self.list_acc) ++ Seq(item)
 {
     assume false
 }

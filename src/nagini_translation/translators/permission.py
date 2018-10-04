@@ -109,10 +109,12 @@ class PermTranslator(CommonTranslator):
                 arg0_stmt, arg0 = self.translate_expr(node.args[0], ctx, self.viper.Int)
                 if arg0_stmt:
                     raise InvalidProgramException(node, 'purity.violated')
-                formal_arg = self.viper.LocalVarDecl(
-                    'count', self.viper.Int, self.to_position(node, ctx), self.no_info(ctx))
+                formal_arg = self.viper.LocalVarDecl('count', self.viper.Int,
+                                                     self.to_position(node, ctx),
+                                                     self.no_info(ctx))
                 return self.viper.FuncApp('rdc', [arg0], self.to_position(node, ctx),
-                                          self.no_info(ctx), self.viper.Perm, [formal_arg])
+                                          self.no_info(ctx), self.viper.Perm,
+                                          [formal_arg])
         elif func_name == 'getARP':
             if not ctx.arp:
                 raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
@@ -123,7 +125,8 @@ class PermTranslator(CommonTranslator):
                 if arg0_stmt:
                     raise InvalidProgramException(node, 'purity.violated')
                 return self.viper.FuncApp('rd_token', [arg0], self.to_position(node, ctx),
-                                          self.no_info(ctx), self.viper.Perm, [formal_arg])
+                                          self.no_info(ctx), self.viper.Perm,
+                                          [formal_arg])
 
         call_stmt, call = self.translate_expr(node, ctx, self.viper.Int)
         if not call_stmt:
@@ -148,19 +151,27 @@ class PermTranslator(CommonTranslator):
         raise InvalidProgramException(node, 'purity.violated')
 
     def get_arp_for_context(self, node: ast.AST, ctx: Context):
-        if ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and ctx.actual_function.pure:
+        if (ctx.actual_function and isinstance(ctx.actual_function, PythonMethod) and
+                ctx.actual_function.pure):
             return self.viper.WildcardPerm(self.to_position(node, ctx), self.no_info(ctx))
         else:
             if not ctx.arp:
                 raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             if ctx.current_thread_object is not None:
-                formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref, self.to_position(node, ctx), self.no_info(ctx))
+                formal_arg = self.viper.LocalVarDecl('tk', self.viper.Ref,
+                                                     self.to_position(node, ctx),
+                                                     self.no_info(ctx))
                 if ctx.is_thread_start:
-                    return self.viper.FuncApp('rd_token_fresh', [ctx.current_thread_object], self.to_position(node, ctx),
-                                              self.no_info(ctx), self.viper.Perm, [formal_arg])
+                    return self.viper.FuncApp('rd_token_fresh',
+                                              [ctx.current_thread_object],
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx), self.viper.Perm,
+                                              [formal_arg])
                 else:
-                    return self.viper.FuncApp('rd_token', [ctx.current_thread_object], self.to_position(node, ctx),
-                                              self.no_info(ctx), self.viper.Perm, [formal_arg])
+                    return self.viper.FuncApp('rd_token', [ctx.current_thread_object],
+                                              self.to_position(node, ctx),
+                                              self.no_info(ctx), self.viper.Perm,
+                                              [formal_arg])
             else:
                 return self.viper.FuncApp('rd', [], self.to_position(node, ctx),
                                           self.no_info(ctx), self.viper.Perm, {})

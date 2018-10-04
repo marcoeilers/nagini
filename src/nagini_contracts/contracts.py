@@ -411,7 +411,6 @@ __all__ = [
         'Assert',
         'Old',
         'Result',
-        'TypedResult',
         'RaisedException',
         'Implies',
         'Forall',
@@ -443,7 +442,6 @@ __all__ = [
         'Sequence',
         'PSet',
         'ToSeq',
-        'PSet',
         'MaySet',
         'MayCreate',
         ]

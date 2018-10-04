@@ -65,7 +65,7 @@ def get_target(node: ast.AST,
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
         func_name = get_func_name(node)
-        if (container and func_name in ('Result', 'TypedResult') and
+        if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
             # In this case the immediate container must be a method, and we
             # return its result type

@@ -23,7 +23,6 @@ Getting Started (Ubuntu Linux only)
 
         export SILICONJAR=backends/silicon.jar
         export CARBONJAR=backends/carbon.jar
-        export ARPPLUGINJAR=backends/arpplugin.jar
         export Z3_EXE=z3/bin/z3
         export BOOGIE_EXE=boogie/Binaries/Boogie.exe
 
@@ -67,7 +66,6 @@ Getting Started on Windows
 
         set SILICONJAR=backends\silicon.jar
         set CARBONJAR=backends\carbon.jar
-        set ARPPLUGINJAR=backends\arpplugin.jar
         set Z3_EXE=z3\bin\z3.exe
         set BOOGIE_EXE=boogie\Binaries\Boogie.exe
 
