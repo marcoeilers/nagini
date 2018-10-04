@@ -118,12 +118,14 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
-    'm',     # used in a quantifier in measures.sil
-    'X',
+    'm',     # the following are used in various
+    'X',     # places in the resources/... files.
     'Y',
     'id',
     't',
-    'g'
+    'g',
+    'x',
+    'Low'
 ]
 
 VIPER_KEYWORDS = [
