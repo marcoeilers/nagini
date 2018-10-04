@@ -1,3 +1,4 @@
+#:: IgnoreFile(silicon)(320)
 # chaliceSuite/permission-model/basic.chalice
 
 from nagini_contracts.contracts import *

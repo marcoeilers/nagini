@@ -49,29 +49,6 @@ class Container:
         return self.v
 
 
-def client() -> None:
-    c = Container()
-    fixed_write_client(c)
-    fixed_client(c)
-    c.v = 1
-    Unfold(c.P())
-    Fold(c.P())
-    rd_client(c)
-    #:: ExpectedOutput(assignment.failed:insufficient.permission)
-    c.v = 1
-
-
-def rd_client(c: Container) -> None:
-    Requires(Rd(c.P()))
-    Requires(Rd(c.v))
-    Ensures(Rd(c.P()))
-    Ensures(Rd(c.v))
-    a = c.needs_pred()
-    d = c.needs_field()
-    #:: ExpectedOutput(call.precondition:insufficient.permission)
-    f = c.needs_fixed_pred()
-
-
 def fixed_write_client(c: Container) -> None:
     Requires(Acc(c.P()))
     Requires(Acc(c.v))

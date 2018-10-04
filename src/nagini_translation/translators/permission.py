@@ -51,13 +51,15 @@ class PermTranslator(CommonTranslator):
 
         if isinstance(node.op, ast.Div):
             left, left_int = self.translate_perm_or_int(node.left, ctx)
-            right, right_int = self.translate_perm_or_int(node.right, ctx)
+            right_stmt, right = self.translate_expr(node.right, ctx,
+                                                    target_type=self.viper.Int)
+            if right_stmt:
+                raise InvalidProgramException(node, 'purity.violated')
 
-            if left_int and right_int:
+            if left_int:
                 return self.viper.FractionalPerm(left, right,
                                                  self.to_position(node, ctx),
                                                  self.no_info(ctx))
-
             return self.viper.PermDiv(left, right,
                                       self.to_position(node, ctx),
                                       self.no_info(ctx))
@@ -134,8 +136,10 @@ class PermTranslator(CommonTranslator):
                 raise UnsupportedException(node, 'ARP not supported. Use --arp flag.')
             return self.viper.FuncApp('globalRd', [], self.to_position(node, ctx),
                                       self.no_info(ctx), self.viper.Perm, {})
-        raise InvalidProgramException(node, 'invalid.name')
-
+        stmt, res = self.translate_expr(node, ctx)
+        if stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        return  res
 
     def translate_perm_Attribute(self, node: ast.Attribute, ctx: Context) -> Expr:
         stmt, expr = self.translate_expr(node, ctx, self.viper.Int)

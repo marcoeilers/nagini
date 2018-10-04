@@ -48,15 +48,12 @@ class RWController:
         Requires(WaitLevel() < Level(self.lock))
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
-        Unfold(self.lock.invariant())
         if self.c.rds != 0:
-            #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 320)
-            Fold(self.lock.invariant())
+            #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false, 320)
             self.lock.release()
             self.do_write(writer)  # try again
         else:
             writer.write(self.c)   # lock acquired successfully
-            Fold(self.lock.invariant())
             self.lock.release()
 
     def do_read(self, reader: Reader) -> None:
@@ -65,14 +62,10 @@ class RWController:
         Requires(WaitLevel() < Level(self.lock))
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
-        Unfold(self.lock.invariant())
         self.c.rds += 1
-        #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 320)
-        Fold(self.lock.invariant())
+        #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false, 320)
         self.lock.release()
         reader.read(self.c)
         self.lock.acquire()
-        Unfold(self.lock.invariant())
         self.c.rds -= 1
-        Fold(self.lock.invariant())
         self.lock.release()

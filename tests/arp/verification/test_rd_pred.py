@@ -16,7 +16,6 @@ class Clazz:
     def m1(self) -> None:
         Requires(self != None)
         Requires(Acc(self.y) and self.pred())
-        #:: UnexpectedOutput(carbon)(postcondition.violated:assertion.false, 230)
         Ensures(Acc(self.y) and self.pred() and Unfolding(self.pred(), self.y == self.x + 1))
         Unfold(self.pred())
         self.y = self.x + 1

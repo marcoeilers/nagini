@@ -56,7 +56,6 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
-    NoTypeException,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView

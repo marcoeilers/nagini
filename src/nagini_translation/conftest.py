@@ -158,10 +158,11 @@ def pytest_configure(config: 'pytest.config.Config'):
     if not _pytest_config.translation_test_dirs and not _pytest_config.single_test:
         # Default: all tests that are available, SIF tests only if the extension is
         # present.
+        tests = ['functional', 'io', 'obligations']
         if jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
-            tests = ['functional', 'sif', 'io', 'obligations']
-        else:
-            tests = ['functional', 'io', 'obligations']
+            tests.append('sif')
+        if jvm.is_known_class(jvm.viper.silver.plugin.ARPPlugin):
+            tests.append('arp')
         for test in tests:
             _pytest_config.add_test(test)
     # Setup verifiers.

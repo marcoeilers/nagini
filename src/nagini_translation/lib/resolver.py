@@ -218,15 +218,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return result
         if isinstance(target, PythonIOOperation):
             return module.global_module.classes[BOOL_TYPE]
-<<<<<<< HEAD
-        # If this is a Sequence(...) call, target will be the Sequence class
-        # but won't have generic type information. So we don't return here
-        # and let the code below take care of the call.
-        if not isinstance(target, PythonType) or target.name != SEQ_TYPE or target.name != PSET_TYPE:
-=======
 
         if isinstance(target, (PythonType, PythonModule)):
->>>>>>> master
             if (isinstance(node, ast.Call) and
                     isinstance(target, PythonClass) and
                     target.type_vars):
@@ -238,18 +231,11 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
-<<<<<<< HEAD
-                elif (target.name in ('PSet', 'Sequence') and
-                          isinstance(node, ast.Call) and node.args):
-                    arg_type = get_type(node.args[0], containers, container)
-                    return GenericType(target, [arg_type])
-=======
                 elif (target.name in (SEQ_TYPE, PSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
                                  for arg in node.args]
                     return GenericType(target, [common_supertype(arg_types)])
->>>>>>> master
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
@@ -384,11 +370,6 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     if func_name == SEQ_TYPE:
         return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
                                             containers, container)
-<<<<<<< HEAD
-    if func_name == 'PSet':
-        return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
-                                            containers, container)
-=======
     if func_name == PSET_TYPE:
         return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
                                             containers, container)
@@ -402,10 +383,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         iterable_type = _get_iteration_type(arg_type, module, node)
         return GenericType(list_type, [GenericType(tuple_type,
                                                    [int_type, iterable_type])])
->>>>>>> master
     if isinstance(node.func, ast.Name):
         if node.func.id in CONTRACT_FUNCS:
-            if node.func.id in ('Result', 'TypedResult'):
+            if node.func.id  == 'Result':
                 return current_function.type
             elif node.func.id == 'RaisedException':
                 ctxs = [cont for cont in containers if
@@ -414,13 +394,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-<<<<<<< HEAD
             elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists',
-                                  'MayCreate', 'MaySet'):
-=======
-            elif node.func.id in ('Acc', 'Implies', 'Forall', 'Exists', 'MayCreate',
-                                  'MaySet', 'Low', 'LowVal', 'LowEvent'):
->>>>>>> master
+                                  'MayCreate', 'MaySet', 'Low', 'LowVal', 'LowEvent'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Declassify':
                 return None
@@ -431,27 +406,12 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
                 seq_class = module.global_module.classes[SEQ_TYPE]
-<<<<<<< HEAD
-                return GenericType(seq_class, [_get_content_type(arg_type, module, node)])
-=======
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(seq_class, [content_type])
->>>>>>> master
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[SEQ_TYPE]
                 return GenericType(list_class, [arg_type])
-<<<<<<< HEAD
-            elif node.func.id == 'getArg':
-                object_class = module.global_module.classes[OBJECT_TYPE]
-                return object_class
-            elif node.func.id == 'getOld':
-                object_class = module.global_module.classes[OBJECT_TYPE]
-                return object_class
-            elif node.func.id == 'getMethod':
-                object_class = module.global_module.classes[OBJECT_TYPE]
-                return object_class
-=======
             elif node.func.id in ('getArg', 'getOld', 'getMethod'):
                 object_class = module.global_module.classes[OBJECT_TYPE]
                 return object_class
@@ -460,7 +420,6 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 if isinstance(body_type, PythonType):
                     return body_type
                 raise InvalidProgramException(node, 'invalid.let')
->>>>>>> master
             else:
                 raise UnsupportedException(node)
         elif node.func.id in BUILTINS:
@@ -549,31 +508,6 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.python_class.get_func_or_method('__getitem__'):
         return value_type.python_class.get_func_or_method('__getitem__').type
-<<<<<<< HEAD
-    else:
-        raise UnsupportedException(node)
-
-
-def _get_content_type(value_type: PythonType, module: PythonModule,
-                      node: ast.AST) -> PythonType:
-    if value_type.name == LIST_TYPE:
-        return value_type.type_args[0]
-    elif value_type.name == SET_TYPE:
-        return value_type.type_args[0]
-    elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
-        # FIXME: This is very unfortunate, but right now we cannot handle this
-        # generically, so we have to hard code these two cases for the moment.
-        return value_type.type_args[0]
-    elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
-        return module.global_module.classes[INT_TYPE]
-    elif value_type.name == SEQ_TYPE:
-        return value_type.type_args[0]
-    elif value_type.name == PSET_TYPE:
-        return value_type.type_args[0]
-    elif value_type.python_class.get_func_or_method('__getitem__'):
-        return value_type.python_class.get_func_or_method('__getitem__').type
-=======
->>>>>>> master
     else:
         raise UnsupportedException(node)
 

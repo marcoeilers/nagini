@@ -41,10 +41,8 @@ class ThingWithCell:
         #:: ExpectedOutput(postcondition.violated:assertion.false)|MissingOutput(postcondition.violated:assertion.false, 320)
         Ensures(False)
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.n += 1
-        #:: UnexpectedOutput(silicon)(fold.failed:assertion.false, 320)
-        Fold(self.l.invariant())
+        #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false, 320)
         self.l.release()
         self.need_value()
         t1 = Thread(None, self.need_value, args=())
@@ -57,9 +55,7 @@ class ThingWithCell:
         Assert(False)  # Carbon does not terminate for the next statement
         self.need_value()
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.n -= 1
-        Fold(self.l.invariant())
         self.l.release()
 
 

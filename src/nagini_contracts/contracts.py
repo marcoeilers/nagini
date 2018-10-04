@@ -203,46 +203,6 @@ def Previous(it: T) -> Sequence[T]:
 
 class PSet(Generic[T], Sized, Iterable[T]):
     """
-    A Sequence[T] represents a pure sequence of instances of subtypes of T, and
-    is translated to native Viper sequences.
-    """
-
-    def __init__(self, *args: T) -> None:
-        """
-        ``PSet(a, b, c)`` creates a Sequence instance containing the objects
-        a, b and c in that order.
-        """
-
-    def __contains__(self, item: object) -> bool:
-        """
-        True iff this set contains the given object (not taking ``__eq__``
-        into account).
-        """
-
-    def __len__(self) -> int:
-        """
-        Returns the length of this set.
-        """
-
-    def __add__(self, other: 'PSet[T]') -> 'PSet[T]':
-        """
-        Concatenates two Sequences of the same type to get a new Sequence.
-        """
-
-    def __sub__(self, other: 'PSet[T]') -> 'PSet[T]':
-        """
-        Concatenates two Sequences of the same type to get a new Sequence.
-        """
-
-    def __iter__(self) -> Iterator[T]:
-        """
-        Sequences can be quantified over; this is only here so that Sequences
-        can be used as arguments for Forall.
-        """
-
-
-class PSet(Generic[T], Sized, Iterable[T]):
-    """
     A PSet[T] represents a pure set of instances of subtypes of T, and is translated to
     native Viper sets.
     """
@@ -286,14 +246,6 @@ def ToSeq(l: Iterable[T]) -> Sequence[T]:
     Converts the given iterable of a built-in type (list, set, dict, range) to
     a pure Sequence.
     """
-
-
-def Previous(it: T) -> Sequence[T]:
-    """
-    Within the body of a loop 'for x in xs', Previous(x) represents the sequence of
-    the values of x in previous loop iterations.
-    """
-    pass
 
 
 # The following annotations have no runtime semantics. They are only used for

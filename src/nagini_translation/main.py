@@ -43,6 +43,7 @@ from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translator import Translator
 from nagini_translation.verifier import (
     Carbon,
+    get_arp_plugin,
     Silicon,
     VerificationResult,
     ViperVerifier
@@ -89,7 +90,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False) -> Program:
+              reload_resources: bool = False, verbose: bool = False) -> Program:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -132,11 +133,27 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
+    if verbose:
+        print('Translation successful.')
+    if sif:
+        configure_mpp_transformation(jvm,
+                                     ctrl_opt=True,
+                                     seq_opt=True,
+                                     act_opt=True,
+                                     func_opt=True)
+        prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+        if verbose:
+            print('Transformation to MPP successful.')
+    if arp:
+        prog = get_arp_plugin(jvm).before_verify(prog)
+        if verbose:
+            print('ARP transformation successful.')
     # Run consistency check in translated AST
     consistency_errors = viper_ast.to_list(prog.checkTransitively())
     for error in consistency_errors:
         print(error.toString())
     if consistency_errors:
+        print(prog)
         raise ConsistencyException('consistency.error')
     return prog
 
@@ -315,18 +332,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         prog = translate(python_file, jvm, selected, args.sif,
-                         ignore_global=args.ignore_global, arp=arp)
-        if args.verbose:
-            print('Translation successful.')
-        if args.sif:
-            configure_mpp_transformation(jvm,
-                                         ctrl_opt=True,
-                                         seq_opt=True,
-                                         act_opt=True,
-                                         func_opt=True)
-            prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
-            if args.verbose:
-                print('Transformation to MPP successful.')
+                         ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
         if args.print_silver:
             if args.verbose:
                 print('Result:')

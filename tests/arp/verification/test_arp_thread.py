@@ -1,5 +1,8 @@
+#:: IgnoreFile(silicon)(320)
+
+
 from nagini_contracts.contracts import *
-from nagini_contracts.thread import Thread, getARP, MayJoin, getMethod, getArg, ThreadPost
+from nagini_contracts.thread import Thread, getARP, Joinable, getMethod, getArg, ThreadPost
 from nagini_contracts.obligations import MustTerminate, WaitLevel, Level
 
 
@@ -16,8 +19,6 @@ class Clazz:
 
     def startAndJoinWrite(self) -> None:
         Requires(Acc(self.x))
-        # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 320)
         Ensures(Acc(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
@@ -28,8 +29,6 @@ class Clazz:
 
     def startAndJoinRead(self) -> None:
         Requires(Rd(self.x))
-        # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(postcondition.violated:insufficient.permission, 320)
         Ensures(Rd(self.x))
         t1 = Thread(None, self.readX, args=())
         t2 = Thread(None, self.readX, args=())
@@ -58,7 +57,7 @@ class Clazz:
     def join1(self, t: Thread) -> None:
         Requires(getMethod(t) == Clazz.readX)
         Requires(getArg(t, 0) is self)
-        Requires(MayJoin(t))
+        Requires(Joinable(t))
         Requires(Acc(ThreadPost(t), 1))
         Requires(Acc(self.x, 1 - getARP(t)))
         Requires(WaitLevel() < Level(t))
@@ -71,8 +70,8 @@ class Clazz:
         Requires(getMethod(t2) == Clazz.readX)
         Requires(getArg(t1, 0) is self)
         Requires(getArg(t2, 0) is self)
-        Requires(MayJoin(t1))
-        Requires(MayJoin(t2))
+        Requires(Joinable(t1))
+        Requires(Joinable(t2))
         Requires(Acc(ThreadPost(t1)))
         Requires(Acc(ThreadPost(t2)))
         Requires(WaitLevel() < Level(t1))

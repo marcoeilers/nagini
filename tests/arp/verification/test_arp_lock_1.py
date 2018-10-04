@@ -33,18 +33,7 @@ class ThingWithCell:
         #:: ExpectedOutput(postcondition.violated:assertion.false)
         Ensures(False)
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
-        self.l.release()
-
-    def do_a_thing_2(self) -> None:
-        Requires(Rd(self.l) and Rd(self.c) and self.l.get_locked() is self.c)
-        Requires(WaitLevel() < Level(self.l))
-        self.l.acquire()
-        Unfold(self.l.invariant())
-        self.c.value += 2
-        #:: ExpectedOutput(call.precondition:insufficient.permission)
         self.l.release()
 
     def do_a_thing_3(self) -> None:
@@ -52,10 +41,8 @@ class ThingWithCell:
         Requires(WaitLevel() < Level(self.l))
         Ensures(Rd(self.l) and Rd(self.c))
         self.l.acquire()
-        Unfold(self.l.invariant())
-        #:: ExpectedOutput(assignment.failed:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+        #:: ExpectedOutput(assignment.failed:insufficient.permission)
         self.c.value += 2
-        Fold(self.l.invariant())
         self.l.release()
 
     def do_a_thing_4(self) -> None:
@@ -63,9 +50,7 @@ class ThingWithCell:
         Ensures(Rd(self.l) and Rd(self.c))
         #:: ExpectedOutput(call.precondition:assertion.false)
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
         self.l.release()
 
     #:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
@@ -74,18 +59,14 @@ class ThingWithCell:
         Requires(WaitLevel() < Level(self.l))
         Ensures(Rd(self.l) and Rd(self.c))
         self.l.acquire()
-        Unfold(self.l.invariant())
         self.c.value += 2
-        Fold(self.l.invariant())
 
     def do_a_thing_6(self) -> None:
         Requires(Rd(self.l) and Rd(self.c) and self.l.get_locked() is self.c)
         Requires(WaitLevel() < Level(self.l))
         Ensures(Rd(self.l) and Rd(self.c))
-        #:: ExpectedOutput(unfold.failed:insufficient.permission)
-        Unfold(self.l.invariant())
+        #:: ExpectedOutput(assignment.failed:insufficient.permission)
         self.c.value += 2
-        Fold(self.l.invariant())
         self.l.release()
 
 

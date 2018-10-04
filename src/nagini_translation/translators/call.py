@@ -743,6 +743,7 @@ class CallTranslator(CommonTranslator):
         if implicit_receiver is None:
             implicit_receiver = self._has_implicit_receiver_arg(node, ctx)
 
+        if target.interface:
             # For interface functions defined directly in silver, missing arguments
             # are just set to null.
             if keywords:
