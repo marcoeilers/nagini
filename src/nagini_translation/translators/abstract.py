@@ -101,6 +101,9 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_perm(self, node: ast.AST, ctx: Context) -> Expr:
         return self.config.perm_translator.translate_perm(node, ctx)
 
+    def get_arp_for_context(self, node: ast.AST, ctx: Context) -> Expr:
+        return self.config.perm_translator.get_arp_for_context(node, ctx)
+
     def translate_exprs(self, nodes: List[ast.AST],
                         function: PythonMethod, ctx: Context) -> Expr:
         return self.config.pure_translator.translate_exprs(nodes, function, ctx)
@@ -112,8 +115,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                        ctx: Context) -> 'silver.ast.Type':
         return self.config.type_translator.translate_type(cls, ctx)
 
-    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
-        return self.config.call_translator.translate_Call(node, ctx, impure)
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False,
+                       statement=False) -> StmtsAndExpr:
+        return self.config.call_translator.translate_Call(node, ctx, impure, statement)
 
     def translate_constructor_call(self, target_class: PythonClass,
                                    node: ast.Call, args: List, arg_stmts: List,
@@ -196,9 +200,10 @@ class AbstractTranslator(metaclass=ABCMeta):
                                                          ctx)
 
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
-                                    impure=False) -> StmtsAndExpr:
+                                    impure=False, statement=False) -> StmtsAndExpr:
         return self.config.contract_translator.translate_contractfunc_call(node, ctx,
-                                                                           impure)
+                                                                           impure,
+                                                                           statement)
 
     def translate_normal_call(self, target: PythonMethod, arg_stmts: List[Stmt],
                               args: List[Expr], arg_types: List[PythonType],

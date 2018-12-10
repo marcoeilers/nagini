@@ -11,13 +11,18 @@ from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
+    DICT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    LIST_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    RANGE_TYPE,
+    SEQ_TYPE,
+    SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
 )
@@ -542,48 +547,77 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return call, val
         return [], None
 
-
-    def get_quantifier_lhs(self, receiver, arg, node, ctx, position):
+    def get_quantifier_lhs(self, in_expr: Expr, dom_type: PythonType, dom_arg: Expr,
+                           node: ast.AST, ctx: Context, position: Position,
+                           force_trigger=False) -> Expr:
+        """
+        Returns a contains-expression representing whether in_expr is in dom_arg.
+        To be used on the left hand side of quantifiers (and in the corresponding
+        triggers):
+        Forall(iter, lambda x: e)
+        becomes
+        forall x: <quantifier_lhs> ==> e
+        Defaults to in_expr in type___sil_seq__, but used simpler expressions for known
+        types to improve performance/triggering.
+        """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
-            if receiver.name == 'dict':
-                set_ref = self.viper.SetType(self.viper.Ref)
-                field = self.viper.Field('dict_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(arg, field, position, info)
-                return res
-            if receiver.name == 'set':
-                set_ref = self.viper.SetType(self.viper.Ref)
-                field = self.viper.Field('set_acc', set_ref, position, info)
-                res = self.viper.FieldAccess(arg, field, position, info)
-                return res
-        return self.get_sequence(receiver, arg, None, node, ctx, position)
+        res = None
+        if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
+            if dom_type.name in (DICT_TYPE, SET_TYPE):
+                contains_constructor = self.viper.AnySetContains
+                if dom_type.name == DICT_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('dict_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+                if dom_type.name == SET_TYPE:
+                    set_ref = self.viper.SetType(self.viper.Ref)
+                    field = self.viper.Field('set_acc', set_ref, position, info)
+                    res = self.viper.FieldAccess(dom_arg, field, position, info)
+            if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
+                        node.func.id == 'range'):
+                left = node.args[0]
+                right = node.args[1]
+                _, left_expr = self.translate_expr(left, ctx)
+                _, right_expr = self.translate_expr(right, ctx)
+                int_class = ctx.module.global_module.classes[INT_TYPE]
+                left_bound = self.get_function_call(int_class, '__ge__',
+                                                    [in_expr, left], [None, None],
+                                                    node, ctx, position)
+                right_bound = self.get_function_call(int_class, '__lt__',
+                                                    [in_expr, right], [None, None],
+                                                    node, ctx, position)
+                if force_trigger:
+                    return None
+                else:
+                    return self.viper.And(left_bound, right_bound, position, info)
+        if res is None:
+            contains_constructor = self.viper.SeqContains
+            res = self.get_sequence(dom_type, dom_arg, None, node, ctx, position)
+        return contains_constructor(in_expr, res, position, info)
 
     def get_sequence(self, receiver: PythonType, arg: Expr, arg_type: PythonType,
                      node: ast.AST, ctx: Context,
                      position: Position = None) -> Expr:
+        """
+        Returns a sequence (Viper type Seq[Ref]) representing the contents of arg.
+        Defaults to type___sil_seq__, but used simpler expressions for known types
+        to improve performance/triggering.
+        """
         position = position if position else self.to_position(node, ctx)
         info = self.no_info(ctx)
-        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
-            if receiver.name == 'list':
+        if not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType):
+            if receiver.name == LIST_TYPE:
                 seq_ref = self.viper.SeqType(self.viper.Ref)
                 field = self.viper.Field('list_acc', seq_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
+            if receiver.name == SEQ_TYPE:
+                if (isinstance(arg, self.viper.ast.FuncApp) and
+                            arg.funcname() == 'Sequence___create__'):
+                    args = self.viper.to_list(arg.args())
+                    return args[0]
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],
-                                      node, ctx, position)
-
-    def get_contains(self, receiver: PythonType, args: List[Expr], arg_types: List[PythonType],
-                     node: ast.AST, ctx: Context,
-                     position: Position = None) -> Expr:
-        position = position if position else self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        if (not isinstance(receiver, UnionType) or isinstance(receiver, OptionalType)):
-            if receiver.name in ('list', 'Sequence'):
-                seq = self.get_sequence(receiver, args[0], arg_types[0], node, ctx, position)
-                res = self.viper.SeqContains(args[1], seq, position, info)
-                return res
-        return self.get_function_call(receiver, '__contains__', args, arg_types,
                                       node, ctx, position)
 
     def _get_function_call(self, receiver: PythonType,
@@ -598,20 +632,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         of non-union types.
         """
         if receiver:
-            if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
-                info = self.no_info(ctx)
-                guarded_blocks = []
-                # For each class in union
-                for type in toposort_classes(receiver.get_types() - {None}):
-                    # If receiver is an instance of this particular class
-                    guard = self.type_check(args[0], type, position, ctx)
-                    call = self.get_function_call(type, func_name, args, arg_types, node,
-                                                  ctx, position)
-                    guarded_blocks.append((guard, call))
-                current = guarded_blocks[-1][1]
-                for guard, call in reversed(guarded_blocks[:-1]):
-                    current = self.viper.CondExp(guard, call, current, position, info)
-                return current
             target_cls = receiver
             func = target_cls.get_function(func_name)
         else:
@@ -737,8 +757,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 guard = self.type_check(args[0], cls, position, ctx)
 
                 # Translate the method call on this particular receiver's class
-                method = self._get_method_call(cls, func_name, args, arg_types,
-                                               targets, node, ctx)
+                method = self._get_method_call(cls, func_name, list(args), arg_types,
+                                               list(targets), node, ctx)
 
                 # Translated method call into a block
                 block = self.translate_block(method, position, info)

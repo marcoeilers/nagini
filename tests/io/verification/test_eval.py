@@ -203,6 +203,6 @@ def no_func_perm(t1: Place, a: A, b: A) -> Tuple[Place, int]:
             ),
         )
     )
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
     r, t = Eval(t1, getv, a)
     return t, r

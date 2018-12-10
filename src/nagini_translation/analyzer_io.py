@@ -98,7 +98,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         for default in node.args.defaults:
             if (not isinstance(default, ast.Call) or
                     not isinstance(default.func, ast.Name) or   # type: ignore
-                    not default.func.id == 'Result'):           # type: ignore
+                    not default.func.id == 'Result'):  # type: ignore
                 self._raise_invalid_operation('default_argument')
 
     def _typeof(self, node: ast.AST,

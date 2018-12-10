@@ -115,7 +115,6 @@ class MethodObligationTranslator(CommonObligationTranslator):
         constructor = ObligationMethodForkConstructor(targets, thread, position, info,
                                                       self, ctx, self._obligation_manager,
                                                       target_node)
-
         constructor.construct_fork()
         return constructor.get_statements()
 

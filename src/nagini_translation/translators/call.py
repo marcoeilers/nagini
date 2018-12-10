@@ -6,8 +6,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 import copy
-
 from collections import OrderedDict
+from typing import Dict, List, Tuple, Union
+
 from nagini_contracts.contracts import (
     CONTRACT_FUNCS,
     CONTRACT_WRAPPER_FUNCS
@@ -75,10 +76,10 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import Dict, List, Tuple, Union, Set
 
 
 class CallTranslator(CommonTranslator):
+
 
     def _translate_isinstance(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
@@ -148,19 +149,12 @@ class CallTranslator(CommonTranslator):
         return stmt + bool_stmt, bool_val
 
     def _translate_super(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        if len(node.args) == 2:
-            if self.is_valid_super_call(node, ctx):
-                return self.translate_expr(node.args[1], ctx)
-            else:
-                raise InvalidProgramException(node, 'invalid.super.call')
-        elif not node.args:
-            arg_name = next(iter(ctx.actual_function.args))
-            if arg_name in ctx.var_aliases:
-                replacement = ctx.var_aliases[arg_name]
-                return replacement.ref(node, ctx)
-            return [], ctx.current_function.args[arg_name].ref(node, ctx)
-        else:
-            raise InvalidProgramException(node, 'invalid.super.call')
+        """
+        This will only be called if super() is called in some place that is not the
+        receiver of a method call. Who knows what happens when you interact with that;
+        we do not support it.
+        """
+        raise InvalidProgramException(node, 'invalid.super.call')
 
     def translate_adt_cons(self, cons: PythonClass, args: List[FuncApp],
                            pos: Position, ctx: Context) -> Expr:
@@ -256,12 +250,13 @@ class CallTranslator(CommonTranslator):
         defined_check = []
         if target_class.module is not target_class.module.global_module:
             # Mark the current function as depending on the called class. If we're in
-            # a global context, assert that the called class and its dependencies are defined.
+            # a global context, assert that the called class and its dependencies are
+            # defined.
             func_node = node.func if isinstance(node, ast.Call) else node
             self._add_dependencies(func_node, target_class, ctx)
             if self.is_main_method(ctx):
-                defined_check = self.assert_global_defined(target_class, ctx.module, node.func,
-                                                           ctx)
+                defined_check = self.assert_global_defined(target_class, ctx.module,
+                                                           node.func, ctx)
 
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
@@ -273,17 +268,19 @@ class CallTranslator(CommonTranslator):
         if self._is_lock_subtype(target_class):
             # For locks, fold the invariant predicate before actually calling the
             # constructor (which requires the predicate in its precondition).
+            lock_pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
             lock_class = self._is_lock_subtype(target_class)
             locked_obj = self.get_function_call(lock_class, 'get_locked', [res_var.ref()],
-                                                [None], node, ctx, pos)
-            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], pos, info)
-            stmts.append(self.viper.Inhale(arg_is_locked, pos, info))
+                                                [None], node, ctx, lock_pos)
+            arg_is_locked = self.viper.EqCmp(locked_obj, args[1], lock_pos, info)
+            stmts.append(self.viper.Inhale(arg_is_locked, lock_pos, info))
             invariant_pred = lock_class.get_predicate('invariant')
-            full_perm = self.viper.FullPerm(pos, info)
+            full_perm = self.viper.FullPerm(lock_pos, info)
             pred_acc = self.viper.PredicateAccess([res_var.ref()],
-                                                  invariant_pred.sil_name, pos, info)
-            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm, pos, info)
-            stmts.append(self.viper.Fold(acc_pred, pos, info))
+                                                  invariant_pred.sil_name, lock_pos, info)
+            acc_pred = self.viper.PredicateAccessPredicate(pred_acc, full_perm,
+                                                           lock_pos, info)
+            stmts.append(self.viper.Fold(acc_pred, lock_pos, info))
 
         target = target_class.get_method('__init__')
         if target:
@@ -332,7 +329,8 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_seq = self.viper.SeqType(self.viper.Ref)
             ref_seq = SilverType(sil_ref_seq, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq, self.translator)
+            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq,
+                                                            self.translator)
             seq_field = self.viper.Field('list_acc', sil_ref_seq, position, info)
             content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
@@ -373,23 +371,28 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_set = self.viper.SetType(self.viper.Ref)
             ref_set = SilverType(sil_ref_set, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set, self.translator)
+            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set,
+                                                            self.translator)
             set_field = self.viper.Field('set_acc', sil_ref_set, position, info)
             content_field = self.viper.FieldAccess(result_var, set_field, position, info)
             stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
             quant_var_name = ctx.actual_function.get_fresh_name('item')
-            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position, info)
-            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref, position,
-                                                     info)
-            arg_contains = self.get_contains(arg_type, [contents, quant_var], [None, None],
-                                             node, ctx)
-            res_contains = self.get_contains(set_type, [result_var, quant_var], [None, None],
-                                             node, ctx)
+            quant_var = self.viper.LocalVar(quant_var_name, self.viper.Ref, position,
+                                            info)
+            quant_var_decl = self.viper.LocalVarDecl(quant_var_name, self.viper.Ref,
+                                                     position, info)
+            arg_contains = self.get_function_call(arg_type, '__contains__',
+                                                  [contents, quant_var], [None, None],
+                                                  node, ctx)
+            res_contains = self.get_function_call(set_type, '__contains__',
+                                                  [result_var, quant_var], [None, None],
+                                                  node, ctx)
             contain_equal = self.viper.EqCmp(arg_contains, res_contains, position, info)
             trigger = self.viper.Trigger([res_contains], position, info)
-            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal, position, info)
+            quantifier = self.viper.Forall([quant_var_decl], [trigger], contain_equal,
+                                           position, info)
             stmts.append(self.viper.Inhale(quantifier, position, info))
         return stmts, result_var
 
@@ -409,10 +412,15 @@ class CallTranslator(CommonTranslator):
         return start_stmt + end_stmt, call
 
     def _translate_enumerate(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translate a call to enumerate(iterable) to a creation of a new list-object,
+        an inhale about its type, and an inhale defining the contents of the new
+        list.
+        """
         if len(node.args) != 1:
             msg = 'enumerate() is currently only supported with one args.'
             raise UnsupportedException(node, msg)
-        pos = self.to_position(node, ctx)
+        pos = self.to_position(node, ctx, rules=rules.INHALE_TO_CALL)
         info = self.no_info(ctx)
         result_type = self.get_type(node, ctx)
         arg_type = self.get_type(node.args[0], ctx)
@@ -438,18 +446,22 @@ class CallTranslator(CommonTranslator):
         orig_seq_i = self.viper.SeqIndex(arg_contents, i_var.ref(), pos, info)
         content_type = result_type.type_args[0].type_args[1]
         content_has_type = self.type_check(orig_seq_i, content_type, pos, ctx, False)
-        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i], [int_type, content_type], node, ctx)
+        tuple_for_i = self.create_tuple([i_var.ref(), orig_seq_i],
+                                        [int_type, content_type], node, ctx)
         new_list_i = self.viper.SeqIndex(seq_ref, i_var.ref(), pos, info)
         equal_content = self.viper.EqCmp(new_list_i, tuple_for_i, pos, info)
-        i_positive = self.viper.GeCmp(i_var.ref(), self.viper.IntLit(0, pos, info), pos, info)
-        i_lt_len = self.viper.LtCmp(i_var.ref(), self.viper.SeqLength(seq_ref, pos, info), pos, info)
+        i_positive = self.viper.GeCmp(i_var.ref(), self.viper.IntLit(0, pos, info), pos,
+                                      info)
+        i_lt_len = self.viper.LtCmp(i_var.ref(), self.viper.SeqLength(seq_ref, pos, info),
+                                    pos, info)
         i_in_bounds = self.viper.And(i_positive, i_lt_len, pos, info)
         content_info = self.viper.And(content_has_type, equal_content, pos, info)
         body = self.viper.Implies(i_in_bounds, content_info, pos, info)
         trigger = self.viper.Trigger([new_list_i], pos, info)
         contents_info = self.viper.Forall([i_var.decl], [trigger], body, pos, info)
         contents_inhale = self.viper.Inhale(contents_info, pos, info)
-        return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node, ctx)
+        return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node,
+                                                                                 ctx)
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
@@ -489,6 +501,45 @@ class CallTranslator(CommonTranslator):
                                position: 'silver.ast.Position', node: ast.AST,
                                ctx: Context) -> StmtsAndExpr:
         """
+        Translates a call to an impure method, and performs any additional steps around
+        it that might be necessary (e.g., folding/unfolding invariant predicates if the
+        call is a lock release/acquire).
+        """
+        stmts = arg_stmts
+        if target.name in ('acquire', 'release'):
+            if (target.cls and target.cls.name == 'Lock' and
+                        target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                # Store receiver for later use (contents of args list get changed by
+                # subsequent call).
+                receiver = args[0]
+        call_stmt, res = self._only_translate_method_call(target, args, position, node,
+                                                          ctx)
+        if target.name in ('acquire', 'release'):
+            if (target.cls and target.cls.name == 'Lock' and
+                        target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                # Automatically fold/unfold the invariant predicate.
+                target_name = target.cls.get_predicate('invariant').sil_name
+                pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
+                info = self.no_info(ctx)
+                pa = self.viper.PredicateAccess([receiver], target_name, pos, info)
+                full_perm = self.viper.FullPerm(pos, info)
+                pap = self.viper.PredicateAccessPredicate(pa, full_perm, pos, info)
+                if target.name == 'acquire':
+                    stmts.extend(call_stmt)
+                    unfold = self.viper.Unfold(pap, pos, info)
+                    stmts.append(unfold)
+                else:
+                    fold = self.viper.Fold(pap, pos, info)
+                    stmts.append(fold)
+                    stmts.extend(call_stmt)
+        else:
+            stmts.extend(call_stmt)
+        return stmts, res
+
+    def _only_translate_method_call(self, target: PythonMethod, args: List[Expr],
+                                    position: 'silver.ast.Position', node: ast.AST,
+                                    ctx: Context) -> StmtsAndExpr:
+        """
         Translates a call to an impure method.
         """
         targets = []
@@ -507,14 +558,15 @@ class CallTranslator(CommonTranslator):
             # defined.
             self._add_dependencies(node.func, target, ctx)
             if self.is_main_method(ctx) and not target.cls:
-                defined_check = self.assert_global_defined(target, ctx.module, node.func, ctx)
+                defined_check = self.assert_global_defined(target, ctx.module, node.func,
+                                                           ctx)
         call = self.create_method_call_node(
             ctx, target.sil_name, args, targets, position, self.no_info(ctx),
             target_method=target, target_node=node)
         if target.declared_exceptions:
             call = call + self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
-        return (arg_stmts + defined_check + call,
+        return (defined_check + call,
                 result_var.ref() if result_var else None)
 
     def _add_dependencies(self, reference: ast.AST, target: PythonMethod,
@@ -912,7 +964,8 @@ class CallTranslator(CommonTranslator):
                                                    optional_error_var, ctx)
         ctx.ignore_family_folds = old_fold
         stmts += inline_stmts
-        stmts.append(end_lbl)
+        if end_lbl:
+            stmts.append(end_lbl)
         if method.declared_exceptions:
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
@@ -946,7 +999,7 @@ class CallTranslator(CommonTranslator):
             stmts, expr = self.translate_normal_call(
                 type.get_func_or_method(node.func.attr), arg_stmts, args,
                 arg_types, node, ctx, impure)
-            
+
             # Stores guard and translated method call as tuple
             guard_stmts_expr.append((guard, stmts, expr))
 
@@ -1102,9 +1155,6 @@ class CallTranslator(CommonTranslator):
                        family_root.superclass.get_predicate(name)):
                     family_root = family_root.superclass
                 target_name = family_root.get_predicate(name).sil_name
-            #if ctx.current_function.pure:
-            #    perm = self.viper.WildcardPerm(position, self.no_info(ctx))
-            #else:
             perm = self.viper.FullPerm(position, self.no_info(ctx))
             if not impure:
                 raise InvalidProgramException(node, 'invalid.contract.position')
@@ -1130,20 +1180,24 @@ class CallTranslator(CommonTranslator):
                 return True
         return False
 
-    def translate_Call(self, node: ast.Call, ctx: Context, impure=False) -> StmtsAndExpr:
+    def translate_Call(self, node: ast.Call, ctx: Context, impure=False,
+                       statement=False) -> StmtsAndExpr:
         """
         Translates any kind of call. This can be a call to a contract function
         like Assert, a builtin Python function like isinstance, a
         constructor call, a 'call' to a predicate, a pure function or impure
         method call, on a receiver object or not.
+        Top-level contract statements like Assert are only allowed if the
+        'statement' flag is set.
         """
+
         is_name = isinstance(node.func, ast.Name)
         func_name = get_func_name(node)
         if is_name:
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             elif func_name in CONTRACT_FUNCS:
-                return self.translate_contractfunc_call(node, ctx, impure)
+                return self.translate_contractfunc_call(node, ctx, impure, statement)
             elif func_name in IO_CONTRACT_FUNCS:
                 return self.translate_io_contractfunc_call(node, ctx)
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
@@ -1303,6 +1357,7 @@ class CallTranslator(CommonTranslator):
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, True
 
         # Resolve list of possible target methods.
         method_options = []
@@ -1345,6 +1400,7 @@ class CallTranslator(CommonTranslator):
         # Actual fork operation is carried out elsewhere.
         stmts.extend(self.create_method_fork(ctx, method_options, thread, precond_pos,
                                              info, node))
+        ctx.current_thread_object, ctx.is_thread_start = None, False
         return thread_stmt + stmts, None
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
@@ -1353,6 +1409,7 @@ class CallTranslator(CommonTranslator):
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
+        ctx.current_thread_object, ctx.is_thread_start = thread, False
         stmts = thread_stmt
 
         # Assert that thread may be joined.
@@ -1407,6 +1464,7 @@ class CallTranslator(CommonTranslator):
                                                         info)
         exhale_pred = self.viper.Exhale(post_pred, pos, info)
         stmts.append(exhale_pred)
+        ctx.current_thread_object, ctx.is_thread_start = None, False
 
         return stmts, None
 
@@ -1468,7 +1526,8 @@ class CallTranslator(CommonTranslator):
 
         # Translate postcondition
         for post, _ in method.postcondition:
-            _, post_val = self.translate_expr(post, ctx, impure=True)
+            _, post_val = self.translate_expr(post, ctx, target_type=self.viper.Bool,
+                                              impure=True)
             post_assertion = self.viper.And(post_assertion, post_val, pos, info)
 
         ctx.inlined_calls.pop()

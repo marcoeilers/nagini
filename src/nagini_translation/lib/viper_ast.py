@@ -70,6 +70,12 @@ class ViperAST:
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
 
+    def is_available(self) -> bool:
+        """
+        Checks if the Viper AST is available, i.e., silver is on the Java classpath.
+        """
+        return self.jvm.is_known_class(self.ast.Program)
+
     def function_domain_type(self):
         return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
 
@@ -143,10 +149,11 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
-                               self.to_seq(pres), self.to_seq(posts),
-                               body_with_locals, position, info,
-                               self.NoTrafos)
+        method = getobject(self.ast, "MethodWithLabelsInScope")
+        return method.apply(name, self.to_seq(args), self.to_seq(returns),
+                            self.to_seq(pres), self.to_seq(posts),
+                            body_with_locals, position, info,
+                            self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -317,6 +324,9 @@ class ViperAST:
     def IntPermMul(self, left, right, position, info):
         return self.ast.IntPermMul(left, right, position, info, self.NoTrafos)
 
+    def PermDiv(self, left, right, position, info):
+        return self.ast.PermDiv(left, right, position, info, self.NoTrafos)
+
     def PermLtCmp(self, left, right, position, info):
         return self.ast.PermLtCmp(left, right, position, info, self.NoTrafos)
 
@@ -461,7 +471,7 @@ class ViperAST:
         if res.isPure():
             return res
         else:
-            desugared = self.to_list(self.QPs.desugareSourceSyntax(res))
+            desugared = self.to_list(self.QPs.desugarSourceQuantifiedPermissionSyntax(res))
             result = self.TrueLit(position, info)
             for qp in desugared:
                 result = self.And(result, qp, position, info)
@@ -496,6 +506,9 @@ class ViperAST:
 
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
+
+    def ConsInfo(self, head, tail):
+        return self.ast.ConsInfo(head, tail)
 
     def to_position(self, expr, vias, error_string: str=None,
                     rules: Rules=None, file: str = None):

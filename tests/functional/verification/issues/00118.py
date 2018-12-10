@@ -23,4 +23,4 @@ def test_union_optional(a: int) -> int:
     c = Super()  # type: Optional[Super]
     if a == 44:
         c = None
-    return 99 if c else 88
+    return 99 if c is not None else 88

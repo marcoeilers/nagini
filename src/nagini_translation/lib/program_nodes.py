@@ -213,7 +213,9 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
                 return module.methods[name]
 
     def get_type(self, prefixes: List[str], name: str,
-                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str, Dict[Tuple[int, int], str]]:
+                 previous: Tuple['PythonModule', ...] = ()) -> Tuple[str,
+                                                                     Dict[Tuple[int, int],
+                                                                          str]]:
         """
         Returns the main type and the alternative types of the element
         identified by this name found under this prefix in the current module
@@ -247,7 +249,7 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         if local_result is not None:
             return local_result
         for module in self.from_imports:
-            module_result = module.get_func_type(prefix)
+            module_result = module.get_func_type(path)
             if module_result is not None:
                 return module_result
         return None
@@ -493,7 +495,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             assert self.types_match(field.type.try_box(), type.try_box())
         elif name in self.static_fields:
             field = self.static_fields[name]
-            assert self.types_match(field.type, type)
         else:
             field = self.node_factory.create_python_field(name, node,
                                                           type, self)
@@ -995,6 +996,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
         self.predicate = False
+        self.all_low = False
+        self.preserves_low = False
         self.contract_only = contract_only
         self.interface = interface
         self.interface_name = None  # Name to be used in error messages, if different from
@@ -1018,7 +1021,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         Adds all dependencies needed when this method is called to the given set.
         """
         add_all_call_deps(self.call_deps, res, prefix)
-
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """
@@ -1176,6 +1178,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         dicts = [self.args,  self.special_args, self.locals, self.special_vars]
         return CombinedDict([], dicts)
+
+
 
 
 class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):

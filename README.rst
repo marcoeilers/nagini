@@ -8,7 +8,7 @@ For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com
 Getting Started (Ubuntu Linux only)
 ===================================
 
-0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.5 (64 bit, newer versions should work but are currently untested) and the required libraries::
+0.  Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
 
         sudo apt-get install python3-dev libzmq3-dev
 
@@ -21,10 +21,10 @@ Getting Started (Ubuntu Linux only)
 2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_ to the nagini directory
 3.  Set paths to Viper (adjust paths if necessary)::
 
-        SILICONJAR=backends\silicon.jar
-        CARBONJAR=backends\carbon.jar
-        Z3_EXE=z3\bin\z3
-        BOOGIE_EXE=boogie\Binaries\Boogie.exe
+        export SILICONJAR=backends/silicon.jar
+        export CARBONJAR=backends/carbon.jar
+        export Z3_EXE=z3/bin/z3
+        export BOOGIE_EXE=boogie/Binaries/Boogie.exe
 
 4.  Install dependencies and run tests::
 

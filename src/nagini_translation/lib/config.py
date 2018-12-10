@@ -43,11 +43,6 @@ class ObligationConfig(SectionConfig):
         super().__init__(config, 'Obligations')
 
     @property
-    def disable_vars(self):
-        """Disable all obligation related parameters and arguments."""
-        return self._info.getboolean('disable_vars', False)
-
-    @property
     def disable_all(self):
         """Disable all obligation related checks."""
         return self._info.getboolean('disable_all', False)
@@ -120,17 +115,18 @@ class TestConfig(SectionConfig):
         if not ignore_tests_value:
             self.ignore_tests = set([])
         else:
-            self.ignore_tests = set(ignore_tests_value.strip().splitlines())
+            patterns = ignore_tests_value.strip().splitlines()
+            self.ignore_tests = set([i for pattern in patterns for i in glob.glob(pattern)])
 
         verifiers_value = self._info.get('verifiers')
         if not verifiers_value:
-            self.verifiers = ['silicon', 'carbon']
+            self.verifiers = []
         else:
             self.verifiers = verifiers_value.strip().split()
 
         tests_value = self._info.get('tests')
         if not tests_value:
-            self.tests = ['functional', 'sif', 'io', 'obligations']
+            self.tests = []
         else:
             self.tests = tests_value.strip().split()
 
@@ -156,13 +152,16 @@ def _construct_classpath(verifier : str = None):
     viper_java_path = os.environ.get('VIPERJAVAPATH')
     silicon_jar = os.environ.get('SILICONJAR')
     carbon_jar = os.environ.get('CARBONJAR')
+    arpplugin_jar = os.environ.get('ARPPLUGINJAR')
 
     if viper_java_path:
         return viper_java_path
 
     if silicon_jar or carbon_jar:
         return os.pathsep.join(
-            jar for jar, v in ((silicon_jar, 'carbon'), (carbon_jar, 'silicon'))
+            jar for jar, v in ((silicon_jar, 'carbon'),
+                               (carbon_jar, 'silicon'),
+                               (arpplugin_jar, 'arpplugin'))
             if jar and v != verifier)
 
     if sys.platform.startswith('linux'):
@@ -171,7 +170,7 @@ def _construct_classpath(verifier : str = None):
             return os.pathsep.join(
                 glob.glob('/usr/lib/viper/*.jar'))
 
-    return None
+    return ''
 
 
 def _get_boogie_path():

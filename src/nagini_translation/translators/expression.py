@@ -199,7 +199,8 @@ class ExpressionTranslator(CommonTranslator):
                                             [None], node, ctx)
         iter_stmt, iter = self.translate_expr(node.generators[0].iter, ctx)
         iter_type = self.get_type(node.generators[0].iter, ctx)
-        sil_seq = self.get_sequence(iter_type, iter, None, node, ctx, position)
+        sil_seq = self.get_sequence(iter_type.python_class, iter, None, node, ctx,
+                                    position)
         seq_len = self.viper.SeqLength(sil_seq, position, info)
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
                                      info)
@@ -563,26 +564,6 @@ class ExpressionTranslator(CommonTranslator):
                 return result
         return None
 
-    def translate_to_bool(self, node: ast.AST, ctx: Context,
-                          expression: bool = False) -> StmtsAndExpr:
-        """
-        Translates node as a normal expression, then applies Python's auto-
-        conversion to a boolean value (using the __bool__ function)
-        """
-        stmt, res = self.translate_expr(node, ctx, expression)
-        type = self.get_type(node, ctx)
-        bool_class = ctx.module.global_module.classes[BOOL_TYPE]
-        if type is not bool_class:
-            args = [res]
-            arg_type = self.get_type(node, ctx)
-            arg_types = [arg_type]
-            res = self.get_function_call(arg_type, '__bool__', args, arg_types,
-                                         node, ctx)
-        if res.typ() != self.viper.Bool:
-            res = self.get_function_call(bool_class, '__unbox__', [res], [None],
-                                         node, ctx)
-        return stmt, res
-
     def translate_Expr(self, node: ast.Expr, ctx: Context) -> StmtsAndExpr:
         return self.translate_expr(node.value, ctx)
 
@@ -781,7 +762,8 @@ class ExpressionTranslator(CommonTranslator):
                 return self.translate_global_var_reference(target, node, ctx)
             else:
                 raise UnsupportedException(node)
-        elif isinstance(target, PythonClass) and func_name != 'Result':
+        elif (isinstance(target, PythonClass) and
+                      func_name != 'Result'):
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
                                                             node, ctx)
@@ -900,7 +882,10 @@ class ExpressionTranslator(CommonTranslator):
         translated as a native silver binary operation. True iff both types
         are identical and primitives.
         """
-        if op not in self._primitive_operations:
+        # This is disabled for the moment because using the functions is advantageous
+        # when using operations as triggers
+        return False
+        if type(op) not in self._primitive_operations:
             return False
         left_type_boxed = left_type.python_class.try_box()
         right_type_boxed = right_type.python_class.try_box()
@@ -1105,12 +1090,12 @@ class ExpressionTranslator(CommonTranslator):
             ctx: Context) -> StmtsAndExpr:
         args = [right, left]
         arg_types = [right_type, left_type]
-        if right_type.get_function('__contains__'):
-            app_stmt = []
-            app = self.get_contains(right_type, args, arg_types, node, ctx)
-        else:
-            app_stmt, app = self.get_func_or_method_call(
-                right_type, '__contains__', args, arg_types, node, ctx)
+        # if right_type.get_function('__contains__'):
+        #     app_stmt = []
+        #     app = self.get_contains(right_type, args, arg_types, node, ctx)
+        # else:
+        app_stmt, app = self.get_func_or_method_call(
+            right_type, '__contains__', args, arg_types, node, ctx)
         if isinstance(node.ops[0], ast.NotIn):
             app = self.viper.Not(
                 app, self.to_position(node, ctx), self.no_info(ctx))

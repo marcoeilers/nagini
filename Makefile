@@ -69,7 +69,7 @@ CMD=env
 .PHONY: docs
 
 test: env/bin/py.test
-	env/bin/pytest --all-tests --all-verifiers -v src/nagini_translation/tests.py
+	env/bin/pytest -v src/nagini_translation/tests.py
 
 freeze: env
 	env/bin/pip freeze > requirements.txt

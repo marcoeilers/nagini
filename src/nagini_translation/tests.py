@@ -35,16 +35,16 @@ Supported annotation types are:
 
 import abc
 import os
+import pytest
 import re
 import tokenize
+from collections import Counter
+from typing import Any, Dict, List, Optional
 
-import pytest
 
 # These imports monkey-patch mypy and should happen as early as possible.
 import nagini_translation.mypy_patches.column_info_patch
 import nagini_translation.mypy_patches.optional_patch
-
-from typing import Any, Dict, List, Optional
 
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
@@ -53,9 +53,9 @@ from nagini_translation.lib.util import InvalidProgramException
 from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
+
 os.environ['MYPYPATH'] = config.mypy_path
 
-assert config.classpath
 _JVM = jvmaccess.JVM(config.classpath)
 
 
@@ -559,20 +559,20 @@ class VerificationTest(AnnotatedTest):
 
     def test_file(
             self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-            sif: bool, reload_resources: bool):
+            sif: bool, reload_resources: bool, arp: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         path = os.path.abspath(path)
-        prog = translate(path, jvm, sif=sif, reload_resources=reload_resources)
+        prog = translate(path, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
         assert prog is not None
-        vresult = verify(prog, path, jvm, verifier)
-        self._evaluate_result(vresult, annotation_manager, jvm)
+        vresult = verify(prog, path, jvm, verifier, arp=arp)
+        self._evaluate_result(vresult, annotation_manager, jvm, sif)
 
     def _evaluate_result(
             self, vresult: VerificationResult,
-            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM):
+            annotation_manager: AnnotationManager, jvm: jvmaccess.JVM, sif: bool = False):
         """Evaluate verification result with regard to test annotations."""
         if vresult:
             actual_errors = []
@@ -582,6 +582,20 @@ class VerificationTest(AnnotatedTest):
                 for error in vresult.errors)
             actual_errors = [
                 VerificationError(error) for error in vresult.errors]
+            if sif:
+                # carbon will report all functional errors twice, as we model two
+                # executions, therefore we filter duplicated errors here.
+                # (Note: we don't make errors unique, just remove one duplicate)
+                distinct = []
+                reprs = map(lambda e: e.__repr__(), actual_errors)
+                repr_counts = Counter(reprs)
+                repr_counts = dict(map(lambda rc: (rc[0], -(-rc[1] // 2)),
+                                       repr_counts.items()))
+                for err in actual_errors:
+                    if repr_counts[err.__repr__()] > 0:
+                        distinct.append(err)
+                        repr_counts[err.__repr__()] -= 1
+                actual_errors = distinct
         annotation_manager.check_errors(actual_errors)
         if annotation_manager.has_unexpected_missing():
             pytest.skip('Unexpected or missing output')
@@ -590,23 +604,23 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, verifier, sif, reload_resources):
+def test_verification(path, verifier, sif, reload_resources, arp):
     """Execute provided verification test."""
-    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources)
+    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources, arp)
 
 
 class TranslationTest(AnnotatedTest):
     """Test for testing translation errors."""
 
     def test_file(self, path: str, jvm: jvmaccess.JVM, sif: bool,
-                  reload_resources: bool):
+                  reload_resources: bool, arp: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         path = os.path.abspath(path)
         try:
-            translate(path, jvm, sif=sif, reload_resources=reload_resources)
+            translate(path, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
             actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
@@ -622,6 +636,6 @@ class TranslationTest(AnnotatedTest):
 _TRANSLATION_TESTER = TranslationTest()
 
 
-def test_translation(path, sif, reload_resources):
+def test_translation(path, sif, reload_resources, arp):
     """Execute provided translation test."""
-    _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources)
+    _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources, arp)

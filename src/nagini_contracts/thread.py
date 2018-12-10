@@ -56,6 +56,13 @@ def getOld(t: Thread, o: object) -> object:
     pass
 
 
+def getARP(t: Thread) -> float:
+    """
+    Returns the permission value of abstract read permissions passed to thread t.
+    """
+    pass
+
+
 def arg(i: int) -> Any:
     """Used to reference method parameters in getOld() calls."""
     pass

@@ -51,6 +51,7 @@ from nagini_translation.lib.typedefs import Expr
 from nagini_translation.lib.typeinfo import TypeInfo
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
+    contains_stmt,
     get_func_name,
     get_parent_of_type,
     InvalidProgramException,
@@ -430,12 +431,16 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
+        elif isinstance(node, ast.Str):
+            return self.find_or_create_class(node.s)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice.value, ast.Name):
+                ast_args = [node.slice.value]
+            elif isinstance(node.slice.value, ast.Str):
                 ast_args = [node.slice.value]
             else:
                 ast_args = node.slice.value.elts
@@ -554,7 +559,7 @@ class Analyzer(ast.NodeVisitor):
             cls.superclass = self.find_or_create_class(OBJECT_TYPE)
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
-        
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -657,6 +662,8 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+        func.all_low = self.is_all_low(node)
+        func.preserves_low = self.preserves_low(node)
 
         # TODO: When we want to support method type parameters, this would be
         # the place to find all type variables used in the parameters which
@@ -890,6 +897,10 @@ class Analyzer(ast.NodeVisitor):
             return
         if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
             return
+        if isinstance(node.func, ast.Name) and node.func.id == 'LowEvent':
+            preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
+            if not contains_stmt(preconditions, node):
+                raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
@@ -1070,7 +1081,8 @@ class Analyzer(ast.NodeVisitor):
                 not isinstance(node.value, ast.Subscript) and
                 not (isinstance(node.value, ast.Call) and
                          isinstance(node.ctx, ast.Load))):
-            target = self.get_target(node.value, self.current_function if self.current_function else self.module)
+            container = self.current_function if self.current_function else self.module
+            target = self.get_target(node.value, container)
             if isinstance(target, (PythonModule, PythonClass)):
                 real_target = self.get_target(node, self.module)
                 if isinstance(real_target, PythonGlobalVar):
@@ -1110,6 +1122,7 @@ class Analyzer(ast.NodeVisitor):
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
                 if mypy_type.type.name() == 'enumerate':
+                    # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
                     int_type = self.module.global_module.classes[INT_TYPE]
                     tuple_class = self.module.global_module.classes[TUPLE_TYPE]
@@ -1153,6 +1166,7 @@ class Analyzer(ast.NodeVisitor):
         prefix = mypy_type._fullname
         name = mypy_type.name()
         if prefix == 'builtins.enumerate':
+            # We cheat and represent type enumerate as a list of pairs.
             prefix = 'builtins.list'
             name = 'list'
         if prefix.endswith('.' + name):
@@ -1251,7 +1265,7 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             receiver = self.typeof(node.value)
             if isinstance(receiver, UnionType) and not isinstance(receiver, OptionalType):
-                set_of_types = set() 
+                set_of_types = set()
                 for type_in_union in receiver.get_types() - {None}:
                     if isinstance(type_in_union, OptionalType):
                         context = [type_in_union.optional_type.name]
@@ -1376,7 +1390,11 @@ class Analyzer(ast.NodeVisitor):
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
-                (('property' in decorators) and (len(decorators) != 1)))
+                (('property' in decorators) and (len(decorators) != 1)) or
+                (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
+                ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
+                    ('Predicate' in decorators) or ('Pure' in decorators)))
+               )
 
     def is_declared_contract_only(self, func: ast.FunctionDef) -> bool:
         """
@@ -1411,41 +1429,29 @@ class Analyzer(ast.NodeVisitor):
             result = result or (not selected)
         return result
 
-    def is_pure(self, func: ast.FunctionDef) -> bool:
+    def has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
         if self._incompatible_decorators(decorators):
             raise InvalidProgramException(func, "decorators.incompatible")
-        return 'Pure' in decorators
+        return decorator in decorators
+
+    def is_pure(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Pure')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'Predicate' in decorators
+        return self.has_decorator(func, 'Predicate')
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'staticmethod' in decorators
+        return self.has_decorator(func, 'staticmethod')
 
     def is_class_method(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'classmethod' in decorators
+        return self.has_decorator(func, 'classmethod')
 
     def is_io_operation(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'IOOperation' in decorators
+        return self.has_decorator(func, 'IOOperation')
 
     def is_property_getter(self, func: ast.FunctionDef) -> bool:
-        decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
-        return 'property' in decorators
+        return self.has_decorator(func, 'property')
 
     def is_property_setter(self, func: ast.FunctionDef) -> bool:
         setter_decorator = [d for d in func.decorator_list
@@ -1455,3 +1461,9 @@ class Analyzer(ast.NodeVisitor):
         if len(setter_decorator) > 1 or setter_decorator[0].attr != 'setter':
             raise InvalidProgramException(func, 'unknown.decorator')
         return self.current_class.fields[setter_decorator[0].value.id]
+
+    def is_all_low(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'AllLow')
+
+    def preserves_low(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'PreservesLow')

@@ -32,6 +32,7 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonNode,
+    PythonTryBlock,
     PythonType,
     PythonVar,
     SilverType,
@@ -418,13 +419,11 @@ class StatementTranslator(CommonTranslator):
             invariant acc(iter.list_acc, 1 / 20)
             invariant iter.list_acc == list___sil_seq__(a)
             invariant acc(iter.__iter_index, write)
-            invariant acc(iter.__previous, 1 / 20)
-            invariant acc(iter.__previous.list_acc, write)
-            invariant issubtype(typeof(iter.__previous), list()) && ...
+            invariant acc(iter.__previous, write)
             invariant iter_err == null ==>
-                      iter.__iter_index - 1 == list___len__(iter.__previous)
+                      iter.__iter_index - 1 == |iter.__previous|
             invariant iter_err != null ==>
-                      iter.__iter_index == list___len__(iter.__previous)
+                      iter.__iter_index == |iter.__previous|
             invariant iter.__iter_index >= 0 &&
                       iter.__iter_index <= |iter.list_acc|
             invariant |iter.list_acc| > 0 ==>
@@ -434,19 +433,17 @@ class StatementTranslator(CommonTranslator):
                        as given in ``assign_expr``)
             invariant |iter.list_acc| > 0 ==> (c in iter.list_acc)
             invariant iter_err == null ==>
-                          iter.__previous.list_acc ==
+                          iter.__previous ==
                           iter.list_acc[..iter.__iter_index - 1]
             invariant |iter.list_acc| > 0 ==>
                       issubtype(typeof(c), list()) && ...
             invariant iter_err != null ==>
-                      iter.__previous.list_acc == iter.list_acc
+                      iter.__previous == iter.list_acc
         """
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
-
-        param = self.viper.LocalVarDecl('self', self.viper.Ref, pos, info)
 
         iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
         full_perm = self.viper.FullPerm(pos, info)
@@ -492,32 +489,16 @@ class StatementTranslator(CommonTranslator):
                                                               info)
         invariant.append(iter_index_acc_pred)
 
-        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
-                                          pos, info)
+        previous_field = self.viper.Field('__previous', seq_ref, pos, info)
         previous_list_acc = self.viper.FieldAccess(iter_var.ref(),
                                                    previous_field,
                                                    pos, info)
-        #iter_previous_acc_pred = self.viper.FieldAccessPredicate(
-        #    iter_previous_acc, frac_perm_120, pos, info)
-        #invariant.append(iter_previous_acc_pred)
-
-        #previous_list_acc = self.viper.FieldAccess(iter_previous_acc,
-        #                                           list_acc_field, pos, info)
         previous_list_acc_pred = self.viper.FieldAccessPredicate(
             previous_list_acc, full_perm, pos, info)
         invariant.append(previous_list_acc_pred)
-        list_class = ctx.module.global_module.classes[LIST_TYPE]
-
-        #previous_type = GenericType(list_class, [target_var.type])
-        #invariant.append(self.type_check(iter_previous_acc, previous_type, pos,
-        #                                 ctx))
 
         index_minus_one = self.viper.Sub(iter_index_acc, one, pos, info)
-        object_class = ctx.module.global_module.classes[OBJECT_TYPE]
 
-        #previous_len = self.get_function_call(list_class, '__len__',
-        #                                      [iter_previous_acc],
-        #                                      [object_class], None, ctx)
         previous_len = self.viper.SeqLength(previous_list_acc, pos, info)
         no_error_previous_len_eq = self.viper.EqCmp(index_minus_one,
                                                     previous_len, pos, info)
@@ -774,16 +755,6 @@ class StatementTranslator(CommonTranslator):
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
 
-        previous_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
-                                          position, info)
-        previous_acc = self.viper.FieldAccess(iter_var.ref(), previous_field, position,
-                                              info)
-        old_previous = self.viper.LabelledOld(previous_acc, end_label, position, info)
-        target_seq = self.viper.ExplicitSeq([target_var.ref()], position, info)
-        updated_seq = self.viper.SeqAppend(old_previous, target_seq, position, info)
-        previous_is_updated = self.viper.EqCmp(previous_acc, updated_seq, position, info)
-        # body.append(self.viper.Assert(previous_is_updated, position, info))
-
         body.extend(assign_stmt)
 
         loop = global_stmts + self.create_while_node(
@@ -810,12 +781,16 @@ class StatementTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion]
 
-    def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
+    def _get_try_block(self, node: Stmt, ctx: Context) -> PythonTryBlock:
         try_block = None
         for block in ctx.actual_function.try_blocks:
             if block.node is node:
                 try_block = block
                 break
+        return try_block
+
+    def translate_stmt_With(self, node: ast.With, ctx: Context) -> List[Stmt]:
+        try_block = self._get_try_block(node, ctx)
         assert try_block
         code_var = try_block.get_finally_var(self.translator)
         if code_var.sil_name in ctx.var_aliases:
@@ -874,11 +849,7 @@ class StatementTranslator(CommonTranslator):
         return ctx_stmt + [ctx_assign] + enter_call + body + [end_label]
 
     def translate_stmt_Try(self, node: ast.Try, ctx: Context) -> List[Stmt]:
-        try_block = None
-        for block in ctx.actual_function.try_blocks:
-            if block.node is node:
-                try_block = block
-                break
+        try_block = self._get_try_block(node, ctx)
         assert try_block
         code_var = try_block.get_finally_var(self.translator)
         if code_var.sil_name in ctx.var_aliases:
@@ -909,8 +880,12 @@ class StatementTranslator(CommonTranslator):
                                      self.no_info(ctx))
         return body + [end_label]
 
-    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
-        var = self.get_error_var(node, ctx)
+    def _translate_stmt_raise_create(self, node: ast.Raise,
+                                     error_var: 'silver.ast.LocalVarRef',
+                                     ctx: Context) -> List[Stmt]:
+        """
+        Translate the part of raise where we create the exception.
+        """
         raised = self.get_target(node.exc, ctx)
         if (not isinstance(node.exc, ast.Call) and
                 isinstance(raised, PythonType)):
@@ -929,11 +904,16 @@ class StatementTranslator(CommonTranslator):
         if node.cause:
             cause_stmt, cause = self.translate_expr(node.cause, ctx)
             stmt += cause_stmt
-        assignment = self.viper.LocalVarAssign(var, exception, position,
+        assignment = self.viper.LocalVarAssign(error_var, exception, position,
                                                self.no_info(ctx))
-        catchers = self.create_exception_catchers(var,
-            ctx.actual_function.try_blocks, node, ctx)
-        return stmt + [assignment] + catchers
+        return stmt + [assignment]
+
+    def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
+        var = self.get_error_var(node, ctx)
+        create_stmts = self._translate_stmt_raise_create(node, var, ctx)
+        catchers = self.create_exception_catchers(
+            var, ctx.actual_function.try_blocks, node, ctx)
+        return create_stmts + catchers
 
     def translate_stmt_Call(self, node: ast.Call, ctx: Context) -> List[Stmt]:
         stmt, expr = self.translate_Call(node, ctx)
@@ -949,7 +929,18 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Expr(self, node: ast.Expr, ctx: Context) -> List[Stmt]:
         if isinstance(node.value, ast.Call):
-            return self.translate_stmt(node.value, ctx)
+            # Call translate_Call directly to preserve information that this is
+            # a top-level contract statement (those aren't allowed in most places).
+            stmt, val = self.translate_Call(node.value, ctx, statement=True)
+            if val is not None:
+                pos = self.to_position(node, ctx)
+                info = self.no_info(ctx)
+                res_type = self.get_type(node.value, ctx)
+                res_var = ctx.current_function.create_variable('expr_res', res_type,
+                                                               self.translator)
+                assign = self.viper.LocalVarAssign(res_var.ref(), val, pos, info)
+                stmt.append(assign)
+            return stmt
         elif isinstance(node.value, (ast.Str, ast.Ellipsis)):
             # Docstring or ellipsis, just skip.
             return []
@@ -1253,6 +1244,27 @@ class StatementTranslator(CommonTranslator):
             assign_stmts += target_stmt
         return rhs_stmt + assign_stmts
 
+    def _translate_while_invariants(self, node: ast.While, ctx: Context) -> List[Stmt]:
+        invariants = []
+        for expr, aliases in ctx.actual_function.loop_invariants[node]:
+            with ctx.additional_aliases(aliases):
+                invariants.append(self.translate_contract(expr, ctx))
+        return invariants
+
+    def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
+        start, end = get_body_indices(node.body)
+        body = flatten(
+            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
+        body.append(self.viper.Label(end_label, self.to_position(node, ctx),
+                                     self.no_info(ctx)))
+        return body
+
+    def _while_postamble(self, node: ast.While, post_label: str, ctx: Context) -> List[Stmt]:
+        postamble = [self.viper.Label(post_label, self.to_position(node, ctx),
+                                      self.no_info(ctx))]
+        postamble += self._set_result_none(ctx)
+        return postamble
+
     def translate_stmt_While(self, node: ast.While,
                              ctx: Context) -> List[Stmt]:
         post_label = ctx.actual_function.get_fresh_name('post_loop')
@@ -1262,30 +1274,21 @@ class StatementTranslator(CommonTranslator):
                                               target_type=self.viper.Bool)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        invariants = []
+        invariants = self._translate_while_invariants(node, ctx)
         locals = []
-        for expr, aliases in ctx.actual_function.loop_invariants[node]:
-            with ctx.additional_aliases(aliases):
-                invariants.append(self.translate_contract(expr, ctx))
         start, end = get_body_indices(node.body)
         var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariants = [global_inv] + var_types + invariants
-        body = flatten(
-            [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
-        body.append(self.viper.Label(end_label, self.to_position(node, ctx),
-                                     self.no_info(ctx)))
+        body = self._translate_while_body(node, ctx, end_label)
         loop = global_stmts + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
-        loop += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
             loop += translated_block
-        loop.append(self.viper.Label(post_label, self.to_position(node, ctx),
-                    self.no_info(ctx)))
-        loop += self._set_result_none(ctx)
+        loop += self._while_postamble(node, post_label, ctx)
         return loop
 
     def enter_loop_translation(
@@ -1333,12 +1336,10 @@ class StatementTranslator(CommonTranslator):
         parent = node
         # Find the loop surrounding this node.
         while not isinstance(parent._parent, (ast.While, ast.For)):
-            # If we find, on the way, that we're in a try block
-            if isinstance(parent._parent, ast.Try):
-                # namely, in the finally branch
-                if parent in parent._parent.finalbody:
-                    # this is illegal in Python any mypy doesn't check it.
-                    raise InvalidProgramException(node, 'continue.in.finally')
+            # If we find, on the way, that we're in a try block, namely in the finally branch
+            if isinstance(parent._parent, ast.Try) and parent in parent._parent.finalbody:
+                # this is illegal in Python any mypy doesn't check it.
+                raise InvalidProgramException(node, 'continue.in.finally')
             else:
                 parent = parent._parent
 
