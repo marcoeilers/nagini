@@ -701,6 +701,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             if boxed_name == 'Set':
                 boxed_name = 'PSet'
+            if boxed_name == 'Multiset':
+                boxed_name = 'MSet'
             return self.module.classes[boxed_name]
         return self
 

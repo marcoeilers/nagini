@@ -698,6 +698,34 @@ class ContractTranslator(CommonTranslator):
                                         ctx)
         return val_stmts, result
 
+    def translate_mset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        mset_type = self.get_type(node, ctx)
+
+        viper_type = self.translate_type(mset_type.type_args[0], ctx)
+        val_stmts = []
+
+        if node.args:
+            vals = []
+            for arg in node.args:
+                arg_stmt, arg_val = self.translate_expr(arg, ctx,
+                    target_type = viper_type)
+                val_stmts += arg_stmt
+                vals.append(arg_val)
+            result = self.viper.ExplicitMultiset(vals, self.to_position(node, ctx),
+                                                 self.no_info(ctx))
+        else:
+            result = self.viper.EmptyMultiset(viper_type,
+                                         self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        type_arg = mset_type.type_args[0]
+        position = self.to_position(node, ctx)
+        type_lit = self.type_factory.translate_type_literal(type_arg, position,
+                                                            ctx)
+        result = self.get_function_call(mset_type.cls, '__create__',
+                                        [result, type_lit], [None, None], node,
+                                        ctx)
+        return val_stmts, result
+
     def translate_get_arg(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         thread_stmt, thread = self.translate_expr(node.args[0], ctx)
         index_stmt, index = self.translate_expr(node.args[1], ctx,
@@ -920,6 +948,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
+        elif func_name == 'MSet':
+            return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'Joinable':

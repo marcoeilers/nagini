@@ -231,7 +231,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
-                elif (target.name in (SEQ_TYPE, PSET_TYPE) and
+                elif (target.name in (SEQ_TYPE, PSET_TYPE, 'MSet') and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
                                  for arg in node.args]
@@ -373,6 +373,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
     if func_name == PSET_TYPE:
         return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
                                             containers, container)
+    if func_name == 'MSet':
+        return _get_collection_literal_type(node, ['args'], 'MSet', module,
+                                            containers, container)
     if func_name == 'enumerate':
         if len(node.args) != 1:
             raise UnsupportedException(node, 'enumerate only supported with single arg.')
@@ -505,6 +508,8 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
     elif value_type.name == SEQ_TYPE:
         return value_type.type_args[0]
     elif value_type.name == PSET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == 'MSet':
         return value_type.type_args[0]
     elif value_type.python_class.get_func_or_method('__getitem__'):
         return value_type.python_class.get_func_or_method('__getitem__').type

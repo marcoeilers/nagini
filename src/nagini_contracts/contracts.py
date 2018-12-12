@@ -28,7 +28,8 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'Sequence', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
-                  'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',]
+                  'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
+                  'MSet',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -240,6 +241,44 @@ class PSet(Generic[T], Sized, Iterable[T]):
         can be used as arguments for Forall.
         """
 
+class MSet(Generic[T], Sized, Iterable[T]):
+    """
+    An MSet[T] represents a pure multiset of instances of subtypes of T, and is translated to
+    native Viper multisets.
+    """
+
+    def __init__(self, *args: T) -> None:
+        """
+        ``MSet(a, b, c)`` creates a multiset instance containing the objects
+        a, b and c.
+        """
+
+    def num(self, item: object) -> int:
+        """
+        TODO
+        """
+
+    def __len__(self) -> int:
+        """
+        Returns the cardinality of this set.
+        """
+
+    def __add__(self, other: 'MSet[T]') -> 'MSet[T]':
+        """
+        Returns the union of this multiset and the other.
+        """
+
+    def __sub__(self, other: 'MSet[T]') -> 'MSet[T]':
+        """
+        Returns the difference between this multiset and the other,
+        """
+
+    def __iter__(self) -> Iterator[T]:
+        """
+        Multisets can be quantified over; this is only here so that multisets
+        can be used as arguments for Forall.
+        """
+
 
 def ToSeq(l: Iterable[T]) -> Sequence[T]:
     """
@@ -441,6 +480,7 @@ __all__ = [
         'set_pred',
         'Sequence',
         'PSet',
+        'MSet',
         'ToSeq',
         'MaySet',
         'MayCreate',

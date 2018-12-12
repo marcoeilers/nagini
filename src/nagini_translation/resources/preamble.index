@@ -574,6 +574,7 @@
 },
 "__prim__Sequence": {},
 "__prim__Set": {},
+"__prim__Multiset": {},
 "Sequence": {
     "functions": {
         "__create__": {
@@ -673,6 +674,52 @@
         },
         "__eq__": {
             "args": ["PSet", "PSet"],
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
+        }
+    },
+    "type_vars": 1,
+    "extends": "object"
+},
+"MSet": {
+    "functions": {
+        "__create__": {
+            "args": ["__prim__Multiset", "type"],
+            "type": "MSet",
+            "requires": ["__unbox__"]
+        },
+        "__unbox__": {
+            "args": ["MSet"],
+            "type": "__prim__Multiset",
+            "requires": []
+        },
+        "num": {
+            "args": ["MSet", "object"],
+            "type": "__prim__int",
+            "requires": ["__unbox__"]
+        },
+        "__sil_seq__": {
+            "args": ["MSet"],
+            "type": "__prim__Sequence",
+            "requires": ["__unbox__"]
+        },
+        "__len__": {
+            "args": ["MSet"],
+            "type": "__prim__int",
+            "requires": ["__unbox__"]
+        },
+        "__add__": {
+            "args": ["MSet", "MSet"],
+            "type": "MSet",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "__sub__": {
+            "args": ["MSet", "MSet"],
+            "type": "MSet",
+            "requires": ["__unbox__", "__create__"]
+        },
+        "__eq__": {
+            "args": ["MSet", "MSet"],
             "type": "__prim__bool",
             "requires": ["__unbox__"]
         }
