@@ -87,14 +87,16 @@ class Analyzer(ast.NodeVisitor):
         self.modules = OrderedDict()
         self.modules[os.path.abspath(path)] = self.module
         self.asts = {}
-        self.io_operation_analyzer = IOOperationAnalyzer(
-            self, self.node_factory)
         # Are we defining an IOExists block?
         self._is_io_existential = False
         self._aliases = {}  # Dict[str, PythonBaseVar]
         self.current_loop_invariant = None
         self.selected = selected
         self.deferred_tasks = []
+
+    def initialize_io_analyzer(self) -> None:
+        self.io_operation_analyzer = IOOperationAnalyzer(
+            self, self.node_factory)
 
     @property
     def stmt_container(self):
@@ -419,8 +421,10 @@ class Analyzer(ast.NodeVisitor):
                 break
         else:
             # Class doesn't exist yet, create it.
+            superclass = self.global_module.classes[OBJECT_TYPE] if name != OBJECT_TYPE else None
             cls = self.node_factory.create_python_class(name, module,
-                                                        self.node_factory)
+                                                        self.node_factory,
+                                                        superclass=superclass)
             module.classes[name] = cls
         return cls
 

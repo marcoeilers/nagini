@@ -117,6 +117,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
+    analyzer.initialize_io_analyzer()
+
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
