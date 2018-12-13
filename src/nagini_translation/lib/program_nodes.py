@@ -18,11 +18,14 @@ from nagini_translation.lib.constants import (
     ERROR_NAME,
     INTERNAL_NAMES,
     MODULE_VARS,
+    PMSET_TYPE,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
     PRIMITIVE_SET_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
+    PSET_TYPE,
     RESULT_NAME,
     STRING_TYPE,
     VIPER_KEYWORDS,
@@ -700,9 +703,11 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                                                          CALLABLE_TYPE):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             if boxed_name == 'Set':
-                boxed_name = 'PSet'
+                boxed_name = PSET_TYPE
             if boxed_name == 'Multiset':
-                boxed_name = 'MSet'
+                boxed_name = PMSET_TYPE
+            if boxed_name == 'Seq':
+                boxed_name = PSEQ_TYPE
             return self.module.classes[boxed_name]
         return self
 

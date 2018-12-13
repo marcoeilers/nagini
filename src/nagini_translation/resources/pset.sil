@@ -46,41 +46,41 @@ function PSet___eq__(self: Ref, other: Ref): Bool
 
 
 
-function MSet___create__(prim: Multiset[Ref], cont_type: PyType): Ref
-    ensures typeof(result) == MSet(cont_type)
-    ensures MSet___unbox__(result) == prim
+function PMultiset___create__(prim: Multiset[Ref], cont_type: PyType): Ref
+    ensures typeof(result) == PMultiset(cont_type)
+    ensures PMultiset___unbox__(result) == prim
 
-function MSet___unbox__(box: Ref): Multiset[Ref]
-    requires issubtype(typeof(box), MSet(MSet_arg(typeof(box), 0)))
+function PMultiset___unbox__(box: Ref): Multiset[Ref]
+    requires issubtype(typeof(box), PMultiset(PMultiset_arg(typeof(box), 0)))
 
-function MSet_num(self: Ref, item: Ref): Int
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    ensures result == (item in MSet___unbox__(self))
-    ensures (result > 0) ==> issubtype(typeof(item), MSet_arg(typeof(self), 0))
+function PMultiset_num(self: Ref, item: Ref): Int
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    ensures result == (item in PMultiset___unbox__(self))
+    ensures (result > 0) ==> issubtype(typeof(item), PMultiset_arg(typeof(self), 0))
 
-function MSet___sil_seq__(self: Ref): Seq[Ref]
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    ensures forall r: Ref :: {r in result} r in result == ((r in MSet___unbox__(self)) > 0)
-    ensures |result| == |MSet___unbox__(self)|
+function PMultiset___sil_seq__(self: Ref): Seq[Ref]
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    ensures forall r: Ref :: {r in result} r in result == ((r in PMultiset___unbox__(self)) > 0)
+    ensures |result| == |PMultiset___unbox__(self)|
 
-function MSet___len__(self: Ref): Int
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    ensures result == |MSet___unbox__(self)|
+function PMultiset___len__(self: Ref): Int
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    ensures result == |PMultiset___unbox__(self)|
 
-function MSet___add__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    requires issubtype(typeof(other), MSet(MSet_arg(typeof(other), 0)))
-    requires MSet_arg(typeof(self), 0) == MSet_arg(typeof(other), 0)
-    ensures result == MSet___create__(MSet___unbox__(self) union MSet___unbox__(other), MSet_arg(typeof(self), 0))
+function PMultiset___add__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PMultiset(PMultiset_arg(typeof(other), 0)))
+    requires PMultiset_arg(typeof(self), 0) == PMultiset_arg(typeof(other), 0)
+    ensures result == PMultiset___create__(PMultiset___unbox__(self) union PMultiset___unbox__(other), PMultiset_arg(typeof(self), 0))
 
-function MSet___sub__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    requires issubtype(typeof(other), MSet(MSet_arg(typeof(other), 0)))
-    requires MSet_arg(typeof(self), 0) == MSet_arg(typeof(other), 0)
-    ensures result == MSet___create__(MSet___unbox__(self) setminus MSet___unbox__(other), MSet_arg(typeof(self), 0))
+function PMultiset___sub__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PMultiset(PMultiset_arg(typeof(other), 0)))
+    requires PMultiset_arg(typeof(self), 0) == PMultiset_arg(typeof(other), 0)
+    ensures result == PMultiset___create__(PMultiset___unbox__(self) setminus PMultiset___unbox__(other), PMultiset_arg(typeof(self), 0))
 
-function MSet___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), MSet(MSet_arg(typeof(self), 0)))
-    requires issubtype(typeof(other), MSet(MSet_arg(typeof(other), 0)))
-    requires MSet_arg(typeof(self), 0) == MSet_arg(typeof(other), 0)
-    ensures result == (MSet___unbox__(self) == MSet___unbox__(other))
+function PMultiset___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), PMultiset(PMultiset_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PMultiset(PMultiset_arg(typeof(other), 0)))
+    requires PMultiset_arg(typeof(self), 0) == PMultiset_arg(typeof(other), 0)
+    ensures result == (PMultiset___unbox__(self) == PMultiset___unbox__(other))

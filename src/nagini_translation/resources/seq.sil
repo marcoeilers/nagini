@@ -4,49 +4,49 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-function Sequence___create__(prim: Seq[Ref], cont_type: PyType): Ref
-    ensures typeof(result) == Sequence(cont_type)
-    ensures Sequence___sil_seq__(result) == prim
+function PSeq___create__(prim: Seq[Ref], cont_type: PyType): Ref
+    ensures typeof(result) == PSeq(cont_type)
+    ensures PSeq___sil_seq__(result) == prim
 
-function Sequence___sil_seq__(box: Ref): Seq[Ref]
-    requires issubtype(typeof(box), Sequence(Sequence_arg(typeof(box), 0)))
+function PSeq___sil_seq__(box: Ref): Seq[Ref]
+    requires issubtype(typeof(box), PSeq(PSeq_arg(typeof(box), 0)))
 
-function Sequence___contains__(self: Ref, item: Ref): Bool
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    ensures result == (item in Sequence___sil_seq__(self))
-    ensures result ==> issubtype(typeof(item), Sequence_arg(typeof(self), 0))
+function PSeq___contains__(self: Ref, item: Ref): Bool
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == (item in PSeq___sil_seq__(self))
+    ensures result ==> issubtype(typeof(item), PSeq_arg(typeof(self), 0))
 
-function Sequence___getitem__(self: Ref, index: Ref): Ref
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
+function PSeq___getitem__(self: Ref, index: Ref): Ref
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(index), int())
-    requires (int___unbox__(index) >= 0 && int___unbox__(index) < Sequence___len__(self))
-    ensures result == Sequence___sil_seq__(self)[int___unbox__(index)]
-    ensures issubtype(typeof(result), Sequence_arg(typeof(self), 0))
+    requires (int___unbox__(index) >= 0 && int___unbox__(index) < PSeq___len__(self))
+    ensures result == PSeq___sil_seq__(self)[int___unbox__(index)]
+    ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
 
-function Sequence___len__(self: Ref): Int
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    ensures result == |Sequence___sil_seq__(self)|
+function PSeq___len__(self: Ref): Int
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == |PSeq___sil_seq__(self)|
 
-function Sequence_take(self: Ref, no: Int): Ref
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    ensures result == Sequence___create__(Sequence___sil_seq__(self)[..no], Sequence_arg(typeof(self), 0))
+function PSeq_take(self: Ref, no: Int): Ref
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[..no], PSeq_arg(typeof(self), 0))
 
-function Sequence_drop(self: Ref, no: Int): Ref
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    ensures result == Sequence___create__(Sequence___sil_seq__(self)[no..], Sequence_arg(typeof(self), 0))
+function PSeq_drop(self: Ref, no: Int): Ref
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[no..], PSeq_arg(typeof(self), 0))
 
-function Sequence_update(self: Ref, index: Int, val: Ref): Ref
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    ensures result == Sequence___create__(Sequence___sil_seq__(self)[index := val], Sequence_arg(typeof(self), 0))
+function PSeq_update(self: Ref, index: Int, val: Ref): Ref
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[index := val], PSeq_arg(typeof(self), 0))
 
-function Sequence___add__(self: Ref, other: Ref): Ref
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    requires issubtype(typeof(other), Sequence(Sequence_arg(typeof(other), 0)))
-    requires Sequence_arg(typeof(self), 0) == Sequence_arg(typeof(other), 0)
-    ensures result == Sequence___create__(Sequence___sil_seq__(self) ++ Sequence___sil_seq__(other), Sequence_arg(typeof(self), 0))
+function PSeq___add__(self: Ref, other: Ref): Ref
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
+    requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
+    ensures result == PSeq___create__(PSeq___sil_seq__(self) ++ PSeq___sil_seq__(other), PSeq_arg(typeof(self), 0))
 
-function Sequence___eq__(self: Ref, other: Ref): Bool
-    requires issubtype(typeof(self), Sequence(Sequence_arg(typeof(self), 0)))
-    requires issubtype(typeof(other), Sequence(Sequence_arg(typeof(other), 0)))
-    requires Sequence_arg(typeof(self), 0) == Sequence_arg(typeof(other), 0)
-    ensures result == (Sequence___sil_seq__(self) == Sequence___sil_seq__(other))
+function PSeq___eq__(self: Ref, other: Ref): Bool
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
+    requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
+    ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))

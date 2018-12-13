@@ -343,9 +343,9 @@ class TypeDomainFactory:
                           ctx: Context) -> List['silver.ast.DomainAxiom']:
         """
         Creates an axiom defining the type argument getter functions for a given
-        type, e.g. for Sequence:
+        type, e.g. for PSeq:
         (forall Z: PyType, arg0: PyType ::
-          issubtype(Z, Sequence(arg0)) ==> Sequence_arg(Z, 0) == arg0)
+          issubtype(Z, PSeq(arg0)) ==> PSeq_arg(Z, 0) == arg0)
         """
         position, info = self.no_position(ctx), self.no_info(ctx)
         z_decl = self.viper.LocalVarDecl('Z', self.type_type(), position, info)

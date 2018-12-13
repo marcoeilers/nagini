@@ -9,7 +9,7 @@ class RingBuffer:
         Ensures(Acc(self.data))
         Ensures(Acc(self.first))
         Ensures(Acc(self.datalen))
-        self.data = Sequence()  # type: Sequence[int]
+        self.data = PSeq()  # type: PSeq[int]
         self.first = 0  # type: int
         self.datalen = 0  # type: int
 
@@ -21,7 +21,7 @@ class RingBuffer:
                Implies(len(self.data) > 0, self.datalen <= len(self.data) and self.first < len(self.data))
 
     @Pure
-    def contents(self) -> Sequence[int]:
+    def contents(self) -> PSeq[int]:
         Requires(Rd(self.valid()))
         return Unfolding(Rd(self.valid()),
                          self.data.drop(self.first).take(self.datalen)
@@ -38,11 +38,11 @@ class RingBuffer:
         Requires(Acc(self.data) and Acc(self.first) and Acc(self.datalen))
         Ensures(self.valid())
         Ensures(len(self.contents()) == 0 and self.capacity() == n)
-        self.data = Sequence()
+        self.data = PSeq()
         i = n
         while i > 0:
             Invariant(Acc(self.data) and 0 <= i and len(self.data) == n - i)
-            self.data = self.data + Sequence(0)
+            self.data = self.data + PSeq(0)
             i -= 1
         self.first = 0
         self.datalen = 0
@@ -69,7 +69,7 @@ class RingBuffer:
         Requires(self.valid())
         Requires(len(self.contents()) != self.capacity())
         Ensures(self.valid())
-        Ensures(self.contents() == Old(self.contents()) + Sequence(x))
+        Ensures(self.contents() == Old(self.contents()) + PSeq(x))
         Ensures(self.capacity() == Old(self.capacity()))
         Unfold(self.valid())
         nextEmpty = self.first + self.datalen if self.first + self.datalen < len(self.data) else self.first + self.datalen - len(self.data)

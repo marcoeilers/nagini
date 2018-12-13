@@ -21,7 +21,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
-    SEQ_TYPE,
+    PSEQ_TYPE,
     SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
@@ -612,9 +612,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 field = self.viper.Field('list_acc', seq_ref, position, info)
                 res = self.viper.FieldAccess(arg, field, position, info)
                 return res
-            if receiver.name == SEQ_TYPE:
+            if receiver.name == PSEQ_TYPE:
                 if (isinstance(arg, self.viper.ast.FuncApp) and
-                            arg.funcname() == 'Sequence___create__'):
+                            arg.funcname() == 'PSeq___create__'):
                     args = self.viper.to_list(arg.args())
                     return args[0]
         return self.get_function_call(receiver, '__sil_seq__', [arg], [arg_type],

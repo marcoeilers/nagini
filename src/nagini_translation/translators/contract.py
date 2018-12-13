@@ -17,10 +17,11 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
+    PMSET_TYPE,
     PRIMITIVES,
+    PSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
-    SEQ_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -439,7 +440,7 @@ class ContractTranslator(CommonTranslator):
         list_field = self.viper.Field('__previous', self.viper.SeqType(self.viper.Ref),
                                       pos, info)
         field_acc = self.viper.FieldAccess(iterator, list_field, pos, info)
-        seq_type = ctx.module.global_module.classes[SEQ_TYPE]
+        seq_type = ctx.module.global_module.classes[PSEQ_TYPE]
         content_type = self.get_type(node.args[0], ctx)
         type_lit = self.type_factory.translate_type_literal(content_type, pos, ctx)
         res = self.get_function_call(seq_type, '__create__', [field_acc, type_lit],
@@ -629,7 +630,7 @@ class ContractTranslator(CommonTranslator):
         # Use the same sequence conversion as for iterating over the
         # iterable (which gives no information about order for unordered types).
         seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
-        seq_class = ctx.module.global_module.classes[SEQ_TYPE]
+        seq_class = ctx.module.global_module.classes[PSEQ_TYPE]
         if coll_type.name == RANGE_TYPE:
             type_arg = ctx.module.global_module.classes[INT_TYPE]
         else:
@@ -944,11 +945,11 @@ class ContractTranslator(CommonTranslator):
             return self.translate_previous(node, ctx)
         elif func_name == 'Let':
             return self.translate_let(node, ctx, impure)
-        elif func_name == SEQ_TYPE:
+        elif func_name == PSEQ_TYPE:
             return self.translate_sequence(node, ctx)
         elif func_name == PSET_TYPE:
             return self.translate_pset(node, ctx)
-        elif func_name == 'MSet':
+        elif func_name == PMSET_TYPE:
             return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)

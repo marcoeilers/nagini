@@ -146,7 +146,7 @@ class Domain:
         return DomainFuncApp(name, args, self.get_type())
 
 
-class Sequence:
+class PSeq:
     """A helper class for generating Silver sequences."""
 
     def __init__(self, typ: Type, elements: List['Expression']) -> None:
