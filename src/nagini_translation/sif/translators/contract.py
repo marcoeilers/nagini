@@ -11,7 +11,7 @@ from nagini_translation.lib.constants import (
     FLOAT_TYPE,
     INT_TYPE,
     PSET_TYPE,
-    SEQ_TYPE,
+    PSEQ_TYPE,
     STRING_TYPE,
     TUPLE_TYPE
 )
@@ -69,7 +69,7 @@ class SIFContractTranslator(ContractTranslator):
         info = self._create_dyn_check_info(ctx)
         # determine the comparator function to use
         expr_type = self.get_type(node.args[0], ctx)
-        low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, SEQ_TYPE,
+        low_val_types = [BOOL_TYPE, FLOAT_TYPE, INT_TYPE, PSET_TYPE, PSEQ_TYPE,
                          STRING_TYPE, TUPLE_TYPE]
         if expr_type.name in low_val_types:
             comparator = expr_type.get_function('__eq__')

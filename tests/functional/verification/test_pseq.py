@@ -6,11 +6,11 @@ class A:
 
 
 def test_seq() -> None:
-    no_ints = Sequence()  # type: Sequence[int]
+    no_ints = PSeq()  # type: PSeq[int]
     assert len(no_ints) == 0
-    ints = Sequence(1, 2, 3)
+    ints = PSeq(1, 2, 3)
     a = A()
-    ass = Sequence(a)
+    ass = PSeq(a)
     assert a in ass
     assert 3 in ints and 1 in ints
     assert 4 not in ints
@@ -35,7 +35,7 @@ def test_seq() -> None:
 
 def test_list_ToSeq() -> None:
     a = [1,2,3]
-    assert ToSeq(a) == Sequence(1,2,3)
+    assert ToSeq(a) == PSeq(1,2,3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
 

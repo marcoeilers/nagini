@@ -8,7 +8,7 @@ class Clazz:
         Ensures(Acc(self.y))
         self.x = 5  # type: int
         self.y = 3  # type: int
-        self.seq = Sequence(self)  # type: Sequence[Clazz]
+        self.seq = PSeq(self)  # type: PSeq[Clazz]
 
     def m1(self, b: bool) -> None:
         Requires(self != None)

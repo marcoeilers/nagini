@@ -18,10 +18,12 @@ domain PyType {
     function tuple_arg(t: PyType, i: Int): PyType
     function Iterator(t: PyType): PyType
     function Iterator_arg(t: PyType, i: Int): PyType
-    function Sequence(t: PyType): PyType
-    function Sequence_arg(t: PyType, i: Int): PyType
+    function PSeq(t: PyType): PyType
+    function PSeq_arg(t: PyType, i: Int): PyType
     function PSet(t: PyType): PyType
     function PSet_arg(t: PyType, i: Int): PyType
+    function PMultiset(t: PyType): PyType
+    function PMultiset_arg(t: PyType, i: Int): PyType
 
     unique function int(): PyType
     unique function float(): PyType

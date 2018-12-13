@@ -16,10 +16,10 @@ from nagini_translation.lib.constants import (
     LIST_TYPE,
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
-    PRIMITIVE_SEQ_TYPE,
+    PMSET_TYPE,
+    PSEQ_TYPE,
     PSET_TYPE,
     RANGE_TYPE,
-    SEQ_TYPE,
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
@@ -231,7 +231,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
-                elif (target.name in (SEQ_TYPE, PSET_TYPE) and
+                elif (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
                                  for arg in node.args]
@@ -367,11 +367,14 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
-    if func_name == SEQ_TYPE:
-        return _get_collection_literal_type(node, ['args'], SEQ_TYPE, module,
+    if func_name == PSEQ_TYPE:
+        return _get_collection_literal_type(node, ['args'], PSEQ_TYPE, module,
                                             containers, container)
     if func_name == PSET_TYPE:
         return _get_collection_literal_type(node, ['args'], PSET_TYPE, module,
+                                            containers, container)
+    if func_name == PMSET_TYPE:
+        return _get_collection_literal_type(node, ['args'], PMSET_TYPE, module,
                                             containers, container)
     if func_name == 'enumerate':
         if len(node.args) != 1:
@@ -405,12 +408,12 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 return get_type(node.args[1], containers, container)
             elif node.func.id == 'ToSeq':
                 arg_type = get_type(node.args[0], containers, container)
-                seq_class = module.global_module.classes[SEQ_TYPE]
+                seq_class = module.global_module.classes[PSEQ_TYPE]
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(seq_class, [content_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
-                list_class = module.global_module.classes[SEQ_TYPE]
+                list_class = module.global_module.classes[PSEQ_TYPE]
                 return GenericType(list_class, [arg_type])
             elif node.func.id in ('getArg', 'getOld', 'getMethod'):
                 object_class = module.global_module.classes[OBJECT_TYPE]
@@ -502,9 +505,11 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
         return value_type.type_args[1]
     elif value_type.name in (RANGE_TYPE, BYTES_TYPE):
         return module.global_module.classes[INT_TYPE]
-    elif value_type.name == SEQ_TYPE:
+    elif value_type.name == PSEQ_TYPE:
         return value_type.type_args[0]
     elif value_type.name == PSET_TYPE:
+        return value_type.type_args[0]
+    elif value_type.name == PMSET_TYPE:
         return value_type.type_args[0]
     elif value_type.python_class.get_func_or_method('__getitem__'):
         return value_type.python_class.get_func_or_method('__getitem__').type

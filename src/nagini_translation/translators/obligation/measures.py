@@ -81,6 +81,6 @@ class MeasureMap:
             measures.append(measure)
         assign = sil.Assign(
             self._map_var,
-            sil.Sequence(self._measure_domain.get_type(), measures))
+            sil.PSeq(self._measure_domain.get_type(), measures))
         statement = assign.translate(translator, ctx, position, info)
         return [statement]

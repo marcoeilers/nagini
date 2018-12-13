@@ -186,6 +186,9 @@ class ViperAST:
     def SetType(self, element_type):
         return self.ast.SetType(element_type)
 
+    def MultisetType(self, element_type):
+        return self.ast.MultisetType(element_type)
+
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
                                self.to_seq(axioms), self.to_seq(typevars),
@@ -377,11 +380,17 @@ class ViperAST:
     def ExplicitSet(self, elems, position, info):
         return self.ast.ExplicitSet(self.to_seq(elems), position, info, self.NoTrafos)
 
+    def ExplicitMultiset(self, elems, position, info):
+        return self.ast.ExplicitMultiset(self.to_seq(elems), position, info, self.NoTrafos)
+
     def EmptySeq(self, type, position, info):
         return self.ast.EmptySeq(type, position, info, self.NoTrafos)
 
     def EmptySet(self, type, position, info):
         return self.ast.EmptySet(type, position, info, self.NoTrafos)
+
+    def EmptyMultiset(self, type, position, info):
+        return self.ast.EmptyMultiset(type, position, info, self.NoTrafos)
 
     def LocalVarDecl(self, name, type, position, info):
         return self.ast.LocalVarDecl(name, type, position, info, self.NoTrafos)
