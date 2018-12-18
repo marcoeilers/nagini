@@ -45,7 +45,7 @@ class TypeDomainFactory:
     def get_default_axioms(self,
                            ctx: Context) -> List['silver.ast.DomainAxiom']:
         result = [
-            #self.create_reflexivity_axiom(ctx),
+            self.create_reflexivity_axiom(ctx),
             self.create_null_type_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
             #self.create_tuple_args_axiom(ctx),
@@ -118,14 +118,22 @@ class TypeDomainFactory:
                                              self.type_type(), position,
                                              info, self.type_domain)
             subtype_union = self._issubtype(sub_var, union, ctx, position)
+            subtype_union_general = self._issubtype(sub_var, union, ctx, position,
+                                                    force_general=True)
             current_arg_subtype = self._issubtype(sub_var, arg, ctx, position)
             arg_subtype = self.viper.Or(arg_subtype, current_arg_subtype,
                                         position, info)
             body = self.viper.EqCmp(subtype_union, arg_subtype, position, info)
-            trigger = self.viper.Trigger([subtype_union], position, info)
-            forall = self.viper.Forall(arg_decls + [sub_decl], [trigger], body,
+            trigger1 = self.viper.Trigger([subtype_union], position, info)
+            forall1 = self.viper.Forall(arg_decls + [sub_decl], [trigger1], body,
                                        position, info)
-            axiom = self.viper.DomainAxiom('union_subtype_' + str(i), forall,
+            trigger2 = self.viper.Trigger([subtype_union_general], position, info)
+            implication = self.viper.EqCmp(subtype_union_general, subtype_union,
+                                             position, info)
+            forall2 = self.viper.Forall(arg_decls + [sub_decl], [trigger2], implication,
+                                        position, info)
+            axiom_body = self.viper.And(forall1, forall2, position, info)
+            axiom = self.viper.DomainAxiom('union_subtype_' + str(i), axiom_body,
                                            position, info, self.type_domain)
             result.append(axiom)
         return result
@@ -330,6 +338,8 @@ class TypeDomainFactory:
 
     def create_arg_functions(self, cls: 'PythonClass',
                              ctx: Context) -> List['silver.ast.DomainFunc']:
+        if cls.name == TUPLE_TYPE:
+            return []
         position, info = self.no_position(ctx), self.no_info(ctx)
         result = []
         name = cls.sil_name + '_arg'
@@ -368,16 +378,41 @@ class TypeDomainFactory:
                                             self.type_domain)
         subtype = self._issubtype(z_ref, func_lit, ctx)
         subtype_general = self._issubtype(z_ref, func_lit, ctx, force_general=True)
+        if cls.name == TUPLE_TYPE:
+            return []
+            # args = [z_ref]
+            # decls = [z_decl]
+            # type_seq = self.viper.SeqType(self.type_type())
+            # name = 'args'
+            # decl = self.viper.LocalVarDecl(name, type_seq, position,
+            #                                info)
+            # ref = self.viper.LocalVar(name, type_seq, position, info)
+            # decls.append(decl)
+            # type_args = ref
+            # func_lit = self.viper.DomainFuncApp(cls.sil_name, [type_args],
+            #                                     self.type_type(), position, info,
+            #                                     self.type_domain)
+            # subtype = self._issubtype(z_ref, func_lit, ctx)
+            #
+            # current_arg = self.viper.DomainFuncApp(cls.sil_name + '_args', args,
+            #                                        type_seq, position,
+            #                                        info, self.type_domain)
+            # rhs = self.viper.EqCmp(current_arg, type_args, position,
+            #                        info)
+            # implication = self.viper.Implies(subtype, rhs, position, info)
+            # trigger1 = self.viper.Trigger([subtype], position, info)
+            # quantifier = self.viper.Forall(decls, [trigger1], implication,
+            #                                position, info)
+            # axiom = self.viper.DomainAxiom(cls.sil_name + '_args_seq',
+            #                                quantifier, position, info,
+            #                                self.type_domain)
+            # return [axiom]
         for i, var in enumerate(cls.type_vars):
             args = [z_ref, self.viper.IntLit(i, position, info)]
             current_arg = self.viper.DomainFuncApp(cls.sil_name + '_arg', args,
                                                    self.type_type(), position,
                                                    info, self.type_domain)
-            if cls.name == TUPLE_TYPE:
-                args = [current_arg, type_args[i]]
-                rhs = self._issubtype(current_arg, type_args[i], ctx)
-            else:
-                rhs = self.viper.EqCmp(current_arg, type_args[i], position,
+            rhs = self.viper.EqCmp(current_arg, type_args[i], position,
                                        info)
             implication = self.viper.Implies(subtype, rhs, position, info)
             trigger1 = self.viper.Trigger([subtype], position, info)
@@ -493,6 +528,11 @@ class TypeDomainFactory:
                                              self.type_type(), position, info,
                                              self.type_domain)
         body = self._issubtype(type_func, type_func, ctx, position)
+        if type.name == TUPLE_TYPE:
+            tuple_args = self.viper.DomainFuncApp('tuple_args', [type_func], seq_type,
+                                                  position, info, self.type_domain)
+            args_def = self.viper.EqCmp(tuple_args, args_ref, position, info)
+            body = self.viper.And(body, args_def, position, info)
         if type_arg_decls:
             trigger =self.viper.Trigger([type_func], position, info)
             body = self.viper.Forall(type_arg_decls, [trigger], body, position, info)
@@ -539,10 +579,33 @@ class TypeDomainFactory:
         one_part = self._issubtype(t, type_func, ctx, position)
         other_part = self._issubtype_app('issubtype', t, type_func, ctx, position)
         other_body = self.viper.EqCmp(one_part, other_part, position, info)
-        if type.name == 'tuple':
+        if type.name == TUPLE_TYPE:
             trigger1 = self.viper.Trigger([one_part], position, info)
             trigger2 = self.viper.Trigger([other_part], position, info)
             triggers = [trigger1, trigger2]
+            tuple_args = self.viper.DomainFuncApp('tuple_args', [t], seq_type,
+                                                  position, info, self.type_domain)
+            j_decl = self.viper.LocalVarDecl('___j', self.viper.Int, position, info)
+            j_ref = self.viper.LocalVar('___j', self.viper.Int, position, info)
+            tuple_arg_j = self.viper.SeqIndex(tuple_args, j_ref, position, info)
+            arg_j = self.viper.SeqIndex(args_ref, j_ref, position, info)
+            zero = self.viper.IntLit(0, position, info)
+            j_positive = self.viper.GeCmp(j_ref, zero, position, info)
+            tuple_args_len = self.viper.SeqLength(tuple_args, position, info)
+            args_len = self.viper.SeqLength(args_ref, position, info)
+            j_lt_args = self.viper.LtCmp(j_ref, tuple_args_len, position, info)
+            j_in_range = self.viper.And(j_positive, j_lt_args, position, info)
+            j_subtype = self._issubtype(tuple_arg_j, arg_j, ctx, position)
+            inner_implication = self.viper.Implies(j_in_range, j_subtype, position, info)
+            inner_trigger = self.viper.Trigger([tuple_arg_j], position, info)
+            inner_forall = self.viper.Forall([j_decl], [inner_trigger], inner_implication, position, info)
+            some_tuple = self.viper.DomainFuncApp(type.sil_name, [tuple_args], self.type_type(), position, info, self.type_domain)
+            is_some_tuple = self._issubtype(t, some_tuple, ctx, position)
+            inner_forall = self.viper.And(is_some_tuple, inner_forall, position, info)
+            len_eq = self.viper.EqCmp(tuple_args_len, args_len, position, info)
+            inner_forall = self.viper.And(len_eq, inner_forall, position, info)
+            forall_def = self.viper.EqCmp(one_part, inner_forall, position, info)
+            other_body = self.viper.And(other_body, forall_def, position, info)
         else:
             trigger = self.viper.Trigger([other_part], position, info)
             triggers = [trigger]
@@ -904,13 +967,16 @@ class TypeDomainFactory:
                                              position, info, self.type_domain)
         typeof = self.typeof(var_r, ctx)
         subtype = self._issubtype(typeof, none_type, ctx)
+        subtype_general = self._issubtype(typeof, none_type, ctx, force_general=True)
         is_null = self.viper.EqCmp(var_r,
                                    self.viper.NullLit(position, info),
                                    position, info)
-        biimplication = self.viper.EqCmp(subtype, is_null, position, info)
+        biimplication1 = self.viper.EqCmp(subtype, is_null, position, info)
+        biimplication2 = self.viper.EqCmp(subtype, subtype_general, position, info)
+        biimplications = self.viper.And(biimplication1, biimplication2, position, info)
         trigger = self.viper.Trigger([typeof], position, info)
         body = self.viper.Forall([arg_r], [trigger],
-                                 biimplication, position, info)
+                                 biimplications, position, info)
         return self.viper.DomainAxiom('null_nonetype', body, position, info,
                                       self.type_domain)
 
@@ -1062,36 +1128,53 @@ class TypeDomainFactory:
         the given ``type``.
         """
         info = self.no_info(ctx)
-        if isinstance(type, GenericType) and not type.exact_length:
-            assert type.name == TUPLE_TYPE
+        if type.name == TUPLE_TYPE and isinstance(type, GenericType) and not type.exact_length:
             seq_type = self.viper.SeqType(self.type_type())
-            i_ref = self.viper.LocalVar('i', self.viper.Int, position, info)
-            i_decl = self.viper.LocalVarDecl('i', self.viper.Int, position,
-                                             info)
-            zero = self.viper.IntLit(0, position, info)
-            i_ge_zero = self.viper.GeCmp(i_ref, zero, position, info)
             tuple_args = self.viper.DomainFuncApp('tuple_args', [type_func],
                                                   seq_type, position, info,
                                                   self.type_domain)
+            tuple_type = self.viper.DomainFuncApp(type.sil_name, [tuple_args],
+                                                  self.type_type(), position, info,
+                                                  self.type_domain)
             tuple_args_len = self.viper.SeqLength(tuple_args, position, info)
-            i_lt_len = self.viper.LtCmp(i_ref, tuple_args_len, position, info)
-            i_in_bounds = self.viper.And(i_ge_zero, i_lt_len, position, info)
-            tuple_arg = self.viper.DomainFuncApp('tuple_arg',
-                                                 [type_func, i_ref],
-                                                 self.type_type(), position,
-                                                 info, self.type_domain)
-            arg_lit = self.translate_type_literal(type.type_args[0], position,
-                                                  ctx)
-            if concrete:
-                subtype = self.viper.EqCmp(tuple_arg, arg_lit, position, info)
-            else:
-                subtype = self._issubtype(tuple_arg, arg_lit, ctx)
-            implication = self.viper.Implies(i_in_bounds, subtype, position,
-                                             info)
-            trigger = self.viper.Trigger([tuple_arg], position, info)
-            forall = self.viper.Forall([i_decl], [trigger], implication,
-                                       position, info)
-            return forall
+            basic = self._issubtype(type_func, tuple_type, ctx)
+            if not type.exact_length:
+                # issubtypetuple(type_func,tuple_args(type_func)) && forall i :: 0 <= i < |tuple_args(type_func)| ==> issubtype(tuple_args()[i], T)
+
+                i_ref = self.viper.LocalVar('i', self.viper.Int, position, info)
+                i_decl = self.viper.LocalVarDecl('i', self.viper.Int, position,
+                                                 info)
+                zero = self.viper.IntLit(0, position, info)
+                i_ge_zero = self.viper.GeCmp(i_ref, zero, position, info)
+
+
+                i_lt_len = self.viper.LtCmp(i_ref, tuple_args_len, position, info)
+                i_in_bounds = self.viper.And(i_ge_zero, i_lt_len, position, info)
+
+                tuple_arg = self.viper.SeqIndex(tuple_args, i_ref, position, info)
+                arg_lit = self.translate_type_literal(type.type_args[0], position,
+                                                      ctx)
+                if concrete:
+                    subtype = self.viper.EqCmp(tuple_arg, arg_lit, position, info)
+                else:
+                    subtype = self._issubtype(tuple_arg, arg_lit, ctx)
+                implication = self.viper.Implies(i_in_bounds, subtype, position,
+                                                 info)
+                trigger = self.viper.Trigger([tuple_arg], position, info)
+                forall = self.viper.Forall([i_decl], [trigger], implication,
+                                           position, info)
+
+                return self.viper.And(basic, forall, position, info)
+            # issubtypetuple(type_func,tuple_args(type_func)) && |tuple_args| == bla && bigwedge
+            len_lit = self.viper.IntLit(len(type.type_args), position, info)
+            set_len = self.viper.EqCmp(tuple_args_len, len_lit, position, info)
+            result = self.viper.And(basic, set_len, position, info)
+            for i, arg in enumerate(type.type_args):
+                i_lit = self.viper.IntLit(i, position, info)
+                tuple_arg = self.viper.SeqIndex(tuple_args, i_lit, position, info)
+                arg_subtype = self.subtype_check(tuple_arg, arg, position, ctx)
+                result = self.viper.And(result, arg_subtype, position, info)
+            return result
 
         supertype_func = self.translate_type_literal(type, position, ctx,
                                                      alias=type_func)
