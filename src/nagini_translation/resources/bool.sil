@@ -181,6 +181,14 @@ function float___div__(self: Ref, other: Ref): Ref
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
             (result == int___div__(int___unbox__(self), int___unbox__(other)))
 
+function float___int__(self: Ref): Ref
+    requires issubtype(typeof(self), float())
+    ensures typeof(result) == int()
+
+function int___int__(self: Ref): Ref
+    requires issubtype(typeof(self), int())
+    ensures result == self
+
 function object___eq__(self: Ref, other: Ref): Bool
     ensures self == other ==> result
     ensures ((self == null) != (other == null)) ==> !result

@@ -132,6 +132,15 @@ class CallTranslator(CommonTranslator):
                                                          [None], node, ctx)
         return stmt + str_stmt, str_val
 
+
+    def _translate_int(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        str_stmt, str_val = self.get_func_or_method_call(arg_type, '__int__', [target],
+                                                         [None], node, ctx)
+        return stmt + str_stmt, str_val
+
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -469,6 +478,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_len(node, ctx)
         elif func_name == 'str':
             return self._translate_str(node, ctx)
+        elif func_name == 'int':
+            return self._translate_int(node, ctx)
         elif func_name == 'bool':
             return self._translate_bool(node, ctx)
         elif func_name == 'set':

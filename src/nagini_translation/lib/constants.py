@@ -13,6 +13,7 @@ DEFAULT_SERVER_SOCKET = "tcp://*:5555"
 LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['cast',
+            'int',
             'isinstance',
             'bool',
             'len',
