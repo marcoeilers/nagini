@@ -3,7 +3,8 @@
     "functions": {
         "__bool__": {
             "args": ["object"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["list", "set", "dict"]
         },
         "__eq__": {
             "args": ["object", "object"],

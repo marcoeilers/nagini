@@ -431,9 +431,9 @@ class TypeDomainFactory:
                              ctx: Context) -> List['silver.ast.DomainFunc']:
         args = []
         result = []
-        if type_nargs != 0:
-            result.append(self.viper.DomainFunc(name + '_basic', [], self.type_type(),
-                                                True, position, info, self.type_domain))
+        # if type_nargs != 0:
+        #     result.append(self.viper.DomainFunc(name + '_basic', [], self.type_type(),
+        #                                         True, position, info, self.type_domain))
         if type_nargs == -1:
             seq_type = self.viper.SeqType(self.type_type())
             args.append(self.viper.LocalVarDecl('args', seq_type, position,
@@ -965,18 +965,20 @@ class TypeDomainFactory:
         var_r = self.viper.LocalVar('r', self.viper.Ref, position, info)
         none_type = self.viper.DomainFuncApp('NoneType', [], self.type_type(),
                                              position, info, self.type_domain)
-        typeof = self.typeof(var_r, ctx)
-        subtype = self._issubtype(typeof, none_type, ctx)
-        subtype_general = self._issubtype(typeof, none_type, ctx, force_general=True)
-        is_null = self.viper.EqCmp(var_r,
-                                   self.viper.NullLit(position, info),
-                                   position, info)
-        biimplication1 = self.viper.EqCmp(subtype, is_null, position, info)
-        biimplication2 = self.viper.EqCmp(subtype, subtype_general, position, info)
-        biimplications = self.viper.And(biimplication1, biimplication2, position, info)
-        trigger = self.viper.Trigger([typeof], position, info)
-        body = self.viper.Forall([arg_r], [trigger],
-                                 biimplications, position, info)
+        t_decl = self.viper.LocalVarDecl('___t', self.type_type(), position, info)
+        t_ref = self.viper.LocalVar('___t', self.type_type(), position, info)
+        null = self.viper.NullLit(position, info)
+        typeof_null = self.typeof(null, ctx)
+        null_has_type_none = self._issubtype(typeof_null, none_type, ctx)
+
+        subtype = self._issubtype(t_ref, none_type, ctx)
+        subtype_general = self._issubtype(t_ref, none_type, ctx, force_general=True)
+
+        biimplication = self.viper.EqCmp(subtype, subtype_general, position, info)
+        trigger = self.viper.Trigger([subtype_general], position, info)
+        quantifier = self.viper.Forall([t_decl], [trigger],
+                                       biimplication, position, info)
+        body = self.viper.And(null_has_type_none, quantifier, position, info)
         return self.viper.DomainAxiom('null_nonetype', body, position, info,
                                       self.type_domain)
 

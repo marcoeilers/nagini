@@ -138,6 +138,9 @@ class IOOperationDefinitionTranslator(IOOperationCommonTranslator):
 
         name = ctx.module.get_fresh_name(
             operation.sil_name + '__termination_check')
+        if operation.sil_name not in self.viper.used_names_sets:
+            self.viper.used_names_sets[operation.sil_name] = set()
+        self.viper.used_names_sets[operation.sil_name].add(name)
         parameters = [
             parameter.decl
             for parameter in operation.get_parameters()

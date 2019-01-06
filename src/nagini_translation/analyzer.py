@@ -329,6 +329,8 @@ class Analyzer(ast.NodeVisitor):
             method.generic_type = if_method['generic_type']
         if if_method.get('requires'):
             method.requires = if_method['requires']
+        if cls:
+            method.requires.append(cls.name)
         cont = cls if cls else self.module.global_module
         if predicate:
             cont.predicates[method_name] = method

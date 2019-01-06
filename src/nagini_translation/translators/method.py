@@ -885,10 +885,13 @@ class MethodTranslator(CommonTranslator):
         """
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
+        used_names = set()
+        self.viper.used_names = used_names
 
         main = self._get_main_module(modules)
         main_method, locals, stmts = self._create_main_method_setup(modules, ctx)
         method_name = main_method.sil_name
+        self.viper.used_names_sets[method_name] = used_names
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
