@@ -1180,8 +1180,8 @@ class ProgramTranslator(CommonTranslator):
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
-        type_funcs = self.type_factory.get_default_functions(ctx)
-        type_axioms = self.type_factory.get_default_axioms(ctx)
+        type_funcs = []
+        type_axioms = []
 
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
@@ -1417,6 +1417,8 @@ class ProgramTranslator(CommonTranslator):
                 if axioms:
                     type_axioms.extend(axioms)
 
+        type_funcs.extend(self.type_factory.get_default_functions(ctx))
+        type_axioms.extend(self.type_factory.get_default_axioms(ctx))
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))
         domains.append(self.create_thread_domain(ctx))
