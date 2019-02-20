@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 
 setup(
         name='nagini',
-        version='0.1',
+        version='0.8',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
-        packages=['nagini_translation',],
+        packages=find_packages('src'),
         package_dir={'': 'src'},
         requires=[
             'distribute',
@@ -27,9 +27,8 @@ setup(
                  'nagini = nagini_translation.main:main',
                  ]
              },
-        url='http://www.pm.inf.ethz.ch/research/viper.html',
-        description='Python frontend for VIPER.',
-        long_description=(open('README.rst').read()),
+        url='http://www.pm.inf.ethz.ch/research/nagini.html',
+        description='Static verifier for Python 3, based on Viper.',
         # Full list of classifiers could be found at:
         # http://pypi.python.org/pypi?%3Aaction=list_classifiers
         classifiers=[
