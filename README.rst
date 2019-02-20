@@ -38,12 +38,6 @@ Getting Started
 
     ./<env>/bin/pip install nagini
 
-on Linux or ::
-
-    <env>\Scripts\pip.exe install nagini
-
-on Windows.
-
 
 Command Line Usage
 ==================
@@ -52,15 +46,10 @@ To verify a specific file from the nagini directory, run::
 
     ./<env>/bin/nagini [OPTIONS] path-to-file.py
 
-on Linux or ::
 
-    <env>\Scripts\nagini.exe [OPTIONS] path-to-file.py
+The options ``--z3`` and ``--viper-jar-path`` are mandatory and must point to a Z3 executable and a JAR file containing the desired Viper backend. E.g., to use the Symbolic Execution backend (Silicon) from the provided Viper Tools file, call ::
 
-on Windows.
-
-The options ``--z3`` and ``--viper-jar-path`` are mandatory and must point to a Z3 executable and a JAR file containing the desired Viper backend. E.g., to use the Symbolic Execution backend (Silicon) from the provided Viper Tools file, call
-
-    ./<env>/bin/nagini --z3 <viperTools>/z3/bin/u3 --viper-jar-path <viperTools>/backends/silicon.jar path-to-file.py
+    ./<env>/bin/nagini --z3 <viperTools>/z3/bin/z3 --viper-jar-path <viperTools>/backends/silicon.jar path-to-file.py
 
 The following command line options are available::
 
