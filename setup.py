@@ -11,16 +11,19 @@ setup(
         license='MPL-2.0',
         packages=find_packages('src'),
         package_dir={'': 'src'},
+        package_data={
+            '': ['*.sil', '*.index'],
+        },
         requires=[
             'distribute',
             ],
         install_requires=[
-            'mypy-lang',
-            'toposort',
-            'jpype1',
-            'astunparse',
-            'typed-ast',
-            'pyzmq',
+            'mypy-lang==0.4.5',
+            'toposort==1.5',
+            'jpype1==0.6.2',
+            'astunparse==1.6.2',
+            'typed-ast==0.6.3',
+            'pytest==3.3.0',
             ],
         entry_points = {
              'console_scripts': [
