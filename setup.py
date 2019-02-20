@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='0.8',
+        version='0.8.2',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -32,6 +32,7 @@ setup(
              },
         url='http://www.pm.inf.ethz.ch/research/nagini.html',
         description='Static verifier for Python 3, based on Viper.',
+        long_description=(open('README.rst').read()),
         # Full list of classifiers could be found at:
         # http://pypi.python.org/pypi?%3Aaction=list_classifiers
         classifiers=[
