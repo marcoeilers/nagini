@@ -1,3 +1,6 @@
+#:: IgnoreFile(silicon)(320)
+
+
 from nagini_contracts.contracts import *
 
 

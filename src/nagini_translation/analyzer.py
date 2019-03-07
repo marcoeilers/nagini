@@ -901,6 +901,10 @@ class Analyzer(ast.NodeVisitor):
             preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
             if not contains_stmt(preconditions, node):
                 raise InvalidProgramException(node, 'invalid.contract.position')
+        if isinstance(node.func, ast.Name) and node.func.id == 'LowExit':
+            invariants = list(map(lambda tuple: tuple[0], self.stmt_container.loop_invariants))
+            if not contains_stmt(invariants, node):
+                raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:

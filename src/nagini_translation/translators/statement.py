@@ -745,7 +745,6 @@ class StatementTranslator(CommonTranslator):
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
 
-
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))

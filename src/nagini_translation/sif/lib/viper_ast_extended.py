@@ -91,6 +91,9 @@ class ViperASTExtended(ViperAST):
     def LowEvent(self, position: Position, info: Info):
         return self.ast_extensions.SIFLowEventExp(position, info, self.NoTrafos)
 
+    def LowExit(self, position: Position, info: Info):
+        return self.ast_extensions.SIFLowExitExp(position, info, self.NoTrafos)
+
     def Declassify(self, expr: Expr, position: Position, info: Info):
         return self.ast_extensions.SIFDeclassifyStmt(expr, position, info, self.NoTrafos)
 

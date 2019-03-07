@@ -6,6 +6,7 @@ def m1(x: int) -> int:
     res = 1
     while res < x:
         Invariant(Low(res))
+        Invariant(LowExit())
         res = res * 2
         if res > 100:
             return res
@@ -45,6 +46,7 @@ def next_leapyear(start: int) -> int:
     while True:
         Invariant(next_ly > start)
         Invariant(Low(next_ly))
+        Invariant(LowExit())
         if next_ly % 4 != 0:
             next_ly = next_ly + 1
             continue

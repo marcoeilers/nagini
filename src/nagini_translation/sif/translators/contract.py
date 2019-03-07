@@ -93,6 +93,13 @@ class SIFContractTranslator(ContractTranslator):
             info = self.no_info(ctx)
         return [], self.viper.LowEvent(self.to_position(node, ctx), info)
 
+    def translate_lowexit(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to the LowExit() contract function.
+        """
+        info = self.no_info(ctx)
+        return [], self.viper.LowExit(self.to_position(node, ctx), info)
+
     def translate_declassify(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to the Declassify() contract function.

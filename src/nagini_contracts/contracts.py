@@ -30,7 +30,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset',]
+                  'PMultiset', 'LowExit',]
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -119,6 +119,13 @@ def LowVal(expr: T) -> bool:
 def LowEvent() -> bool:
     """
     Predicate that states that either both executions reach this point or none of them.
+    """
+    pass
+
+def LowExit() -> bool:
+    """
+    Predicate that states that whether the current loop has been left via a break or
+    return statement does not depend on high data.
     """
     pass
 
@@ -459,6 +466,7 @@ __all__ = [
         'Low',
         'LowVal',
         'LowEvent',
+        'LowExit',
         'Declassify',
         'TerminatesSif',
         'AllLow',
