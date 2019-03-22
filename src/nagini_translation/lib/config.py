@@ -24,7 +24,7 @@ import glob
 import os
 import sys
 
-from typing import List
+import nagini_translation.resources
 
 
 class SectionConfig:
@@ -142,6 +142,11 @@ class FileConfig:
         self.test_config = TestConfig(self.config)
 
 
+def resources_folder():
+    resources = os.path.dirname(nagini_translation.resources.__file__)
+    return resources
+
+
 def _construct_classpath(verifier : str = None):
     """ Contstructs JAVA classpath.
 
@@ -171,7 +176,14 @@ def _construct_classpath(verifier : str = None):
             return os.pathsep.join(
                 glob.glob('/usr/lib/viper/*.jar'))
 
-    return ''
+    resources = resources_folder()
+    silicon = os.path.join(resources, 'backends', 'silicon.jar')
+    carbon = os.path.join(resources, 'backends', 'carbon.jar')
+    return os.pathsep.join(
+        jar for jar, v in ((silicon, 'carbon'),
+                           (carbon, 'silicon'),
+                           (arpplugin_jar, 'arpplugin'))
+        if jar and v != verifier)
 
 
 def _get_boogie_path():
@@ -209,6 +221,12 @@ def _get_z3_path():
             return '/usr/bin/viper-z3'
         if os.path.exists('/usr/bin/z3'):
             return '/usr/bin/z3'
+
+    path = os.path.join(os.path.dirname(sys.executable),
+                        'z3.exe' if sys.platform.startswith('win') else 'z3')
+    if os.path.exists(path):
+        return path
+
 
 
 def _get_mypy_path():

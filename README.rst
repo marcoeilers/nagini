@@ -10,13 +10,11 @@ For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com
 Dependencies (Ubuntu Linux)
 ===================================
 
-1.  Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
+Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
 
-        sudo apt-get install python3-dev libzmq3-dev
+    sudo apt-get install python3-dev
 
-    For usage with the Viper's verification condition generation backend Carbon, you will also need to install the Mono runtime.
-
-2.  Download and extract `ViperToolsLinux <http://viper.ethz.ch/downloads/ViperToolsLinux.zip>`_
+For usage with the Viper's verification condition generation backend Carbon, you will also need to install the Mono runtime.
 
 Dependencies (Windows)
 ==========================
@@ -25,7 +23,6 @@ Dependencies (Windows)
 
 2.  Install either Visual C++ Build Tools 2015 (http://go.microsoft.com/fwlink/?LinkId=691126) or Visual Studio 2015. For the latter, make sure to choose the option "Common Tools for Visual C++ 2015" in the setup (see https://blogs.msdn.microsoft.com/vcblog/2015/07/24/setup-changes-in-visual-studio-2015-affecting-c-developers/ for an explanation).
 
-3.  Download and extract `ViperToolsWin <http://viper.ethz.ch/downloads/ViperToolsWin.zip>`_
 
 Getting Started
 ===============
@@ -47,10 +44,6 @@ To verify a specific file from the nagini directory, run::
     ./<env>/bin/nagini [OPTIONS] path-to-file.py
 
 
-The options ``--z3`` and ``--viper-jar-path`` are mandatory and must point to a Z3 executable and a JAR file containing the desired Viper backend. E.g., to use the Symbolic Execution backend (Silicon) from the provided Viper Tools file, call ::
-
-    ./<env>/bin/nagini --z3 <viperTools>/z3/bin/z3 --viper-jar-path <viperTools>/backends/silicon.jar path-to-file.py
-
 The following command line options are available::
 
     ``--verifier``      
@@ -64,7 +57,7 @@ The following command line options are available::
                     separated list of names.
 
     ``--z3``            
-                    Sets the path of the Z3 executable. Always required. Alternatively, the
+                    Sets the path of the Z3 executable. Alternatively, the
                     ``Z3_EXE`` environment variable can be set.
                     
     ``--boogie``        
@@ -75,8 +68,8 @@ The following command line options are available::
     ``--viper-jar-path``    
                     Sets the path to the required Viper binaries (``silicon.jar`` or
                     ``carbon.jar``). Only the binary for the selected backend is
-                    required. You can either use the provided binary packages
-                    (see above) or compile your own from source (see below).
+                    required. You can either use the provided binary packages installed
+                    by default or compile your own from source (see below).
                     Expects either a single path or a colon- (Unix) or semicolon-
                     (Windows) separated list of paths. Alternatively, the environment
                     variables ``SILICONJAR``, ``CARBONJAR`` or ``VIPERJAR`` can be set.
@@ -104,9 +97,6 @@ Troubleshooting
 
     The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
 
-3.  When using the Carbon backend, Boogie crashes:
-
-    The Boogie binaries in ViperToolsWin don't seem to work on all systems; in this case, compile Boogie from scratch and set the Boogie path point to the new (or an existing) Boogie installation.
 
 Build Status
 ============

@@ -152,6 +152,8 @@ class Carbon:
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.carbon.CarbonVerifier):
             raise Exception('Carbon backend not found on classpath.')
+        if config.boogie_path is None:
+            raise Exception('Boogie not found.')
         self.carbon = jvm.viper.carbon.CarbonVerifier()
         args = jvm.scala.collection.mutable.ArraySeq(5)
         args.update(0, '--boogieExe')

@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='0.8.2',
+        version='0.8.3',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -13,6 +13,7 @@ setup(
         package_dir={'': 'src'},
         package_data={
             '': ['*.sil', '*.index'],
+            'nagini_translation.resources': ['backends/*.jar']
         },
         requires=[
             'distribute',
@@ -24,6 +25,7 @@ setup(
             'astunparse==1.6.2',
             'typed-ast==0.6.3',
             'pytest==3.3.0',
+            'z3-solver'
             ],
         entry_points = {
              'console_scripts': [
