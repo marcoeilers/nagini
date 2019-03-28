@@ -42,7 +42,7 @@ def check_join_and_find_employee(psi: Payroll, es: List[Employee]) -> Optional[C
         j = 0
         while j < len(es):
             Invariant(list_pred(es))
-            Invariant(Low(es) and Low(len(es)))
+            Invariant(LowExit() and Low(es) and Low(len(es)))
             Invariant(Acc(psi.PID, 1/8) and Low(psi.PID))
             Invariant(j >= 0 and j <= len(es) and Low(j))
             Invariant(Forall(int, lambda i: (Implies(i >= 0 and i < len(es), Acc(es[i].EID, 1/4) and Low(es[i].EID)), [[es[i]]])))

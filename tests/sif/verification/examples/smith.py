@@ -18,7 +18,7 @@ def main(a: List[int], secret: int) -> int:
     i = 0
     while i < len(a):
         Invariant(list_pred(a))
-        Invariant(Low(len(a)))
+        Invariant(LowExit() and Low(len(a)))
         Invariant(0 <= i and i <= len(a))
         #:: ExpectedOutput(invariant.not.established:assertion.false)
         Invariant(Forall(int, lambda el: (Implies(el >= 0 and el < len(a), Low(a[el])), [[a[el]]])))
@@ -39,7 +39,7 @@ def main_fixed(a: List[int], secret: int) -> int:
     asd = [12]
     while i < len(a):
         Invariant(list_pred(a))
-        Invariant(Low(len(a)))
+        Invariant(LowExit() and Low(len(a)))
         Invariant(0 <= i and i <= len(a))
         Invariant(Forall(int, lambda el: (Implies(el >= 0 and el < len(a), Low(a[el])), [[a[el]]])))
         Invariant(Low(i))
