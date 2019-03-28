@@ -903,7 +903,7 @@ class Analyzer(ast.NodeVisitor):
                 raise InvalidProgramException(node, 'invalid.contract.position')
         if isinstance(node.func, ast.Name) and node.func.id == 'LowExit':
             preconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
-            postconditions = list(map(lambda tuple: tuple[0], self.stmt_container.precondition))
+            postconditions = list(map(lambda tuple: tuple[0], self.stmt_container.postcondition))
             if contains_stmt(preconditions, node) or contains_stmt(postconditions, node):
                 raise InvalidProgramException(node, 'invalid.contract.position')
         self.visit_default(node)
