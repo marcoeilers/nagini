@@ -10,7 +10,7 @@ For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 8 (64 bit), Mercurial, Git and Python 3.6 (64 bit, newer versions should work but are currently untested) and the required libraries::
+Install Java 8 (64 bit) and Python 3 (64 bit) and the required libraries::
 
     sudo apt-get install python3-dev
 
@@ -19,7 +19,7 @@ For usage with the Viper's verification condition generation backend Carbon, you
 Dependencies (Windows)
 ==========================
 
-1.  Install Java (64 bit), Mercurial, Git and Python 3.5 (64 bit), s.t. java, hg, git and python are all available from the command line.
+1.  Install Java (64 bit) and Python 3 (64 bit).
 
 2.  Install either Visual C++ Build Tools 2015 (http://go.microsoft.com/fwlink/?LinkId=691126) or Visual Studio 2015. For the latter, make sure to choose the option "Common Tools for Visual C++ 2015" in the setup (see https://blogs.msdn.microsoft.com/vcblog/2015/07/24/setup-changes-in-visual-studio-2015-affecting-c-developers/ for an explanation).
 
