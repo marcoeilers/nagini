@@ -71,7 +71,7 @@ def parse_sil_file(sil_path: str, jvm):
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
-    translator = jvm.viper.silver.parser.Translator(resolved, False)
+    translator = jvm.viper.silver.parser.Translator(resolved)
     # Reset messages in global Consistency object. Otherwise, left-over
     # translation errors from previous translations prevent loading of the
     # built-in silver files.
