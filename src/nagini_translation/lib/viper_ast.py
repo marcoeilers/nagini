@@ -141,7 +141,7 @@ class ViperAST:
         body = self.scala.Some(body) if body is not None else self.none
         return self.ast.Function(name, self.to_seq(args), type,
                                  self.to_seq(pres),
-                                 self.to_seq(posts), self.none,
+                                 self.to_seq(posts),
                                  body, position, info, self.NoTrafos)
 
     def Method(self, name, args, returns, pres, posts, locals, body, position,
