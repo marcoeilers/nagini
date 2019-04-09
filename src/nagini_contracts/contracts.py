@@ -87,7 +87,7 @@ def Let(e1: T, t: Type[V], e2: Callable[[T], V]) -> V:
     """
     pass
 
-def Forall(domain: Union[Iterable[T], Type[T]],
+def Forall(domain: 'Union[Iterable[T], Type[T]]',
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
