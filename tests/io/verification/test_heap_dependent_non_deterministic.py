@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 This test illustrates the problem of using heap dependent IO operations
 in non-deterministic choice.

@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 This is an example that illustrates Chalice2Silver
 `issue 82 <https://bitbucket.org/viperproject/chalice2silver/issues/82/>`_.

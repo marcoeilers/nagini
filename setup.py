@@ -1,11 +1,16 @@
-#!/usr/bin/env python3
+"""
+Copyright (c) 2019 ETH Zurich
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
 
 from setuptools import setup, find_packages
 
 
 setup(
         name='nagini',
-        version='0.8.3',
+        version='0.8.4',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',

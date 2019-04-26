@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 # Abstract definition:
 # Tree = Leaf(elem: int)
 #      | Node(left: Tree, right: Tree)

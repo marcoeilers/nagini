@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import *
 from resources.test_import_file import test_func, test_method
 

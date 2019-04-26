@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import *
 import resources.namespace_test as nt
 from resources.namespace_test_3 import a_function, P as PPP

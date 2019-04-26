@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import *
 from resources.sif_utils import input_high, input_low, sif_print
 from typing import List

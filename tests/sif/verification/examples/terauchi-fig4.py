@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 Example from "Secure Information Flow as a Safety Problem", Figure 4
 T. Terauchi and A. Aiken

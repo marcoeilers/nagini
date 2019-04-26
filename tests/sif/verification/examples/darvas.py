@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 Example from "A Theorem Proving Approach to Analysis of Secure Information Flow"
 Darvas, Adam and Haehnle, Reiner and Sands, David

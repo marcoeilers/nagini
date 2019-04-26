@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 Example from "Secure Information Flow and Pointer Confinement in a Java-like Language"
 A. Banerjee and D. A. Naumann

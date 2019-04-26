@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 A variation of example 1 where client handling is performed in a
 separate function that in theory can be forked.

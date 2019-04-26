@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 This test is a ported version of ``obligations/termination.chalice``
 test from Chalice2Silver test suite.

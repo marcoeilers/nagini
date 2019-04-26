@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 Example from paper "Modular Product Programs"
 M. Eilers, P. Müller, S. Hitz

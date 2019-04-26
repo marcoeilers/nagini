@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 """
 Example from "A Hybrid Approach for Proving Noninterference of Java Programs"
 R. Kuesters, T. Truderung, B. Beckert, D. Bruns, M. Kirsten, and M. Mohr

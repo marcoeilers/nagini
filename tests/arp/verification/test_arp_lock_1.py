@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.lock import Lock
 from nagini_contracts.contracts import *
 from nagini_contracts.obligations import Level, WaitLevel

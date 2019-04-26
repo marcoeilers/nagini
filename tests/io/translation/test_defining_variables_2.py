@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import Ensures
 from nagini_contracts.io_contracts import *
 from typing import Tuple, Callable
