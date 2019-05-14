@@ -454,7 +454,8 @@ class StatementTranslator(CommonTranslator):
         zero = self.viper.IntLit(0, pos, info)
         twenty = self.viper.IntLit(20, pos, info)
         frac_perm_120 = self.viper.FractionalPerm(one, twenty, pos, info)
-        if iterable_type.name in {DICT_TYPE, LIST_TYPE, SET_TYPE}:
+
+        if iterable_type.name in {LIST_TYPE, SET_TYPE}:
             field_name = iterable_type.name + '_acc'
             field_type = seq_ref if iterable_type.name == LIST_TYPE else set_ref
             acc_field = self.viper.Field(field_name, field_type, pos, info)
@@ -463,6 +464,19 @@ class StatementTranslator(CommonTranslator):
                                                          frac_perm_120, pos,
                                                          info)
             invariant.append(field_pred)
+        elif iterable_type.name == DICT_TYPE:
+            acc_field = self.viper.Field('dict_acc', set_ref, pos, info)
+            acc_field2 = self.viper.Field('dict_acc2', self.viper.Ref, pos, info)
+            field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
+            field_acc2 = self.viper.FieldAccess(iterable, acc_field2, pos, info)
+            field_pred = self.viper.FieldAccessPredicate(field_acc,
+                                                         frac_perm_120, pos,
+                                                         info)
+            field_pred2 = self.viper.FieldAccessPredicate(field_acc2,
+                                                          frac_perm_120, pos,
+                                                          info)
+            invariant.append(field_pred)
+            invariant.append(field_pred2)
         elif iterable_type.name == RANGE_TYPE:
             pass
         else:

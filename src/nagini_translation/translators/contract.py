@@ -130,29 +130,31 @@ class ContractTranslator(CommonTranslator):
         name = node.func.id
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
+        pos = self.to_position(node, ctx)
         if name == 'list_pred':
             # field list_acc : Seq[Ref]
-            field = self.viper.Field('list_acc', seq_ref, self.no_position(ctx),
-                                     self.no_info(ctx))
+            return self._get_field_perm('list_acc', seq_ref, perm, args[0], pos, ctx)
         elif name == 'set_pred':
             # field set_acc : Set[Ref]
-            field = self.viper.Field('set_acc', set_ref, self.no_position(ctx),
-                                     self.no_info(ctx))
+            return self._get_field_perm('set_acc', set_ref, perm, args[0], pos, ctx)
         elif name == 'dict_pred':
-            # field dict_acc : Set[Ref]
-            field = self.viper.Field('dict_acc', set_ref, self.no_position(ctx),
-                                     self.no_info(ctx))
+            # field dict_acc : Set[Ref] && dict_acc2 : Ref
+            acc1 = self._get_field_perm('dict_acc', set_ref, perm, args[0], pos, ctx)
+            acc2 = self._get_field_perm('dict_acc2', self.viper.Ref, perm, args[0], pos,
+                                        ctx)
+            return self.viper.And(acc1, acc2, pos, self.no_info(ctx))
         elif name == 'MayStart':
             return self.translate_may_start(node, args, perm, ctx)
         elif name == 'ThreadPost':
             return self.translate_thread_post(node, args, perm, ctx)
         else:
             raise UnsupportedException(node)
-        field_acc = self.viper.FieldAccess(args[0], field,
-                                           self.to_position(node, ctx),
-                                           self.no_info(ctx))
-        pos = self.to_position(node, ctx)
+
+    def _get_field_perm(self, field_name: str, field_type: 'silver.ast.Type', perm: Expr,
+                        rec: Expr, pos: Position, ctx: Context) -> Expr:
         info = self.no_info(ctx)
+        field = self.viper.Field(field_name, field_type, pos, info)
+        field_acc = self.viper.FieldAccess(rec, field, pos, info)
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)

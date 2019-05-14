@@ -89,3 +89,13 @@ def test_set() -> None:
     Assert(mydict[key7] == super3)
     #:: ExpectedOutput(assert.failed:assertion.false)
     Assert(mydict[key1] == super1)
+
+
+def test_change() -> None:
+    a = {1 : 2}
+    a[2] = 4
+    a[2] = 5
+    assert a[2] == 5
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert a[2] == 4
+    assert False

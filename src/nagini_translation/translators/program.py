@@ -468,6 +468,10 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SetType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+        fields.append(self.viper.Field('dict_acc2',
+                                       self.viper.Ref,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
         fields.append(self.viper.Field('Measure$acc',
                                        self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),

@@ -85,9 +85,10 @@ function set___sil_seq__(self: Ref): Seq[Ref]
     ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), set_arg(typeof(self), 0))
 
 field dict_acc : Set[Ref]
+field dict_acc2 : Ref
 
 method dict___init__() returns (res: Ref)
-    ensures acc(res.dict_acc)
+    ensures acc(res.dict_acc) && acc(res.dict_acc2)
     ensures res.dict_acc == Set[Ref]()
     ensures typeof(res) == dict(dict_arg(typeof(res), 0), dict_arg(typeof(res), 1))
 {
@@ -96,15 +97,15 @@ method dict___init__() returns (res: Ref)
 
 function dict___contains__(self: Ref, item: Ref) : Bool
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures result == (item in self.dict_acc)
 
 method dict___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-  requires acc(self.dict_acc, 1 / 10)
+  requires acc(self.dict_acc, 1 / 10) && acc(self.dict_acc2, 1 / 10)
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
-  ensures acc(self.dict_acc, 1 / 20)
+  ensures acc(self.dict_acc, 1 / 20) && acc(self.dict_acc2, 1 / 20)
   ensures _res.list_acc == dict___sil_seq__(self)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
@@ -116,14 +117,14 @@ method dict___iter__(self: Ref) returns (_res: Ref)
 
 function dict___bool__(self: Ref) : Bool
     requires self != null ==> issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires self != null ==> acc(self.dict_acc, wildcard)
+    requires self != null ==> acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures self == null ==> !result
     ensures self != null ==> result == (|self.dict_acc| != 0)
 
 method dict_keys(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, 1/100)
-    ensures acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
+    ensures acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
     ensures acc(res.set_acc)
     ensures res.set_acc == self.dict_acc
 {
@@ -132,26 +133,26 @@ method dict_keys(self: Ref) returns (res: Ref)
 
 function dict___getitem__(self: Ref, key: Ref) : Ref
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     requires dict___contains__(self, key)
     ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
     ensures result in dict___values__(self)
 
 function dict___values__(self: Ref) : Seq[Ref]
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures |result| == |self.dict_acc|
 
 function dict_get(self: Ref, key: Ref) : Ref
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
 
 method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc)
+    requires acc(self.dict_acc) && acc(self.dict_acc2)
     requires issubtype(typeof(item), dict_arg(typeof(self), 1))
     requires issubtype(typeof(key), dict_arg(typeof(self), 0))
-    ensures acc(self.dict_acc)
+    ensures acc(self.dict_acc) && acc(self.dict_acc2)
     ensures self.dict_acc == old(self.dict_acc) union Set(key)
     ensures dict___getitem__(self, key) == item
     ensures forall k : Ref ::
@@ -172,8 +173,8 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
 
 method dict_values(self: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, 1/100)
-    ensures acc(self.dict_acc, 1/100)
+    requires acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
+    ensures acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
     ensures self.dict_acc == old(self.dict_acc)
     ensures typeof(_res) == list(dict_arg(typeof(self), 1))
     ensures acc(_res.list_acc)
@@ -181,11 +182,11 @@ method dict_values(self: Ref) returns (_res: Ref)
 
 function dict___len__(self: Ref): Int
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures result == |self.dict_acc|
 
 function dict___sil_seq__(self: Ref): Seq[Ref]
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
+    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
     ensures |result| == |self.dict_acc|
     ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result

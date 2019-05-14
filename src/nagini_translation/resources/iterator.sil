@@ -40,7 +40,7 @@ method Iterator___del__(self: Ref)
   requires acc(self.__container, 1 / 20)
   ensures acc(self.__container, 1 / 20)
   ensures (issubtype(typeof(self.__container), list(list_arg(typeof(self.__container), 0)))) ==> acc(self.__container.list_acc, 1 / 20)
-  ensures (issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container), 0), dict_arg(typeof(self.__container), 1)))) ==> acc(self.__container.dict_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container), 0), dict_arg(typeof(self.__container), 1)))) ==> acc(self.__container.dict_acc, 1 / 20) && acc(self.__container.dict_acc2, 1 / 20)
   ensures (issubtype(typeof(self.__container), set(set_arg(typeof(self.__container), 0)))) ==> acc(self.__container.set_acc, 1 / 20)
 {
   inhale false

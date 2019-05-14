@@ -199,15 +199,23 @@ class MethodTranslator(CommonTranslator):
             set_ref = self.viper.SetType(self.viper.Ref)
             dict_acc_field = self.viper.Field('dict_acc', set_ref,
                                               pos, info)
+            dict_acc2_field = self.viper.Field('dict_acc2', self.viper.Ref,
+                                              pos, info)
             field_acc = self.viper.FieldAccess(func.kw_arg.ref(),
                                                dict_acc_field,
                                                pos, info)
+            field_acc2 = self.viper.FieldAccess(func.kw_arg.ref(),
+                                                dict_acc2_field,
+                                                pos, info)
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
             acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
                                                        pos, info)
+            acc_pred2 = self.viper.FieldAccessPredicate(field_acc2, full_perm,
+                                                        pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
+            pres.append(acc_pred2)
         if func.cls:
             # Add upper bound information for type variables.
             for name, var in func.cls.type_vars.items():
