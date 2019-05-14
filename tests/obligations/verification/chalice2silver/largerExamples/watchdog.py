@@ -10,14 +10,10 @@ test suite.
 
 from nagini_contracts.contracts import (
     Acc,
-    Assert,
     Ensures,
-    Fold,
-    Implies,
     Invariant,
     Predicate,
     Requires,
-    Unfold
 )
 from nagini_contracts.obligations import *
 from nagini_contracts.lock import Lock

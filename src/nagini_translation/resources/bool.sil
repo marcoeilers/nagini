@@ -32,7 +32,6 @@ function int___bool__(self: Ref) : Bool
 function __prim__int___box__(prim: Int): Ref
     ensures typeof(result) == int()
     ensures int___unbox__(result) == prim
-    ensures forall other: Int :: {__prim__int___box__(other)} ((__prim__int___box__(other) == result) <==> (other == prim))
 
 function int___unbox__(box: Ref): Int
     requires issubtype(typeof(box), int())
