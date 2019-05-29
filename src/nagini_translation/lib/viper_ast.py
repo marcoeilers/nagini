@@ -222,11 +222,10 @@ class ViperAST:
             return self.to_seq(arg_decls)
 
         type_passed_func = self.to_function0(type_passed_apply)
-        args_passed_func = self.to_function0(args_passed_apply)
         result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
                                         self.to_map(type_var_map), position,
                                         info, type_passed_func,
-                                        args_passed_func, domain_name, self.NoTrafos)
+                                        domain_name, self.NoTrafos)
         return result
 
     def TypeVar(self, name):
@@ -367,13 +366,8 @@ class ViperAST:
 
     def FuncApp(self, name, args, position, info, type, formalargs=None):
         self.used_names.add(name)
-        if formalargs is None:
-            formalargs = []
-            for i, a in enumerate(args):
-                formalargs.append(self.LocalVarDecl('p' + str(i), a.typ(), a.pos(),
-                                                    a.info()))
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
-                                self.to_seq(formalargs), self.NoTrafos)
+                                self.NoTrafos)
 
     def ExplicitSeq(self, elems, position, info):
         return self.ast.ExplicitSeq(self.to_seq(elems), position, info, self.NoTrafos)
