@@ -29,7 +29,7 @@ setup(
             'jpype1==0.6.2',
             'astunparse==1.6.2',
             'typed-ast==0.6.3',
-            'pytest==3.3.0',
+            'pytest==4.3.0',
             'z3-solver'
             ],
         entry_points = {
