@@ -86,7 +86,7 @@ class ViperASTExtended(ViperAST):
         else:
             comp_opt = self.none
         return self.ast_extensions.SIFLowExp(
-            expr, comp_opt, position, info, self.NoTrafos)
+            expr, comp_opt, self.to_map({}), position, info, self.NoTrafos)
 
     def LowEvent(self, position: Position, info: Info):
         return self.ast_extensions.SIFLowEventExp(position, info, self.NoTrafos)
