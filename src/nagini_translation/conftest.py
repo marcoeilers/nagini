@@ -38,6 +38,7 @@ class PyTestConfig:
         self.verification_test_dirs = []
         self.single_test = None
         self.verifiers = []
+        self.store_viper = False
 
         self.init_from_config_file()
 
@@ -126,6 +127,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
                      action='store_true')
     parser.addoption('--silicon', dest='silicon', action='store_true')
     parser.addoption('--carbon', dest='carbon', action='store_true')
+    parser.addoption('--store-viper', dest='store_viper', action='store_true')
 
 
 def pytest_configure(config: 'pytest.config.Config'):
@@ -180,6 +182,7 @@ def pytest_configure(config: 'pytest.config.Config'):
         _pytest_config.clear_verifiers()
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
+    _pytest_config.store_viper = config.option.store_viper
     if not _pytest_config.verifiers:
         # Default: all available verifiers.
         verifiers = []
@@ -223,8 +226,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             sif = 'sif' in file
             reload_resources = file in reload_triggers
             arp = 'arp' in file
-            params.extend([(file, verifier, sif, reload_resources, arp) for verifier
+            params.extend([(file, verifier, sif, reload_resources, arp, _pytest_config.store_viper) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,verifier,sif,reload_resources,arp', params)
+        metafunc.parametrize('path,verifier,sif,reload_resources,arp,print', params)
     else:
         pytest.exit('Unrecognized test function.')
