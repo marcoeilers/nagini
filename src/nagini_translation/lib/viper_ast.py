@@ -135,7 +135,7 @@ class ViperAST:
     def Program(self, domains, fields, functions, predicates, methods, position, info):
         return self.ast.Program(self.to_seq(domains), self.to_seq(fields),
                                 self.to_seq(functions), self.to_seq(predicates),
-                                self.to_seq(methods), position, info, self.NoTrafos)
+                                self.to_seq(methods), self.to_seq([]), position, info, self.NoTrafos)
 
     def Function(self, name, args, type, pres, posts, body, position, info):
         body = self.scala.Some(body) if body is not None else self.none
