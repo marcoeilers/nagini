@@ -563,6 +563,8 @@ class VerificationTest(AnnotatedTest):
             sif: bool, reload_resources: bool, arp: bool, store_viper: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
+        if arp and verifier is ViperVerifier.silicon:
+            pytest.skip('Ignoring ARP with Silicon')
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         abspath = os.path.abspath(path)
