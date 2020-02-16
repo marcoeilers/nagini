@@ -6,6 +6,7 @@ from nagini_contracts.contracts import *
 from nagini_contracts.obligations import Level, WaitLevel, MustTerminate
 from nagini_contracts.thread import Thread
 
+#:: IgnoreFile(carbon)(228)
 
 class Cell:
     def __init__(self, val: int) -> None:
