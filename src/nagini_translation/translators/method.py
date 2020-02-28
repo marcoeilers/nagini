@@ -39,6 +39,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     flatten,
     get_body_indices,
+    get_parent_of_type,
     get_surrounding_try_blocks,
     InvalidProgramException
 )
@@ -608,6 +609,7 @@ class MethodTranslator(CommonTranslator):
         label = self.viper.Label(label_name,
                                  self.to_position(block.node, ctx),
                                  self.no_info(ctx))
+        loop = get_parent_of_type(block.node, (ast.While, ast.For))
         body = [label]
         if block.finally_block:
             for stmt in block.finally_block:
@@ -649,6 +651,10 @@ class MethodTranslator(CommonTranslator):
             finally_var = ctx.var_aliases[finally_var.sil_name]
         tries = get_surrounding_try_blocks(ctx.actual_function.try_blocks,
                                            block.node)
+        tries_in_same_loop = []
+        if loop is not None:
+            tries_in_same_loop = [t for t in tries if get_parent_of_type(t.node, (ast.While, ast.For)) is loop]
+
         post_label = ctx.get_label_name(block.post_name)
         goto_post = self.viper.Goto(post_label, pos, info)
         end_label = ctx.get_label_name(END_LABEL)
@@ -659,7 +665,7 @@ class MethodTranslator(CommonTranslator):
         return_block = []
         for current in tries:
             if not return_block and current.finally_block:
-                # Propagate return value
+                # Propagate finally var value
                 var_next = current.get_finally_var(self.translator)
                 if var_next.sil_name in ctx.var_aliases:
                     var_next = ctx.var_aliases[var_next.sil_name]
@@ -687,12 +693,32 @@ class MethodTranslator(CommonTranslator):
                                            info)
                 except_block.append(if_handler)
             if current.finally_block:
-                # Propagate return value
+                # Propagate finally var value
                 # Goto finally block
                 except_block += return_block
                 break
+        break_block = []
+        for current in tries_in_same_loop:
+            if not break_block and current.finally_block:
+                # Propagate finally var value
+                var_next = current.get_finally_var(self.translator)
+                if var_next.sil_name in ctx.var_aliases:
+                    var_next = ctx.var_aliases[var_next.sil_name]
+                next_assign = self.viper.LocalVarAssign(var_next.ref(),
+                                                        finally_var.ref(),
+                                                        pos, info)
+                # Goto finally block
+                next_label = ctx.get_label_name(current.finally_name)
+                goto_next = self.viper.Goto(next_label, pos, info)
+                break_block = [next_assign, goto_next]
+                continue_block = [next_assign, goto_next]
         if not return_block:
             return_block = [goto_end]
+        if loop and not break_block:
+            goto_break = self.viper.Goto(loop.post_label, pos, info)
+            goto_continue = self.viper.Goto(loop.end_label, pos, info)
+            break_block = [goto_break]
+            continue_block = [goto_continue]
         if ctx.actual_function.declared_exceptions:
             # Assign error to error output var
             error_var = ctx.error_var.ref()
@@ -712,17 +738,30 @@ class MethodTranslator(CommonTranslator):
             except_block.append(goto_end)
         except_block = self.translate_block(except_block, pos, info)
         return_block = self.translate_block(return_block, pos, info)
+        if loop:
+            break_block = self.translate_block(break_block, pos, info)
+            continue_block = self.translate_block(continue_block, pos, info)
 
-        number_zero = self.viper.IntLit(0, pos, info)
-        greater_zero = self.viper.GtCmp(finally_var.ref(), number_zero, pos,
-                                        info)
         number_one = self.viper.IntLit(1, pos, info)
-        greater_one = self.viper.GtCmp(finally_var.ref(), number_one, pos, info)
-        if_return = self.viper.If(greater_zero, return_block, goto_post, pos,
+        number_two = self.viper.IntLit(2, pos, info)
+        number_three = self.viper.IntLit(3, pos, info)
+        number_four = self.viper.IntLit(4, pos, info)
+
+        is_one = self.viper.EqCmp(finally_var.ref(), number_one, pos, info)
+        is_two = self.viper.EqCmp(finally_var.ref(), number_two, pos, info)
+        is_three = self.viper.EqCmp(finally_var.ref(), number_three, pos, info)
+        is_four = self.viper.EqCmp(finally_var.ref(), number_four, pos, info)
+
+        if_return = self.viper.If(is_one, return_block, goto_post, pos,
                                   info)
-        if_except = self.viper.If(greater_one, except_block, if_return, pos,
+        if_except = self.viper.If(is_two, except_block, if_return, pos,
                                   info)
-        body += [if_except]
+        top_level_if = if_except
+        if loop is not None:
+            if_break = self.viper.If(is_three, break_block, if_except, pos, info)
+            if_continue = self.viper.If(is_four, continue_block, if_break, pos, info)
+            top_level_if = if_continue
+        body += [top_level_if]
         return body
 
     def translate_handler(self, handler: PythonExceptionHandler,
