@@ -125,3 +125,15 @@ def f8(m: MyClass) -> int:
     finally:
         l += 1
     return l
+
+
+def f9(m: MyClass) -> None:
+    Requires(Acc(m.x) and m.x == 0)
+    Ensures(Acc(m.x))
+    Ensures(m.x == 0)
+    while True:
+        Invariant(Acc(m.x) and m.x == 0)
+        try:
+            break
+        except Exception:
+            m.x = 1
