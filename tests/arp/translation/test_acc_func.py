@@ -2,7 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 
-#:: IgnoreFile(carbon)(228)
+#:: IgnoreFile(ANY)(228)
 
 
 from nagini_contracts.contracts import *
