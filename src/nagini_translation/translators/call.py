@@ -1119,7 +1119,7 @@ class CallTranslator(CommonTranslator):
                 receiver_class = None
                 is_predicate = target.predicate
             elif (isinstance(node.func.value, ast.Call) and
-                        get_func_name(node.func.value) == 'super'):
+                        get_func_name(node.func.value) == 'super' and not (target.cls and target.cls.name == 'dict')):
                     # Super call
                     return self._inline_call(target, node, True, 'static call',
                                              ctx)
@@ -1194,8 +1194,9 @@ class CallTranslator(CommonTranslator):
         """
 
         is_name = isinstance(node.func, ast.Name)
-        func_name = get_func_name(node)
+
         if is_name:
+            func_name = get_func_name(node)
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             elif func_name in CONTRACT_FUNCS:
@@ -1210,6 +1211,9 @@ class CallTranslator(CommonTranslator):
                 return self._translate_thread_creation(node, ctx)
             elif func_name in BUILTIN_PREDICATES:
                 return self.translate_contractfunc_call(node, ctx, impure)
+        elif isinstance(node.func, ast.Call):
+            if get_func_name(node.func) == 'IOExists':
+                return self.translate_expr(node.args[0].body, ctx, impure, statement)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):

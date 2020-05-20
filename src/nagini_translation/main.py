@@ -91,7 +91,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False, verbose: bool = False) -> Program:
+              reload_resources: bool = False, verbose: bool = False, check_consistency: bool = False) -> Program:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -118,6 +118,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
+    analyzer.initialize_io_analyzer()
     main_module.add_builtin_vars()
     collect_modules(analyzer, path)
     if sif:
@@ -149,13 +150,13 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
         prog = get_arp_plugin(jvm).before_verify(prog)
         if verbose:
             print('ARP transformation successful.')
-    # Run consistency check in translated AST
-    consistency_errors = viper_ast.to_list(prog.checkTransitively())
-    for error in consistency_errors:
-        print(error.toString())
-    if consistency_errors:
-        print(prog)
-        raise ConsistencyException('consistency.error')
+    if check_consistency:
+        # Run consistency check in translated AST
+        consistency_errors = viper_ast.to_list(prog.checkTransitively())
+        for error in consistency_errors:
+            print(error.toString())
+        if consistency_errors:
+            raise ConsistencyException('consistency.error')
     return prog
 
 

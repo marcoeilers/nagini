@@ -97,7 +97,7 @@ class A:
         Requires(Acc(other.b))
         Requires(MustRelease(other.a, other.b))
 
-        #:: ExpectedOutput(call.precondition:assertion.false)|ExpectedOutput(carbon)(call.precondition:insufficient.permission)
+        #:: ExpectedOutput(silicon)(call.precondition:assertion.false)|ExpectedOutput(carbon)(call.precondition:insufficient.permission)
         self.quick_release(other)
 
     def timed_release_bounded_statdec(self, other: 'A') -> None:

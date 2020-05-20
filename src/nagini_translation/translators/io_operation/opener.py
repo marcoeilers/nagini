@@ -11,6 +11,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 
 from typing import cast, List
+from collections import OrderedDict
 
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.io_context import IOOpenContext
@@ -120,10 +121,17 @@ class Opener:
             self._define_existential_variables()
             self._ctx.inlined_calls.append(self._operation)
             body = self._translate_body()
+            alias_definitions = dict(self._io_ctx._open_var_alias_definitions)
+            for alias in self._io_ctx._open_var_aliases:
+                ref = self._io_ctx._open_var_aliases[alias].ref()
+                replacement = alias_definitions[alias]
+                body = body.replace(ref, replacement)
+                for other_alias in self._io_ctx._open_var_alias_definitions:
+                    if alias == other_alias:
+                        continue
+                    alias_definitions[other_alias] = alias_definitions[other_alias].replace(ref, replacement)
             self._ctx.inlined_calls.pop()
-        statements = self._emit_existential_variable_definitions()
-        statements.append(self._emit_body_inhale(body))
-        return statements
+        return [self._emit_body_inhale(body)]
 
     def _define_existential_variables(self) -> None:
         """Define fresh local variables for stuff mentioned in IOExists.
@@ -131,7 +139,7 @@ class Opener:
         Make sure that they have fresh silver names. Add them to the
         context and variable aliases.
         """
-        io_existential_vars = dict(
+        io_existential_vars = OrderedDict(
             (creator.name, creator.create_variable_instance())
             for creator in self._operation.get_io_existentials()
         )

@@ -761,9 +761,11 @@ class ExpressionTranslator(CommonTranslator):
             target = self.get_target(node, ctx)
             if isinstance(target, PythonGlobalVar):
                 return self.translate_global_var_reference(target, node, ctx)
+            elif isinstance(target, PythonClass):
+                return [], self.type_factory.translate_type_literal(target, self.to_position(node, ctx), ctx)
             else:
                 raise UnsupportedException(node)
-        elif (isinstance(target, PythonClass) and
+        elif (isinstance(target, PythonClass) and not isinstance(node.value, ast.Call) and
                       func_name != 'Result'):
             field = target.get_static_field(node.attr)
             field_func = self.translate_static_field_access(field, target,
@@ -802,8 +804,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             # If the receiver is an ADT, attribute access is translated as deconstruction
             recv_type = self.get_type(node.value, ctx)
-            if isinstance(recv_type, PythonClass) and recv_type.is_adt:
-                return self.translate_adt_decons(recv_type, node, position, ctx)
+            if isinstance(recv_type.python_class, PythonClass) and recv_type.python_class.is_adt:
+                return self.translate_adt_decons(recv_type.python_class, node, position, ctx)
 
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)

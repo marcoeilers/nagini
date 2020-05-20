@@ -8,8 +8,8 @@ b = [a]
 
 
 def foo_1() -> int:
-    Requires(Acc(a) and Acc(b) and a >= 1)
     global b, a
+    Requires(Acc(a) and Acc(b) and a >= 1)
     tmp = a
     a = 0  # b[0]
     b = [34]

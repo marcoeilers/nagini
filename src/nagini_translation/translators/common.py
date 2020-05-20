@@ -23,6 +23,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
     PSEQ_TYPE,
+    PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
@@ -565,16 +566,24 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         info = self.no_info(ctx)
         res = None
         if not (isinstance(dom_type, UnionType) or isinstance(dom_type, OptionalType)):
-            if dom_type.name in (DICT_TYPE, SET_TYPE):
+            if dom_type.name in (DICT_TYPE, SET_TYPE, PSEQ_TYPE, PSET_TYPE):
                 contains_constructor = self.viper.AnySetContains
                 if dom_type.name == DICT_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)
                     field = self.viper.Field('dict_acc', set_ref, position, info)
                     res = self.viper.FieldAccess(dom_arg, field, position, info)
-                if dom_type.name == SET_TYPE:
+                elif dom_type.name == SET_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)
                     field = self.viper.Field('set_acc', set_ref, position, info)
                     res = self.viper.FieldAccess(dom_arg, field, position, info)
+                elif dom_type.name == PSET_TYPE:
+                    res = self.get_function_call(dom_type, '__unbox__', [dom_arg],
+                                                 [None], node, ctx, position)
+                else:
+                    # PSEQ_TYPE
+                    contains_constructor = self.viper.SeqContains
+                    res = self.get_function_call(dom_type, '__sil_seq__', [dom_arg],
+                                                 [None], node, ctx, position)
             if False and (dom_type.name == RANGE_TYPE and isinstance(node.func, ast.Name) and
                         node.func.id == 'range'):
                 left = node.args[0]

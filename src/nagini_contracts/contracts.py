@@ -25,7 +25,7 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
@@ -95,7 +95,7 @@ def Forall(domain: 'Union[Iterable[T], Type[T]]',
     pass
 
 
-def Exists(domain: Iterable[T], predicate: Callable[[T], bool]) -> bool:
+def Exists(domain: 'Union[Iterable[T], Type[T]]', predicate: Callable[[T], bool]) -> bool:
     """
     exists x in domain: predicate(x)
     """

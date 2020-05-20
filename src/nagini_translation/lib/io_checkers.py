@@ -55,8 +55,6 @@ class IOOperationBodyChecker(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         """Check that only allowed names are used in the body."""
         name = node.id
-        if name.startswith('IOExists'):
-            _raise_error(node, 'ioexists')
         if name == 'Acc':
             _raise_error(node, 'non_pure')
         if name in self._undefined_existentials:

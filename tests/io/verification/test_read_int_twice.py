@@ -28,7 +28,7 @@ def read_int_twice_io(
         t_post: Place = Result(),
         ) -> bool:
     Terminates(False)
-    return IOExists1(Place)(
+    return IOExists(Place)(
         lambda t2: (
         read_int_io(t_pre, number1, t2) and
         read_int_io(t2, number2, t_post)

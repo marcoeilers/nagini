@@ -10,7 +10,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # pragma pylint: disable=too-many-arguments,invalid-name,unused-argument,too-many-locals
 
 
-from typing import Any, TypeVar, Generic, Callable, Type
+from typing import Any, Callable, Generic, List, Tuple, Type, TypeVar, Union
 
 
 BUILTIN_IO_OPERATIONS = (
@@ -53,6 +53,15 @@ T12 = TypeVar('T12')
 T13 = TypeVar('T13')
 T14 = TypeVar('T14')
 T15 = TypeVar('T15')
+
+
+def IOForall(domain: Type[T],
+             predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    pass
+
+
+def IOExists(domain: Type[T]) -> Callable[[Callable[[T], bool]], bool]:
+    pass
 
 
 class IOExists1(Generic[T1]):
@@ -429,6 +438,8 @@ def ctoken(t: Place) -> bool:
 
 
 __all__ = (
+    'IOForall',
+    'IOExists',
     'IOExists1',
     'IOExists2',
     'IOExists3',

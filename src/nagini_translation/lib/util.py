@@ -214,6 +214,8 @@ def get_body_indices(statements: List[ast.AST]) -> Tuple[int, int]:
     try:
         while is_docstring(statements[start_index]):
             start_index += 1
+        while isinstance(statements[start_index], ast.Global):
+            start_index += 1
         while is_io_existential(statements[start_index]):
             start_index += 1
         while is_invariant(statements[start_index]):

@@ -187,3 +187,13 @@ def io_exists(
             c9 == a9 and is_c9(c9, a9)
         )
     )
+
+
+def io_exists_2(
+        a1: C1) -> None:
+    IOExists(C1)(
+        lambda c1:
+        Ensures(
+            c1 == a1 and is_c1(c1, a1)
+        )
+    )

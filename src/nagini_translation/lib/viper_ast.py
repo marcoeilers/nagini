@@ -209,8 +209,19 @@ class ViperAST:
         return self.ast.DomainType(name, map,
                                    seq)
 
+    def mark_class_used(self, name: str):
+        if name == 'Iterator':
+            self.used_names.add('list')
+            self.used_names.add('dict')
+            self.used_names.add('set')
+        self.used_names.add(name)
+
     def DomainFuncApp(self, func_name, args, type_passed,
                       position, info, domain_name, type_var_map={}):
+        if func_name.startswith('issubtype'):
+            self.used_names.add(func_name[9:])
+        else:
+            self.used_names.add(func_name)
         arg_decls = [self.LocalVarDecl('arg' + str(i), arg.typ(), arg.pos(),
                                        arg.info())
                      for i, arg in enumerate(args)]
@@ -397,6 +408,8 @@ class ViperAST:
         return self.ast.Result(type, position, info, self.NoTrafos)
 
     def AnySetContains(self, elem, s, position, info):
+        if (str(s).startswith("PSeq___sil_seq")):
+            raise Exception
         return self.ast.AnySetContains(elem, s, position, info, self.NoTrafos)
 
     def AnySetUnion(self, left, right, position, info):
@@ -470,8 +483,8 @@ class ViperAST:
                 result = self.And(result, qp, position, info)
             return result
 
-    def Exists(self, variables, exp, position, info):
-        res = self.ast.Exists(self.to_seq(variables), exp, position, info, self.NoTrafos)
+    def Exists(self, variables, triggers, exp, position, info):
+        res = self.ast.Exists(self.to_seq(variables), self.to_seq(triggers), exp, position, info, self.NoTrafos)
         return res
 
     def Trigger(self, exps, position, info):

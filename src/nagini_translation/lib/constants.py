@@ -127,7 +127,10 @@ INTERNAL_NAMES = [
     't',
     'g',
     'x',
-    'Low'
+    'Low',
+    'key',
+    'guard',
+    'value'
 ]
 
 VIPER_KEYWORDS = [

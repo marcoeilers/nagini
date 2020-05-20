@@ -803,6 +803,8 @@ class ContractTranslator(CommonTranslator):
         lambda_prefix += '$'
         arg = lambda_.args.args[0]
         var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+        if var is None:
+            var = ctx.actual_function.get_variable(arg.arg)
         variables.append(var.decl)
 
         ctx.set_alias(arg.arg, var, None)
@@ -858,6 +860,80 @@ class ContractTranslator(CommonTranslator):
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
         return dom_stmt, forall
+
+    def translate_exists(self, node: ast.Call, ctx: Context,
+                         impure=False) -> StmtsAndExpr:
+        domain_node = node.args[0]
+
+        lambda_ = node.args[1]
+        variables = []
+        lambda_prefix = construct_lambda_prefix(lambda_.lineno,
+                                                getattr(lambda_, 'col_offset',
+                                                        None))
+        lambda_prefix += '$'
+        arg = lambda_.args.args[0]
+        var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+        if not var:
+            var = ctx.actual_function.get_variable(arg.arg)
+        assert var, lambda_prefix + arg.arg
+        variables.append(var.decl)
+
+        ctx.set_alias(arg.arg, var, None)
+        if isinstance(lambda_.body, ast.Tuple):
+            if not len(lambda_.body.elts) == 2:
+                raise InvalidProgramException(node, 'invalid.exists')
+            body_stmt, rhs = self.translate_expr(lambda_.body.elts[0], ctx,
+                                                 self.viper.Bool, impure)
+
+            triggers = self._translate_triggers(lambda_.body, node, ctx)
+        else:
+            body_type = self.get_type(lambda_.body, ctx)
+            if not body_type or body_type.name != BOOL_TYPE:
+                raise InvalidProgramException(node, 'invalid.exists')
+            body_stmt, rhs = self.translate_expr(lambda_.body, ctx,
+                                                 self.viper.Bool, impure)
+            triggers = []
+
+        ctx.remove_alias(arg.arg)
+        if body_stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+
+
+        dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
+                                                                          domain_node,
+                                                                          ctx)
+        if dom_stmt:
+            raise InvalidProgramException(domain_node,
+                                          'purity.violated')
+        lhs = self.unwrap(lhs)
+
+        implication = self.viper.And(lhs, rhs, self.to_position(node, ctx),
+                                     self.no_info(ctx))
+        if always_use or not triggers:
+            # Add lhs of the implication, which the user cannot write directly
+            # in this exact form.
+            # If we always do this, we apparently deactivate the automatically
+            # generated triggers and things are actually worse.
+            # Change: We always do this now.
+            try:
+                # Depending on the collection expression, this doesn't always
+                # work (malformed trigger); in that case, we just don't do it.
+                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                                                 self.no_info(ctx))
+                triggers = [lhs_trigger] + triggers
+            except Exception:
+                pass
+        var_type_check = self.type_check(var.ref(), var.type,
+                                         self.no_position(ctx), ctx, False)
+        implication = self.viper.And(var_type_check, implication,
+                                     self.to_position(node, ctx),
+                                     self.no_info(ctx))
+
+
+        exists = self.viper.Exists(variables, triggers, implication,
+                                   self.to_position(node, ctx),
+                                   self.no_info(ctx))
+        return dom_stmt, exists
 
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
                                     impure=False, statement=False) -> StmtsAndExpr:
@@ -951,8 +1027,10 @@ class ContractTranslator(CommonTranslator):
             return self.translate_declassify(node, ctx)
         elif func_name == 'TerminatesSif':
             return self.translate_terminates_sif(node, ctx)
-        elif func_name == 'Forall':
+        elif func_name in ('Forall', 'IOForall'):
             return self.translate_forall(node, ctx, impure)
+        elif func_name == 'Exists':
+            return self.translate_exists(node, ctx, impure)
         elif func_name == 'Previous':
             return self.translate_previous(node, ctx)
         elif func_name == 'Let':

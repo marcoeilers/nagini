@@ -65,6 +65,11 @@ def get_target(node: ast.AST,
         return find_entry(node.s, True, containers)
     elif isinstance(node, ast.Call):
         # For calls, we return the type of the result of the call
+        if isinstance(node.func, ast.Call):
+            if get_func_name(node.func) == 'IOExists':
+                module = next(cont for cont in containers
+                              if isinstance(cont, PythonModule))
+                return module.global_module.classes[BOOL_TYPE]
         func_name = get_func_name(node)
         if (container and func_name == 'Result' and
                 isinstance(container, PythonMethod)):
@@ -229,7 +234,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 # type arguments. We only support that if we can get it directly
                 # from mypy, i.e., when the result is assigned to a variable
                 # and we can get the variable type.
-                if node._parent and isinstance(node._parent, ast.Assign):
+                if hasattr(node, '_parent') and node._parent and isinstance(node._parent, ast.Assign):
                     return get_type(node._parent.targets[0], containers,
                                     container)
                 elif (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
@@ -302,7 +307,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if (node.value is True) or (node.value is False):
             return module.global_module.classes[BOOL_TYPE]
         elif node.value is None:
-            return module.global_module.classes[OBJECT_TYPE]
+            return module.global_module.classes['NoneType']
         else:
             raise UnsupportedException(node)
     elif isinstance(node, ast.Call):
@@ -398,9 +403,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'Exists',
-                                  'MayCreate', 'MaySet', 'Low', 'LowVal', 'LowEvent',
-                                  'LowExit'):
+            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'IOForall', 'Exists',
+                                  'MayCreate', 'MaySet', 'Low', 'LowVal', 'LowEvent', 'LowExit'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Declassify':
                 return None

@@ -217,3 +217,5 @@ function min(a: Ref, b: Ref): Int
 
 function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)
+
+method print(r: Ref)

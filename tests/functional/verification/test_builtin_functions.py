@@ -26,3 +26,6 @@ def test_min() -> None:
     assert c is not 6
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert c is not 1
+
+
+print("Hello")

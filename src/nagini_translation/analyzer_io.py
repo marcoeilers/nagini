@@ -44,6 +44,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         self._current_io_operation = None   # type: nodes.PythonIOOperation
         self._current_node = None           # type: ast.FunctionDef
         self._in_property = False
+        self._current_lambdas = []
 
     def _raise_invalid_operation(
             self,
@@ -110,6 +111,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 node.arg == EVAL_IO_SIGNATURE[2]):
             return self._parent.module.global_module.classes[OBJECT_TYPE]
         scopes = [self._current_io_operation.name]
+        scopes.extend(self._current_lambdas)
         if lambda_:
             prefix = construct_lambda_prefix(
                 lambda_.lineno, lambda_.col_offset)
@@ -233,6 +235,7 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         IO operation body must be a single expression that is returned.
         """
         body = node.value
+        lambda_ = None
 
         if (isinstance(body, ast.Call) and
                 isinstance(body.func, ast.Call) and
@@ -254,6 +257,14 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 node)
         assert self._current_io_operation.set_io_existentials(
             io_existential_creators)
+        if lambda_ is not None:
+            prefix = construct_lambda_prefix(
+                lambda_.lineno, lambda_.col_offset)
+            self._current_lambdas.append(prefix)
+            self.visit(node.value.args[0].body)
+            self._current_lambdas.pop()
+        else:
+            self.visit(node.value)
 
     def visit_Call(self, node: ast.Call) -> None:
         """Parse IO operation properties.
@@ -263,6 +274,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
         """
         assert self._current_io_operation is not None
         assert self._current_node is not None
+
+        body_prefix = None
 
         if (isinstance(node.func, ast.Name) and
                 node.func.id in IO_OPERATION_PROPERTY_FUNCS):
@@ -295,9 +308,35 @@ class IOOperationAnalyzer(ast.NodeVisitor):
             for arg in node.args:
                 self.visit(arg)
             self._in_property = False
-        else:
-            for arg in node.args:
-                self.visit(arg)
+            return
+        elif isinstance(node.func, ast.Name) and node.func.id in ('IOForall', 'Forall', 'Exists'):
+            operation = self._current_io_operation
+            assert len(node.args[1].args.args) == 1
+            arg_type = self._parent.get_target(node.args[0], operation.module)
+            lambda_ = node.args[1]
+            body_prefix = construct_lambda_prefix(lambda_.lineno,
+                                                  getattr(lambda_, 'col_offset',
+                                                          None))
+            for arg in lambda_.args.args:
+                var = self._node_factory.create_python_var(arg.arg, arg,
+                                                           arg_type)
+                operation._io_universals.append(var)
+        elif (isinstance(node.func, ast.Call) and isinstance(node.func.func, ast.Name)
+              and node.func.func.id == 'IOExists'):
+            lambda_ = node.args[0]
+            arg = lambda_.args.args[0]
+            body_prefix = construct_lambda_prefix(
+                lambda_.lineno, lambda_.col_offset)
+            creator = self._node_factory.create_python_var_creator(
+                arg.arg, arg, self._typeof(arg, lambda_))
+            current_existentials = self._current_io_operation.get_io_existentials()
+            current_existentials.append(creator)
+        if body_prefix:
+            self._current_lambdas.append(body_prefix)
+        for arg in node.args:
+            self.visit(arg)
+        if body_prefix:
+            self._current_lambdas.pop()
 
     def visit_Name(self, node: ast.Name) -> None:
         """Check if node is an operation input.

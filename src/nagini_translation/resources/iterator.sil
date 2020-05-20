@@ -13,26 +13,52 @@ method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
   requires acc(self.list_acc, 1 / 40)
   requires acc(self.__iter_index, write)
   requires acc(self.__previous, write)
-  ensures acc(self.list_acc, 1 / 40) && (self.list_acc == old(self.list_acc))
+  // invariants:
+  //requires self.__iter_index <= |self.list_acc|
+  //requires self.__iter_index >= 0
+  //requires self.__previous == self.list_acc[..self.__iter_index - 1]
+  ensures acc(self.list_acc, 1 / 40) && self.list_acc == old(self.list_acc)
   ensures acc(self.__iter_index, write)
-  ensures self.__iter_index <= |self.list_acc|
-  ensures old(self.__iter_index == |self.list_acc|) <==> _err != null
+  ensures self.__iter_index <= |self.list_acc| + 1
+  ensures old(self.__iter_index == |self.list_acc|) == (_err != null)
   ensures acc(self.__previous, write)
-  ensures _err == null ==> (self.__iter_index == old(self.__iter_index) + 1)
+  ensures _err == null ==> self.__iter_index == old(self.__iter_index) + 1
   ensures _err == null ==> self.__iter_index > 0
   ensures _err == null ==> self.__previous == self.list_acc[..self.__iter_index - 1]
-  ensures forall r : Ref :: {r in self.__previous}
-                             r in self.__previous == ((r in old(self.__previous)) ||
-                                                      (old(self.__iter_index) > 1 &&
-                                                      old(self.__iter_index) != |self.list_acc| &&
-                                                      r == old(self.list_acc[self.__iter_index - 1])))
   ensures |self.list_acc| > 0 ==> self.__iter_index > 0
-  ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && _res in self.list_acc
   ensures _err != null ==> self.__previous == self.list_acc
   ensures _err != null ==> self.__iter_index == |self.list_acc|
+  ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && (_res in self.list_acc)
   ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
+
+  ensures (forall r: Ref :: { (r in self.__previous) }
+    (r in self.__previous) == ((r in old(self.__previous)) ||
+                               ((self.__iter_index > 1 &&  r == self.list_acc[self.__iter_index - 2] && _err == null) || (self.__iter_index > 0 && _err != null &&   r == self.list_acc[self.__iter_index-1]))))
 {
-  inhale false
+  // This is a valid implementation with the added preconditions from above (but we don't prove it correct every time).
+  /*
+  if (self.__iter_index < |self.list_acc|) {
+    _err := null
+    self.__iter_index := self.__iter_index + 1
+    self.__previous := self.list_acc[..self.__iter_index - 1]
+    _res := self.list_acc[self.__iter_index - 1]
+  }else{
+    _err := new()
+    assert self.__previous == self.list_acc[..|self.list_acc| - 1]
+    if (|self.list_acc| > 0) {
+      assert self.list_acc == self.__previous ++ Seq(self.list_acc[|self.list_acc| - 1])
+    }
+
+    assert (forall r: Ref :: {r in self.list_acc} (r in self.list_acc) == (r in self.__previous || |self.list_acc| > 0 && r == self.list_acc[|self.list_acc| - 1]))
+    self.__previous := self.list_acc
+    if (|self.list_acc| > 0) {
+      _res := self.list_acc[|self.list_acc| - 1]
+    }
+
+    self.__iter_index := |self.list_acc|
+  }
+  */
+  assume false
 }
 
 method Iterator___del__(self: Ref)

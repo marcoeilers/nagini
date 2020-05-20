@@ -234,10 +234,6 @@ class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
         local_type, local_alts = self.types.get_type(actual_prefix, name)
         if local_type is not None:
             return local_type, local_alts
-        for module in self.from_imports:
-            module_result = module.get_type(prefixes, name, previous + (self,))
-            if module_result != (None, None):
-                return module_result
         return None, None
 
     def get_func_type(self, path: List[str]):
@@ -676,9 +672,9 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         if other.issubtype(self):
             return self
         if self.superclass:
-            return self.superclass.get_common_superclass(other)
+            return self.superclass.python_class.get_common_superclass(other)
         elif other.superclass:
-            return self.get_common_superclass(other.superclass)
+            return self.get_common_superclass(other.superclass.python_class)
         else:
             assert False, 'Internal error: Classes without common superclass.'
 
@@ -1212,6 +1208,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self._postset = []
         self._inputs = []
         self._outputs = []
+        self._io_universals = []
         self._terminates = None
         self._termination_measure = None
         self._body = None
@@ -1219,6 +1216,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self.func_args = []
         self.definition_deps = set()
         self.call_deps = set()
+        self.node_factory = node_factory
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1255,6 +1253,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         self._process_var_list(self._postset, translator)
         self._process_var_list(self._inputs, translator)
         self._process_var_list(self._outputs, translator)
+        self._process_var_list(self._io_universals, translator)
 
     def set_preset(self, preset: List['PythonVar']) -> None:
         assert len(preset) == 1 or self.is_builtin
@@ -1388,6 +1387,9 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
             if var.name == name:
                 return var
         for var in self._inputs:
+            if var.name == name:
+                return var
+        for var in self._io_universals:
             if var.name == name:
                 return var
         if self._io_existentials:
