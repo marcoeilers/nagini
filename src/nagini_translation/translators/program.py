@@ -18,15 +18,14 @@ from nagini_translation.lib.constants import (
     GET_ARG_FUNC,
     GET_METHOD_FUNC,
     GET_OLD_FUNC,
-    GLOBAL_CHECK_DEFINED_FUNC,
     GLOBAL_VAR_FIELD,
     IS_DEFINED_FUNC,
     JOINABLE_FUNC,
     MAY_SET_PRED,
     METHOD_ID_DOMAIN,
+    NAME_DOMAIN,
     PRIMITIVES,
     RESULT_NAME,
-    STRING_TYPE,
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
@@ -508,7 +507,7 @@ class ProgramTranslator(CommonTranslator):
             index = index + 1
 
     def _convert_silver_elements(
-            self, sil_progs: Program, all_used: List[str],
+            self, sil_progs: Program, all_used: List[str], include_names_domain: bool,
             ctx: Context) -> Tuple[List[Domain],
                                    List[Predicate],
                                    List[Function],
@@ -557,9 +556,10 @@ class ProgramTranslator(CommonTranslator):
         # requirements (which should never be the case).
         self._add_all_used_names(used_names)
 
+        excluded_domains = ('PyType', NAME_DOMAIN) if not include_names_domain else ('PyType',)
         domains += [
             domain for domain in self.viper.to_list(sil_progs.domains())
-            if domain.name() != 'PyType']
+            if domain.name() not in excluded_domains]
 
         functions += [
             function
@@ -1460,16 +1460,18 @@ class ProgramTranslator(CommonTranslator):
 
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))
-        domains.append(self.create_thread_domain(ctx))
-        domains.append(self.create_functions_domain(func_constants, ctx))
-        domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
+
+        if ctx.are_function_constants_used:
+            domains.append(self.create_functions_domain(func_constants, ctx))
+        if ctx.are_threading_constants_used:
+            domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
+            domains.append(self.create_thread_domain(ctx))
         adts_domains, adts_functions = self.create_adts_domains_and_functions(adt_list,
                                                                               ctx)
         domains.extend(adts_domains)
         functions.extend(adts_functions)
 
-        converted_sil_progs = self._convert_silver_elements(sil_progs,
-                                                            all_used_names, ctx)
+        converted_sil_progs = self._convert_silver_elements(sil_progs, all_used_names, not ignore_global, ctx)
         s_domains, s_predicates, s_functions, s_methods = converted_sil_progs
         domains += s_domains
         predicates += s_predicates

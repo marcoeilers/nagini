@@ -1300,6 +1300,7 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_creation(self, node: ast.Call,
                                    ctx: Context) -> StmtsAndExpr:
         """Translates the instantiation of a Thread object."""
+        ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
 
         thread_arg_stmts, meth_args, target = self._handle_thread_constructor_args(node,
@@ -1360,6 +1361,7 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_start(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """Translates a thread start call."""
+        ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)
@@ -1411,7 +1413,7 @@ class CallTranslator(CommonTranslator):
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translates a thread join call."""
-
+        ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
         thread_stmt, thread = self.translate_expr(node.func.value, ctx)

@@ -738,6 +738,7 @@ class ContractTranslator(CommonTranslator):
         return val_stmts, result
 
     def translate_get_arg(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        ctx.are_threading_constants_used = True
         thread_stmt, thread = self.translate_expr(node.args[0], ctx)
         index_stmt, index = self.translate_expr(node.args[1], ctx,
                                                 target_type = self.viper.Int)
@@ -749,6 +750,7 @@ class ContractTranslator(CommonTranslator):
         return thread_stmt + index_stmt, func
 
     def translate_get_old(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        ctx.are_threading_constants_used = True
         stmt, thread = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)

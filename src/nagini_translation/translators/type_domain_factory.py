@@ -377,7 +377,8 @@ class TypeDomainFactory:
                 rhs = self.viper.EqCmp(current_arg, type_args[i], position,
                                        info)
             implication = self.viper.Implies(subtype, rhs, position, info)
-            quantifier = self.viper.Forall(decls, [], implication, position,
+            triggers = [self.viper.Trigger([func_lit, current_arg], position, info)]
+            quantifier = self.viper.Forall(decls, triggers, implication, position,
                                            info)
             axiom = self.viper.DomainAxiom(cls.sil_name + '_args' + str(i),
                                            quantifier, position, info,

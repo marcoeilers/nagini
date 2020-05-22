@@ -609,6 +609,7 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
+            cts.are_function_constants_used = True
             func = self.viper.DomainFuncApp(target.func_constant, [],
                                             self.viper.function_domain_type(),
                                             self.to_position(node, ctx), self.no_info(ctx),
@@ -990,6 +991,7 @@ class ExpressionTranslator(CommonTranslator):
 
     def translate_thread_method_definition(self, node: ast.Compare,
                                            ctx: Context) -> StmtsAndExpr:
+        ctx.are_threading_constants_used = True
         if (isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name) and
                     node.left.func.id == 'getMethod'):
             get_call = node.left
