@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Error handling state is stored in singleton ``manager``."""
 
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from uuid import uuid1
 
 from typing import Any, List, Optional
@@ -16,6 +16,7 @@ from typing import Any, List, Optional
 from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
 from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.models.converter import Converter, SNAP_TO_REF, get_func_value
 
 
 Item = namedtuple('Item', 'node vias reason_string')
@@ -47,13 +48,14 @@ class ErrorManager:
     def convert(
             self,
             errors: List['AbstractVerificationError'],
-            jvm: Optional[JVM]) -> List[Error]:
+            jvm: JVM,
+            modules) -> List[Error]:
         """Convert Viper errors into Nagini errors.
 
         It does that by wrapping in ``Error`` subclasses.
         """
         new_errors = [
-            self._convert_error(error, jvm)
+            self._convert_error(error, jvm, modules)
             for error in errors
         ]
         return new_errors
@@ -109,10 +111,35 @@ class ErrorManager:
             error = error.transformedError()
         return error
 
+    def try_evaluate(self, jvm, term, model):
+        if isinstance(term, jvm.viper.silicon.state.terms.First):
+            sub = self.try_evaluate(jvm, term.p(), model)
+            if sub.startswith('($Snap.combine '):
+                return self.get_parts(jvm, sub)[1]
+        elif isinstance(term, jvm.viper.silicon.state.terms.Second):
+            sub = self.try_evaluate(jvm, term.p(), model)
+            if sub.startswith('($Snap.combine '):
+                return self.get_parts(jvm, sub)[2]
+        elif isinstance(term, jvm.viper.silicon.state.terms.Var):
+            return model[term.id().name()]
+        elif isinstance(term, jvm.viper.silicon.state.terms.SortWrapper):
+            sub = self.try_evaluate(jvm, term.t(), model)
+            return get_func_value(model, SNAP_TO_REF, (sub,))
+        raise Exception
+
+    def get_parts(self, jvm, val):
+        parser = getattr(getattr(jvm.viper.silver.verifier, 'ModelParser$'), 'MODULE$')
+        res_it = parser.getApplication(val).toIterator()
+        res = []
+        while res_it.hasNext():
+            part = res_it.next()
+            res.append(part)
+        return res
+
     def _convert_error(
-            self, error: 'AbstractVerificationError',
-            jvm: Optional[JVM]) -> Error:
-        error = self.transformError(error)
+            self, original_error: 'AbstractVerificationError',
+            jvm: JVM, modules) -> Error:
+        error = self.transformError(original_error)
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
         position = error.pos()
@@ -124,11 +151,87 @@ class ErrorManager:
         if rules is None:
             rules = {}
         error_item = self._get_item(position)
+
+        if original_error.scope().isDefined() and original_error.counterExample().isDefined():
+            method_name = original_error.scope().get().name()
+            pymethods = [m for mod in modules for m in mod.methods.values() if m.sil_name == method_name]
+            if not pymethods:
+                pymethods = [m for mod in modules for c in mod.classes.values() for m in c.methods.values()
+                             if m.sil_name == method_name]
+            pymethod = pymethods[0]
+            scala_store = original_error.counterExample().get().store()
+            store = OrderedDict()
+            scala_store_iter = scala_store.toIterator()
+            while scala_store_iter.hasNext():
+                entry = scala_store_iter.next()
+                store[entry._1()] = entry._2().toString()
+            scala_model = original_error.counterExample().get().nativeModel()
+            model = OrderedDict()
+            scala_model_iter = scala_model.entries().toIterator()
+            while scala_model_iter.hasNext():
+                entry = scala_model_iter.next()
+                name = entry._1()
+                value = entry._2()
+                if isinstance(value, jvm.viper.silver.verifier.SingleEntry):
+                    model[name] = value.value()
+                else:
+                    entry_val = OrderedDict()
+                    options_it = value.options().toIterator()
+                    while options_it.hasNext():
+                        option = options_it.next()
+                        option_value = option._2()
+                        option_key = ()
+                        option_key_it = option._1().toIterator()
+                        while option_key_it.hasNext():
+                            option_key_entry = option_key_it.next()
+                            option_key += (option_key_entry,)
+                        entry_val[option_key] = option_value
+                    entry_val['else'] = value.els()
+                    model[name] = entry_val
+
+            heap = OrderedDict()
+            heap_it = original_error.counterExample().get().heap().toIterator()
+            while heap_it.hasNext():
+                chunk = heap_it.next()
+                if not isinstance(chunk, jvm.viper.silicon.state.BasicChunk):
+                    continue
+                if not str(chunk.resourceID()) == 'FieldID':
+                    continue
+                field_name = str(chunk.id())
+                pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
+                           if f.sil_name == field_name][0]
+                recv_val = str(chunk.args().toIterator().next())
+                value = self.try_evaluate(jvm, chunk.snap(), model)
+                heap[(recv_val, pyfield)] = ' '.join(value.split())
+
+            oheap = OrderedDict()
+            oheap_it = original_error.counterExample().get().oldHeap().toIterator()
+            while oheap_it.hasNext():
+                chunk = oheap_it.next()
+                if not isinstance(chunk, jvm.viper.silicon.state.BasicChunk):
+                    continue
+                if not str(chunk.resourceID()) == 'FieldID':
+                    continue
+                field_name = str(chunk.id())
+                pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
+                           if f.sil_name == field_name][0]
+                recv_val = str(chunk.args().toIterator().next())
+                value = self.try_evaluate(jvm, chunk.snap(), model)
+                oheap[(recv_val, pyfield)] = ' '.join(value.split())
+
+            converter = Converter(pymethod, model, store, heap, oheap, jvm)
+            # try:
+            inputs = converter.generate_inputs()
+            # except:
+            #     inputs = None
+        else:
+            inputs = None
+
         if error_item:
             return Error(error, rules, reason_item, error_item.node,
-                         error_item.vias)
+                         error_item.vias, inputs=inputs)
         else:
-            return Error(error, rules, reason_item)
+            return Error(error, rules, reason_item, inputs=inputs)
 
 
 manager = ErrorManager()     # pylint: disable=invalid-name

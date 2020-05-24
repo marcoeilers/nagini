@@ -157,7 +157,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
             print(error.toString())
         if consistency_errors:
             raise ConsistencyException('consistency.error')
-    return prog
+    return modules, prog
 
 
 def collect_modules(analyzer: Analyzer, path: str) -> None:
@@ -175,7 +175,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
         task()
 
 
-def verify(prog: 'viper.silver.ast.Program', path: str,
+def verify(modules, prog: 'viper.silver.ast.Program', path: str,
            jvm: JVM, backend=ViperVerifier.silicon, arp=False) -> VerificationResult:
     """
     Verifies the given Viper program
@@ -185,7 +185,7 @@ def verify(prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        vresult = verifier.verify(prog, arp=arp)
+        vresult = verifier.verify(modules, prog, arp=arp)
         return vresult
     except JavaException as je:
         print(je.stacktrace())
@@ -333,7 +333,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
-        prog = translate(python_file, jvm, selected, args.sif,
+        modules, prog = translate(python_file, jvm, selected, args.sif,
                          ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
         if args.print_silver:
             if args.verbose:
@@ -352,13 +352,13 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                prog = translate(python_file, jvm, selected, args.sif, arp=arp)
-                vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
+                modules, prog = translate(python_file, jvm, selected, args.sif, arp=arp)
+                vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(prog, python_file, jvm, backend=backend, arp=arp)
+            vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))

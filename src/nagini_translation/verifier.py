@@ -5,15 +5,12 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-import ast
 
 from abc import ABCMeta
-from collections import OrderedDict
 from enum import Enum
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
-from typing import Optional
 
 
 class ViperVerifier(Enum):
@@ -44,8 +41,8 @@ class Failure(VerificationResult):
 
     def __init__(
             self, errors: 'silver.verifier.AbstractError',
-            jvm: Optional[JVM] = None):
-        self.errors = error_manager.convert(errors, jvm)
+            jvm: JVM, modules):
+        self.errors = error_manager.convert(errors, jvm, modules)
 
     def __bool__(self):
         return False
@@ -110,16 +107,18 @@ class Silicon:
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
             raise Exception('Silicon backend not found on classpath.')
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(4)
+        args = jvm.scala.collection.mutable.ArraySeq(6)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
         args.update(2, '--disableCatchingExceptions')
-        args.update(3, filename)
+        args.update(3, '--counterexample')
+        args.update(4, 'native')
+        args.update(5, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.ready = True
 
-    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
+    def verify(self, modules, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
@@ -134,7 +133,7 @@ class Silicon:
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors, self.jvm)
+            return Failure(errors, self.jvm, modules)
         else:
             return Success()
 
@@ -166,7 +165,7 @@ class Carbon:
         self.ready = True
         self.jvm = jvm
 
-    def verify(self, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
+    def verify(self, modules, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """

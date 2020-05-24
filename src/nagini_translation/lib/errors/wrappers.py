@@ -82,7 +82,7 @@ class Error:
 
     def __init__(self, error: 'AbstractVerificationError', rules: Rules,
                  reason_item: Any, node: 'ast.Node' = None,
-                 vias: List[Any] = None) -> None:
+                 vias: List[Any] = None, inputs: List[Any] = None) -> None:
 
         # Translate error id.
         viper_reason = error.reason()
@@ -96,6 +96,7 @@ class Error:
         self._error = error
         self._node = node
         self._vias = vias
+        self._inputs = inputs
         self.identifier = error_id
         if reason_item:
             self.reason = Reason(
@@ -169,5 +170,9 @@ class Error:
                 self.position.line, self.position.column, self.message,
                 self.reason)
         else:
-            return '{0} {1} ({2})'.format(
-                self.message, self.reason.string(show_viper_errors), self.position_string)
+            if self._inputs is not None:
+                return '{0} {1} ({2}).\n{3}'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string, str(self._inputs))
+            else:
+                return '{0} {1} ({2})'.format(
+                    self.message, self.reason.string(show_viper_errors), self.position_string)
