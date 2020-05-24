@@ -16,7 +16,7 @@ from typing import Any, List, Optional
 from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.models.converter import Converter, SNAP_TO_REF, get_func_value
+from nagini_translation.models.converter import Converter, SNAP_TO, get_func_value
 
 
 Item = namedtuple('Item', 'node vias reason_string')
@@ -111,6 +111,23 @@ class ErrorManager:
             error = error.transformedError()
         return error
 
+    def translate_sort(self, jvm, s):
+        terms = jvm.viper.silicon.state.terms
+        def get_sort_object(name):
+            return getattr(terms, 'sorts$' + name + '$')
+        def get_sort_class(name):
+            return getattr(terms, 'sorts$' + name)
+
+        if isinstance(s, get_sort_class('Set')):
+            return 'Set<{}>'.format(self.translate_sort(jvm, s.elementsSort()))
+        elif isinstance(s, get_sort_object('Ref')):
+            return '$Ref'
+        elif isinstance(s, get_sort_class('Seq')):
+            return 'Seq<{}>'.format(self.translate_sort(jvm, s.elementsSort()))
+        else:
+            return str(s)
+
+
     def try_evaluate(self, jvm, term, model):
         if isinstance(term, jvm.viper.silicon.state.terms.First):
             sub = self.try_evaluate(jvm, term.p(), model)
@@ -124,7 +141,8 @@ class ErrorManager:
             return model[term.id().name()]
         elif isinstance(term, jvm.viper.silicon.state.terms.SortWrapper):
             sub = self.try_evaluate(jvm, term.t(), model)
-            return get_func_value(model, SNAP_TO_REF, (sub,))
+            sort_name = self.translate_sort(jvm, term.to())
+            return get_func_value(model, SNAP_TO + sort_name, (sub,))
         raise Exception
 
     def get_parts(self, jvm, val):
@@ -198,10 +216,15 @@ class ErrorManager:
                 if not str(chunk.resourceID()) == 'FieldID':
                     continue
                 field_name = str(chunk.id())
-                pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
-                           if f.sil_name == field_name][0]
                 recv_val = str(chunk.args().toIterator().next())
                 value = self.try_evaluate(jvm, chunk.snap(), model)
+                if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2'):
+                    # Special handling,
+                    pyfield = field_name
+                else:
+                    pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
+                               if f.sil_name == field_name][0]
+
                 heap[(recv_val, pyfield)] = ' '.join(value.split())
 
             oheap = OrderedDict()
@@ -213,8 +236,12 @@ class ErrorManager:
                 if not str(chunk.resourceID()) == 'FieldID':
                     continue
                 field_name = str(chunk.id())
-                pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
-                           if f.sil_name == field_name][0]
+                if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2'):
+                    # Special handling,
+                    pyfield = field_name
+                else:
+                    pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
+                               if f.sil_name == field_name][0]
                 recv_val = str(chunk.args().toIterator().next())
                 value = self.try_evaluate(jvm, chunk.snap(), model)
                 oheap[(recv_val, pyfield)] = ' '.join(value.split())

@@ -87,6 +87,10 @@ function set___sil_seq__(self: Ref): Seq[Ref]
 field dict_acc : Set[Ref]
 field dict_acc2 : Ref
 
+domain _dict_ce_helper {
+    function dict_get_helper(___s: Set[Ref], ___s2: Ref, ___s3: Ref): Ref
+}
+
 method dict___init__() returns (res: Ref)
     ensures acc(res.dict_acc) && acc(res.dict_acc2)
     ensures res.dict_acc == Set[Ref]()
@@ -137,6 +141,7 @@ function dict___getitem__(self: Ref, key: Ref) : Ref
     requires dict___contains__(self, key)
     ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
     ensures result in dict___values__(self)
+    ensures dict_get_helper(self.dict_acc, self.dict_acc2, key) == result
 
 function dict___values__(self: Ref) : Seq[Ref]
     requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
