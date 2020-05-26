@@ -151,7 +151,7 @@ class Converter:
                 elif field == 'set_acc':
                     receiver_type = global_module.classes['set']
                 else:
-                    print("TODO")
+                    raise Exception
             self.get_reference_name(smt_ref_val, receiver_type)
             object_name, t = self.reference_values[smt_ref_val]
             smt_value = value
@@ -375,6 +375,8 @@ class Converter:
             return self.parse_bool(bool_or_none)
         try:
             type_val = self.get_type_val(t)
+            if type_val == val_type:
+                return True
             bool_or_none = self.get_func_value(ISSUBTYPE, (val_type, type_val))
             if bool_or_none is None:
                 return False
