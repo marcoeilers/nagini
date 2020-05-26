@@ -176,13 +176,13 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon, arp=False) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
         if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path)
+            verifier = Silicon(jvm, path, counterexample)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
         vresult = verifier.verify(modules, prog, arp=arp)
@@ -231,13 +231,13 @@ def main() -> None:
         help='mypy path',
         default=config.mypy_path)
     parser.add_argument(
-        '--print-silver',
+        '--print-viper',
         action='store_true',
-        help='print generated Silver program')
+        help='print generated Viper program')
     parser.add_argument(
-        '--write-silver-to-file',
+        '--write-viper-to-file',
         default=None,
-        help='write generated Silver program to specified file')
+        help='write generated Viper program to specified file')
     parser.add_argument(
         "-v",
         "--verbose",
@@ -287,7 +287,12 @@ def main() -> None:
     parser.add_argument(
         '--server',
         action='store_true',
-        help='Start Nagini server'
+        help='start Nagini server'
+    )
+    parser.add_argument(
+        '--counterexample',
+        action='store_true',
+        help='return a counterexample for every verification error if possible'
     )
     args = parser.parse_args()
 
@@ -334,13 +339,13 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, selected, args.sif,
-                         ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
-        if args.print_silver:
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
+        if args.print_viper:
             if args.verbose:
                 print('Result:')
             print(str(prog))
-        if args.write_silver_to_file:
-            with open(args.write_silver_to_file, 'w') as fp:
+        if args.write_viper_to_file:
+            with open(args.write_viper_to_file, 'w') as fp:
                 fp.write(str(prog))
         if args.verifier == 'silicon':
             backend = ViperVerifier.silicon
@@ -358,7 +363,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
+            vresult = verify(modules, prog, python_file, jvm,
+                             backend=backend, arp=arp, counterexample=args.counterexample)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))

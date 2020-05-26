@@ -101,19 +101,21 @@ class Silicon:
     Provides access to the Silicon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str):
+    def __init__(self, jvm: JVM, filename: str, counterexample: bool):
         self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
             raise Exception('Silicon backend not found on classpath.')
         self.silicon = jvm.viper.silicon.Silicon()
-        args = jvm.scala.collection.mutable.ArraySeq(6)
+        nargs = 6 if counterexample else 4
+        args = jvm.scala.collection.mutable.ArraySeq(nargs)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
         args.update(2, '--disableCatchingExceptions')
-        args.update(3, '--counterexample')
-        args.update(4, 'native')
-        args.update(5, filename)
+        if counterexample:
+            args.update(3, '--counterexample')
+            args.update(4, 'native')
+        args.update(5 if counterexample else 3, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.ready = True

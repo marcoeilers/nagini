@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Error handling state is stored in singleton ``manager``."""
 
 
-from collections import namedtuple, OrderedDict
+from collections import namedtuple
 from uuid import uuid1
 
 from typing import Any, List, Optional
@@ -16,10 +16,11 @@ from typing import Any, List, Optional
 from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.models.converter import Converter, SNAP_TO, get_func_value
+from nagini_translation.lib.program_nodes import PythonNode
+from nagini_translation.models.extractor import Extractor
 
 
-Item = namedtuple('Item', 'node vias reason_string')
+Item = namedtuple('Item', 'node vias reason_string py_node')
 
 
 class ErrorManager:
@@ -30,12 +31,12 @@ class ErrorManager:
         self._conversion_rules = {}     # type: Dict[str, Rules]
 
     def add_error_information(
-            self, node: 'ast.Node', vias: List[Any], reason_string: str,
+            self, node: 'ast.Node', vias: List[Any], reason_string: str, py_node: PythonNode,
             conversion_rules: Rules = None) -> str:
         """Add error information to state."""
         item_id = str(uuid1())
         assert item_id not in self._items
-        self._items[item_id] = Item(node, vias, reason_string)
+        self._items[item_id] = Item(node, vias, reason_string, py_node)
         if conversion_rules is not None:
             self._conversion_rules[item_id] = conversion_rules
         return item_id
@@ -111,49 +112,6 @@ class ErrorManager:
             error = error.transformedError()
         return error
 
-    def translate_sort(self, jvm, s):
-        terms = jvm.viper.silicon.state.terms
-        def get_sort_object(name):
-            return getattr(terms, 'sorts$' + name + '$')
-        def get_sort_class(name):
-            return getattr(terms, 'sorts$' + name)
-
-        if isinstance(s, get_sort_class('Set')):
-            return 'Set<{}>'.format(self.translate_sort(jvm, s.elementsSort()))
-        elif isinstance(s, get_sort_object('Ref')):
-            return '$Ref'
-        elif isinstance(s, get_sort_class('Seq')):
-            return 'Seq<{}>'.format(self.translate_sort(jvm, s.elementsSort()))
-        else:
-            return str(s)
-
-
-    def try_evaluate(self, jvm, term, model):
-        if isinstance(term, jvm.viper.silicon.state.terms.First):
-            sub = self.try_evaluate(jvm, term.p(), model)
-            if sub.startswith('($Snap.combine '):
-                return self.get_parts(jvm, sub)[1]
-        elif isinstance(term, jvm.viper.silicon.state.terms.Second):
-            sub = self.try_evaluate(jvm, term.p(), model)
-            if sub.startswith('($Snap.combine '):
-                return self.get_parts(jvm, sub)[2]
-        elif isinstance(term, jvm.viper.silicon.state.terms.Var):
-            return model[term.id().name()]
-        elif isinstance(term, jvm.viper.silicon.state.terms.SortWrapper):
-            sub = self.try_evaluate(jvm, term.t(), model)
-            sort_name = self.translate_sort(jvm, term.to())
-            return get_func_value(model, SNAP_TO + sort_name, (sub,))
-        raise Exception
-
-    def get_parts(self, jvm, val):
-        parser = getattr(getattr(jvm.viper.silver.verifier, 'ModelParser$'), 'MODULE$')
-        res_it = parser.getApplication(val).toIterator()
-        res = []
-        while res_it.hasNext():
-            part = res_it.next()
-            res.append(part)
-        return res
-
     def _convert_error(
             self, original_error: 'AbstractVerificationError',
             jvm: JVM, modules) -> Error:
@@ -170,87 +128,10 @@ class ErrorManager:
             rules = {}
         error_item = self._get_item(position)
 
-        if original_error.scope().isDefined() and original_error.counterExample().isDefined():
-            method_name = original_error.scope().get().name()
-            pymethods = [m for mod in modules for m in mod.methods.values() if m.sil_name == method_name]
-            if not pymethods:
-                pymethods = [m for mod in modules for c in mod.classes.values() for m in c.methods.values()
-                             if m.sil_name == method_name]
-            pymethod = pymethods[0]
-            scala_store = original_error.counterExample().get().store()
-            store = OrderedDict()
-            scala_store_iter = scala_store.toIterator()
-            while scala_store_iter.hasNext():
-                entry = scala_store_iter.next()
-                store[entry._1()] = entry._2().toString()
-            scala_model = original_error.counterExample().get().nativeModel()
-            model = OrderedDict()
-            scala_model_iter = scala_model.entries().toIterator()
-            while scala_model_iter.hasNext():
-                entry = scala_model_iter.next()
-                name = entry._1()
-                value = entry._2()
-                if isinstance(value, jvm.viper.silver.verifier.SingleEntry):
-                    model[name] = value.value()
-                else:
-                    entry_val = OrderedDict()
-                    options_it = value.options().toIterator()
-                    while options_it.hasNext():
-                        option = options_it.next()
-                        option_value = option._2()
-                        option_key = ()
-                        option_key_it = option._1().toIterator()
-                        while option_key_it.hasNext():
-                            option_key_entry = option_key_it.next()
-                            option_key += (option_key_entry,)
-                        entry_val[option_key] = option_value
-                    entry_val['else'] = value.els()
-                    model[name] = entry_val
-
-            heap = OrderedDict()
-            heap_it = original_error.counterExample().get().heap().toIterator()
-            while heap_it.hasNext():
-                chunk = heap_it.next()
-                if not isinstance(chunk, jvm.viper.silicon.state.BasicChunk):
-                    continue
-                if not str(chunk.resourceID()) == 'FieldID':
-                    continue
-                field_name = str(chunk.id())
-                recv_val = str(chunk.args().toIterator().next())
-                value = self.try_evaluate(jvm, chunk.snap(), model)
-                if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2'):
-                    # Special handling,
-                    pyfield = field_name
-                else:
-                    pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
-                               if f.sil_name == field_name][0]
-
-                heap[(recv_val, pyfield)] = ' '.join(value.split())
-
-            oheap = OrderedDict()
-            oheap_it = original_error.counterExample().get().oldHeap().toIterator()
-            while oheap_it.hasNext():
-                chunk = oheap_it.next()
-                if not isinstance(chunk, jvm.viper.silicon.state.BasicChunk):
-                    continue
-                if not str(chunk.resourceID()) == 'FieldID':
-                    continue
-                field_name = str(chunk.id())
-                if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2'):
-                    # Special handling,
-                    pyfield = field_name
-                else:
-                    pyfield = [f for mod in modules for c in mod.classes.values() for f in c.fields.values()
-                               if f.sil_name == field_name][0]
-                recv_val = str(chunk.args().toIterator().next())
-                value = self.try_evaluate(jvm, chunk.snap(), model)
-                oheap[(recv_val, pyfield)] = ' '.join(value.split())
-
-            converter = Converter(pymethod, model, store, heap, oheap, jvm)
-            # try:
-            inputs = converter.generate_inputs()
-            # except:
-            #     inputs = None
+        if error_item is not None and original_error.counterexample().isDefined():
+            pymethod = error_item.py_node
+            ce = original_error.counterexample().get()
+            inputs = Extractor().extract_counterexample(jvm, pymethod, ce, modules)
         else:
             inputs = None
 
@@ -259,6 +140,8 @@ class ErrorManager:
                          error_item.vias, inputs=inputs)
         else:
             return Error(error, rules, reason_item, inputs=inputs)
+
+
 
 
 manager = ErrorManager()     # pylint: disable=invalid-name

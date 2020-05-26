@@ -1141,7 +1141,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
 
     def create_variable(self, name: str, cls: PythonClass,
                         translator: 'Translator',
-                        local: bool=True) -> 'PythonVar':
+                        local: bool=False) -> 'PythonVar':
         """
         Creates a new local variable with the given name and type and performs
         all necessary processing/initialization

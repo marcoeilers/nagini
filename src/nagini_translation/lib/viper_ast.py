@@ -200,14 +200,12 @@ class ViperAST:
                                    position, info, domain_name, self.NoTrafos)
 
     def DomainAxiom(self, name, expr, position, info, domain_name):
-        return self.ast.NamedDomainAxiom(name, expr, position, info, domain_name,
-                                    self.NoTrafos)
+        return self.ast.NamedDomainAxiom(name, expr, position, info, domain_name, self.NoTrafos)
 
     def DomainType(self, name, type_vars_map, type_vars):
         map = self.to_map(type_vars_map)
         seq = self.to_seq(type_vars)
-        return self.ast.DomainType(name, map,
-                                   seq)
+        return self.ast.DomainType(name, map, seq)
 
     def mark_class_used(self, name: str):
         if name == 'Iterator':
@@ -517,7 +515,7 @@ class ViperAST:
         return self.ast.ConsInfo(head, tail)
 
     def to_position(self, expr, vias, error_string: str=None,
-                    rules: Rules=None, file: str = None):
+                    rules: Rules=None, file: str = None, py_node=None):
         if expr is None:
             return self.NoPosition
         if not hasattr(expr, 'lineno'):
@@ -531,7 +529,7 @@ class ViperAST:
         path = self.java.nio.file.Paths.get(file, [])
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
         id = error_manager.add_error_information(
-            expr, list(vias), error_string, rules)
+            expr, list(vias), error_string, py_node, rules)
         if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)

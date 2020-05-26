@@ -214,7 +214,7 @@ class ProgramTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
-        pos = self.viper.to_position(cls.node, ctx.position)
+        pos = self.viper.to_position(cls.node, ctx.position, py_node=method)
         ctx.position.append(('inheritance', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
 
@@ -284,7 +284,7 @@ class ProgramTranslator(CommonTranslator):
         assert not method.pure
         old_function = ctx.current_function
         ctx.current_function = method.overrides
-        pos = self.viper.to_position(method.node, ctx.position)
+        pos = self.viper.to_position(method.node, ctx.position, py_node=method)
         ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['behavioural.subtyping'])
         self._check_override_validity(method, ctx)
@@ -385,7 +385,7 @@ class ProgramTranslator(CommonTranslator):
                 default_checks.append(assertion)
         ctx.position.append(('overridden method',
                              self.viper.to_position(method.overrides.node,
-                                                    ctx.position)))
+                                                    ctx.position, py_node=method)))
         call = self.create_method_call_node(
             ctx, calledname, args, targets,
             self.to_position(method.node, ctx), self.no_info(ctx),

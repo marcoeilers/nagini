@@ -221,7 +221,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         the node and the position in the context for it.
         """
         return self.viper.to_position(node, ctx.position, error_string, rules,
-                                      ctx.module.file)
+                                      ctx.module.file, py_node=ctx.current_function)
 
     def no_position(self, ctx: Context, error_string: str=None,
             rules: rules.Rules=None) -> 'silver.ast.Position':
