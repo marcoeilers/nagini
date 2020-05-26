@@ -137,7 +137,7 @@ class Converter:
         except NoFittingValueException:
             pass
 
-    def convert_python_field(self, recv, field, value, heap_contents, target):
+    def convert_python_field(self, recv, field, value, heap_contents, target, target_store):
         try:
             smt_ref_val = self.evaluate_term(recv)
             if isinstance(field, PythonField):
@@ -150,6 +150,14 @@ class Converter:
                     receiver_type = global_module.classes['list']
                 elif field == 'set_acc':
                     receiver_type = global_module.classes['set']
+                elif field == '_val':
+                    # This is a global variable.
+                    var_sil_name = str(recv.applicable().id())
+                    var_name, variable = [(name, var) for mod in self.modules for name, var in mod.global_vars.items()
+                                          if var.sil_name == var_sil_name][0]
+                    py_value = self.convert_value(value, variable.type, var_name)
+                    target_store[var_name] = py_value
+                    return
                 else:
                     raise Exception
             self.get_reference_name(smt_ref_val, receiver_type)
@@ -187,7 +195,10 @@ class Converter:
         heap = OrderedDict()
         for name, var in self.method.args.items():
             self.convert_python_variable(name, var, old_store)
-        for name, var in list(self.method.locals.items()) + [('Result()', self.method.result)]:
+        locals = list(self.method.locals.items())
+        if self.method.result:
+            locals += [('Result()', self.method.result)]
+        for name, var in locals:
             self.convert_python_variable(name, var, store)
 
         for (recv, field), value in self.heap.items():
@@ -195,14 +206,14 @@ class Converter:
                 # this is a predicate
                 self.convert_python_predicate(recv, field, heap)
             else:
-                self.convert_python_field(recv, field, value, self.heap, heap)
+                self.convert_python_field(recv, field, value, self.heap, heap, store)
 
         for (recv, field), value in self.old_heap.items():
             if isinstance(field, PythonMethod):
                 # this is a predicate
                 self.convert_python_predicate(recv, field, old_heap)
             else:
-                self.convert_python_field(recv, field, value, self.old_heap, old_heap)
+                self.convert_python_field(recv, field, value, self.old_heap, old_heap, old_store)
         if self.method.pure:
             # no old heap, no updated store.
             return Model(None, old_store, None, heap)

@@ -97,7 +97,7 @@ class Extractor:
         field_name = str(chunk.id())
         recv_val = chunk.args().toIterator().next()
         value = self.try_evaluate(jvm, chunk.snap(), model)
-        if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2'):
+        if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2', '_val'):
             # Special handling,
             pyfield = field_name
         else:
