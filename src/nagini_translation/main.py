@@ -49,7 +49,7 @@ from nagini_translation.verifier import (
     VerificationResult,
     ViperVerifier
 )
-from typing import Set
+from typing import List, Set, Tuple
 
 
 TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
@@ -91,7 +91,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(),
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False, verbose: bool = False, check_consistency: bool = False) -> Program:
+              reload_resources: bool = False, verbose: bool = False,
+              check_consistency: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """

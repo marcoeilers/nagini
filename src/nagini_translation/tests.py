@@ -568,7 +568,7 @@ class VerificationTest(AnnotatedTest):
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         abspath = os.path.abspath(path)
-        prog = translate(abspath, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
+        modules, prog = translate(abspath, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
         assert prog is not None
         if store_viper:
             import string
@@ -580,7 +580,7 @@ class VerificationTest(AnnotatedTest):
             file_path = os.path.join(dir, file_name)
             with open(file_path, 'w') as fp:
                 fp.write(str(prog))
-        vresult = verify(prog, abspath, jvm, verifier, arp=arp)
+        vresult = verify(modules, prog, abspath, jvm, verifier, arp=arp)
         self._evaluate_result(vresult, annotation_manager, jvm, sif)
 
     def _evaluate_result(

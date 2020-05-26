@@ -182,6 +182,6 @@ class Carbon:
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors)
+            return Failure(errors, self.jvm, modules)
         else:
             return Success()

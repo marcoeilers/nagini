@@ -391,7 +391,7 @@ class MethodTranslator(CommonTranslator):
         assign_stmts = []
         for name, arg in method.args.items():
             arg_var = ctx.current_function.create_variable(name, arg.type,
-                                                           self.translator, True)
+                                                           self.translator, show_in_ce=True)
             arg_assign = self.viper.LocalVarAssign(arg_var.ref(), arg.ref(),
                                                    self.no_position(ctx),
                                                    self.no_info(ctx))

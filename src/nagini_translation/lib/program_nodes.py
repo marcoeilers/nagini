@@ -1139,9 +1139,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         else:
             return self.module.global_vars.get(name)
 
-    def create_variable(self, name: str, cls: PythonClass,
-                        translator: 'Translator',
-                        local: bool=False) -> 'PythonVar':
+    def create_variable(self, name: str, cls: PythonClass, translator: 'Translator',
+                        local: bool = True, show_in_ce: bool = False) -> 'PythonVar':
         """
         Creates a new local variable with the given name and type and performs
         all necessary processing/initialization
@@ -1149,6 +1148,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         sil_name = self.get_fresh_name(name)
         result = self.node_factory.create_python_var(name, None, cls)
         result.process(sil_name, translator)
+        result.show_in_ce = show_in_ce
         if local:
             self.add_local(sil_name, result)
         return result
@@ -1516,6 +1516,7 @@ class PythonVarBase(PythonNode):
         self.alt_types = {}
         self.default = None
         self.default_expr = None
+        self.show_in_ce = True
 
     def process(self, sil_name: str, translator: 'Translator') -> None:
         """

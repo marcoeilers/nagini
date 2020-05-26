@@ -127,6 +127,8 @@ class Converter:
         try:
             if var.sil_name not in self.store:
                 return
+            if not var.show_in_ce:
+                return
             term = self.store[var.sil_name]
             val = self.evaluate_term(term)
             display_name = 'Result()' if var.name == RESULT_NAME else var.name
