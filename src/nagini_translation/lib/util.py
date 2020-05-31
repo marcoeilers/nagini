@@ -408,3 +408,21 @@ class SingletonFreshName:
         if name not in self._fresh_name_dict:
             self._fresh_name_dict[name] = self._scope.get_fresh_name(name)
         return self._fresh_name_dict[name]
+
+
+def string_to_int(string: str) -> int:
+    """
+    Computes an integer value that uniquely represents the given string.
+    """
+    result = 0
+    for (index, char) in enumerate(string):
+        result += pow(256, index) * ord(char)
+    return result
+
+
+def int_to_string(i: int) -> str:
+    result = ''
+    while i > 0:
+        result += chr(i % 256)
+        i = i // 256
+    return result

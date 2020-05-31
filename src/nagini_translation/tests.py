@@ -580,7 +580,8 @@ class VerificationTest(AnnotatedTest):
             file_path = os.path.join(dir, file_name)
             with open(file_path, 'w') as fp:
                 fp.write(str(prog))
-        vresult = verify(modules, prog, abspath, jvm, verifier, arp=arp)
+        enable_ce = verifier == ViperVerifier.silicon and not sif
+        vresult = verify(modules, prog, abspath, jvm, verifier, arp=arp, counterexample=enable_ce)
         self._evaluate_result(vresult, annotation_manager, jvm, sif)
 
     def _evaluate_result(

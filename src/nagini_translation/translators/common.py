@@ -57,6 +57,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
+    string_to_int,
     UnsupportedException
 )
 from nagini_translation.translators.abstract import AbstractTranslator
@@ -863,10 +864,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         """
         Computes an integer value that uniquely represents the given string.
         """
-        result = 0
-        for (index, char) in enumerate(string):
-            result += pow(256, index) * ord(char)
-        return result
+        return string_to_int(string)
 
     def is_valid_super_call(self, node: ast.Call, container) -> bool:
         """

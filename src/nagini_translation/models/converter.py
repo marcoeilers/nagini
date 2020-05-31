@@ -1,6 +1,6 @@
 from nagini_translation.lib.constants import RESULT_NAME
-from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass
-from nagini_translation.lib.util import UnsupportedException
+from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType
+from nagini_translation.lib.util import int_to_string, UnsupportedException
 from collections import OrderedDict
 from typing import Dict, Tuple, Union
 
@@ -10,7 +10,7 @@ UNBOX_INT = 'int___unbox__%limited'
 UNBOX_BOOL = 'bool___unbox__%limited'
 UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
 TYPEOF = 'typeof<PyType>'
-SNAP_TO = '$SortWrappers.$SnapTo'
+SNAP_TO = '$SortWrappers.'
 SEQ_LENGTH = 'seq_ref_length<Int>'
 SEQ_INDEX = 'seq_ref_index<Ref>'
 SET_CARD = 'Set_card'
@@ -79,7 +79,10 @@ class NoFittingValueException(Exception):
 
 def get_func_value(model, name, args):
     args = tuple([' '.join(a.split()) for a in args])
-    res = model[name].get(args)
+    entry = model[name]
+    if args is () and isinstance(entry, str):
+        return entry
+    res = entry.get(args)
     if res is not None:
         return res
     return model[name].get('else')
@@ -90,6 +93,86 @@ def get_func_values(model, name, args):
     options = [(k[len(args):], v) for k, v in model[name].items() if k != 'else' and k[:len(args)] == args]
     els= model[name].get('else')
     return options, els
+
+
+def get_parts(jvm, val):
+    parser = getattr(getattr(jvm.viper.silver.verifier, 'ModelParser$'), 'MODULE$')
+    res = []
+    for part in ScalaIterableWrapper(parser.getApplication(val)):
+        res.append(part)
+    return res
+
+def translate_sort(jvm, s):
+    terms = jvm.viper.silicon.state.terms
+    def get_sort_object(name):
+        return getattr(terms, 'sorts$' + name + '$')
+    def get_sort_class(name):
+        return getattr(terms, 'sorts$' + name)
+
+    if isinstance(s, get_sort_class('Set')):
+        return 'Set<{}>'.format(translate_sort(jvm, s.elementsSort()))
+    elif isinstance(s, get_sort_object('Ref')):
+        return '$Ref'
+    elif isinstance(s, get_sort_object('Snap')):
+        return '$Snap'
+    elif isinstance(s, get_sort_object('Perm')):
+        return '$Perm'
+    elif isinstance(s, get_sort_class('Seq')):
+        return 'Seq<{}>'.format(translate_sort(jvm, s.elementsSort()))
+    else:
+        return str(s)
+
+
+def evaluate_term(jvm, term, model):
+    if isinstance(term, getattr(jvm.viper.silicon.state.terms, 'Unit$')):
+        return '$Snap.unit'
+    if isinstance(term, jvm.viper.silicon.state.terms.IntLiteral):
+        return str(term)
+    if isinstance(term, jvm.viper.silicon.state.terms.Null):
+        return model['$Ref.null']
+    if isinstance(term, jvm.viper.silicon.state.terms.Var):
+        key = str(term)
+        if key not in model:
+            raise NoFittingValueException
+        return model[key]
+    elif isinstance(term, jvm.viper.silicon.state.terms.App):
+        fname = str(term.applicable().id()) + '%limited'
+        if fname not in model:
+            fname = str(term.applicable().id())
+            if fname not in model:
+                fname = fname.replace('[', '<').replace(']', '>')
+        args = []
+        for arg in ScalaIterableWrapper(term.args()):
+            args.append(evaluate_term(jvm, arg, model))
+        res = get_func_value(model, fname, tuple(args))
+        return res
+    if isinstance(term, jvm.viper.silicon.state.terms.Combine):
+        p0_val = evaluate_term(jvm, term.p0(), model)
+        p1_val = evaluate_term(jvm, term.p1(), model)
+        return '($Snap.combine ' + p0_val + ' ' + p1_val + ')'
+    if isinstance(term, jvm.viper.silicon.state.terms.First):
+        sub = evaluate_term(jvm, term.p(), model)
+        if sub.startswith('($Snap.combine '):
+            return get_parts(jvm, sub)[1]
+    elif isinstance(term, jvm.viper.silicon.state.terms.Second):
+        sub = evaluate_term(jvm, term.p(), model)
+        if sub.startswith('($Snap.combine '):
+            return get_parts(jvm, sub)[2]
+    elif isinstance(term, jvm.viper.silicon.state.terms.SortWrapper):
+        sub = evaluate_term(jvm, term.t(), model)
+        from_sort_name = translate_sort(jvm, term.t().sort())
+        to_sort_name = translate_sort(jvm, term.to())
+        return get_func_value(model, SNAP_TO + from_sort_name + 'To' + to_sort_name, (sub,))
+    elif isinstance(term, jvm.viper.silicon.state.terms.PredicateLookup):
+        lookup_func_name = '$PSF.lookup_' + term.predname()
+        toSnapTree = getattr(jvm.viper.silicon.state.terms, 'toSnapTree$')
+        obj = getattr(toSnapTree, 'MODULE$')
+        snap = obj.apply(term.args())
+        psf_value = evaluate_term(jvm, term.psf(), model)
+        snap_value = evaluate_term(jvm, snap, model)
+        return get_func_value(model, lookup_func_name, (psf_value, snap_value))
+    raise Exception(str(term))
+
 
 
 class Converter:
@@ -155,8 +238,21 @@ class Converter:
                     var_sil_name = str(recv.applicable().id())
                     var_name, variable = [(name, var) for mod in self.modules for name, var in mod.global_vars.items()
                                           if var.sil_name == var_sil_name][0]
-                    py_value = self.convert_value(value, variable.type, var_name)
+                    if value is not None:
+                        py_value = self.convert_value(value, variable.type, var_name)
+                    else:
+                        py_value = '?'
                     target_store[var_name] = py_value
+                    return
+                elif field.startswith('MustRelease'):
+                    lock_module = [m for m in self.modules if m.type_prefix == 'nagini_contracts.lock'][0]
+                    lock_type = lock_module.classes['Lock']
+                    self.get_reference_name(smt_ref_val, lock_type)
+                    lock_name, _ = self.reference_values[smt_ref_val]
+                    if field == 'MustReleaseUnbounded':
+                        target['MustRelease({})'.format(lock_name)] = OrderedDict()
+                    else:
+                        target['MustRelease({}, _)'.format(lock_name)] = OrderedDict()
                     return
                 else:
                     raise Exception
@@ -166,7 +262,10 @@ class Converter:
             if not isinstance(field, PythonField):
                 target[object_name] = self.convert_special_field(recv, heap_contents, object_name, t, smt_value)
                 return
-            py_value = self.convert_value(smt_value, field.type)
+            if smt_value is not None:
+                py_value = self.convert_value(smt_value, field.type)
+            else:
+                py_value = '?'
             if object_name not in target:
                 target[object_name] = OrderedDict()
             target[object_name][field.name] = py_value
@@ -175,15 +274,59 @@ class Converter:
 
     def convert_python_predicate(self, smt_args, pred, target):
         try:
+            if isinstance(pred, str):
+                # Special case for _MaySet, MustTerminate or MustInvoke
+                contents = OrderedDict()
+                if pred == 'MustTerminate':
+                    target['MustTerminate(_)'] = contents
+                    return
+                if pred.startswith('MustInvoke'):
+                    place_term = self.evaluate_term(smt_args[0])
+                    place_class = self.modules[0].global_module.classes['Place']
+                    place_val = self.convert_value(place_term, place_class)
+                    if pred == 'MustInvokeBounded':
+                        target['token({}, _)'.format(place_val)] = contents
+                    else:
+                        target['token({})'.format(place_val)] = contents
+                    return
+                if pred.startswith('_thread_'):
+                    thread_term = self.evaluate_term(smt_args[0])
+                    thread_module = self.modules[0].global_module
+                    thread_class = thread_module.classes['Thread']
+                    thread_val = self.convert_value(thread_term, thread_class)
+                    if pred == '_thread_start':
+                        target['MayStart({})'.format(thread_val)] = contents
+                    else:
+                        target['ThreadPost({})'.format(thread_val)] = contents
+                    return
+                if pred == '_MaySet':
+                    field_name_int_term = self.evaluate_term(smt_args[1])
+                    field_name_int = int(field_name_int_term)
+                    field_name = int_to_string(field_name_int)
+                    pyfield = [f for mod in self.modules for c in mod.classes.values()
+                               for f in c.fields.values() if f.sil_name == field_name][0]
+                    receiver_term = self.evaluate_term(smt_args[0])
+                    receiver_val = self.convert_value(receiver_term, pyfield.cls)
+                    name = "MaySet({}, '{}')".format(receiver_val, pyfield.name)
+                    target[name] = OrderedDict()
+                    return
+                raise Exception(pred)
             args = []
-            param_types = [f.type for f in pred.args.values()]
+            if isinstance(pred, PythonMethod):
+                param_types = [f.type for f in pred.args.values()]
+            else:
+                param_types = [f.type for f in pred.get_parameters()]
             for arg, t in zip(smt_args, param_types):
                 evaluated_arg = self.evaluate_term(arg)
                 args.append(self.convert_value(evaluated_arg, t))
-            if pred.cls:
+            if isinstance(pred, PythonMethod) and pred.cls:
                 name = '{}.{}({})'.format(args[0], pred.name, ', '.join([str(a) for a in args[1:]]))
-            else:
+            elif isinstance(pred, PythonMethod):
                 name = '{}({})'.format(pred.name, ', '.join([str(a) for a in args]))
+            else:
+                # IO operation
+                all_args = [str(a) for a in args] + ['?' for a in pred.get_results()]
+                name = '{}({})'.format(pred.name, ', '.join(all_args))
             target[name] = OrderedDict()
         except NoFittingValueException:
             pass
@@ -202,14 +345,14 @@ class Converter:
             self.convert_python_variable(name, var, store)
 
         for (recv, field), value in self.heap.items():
-            if isinstance(field, PythonMethod):
+            if isinstance(recv, tuple):
                 # this is a predicate
                 self.convert_python_predicate(recv, field, heap)
             else:
                 self.convert_python_field(recv, field, value, self.heap, heap, store)
 
         for (recv, field), value in self.old_heap.items():
-            if isinstance(field, PythonMethod):
+            if isinstance(recv, tuple):
                 # this is a predicate
                 self.convert_python_predicate(recv, field, old_heap)
             else:
@@ -220,23 +363,7 @@ class Converter:
         return Model(old_store, store, old_heap, heap)
 
     def evaluate_term(self, term):
-        if isinstance(term, getattr(self.jvm.viper.silicon.state.terms, 'Unit$')):
-            return '$Snap.unit'
-        if isinstance(term, self.jvm.viper.silicon.state.terms.IntLiteral):
-            return str(term)
-        if isinstance(term, self.jvm.viper.silicon.state.terms.Null):
-            return self.model['$Ref.null']
-        if isinstance(term, self.jvm.viper.silicon.state.terms.Var):
-            return self.model[str(term)]
-        elif isinstance(term, self.jvm.viper.silicon.state.terms.App):
-            fname = str(term.applicable().id()) + '%limited'
-            args = []
-            for arg in ScalaIterableWrapper(term.args()):
-                args.append(self.evaluate_term(arg))
-            res = self.get_func_value(fname, tuple(args))
-            return res
-        else:
-            raise Exception(str(term))
+        return evaluate_term(self.jvm, term, self.model)
 
     def convert_sequence_value(self, val, content_type, object_name):
         res = OrderedDict()
@@ -300,6 +427,9 @@ class Converter:
             return self.reference_values[val][0]
         else:
             actual_type = self.get_actual_type(val, t)
+            if actual_type.name == 'NoneType':
+                self.reference_values[val] = ('None', actual_type)
+                return 'None'
             actual_type_name = actual_type.python_class.name
             i = 0
             ref_name = actual_type_name + str(i)
@@ -312,6 +442,10 @@ class Converter:
     def get_actual_type(self, val, t: PythonType):
         cls = t.python_class
         if not self.has_type(val, cls):
+            if isinstance(t, OptionalType):
+                none_type = self.modules[0].global_module.classes['NoneType']
+                if self.has_type(val, none_type) or '$Ref.null' in self.model and val == self.model['$Ref.null']:
+                    return none_type
             raise NoFittingValueException
         for sc in cls.direct_subclasses:
             if self.has_type(val, sc):

@@ -114,20 +114,11 @@ class ViperAST:
 
     def to_big_int(self, num):
         # We cannot give integers directly to Scala if they don't
-        # fit into a C long int, so we have to split things up.
+        # fit into a C long int.
         negative = num < 0
         if negative:
             num = -num
-        cutoff = LONG_SIZE
-        cutoff_int = self.java.math.BigInteger.valueOf(cutoff)
-        rest = num
-        result_int = self.java.math.BigInteger.valueOf(0)
-        while rest > 0:
-            current_part = rest % cutoff
-            current_int = self.java.math.BigInteger.valueOf(current_part)
-            result_int = result_int.multiply(cutoff_int)
-            result_int = result_int.add(current_int)
-            rest = rest // cutoff
+        result_int = self.java.math.BigInteger(str(num))
         if negative:
             result_int = result_int.negate()
         return self.scala.math.BigInt(result_int)

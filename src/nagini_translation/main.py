@@ -309,6 +309,10 @@ def main() -> None:
         parser.error('missing argument: --z3')
     if args.verifier == 'carbon' and not config.classpath:
         parser.error('missing argument: --boogie')
+    if args.verifier != 'silicon' and args.counterexample:
+        parser.error('counterexamples only supported with Silicon backend')
+    if args.sif and args.counterexample:
+        parser.error('counterexamples not supported for information flow verification')
 
     logging.basicConfig(level=args.log)
 

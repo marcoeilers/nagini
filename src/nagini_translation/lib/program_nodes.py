@@ -1493,6 +1493,7 @@ class PythonTryBlock(PythonNode):
         result = self.node_factory.create_python_var(sil_name, None,
                                                      exc_type)
         result.process(sil_name, translator)
+        result.show_in_ce = False
         if isinstance(self.method, PythonMethod):
             self.method.locals[sil_name] = result
         self.error_var = result

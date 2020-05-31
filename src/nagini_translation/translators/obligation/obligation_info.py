@@ -78,6 +78,7 @@ class SilverVar:
         """A variable declaration."""
 
         self._ref = ref
+        self.show_in_ce = False
 
     def ref(self, node: ast.AST = None,                         # pylint: disable=unused-argument
             ctx: Context = None) -> 'viper_ast.LocalVarRef':    # pylint: disable=unused-argument

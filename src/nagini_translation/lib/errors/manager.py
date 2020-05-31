@@ -16,7 +16,7 @@ from typing import Any, List, Optional
 from nagini_translation.lib.errors.wrappers import Error
 from nagini_translation.lib.errors.rules import Rules
 from nagini_translation.lib.jvmaccess import JVM
-from nagini_translation.lib.program_nodes import PythonNode
+from nagini_translation.lib.program_nodes import PythonMethod, PythonNode
 from nagini_translation.models.extractor import Extractor
 
 
@@ -128,7 +128,7 @@ class ErrorManager:
             rules = {}
         error_item = self._get_item(position)
 
-        if error_item is not None and original_error.counterexample().isDefined():
+        if error_item is not None and original_error.counterexample().isDefined() and isinstance(error_item.py_node, PythonMethod):
             pymethod = error_item.py_node
             ce = original_error.counterexample().get()
             inputs = Extractor().extract_counterexample(jvm, pymethod, ce, modules)
