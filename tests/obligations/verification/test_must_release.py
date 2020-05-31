@@ -197,7 +197,7 @@ def test_loop_condition_framing_1() -> None:
     l.acquire()
     i = 5
     while a.steps < 5:
-        #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)|MissingOutput(carbon)(not.wellformed:loop_condition.not_framed_for_obligation_use, 70)|UnexpectedOutput(carbon)(not.wellformed:insufficient.permission, 70)
+        #:: ExpectedOutput(not.wellformed:loop_condition.not_framed_for_obligation_use)
         Invariant(MustRelease(l, i))
         Invariant(Acc(a.steps))
         Invariant(i == 5 - a.steps)
