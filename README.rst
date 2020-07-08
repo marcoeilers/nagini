@@ -31,7 +31,7 @@ Getting Started
 
         virtualenv --python=python3 <env>
         
-2.  Activate it:
+2.  Activate it::
 
         source env/bin/activate
         
