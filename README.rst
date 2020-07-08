@@ -3,7 +3,7 @@ Nagini is an automatic verifier for statically typed Python programs, based on t
 
 Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_. See `the Wiki <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
 
-You can try a (rather slow) online version of Nagini `on this website <http://viper.ethz.ch/nagini-examples>`_.
+You can try a (rather slow) online version of Nagini `on this website <http://viper.ethz.ch/nagini-examples/>`_.
 
 For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com/marcoeilers/nagini-pycharm>`_.
 
@@ -31,9 +31,13 @@ Getting Started
 
         virtualenv --python=python3 <env>
         
-2.  Install Nagini::
+2.  Activate it:
 
-    ./<env>/bin/pip install nagini
+        source env/bin/activate
+        
+3.  Install Nagini::
+
+        pip install nagini
 
 
 Command Line Usage
@@ -41,50 +45,50 @@ Command Line Usage
 
 To verify a specific file from the nagini directory, run::
 
-    ./<env>/bin/nagini [OPTIONS] path-to-file.py
+    nagini [OPTIONS] path-to-file.py
 
 
 The following command line options are available::
 
-    ``--verifier``      
+    --verifier      
                     Selects the Viper backend to use for verification.
-                    Possible options are ``silicon`` (for Symbolic Execution) and ``carbon`` 
+                    Possible options are 'silicon' (for Symbolic Execution) and 'carbon' 
                     (for Verification Condition Generation based on Boogie).  
-                    Default: ``silicon``.
+                    Default: 'silicon'.
 
-    ``--select``        
+    --select        
                     Select which functions/methods/classes to verify. Expects a comma-
                     separated list of names.
 
-    ``--counterexample``        
+    --counterexample        
                     Enable outputting counterexamples for verification errors.
 
-    ``--z3``            
+    --z3           
                     Sets the path of the Z3 executable. Alternatively, the
-                    ``Z3_EXE`` environment variable can be set.
+                    'Z3_EXE' environment variable can be set.
                     
-    ``--boogie``        
+    --boogie        
                     Sets the path of the Boogie executable. Required if the Carbon backend
-                    is selected. Alternatively, the ``BOOGIE_EXE`` environment variable can be
+                    is selected. Alternatively, the 'BOOGIE_EXE' environment variable can be
                     set.
 
-    ``--viper-jar-path``    
-                    Sets the path to the required Viper binaries (``silicon.jar`` or
-                    ``carbon.jar``). Only the binary for the selected backend is
+    --viper-jar-path    
+                    Sets the path to the required Viper binaries ('silicon.jar' or
+                    'carbon.jar'). Only the binary for the selected backend is
                     required. You can either use the provided binary packages installed
                     by default or compile your own from source (see below).
                     Expects either a single path or a colon- (Unix) or semicolon-
                     (Windows) separated list of paths. Alternatively, the environment
-                    variables ``SILICONJAR``, ``CARBONJAR`` or ``VIPERJAR`` can be set.
+                    variables 'SILICONJAR', 'CARBONJAR' or 'VIPERJAR' can be set.
                         
-To see all possible command line options, invoke ``./bin/nagini`` without arguments.
+To see all possible command line options, invoke ``nagini`` without arguments.
 
 
 Alternative Viper Versions
 ==========================
 
 To use a more recent or custom version of the Viper infrastructure, follow the
-`instructions here <https://bitbucket.org/viperproject/documentation/wiki/Home>`_. Look for
+`instructions here <https://github.com/viperproject/documentation/wiki>`_. Look for
 ``sbt assembly`` to find instructions for packaging the required JAR files. Use the
 parameters mentioned above to instruct Nagini to use your custom Viper version.
 
