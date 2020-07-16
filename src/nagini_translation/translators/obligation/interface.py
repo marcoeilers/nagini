@@ -93,12 +93,16 @@ class ObligationTranslator(CommonTranslator):
             ctx, cond, invariants, local_vars, body, node)
 
     def translate_obligation_contractfunc_call(
-            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+            self, node: ast.Call, ctx: Context, impure: bool) -> StmtsAndExpr:
         """Translate a call to obligation contract function."""
         func_name = get_func_name(node)
         if func_name == 'MustTerminate':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self._translate_must_terminate(node, ctx)
         elif func_name == 'MustRelease':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self._translate_must_release(node, ctx)
         elif func_name == 'WaitLevel':
             raise InvalidProgramException(

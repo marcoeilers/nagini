@@ -172,7 +172,7 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         return [assignment, set_defined]
 
     def translate_io_contractfunc_call(self, node: ast.Call,
-                                       ctx: Context) -> StmtsAndExpr:
+                                       ctx: Context, impure: bool, statement: bool) -> StmtsAndExpr:
         """Translate a call to a IO contract function.
 
         Currently supported functions:
@@ -183,14 +183,22 @@ class IOOperationUseTranslator(IOOperationCommonTranslator):
         """
         func_name = get_func_name(node)
         if func_name == 'token':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_must_invoke_token(node, ctx)
         elif func_name == 'ctoken':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_must_invoke_ctoken(node, ctx)
         elif func_name == 'Open':
+            if not statement:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self._translate_open(node, ctx)
         elif func_name == 'Eval':
             return self._translate_eval(node, ctx)
         elif func_name == 'eval_io':
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self._translate_eval_io(node, ctx)
         else:
             raise UnsupportedException(node,

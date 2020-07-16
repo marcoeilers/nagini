@@ -1202,9 +1202,9 @@ class CallTranslator(CommonTranslator):
             elif func_name in CONTRACT_FUNCS:
                 return self.translate_contractfunc_call(node, ctx, impure, statement)
             elif func_name in IO_CONTRACT_FUNCS:
-                return self.translate_io_contractfunc_call(node, ctx)
+                return self.translate_io_contractfunc_call(node, ctx, impure, statement)
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
-                return self.translate_obligation_contractfunc_call(node, ctx)
+                return self.translate_obligation_contractfunc_call(node, ctx, impure)
             elif func_name in BUILTINS:
                 return self._translate_builtin_func(node, ctx)
             elif func_name == "Thread":
@@ -1213,10 +1213,12 @@ class CallTranslator(CommonTranslator):
                 return self.translate_contractfunc_call(node, ctx, impure)
         elif isinstance(node.func, ast.Call):
             if get_func_name(node.func) == 'IOExists':
-                return self.translate_expr(node.args[0].body, ctx, impure, statement)
+                return self.translate_expr(node.args[0].body, ctx, impure=impure)
         if self._is_cls_call(node, ctx):
             return self._translate_cls_call(node, ctx)
         elif isinstance(self.get_target(node, ctx), PythonIOOperation):
+            if not impure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self.translate_io_operation_call(node, ctx)
         elif self._is_thread_method_call(node, 'start', ctx):
             return self._translate_thread_start(node, ctx)

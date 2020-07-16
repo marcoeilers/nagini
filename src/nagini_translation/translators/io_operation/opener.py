@@ -182,7 +182,7 @@ class Opener:
         """
         statements, body_expression = self._translator.translate_expr(
             self._operation.get_body(), self._ctx,
-            target_type=self._translator.viper.Bool)
+            target_type=self._translator.viper.Bool, impure=True)
         assert not statements
         return body_expression
 

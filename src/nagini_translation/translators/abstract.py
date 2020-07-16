@@ -218,9 +218,9 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.call_translator.translate_normal_call_node(node, ctx, impure)
 
     def translate_io_contractfunc_call(self, node: ast.Call,
-                                       ctx: Context) -> StmtsAndExpr:
+                                       ctx: Context, impure: bool, statement: bool) -> StmtsAndExpr:
         translator = self.config.io_operation_translator
-        return translator.translate_io_contractfunc_call(node, ctx)
+        return translator.translate_io_contractfunc_call(node, ctx, impure, statement)
 
     def translate_io_operation_call(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:
@@ -242,9 +242,9 @@ class AbstractTranslator(metaclass=ABCMeta):
         return translator.translate_get_ghost_output(node, ctx)
 
     def translate_obligation_contractfunc_call(self, node: ast.Call,
-                                               ctx: Context) -> StmtsAndExpr:
+                                               ctx: Context, impure: bool = False) -> StmtsAndExpr:
         translator = self.config.obligation_translator
-        return translator.translate_obligation_contractfunc_call(node, ctx)
+        return translator.translate_obligation_contractfunc_call(node, ctx, impure)
 
     def translate_must_invoke_token(self, node: ast.Call,
                                     ctx: Context) -> StmtsAndExpr:

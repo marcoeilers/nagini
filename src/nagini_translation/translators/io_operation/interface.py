@@ -79,7 +79,7 @@ class IOOperationTranslator:
             node, ctx)
 
     def translate_io_contractfunc_call(self, node: ast.Call,
-                                       ctx: Context) -> StmtsAndExpr:
+                                       ctx: Context, impure: bool, statement: bool) -> StmtsAndExpr:
         """Translate a call to a IO contract function."""
         return self._use_translator.translate_io_contractfunc_call(
-            node, ctx)
+            node, ctx, impure, statement)
