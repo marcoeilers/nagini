@@ -277,6 +277,9 @@ class ViperAST:
         return self.ast.InhaleExhaleExp(inhale, exhale, position, info, self.NoTrafos)
 
     def Assert(self, expr, position, info):
+        # Avoid generating "assert true" since this will trigger an expensive state consolidation in Silicon.
+        if isinstance(expr, self.ast.TrueLit):
+            return self.Seqn([], position, info)
         return self.ast.Assert(expr, position, info, self.NoTrafos)
 
     def FullPerm(self, position, info):
