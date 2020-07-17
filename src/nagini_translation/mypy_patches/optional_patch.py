@@ -18,13 +18,22 @@ from functools import wraps
 def remove_none(f):
     @wraps(f)
     def wrapper(*args, **varargs):
-        if isinstance(args[1], mypy.types.UnionType):
+        if 'typ' in varargs:
+            typ_named_arg = True
+            typ = varargs['typ']
+        else:
+            typ_named_arg = False
+            typ = args[1]
+        if isinstance(typ, mypy.types.UnionType):
             args = list(args)
-            members = [t for t in args[1].items
+            members = [t for t in typ.items
                        if not isinstance(t, mypy.types.NoneTyp)]
-            new_type = mypy.types.UnionType.make_simplified_union(members)
-            args[1] = new_type
-            args = tuple(args)
+            new_type = mypy.types.UnionType.make_union(members)
+            if typ_named_arg:
+                varargs['typ'] = new_type
+            else:
+                args[1] = new_type
+                args = tuple(args)
         res = f(*args, **varargs)
         return res
     return wrapper

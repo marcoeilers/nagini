@@ -24,12 +24,13 @@ setup(
             'distribute',
             ],
         install_requires=[
-            'mypy-lang==0.4.5',
+            'mypy==0.782',
             'toposort==1.5',
             'jpype1==0.6.2',
             'astunparse==1.6.2',
-            'typed-ast==0.6.3',
+            'typed-ast==1.4.0',
             'pytest==4.3.0',
+            'pytest-xdist==1.20.1',
             'z3-solver'
             ],
         entry_points = {
