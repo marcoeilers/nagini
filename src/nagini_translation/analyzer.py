@@ -1133,7 +1133,7 @@ class Analyzer(ast.NodeVisitor):
             result = self.convert_type(mypy_type.type, node)
             if mypy_type.args:
                 args = [self.convert_type(arg, node) for arg in mypy_type.args]
-                if mypy_type.type.name() == 'enumerate':
+                if mypy_type.type.name == 'enumerate':
                     # We cheat and represent type enumerate as a list of pairs.
                     assert len(args) == 1
                     int_type = self.module.global_module.classes[INT_TYPE]
@@ -1176,7 +1176,7 @@ class Analyzer(ast.NodeVisitor):
 
     def _convert_normal_type(self, mypy_type) -> PythonType:
         prefix = mypy_type._fullname
-        name = mypy_type.name()
+        name = mypy_type.name
         if prefix == 'builtins.enumerate':
             # We cheat and represent type enumerate as a list of pairs.
             prefix = 'builtins.list'

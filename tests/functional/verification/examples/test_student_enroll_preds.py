@@ -3,7 +3,7 @@
 
 from nagini_contracts.contracts import *
 from nagini_contracts.io_contracts import *
-from typing import Set
+from typing import List, Set
 
 
 class Student:

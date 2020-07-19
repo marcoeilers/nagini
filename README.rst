@@ -61,7 +61,7 @@ The following command line options are available::
                     separated list of names.
 
     --counterexample        
-                    Enable outputting counterexamples for verification errors.
+                    Enable outputting counterexamples for verification errors (experimental).
 
     --z3           
                     Sets the path of the Z3 executable. Alternatively, the

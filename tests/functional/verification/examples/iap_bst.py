@@ -14,6 +14,10 @@ class TreeNode:
         self.leftChild = left
         self.rightChild = right
         self.parent = parent
+        # urgh = Forall([1, 2, 3], lambda x: x > 23)
+        # abba = object()
+        # if isinstance(abba, TreeNode):
+        #     asd = abba.key
         Ensures(Acc(self.key) and self.key is key and
                 Acc(self.payload) and self.payload is val and
                 Acc(self.leftChild) and self.leftChild is left and

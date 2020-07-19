@@ -9,6 +9,6 @@ def bla(x: int) -> None:
     Ensures(x == 5)
 
 
-#:: ExpectedOutput(type.error:Name 'bla' already defined)
+#:: ExpectedOutput(type.error:Name 'bla' already defined on line 7)
 def bla(u: int, b: str) -> None:
     return

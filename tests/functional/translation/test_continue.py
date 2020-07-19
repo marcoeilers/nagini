@@ -20,4 +20,3 @@ def break_out(c: Container) -> None:
         finally:
             #:: ExpectedOutput(invalid.program:continue.in.finally)
             continue
-    c.value = 5

@@ -2,7 +2,8 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
-from typing import Optional
+from typing import Dict, List, Optional, Set
+
 
 class Super:
     pass

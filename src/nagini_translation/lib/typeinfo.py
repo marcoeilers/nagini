@@ -82,9 +82,9 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             else:
                 types = [rectype]
             for t in types:
-                if not hasattr(t, 'type'): # Work around issue 979 in MyPy
-                    t = t.fallback   # 'TupleType' object has no attribute 'type'
-                self.set_type(t.type.fullname().split('.') + [node.name],
+                if not hasattr(t, 'type'):
+                    t = t.partial_fallback   # 'TupleType' object has no attribute 'type'
+                self.set_type(t.type.fullname.split('.') + [node.name],
                               self.type_of(node),
                               node.line, col(node))
         super().visit_member_expr(node)
@@ -131,11 +131,11 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def visit_func_def(self, node: mypy.nodes.FuncDef):
         oldprefix = self.prefix
-        self.prefix = self.prefix + [node.name()]
+        self.prefix = self.prefix + [node.name]
         functype = self.type_of(node)
         self.set_type(self.prefix, functype, node.line, col(node), True)
         for arg in node.arguments:
-            self.set_type(self.prefix + [arg.variable.name()],
+            self.set_type(self.prefix + [arg.variable.name],
                           arg.variable.type, arg.line, col(arg))
         super().visit_func_def(node)
         self.prefix = oldprefix
@@ -145,7 +145,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         prefix_string = construct_lambda_prefix(node.line, col(node))
         self.prefix = self.prefix + [prefix_string]
         for arg in node.arguments:
-            self.set_type(self.prefix + [arg.variable.name()],
+            self.set_type(self.prefix + [arg.variable.name],
                           arg.variable.type, arg.line, col(arg))
         node.body.accept(self)
         self.prefix = oldprefix
@@ -157,6 +157,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.prefix = oldprefix
 
     def set_type(self, fqn, type, line, col, return_type=False):
+        if isinstance(type, mypy.types.TupleType) and hasattr(type, 'partial_fallback'):
+            type = type.partial_fallback
         if return_type and isinstance(type, mypy.types.CallableType):
             type = type.ret_type
         if not type or isinstance(type, mypy.types.AnyType):
@@ -192,12 +194,16 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if (isinstance(node.callee, mypy.nodes.NameExpr) and
                     node.callee.fullname == 'typing.cast'):
             return
+        if isinstance(node.callee, mypy.nodes.SuperExpr):
+            return
         for a in node.args:
             a.accept(self)
         node.callee.accept(self)
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
+            return node.fullname
+        if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.TypeInfo):
             return node.fullname
         if isinstance(node, mypy.nodes.FuncDef):
             if node.type:
@@ -256,6 +262,10 @@ class TypeInfo:
         result.strict_optional = strict_optional
         result.show_none_errors = strict_optional
         result.show_traceback = True
+        result.export_types = True
+        result.preserve_asts = True
+        result.warn_no_return = False
+        result.incremental = False
         # This is an experimental feature atm and you actually have to
         # enable it like this
         return result
@@ -271,10 +281,11 @@ class TypeInfo:
                 logger.info(error)
             raise TypeException(errors)
 
+        base_dir = os.path.dirname(filename)
         try:
             options_strict = self._create_options(True)
             res_strict = mypy.build.build(
-                [BuildSource(filename, None, None)],
+                [BuildSource(filename, None, None, base_dir=base_dir)],
                 options_strict #, bin_dir=config.mypy_dir
                 )
 
@@ -288,9 +299,20 @@ class TypeInfo:
                 )
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
-            for name, file in res_strict.files.items():
-                if name in IGNORED_IMPORTS:
-                    continue
+            relevant_files = ['__main__']
+            i = 0
+            while i < len(relevant_files):
+                name = relevant_files[i]
+                for dep_name in res_strict.graph[name].dep_line_map:
+                    if dep_name in IGNORED_IMPORTS:
+                        continue
+                    if dep_name not in relevant_files:
+                        relevant_files.append(dep_name)
+                i += 1
+            relevant_files = [(name, res_strict.files[name]) for name in relevant_files]
+            for name, file in relevant_files:
+                # if name in IGNORED_IMPORTS:
+                #     continue
                 self.files[name] = file.path
                 visitor = TypeVisitor(res_strict.types, name,
                                       file.ignored_lines)

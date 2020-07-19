@@ -18,7 +18,7 @@ def something(normal: int, named1: bool, named2: object,
 
 def caller() -> int:
     Ensures(Result() == 12)
-    #:: ExpectedOutput(type.error:Unexpected keyword argument "named3" for "something")
+    #:: ExpectedOutput(type.error:Unexpected keyword argument "named3" for "something"; did you mean "named2"?)
     r = something(23, False, named_default2=(12, False), named2=Whatever(),
                   named3=456)
     return r
