@@ -36,7 +36,7 @@ class TypeException(Exception):
 
 
 class TypeVisitor(mypy.traverser.TraverserVisitor):
-    def __init__(self, type_map, path, ignored_lines):
+    def __init__(self, type_map, path, ignored_lines, real_path):
         self.prefix = []
         self.all_types = {}
         self.alt_types = {}
@@ -45,6 +45,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         self.ignored_lines = ignored_lines
         self.type_aliases = {}
         self.type_vars = {}
+        self.real_path = real_path
 
     def _is_result_call(self, node: mypy.nodes.Node) -> bool:
         """Checks if call is either ``Result`` or ``RaisedException``."""
@@ -82,8 +83,12 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
             else:
                 types = [rectype]
             for t in types:
+                if isinstance(t, mypy.types.TypeType):
+                    continue
                 if not hasattr(t, 'type'):
                     t = t.partial_fallback   # 'TupleType' object has no attribute 'type'
+                if isinstance(t, mypy.types.Instance) and t.type.fullname.startswith('builtins.'):
+                    continue
                 self.set_type(t.type.fullname.split('.') + [node.name],
                               self.type_of(node),
                               node.line, col(node))
@@ -156,9 +161,13 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         super().visit_class_def(node)
         self.prefix = oldprefix
 
+    def startswith(self, l1, l2):
+        return len(l2) <= len(l1) and all(l1[i] == ele for i, ele in enumerate(l2))
+
     def set_type(self, fqn, type, line, col, return_type=False):
-        if isinstance(type, mypy.types.TupleType) and hasattr(type, 'partial_fallback'):
-            type = type.partial_fallback
+        if self.real_path is not None:
+            if self.startswith(fqn, self.real_path):
+                fqn = ['__main__'] + fqn[len(self.real_path):]
         if return_type and isinstance(type, mypy.types.CallableType):
             type = type.ret_type
         if not type or isinstance(type, mypy.types.AnyType):
@@ -224,13 +233,20 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if node in self.type_map:
             result = self.type_map[node]
             return result
+        elif hasattr(node, 'fullname'):
+            fullname = node.fullname.split('.')
+            if self.real_path is not None:
+                if self.startswith(fullname, self.real_path):
+                    fullname = ['__main__'] + fullname[len(self.real_path):]
+            if tuple(fullname) in self.type_vars:
+                result = self.type_vars[tuple(fullname)]
+                return result
+        msg = self.path + ':' + str(node.get_line()) + ': error: '
+        if isinstance(node, mypy.nodes.FuncDef):
+            msg += 'Encountered Any type. Type annotation missing?'
         else:
-            msg = self.path + ':' + str(node.get_line()) + ': error: '
-            if isinstance(node, mypy.nodes.FuncDef):
-                msg += 'Encountered Any type. Type annotation missing?'
-            else:
-                msg += 'dead.code'
-            raise TypeException([msg])
+            msg += 'dead.code'
+        raise TypeException([msg])
 
     def visit_comparison_expr(self, o: mypy.nodes.ComparisonExpr):
         # Weird things seem to happen with is-comparisons, so we ignore those.
@@ -270,7 +286,7 @@ class TypeInfo:
         # enable it like this
         return result
 
-    def check(self, filename: str) -> bool:
+    def check(self, filename: str, base_dir: str = None) -> bool:
         """
         Typechecks the given file and collects all type information needed for
         the translation to Viper
@@ -281,12 +297,21 @@ class TypeInfo:
                 logger.info(error)
             raise TypeException(errors)
 
-        base_dir = os.path.dirname(filename)
+        module_name = None
+        if base_dir is not None:
+            relpath = os.path.relpath(filename, base_dir)
+            if '..' not in relpath:
+                relpath = relpath.replace('/', '.').replace('\\', '.')
+                if relpath.endswith('.py'):
+                    relpath = relpath[:-3]
+                elif relpath.endswith('.pyi'):
+                    relpath = relpath[:-4]
+                module_name = relpath
         try:
             options_strict = self._create_options(True)
             res_strict = mypy.build.build(
-                [BuildSource(filename, None, None, base_dir=base_dir)],
-                options_strict #, bin_dir=config.mypy_dir
+                [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                options_strict
                 )
 
             if res_strict.errors:
@@ -294,12 +319,12 @@ class TypeInfo:
                 # s.t. we don't get overapproximated none-related errors.
                 options_non_strict = self._create_options(False)
                 res_non_strict = mypy.build.build(
-                    [BuildSource(filename, None, None)],
-                    options_non_strict # , bin_dir=config.mypy_dir
+                    [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                    options_non_strict
                 )
                 if res_non_strict.errors:
                     report_errors(res_non_strict.errors)
-            relevant_files = ['__main__']
+            relevant_files = [next(iter(res_strict.graph))]
             i = 0
             while i < len(relevant_files):
                 name = relevant_files[i]
@@ -311,11 +336,13 @@ class TypeInfo:
                 i += 1
             relevant_files = [(name, res_strict.files[name]) for name in relevant_files]
             for name, file in relevant_files:
-                # if name in IGNORED_IMPORTS:
-                #     continue
+                real_name = None
+                if name == module_name:
+                    real_name = name.split('.')
+                    name = '__main__'
                 self.files[name] = file.path
                 visitor = TypeVisitor(res_strict.types, name,
-                                      file.ignored_lines)
+                                      file.ignored_lines, real_name)
                 visitor.prefix = name.split('.')
                 file.accept(visitor)
                 self.all_types.update(visitor.all_types)

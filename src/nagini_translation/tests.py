@@ -429,7 +429,7 @@ class AnnotationManager:
             r'\('
             # Error message, or label id. Matches everything except
             # comma.
-            r'(?P<id>[a-zA-Z\.\(\)_\-:;\d ?\'"]+)'
+            r'(?P<id>[a-zA-Z\.\(\)_\[\]\-:;\d ?\'"]+)'
             # Issue id in the issue tracker.
             r'(, (?P<issue_id>\d+))?'
             # Labels. Note that label must start with a letter.
@@ -563,7 +563,7 @@ class VerificationTest(AnnotatedTest):
     """Test for testing verification of successfully translated programs."""
 
     def test_file(
-            self, path: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
+            self, path: str, base: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
             sif: bool, reload_resources: bool, arp: bool, store_viper: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, verifier.name)
@@ -572,7 +572,8 @@ class VerificationTest(AnnotatedTest):
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         abspath = os.path.abspath(path)
-        modules, prog = translate(abspath, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
+        absbase = os.path.abspath(base)
+        modules, prog = translate(abspath, jvm, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources)
         assert prog is not None
         if store_viper:
             import string
@@ -622,23 +623,24 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, verifier, sif, reload_resources, arp, print):
+def test_verification(path, base, verifier, sif, reload_resources, arp, print):
     """Execute provided verification test."""
-    _VERIFICATION_TESTER.test_file(path, _JVM, verifier, sif, reload_resources, arp, print)
+    _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, print)
 
 
 class TranslationTest(AnnotatedTest):
     """Test for testing translation errors."""
 
-    def test_file(self, path: str, jvm: jvmaccess.JVM, sif: bool,
+    def test_file(self, path: str, base: str, jvm: jvmaccess.JVM, sif: bool,
                   reload_resources: bool, arp: bool):
         """Test specific Python file."""
         annotation_manager = self.get_annotation_manager(path, _BACKEND_ANY)
         if annotation_manager.ignore_file():
             pytest.skip('Ignored')
         path = os.path.abspath(path)
+        base = os.path.abspath(base)
         try:
-            translate(path, jvm, sif=sif, arp=arp, reload_resources=reload_resources)
+            translate(path, jvm, base_dir=base, sif=sif, arp=arp, reload_resources=reload_resources)
             actual_errors = []
         except InvalidProgramException as exp1:
             actual_errors = [InvalidProgramError(exp1)]
@@ -654,6 +656,6 @@ class TranslationTest(AnnotatedTest):
 _TRANSLATION_TESTER = TranslationTest()
 
 
-def test_translation(path, sif, reload_resources, arp):
+def test_translation(path, base, sif, reload_resources, arp):
     """Execute provided translation test."""
-    _TRANSLATION_TESTER.test_file(path, _JVM, sif, reload_resources, arp)
+    _TRANSLATION_TESTER.test_file(path, base, _JVM, sif, reload_resources, arp)

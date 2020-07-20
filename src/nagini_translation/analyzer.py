@@ -165,8 +165,10 @@ class Analyzer(ast.NodeVisitor):
                     redefined_name = name.asname
                     if not redefined_name:
                         redefined_name = module_name
-                    assert module_name in self.types.files
-                    path = os.path.abspath(self.types.files[module_name])
+                    file_name = module_name
+                    if file_name not in self.types.files:
+                        file_name = '__main__'
+                    path = os.path.abspath(self.types.files[file_name])
                     self.add_module(path, abs_path, redefined_name, parse_result)
             elif isinstance(stmt, ast.ImportFrom):
                 module_name = stmt.module
@@ -177,8 +179,10 @@ class Analyzer(ast.NodeVisitor):
                 elif module_name == 'nagini_contracts.lock':
                     path = nagini_contracts.lock.__file__
                 else:
-                    assert module_name in self.types.files
-                    path = self.types.files[module_name]
+                    file_name = module_name
+                    if file_name not in self.types.files:
+                        file_name = '__main__'
+                    path = self.types.files[file_name]
                 path = os.path.abspath(path)
                 if len(stmt.names) == 1 and stmt.names[0].name == '*':
                     names = None
@@ -1144,10 +1148,10 @@ class Analyzer(ast.NodeVisitor):
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):
-            if hasattr(mypy_type, 'fallback'):
+            if hasattr(mypy_type, 'partial_fallback'):
                 # Handle ADTs which are typed as tuple and should fallback to class
                 try:
-                    fallback_type = self.convert_type(mypy_type.fallback, node)
+                    fallback_type = self.convert_type(mypy_type.partial_fallback, node)
                     if isinstance(fallback_type, PythonClass) and fallback_type.is_adt:
                         return fallback_type
                 except UnsupportedException:

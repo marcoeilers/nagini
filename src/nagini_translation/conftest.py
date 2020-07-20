@@ -213,8 +213,9 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             sif = 'sif' in file
             reload_resources = file in reload_triggers
             arp = 'arp' in file
-            params.append((file, sif, reload_resources, arp))
-        metafunc.parametrize('path,sif,reload_resources,arp', params)
+            base = file.partition('translation')[0] + 'translation'
+            params.append((file, base, sif, reload_resources, arp))
+        metafunc.parametrize('path,base,sif,reload_resources,arp', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
         for test_dir in _pytest_config.verification_test_dirs:
             files = _test_files(test_dir)
@@ -226,8 +227,9 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             sif = 'sif' in file
             reload_resources = file in reload_triggers
             arp = 'arp' in file
-            params.extend([(file, verifier, sif, reload_resources, arp, _pytest_config.store_viper) for verifier
+            base = file.partition('verification')[0] + 'verification'
+            params.extend([(file, base, verifier, sif, reload_resources, arp, _pytest_config.store_viper) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,verifier,sif,reload_resources,arp,print', params)
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,print', params)
     else:
         pytest.exit('Unrecognized test function.')

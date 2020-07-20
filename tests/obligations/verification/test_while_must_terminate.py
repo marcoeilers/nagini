@@ -89,7 +89,7 @@ def test_measures_1() -> None:
 
 
 def test_measures_2() -> None:
-    while False:
+    while 2 + 2 > 7:
         # Negative measure is ok because loop is never executed.
         Invariant(MustTerminate(-1))
 

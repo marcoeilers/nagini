@@ -32,7 +32,7 @@ from nagini_contracts.obligations import (
     MustTerminate,
 )
 from typing import Tuple
-from library import (
+from master.library import (
     accept_io,
     accept,
     close_io,

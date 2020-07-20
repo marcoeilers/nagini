@@ -32,16 +32,6 @@ def return_optional(b: bool) -> Optional[Cont1]:
 OptionalCont1 = Optional[Cont1]
 
 
-def return_optional_fail(b: bool) -> None:
-    result = object()
-    if b:
-        result = None
-    else:
-        result = Cont2()
-    #:: ExpectedOutput(assert.failed:assertion.false)
-    assert isinstance(result, OptionalCont1)
-
-
 def param(o1: Optional[Cont1]) -> None:
     if o1 is not None:
         assert isinstance(o1, Cont1)

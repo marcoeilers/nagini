@@ -21,7 +21,7 @@ def test1(l: Lock[object]) -> None:
     Requires(l is not None)
     Requires(WaitLevel() < Level(l))
     l.acquire()
-    while False:
+    while 2 + 2 < 3:
         Invariant(MustRelease(l, 10 - 100))
         pass
     l.release()

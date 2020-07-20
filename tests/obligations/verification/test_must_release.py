@@ -153,7 +153,7 @@ def test_measures_1() -> None:
 def test_measures_2() -> None:
     l = ObjectLock(object())
     l.acquire()
-    while False:
+    while 5 + 5 < 4:
         # Negative measure is ok because loop is never executed.
         Invariant(MustRelease(l, -1))
         a = 2

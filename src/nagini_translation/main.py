@@ -89,7 +89,7 @@ def load_sil_files(jvm: JVM, sif: bool = False):
     return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
 
 
-def translate(path: str, jvm: JVM, selected: Set[str] = set(),
+def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False) -> Tuple[List['PythonModule'], Program]:
@@ -110,7 +110,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(),
     if sif and not viper_ast.is_extension_available():
         raise Exception('Viper AST SIF extension not found on classpath.')
     types = TypeInfo()
-    type_correct = types.check(path)
+    type_correct = types.check(path, base_dir)
     if not type_correct:
         return None
 
@@ -232,6 +232,10 @@ def main() -> None:
         help='mypy path',
         default=config.mypy_path)
     parser.add_argument(
+        '--base-dir',
+        help='base directory',
+        default=None)
+    parser.add_argument(
         '--print-viper',
         action='store_true',
         help='print generated Viper program')
@@ -333,17 +337,17 @@ def main() -> None:
             def add_response(part):
                 response[0] = response[0] + '\n' + part
 
-            translate_and_verify(file, jvm, args, add_response, arp=args.arp)
+            translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
             socket.send_string(response[0])
     else:
-        translate_and_verify(args.python_file, jvm, args, arp=args.arp)
+        translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
 
 
-def translate_and_verify(python_file, jvm, args, print=print, arp=False):
+def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None):
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
-        modules, prog = translate(python_file, jvm, selected, args.sif,
+        modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
         if args.print_viper:
             if args.verbose:
@@ -362,7 +366,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False):
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, selected, args.sif, arp=arp)
+                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir)
                 vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(

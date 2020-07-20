@@ -14,7 +14,7 @@ from typing import (
 )
 
 from nagini_contracts.adt import ADT
-import import_for_00120
+import resources.import_for_00120
 
 class Tree(ADT):
     pass

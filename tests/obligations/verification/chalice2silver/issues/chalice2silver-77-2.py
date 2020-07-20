@@ -15,7 +15,7 @@ from nagini_contracts.obligations import *
 
 
 def test1() -> None:
-    while False:
+    while 3 + 3 < 2:
         Invariant(MustTerminate(0))
         pass
 

@@ -227,8 +227,6 @@ def nested_else_finally(out: Container) -> None:
             out.value = 33
         except Exception:
             Assert(False)
-        else:
-            Assert(False)
         finally:
             out.value += 1
         if out.value == 34:
@@ -251,8 +249,6 @@ def nested_else_finally_2(out: Container) -> None:
         except MyException as e:
             out.value = 33
         except Exception:
-            Assert(False)
-        else:
             Assert(False)
         finally:
             out.value += 1
@@ -281,8 +277,6 @@ def nested_try_finally(out: Container) -> None:
             out.value = out.value + 3
         except Exception:
             Assert(False)
-        else:
-            Assert(False)
         finally:
             out.value += 1
         if out.value == 34:
@@ -307,8 +301,6 @@ def nested_try_finally_2(out: Container) -> None:
         except MyException as e:
             out.value = out.value + 3
         except Exception:
-            Assert(False)
-        else:
             Assert(False)
         finally:
             out.value += 1
