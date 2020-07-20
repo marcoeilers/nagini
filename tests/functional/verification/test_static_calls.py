@@ -46,7 +46,7 @@ class Super:
         finally:
             c.value += 3
 
-    #:: ExpectedOutput(postcondition.violated:assertion.false)|ExpectedOutput(postcondition.violated:assertion.false, L1)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)|ExpectedOutput(postcondition.violated:assertion.false,L1)
     def some_func_2(self, c: Container) -> int:
         Requires(Acc(c.value))
         Ensures(False)

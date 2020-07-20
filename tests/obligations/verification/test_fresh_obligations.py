@@ -133,7 +133,7 @@ class B:
 
 class BSub(B):
 
-    #:: ExpectedOutput(call.precondition:insufficient.permission, B_release)
+    #:: ExpectedOutput(call.precondition:insufficient.permission,B_release)
     def release(self, l: Lock[object]) -> None:
         Requires(MustRelease(l))
         l.release()

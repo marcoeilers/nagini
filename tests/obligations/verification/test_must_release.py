@@ -25,7 +25,7 @@ class ObjectLock(Lock[object]):
 
 #:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def acquire_1(l: Optional[ObjectLock]) -> None:
-    #:: ExpectedOutput(call.precondition:assertion.false)|UnexpectedOutput(carbon)(call.precondition:assertion.false, 168)
+    #:: ExpectedOutput(call.precondition:assertion.false)|UnexpectedOutput(carbon)(call.precondition:assertion.false,168)
     l.acquire()
 
 

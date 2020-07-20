@@ -7,7 +7,7 @@ from nagini_contracts.contracts import *
 class A:
     @staticmethod
     def static_method() -> int:
-        #:: ExpectedOutput(postcondition.violated:assertion.false, L1)
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L1)
         Ensures(Result() > 1)
         return 17
 

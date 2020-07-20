@@ -56,7 +56,7 @@ class RWController:
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
         if self.c.rds != 0:
-            #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false, 320)
+            #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false,320)
             self.lock.release()
             self.do_write(writer)  # try again
         else:
@@ -70,7 +70,7 @@ class RWController:
         Ensures(Rd(self.lock) and Rd(self.c))
         self.lock.acquire()
         self.c.rds += 1
-        #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false, 320)
+        #:: UnexpectedOutput(silicon)(lock.invariant.not.established:assertion.false,320)
         self.lock.release()
         reader.read(self.c)
         self.lock.acquire()

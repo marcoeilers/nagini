@@ -233,7 +233,7 @@ def ensure_dir_exists2(t1: Place, path: str) -> Place:
                 token(t2) and t2 == Result() and ex is None
             ),
             Exsures(OSErrorWrapper,
-                #:: UnexpectedOutput(postcondition.violated:assertion.false, 55) | UnexpectedOutput(carbon)(postcondition.violated:assertion.false, 168)
+                #:: UnexpectedOutput(postcondition.violated:assertion.false,55) | UnexpectedOutput(carbon)(postcondition.violated:assertion.false,168)
                 ex is RaisedException() and
                 Acc(ex.place) and ex.place == t2 and token(t2) and
                 Acc(ex.exception) and isinstance(ex.exception, Exception)

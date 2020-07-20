@@ -12,6 +12,9 @@ import os
 from mypy.build import BuildSource
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import IGNORED_IMPORTS, LITERALS
+from nagini_translation.mypy_patches.visitor import TraverserVisitor
+# from mypy.traverser import TraverserVisitor
+
 from nagini_translation.lib.util import (
     construct_lambda_prefix,
 )
@@ -35,7 +38,7 @@ class TypeException(Exception):
         self.messages = messages
 
 
-class TypeVisitor(mypy.traverser.TraverserVisitor):
+class TypeVisitor(TraverserVisitor):
     def __init__(self, type_map, path, ignored_lines, real_path):
         self.prefix = []
         self.all_types = {}
@@ -120,6 +123,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
 
     def visit_name_expr(self, node: mypy.nodes.NameExpr):
         is_alias = False
+        if node.name == '_':
+            return
         for i in range(len(self.prefix)):
             key = tuple(self.prefix[:i] + [node.name])
             if key in self.type_aliases:
@@ -132,7 +137,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
                               node.line, col(node))
 
     def visit_star_expr(self, node: mypy.nodes.StarExpr):
-        node.expr.accept(self)
+        self.visit(node.expr)
 
     def visit_func_def(self, node: mypy.nodes.FuncDef):
         oldprefix = self.prefix
@@ -152,7 +157,7 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         for arg in node.arguments:
             self.set_type(self.prefix + [arg.variable.name],
                           arg.variable.type, arg.line, col(arg))
-        node.body.accept(self)
+        self.visit(node.body)
         self.prefix = oldprefix
 
     def visit_class_def(self, node: mypy.nodes.ClassDef):
@@ -206,8 +211,8 @@ class TypeVisitor(mypy.traverser.TraverserVisitor):
         if isinstance(node.callee, mypy.nodes.SuperExpr):
             return
         for a in node.args:
-            a.accept(self)
-        node.callee.accept(self)
+            self.visit(a)
+        self.visit(node.callee)
 
     def type_of(self, node):
         if hasattr(node, 'node') and isinstance(node.node, mypy.nodes.MypyFile):
@@ -344,7 +349,7 @@ class TypeInfo:
                 visitor = TypeVisitor(res_strict.types, name,
                                       file.ignored_lines, real_name)
                 visitor.prefix = name.split('.')
-                file.accept(visitor)
+                visitor.visit(file)
                 self.all_types.update(visitor.all_types)
                 self.alt_types.update(visitor.alt_types)
                 self.type_aliases.update(visitor.type_aliases)

@@ -22,6 +22,7 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     METHOD_ID_DOMAIN,
+    OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     SET_TYPE,
@@ -619,6 +620,10 @@ class ExpressionTranslator(CommonTranslator):
             if isinstance(target, PythonType):
                 return [], self.type_factory.translate_type_literal(target,
                     self.to_position(node, ctx), ctx)
+            if node.id == '_':
+                object_type = ctx.module.global_module.classes[OBJECT_TYPE]
+                temp_var = ctx.actual_function.create_variable('wildcard', object_type, self.translator)
+                return [], temp_var.ref(node, ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
             else:

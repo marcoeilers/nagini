@@ -1082,7 +1082,7 @@ class StatementTranslator(CommonTranslator):
                 after_assign.append(self.set_global_defined(target, ctx.module, node, ctx))
         elif isinstance(lhs, ast.Name):
             assignment = self.viper.LocalVarAssign
-            if self.is_local_variable(target, ctx):
+            if lhs.id != '_' and self.is_local_variable(target, ctx):
                 after_assign.append(self.set_var_defined(target, position, info))
                 definedness_expr = self.check_var_defined(target, position, info)
         else:

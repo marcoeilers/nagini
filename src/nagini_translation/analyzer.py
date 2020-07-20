@@ -958,6 +958,11 @@ class Analyzer(ast.NodeVisitor):
             raise InvalidProgramException(node, 'invalid.ioexists.misplaced')
         if get_parent_of_type(node, ast.Call):
             return
+        if node.id == '_':
+            if isinstance(node.ctx, ast.Store):
+                return
+            else:
+                raise InvalidProgramException(node, 'wildcard.variable.read')
         arg_parent = get_parent_of_type(node, ast.arg)
         if arg_parent:
             if arg_parent.annotation is node:

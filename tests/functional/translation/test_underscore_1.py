@@ -8,5 +8,5 @@ def id(i: int) -> int:
 
 def read_under(i: int) -> int:
     _ = id(i)
-    #:: ExpectedOutput(invalid.program:wildcard.variable.use)
+    #:: ExpectedOutput(invalid.program:wildcard.variable.read)
     return _

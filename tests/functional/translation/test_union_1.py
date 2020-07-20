@@ -15,13 +15,13 @@ class B:
     pass
 
 def test_1(o: Union[A, B]) -> None:
-    #:: ExpectedOutput(type.error:Item "B" of "Union[A, B]" has no attribute "method")
+    #:: ExpectedOutput(type.error:Item "B" of "Union[A; B]" has no attribute "method")
     x = o.method()
 
 def test_2(o: Union[A, B]) -> None:
-    #:: ExpectedOutput(type.error:Item "B" of "Union[A, B]" has no attribute "field")
+    #:: ExpectedOutput(type.error:Item "B" of "Union[A; B]" has no attribute "field")
     x = o.field
 
 def test_3(o: Union[A, B]) -> None:
-    #:: ExpectedOutput(type.error:Item "B" of "Union[A, B]" has no attribute "field")
+    #:: ExpectedOutput(type.error:Item "B" of "Union[A; B]" has no attribute "field")
     o.field = 5

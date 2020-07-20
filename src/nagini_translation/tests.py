@@ -84,7 +84,7 @@ def _consume_list(key: str, dictionary: Dict[str, Any]) -> Any:
     """Destructive read of comma separated list from the dictionary."""
     value = _consume(key, dictionary)
     if value:
-        return [part for part in value.split(', ') if part]
+        return [part for part in value.split(',') if part]
     else:
         return []
 
@@ -431,9 +431,9 @@ class AnnotationManager:
             # comma.
             r'(?P<id>[a-zA-Z\.\(\)_\[\]\-:;\d ?\'"]+)'
             # Issue id in the issue tracker.
-            r'(, (?P<issue_id>\d+))?'
+            r'(,(?P<issue_id>\d+))?'
             # Labels. Note that label must start with a letter.
-            r'(?P<labels>(, [a-zA-Z][a-zA-Z\d_]+)+)?'
+            r'(?P<labels>(,[a-zA-Z][a-zA-Z\d_]+)+)?'
             r'\)'
         )
         self._annotations = {
@@ -448,6 +448,10 @@ class AnnotationManager:
     def _create_annotation(
             self, annotation_string: str, token: tokenize.TokenInfo) -> None:
         """Create annotation object from the ``annotation_string``."""
+        # Workaround: Mypy will sometimes produce error messages that contain commas,
+        # but those break our matcher. So we replace comma space (from mypy) with semicolon space
+        # and make sure not to put spaces after commas in annotations.
+        annotation_string = annotation_string.replace(', ', '; ')
         match = self._matcher.match(annotation_string)
         assert match, "Failed to match: {}".format(annotation_string)
         group_dict = match.groupdict()

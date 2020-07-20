@@ -6,7 +6,7 @@ from nagini_contracts.contracts import *
 
 class A:
     def __init__(self) -> None:
-        #:: ExpectedOutput(postcondition.violated:assertion.false, L1)
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L1)
         Ensures(Acc(self.val) and self.val > 13)  # type: ignore
         self.val = 16
 
@@ -37,7 +37,7 @@ class D:
     @classmethod
     def construct(cls) -> 'D':
         Ensures(isinstance(Result(), cls))
-        #:: ExpectedOutput(postcondition.violated:assertion.false, L2)
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L2)
         Ensures(Acc(Result().val) and Result().val > 7)
         return cls()
 

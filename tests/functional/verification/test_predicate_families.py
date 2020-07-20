@@ -79,7 +79,7 @@ class A:
         Unfold(self.pred1(oold))
         self.afield += 1
         res_val = self.afield
-        #:: ExpectedOutput(fold.failed:assertion.false, L1)
+        #:: ExpectedOutput(fold.failed:assertion.false,L1)
         Fold(self.pred1(oold + 1))
         return res_val
 
@@ -94,7 +94,7 @@ class A:
 
     def set5(self, oold: int) -> int:
         Requires(self.pred1(oold))
-        #:: ExpectedOutput(postcondition.violated:insufficient.permission, L2)
+        #:: ExpectedOutput(postcondition.violated:insufficient.permission,L2)
         Ensures(self.pred1(oold + 1))
         Unfold(self.pred1(oold))
         self.afield += 1

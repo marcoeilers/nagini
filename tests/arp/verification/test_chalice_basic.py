@@ -50,7 +50,7 @@ class Cell:
         self.dispose_rd()
         t2 = Thread(None, self.dispose_rd, args=())
         t2.start(self.dispose_rd)
-        #:: UnexpectedOutput(silicon)(call.precondition:insufficient.permission, 320)
+        #:: UnexpectedOutput(silicon)(call.precondition:insufficient.permission,320)
         self.dispose_rd()
 
     # forking and method calls of dispose_rd
@@ -75,11 +75,11 @@ class Cell:
         t1.start(self.dispose_rd)
         t2 = Thread(None, self.dispose_rd, args=())
         # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission, 320)
+        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission,320)
         t2.start(self.dispose_rd)
         t3 = Thread(None, self.dispose_rd, args=())
         # probably due to timeout in silicon, does not always occur
-        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission, 320)
+        #:: UnexpectedOutput(silicon)(thread.start.failed:insufficient.permission,320)
         t3.start(self.dispose_rd)
         t4 = Thread(None, self.dispose_rd, args=())
         t4.start(self.dispose_rd)

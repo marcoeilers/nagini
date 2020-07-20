@@ -39,7 +39,7 @@ class SuperB:
 
 
 class SubB(SuperB):
-    #:: ExpectedOutput(call.precondition:assertion.false, L1)|Label(L2)
+    #:: ExpectedOutput(call.precondition:assertion.false,L1)|Label(L2)
     def some_method(self, b: int) -> int:
         Requires(b > 10)
         Ensures(Result() > 10)
@@ -47,7 +47,7 @@ class SubB(SuperB):
 
 
 class SubSubB(SubB):
-    #:: ExpectedOutput(call.precondition:assertion.false, L2)
+    #:: ExpectedOutput(call.precondition:assertion.false,L2)
     def some_method(self, b: int) -> int:
         Requires(b > 11)
         Ensures(Result() > 10)
@@ -57,7 +57,7 @@ class SubSubB(SubB):
 class SuperC:
     def some_method(self, b: int) -> int:
         Requires(b > 9)
-        #:: ExpectedOutput(postcondition.violated:assertion.false, L3)
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L3)
         Ensures(Result() > 9)
         return b
 
@@ -66,7 +66,7 @@ class SubC(SuperC):
     #:: Label(L3)
     def some_method(self, b: int) -> int:
         Requires(b > 5)
-        #:: ExpectedOutput(postcondition.violated:assertion.false, L4)
+        #:: ExpectedOutput(postcondition.violated:assertion.false,L4)
         Ensures(Result() > 8)
         return b + 5
 
@@ -112,13 +112,13 @@ class SuperE:
     #:: Label(L5)
     def some_method(self, a: SuperA) -> int:
         Requires(Acc(a.int_field, 1 / 2))
-        #:: ExpectedOutput(postcondition.violated:insufficient.permission, L6)
+        #:: ExpectedOutput(postcondition.violated:insufficient.permission,L6)
         Ensures(Acc(a.int_field, 1 / 4))
         return a.int_field
 
 
 class SubE(SuperE):
-    #:: ExpectedOutput(call.precondition:insufficient.permission, L5)
+    #:: ExpectedOutput(call.precondition:insufficient.permission,L5)
     def some_method(self, a: SuperA) -> int:
         Requires(Acc(a.int_field, 2 / 3))
         Ensures(Acc(a.int_field, 2 / 3))
@@ -134,7 +134,7 @@ class SubE2(SuperE):
 
 
 class SubE3(SuperE):
-    #:: ExpectedOutput(call.precondition:insufficient.permission, L5)
+    #:: ExpectedOutput(call.precondition:insufficient.permission,L5)
     def some_method(self, a: SuperA) -> int:
         Requires(Acc(a.bool_field, 1 / 2))
         Ensures(Acc(a.bool_field, 1 / 2))
