@@ -15,7 +15,8 @@ class JVM:
 
     def __init__(self, classpath: str):
         jpype.startJVM(jpype.getDefaultJVMPath(),
-                       '-Djava.class.path=' + classpath, '-Xss32m')
+                       '-Djava.class.path=' + classpath, '-Xss32m',
+                       convertStrings=True)
         self.java = jpype.JPackage('java')
         self.scala = jpype.JPackage('scala')
         self.viper = jpype.JPackage('viper')

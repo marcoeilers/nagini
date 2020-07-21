@@ -15,12 +15,8 @@ import re
 import time
 import traceback
 
-# These imports monkey-patch mypy and should happen as early as possible.
-import nagini_translation.mypy_patches.column_info_patch
-import nagini_translation.mypy_patches.optional_patch
 
-
-from jpype import JavaException
+from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
@@ -188,7 +184,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str,
             verifier = Carbon(jvm, path)
         vresult = verifier.verify(modules, prog, arp=arp)
         return vresult
-    except JavaException as je:
+    except JException as je:
         print(je.stacktrace())
         traceback.print_exc()
 
@@ -413,7 +409,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
     except ConsistencyException as e:
         print(e.message + ': Translated AST contains inconsistencies.')
 
-    except JavaException as e:
+    except JException as e:
         print(e.stacktrace())
         raise e
 

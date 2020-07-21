@@ -51,6 +51,8 @@ class Extractor:
 
     def extract_chunk(self, chunk, jvm, modules, model, target):
         if not isinstance(chunk, jvm.viper.silicon.state.BasicChunk):
+            print('WARNING: Found non-basic heap chunk type; quantified chunks are currently not supported and will '
+                  'not be shown in counterexamples.')
             return
         resource_id = str(chunk.resourceID())
         if not resource_id in ('FieldID', 'PredicateID'):

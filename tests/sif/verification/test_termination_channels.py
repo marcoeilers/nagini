@@ -53,7 +53,7 @@ def continue_infinite() -> None:
     while x > 0:
         Invariant(x >= 0 and x <= 10)
         Invariant(TerminatesSif(True, x))
-        if True:
+        if 3 + 3 > 2:
             continue
         x -= 1
 

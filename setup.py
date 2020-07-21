@@ -26,11 +26,10 @@ setup(
         install_requires=[
             'mypy==0.782',
             'toposort==1.5',
-            'jpype1==0.6.2',
+            'jpype1==0.7.0',
             'astunparse==1.6.2',
             'typed-ast==1.4.0',
             'pytest==4.3.0',
-            'pytest-xdist==1.20.1',
             'z3-solver'
             ],
         entry_points = {
@@ -44,7 +43,7 @@ setup(
         # Full list of classifiers could be found at:
         # http://pypi.python.org/pypi?%3Aaction=list_classifiers
         classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             'Environment :: Console',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',

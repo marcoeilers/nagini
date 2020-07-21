@@ -86,6 +86,9 @@ class TypeVisitor(TraverserVisitor):
             else:
                 types = [rectype]
             for t in types:
+                if isinstance(t, mypy.types.AnyType):
+                    if t.type_of_any == mypy.types.TypeOfAny.from_error:
+                        continue
                 if isinstance(t, mypy.types.TypeType):
                     continue
                 if not hasattr(t, 'type'):
@@ -417,6 +420,17 @@ class TypeInfo:
 
     def is_type_type(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeType)
+
+    def is_type_alias_type(self, type: mypy.types.Type) -> bool:
+        return isinstance(type, mypy.types.TypeAliasType)
+
+    def is_any_type_from_error(self, type: mypy.types.Type) -> bool:
+        if isinstance(type, mypy.types.AnyType):
+            if type.type_of_any == mypy.types.TypeOfAny.from_error:
+                return True
+            if type.type_of_any == mypy.types.TypeOfAny.from_another_any:
+                return self.is_any_type_from_error(type.source_any)
+        return False
 
     def is_type_var(self, type: mypy.types.Type) -> bool:
         return isinstance(type, mypy.types.TypeVarType)

@@ -43,10 +43,6 @@ from collections import Counter
 from typing import Any, Dict, List, Optional
 
 
-# These imports monkey-patch mypy and should happen as early as possible.
-import nagini_translation.mypy_patches.column_info_patch
-import nagini_translation.mypy_patches.optional_patch
-
 from nagini_translation.lib import config, jvmaccess
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.typeinfo import TypeException
@@ -241,7 +237,7 @@ class ErrorMatchingAnnotationMixIn:
 
     def match(self, error: Error) -> bool:
         """Check is error matches this annotation."""
-        return (self._id == error.full_id and
+        return (self._id == error.full_id.replace(', ', '; ') and
                 self.line == error.line and
                 self.get_vias() == error.get_vias())
 
@@ -448,10 +444,6 @@ class AnnotationManager:
     def _create_annotation(
             self, annotation_string: str, token: tokenize.TokenInfo) -> None:
         """Create annotation object from the ``annotation_string``."""
-        # Workaround: Mypy will sometimes produce error messages that contain commas,
-        # but those break our matcher. So we replace comma space (from mypy) with semicolon space
-        # and make sure not to put spaces after commas in annotations.
-        annotation_string = annotation_string.replace(', ', '; ')
         match = self._matcher.match(annotation_string)
         assert match, "Failed to match: {}".format(annotation_string)
         group_dict = match.groupdict()

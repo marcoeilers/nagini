@@ -1178,6 +1178,8 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_type_type(mypy_type, node)
         elif self.types.is_callable_type(mypy_type):
             return self._convert_callable_type(mypy_type, node)
+        elif self.types.is_type_alias_type(mypy_type):
+            return self.convert_type(mypy_type.alias.target, node)
         else:
             msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)
@@ -1206,7 +1208,8 @@ class Analyzer(ast.NodeVisitor):
 
     def _convert_union_type(self, mypy_type, node) -> PythonType:
         args = [self.convert_type(arg_type, node)
-                for arg_type in mypy_type.items]
+                for arg_type in mypy_type.items
+                if not self.types.is_any_type_from_error(arg_type)]
         optional = False
         if None in args:
             # It's an optional type, remember this and wrap it later

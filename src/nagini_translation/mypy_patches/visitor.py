@@ -1,3 +1,9 @@
+"""
+Copyright (c) 2019 ETH Zurich
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+"""
 import re
 
 from mypy.nodes import (
@@ -14,12 +20,10 @@ from mypy.nodes import (
 
 
 class TraverserVisitor:
-    """A parse tree visitor that traverses the parse tree during visiting.
-
-    It does not perform any actions outside the traversal. Subclasses
-    should override visit methods to perform actions during
-    traversal. Calling the superclass method allows reusing the
-    traversal implementation.
+    """
+    A custom implementation of mypy's TraverserVisitor that we can subclass (cannot do that with the original one
+    because it's compiled apparently) and that does not use accept methods (because they expect an instance of the
+    original mypy visitor class) and instead uses reflection to call visit-methods.
     """
 
     def __init__(self) -> None:

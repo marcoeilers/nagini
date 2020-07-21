@@ -11,7 +11,7 @@ class A:
 
 
 class B(A):
-    @staticmethod
-    #:: ExpectedOutput(type.error:Signature of "static_method" incompatible with supertype "A")
+
+    @staticmethod   #:: ExpectedOutput(type.error:Signature of "static_method" incompatible with supertype "A")
     def static_method() -> int:
         return 17
