@@ -237,10 +237,6 @@ def _get_mypy_path():
     """
 
     mypy_path = os.environ.get('MYPYPATH')
-    if not mypy_path:
-        import nagini_contracts
-        mypy_path = os.path.dirname(os.path.dirname(
-            nagini_contracts.__file__))
     return mypy_path
 
 

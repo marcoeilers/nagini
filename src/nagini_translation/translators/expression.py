@@ -1107,6 +1107,20 @@ class ExpressionTranslator(CommonTranslator):
                 app, self.to_position(node, ctx), self.no_info(ctx))
         return app_stmt, app
 
+    def translate_Constant(self, node: 'ast.Constant', ctx: Context) -> StmtsAndExpr:
+        # Compatibility with Python 3.8; ast.Constant replaces all of the other node types mentioned below.
+        if isinstance(node.value, (bool, type(None))):
+            return self.translate_NameConstant(node, ctx)
+        if isinstance(node.value, (int, float, complex)):
+            return self.translate_Num(node, ctx)
+        if isinstance(node.value, str):
+            return self.translate_Str(node, ctx)
+        if isinstance(node.value, bytes):
+            return self.translate_Bytes(node, ctx)
+        if isinstance(node.value, type(...)):
+            return self.translate_Ellipsis(node, ctx)
+        raise UnsupportedException(node)
+
     def translate_NameConstant(self, node: ast.NameConstant,
                                ctx: Context) -> StmtsAndExpr:
         if node.value is True:

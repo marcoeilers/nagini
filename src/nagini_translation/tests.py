@@ -51,8 +51,6 @@ from nagini_translation.main import translate, verify, TYPE_ERROR_PATTERN
 from nagini_translation.verifier import VerificationResult, ViperVerifier
 
 
-os.environ['MYPYPATH'] = config.mypy_path
-
 _JVM = jvmaccess.JVM(config.classpath)
 
 
@@ -389,6 +387,16 @@ class LabelAnnotation(Annotation):
     def backend(self) -> str:
         """Back-end which this annotation is targeting."""
         return _BACKEND_ANY
+
+    @property
+    def line(self) -> int:
+        real_line = self._token.start[0] + 1
+        # Hack to accommodate different function AST positions in Python 3.8
+        if self.name.endswith('_lower_in_38'):
+            import sys
+            if sys.version_info[1] >= 8:
+                real_line += 1
+        return real_line
 
 
 class IgnoreFileAnnotation(

@@ -316,7 +316,7 @@ def main() -> None:
 
     logging.basicConfig(level=args.log)
 
-    os.environ['MYPYPATH'] = config.mypy_path
+    # os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
     if args.server:
         import zmq

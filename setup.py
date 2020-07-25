@@ -17,7 +17,7 @@ setup(
         packages=find_packages('src'),
         package_dir={'': 'src'},
         package_data={
-            '': ['*.sil', '*.index'],
+            '': ['*.sil', '*.index', '*.typed'],
             'nagini_translation.resources': ['backends/*.jar']
         },
         requires=[

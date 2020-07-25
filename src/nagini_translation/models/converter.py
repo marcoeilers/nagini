@@ -87,7 +87,7 @@ class NoFittingValueException(Exception):
 def get_func_value(model, name, args):
     args = tuple([' '.join(a.split()) for a in args])
     entry = model[name]
-    if args is () and isinstance(entry, str):
+    if args == () and isinstance(entry, str):
         return entry
     res = entry.get(args)
     if res is not None:
