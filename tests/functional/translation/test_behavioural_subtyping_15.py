@@ -20,8 +20,7 @@ class A(Zero):
         Ensures(Acc(self.v))  # type: ignore
         self.v = 12
 
-    #:: ExpectedOutput(invalid.program:invalid.override)
-    @property
+    @property       #:: ExpectedOutput(invalid.program:invalid.override)
     def vtt(self) -> int:
         Requires(Acc(self.v))
         return self.v * 2

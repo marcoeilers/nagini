@@ -4,7 +4,6 @@
 from nagini_contracts.contracts import *
 
 
-#:: ExpectedOutput(invalid.program:function.type.none)
-@Pure
+@Pure       #:: ExpectedOutput(invalid.program:function.type.none)
 def test1() -> None:
     return

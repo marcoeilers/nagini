@@ -32,6 +32,9 @@ class PermTranslator(CommonTranslator):
         visitor = getattr(self, method, self.translate_generic)
         return visitor(node, ctx)
 
+    def translate_perm_Constant(self, node: 'ast.Constant', ctx: Context) -> Expr:
+        return self.translate_perm_Num(node, ctx)
+
     def translate_perm_Num(self, node: ast.Num, ctx: Context) -> Expr:
         if node.n == 1:
             return self.viper.FullPerm(self.to_position(node, ctx),
@@ -39,7 +42,11 @@ class PermTranslator(CommonTranslator):
         raise UnsupportedException(node)
 
     def translate_perm_or_int(self, node: ast.AST, ctx: Context):
-        if isinstance(node, ast.Num):
+        num_class = ast.Num
+        import sys
+        if sys.version_info[1] >= 8:
+            num_class = ast.Constant
+        if isinstance(node, num_class):
             stmt, int_val = self.translate_expr(node, ctx, self.viper.Int)
             if stmt:
                 raise InvalidProgramException(node, 'purity.violated')

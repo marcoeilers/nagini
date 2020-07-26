@@ -4,8 +4,7 @@
 from nagini_contracts.contracts import *
 
 
-#:: ExpectedOutput(invalid.program:function.dead.code)
-@Pure
+@Pure       #:: ExpectedOutput(invalid.program:function.dead.code)
 def f1(i: int) -> int:
     a = i + 67
     return a - 34

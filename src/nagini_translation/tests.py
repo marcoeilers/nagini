@@ -388,16 +388,6 @@ class LabelAnnotation(Annotation):
         """Back-end which this annotation is targeting."""
         return _BACKEND_ANY
 
-    @property
-    def line(self) -> int:
-        real_line = self._token.start[0] + 1
-        # Hack to accommodate different function AST positions in Python 3.8
-        if self.name.endswith('_lower_in_38'):
-            import sys
-            if sys.version_info[1] >= 8:
-                real_line += 1
-        return real_line
-
 
 class IgnoreFileAnnotation(
         BackendSpecificAnnotationMixIn,

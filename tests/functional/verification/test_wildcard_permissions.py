@@ -25,8 +25,7 @@ class Container:
         Requires(Rd(self.P()))
         return Unfolding(Rd(self.P()), self.v2)
 
-    #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
-    @Pure
+    @Pure       #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
     def needs_pred_fails(self) -> int:
         Requires(Rd(self.P()))
         return Unfolding(self.P(), self.v2)

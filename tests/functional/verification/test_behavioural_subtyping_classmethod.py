@@ -51,8 +51,8 @@ class E(D):
 
 
 class F(D):
-    #:: Label(L2)
-    @classmethod
+
+    @classmethod    #:: Label(L2)
     def construct(cls) -> D:
         Ensures(isinstance(Result(), cls))
         Ensures(Acc(Result().val) and Result().val > 6)

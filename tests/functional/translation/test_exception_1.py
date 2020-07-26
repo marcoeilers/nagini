@@ -8,8 +8,7 @@ class MyException(Exception):
     pass
 
 
-#:: ExpectedOutput(invalid.program:function.throws.exception)
-@Pure
+@Pure       #:: ExpectedOutput(invalid.program:function.throws.exception)
 def some_function(a: int) -> int:
     Ensures(Result() > 17)
     Exsures(MyException, True)

@@ -5,8 +5,7 @@ from nagini_contracts.contracts import Requires, Predicate
 from nagini_contracts.io_contracts import *
 
 
-#:: ExpectedOutput(invalid.program:invalid.io_operation.return_type_not_bool)
-@IOOperation
+@IOOperation        #:: ExpectedOutput(invalid.program:invalid.io_operation.return_type_not_bool)
 def read_int_io(
         t_pre: Place,
         result: int,

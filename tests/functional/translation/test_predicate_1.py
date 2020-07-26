@@ -4,7 +4,6 @@
 from nagini_contracts.contracts import *
 
 
-#:: ExpectedOutput(invalid.program:invalid.predicate)
-@Predicate
+@Predicate      #:: ExpectedOutput(invalid.program:invalid.predicate)
 def meh(val: int) -> int:
     return val
