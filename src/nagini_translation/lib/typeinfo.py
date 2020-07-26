@@ -365,6 +365,14 @@ class TypeInfo:
         name = os.path.abspath(name)
         for prefix, path in self.files.items():
             path = os.path.abspath(path)
+            # If we run tests, we can be in the situation that there is a nagini_contracts directory in the site-
+            # packages and one in the source folder. This workaround ensures that we Nagini treats them as identical.
+            if prefix.startswith('nagini_contracts'):
+                if 'nagini_contracts' in name:
+                    relative_name = name[name.index('nagini_contracts'):]
+                    relative_path = path[path.index('nagini_contracts'):]
+                    if relative_path == relative_name:
+                        return prefix
             if path == name:
                 return prefix
         return None
