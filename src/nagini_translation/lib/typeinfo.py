@@ -209,7 +209,7 @@ class TypeVisitor(TraverserVisitor):
 
     def visit_call_expr(self, node: mypy.nodes.CallExpr):
         if (isinstance(node.callee, mypy.nodes.NameExpr) and
-                    node.callee.fullname == 'typing.cast'):
+                node.callee.fullname in ('typing.cast', 'typing.NamedTuple')):
             return
         if isinstance(node.callee, mypy.nodes.SuperExpr):
             return
