@@ -283,7 +283,12 @@ def main() -> None:
     parser.add_argument(
         '--ignore-global',
         action='store_true',
-        help='do not verify the the top level program (global statements)'
+        help='do not verify the top level program (global statements)'
+    )
+    parser.add_argument(
+        '--ignore-obligations',
+        action='store_true',
+        help='do not verify liveness properties (obligations)'
     )
     parser.add_argument(
         '--server',
@@ -302,6 +307,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    if args.ignore_obligations:
+        config.obligation_config.disable_all = True
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
@@ -316,7 +323,6 @@ def main() -> None:
 
     logging.basicConfig(level=args.log)
 
-    # os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
     if args.server:
         import zmq

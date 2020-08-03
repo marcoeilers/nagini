@@ -374,6 +374,9 @@
 "Exception": {
     "extends": "object"
 },
+"ConnectionRefusedError": {
+    "extends": "Exception"
+},
 "traceback": {
     "extends": "object"
 },

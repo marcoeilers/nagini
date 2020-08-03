@@ -48,6 +48,11 @@ class ObligationConfig(SectionConfig):
         """Disable all obligation related checks."""
         return self._info.getboolean('disable_all', False)
 
+    @disable_all.setter
+    def disable_all(self, val):
+        """Disable all obligation related checks."""
+        self._info['disable_all'] = 'True'
+
     @property
     def disable_measure_check(self):
         """Replace obligation measure checks with ``True``."""
