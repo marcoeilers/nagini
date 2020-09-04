@@ -31,7 +31,11 @@ class Extractor:
                 self.extract_chunk(chunk, jvm, modules, model, oheap)
 
         converter = Converter(pymethod, model, store, heap, oheap, jvm, modules)
-        return converter.generate_inputs()
+        result = converter.generate_inputs()
+        if hasattr(ce, 'second'):
+            second_exec_result = self.extract_counterexample(jvm, pymethod, ce.second(), modules)
+            result = 'First execution:\n' + str(result) + '\nSecond execution:\n' + str(second_exec_result)
+        return result
 
     def extract_model_entry(self, entry, jvm, target):
         name = entry._1()

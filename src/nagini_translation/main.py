@@ -88,7 +88,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
-              check_consistency: bool = False) -> Tuple[List['PythonModule'], Program]:
+              check_consistency: bool = False,
+              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -140,7 +141,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      seq_opt=True,
                                      act_opt=True,
                                      func_opt=True)
-        prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+        if counterexample:
+            prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
+        else:
+            prog = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').transform(prog, False)
         if verbose:
             print('Transformation to MPP successful.')
     if arp:
@@ -173,7 +177,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -182,7 +186,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path, counterexample)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        vresult = verifier.verify(modules, prog, arp=arp)
+        vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
         print(je.stacktrace())
@@ -318,8 +322,6 @@ def main() -> None:
         parser.error('missing argument: --boogie')
     if args.verifier != 'silicon' and args.counterexample:
         parser.error('counterexamples only supported with Silicon backend')
-    if args.sif and args.counterexample:
-        parser.error('counterexamples not supported for information flow verification')
 
     logging.basicConfig(level=args.log)
 
@@ -350,7 +352,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, counterexample=args.counterexample)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -375,7 +377,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(modules, prog, python_file, jvm,
-                             backend=backend, arp=arp, counterexample=args.counterexample)
+                             backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
