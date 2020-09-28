@@ -36,12 +36,12 @@ def brackets_io(
         read5: str = Result(),
         valid: bool = Result(),
         t_read5: Place = Result()) -> bool:
-    return IOExists11(
+    return IOExists10(
                bool, bool, bool, bool,
-               str, str, str, str,
+               str, str, str,
                Place, Place, Place)(
         lambda success1, success2, subvalid1, subvalid2,
-               read2, read3, read4, read5,
+               read2, read3, read4,
                t_read2, t_read3, t_read4: (
             (
                 read_char_io(t_read1, stdin, read2, success1, t_read2) and
@@ -139,7 +139,7 @@ def main(t1: Place) -> Place:
                 token(t1) and
                 read_char_io(t1, stdin, read_ahead, success1, t_read_ahead) and
                 brackets_io(t_read_ahead, read_ahead, read_last, valid, t_brackets_end) and
-                read_last is None and
+                len(read_last) == 0 and
                 write_char_io(t_brackets_end, stdout, ('1' if valid else '0'), success2, t_end)
             ),
             Ensures(
