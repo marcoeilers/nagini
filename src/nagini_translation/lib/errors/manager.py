@@ -50,13 +50,13 @@ class ErrorManager:
             self,
             errors: List['AbstractVerificationError'],
             jvm: JVM,
-            modules) -> List[Error]:
+            modules, sif) -> List[Error]:
         """Convert Viper errors into Nagini errors.
 
         It does that by wrapping in ``Error`` subclasses.
         """
         new_errors = [
-            self._convert_error(error, jvm, modules)
+            self._convert_error(error, jvm, modules, sif)
             for error in errors
         ]
         return new_errors
@@ -114,7 +114,7 @@ class ErrorManager:
 
     def _convert_error(
             self, original_error: 'AbstractVerificationError',
-            jvm: JVM, modules) -> Error:
+            jvm: JVM, modules, sif) -> Error:
         error = self.transformError(original_error)
         reason_pos = error.reason().offendingNode().pos()
         reason_item = self._get_item(reason_pos)
@@ -131,6 +131,8 @@ class ErrorManager:
         if error_item is not None and original_error.counterexample().isDefined() and isinstance(error_item.py_node, PythonMethod):
             pymethod = error_item.py_node
             ce = original_error.counterexample().get()
+            if sif:
+                ce = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transformCounterexample(ce, pymethod.sil_name)
             inputs = Extractor().extract_counterexample(jvm, pymethod, ce, modules)
         else:
             inputs = None
