@@ -761,6 +761,15 @@ class StatementTranslator(CommonTranslator):
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
 
+        if ctx.sif == 'poss':
+            # Force TerminatesSIF annotation
+            inv_nodes = ctx.actual_function.loop_invariants[node]
+            if not inv_nodes:
+                raise InvalidProgramException(node, 'missing.termination.annotation')
+            term_ann = inv_nodes[-1][0]
+            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
+                    term_ann.func.id == 'TerminatesSif'):
+                raise InvalidProgramException(node, 'missing.termination.annotation')
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
@@ -977,8 +986,12 @@ class StatementTranslator(CommonTranslator):
             else_body,
             self.to_position(node, ctx), self.no_info(ctx))
         position = self.to_position(node, ctx)
-        return cond_stmt + [self.viper.If(cond, then_block, else_block,
-                                          position, self.no_info(ctx))]
+        info = self.no_info(ctx)
+        cond_low = []
+        if ctx.sif == 'prob':
+            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, position, info), position, info))
+        return cond_stmt + cond_low + [self.viper.If(cond, then_block, else_block,
+                                                     position, info)]
 
     def assign_to(self, lhs: ast.AST, rhs: Expr, rhs_index: Optional[int],
                   rhs_end: Optional[Expr], rhs_type: PythonType,
@@ -1262,6 +1275,15 @@ class StatementTranslator(CommonTranslator):
 
     def _translate_while_invariants(self, node: ast.While, ctx: Context) -> List[Stmt]:
         invariants = []
+        if ctx.sif == 'poss':
+            # Force TerminatesSIF annotation
+            inv_nodes = ctx.actual_function.loop_invariants[node]
+            if not inv_nodes:
+                raise InvalidProgramException(node, 'missing.termination.annotation')
+            term_ann = inv_nodes[-1][0]
+            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
+                    term_ann.func.id == 'TerminatesSif'):
+                raise InvalidProgramException(node, 'missing.termination.annotation')
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))

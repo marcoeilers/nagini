@@ -256,7 +256,7 @@ def main() -> None:
     parser.add_argument(
         '--sif',
         nargs='?',
-        const=True,
+        const='true',
         default=False,
         help='verify secure information flow')
     parser.add_argument(
@@ -325,7 +325,7 @@ def main() -> None:
         parser.error('missing argument: --boogie')
     if args.verifier != 'silicon' and args.counterexample:
         parser.error('counterexamples only supported with Silicon backend')
-    if args.sif not in (True, False, 'poss', 'prob'):
+    if args.sif not in ('true', False, 'poss', 'prob'):
         parser.error('invalid value for --sif option')
 
     logging.basicConfig(level=args.log)

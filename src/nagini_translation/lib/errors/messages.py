@@ -160,6 +160,13 @@ REASONS = {
                    'both executions don\'t terminate.').format(pprint(n.args[0])),
     'sif_termination.condition_not_tight':
         lambda n: 'Termination condition {} might not be tight.'.format(pprint(n.args[0])),
+    'concurrency.in.sif':
+        lambda n: 'Concurrency (thread and lock operations) is not allowed in noninterference mode.',
+    'missing.termination.annotation':
+        lambda n: 'Function and loop termination must be proved to be low in possibilistic noninterference mode. '
+                  'Use TerminatesSif(...) as the last precondition/loop invariant.',
+    'high.branch':
+        lambda n: 'Branch condition {} might not be low.',
 }
 
 VAGUE_REASONS = {

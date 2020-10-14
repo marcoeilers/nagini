@@ -511,6 +511,8 @@ class CallTranslator(CommonTranslator):
         if target.name in ('acquire', 'release'):
             if (target.cls and target.cls.name == 'Lock' and
                         target.cls.module.type_prefix == 'nagini_contracts.lock'):
+                if ctx.sif == 'true':
+                    raise InvalidProgramException(node, 'concurrency.in.sif')
                 # Store receiver for later use (contents of args list get changed by
                 # subsequent call).
                 receiver = args[0]
@@ -1302,6 +1304,8 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_creation(self, node: ast.Call,
                                    ctx: Context) -> StmtsAndExpr:
         """Translates the instantiation of a Thread object."""
+        if ctx.sif == 'true':
+            raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
 
@@ -1363,6 +1367,8 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_start(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """Translates a thread start call."""
+        if ctx.sif == 'true':
+            raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
@@ -1415,6 +1421,8 @@ class CallTranslator(CommonTranslator):
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translates a thread join call."""
+        if ctx.sif == 'true':
+            raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
         assert isinstance(node.func, ast.Attribute)
