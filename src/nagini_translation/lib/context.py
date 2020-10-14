@@ -61,6 +61,7 @@ class Context:
         self.is_thread_start = False
         self.are_function_constants_used = False
         self.are_threading_constants_used = False
+        self.sif = False
 
     def get_fresh_int(self) -> int:
         """

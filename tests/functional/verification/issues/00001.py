@@ -4,6 +4,6 @@
 from nagini_contracts.contracts import *
 
 
+#:: ExpectedOutput(exhale.failed:assertion.false)
 def test1() -> None:
-    #:: ExpectedOutput(exhale.failed:assertion.false)
     raise Exception()

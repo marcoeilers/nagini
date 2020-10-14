@@ -128,7 +128,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global)
+                                        arp=arp, ignore_global=ignore_global, sif=sif)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -250,7 +250,9 @@ def main() -> None:
         default='silicon')
     parser.add_argument(
         '--sif',
-        action='store_true',
+        nargs='?',
+        const=True,
+        default=False,
         help='verify secure information flow')
     parser.add_argument(
         '--show-viper-errors',
@@ -320,6 +322,8 @@ def main() -> None:
         parser.error('counterexamples only supported with Silicon backend')
     if args.sif and args.counterexample:
         parser.error('counterexamples not supported for information flow verification')
+    if args.sif not in (True, False, 'poss', 'prob'):
+        parser.error('invalid value for --sif option')
 
     logging.basicConfig(level=args.log)
 

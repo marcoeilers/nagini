@@ -731,7 +731,7 @@ class MethodTranslator(CommonTranslator):
             except_block.append(goto_end)
         else:
             error_string = '"method raises no exceptions"'
-            error_pos = self.to_position(block.node, ctx, error_string)
+            error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
             false = self.viper.FalseLit(error_pos, info)
             assert_false = self.viper.Exhale(false, error_pos, info)
             except_block.append(assert_false)

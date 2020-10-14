@@ -488,7 +488,7 @@ class ExpressionTranslator(CommonTranslator):
                                                        self.no_info(ctx))
             else:
                 error_string = '"method raises no exceptions"'
-                error_pos = self.to_position(call, ctx, error_string)
+                error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
                 exhale_false = self.viper.Exhale(
                     self.viper.FalseLit(error_pos, self.no_info(ctx)),
                     error_pos,
