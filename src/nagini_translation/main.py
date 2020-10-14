@@ -140,7 +140,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      ctrl_opt=True,
                                      seq_opt=True,
                                      act_opt=True,
-                                     func_opt=True)
+                                     func_opt=True,
+                                     all_low=analyzer.has_all_low)
         if counterexample:
             prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
         else:

@@ -11,8 +11,12 @@ def f1(m: MyClass) -> None:
     Requires(Acc(m.x) and m.x == 0)
     Ensures(Acc(m.x))
     Ensures(m.x == 1)
+    b = True
+    # Different interpretation between SIF and non SIF mode of loop invariant validity when jumping out of loops,
+    # both are sound, but invariant m.x == 0 (without condition) holds in non-sif but not in sif mode. Same in f2.
     while True:
-        Invariant(Acc(m.x) and m.x == 0)
+        Invariant(Acc(m.x) and Implies(b, m.x == 0))
+        b = False
         try:
             break
         finally:
@@ -24,8 +28,10 @@ def f2(m: MyClass) -> None:
     Ensures(Acc(m.x))
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(m.x == 0)
+    b = True
     while True:
-        Invariant(Acc(m.x) and m.x == 0)
+        Invariant(Acc(m.x) and Implies(b, m.x == 0))
+        b = False
         try:
             break
         finally:

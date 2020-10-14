@@ -94,6 +94,7 @@ class Analyzer(ast.NodeVisitor):
         self.current_loop_invariant = None
         self.selected = selected
         self.deferred_tasks = []
+        self.has_all_low = False
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -673,8 +674,12 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
-        func.all_low = self.is_all_low(node)
-        func.preserves_low = self.preserves_low(node)
+        if self.is_all_low(node):
+            self.has_all_low = True
+            func.all_low = True
+        if self.preserves_low(node):
+            self.has_all_low = True
+            func.preserves_low = True
 
         # TODO: When we want to support method type parameters, this would be
         # the place to find all type variables used in the parameters which
