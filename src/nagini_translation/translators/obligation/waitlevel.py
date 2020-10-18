@@ -14,6 +14,7 @@ import operator
 from typing import Union
 
 from nagini_translation.lib import silver_nodes as sil
+from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.jvmaccess import JVM
 from nagini_translation.lib.program_nodes import PythonVar
@@ -194,7 +195,7 @@ class WaitLevelTranslator(CommonTranslator):
         exhale = self._create_level_below_inex(
             guard, expr, obligation_info.residue_level, ctx)
         translated_exhale = exhale.translate(self, ctx, position, info)
-        if ctx.ignore_waitlevel_constraints:
+        if ctx.ignore_waitlevel_constraints or obligation_config.disable_waitlevel_check:
             return sil.TrueLit()
         if ctx.obligation_context.is_translating_posts:
             obligation_info.add_postcondition(translated_exhale)

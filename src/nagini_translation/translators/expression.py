@@ -893,6 +893,10 @@ class ExpressionTranslator(CommonTranslator):
         """
         # This is disabled for the moment because using the functions is advantageous
         # when using operations as triggers
+        # We make an exception for ADT types.
+        if isinstance(op, (ast.Eq, ast.NotEq)):
+            if left_type.python_class.is_adt and right_type.python_class.is_adt:
+                return True
         return False
         if type(op) not in self._primitive_operations:
             return False
@@ -909,7 +913,9 @@ class ExpressionTranslator(CommonTranslator):
         the given operands to a primitive Viper BinOp.
         """
         op = self._primitive_operations[type(op)]
-        if op_type.python_class.try_box().name == INT_TYPE:
+        if op_type.python_class.is_adt:
+            wrap = self.to_ref
+        elif op_type.python_class.try_box().name == INT_TYPE:
             wrap = self.to_int
         else:
             wrap = self.to_bool

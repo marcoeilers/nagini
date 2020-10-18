@@ -1314,6 +1314,11 @@ class StatementTranslator(CommonTranslator):
                                               target_type=self.viper.Bool)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
+        cond_low = []
+        if ctx.sif == 'prob':
+            position = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, position, info), position, info))
         invariants = self._translate_while_invariants(node, ctx)
         locals = []
         start, end = get_body_indices(node.body)
@@ -1321,7 +1326,7 @@ class StatementTranslator(CommonTranslator):
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariants = [global_inv] + var_types + invariants
         body = self._translate_while_body(node, ctx, end_label)
-        loop = global_stmts + self.create_while_node(
+        loop = global_stmts + cond_low + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
         self.leave_loop_translation(ctx)
         if node.orelse:

@@ -60,6 +60,9 @@ class RPCOverlay:
         self.mouse_click_call = call
         self.mouse_click_arg = button
         self.mouse_click_ret = domain
+        Ensures(Acc(self.mouse_click_arg) and self.mouse_click_arg is button)
+        Ensures(Acc(self.mouse_click_call) and self.mouse_click_call is call)
+        Ensures(Acc(self.mouse_click_ret) and self.mouse_click_ret is domain)
 
 
 class RPCOverlayLock(Lock[RPCOverlay]):
@@ -76,13 +79,19 @@ class RPCOverlayLock(Lock[RPCOverlay]):
 
 class HID:
 
-    def __init__(self, button: Button, mouse: int, keyboard: int, high_key: Event, low_key: Event, et: EventType) -> None:
+    def __init__(self, button: Button, mouse: bool, keyboard: bool, high_key: Event, low_key: Event, et: EventType) -> None:
         self.mouse_available = mouse
         self.mouse_source = button
         self.keyboard_available = keyboard
         self.high_keyboard_source = high_key
         self.low_keyboard_source = low_key
         self.current_event_type = et
+        Ensures(Acc(self.mouse_available) and self.mouse_available is mouse)
+        Ensures(Acc(self.mouse_source) and self.mouse_source is button)
+        Ensures(Acc(self.keyboard_available) and self.keyboard_available is keyboard)
+        Ensures(Acc(self.high_keyboard_source) and self.high_keyboard_source is high_key)
+        Ensures(Acc(self.low_keyboard_source) and self.low_keyboard_source is low_key)
+        Ensures(Acc(self.current_event_type) and self.current_event_type is et)
 
 
 class HIDLock(Lock[HID]):
@@ -105,6 +114,8 @@ class Compositor:
     def __init__(self, domain: Domain, cp: Event) -> None:
         self.domain_under_cursor = domain
         self.cursor_position = cp
+        Ensures(Acc(self.domain_under_cursor) and self.domain_under_cursor is domain)
+        Ensures(Acc(self.cursor_position) and self.cursor_position is cp)
 
 
 class CompositorLock(Lock[Compositor]):
@@ -120,12 +131,13 @@ class CompositorLock(Lock[Compositor]):
 class CDDC:
 
     def __init__(self, ce: Event, b0: Event, b1: Event, ad: Domain, id: Domain,
-                 hid_button: Button, hid_mouse: int, hid_keyboard: int, hid_high: Event, hid_low: Event, hid_et: EventType,
+                 hid_button: Button, hid_mouse: bool, hid_keyboard: bool, hid_high: Event, hid_low: Event, hid_et: EventType,
                  comp_domain: Domain, comp_event: Event,
                  overlay_call: bool, overlay_button: Button, overlay_domain: Domain) -> None:
         Requires(Low(overlay_call) and Low(overlay_button) and Low(overlay_domain))
         Requires(Low(hid_mouse) and Low(hid_button) and Low(hid_keyboard) and Low(hid_low))
         Requires(Low(comp_domain))
+        Requires(Low(ad) and Low(id) and Low(hid_et) and Low(b0))
         self.current_event_data = ce
         self.output_event_buffer0 = b0
         self.output_event_buffer1 = b1
@@ -133,16 +145,13 @@ class CDDC:
         self.indicated_domain = id
         self.hid = HID(hid_button, hid_mouse, hid_keyboard, hid_high, hid_low, hid_et)
         self.hid_lock = HIDLock(self.hid)
-        self.hid_lock.release()
         self.compositor = Compositor(comp_domain, comp_event)
         self.compositor_lock = CompositorLock(self.compositor)
-        self.compositor_lock.release()
         self.overlay = RPCOverlay(overlay_call, overlay_button, overlay_domain)
         self.overlay_lock = RPCOverlayLock(self.overlay)
-        self.overlay_lock.release()
-        Ensures(Acc(self.hid, 1 / 2) and Acc(self.hid_lock, 1 / 2) and self.hid_lock.get_locked() is self.hid)
-        Ensures(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay)
-        Ensures(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock_lock, 1 / 2) and self.compositor_lock.get_locked() is self.compositor)
+        Ensures(Acc(self.hid, 1 / 2) and Acc(self.hid_lock, 1 / 2) and self.hid_lock.get_locked() is self.hid and Low(self.hid_lock))
+        Ensures(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
+        Ensures(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock, 1 / 2) and self.compositor_lock.get_locked() is self.compositor and Low(self.compositor_lock))
         Ensures(Acc(self.active_domain) and Low(self.active_domain))
         Ensures(Acc(self.indicated_domain) and Low(self.indicated_domain))
         Ensures(Acc(self.hid.current_event_type) and Low(self.hid.current_event_type))
@@ -152,9 +161,9 @@ class CDDC:
         Ensures(Acc(self.current_event_data))
 
     def driver(self) -> None:
-        Requires(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay)
+        Requires(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
         while True:
-            Invariant(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay)
+            Invariant(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
             self.overlay_lock.acquire()
 
             if self.overlay.mouse_click_call:
@@ -172,9 +181,9 @@ class CDDC:
             self.overlay_lock.release()
 
     def input_switch(self) -> None:
-        Requires(Acc(self.hid, 1/2) and Acc(self.hid_lock, 1/2) and self.hid_lock.get_locked() is self.hid)
-        Requires(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay)
-        Requires(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock_lock, 1 / 2) and self.compositor_lock.get_locked() is self.compositor)
+        Requires(Acc(self.hid, 1/2) and Acc(self.hid_lock, 1/2) and self.hid_lock.get_locked() is self.hid and Low(self.hid_lock))
+        Requires(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock, 1 / 2) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
+        Requires(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock, 1 / 2) and self.compositor_lock.get_locked() is self.compositor and Low(self.compositor_lock))
         Requires(Acc(self.active_domain) and Low(self.active_domain))
         Requires(Acc(self.indicated_domain) and Low(self.indicated_domain))
         Requires(Acc(self.hid.current_event_type) and Low(self.hid.current_event_type))
@@ -185,23 +194,23 @@ class CDDC:
         temp = False
         done_rpc = False
         switch_state_mouse_down = False
-        overlay_result = DomainInvalid()
-        cursor_domain = DomainInvalid()
+        overlay_result = DomainInvalid()  # type: Domain
+        cursor_domain = DomainInvalid()  # type: Domain
         self.current_event_data = EventNone()
         self.indicated_domain = self.active_domain
         self.hid.current_event_type = EventTypeNone()
 
         while True:
-            Invariant(Acc(self.hid, 1 / 2) and Acc(self.hid_lock, 1 / 2) and self.hid_lock.get_locked() is self.hid)
+            Invariant(Acc(self.hid, 1 / 2) and Acc(self.hid_lock, 1 / 2) and self.hid_lock.get_locked() is self.hid and Low(self.hid_lock))
             Invariant(Acc(self.overlay, 1 / 2) and Acc(self.overlay_lock,
-                                                      1 / 2) and self.overlay_lock.get_locked() is self.overlay)
-            Invariant(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock_lock,
-                                                         1 / 2) and self.compositor_lock.get_locked() is self.compositor)
+                                                      1 / 2) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
+            Invariant(Acc(self.compositor, 1 / 2) and Acc(self.compositor_lock,
+                                                         1 / 2) and self.compositor_lock.get_locked() is self.compositor and Low(self.compositor_lock))
             Invariant(Low(overlay_result))
             Invariant(Low(switch_state_mouse_down))
             Invariant(Acc(self.current_event_data) and Low(self.current_event_data))
             Invariant(Acc(self.active_domain) and Low(self.active_domain))
-            Invariant(Acc(self.indicated_domain) and Low(self.indicated_domain))
+            Invariant(Acc(self.indicated_domain) and self.indicated_domain is self.active_domain)
             Invariant(Acc(self.hid.current_event_type) and Low(self.hid.current_event_type))
             Invariant(Acc(self.output_event_buffer0) and Low(self.output_event_buffer0))
             Invariant(Acc(self.output_event_buffer1))
@@ -219,12 +228,13 @@ class CDDC:
 
                 self.overlay_lock.acquire()
                 self.overlay.mouse_click_arg = source
-                self.overlay.mouse_click_call = 1
+                self.overlay.mouse_click_call = True
                 self.overlay_lock.release()
 
                 done_rpc = False
 
                 while not done_rpc:
+                    Invariant(Acc(self.overlay, 1 / 4) and Acc(self.overlay_lock, 1 / 4) and self.overlay_lock.get_locked() is self.overlay and Low(self.overlay_lock))
                     Invariant(Low(done_rpc) and Low(overlay_result))
                     self.overlay_lock.acquire()
                     if not self.overlay.mouse_click_call:
@@ -259,11 +269,13 @@ class CDDC:
 
                     if switch_state_mouse_down or self.current_event_data == EventMouseDown():
                         if self.active_domain == DomainLow():
+                            Assert(Low(self.current_event_data))
                             self.output_event_buffer0 = self.current_event_data
                         else:
                             self.output_event_buffer1 = self.current_event_data
                     else:
                         if cursor_domain == DomainLow():
+                            Assert(Low(self.current_event_data))
                             self.output_event_buffer0 = self.current_event_data
                         else:
                             self.output_event_buffer1 = self.current_event_data
@@ -291,6 +303,9 @@ class CDDC:
                     self.hid_lock.release()
 
                 if self.active_domain == DomainLow():
+                    Assert(self.indicated_domain == self.active_domain)
+                    Assert(self.indicated_domain != DomainHigh())
+                    Assert(Low(self.current_event_data))
                     self.output_event_buffer0 = self.current_event_data
                 else:
                     self.output_event_buffer1 = self.current_event_data
