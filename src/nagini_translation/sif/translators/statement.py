@@ -110,7 +110,12 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         err_var = self.get_error_var(node, ctx).ref()
         stmts = self._translate_stmt_raise_create(node, err_var, ctx)
-        return stmts[:-1] + [
+        ex_type_low = []
+        if ctx.sif == 'prob':
+            position = self.to_position(node, ctx)
+            info = self.no_info(ctx)
+            ex_type_low.append(self.viper.Assert(self.viper.Low(stmts[-1].rhs(), None, position, info), position, info))
+        return stmts[:-1] + ex_type_low + [
             self.viper.Raise(stmts[-1], self.to_position(node, ctx), self.no_info(ctx))
             ]
 

@@ -793,7 +793,16 @@ class StatementTranslator(CommonTranslator):
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
-            result += translated_block
+            if ctx.sif:
+                translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
+                i = 0
+                while i < len(loop):
+                    if isinstance(loop[i], self.viper.ast.While):
+                        break
+                    i += 1
+                loop[i] = self.viper.SIFWhileElse(loop[i], translated_block)
+            else:
+                result += translated_block
         # Label for break to jump to
         result.append(self.viper.Label(post_label, position, info))
         result += self._set_result_none(ctx)
@@ -1332,7 +1341,17 @@ class StatementTranslator(CommonTranslator):
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
-            loop += translated_block
+
+            if ctx.sif:
+                translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
+                i = 0
+                while i < len(loop):
+                    if isinstance(loop[i], self.viper.ast.While):
+                        break
+                    i += 1
+                loop[i] = self.viper.SIFWhileElse(loop[i], translated_block)
+            else:
+                loop += translated_block
         loop += self._while_postamble(node, post_label, ctx)
         return loop
 

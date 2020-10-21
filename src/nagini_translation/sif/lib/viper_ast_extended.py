@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from typing import List, Optional
 
 from nagini_translation.lib.typedefs import (
-    Expr, Info, Position, Seqn, Stmt, Var, VarAssign
+    Expr, Info, Position, Seqn, Stmt, Var, VarAssign, While
 )
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.sif.lib.util import (
@@ -68,6 +68,10 @@ class ViperASTExtended(ViperAST):
     def SIFExceptionHandler(self, err_var: Var, exception: Expr, handler: Seqn):
         return self.ast_extensions.SIFExceptionHandler(
             err_var, exception, handler, self.NoPosition, self.NoInfo, self.NoTrafos)
+
+    def SIFWhileElse(self, loop: While, els: Stmt):
+        return self.ast_extensions.SIFWhileElse(
+            loop, els, self.NoPosition, self.NoInfo, self.NoTrafos)
 
     def Try(self, body: Seqn, catch_blocks: List['silver.sif.SIFExceptionHandler'],
             else_block: Optional[Seqn], finally_block: Optional[Seqn],

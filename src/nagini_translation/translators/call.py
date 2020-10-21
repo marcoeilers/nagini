@@ -1129,6 +1129,9 @@ class CallTranslator(CommonTranslator):
                 # Method called on an object
                 recv_stmts, recv_exprs, recv_types = self._translate_receiver(
                     node, target, ctx)
+                if ctx.sif == 'prob' and target.method_type == MethodType.normal:
+                    info = self.no_info(ctx)
+                    recv_stmts.append(self.viper.Assert(self.viper.Low(self.type_factory.typeof(recv_exprs[0]), None, position, info), position, info))
                 is_predicate = target.predicate
                 receiver_class = target.cls
                 if target.method_type != MethodType.static_method:
