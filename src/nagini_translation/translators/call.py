@@ -16,6 +16,7 @@ from nagini_contracts.contracts import (
 )
 from nagini_contracts.io_contracts import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
+from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
@@ -1129,9 +1130,9 @@ class CallTranslator(CommonTranslator):
                 # Method called on an object
                 recv_stmts, recv_exprs, recv_types = self._translate_receiver(
                     node, target, ctx)
-                if ctx.sif == 'prob' and target.method_type == MethodType.normal:
+                if ctx.sif == 'prob' and target.method_type == MethodType.normal and not target.pure and not target.predicate:
                     info = self.no_info(ctx)
-                    recv_stmts.append(self.viper.Assert(self.viper.Low(self.type_factory.typeof(recv_exprs[0]), None, position, info), position, info))
+                    recv_stmts.append(self.viper.Assert(self.viper.Low(self.type_factory.typeof(recv_exprs[0], ctx), None, position, info), position, info))
                 is_predicate = target.predicate
                 receiver_class = target.cls
                 if target.method_type != MethodType.static_method:
@@ -1448,7 +1449,8 @@ class CallTranslator(CommonTranslator):
         obligation_assertion = self.create_level_below(thread_level, residue_var, ctx)
         obligation_assertion = obligation_assertion.translate(self, ctx, wait_level_pos,
                                                               info)
-        stmts.append(self.viper.Assert(obligation_assertion, wait_level_pos, info))
+        if not obligation_config.disable_waitlevel_check:
+            stmts.append(self.viper.Assert(obligation_assertion, wait_level_pos, info))
 
         # Check how much permission is held to ThreadPost. This amount of the thread
         # postcondition will be inhaled later.

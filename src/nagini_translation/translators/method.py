@@ -70,7 +70,7 @@ class MethodTranslator(CommonTranslator):
         Translates the preconditions specified for 'method'.
         """
         pres = []
-        if ctx.sif == 'poss':
+        if ctx.sif == 'poss' and method.module is not method.module.global_module and not method.module.type_prefix.startswith('nagini_contracts'):
             # Force TerminatesSIF annotation
             pre_nodes = method.precondition
             if not pre_nodes:

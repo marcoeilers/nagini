@@ -1290,8 +1290,8 @@ class StatementTranslator(CommonTranslator):
             if not inv_nodes:
                 raise InvalidProgramException(node, 'missing.termination.annotation')
             term_ann = inv_nodes[-1][0]
-            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
-                    term_ann.func.id == 'TerminatesSif'):
+            if not (isinstance(term_ann.args[0], ast.Call) and isinstance(term_ann.args[0].func, ast.Name) and
+                    term_ann.args[0].func.id == 'TerminatesSif'):
                 raise InvalidProgramException(node, 'missing.termination.annotation')
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):

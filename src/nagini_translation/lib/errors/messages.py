@@ -149,7 +149,7 @@ REASONS = {
         lambda n: 'May not have permission to start thread.',
     'sif.fold':
         lambda n: 'The low parts of predicate {} might not hold.'.format(
-            get_target_name(n.args[0])),
+            get_target_name(n.args[0]) if n.args else 'lock invariant'),
     'sif.unfold':
         lambda n: 'The low parts of predicate {} might not hold.'.format(
             get_target_name(n.args[0])),

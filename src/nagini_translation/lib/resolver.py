@@ -469,7 +469,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
-    if (node._parent and isinstance(node._parent, ast.Assign) and
+    if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, ast.Assign) and
             node is node._parent.value):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
