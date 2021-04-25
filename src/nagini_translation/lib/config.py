@@ -184,10 +184,13 @@ def _construct_classpath(verifier : str = None):
     resources = resources_folder()
     silicon = os.path.join(resources, 'backends', 'silicon.jar')
     carbon = os.path.join(resources, 'backends', 'carbon.jar')
+    silver_sif = os.path.join(resources, 'backends', 'silver-sif-extension.jar')
+    silicon_sif = os.path.join(resources, 'backends', 'silicon-sif-extension.jar')
     return os.pathsep.join(
         jar for jar, v in ((silicon, 'carbon'),
                            (carbon, 'silicon'),
-                           (arpplugin_jar, 'arpplugin'))
+                           (silver_sif, 'silver-sif'),
+                           (silicon_sif, 'silicon-sif'))
         if jar and v != verifier)
 
 
@@ -219,6 +222,10 @@ def _get_z3_path():
     z3_exe = os.environ.get('Z3_EXE')
     if z3_exe:
         return z3_exe
+
+    script_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'z3')
+    if os.path.exists(script_path):
+        return script_path
 
     if sys.platform.startswith('linux'):
         if os.path.exists('/usr/bin/viper-z3'):
