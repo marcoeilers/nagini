@@ -68,6 +68,14 @@ The following command line options are available::
 
     --counterexample        
                     Enable outputting counterexamples for verification errors (experimental).
+                    
+    --sif=v         
+                    Enable verification of secure information flow. v can be true for ordinary 
+                    non-interference (for sequential programs only), poss for possiblistic 
+                    non-intererence (for concurrent programs) or prob for probabilisitc non-
+                    interference (for concurrent programs).
+                    Requires silver-sif-extension to be on the classpath, and silicon-sif-
+                    extension when used with counterexamples.
 
     --z3           
                     Sets the path of the Z3 executable. Alternatively, the
