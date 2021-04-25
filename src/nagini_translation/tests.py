@@ -558,8 +558,9 @@ class VerificationTest(AnnotatedTest):
 
     def test_file(
             self, path: str, base: str, jvm: jvmaccess.JVM, verifier: ViperVerifier,
-            sif: bool, reload_resources: bool, arp: bool, store_viper: bool):
+            sif: bool, reload_resources: bool, arp: bool, ignore_obligations: bool, store_viper: bool):
         """Test specific Python file."""
+        config.obligation_config.disable_all = ignore_obligations
         annotation_manager = self.get_annotation_manager(path, verifier.name)
         if arp:
             pytest.skip('Ignoring ARP tests')
@@ -617,9 +618,9 @@ class VerificationTest(AnnotatedTest):
 _VERIFICATION_TESTER = VerificationTest()
 
 
-def test_verification(path, base, verifier, sif, reload_resources, arp, print):
+def test_verification(path, base, verifier, sif, reload_resources, arp, ignore_obligations, print):
     """Execute provided verification test."""
-    _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, print)
+    _VERIFICATION_TESTER.test_file(path, base, _JVM, verifier, sif, reload_resources, arp, ignore_obligations, print)
 
 
 class TranslationTest(AnnotatedTest):

@@ -1,6 +1,10 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import *
 from nagini_contracts.lock import Lock
 from nagini_contracts.thread import Thread
+
 
 class CellLock(Lock[object]):
 
@@ -13,12 +17,10 @@ class CellLock(Lock[object]):
 def _print(i: int) -> None:
     Requires(LowEvent())
     Requires(Low(i))
-    Requires(TerminatesSif(True, 1))
 
 def thread1(l: CellLock) -> None:
     Requires(LowEvent())
     Requires(Low(l))
-    Requires(TerminatesSif(True, 2))
     l.acquire()
     _print(1)
     _print(1)
@@ -26,8 +28,7 @@ def thread1(l: CellLock) -> None:
 
 def thread2(l: CellLock) -> None:
     Requires(LowEvent())
-    Requires(TerminatesSif(True, 2))
-    # fail
+    #:: ExpectedOutput(call.precondition:assertion.false)
     l.acquire()
     _print(2)
     _print(2)
@@ -35,7 +36,6 @@ def thread2(l: CellLock) -> None:
 
 def thread0(secret: bool) -> None:
     Requires(LowEvent())
-    Requires(TerminatesSif(True, 2))
     l1 = CellLock(object())
     l2 = CellLock(object())
     l = l1 if secret else l2

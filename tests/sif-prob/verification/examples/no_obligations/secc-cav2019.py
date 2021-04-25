@@ -44,6 +44,7 @@ def thread1_insecure(r: Record, m: Mutex) -> None:
     while True:
         m.acquire()
         if r.is_classified:  # BUG
+            #:: ExpectedOutput(call.precondition:assertion.false)
             output(r.data)
         m.release()
 
@@ -53,4 +54,5 @@ def thread2_insecure(r: Record, m: Mutex) -> None:
     m.acquire()
     r.is_classified = False
     # BUG: r.data = 0
+    #:: ExpectedOutput(fold.failed:sif.fold)
     m.release()

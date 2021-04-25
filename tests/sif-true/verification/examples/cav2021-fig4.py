@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 from nagini_contracts.contracts import *
 
 
@@ -15,13 +18,8 @@ class B(A):
     return 1
 
 
-class C(A):
-
-  def foo(self, secret: int) -> int:
-    return secret
-
-
 def main_incorrect(a: A, secret: int) -> int:
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Low(Result()))
     return a.foo(secret)
 

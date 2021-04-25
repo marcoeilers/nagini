@@ -73,12 +73,12 @@ class MethodTranslator(CommonTranslator):
         if ctx.sif == 'poss' and method.module is not method.module.global_module and not method.module.type_prefix.startswith('nagini_contracts'):
             # Force TerminatesSIF annotation
             pre_nodes = method.precondition
-            if not pre_nodes:
-                raise InvalidProgramException(method.node, 'missing.termination.annotation')
-            term_ann = pre_nodes[-1][0]
-            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
-                    term_ann.func.id == 'TerminatesSif'):
-                raise InvalidProgramException(method.node, 'missing.termination.annotation')
+            # if not pre_nodes:
+            #     raise InvalidProgramException(method.node, 'missing.termination.annotation')
+            # term_ann = pre_nodes[-1][0]
+            # if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
+            #         term_ann.func.id == 'TerminatesSif'):
+            #     raise InvalidProgramException(method.node, 'missing.termination.annotation')
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
                 stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, True)
@@ -468,9 +468,11 @@ class MethodTranslator(CommonTranslator):
         body_start, body_end = get_body_indices(statements)
         # Create local variables for parameters
         body.extend(self._create_local_vars_for_params(method, ctx))
+        ctx.allow_statements = True
         body += flatten(
             [self.translate_stmt(stmt, ctx) for stmt in
                 method.node.body[body_start:body_end]])
+        ctx.allow_statements = False
         return body
 
     def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
@@ -953,8 +955,10 @@ class MethodTranslator(CommonTranslator):
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
+        ctx.allow_statements = True
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
+        ctx.allow_statements = False
 
         stmts += self._method_body_postamble(main_method, ctx)
         stmts += self._create_method_epilog(main_method, ctx)

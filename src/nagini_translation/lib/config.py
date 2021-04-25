@@ -51,7 +51,7 @@ class ObligationConfig(SectionConfig):
     @disable_all.setter
     def disable_all(self, val):
         """Disable all obligation related checks."""
-        self._info['disable_all'] = 'True'
+        self._info['disable_all'] = str(val)
 
     @property
     def disable_measure_check(self):

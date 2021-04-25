@@ -32,7 +32,6 @@ def m(x: int, secret: int, l: List[Node]) -> None:
         Invariant(Low(i))
         Invariant(Forall(cast(NodeList, l), lambda e: Acc(e.val)))
         Invariant(Low(x))
-        # TODO: this is unfortunate, it should not be necessary
         Invariant(Forall(int, lambda k: (Implies(k >= 0 and k < i, l[k] in l and l[k].val is x), [[l[k]]])))
         Invariant(Forall(int, lambda k: (Implies(k >= 0 and k < i, l[k] in l and Low(l[k].val)), [[l[k]]])))
         assert l[i] in l
