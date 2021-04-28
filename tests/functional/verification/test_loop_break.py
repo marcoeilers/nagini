@@ -75,21 +75,23 @@ def find_divisor_else_2(product: int) -> int:
     return i
 
 
-# def find_divisor_for(product: int) -> int:
-#     Requires(product > 2)
-#     Ensures(Result() == -1 or (Result() >= 2 and Result() <= product))
-#     Ensures(Implies(Result() > 0, not_dividing(2, Result() - 1, product)))
-#     Ensures(Implies(Result() == -1, not_dividing(2, product - 1, product)))
-#     Ensures(Implies(Result() > 0, product % Result() == 0))
-#     for i in range(2, product):
-#         Invariant(i >= 2 and i <= product)
-#         Invariant(not_dividing(2, len(Previous(i)) + 2 - 1, product))
-#         if product % i == 0:
-#             break
-#     else:
-#         Assert(not_dividing(2, product - 1, product))
-#         i = -1
-#     return i
+def find_divisor_for(product: int) -> int:
+    Requires(product > 2)
+    Ensures(Result() == -1 or (Result() >= 2 and Result() <= product))
+    Ensures(Implies(Result() > 0, not_dividing(2, Result() - 1, product)))
+    Ensures(Implies(Result() == -1, not_dividing(2, product - 1, product)))
+    Ensures(Implies(Result() > 0, product % Result() == 0))
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
+    Ensures(False)
+    for i in range(2, product):
+        Invariant(i >= 2 and i <= product)
+        Invariant(not_dividing(2, len(Previous(i)) + 2 - 1, product))
+        if product % i == 0:
+            break
+    else:
+        Assert(not_dividing(2, product - 1, product))
+        i = -1
+    return i
 
 
 def find_divisor_for_2(product: int) -> int:

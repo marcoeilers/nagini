@@ -41,6 +41,7 @@ class PyTestConfig:
         self.single_test = None
         self.verifiers = []
         self.store_viper = False
+        self.force_product = False
 
         self.init_from_config_file()
 
@@ -54,6 +55,9 @@ class PyTestConfig:
             self.add_verifier(verifier)
 
     def add_test(self, test: str):
+        if test == 'functional-product':
+            self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
+            self.force_product = True
         if test == 'functional':
             self._add_test_dir(_FUNCTIONAL_TESTS_DIR)
         elif test == 'sif-true':
@@ -127,6 +131,7 @@ def pytest_addoption(parser: 'pytest.config.Parser'):
     parser.addoption('--single-test', dest='single_test', action='store', default=None)
     parser.addoption('--all-tests', dest='all_tests', action='store_true')
     parser.addoption('--functional', dest='functional', action='store_true')
+    parser.addoption('--functional-product', dest='functional_product', action='store_true')
     parser.addoption('--sif-true', dest='sif_true', action='store_true')
     parser.addoption('--sif-poss', dest='sif_poss', action='store_true')
     parser.addoption('--sif-prob', dest='sif_prob', action='store_true')
@@ -161,6 +166,8 @@ def pytest_configure(config: 'pytest.config.Config'):
             tests.append('obligations')
         if config.option.arp:
             tests.append('arp')
+        if config.option.functional_product:
+            tests = ['functional-product']
     if tests:
         # Overwrite config file options.
         _pytest_config.clear_tests()
@@ -255,6 +262,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                 sif = 'prob'
             else:
                 sif = False
+            if _pytest_config.force_product:
+                sif = True
             reload_resources = file in reload_triggers
             arp = 'arp' in file
             base = file.partition('verification')[0] + 'verification'

@@ -807,11 +807,11 @@ class StatementTranslator(CommonTranslator):
             if ctx.sif:
                 translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
                 i = 0
-                while i < len(loop):
-                    if isinstance(loop[i], self.viper.ast.While):
+                while i < len(result):
+                    if isinstance(result[i], self.viper.ast.While):
                         break
                     i += 1
-                loop[i] = self.viper.SIFWhileElse(loop[i], translated_block)
+                result[i] = self.viper.SIFWhileElse(result[i], translated_block)
             else:
                 result += translated_block
         # Label for break to jump to
