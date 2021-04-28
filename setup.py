@@ -30,7 +30,7 @@ setup(
             'astunparse==1.6.2',
             'typed-ast==1.4.0',
             'pytest==4.3.0',
-            'z3-solver'
+            'z3-solver==4.8.7.0'
             ],
         entry_points = {
              'console_scripts': [
