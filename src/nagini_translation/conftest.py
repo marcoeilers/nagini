@@ -272,17 +272,4 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
         metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print', params)
     else:
         pytest.exit('Unrecognized test function.')
-        
-@pytest.fixture(scope='function', autouse=True)
-def testcase_result(request):
-    def fin():
-        print("Test '{}' DURATION={}".format(request.node.nodeid.split('-')[0],request.node.rep_call.duration))
-    request.addfinalizer(fin)
-    
-@pytest.mark.tryfirst
-def pytest_runtest_makereport(item, call, __multicall__):
-    rep = __multicall__.execute()
-    setattr(item, "rep_" + rep.when, rep)
-    return rep
-
 

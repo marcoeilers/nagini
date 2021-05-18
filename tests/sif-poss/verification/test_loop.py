@@ -44,7 +44,7 @@ def while_terminatessif_fail(n: int) -> None:
     Requires(LowEvent())
     i = 0
     while i != n:
-        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)|ExpectedOutput(carbon)(termination_channel_check.failed:sif_termination.condition_not_tight)
         Invariant(TerminatesSif(n >= 0, n-i))
         i += 1
 
@@ -98,7 +98,7 @@ def for_terminatessif_fail(n: int) -> int:
     Requires(LowEvent())
     res = 0
     for i in range(0, n):
-        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)
+        #:: ExpectedOutput(termination_channel_check.failed:sif_termination.condition_not_low)|ExpectedOutput(carbon)(termination_channel_check.failed:sif_termination.condition_not_tight)
         Invariant(TerminatesSif(n > 1, n - len(Previous(i))))
         res += 1
     return res

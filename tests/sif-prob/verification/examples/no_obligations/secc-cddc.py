@@ -1,8 +1,11 @@
-# enums
+#:: IgnoreFile(carbon)(107)
+
 from nagini_contracts.adt import ADT
 from nagini_contracts.lock import Lock
 from nagini_contracts.contracts import *
 from typing import NamedTuple
+
+#enums
 
 class Button(ADT):
     pass

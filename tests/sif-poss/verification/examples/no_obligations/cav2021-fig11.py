@@ -47,10 +47,12 @@ def thread_0(l: CellLock, c: Cell, secret: bool) -> bool:
 
 
 def thread1(l: CellLock, c: Cell, secret: int) -> None:
-    Requires(Low(l) and l.get_locked() is c)
+    Requires(LowEvent() and Low(l) and l.get_locked() is c)
     l.acquire()
     #:: ExpectedOutput(possibilistic.sif.violated:high.branch)
     while not c.go_1:
+        Invariant(Acc(c.go_1))
+        #:: ExpectedOutput(carbon)(lock.invariant.not.established:insufficient.permission)
         l.release()
         l.acquire()
     c.leak = True
@@ -59,10 +61,12 @@ def thread1(l: CellLock, c: Cell, secret: int) -> None:
 
 
 def thread2(l: CellLock, c: Cell, secret: int) -> None:
-    Requires(Low(l) and l.get_locked() is c)
+    Requires(LowEvent() and Low(l) and l.get_locked() is c)
     l.acquire()
     #:: ExpectedOutput(possibilistic.sif.violated:high.branch)
     while not c.go_2:
+        Invariant(Acc(c.go_2))
+        #:: ExpectedOutput(carbon)(lock.invariant.not.established:insufficient.permission)
         l.release()
         l.acquire()
     c.leak = False

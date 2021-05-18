@@ -175,12 +175,6 @@ def _construct_classpath(verifier : str = None):
                                (arpplugin_jar, 'arpplugin'))
             if jar and v != verifier)
 
-    if sys.platform.startswith('linux'):
-        if os.path.isdir('/usr/lib/viper'):
-            # Check if we have Viper installed via package manager.
-            return os.pathsep.join(
-                glob.glob('/usr/lib/viper/*.jar'))
-
     resources = resources_folder()
     silicon = os.path.join(resources, 'backends', 'silicon.jar')
     carbon = os.path.join(resources, 'backends', 'carbon.jar')
@@ -206,11 +200,6 @@ def _get_boogie_path():
     if boogie_exe:
         return boogie_exe
 
-    if sys.platform.startswith('linux'):
-        if (os.path.exists('/usr/bin/boogie') and
-            os.path.exists('/usr/bin/mono')):
-            return '/usr/bin/boogie'
-
 
 def _get_z3_path():
     """ Tries to detect path to Z3 executable.
@@ -226,13 +215,6 @@ def _get_z3_path():
     script_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'z3')
     if os.path.exists(script_path):
         return script_path
-
-    if sys.platform.startswith('linux'):
-        if os.path.exists('/usr/bin/viper-z3'):
-            # First check if we have Z3 installed together with Viper.
-            return '/usr/bin/viper-z3'
-        if os.path.exists('/usr/bin/z3'):
-            return '/usr/bin/z3'
 
     path = os.path.join(os.path.dirname(sys.executable),
                         'z3.exe' if sys.platform.startswith('win') else 'z3')
