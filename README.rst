@@ -14,7 +14,7 @@ Install Java 11 or newer (64 bit) and Python 3.7 or newer (64 bit) and the requi
 
     sudo apt-get install python3-dev
 
-For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie.
+For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.4.21).
 
 Dependencies (Windows)
 ==========================
