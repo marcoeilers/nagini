@@ -70,15 +70,6 @@ class MethodTranslator(CommonTranslator):
         Translates the preconditions specified for 'method'.
         """
         pres = []
-        if ctx.sif == 'poss' and method.module is not method.module.global_module and not method.module.type_prefix.startswith('nagini_contracts'):
-            # Force TerminatesSIF annotation
-            pre_nodes = method.precondition
-            # if not pre_nodes:
-            #     raise InvalidProgramException(method.node, 'missing.termination.annotation')
-            # term_ann = pre_nodes[-1][0]
-            # if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
-            #         term_ann.func.id == 'TerminatesSif'):
-            #     raise InvalidProgramException(method.node, 'missing.termination.annotation')
         for pre, aliases in method.precondition:
             with ctx.additional_aliases(aliases):
                 stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, True)
