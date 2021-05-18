@@ -118,6 +118,30 @@ LOCK_RELEASE_INVARIANT = {
     ('fold.failed', 'assertion.false'):
         ('lock.invariant.not.established', 'assertion.false')
 }
+BRANCH_CONDITION_ASSERT = {
+    ('assert.failed', 'assertion.false'):
+        ('probabilistic.sif.violated', 'high.branch')
+}
+POSS_BRANCH_CONDITION_ASSERT = {
+    ('assert.failed', 'assertion.false'):
+        ('possibilistic.sif.violated', 'high.branch')
+}
+BRANCH_RECEIVER_LOW = {
+    ('assert.failed', 'assertion.false'):
+        ('probabilistic.sif.violated', 'high.receiver.type')
+}
+EXCEPTION_TYPE_LOW = {
+    ('assert.failed', 'assertion.false'):
+        ('probabilistic.sif.violated', 'high.exception.type')
+}
+SHORT_CIRCUIT_LOW = {
+    ('assert.failed', 'assertion.false'):
+        ('probabilistic.sif.violated', 'high.short.circuit')
+}
+COMPREHENSION_LOW = {
+    ('assert.failed', 'assertion.false'):
+        ('probabilistic.sif.violated', 'high.comprehension')
+}
 
 __all__ = (
     'Rules',
@@ -135,4 +159,9 @@ __all__ = (
     'LOCAL_VARIABLE_NOT_DEFINED',
     'GLOBAL_NAME_NOT_DEFINED',
     'DEPENDENCIES_NOT_DEFINED',
+    'BRANCH_CONDITION_ASSERT',
+    'BRANCH_RECEIVER_LOW',
+    'EXCEPTION_TYPE_LOW',
+    'SHORT_CIRCUIT_LOW',
+    'COMPREHENSION_LOW',
 )

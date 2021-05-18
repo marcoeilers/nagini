@@ -16,6 +16,7 @@ from nagini_contracts.contracts import (
 )
 from nagini_contracts.io_contracts import IO_CONTRACT_FUNCS
 from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
+from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib import silver_nodes as sil
 from nagini_translation.lib.constants import (
     BUILTIN_PREDICATES,
@@ -511,7 +512,7 @@ class CallTranslator(CommonTranslator):
         if target.name in ('acquire', 'release'):
             if (target.cls and target.cls.name == 'Lock' and
                         target.cls.module.type_prefix == 'nagini_contracts.lock'):
-                if ctx.sif == 'true':
+                if ctx.sif is True:
                     raise InvalidProgramException(node, 'concurrency.in.sif')
                 # Store receiver for later use (contents of args list get changed by
                 # subsequent call).
@@ -1129,6 +1130,10 @@ class CallTranslator(CommonTranslator):
                 # Method called on an object
                 recv_stmts, recv_exprs, recv_types = self._translate_receiver(
                     node, target, ctx)
+                if ctx.sif == 'prob' and target.method_type == MethodType.normal and not target.pure and not target.predicate:
+                    info = self.no_info(ctx)
+                    recv_pos = self.to_position(node.func.value, ctx, rules=rules.BRANCH_RECEIVER_LOW)
+                    recv_stmts.append(self.viper.Assert(self.viper.Low(self.type_factory.typeof(recv_exprs[0], ctx), None, recv_pos, info), recv_pos, info))
                 is_predicate = target.predicate
                 receiver_class = target.cls
                 if target.method_type != MethodType.static_method:
@@ -1202,9 +1207,17 @@ class CallTranslator(CommonTranslator):
             if func_name in CONTRACT_WRAPPER_FUNCS:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             elif func_name in CONTRACT_FUNCS:
-                return self.translate_contractfunc_call(node, ctx, impure, statement)
+                old_allow_statements = ctx.allow_statements
+                ctx.allow_statements = False
+                res = self.translate_contractfunc_call(node, ctx, impure, statement)
+                ctx.allow_statements = old_allow_statements
+                return res
             elif func_name in IO_CONTRACT_FUNCS:
-                return self.translate_io_contractfunc_call(node, ctx, impure, statement)
+                old_allow_statements = ctx.allow_statements
+                ctx.allow_statements = False
+                res = self.translate_io_contractfunc_call(node, ctx, impure, statement)
+                ctx.allow_statements = old_allow_statements
+                return res
             elif func_name in OBLIGATION_CONTRACT_FUNCS:
                 return self.translate_obligation_contractfunc_call(node, ctx, impure)
             elif func_name in BUILTINS:
@@ -1304,7 +1317,7 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_creation(self, node: ast.Call,
                                    ctx: Context) -> StmtsAndExpr:
         """Translates the instantiation of a Thread object."""
-        if ctx.sif == 'true':
+        if ctx.sif is True:
             raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
@@ -1367,7 +1380,7 @@ class CallTranslator(CommonTranslator):
     def _translate_thread_start(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """Translates a thread start call."""
-        if ctx.sif == 'true':
+        if ctx.sif is True:
             raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
@@ -1421,7 +1434,7 @@ class CallTranslator(CommonTranslator):
 
     def _translate_thread_join(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """Translates a thread join call."""
-        if ctx.sif == 'true':
+        if ctx.sif is True:
             raise InvalidProgramException(node, 'concurrency.in.sif')
         ctx.are_threading_constants_used = True
         pos, info = self.to_position(node, ctx), self.no_info(ctx)
@@ -1445,7 +1458,8 @@ class CallTranslator(CommonTranslator):
         obligation_assertion = self.create_level_below(thread_level, residue_var, ctx)
         obligation_assertion = obligation_assertion.translate(self, ctx, wait_level_pos,
                                                               info)
-        stmts.append(self.viper.Assert(obligation_assertion, wait_level_pos, info))
+        if not obligation_config.disable_waitlevel_check:
+            stmts.append(self.viper.Assert(obligation_assertion, wait_level_pos, info))
 
         # Check how much permission is held to ThreadPost. This amount of the thread
         # postcondition will be inhaled later.

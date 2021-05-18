@@ -61,6 +61,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
+from nagini_translation.lib.errors import rules
 from typing import List, Optional, Tuple, Union
 
 
@@ -730,6 +731,12 @@ class StatementTranslator(CommonTranslator):
                                 self.viper.NullLit(position, info),
                                 position, info)
 
+        cond_low = []
+        if ctx.sif == 'prob':
+            rule_pos = self.to_position(node.iter, ctx, rules=rules.BRANCH_CONDITION_ASSERT)
+            info = self.no_info(ctx)
+            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
+
         conditional_assign = self.viper.If(cond, self.translate_block(assign_stmt,
                                                                       position, info),
                                            self.translate_block([], position, info),
@@ -748,7 +755,7 @@ class StatementTranslator(CommonTranslator):
                                                     position, info)
 
         self.enter_loop_translation(node, post_label, end_label, ctx, err_var)
-
+        ctx.allow_statements = False
         invariant = self._create_for_loop_invariant(iter_var, seq_temp_var, target_var,
                                                     err_var, iterable,
                                                     iterable_type, assign_expr,
@@ -760,26 +767,30 @@ class StatementTranslator(CommonTranslator):
         # Remember type information about havocked local variables.
         invariant.extend(self._get_havocked_var_type_info(node.body[start:end],
                                                           ctx))
-
         if ctx.sif == 'poss':
-            # Force TerminatesSIF annotation
+            # Check if TerminatesSIF annotation present
             inv_nodes = ctx.actual_function.loop_invariants[node]
-            if not inv_nodes:
-                raise InvalidProgramException(node, 'missing.termination.annotation')
-            term_ann = inv_nodes[-1][0]
-            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
-                    term_ann.func.id == 'TerminatesSif'):
-                raise InvalidProgramException(node, 'missing.termination.annotation')
+            term_ann = None
+            if inv_nodes:
+                term_ann = inv_nodes[-1][0]
+                if not (isinstance(term_ann.args[0], ast.Call) and isinstance(term_ann.args[0].func, ast.Name) and
+                         term_ann.args[0].func.id == 'TerminatesSif'):
+                    term_ann = None
+            if not term_ann:
+                rule_pos = self.to_position(node.iter, ctx, rules=rules.POSS_BRANCH_CONDITION_ASSERT)
+                info = self.no_info(ctx)
+                cond_low.append(self.viper.Assert(self.viper.LowEvent(rule_pos, info), rule_pos, info))
+                cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariant.append(self.translate_contract(expr, ctx))
-
+        ctx.allow_statements = True
         body = flatten(
             [self.translate_stmt(stmt, ctx) for stmt in node.body[start:end]])
         # Label for continue to jump to
         body.append(self.viper.Label(end_label, position, info))
         body.extend(next_call)
-
+        body.extend(cond_low)
         body.extend(assign_stmt)
 
         loop = global_stmts + self.create_while_node(
@@ -787,13 +798,22 @@ class StatementTranslator(CommonTranslator):
         iter_del = self._get_iterator_delete(iter_var, node, ctx)
         self.leave_loop_translation(ctx)
         del ctx.loop_iterators[node]
-        result = (iterable_stmt + iter_assign + next_call + assign_stmt +
+        result = (iterable_stmt + iter_assign + next_call + cond_low + assign_stmt +
                   [seq_temp_assign] + loop + iter_del)
         result += self._set_result_none(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
-            result += translated_block
+            if ctx.sif:
+                translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
+                i = 0
+                while i < len(result):
+                    if isinstance(result[i], self.viper.ast.While):
+                        break
+                    i += 1
+                result[i] = self.viper.SIFWhileElse(result[i], translated_block)
+            else:
+                result += translated_block
         # Label for break to jump to
         result.append(self.viper.Label(post_label, position, info))
         result += self._set_result_none(ctx)
@@ -989,7 +1009,8 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
         cond_low = []
         if ctx.sif == 'prob':
-            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, position, info), position, info))
+            rule_pos = self.to_position(node.test, ctx, rules=rules.BRANCH_CONDITION_ASSERT)
+            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
         return cond_stmt + cond_low + [self.viper.If(cond, then_block, else_block,
                                                      position, info)]
 
@@ -1273,21 +1294,30 @@ class StatementTranslator(CommonTranslator):
             assign_stmts += target_stmt
         return rhs_stmt + assign_stmts
 
-    def _translate_while_invariants(self, node: ast.While, ctx: Context) -> List[Stmt]:
+    def _translate_while_invariants(self, node: ast.While, cond: Expr, ctx: Context) -> Tuple[List[Expr], List[Stmt]]:
+        ctx.allow_statements = False
         invariants = []
+        cond_low = []
         if ctx.sif == 'poss':
-            # Force TerminatesSIF annotation
+            # Check if TerminatesSIF annotation present
             inv_nodes = ctx.actual_function.loop_invariants[node]
-            if not inv_nodes:
-                raise InvalidProgramException(node, 'missing.termination.annotation')
-            term_ann = inv_nodes[-1][0]
-            if not (isinstance(term_ann, ast.Call) and isinstance(term_ann.func, ast.Name) and
-                    term_ann.func.id == 'TerminatesSif'):
-                raise InvalidProgramException(node, 'missing.termination.annotation')
+            term_ann = None
+            if inv_nodes:
+                term_ann = inv_nodes[-1][0]
+                if not (isinstance(term_ann.args[0], ast.Call) and isinstance(term_ann.args[0].func, ast.Name) and
+                        term_ann.args[0].func.id == 'TerminatesSif'):
+                    term_ann = None
+            if not term_ann:
+                rule_pos = self.to_position(node.test, ctx, rules=rules.POSS_BRANCH_CONDITION_ASSERT)
+                info = self.no_info(ctx)
+                cond_low.append(self.viper.Assert(self.viper.LowEvent(rule_pos, info), rule_pos, info))
+                cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
+
         for expr, aliases in ctx.actual_function.loop_invariants[node]:
             with ctx.additional_aliases(aliases):
                 invariants.append(self.translate_contract(expr, ctx))
-        return invariants
+        ctx.allow_statements = True
+        return invariants, cond_low
 
     def _translate_while_body(self, node: ast.While, ctx: Context, end_label: str) -> List[Stmt]:
         start, end = get_body_indices(node.body)
@@ -1314,25 +1344,36 @@ class StatementTranslator(CommonTranslator):
                                               target_type=self.viper.Bool)
         if cond_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        cond_low = []
+        invariants, cond_low = self._translate_while_invariants(node, cond, ctx)
         if ctx.sif == 'prob':
-            position = self.to_position(node, ctx)
+            rule_pos = self.to_position(node.test, ctx, rules=rules.BRANCH_CONDITION_ASSERT)
             info = self.no_info(ctx)
-            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, position, info), position, info))
-        invariants = self._translate_while_invariants(node, ctx)
+            cond_low.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
         locals = []
         start, end = get_body_indices(node.body)
         var_types = self._get_havocked_var_type_info(node.body[start:end], ctx)
         global_stmts, global_inv = self._get_havocked_module_var_info(ctx)
         invariants = [global_inv] + var_types + invariants
         body = self._translate_while_body(node, ctx, end_label)
+        ctx.allow_statements = False
         loop = global_stmts + cond_low + self.create_while_node(
             ctx, cond, invariants, locals, body, node)
+        ctx.allow_statements = True
         self.leave_loop_translation(ctx)
         if node.orelse:
             translated_block = flatten([self.translate_stmt(stmt, ctx) for stmt
                                         in node.orelse])
-            loop += translated_block
+
+            if ctx.sif:
+                translated_block = self.translate_block(translated_block, self.no_position(ctx), self.no_info(ctx))
+                i = 0
+                while i < len(loop):
+                    if isinstance(loop[i], self.viper.ast.While):
+                        break
+                    i += 1
+                loop[i] = self.viper.SIFWhileElse(loop[i], translated_block)
+            else:
+                loop += translated_block
         loop += self._while_postamble(node, post_label, ctx)
         return loop
 

@@ -20,6 +20,8 @@ VarDecl = 'silver.ast.LocalVarDecl'
 
 VarAssign = 'silver.ast.LocalVarAssign'
 
+While = 'silver.ast.While'
+
 Domain = 'silver.ast.Domain'
 
 DomainAxiom = 'silver.ast.DomainAxiom'
