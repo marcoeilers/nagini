@@ -1,3 +1,13 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
+"""
+Example adapted from "SecCSL: Security Concurrent Separation Logic"
+G. Ernst and T. Murray
+CAV 2019
+https://bitbucket.org/covern/secc/src/master/examples/case-studies/
+"""
+
 from nagini_contracts.contracts import *
 from nagini_contracts.lock import Lock
 

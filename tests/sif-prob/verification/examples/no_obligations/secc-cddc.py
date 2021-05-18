@@ -1,3 +1,10 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
+"""
+Example adapted from https://bitbucket.org/covern/secc/src/master/examples/case-studies/
+"""
+
 #:: IgnoreFile(carbon)(107)
 
 from nagini_contracts.adt import ADT
