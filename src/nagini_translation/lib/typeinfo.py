@@ -135,7 +135,7 @@ class TypeVisitor(TraverserVisitor):
                 break
         if (node.name not in LITERALS and not is_alias):
             name_type = self.type_of(node)
-            if not isinstance(name_type, mypy.types.CallableType):
+            if not isinstance(name_type, mypy.types.CallableType) and not isinstance(name_type, str):
                 self.set_type(self.prefix + [node.name], name_type,
                               node.line, col(node))
 
@@ -249,6 +249,8 @@ class TypeVisitor(TraverserVisitor):
             if tuple(fullname) in self.type_vars:
                 result = self.type_vars[tuple(fullname)]
                 return result
+            if node.fullname == 'typing.Dict':
+                return "HACK"
         msg = self.path + ':' + str(node.get_line()) + ': error: '
         if isinstance(node, mypy.nodes.FuncDef):
             msg += 'Encountered Any type. Type annotation missing?'
@@ -316,9 +318,11 @@ class TypeInfo:
                     relpath = relpath[:-4]
                 module_name = relpath
         try:
+            # alt_lib_path="/home/marco/git/scion/stubs"
             options_strict = self._create_options(True)
+            bs = [BuildSource(filename, module_name, None, base_dir=base_dir)]
             res_strict = mypy.build.build(
-                [BuildSource(filename, module_name, None, base_dir=base_dir)],
+                bs,
                 options_strict
                 )
 
