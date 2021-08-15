@@ -1452,7 +1452,17 @@ class ProgramTranslator(CommonTranslator):
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.
-        predicates = [p for p in predicates if p.name() in all_used_names]
+        filtered_predicates = []
+        for p in predicates:
+            if p.name() in all_used_names:
+                # if the actual name is included, the predicate is folded or unfolded somewhere, so we need the body.
+                filtered_predicates.append(p)
+            elif (p.name() + " DECLARATION") in all_used_names:
+                # if only name + DECLARATION is included, the predicate is referenced but never unfolded,
+                # so we only need to include the declaration without a body.
+                decl = self.viper.ast.Predicate(p.name(), p.formalArgs(), self.viper.none, p.pos(), p.info(), p.errT())
+                filtered_predicates.append(decl)
+        predicates = filtered_predicates
         functions = [f for f in functions if f.name() in all_used_names]
         methods = [m for m in methods if m.name() in all_used_names]
 
