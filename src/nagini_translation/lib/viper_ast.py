@@ -156,7 +156,7 @@ class ViperAST:
                                   body, position, info, self.NoTrafos)
 
     def PredicateAccess(self, args, pred_name, position, info):
-        self.used_names.add(pred_name)
+        self.used_names.add(pred_name + " DECLARATION")
         return self.ast.PredicateAccess(self.to_seq(args), pred_name, position,
                                         info, self.NoTrafos)
 
@@ -164,12 +164,18 @@ class ViperAST:
         return self.ast.PredicateAccessPredicate(loc, perm, position, info, self.NoTrafos)
 
     def Fold(self, predicate, position, info):
+        pred_name = predicate.loc().predicateName()
+        self.used_names.add(pred_name)
         return self.ast.Fold(predicate, position, info, self.NoTrafos)
 
     def Unfold(self, predicate, position, info):
+        pred_name = predicate.loc().predicateName()
+        self.used_names.add(pred_name)
         return self.ast.Unfold(predicate, position, info, self.NoTrafos)
 
     def Unfolding(self, predicate, expr, position, info):
+        pred_name = predicate.loc().predicateName()
+        self.used_names.add(pred_name)
         return self.ast.Unfolding(predicate, expr, position, info, self.NoTrafos)
 
     def SeqType(self, element_type):
