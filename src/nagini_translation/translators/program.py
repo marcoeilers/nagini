@@ -57,6 +57,7 @@ from nagini_translation.lib.typedefs import (
     VarDecl,
 )
 from nagini_translation.lib.util import (
+    flatten,
     InvalidProgramException,
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
@@ -1227,8 +1228,11 @@ class ProgramTranslator(CommonTranslator):
         functions.append(self.create_arbitrary_bool_func(ctx))
         predicates.append(self.create_may_set_predicate(ctx))
 
-        type_funcs = self.type_factory.get_default_functions(ctx)
-        type_axioms = self.type_factory.get_default_axioms(ctx)
+        default_type_funcs = self.type_factory.get_default_functions(ctx)
+        default_type_axioms = self.type_factory.get_default_axioms(ctx)
+        type_funcs = OrderedDict()
+        type_axioms = OrderedDict()
+
 
         predicate_families = OrderedDict()
         static_fields = OrderedDict()
@@ -1243,6 +1247,9 @@ class ProgramTranslator(CommonTranslator):
         adt_list = []
 
         all_names = []
+
+        # Tracks dependencies between type names
+        type_dependencies = OrderedDict()
 
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
@@ -1324,9 +1331,11 @@ class ProgramTranslator(CommonTranslator):
                 old_class = ctx.current_class
                 ctx.current_class = cls
                 funcs, axioms = self.type_factory.create_type(cls, ctx)
-                type_funcs.extend(funcs)
+                type_funcs[cls.sil_name] = funcs
                 if axioms:
-                    type_axioms.extend(axioms)
+                    type_axioms[cls.sil_name] = axioms
+                if cls.superclass:
+                    type_dependencies[cls.sil_name] = cls.superclass.sil_name
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1429,18 +1438,22 @@ class ProgramTranslator(CommonTranslator):
             selected_names = all_names
             selected_names.extend(
                 ['MustTerminate', 'MustInvokeBounded', 'MustInvokeUnbounded', 'Level', '_MaySet', 'main'])
-            for cname in ['NoneType', 'object', 'Place', 'Thread', 'Exception', 'PSeq', 'PSet', 'tuple']:
-                selected_names.append(module.global_module.classes[cname].sil_name)
-            # Compute all dependencies of directly selected methods/...
+        for cname in ['NoneType', 'object', 'Place', 'Thread', 'Exception', 'PSeq', 'PSet', 'tuple']:
+            sil_name = module.global_module.classes[cname].sil_name
+            if sil_name not in selected_names:
+                selected_names.append(sil_name)
+        # Compute all dependencies of directly selected methods/...
         all_used_names = list(selected_names)
         i = 0
         while i < len(all_used_names):
             name = all_used_names[i]
             to_add = set()
             if name in self.viper.used_names_sets:
-                to_add = self.viper.used_names_sets[name]
+                to_add.update(self.viper.used_names_sets[name])
             if name in self.required_names:
-                to_add = self.required_names[name]
+                to_add.update(self.required_names[name])
+            if name in type_dependencies:
+                to_add.add(type_dependencies[name])
             for add in to_add:
                 if not add in all_used_names:
                     all_used_names.append(add)
@@ -1465,6 +1478,10 @@ class ProgramTranslator(CommonTranslator):
         predicates = filtered_predicates
         functions = [f for f in functions if f.name() in all_used_names]
         methods = [m for m in methods if m.name() in all_used_names]
+        type_funcs = [fs for fname, fs in type_funcs.items() if fname in all_used_names]
+        type_axioms = [axs for fname, axs in type_axioms.items() if fname in all_used_names]
+        type_funcs = default_type_funcs + flatten(type_funcs)
+        type_axioms = default_type_axioms + flatten(type_axioms)
 
         ctx.current_function = None
 
