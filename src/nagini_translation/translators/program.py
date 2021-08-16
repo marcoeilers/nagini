@@ -595,7 +595,8 @@ class ProgramTranslator(CommonTranslator):
             selected_names.append(node.sil_name)
 
     def create_functions_domain(self, constants: List, ctx: Context):
-        return self.viper.Domain(FUNCTION_DOMAIN_NAME, constants, [], [],
+        filtered_constants = [c for c in constants if c.name() in ctx.function_constants_used]
+        return self.viper.Domain(FUNCTION_DOMAIN_NAME, filtered_constants, [], [],
                                  self.no_position(ctx), self.no_info(ctx))
 
     def translate_function_constant(self, func: PythonMethod, ctx: Context):
@@ -1118,7 +1119,7 @@ class ProgramTranslator(CommonTranslator):
                                   [adt_ref_decl], adt_type, preconds, postconds,
                                   None, pos, info)
 
-    def create_adts_domains_and_functions(self, adts: List[PythonClass],
+    def create_adts_domains_and_functions(self, adts: List[PythonClass], selected,
                                           ctx: Context) -> List['silver.ast.domain']:
         """
         Translate Algebraic Data Types defined in Python, with classes (sum)
@@ -1132,6 +1133,8 @@ class ProgramTranslator(CommonTranslator):
 
         for adt in adts:
             assert adt.is_adt and adt.is_defining_adt
+            if adt.sil_name not in selected:
+                continue
 
             # ADTs should have constructors
             if not len(adt.all_subclasses) > 1:
@@ -1335,7 +1338,9 @@ class ProgramTranslator(CommonTranslator):
                 if axioms:
                     type_axioms[cls.sil_name] = axioms
                 if cls.superclass:
-                    type_dependencies[cls.sil_name] = cls.superclass.sil_name
+                    type_dependencies[cls.sil_name] = { cls.superclass.sil_name }
+                if cls.is_adt:
+                    type_dependencies[cls.sil_name].update(set(sc.sil_name for sc in cls.direct_subclasses))
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
                     if func.interface:
@@ -1453,7 +1458,7 @@ class ProgramTranslator(CommonTranslator):
             if name in self.required_names:
                 to_add.update(self.required_names[name])
             if name in type_dependencies:
-                to_add.add(type_dependencies[name])
+                to_add.update(type_dependencies[name])
             for add in to_add:
                 if not add in all_used_names:
                     all_used_names.append(add)
@@ -1488,12 +1493,11 @@ class ProgramTranslator(CommonTranslator):
         domains.append(self.type_factory.create_type_domain(type_funcs,
                                                             type_axioms, ctx))
 
-        if ctx.are_function_constants_used:
-            domains.append(self.create_functions_domain(func_constants, ctx))
+        domains.append(self.create_functions_domain(func_constants, ctx))
         if ctx.are_threading_constants_used:
             domains.append(self.create_method_id_domain(threading_ids_constants, ctx))
             domains.append(self.create_thread_domain(ctx))
-        adts_domains, adts_functions = self.create_adts_domains_and_functions(adt_list,
+        adts_domains, adts_functions = self.create_adts_domains_and_functions(adt_list, all_used_names,
                                                                               ctx)
         domains.extend(adts_domains)
         functions.extend(adts_functions)

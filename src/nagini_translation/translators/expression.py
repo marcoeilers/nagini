@@ -616,7 +616,7 @@ class ExpressionTranslator(CommonTranslator):
         if isinstance(target, PythonGlobalVar):
             return self.translate_global_var_reference(target, node, ctx)
         elif isinstance(target, PythonMethod):
-            ctx.are_function_constants_used = True
+            ctx.function_constants_used.add(target.func_constant)
             func = self.viper.DomainFuncApp(target.func_constant, [],
                                             self.viper.function_domain_type(),
                                             self.to_position(node, ctx), self.no_info(ctx),
