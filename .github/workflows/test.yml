@@ -14,7 +14,7 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
-      BOOGIE_EXE: "boogie"
+      BOOGIE_EXE: "/usr/bin/boogie"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
@@ -29,5 +29,6 @@ jobs:
     - name: Test with pytest
       run: |
         dotnet tool install --global Boogie --version 2.4.21
+        whereis boogie
         nagini --verifier=carbon tests/functional/verification/empty.py
         pytest src/nagini_translation/tests.py --silicon --carbon
