@@ -14,17 +14,13 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
-      BOOGIE_EXE: "viper_tools/boogie/Binaries/Boogie"
+      BOOGIE_EXE: "boogie"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
-    - name: Get Viper tools
-      run: |
-        curl https://github.com/viperproject/viper-ide/releases/download/v-2021-08-03-0738/ViperToolsLinux.zip -Lo ViperToolsLinux.zip
-        unzip ViperToolsLinux.zip -d viper_tools
     - name: Install nagini
       run: |
         python -m pip install --upgrade pip
