@@ -32,5 +32,6 @@ jobs:
         pip install .
     - name: Test with pytest
       run: |
+        dotnet tool install --global Boogie --version 2.4.21
         nagini --verifier=carbon tests/functional/verification/empty.py
         pytest src/nagini_translation/tests.py --silicon --carbon
