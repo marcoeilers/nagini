@@ -9,6 +9,7 @@ import ast
 from typing import List
 
 from nagini_translation.lib.constants import ARBITRARY_BOOL_FUNC
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonClass, PythonTryBlock, PythonVar
 from nagini_translation.lib.typedefs import Expr, Position, Seqn, Stmt, Var, VarDecl
 from nagini_translation.lib.util import flatten, get_body_indices, get_surrounding_try_blocks
@@ -110,7 +111,15 @@ class SIFStatementTranslator(StatementTranslator):
     def translate_stmt_Raise(self, node: ast.Raise, ctx: Context) -> List[Stmt]:
         err_var = self.get_error_var(node, ctx).ref()
         stmts = self._translate_stmt_raise_create(node, err_var, ctx)
-        return stmts[:-1] + [
+        ex_type_low = []
+        if ctx.sif == 'prob':
+            position = self.to_position(node.exc, ctx, rules=rules.EXCEPTION_TYPE_LOW)
+            info = self.no_info(ctx)
+            exc_expr = stmts[-1].rhs()
+            exc_type = self.type_factory.typeof(exc_expr, ctx)
+
+            ex_type_low.append(self.viper.Assert(self.viper.Low(exc_type, None, position, info), position, info))
+        return stmts[:-1] + ex_type_low + [
             self.viper.Raise(stmts[-1], self.to_position(node, ctx), self.no_info(ctx))
             ]
 

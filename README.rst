@@ -10,16 +10,16 @@ For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.6 or newer (64 bit) and the required libraries::
+Install Java 11 or newer (64 bit) and Python 3.8 or newer (64 bit) and the required libraries::
 
     sudo apt-get install python3-dev
 
-For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie.
+For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.4.21).
 
 Dependencies (Windows)
 ==========================
 
-1.  Install Java 11 or newer (64 bit) and Python 3.6 or newer (64 bit).
+1.  Install Java 11 or newer (64 bit) and Python 3.8 or newer (64 bit).
 
 2.  Install either Visual C++ Build Tools 2015 (http://go.microsoft.com/fwlink/?LinkId=691126) or Visual Studio 2015. For the latter, make sure to choose the option "Common Tools for Visual C++ 2015" in the setup (see https://blogs.msdn.microsoft.com/vcblog/2015/07/24/setup-changes-in-visual-studio-2015-affecting-c-developers/ for an explanation).
 
@@ -68,6 +68,14 @@ The following command line options are available::
 
     --counterexample        
                     Enable outputting counterexamples for verification errors (experimental).
+                    
+    --sif=v         
+                    Enable verification of secure information flow. v can be true for ordinary 
+                    non-interference (for sequential programs only), poss for possiblistic 
+                    non-intererence (for concurrent programs) or prob for probabilisitc non-
+                    interference (for concurrent programs).
+                    Requires silver-sif-extension to be on the classpath, and silicon-sif-
+                    extension when used with counterexamples.
 
     --z3           
                     Sets the path of the Z3 executable. Alternatively, the

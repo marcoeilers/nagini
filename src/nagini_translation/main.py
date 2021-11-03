@@ -88,7 +88,8 @@ def load_sil_files(jvm: JVM, sif: bool = False):
 def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
-              check_consistency: bool = False) -> Tuple[List['PythonModule'], Program]:
+              check_consistency: bool = False,
+              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -128,7 +129,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global)
+                                        arp=arp, ignore_global=ignore_global, sif=sif)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -139,8 +140,12 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      ctrl_opt=True,
                                      seq_opt=True,
                                      act_opt=True,
-                                     func_opt=True)
-        prog = jvm.viper.silver.sif.SIFExtendedTransformer.transform(prog, False)
+                                     func_opt=True,
+                                     all_low=analyzer.has_all_low)
+        if counterexample:
+            prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
+        else:
+            prog = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').transform(prog, False)
         if verbose:
             print('Transformation to MPP successful.')
     if arp:
@@ -173,7 +178,7 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
 
 
 def verify(modules, prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False) -> VerificationResult:
+           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
@@ -182,7 +187,7 @@ def verify(modules, prog: 'viper.silver.ast.Program', path: str,
             verifier = Silicon(jvm, path, counterexample)
         elif backend == ViperVerifier.carbon:
             verifier = Carbon(jvm, path)
-        vresult = verifier.verify(modules, prog, arp=arp)
+        vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
         print(je.stacktrace())
@@ -250,7 +255,9 @@ def main() -> None:
         default='silicon')
     parser.add_argument(
         '--sif',
-        action='store_true',
+        nargs='?',
+        const='true',
+        default=False,
         help='verify secure information flow')
     parser.add_argument(
         '--show-viper-errors',
@@ -283,7 +290,12 @@ def main() -> None:
     parser.add_argument(
         '--ignore-global',
         action='store_true',
-        help='do not verify the the top level program (global statements)'
+        help='do not verify the top level program (global statements)'
+    )
+    parser.add_argument(
+        '--ignore-obligations',
+        action='store_true',
+        help='do not verify liveness properties (obligations)'
     )
     parser.add_argument(
         '--server',
@@ -302,6 +314,8 @@ def main() -> None:
     config.z3_path = args.z3
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
+    if args.ignore_obligations:
+        config.obligation_config.disable_all = True
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
@@ -311,12 +325,11 @@ def main() -> None:
         parser.error('missing argument: --boogie')
     if args.verifier != 'silicon' and args.counterexample:
         parser.error('counterexamples only supported with Silicon backend')
-    if args.sif and args.counterexample:
-        parser.error('counterexamples not supported for information flow verification')
+    if args.sif not in ('true', False, 'poss', 'prob'):
+        parser.error('invalid value for --sif option')
 
     logging.basicConfig(level=args.log)
 
-    # os.environ['MYPYPATH'] = config.mypy_path
     jvm = JVM(config.classpath)
     if args.server:
         import zmq
@@ -344,7 +357,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose)
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, counterexample=args.counterexample)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -369,7 +382,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     i, args.benchmark, start, end, end - start))
         else:
             vresult = verify(modules, prog, python_file, jvm,
-                             backend=backend, arp=arp, counterexample=args.counterexample)
+                             backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))

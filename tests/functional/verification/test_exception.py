@@ -98,6 +98,7 @@ def raised_and_declared_5(input: int, incon: Container) -> None:
     raise MyException()
 
 
+#:: ExpectedOutput(exhale.failed:assertion.false)
 def raised_and_undeclared(input: int, incon: Container) -> Container:
     Requires(incon != None and Acc(incon.value))
     Ensures(Acc(incon.value) and (
@@ -105,7 +106,6 @@ def raised_and_undeclared(input: int, incon: Container) -> Container:
     res = Container()
     incon.value = -1
     if input == 22:
-        #:: ExpectedOutput(exhale.failed:assertion.false)
         raise MyException()
     res.value = input
     return res
@@ -459,9 +459,7 @@ class ExceptionClass:
             self.a_field = 12
             raise MyOtherException()
 
-#:: ExpectedOutput(carbon)(postcondition.violated:assertion.false)
-def class_client() -> ExceptionClass:
-    Ensures(Result() is not None)
+def class_client() -> object:
     try:
         res = ExceptionClass(False)
     except MyOtherException:

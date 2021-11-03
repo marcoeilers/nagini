@@ -48,6 +48,11 @@ class ObligationConfig(SectionConfig):
         """Disable all obligation related checks."""
         return self._info.getboolean('disable_all', False)
 
+    @disable_all.setter
+    def disable_all(self, val):
+        """Disable all obligation related checks."""
+        self._info['disable_all'] = str(val)
+
     @property
     def disable_measure_check(self):
         """Replace obligation measure checks with ``True``."""
@@ -170,19 +175,16 @@ def _construct_classpath(verifier : str = None):
                                (arpplugin_jar, 'arpplugin'))
             if jar and v != verifier)
 
-    if sys.platform.startswith('linux'):
-        if os.path.isdir('/usr/lib/viper'):
-            # Check if we have Viper installed via package manager.
-            return os.pathsep.join(
-                glob.glob('/usr/lib/viper/*.jar'))
-
     resources = resources_folder()
     silicon = os.path.join(resources, 'backends', 'silicon.jar')
     carbon = os.path.join(resources, 'backends', 'carbon.jar')
+    silver_sif = os.path.join(resources, 'backends', 'silver-sif-extension.jar')
+    silicon_sif = os.path.join(resources, 'backends', 'silicon-sif-extension.jar')
     return os.pathsep.join(
         jar for jar, v in ((silicon, 'carbon'),
                            (carbon, 'silicon'),
-                           (arpplugin_jar, 'arpplugin'))
+                           (silver_sif, 'silver-sif'),
+                           (silicon_sif, 'silicon-sif'))
         if jar and v != verifier)
 
 
@@ -198,11 +200,6 @@ def _get_boogie_path():
     if boogie_exe:
         return boogie_exe
 
-    if sys.platform.startswith('linux'):
-        if (os.path.exists('/usr/bin/boogie') and
-            os.path.exists('/usr/bin/mono')):
-            return '/usr/bin/boogie'
-
 
 def _get_z3_path():
     """ Tries to detect path to Z3 executable.
@@ -215,12 +212,9 @@ def _get_z3_path():
     if z3_exe:
         return z3_exe
 
-    if sys.platform.startswith('linux'):
-        if os.path.exists('/usr/bin/viper-z3'):
-            # First check if we have Z3 installed together with Viper.
-            return '/usr/bin/viper-z3'
-        if os.path.exists('/usr/bin/z3'):
-            return '/usr/bin/z3'
+    script_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'z3')
+    if os.path.exists(script_path):
+        return script_path
 
     path = os.path.join(os.path.dirname(sys.executable),
                         'z3.exe' if sys.platform.startswith('win') else 'z3')

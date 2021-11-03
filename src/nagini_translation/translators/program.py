@@ -646,7 +646,7 @@ class ProgramTranslator(CommonTranslator):
         domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
                                    pos, info)
         if isinstance(self.viper, ViperASTExtended):
-            self.viper.ast_extensions.SIFExtendedTransformer.addDomainFuncToDuplicate(
+            getattr(getattr(self.viper.ast_extensions, 'SIFExtendedTransformer$'), 'MODULE$').addDomainFuncToDuplicate(
                 self.viper.to_seq([get_method, get_arg, get_old]))
         return domain
 

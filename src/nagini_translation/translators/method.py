@@ -459,9 +459,11 @@ class MethodTranslator(CommonTranslator):
         body_start, body_end = get_body_indices(statements)
         # Create local variables for parameters
         body.extend(self._create_local_vars_for_params(method, ctx))
+        ctx.allow_statements = True
         body += flatten(
             [self.translate_stmt(stmt, ctx) for stmt in
                 method.node.body[body_start:body_end]])
+        ctx.allow_statements = False
         return body
 
     def _translate_try_handlers(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
@@ -731,7 +733,7 @@ class MethodTranslator(CommonTranslator):
             except_block.append(goto_end)
         else:
             error_string = '"method raises no exceptions"'
-            error_pos = self.to_position(block.node, ctx, error_string)
+            error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
             false = self.viper.FalseLit(error_pos, info)
             assert_false = self.viper.Exhale(false, error_pos, info)
             except_block.append(assert_false)
@@ -944,8 +946,10 @@ class MethodTranslator(CommonTranslator):
 
         # Translate statements in main module. When an import statement is encountered,
         # the translation will include executing the statements in the imported module.
+        ctx.allow_statements = True
         for stmt in main.node.body:
             stmts.extend(self.translate_stmt(stmt, ctx))
+        ctx.allow_statements = False
 
         stmts += self._method_body_postamble(main_method, ctx)
         stmts += self._create_method_epilog(main_method, ctx)

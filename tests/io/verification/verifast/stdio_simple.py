@@ -87,7 +87,8 @@ def getchar(t1: Place) -> Tuple[str, bool, Place]:
                 c is Result()[0] and
                 success == Result()[1] and
                 t2 == Result()[2] and
-                token(t2)
+                token(t2) and
+                (len(c) == 1 if success else len(c) == 0)
             ),
         )
     )

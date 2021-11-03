@@ -11,6 +11,7 @@ import operator
 from typing import List
 
 from nagini_translation.lib import silver_nodes as sil
+from nagini_translation.lib.config import obligation_config
 from nagini_translation.lib.constants import (
     GET_ARG_FUNC,
     GET_METHOD_FUNC,
@@ -212,7 +213,8 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         level = self.create_level_call(sil.RefExpr(self._thread))
         comp = self._create_level_below(level, self._ctx)
         comp = comp.translate(self._translator, self._ctx, self._position, self._info)
-        self._statements.append(self.viper.Inhale(comp, self._position, self._info))
+        if not obligation_config.disable_waitlevel_check:
+            self._statements.append(self.viper.Inhale(comp, self._position, self._info))
 
     def _create_level_below(
             self, expr: sil.PermExpression,

@@ -89,8 +89,10 @@ class Translator:
     def translate_program(self, modules: List[PythonModule], sil_progs: List,
                           selected: Set[str] = None,
                           ignore_global: bool = False,
-                          arp: bool = False) -> 'silver.ast.Program':
+                          arp: bool = False,
+                          sif = False) -> 'silver.ast.Program':
         ctx = Context()
+        ctx.sif = sif
         ctx.current_class = None
         ctx.current_function = None
         ctx.module = modules[0]

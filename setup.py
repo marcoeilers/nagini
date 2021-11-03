@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='0.8.6',
+        version='0.9.0',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -30,7 +30,8 @@ setup(
             'astunparse==1.6.2',
             'typed-ast==1.4.0',
             'pytest==4.3.0',
-            'z3-solver'
+            'pytest-xdist==1.27.0',
+            'z3-solver==4.8.7.0'
             ],
         entry_points = {
              'console_scripts': [

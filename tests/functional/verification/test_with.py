@@ -48,8 +48,9 @@ class NoLockExOnly:
         Requires(Acc(self.value))
         Requires(isinstance(e, MyException))
         Ensures(Acc(self.value) and self.value == Old(self.value) + 7)
+        Ensures(Result() == 0)
         self.value += 7
-        return 7
+        return 0
 
 
 class NoLockNoEx:
@@ -133,9 +134,9 @@ def client_exonly_3() -> NoLockExOnly:
         raise Exception()
 
 
+#:: ExpectedOutput(exhale.failed:assertion.false)
 def client_exonly_4() -> NoLockExOnly:
     nl = NoLockExOnly()
-    #:: ExpectedOutput(exhale.failed:assertion.false)
     with nl as v:
         raise MyException()
 

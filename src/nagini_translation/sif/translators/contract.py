@@ -91,7 +91,12 @@ class SIFContractTranslator(ContractTranslator):
                                               dyn_check_only=in_override_check(ctx))
         else:
             info = self.no_info(ctx)
-        return [], self.viper.LowEvent(self.to_position(node, ctx), info)
+        if ctx.sif == 'prob':
+            # LowEvent is trivially true
+            res = self.viper.TrueLit(self.to_position(node, ctx), info)
+        else:
+            res = self.viper.LowEvent(self.to_position(node, ctx), info)
+        return [], res
 
     def translate_lowexit(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """

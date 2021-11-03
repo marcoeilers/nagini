@@ -77,6 +77,10 @@ ERRORS = {
         lambda n: 'Termination channel might exist.',
     'lock.invariant.not.established':
         lambda n: 'Lock invariant might not hold.',
+    'probabilistic.sif.violated':
+        lambda n: 'Probabilistic non-interference might not be satisfied.',
+    'possibilistic.sif.violated':
+        lambda n: 'Possibilistic non-interference might not be satisfied.'
 }
 
 REASONS = {
@@ -149,7 +153,7 @@ REASONS = {
         lambda n: 'May not have permission to start thread.',
     'sif.fold':
         lambda n: 'The low parts of predicate {} might not hold.'.format(
-            get_target_name(n.args[0])),
+            get_target_name(n.args[0]) if n.args else 'lock invariant'),
     'sif.unfold':
         lambda n: 'The low parts of predicate {} might not hold.'.format(
             get_target_name(n.args[0])),
@@ -160,6 +164,21 @@ REASONS = {
                    'both executions don\'t terminate.').format(pprint(n.args[0])),
     'sif_termination.condition_not_tight':
         lambda n: 'Termination condition {} might not be tight.'.format(pprint(n.args[0])),
+    'concurrency.in.sif':
+        lambda n: 'Concurrency (thread and lock operations) is not allowed in noninterference mode.',
+    'missing.termination.annotation':
+        lambda n: 'Function and loop termination must be proved to be low in possibilistic noninterference mode. '
+                  'Use TerminatesSif(...) as the last precondition/loop invariant.',
+    'high.branch':
+        lambda n: 'Branch condition {} might not be low or reaching the loop might not be a low event.'.format(pprint(n)),
+    'high.receiver.type':
+        lambda n: 'Type of call receiver {} might not be low.'.format(pprint(n)),
+    'high.exception.type':
+        lambda n: 'Type of raised exception {} might not be low.'.format(pprint(n)),
+    'high.short.circuit':
+        lambda n: 'Short-circuiting behavior of expression {} might not be low.'.format(pprint(n)),
+    'high.comprehension':
+        lambda n: 'Comprehension {} might introduce high control flow'.format(pprint(n)),
 }
 
 VAGUE_REASONS = {

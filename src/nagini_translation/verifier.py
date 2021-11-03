@@ -41,8 +41,8 @@ class Failure(VerificationResult):
 
     def __init__(
             self, errors: 'silver.verifier.AbstractError',
-            jvm: JVM, modules):
-        self.errors = error_manager.convert(errors, jvm, modules)
+            jvm: JVM, modules, sif):
+        self.errors = error_manager.convert(errors, jvm, modules, sif)
 
     def __bool__(self):
         return False
@@ -120,7 +120,7 @@ class Silicon:
         self.silicon.start()
         self.ready = True
 
-    def verify(self, modules, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
+    def verify(self, modules, prog: 'silver.ast.Program', arp=False, sif=False) -> VerificationResult:
         """
         Verifies the given program using Silicon
         """
@@ -135,7 +135,7 @@ class Silicon:
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors, self.jvm, modules)
+            return Failure(errors, self.jvm, modules, sif)
         else:
             return Success()
 
@@ -167,7 +167,7 @@ class Carbon:
         self.ready = True
         self.jvm = jvm
 
-    def verify(self, modules, prog: 'silver.ast.Program', arp=False) -> VerificationResult:
+    def verify(self, modules, prog: 'silver.ast.Program', arp=False, sif=False) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """
@@ -182,6 +182,6 @@ class Carbon:
             errors = []
             while it.hasNext():
                 errors += [it.next()]
-            return Failure(errors, self.jvm, modules)
+            return Failure(errors, self.jvm, modules, sif)
         else:
             return Success()

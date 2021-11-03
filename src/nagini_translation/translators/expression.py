@@ -165,7 +165,9 @@ class ExpressionTranslator(CommonTranslator):
         local_name = name + '$' + target.id
         element_var = ctx.actual_function.special_vars[local_name]
         ctx.set_alias(target.id, element_var)
+        ctx.allow_statements = False
         body_stmt, body = self.translate_expr(node.elt, ctx)
+        ctx.allow_statements = True
         result_type = self.get_type(node.elt, ctx)
         list_type = GenericType(list_class, [result_type])
         if body_stmt:
@@ -228,7 +230,11 @@ class ExpressionTranslator(CommonTranslator):
         contents = self.viper.And(len_equal, values, position, info)
         all = self.viper.And(type_and_perm, contents, position, info)
         inhale = self.viper.Inhale(all, position, info)
-        return iter_stmt + [inhale]
+        sif_checks = []
+        if ctx.sif == 'prob':
+            low_pos = self.to_position(node, ctx, rules=rules.COMPREHENSION_LOW)
+            sif_checks.append(self.viper.Assert(self.viper.Low(seq_len, None, low_pos, info), low_pos, info))
+        return iter_stmt + [inhale] + sif_checks
 
     def translate_Num(self, node: ast.Num, ctx: Context) -> StmtsAndExpr:
         pos = self.to_position(node, ctx)
@@ -488,7 +494,7 @@ class ExpressionTranslator(CommonTranslator):
                                                        self.no_info(ctx))
             else:
                 error_string = '"method raises no exceptions"'
-                error_pos = self.to_position(call, ctx, error_string)
+                error_pos = self.to_position(ctx.actual_function.node, ctx, error_string)
                 exhale_false = self.viper.Exhale(
                     self.viper.FalseLit(error_pos, self.no_info(ctx)),
                     error_pos,
@@ -851,6 +857,7 @@ class ExpressionTranslator(CommonTranslator):
     def translate_IfExp(self, node: ast.IfExp, ctx: Context,
                         impure=False) -> StmtsAndExpr:
         position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         cond_stmt, cond = self.translate_expr(node.test, ctx,
                                               target_type=self.viper.Bool)
         then_stmt, then = self.translate_expr(node.body, ctx,
@@ -861,17 +868,20 @@ class ExpressionTranslator(CommonTranslator):
                                                impure=impure)
         if then_stmt or else_stmt:
             then_block = self.translate_block(then_stmt, position,
-                                              self.no_info(ctx))
+                                              info)
             else_block = self.translate_block(else_stmt, position,
-                                              self.no_info(ctx))
+                                              info)
             if_stmt = self.viper.If(cond, then_block, else_block, position,
-                                    self.no_info(ctx))
+                                    info)
             bodystmt = [if_stmt]
         else:
             bodystmt = []
+        if ctx.sif == 'prob' and ctx.allow_statements:
+            rule_pos = self.to_position(node.test, ctx, rules=rules.BRANCH_CONDITION_ASSERT)
+            cond_stmt.append(self.viper.Assert(self.viper.Low(cond, None, rule_pos, info), rule_pos, info))
         cond_exp = self.viper.CondExp(cond, then, else_,
                                       self.to_position(node, ctx),
-                                      self.no_info(ctx))
+                                      info)
         return cond_stmt + bodystmt, cond_exp
 
     def translate_BinOp(self, node: ast.BinOp, ctx: Context) -> StmtsAndExpr:
@@ -893,6 +903,10 @@ class ExpressionTranslator(CommonTranslator):
         """
         # This is disabled for the moment because using the functions is advantageous
         # when using operations as triggers
+        # We make an exception for ADT types.
+        if isinstance(op, (ast.Eq, ast.NotEq)):
+            if left_type.python_class.is_adt and right_type.python_class.is_adt:
+                return True
         return False
         if type(op) not in self._primitive_operations:
             return False
@@ -909,7 +923,9 @@ class ExpressionTranslator(CommonTranslator):
         the given operands to a primitive Viper BinOp.
         """
         op = self._primitive_operations[type(op)]
-        if op_type.python_class.try_box().name == INT_TYPE:
+        if op_type.python_class.is_adt:
+            wrap = self.to_ref
+        elif op_type.python_class.try_box().name == INT_TYPE:
             wrap = self.to_int
         else:
             wrap = self.to_bool
@@ -1166,6 +1182,9 @@ class ExpressionTranslator(CommonTranslator):
                 all_pure = False
             if self._is_expression and statements_part:
                 raise InvalidProgramException(node, 'not_expression')
+            if ctx.sif == 'prob' and self._is_pure(expression_part) and ctx.allow_statements:
+                low_pos = self.to_position(node, ctx, rules=rules.SHORT_CIRCUIT_LOW)
+                statements_part.append(self.viper.Assert(self.viper.Low(bool_expression, None, low_pos, info), low_pos, info))
             statements_parts.append(statements_part)
             if all_pure:
                 expression_parts.append(self.to_ref(expression_part, ctx))

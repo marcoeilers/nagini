@@ -13,7 +13,7 @@ from nagini_translation.lib.typedefs import DomainFuncApp
 from nagini_translation.translators.type_domain_factory import TypeDomainFactory
 
 def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
-                                 act_opt: bool, func_opt: bool) -> None:
+                                 act_opt: bool, func_opt: bool, all_low: bool) -> None:
     """
     Configure which optimizations to apply in MPP transformation.
     - ctrl_opt: only generate those control variables which are needed.
@@ -22,16 +22,18 @@ def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
     - act_opt:  at the beginning of each method add an 'assume p1' statement.
     - func_opt: only apply the _checkDefined and _isDefined functions in the first execution.
     """
-    jvm.viper.silver.sif.SIFExtendedTransformer.optimizeControlFlow(ctrl_opt)
-    jvm.viper.silver.sif.SIFExtendedTransformer.optimizeSequential(seq_opt)
-    jvm.viper.silver.sif.SIFExtendedTransformer.optimizeRestrictActVars(act_opt)
+    transformer_object = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$')
+    transformer_object.optimizeControlFlow(ctrl_opt)
+    transformer_object.optimizeSequential(seq_opt)
+    transformer_object.optimizeRestrictActVars(act_opt)
+    transformer_object.generateAllLowFuncs(all_low)
     if func_opt:
-        jvm.viper.silver.sif.SIFExtendedTransformer.addPrimedFuncAppReplacement(
+        transformer_object.addPrimedFuncAppReplacement(
             "_checkDefined", "first_arg")
-        jvm.viper.silver.sif.SIFExtendedTransformer.addPrimedFuncAppReplacement(
+        transformer_object.addPrimedFuncAppReplacement(
             "_isDefined", "true")
     else:
-        jvm.viper.silver.sif.SIFExtendedTransformer.clearPrimedFuncAppReplacement()
+        transformer_object.clearPrimedFuncAppReplacement()
 
 def _to_scala_set(jvm, inset: set):
     seq = jvm.scala.collection.mutable.ArraySeq(len(inset))
@@ -41,11 +43,11 @@ def _to_scala_set(jvm, inset: set):
 
 def set_all_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
-    jvm.viper.silver.sif.SIFExtendedTransformer.setAllLowMethods(scala_set)
+    getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setAllLowMethods(scala_set)
 
 def set_preserves_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
-    jvm.viper.silver.sif.SIFExtendedTransformer.setPreservesLowMethods(scala_set)
+    getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setPreservesLowMethods(scala_set)
 
 def set_equality_comp_functions(jvm, names: set) -> None:
     if not names:
