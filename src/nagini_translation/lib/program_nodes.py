@@ -637,7 +637,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                 if field.setter:
                     field.setter.process(self.get_fresh_name(setter_name), translator)
             else:
-                field_name = self.name + '_' + name + '__' + field.type.sil_name
+                field_name = self.name + '_' + name + '__' + (field.type.sil_name or field.type.name)
                 field.process(self.get_fresh_name(field_name))
         for name, field in self.static_fields.items():
             field_name = self.name + '_' + name
