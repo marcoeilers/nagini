@@ -519,24 +519,23 @@ class CallTranslator(CommonTranslator):
                 receiver = args[0]
         call_stmt, res = self._only_translate_method_call(target, args, position, node,
                                                           ctx)
-        if target.name in ('acquire', 'release'):
-            if (target.cls and target.cls.name == 'Lock' and
-                        target.cls.module.type_prefix == 'nagini_contracts.lock'):
-                # Automatically fold/unfold the invariant predicate.
-                target_name = target.cls.get_predicate('invariant').sil_name
-                pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
-                info = self.no_info(ctx)
-                pa = self.viper.PredicateAccess([receiver], target_name, pos, info)
-                full_perm = self.viper.FullPerm(pos, info)
-                pap = self.viper.PredicateAccessPredicate(pa, full_perm, pos, info)
-                if target.name == 'acquire':
-                    stmts.extend(call_stmt)
-                    unfold = self.viper.Unfold(pap, pos, info)
-                    stmts.append(unfold)
-                else:
-                    fold = self.viper.Fold(pap, pos, info)
-                    stmts.append(fold)
-                    stmts.extend(call_stmt)
+        if (target.name in ('acquire', 'release') and (target.cls and target.cls.name == 'Lock' and
+                                                       target.cls.module.type_prefix == 'nagini_contracts.lock')):
+            # Automatically fold/unfold the invariant predicate.
+            target_name = target.cls.get_predicate('invariant').sil_name
+            pos = self.to_position(node, ctx, rules=rules.LOCK_RELEASE_INVARIANT)
+            info = self.no_info(ctx)
+            pa = self.viper.PredicateAccess([receiver], target_name, pos, info)
+            full_perm = self.viper.FullPerm(pos, info)
+            pap = self.viper.PredicateAccessPredicate(pa, full_perm, pos, info)
+            if target.name == 'acquire':
+                stmts.extend(call_stmt)
+                unfold = self.viper.Unfold(pap, pos, info)
+                stmts.append(unfold)
+            else:
+                fold = self.viper.Fold(pap, pos, info)
+                stmts.append(fold)
+                stmts.extend(call_stmt)
         else:
             stmts.extend(call_stmt)
         return stmts, res
