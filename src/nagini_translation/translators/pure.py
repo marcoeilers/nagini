@@ -133,7 +133,8 @@ class PureTranslator(CommonTranslator):
         Translates an assign statement to an AssignWrapper
         """
         assert len(node.targets) == 1
-        assert isinstance(node.targets[0], ast.Name)
+        if not isinstance(node.targets[0], ast.Name):
+            raise UnsupportedException(node, "Multi-target assignments are not supported in pure functions.")
         wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
         return [wrapper]
 
