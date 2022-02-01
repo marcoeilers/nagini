@@ -1198,11 +1198,13 @@ class StatementTranslator(CommonTranslator):
         next = 0
         stmt_result = []
         val_result = []
+        has_starred_receiver = False
         # Need to find out how many other receivers come after a starred
         # expression (if any) to calculate the last index that should be
         # assigned to the starred expression.
         for index, e in enumerate(lhs.elts):
             if isinstance(e, ast.Starred):
+                has_starred_receiver = True
                 no_after_starred = len(lhs.elts) - index - 1
                 next = -no_after_starred
             else:
@@ -1215,11 +1217,20 @@ class StatementTranslator(CommonTranslator):
                                                   [rhs], [None], node, ctx)
                 next_expr = self.viper.Add(len_expr, next_expr, position,
                                            info)
-
             stmt, val = self.assign_to(e, rhs, index, next_expr,
                                        rhs_type, node, ctx)
             stmt_result += stmt
             val_result += val
+        right_len = self.get_function_call(rhs_type, '__len__', [rhs], [None], node, ctx)
+        if not has_starred_receiver:
+            # assert right len is exactly len(lhs.elts)
+            left_len = self.viper.IntLit(len(lhs.elts), position, info)
+            len_assert = self.viper.Assert(self.viper.EqCmp(left_len, right_len, position, info), position, info)
+        else:
+            # assert right len is at least len(lhs.elts) - 1
+            left_len = self.viper.IntLit(len(lhs.elts) - 1, position, info)
+            len_assert = self.viper.Assert(self.viper.LeCmp(left_len, right_len, position, info), position, info)
+        stmt_result = [len_assert] + stmt_result
         return stmt_result, val_result
 
     def _assign_to_starred(self, lhs: ast.Starred, rhs: Expr,
