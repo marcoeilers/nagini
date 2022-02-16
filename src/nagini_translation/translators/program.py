@@ -1481,4 +1481,7 @@ class ProgramTranslator(CommonTranslator):
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
+
+        method_splitter = getattr(getattr(self.viper.ast.utility, "MethodSplitter$"), "MODULE$")
+        prog = method_splitter.split(prog)
         return prog
