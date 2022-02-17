@@ -1419,9 +1419,9 @@ class ProgramTranslator(CommonTranslator):
 
         for root in predicate_families:
             self.track_dependencies(selected_names, selected, root, ctx)
-            pf = self.translate_predicate_family(root, predicate_families[root],
-                                                 ctx)
-            predicates.append(pf)
+            preds, pred_self_framing_checks = self.translate_predicate_family(root, predicate_families[root], ctx)
+            predicates.extend(preds)
+            methods.extend(pred_self_framing_checks)
 
         all_used_names = None
 

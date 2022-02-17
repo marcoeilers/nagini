@@ -142,6 +142,14 @@ COMPREHENSION_LOW = {
     ('assert.failed', 'assertion.false'):
         ('probabilistic.sif.violated', 'high.comprehension')
 }
+PRED_FAM_FOLD_UNKNOWN_RECEIVER = {
+    ('fold.failed', 'insufficient.permission'):
+        ('fold.failed', 'unknown.family.receiver.type')
+}
+PRED_FAM_MEMBER_NOT_FRAMED = {
+    ('not.wellformed', 'insufficient.permission'):
+        ('predicate.not.wellformed', 'family.member.not.framed')
+}
 
 __all__ = (
     'Rules',

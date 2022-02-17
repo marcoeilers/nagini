@@ -179,6 +179,10 @@ REASONS = {
         lambda n: 'Short-circuiting behavior of expression {} might not be low.'.format(pprint(n)),
     'high.comprehension':
         lambda n: 'Comprehension {} might introduce high control flow'.format(pprint(n)),
+    'unknown.family.receiver.type':
+        lambda n: 'Might not be able to satisfy constraints from currently unknown predicate family members.',
+    'family.member.not.framed':
+        lambda n: 'Predicate family addition might not be self-framing.'
 }
 
 VAGUE_REASONS = {
