@@ -30,10 +30,14 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOF
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit',]
+                  'PMultiset', 'LowExit', 'SplitOn']
 
 T = TypeVar('T')
 V = TypeVar('V')
+
+
+def SplitOn(expr: bool, trueSplit: bool = True, falseSplit: bool = True) -> bool:
+    pass
 
 
 def Requires(expr: bool) -> bool:
@@ -493,4 +497,5 @@ __all__ = [
         'ToSeq',
         'MaySet',
         'MayCreate',
+        'SplitOn',
         ]
