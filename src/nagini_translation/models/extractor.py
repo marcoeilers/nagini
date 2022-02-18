@@ -98,7 +98,10 @@ class Extractor:
                 if not pypreds:
                     pypreds = [o for mod in modules for o in mod.io_operations.values()
                                if o.sil_name == pred_name]
-            pypred = pypreds[0]
+            if pypreds:
+                pypred = pypreds[0]
+            else:
+                return
         pred_args = []
         for pred_arg in ScalaIterableWrapper(chunk.args()):
             pred_args.append(pred_arg)

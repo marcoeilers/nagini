@@ -132,10 +132,10 @@ class PredicateTranslator(CommonTranslator):
             instance_pos = self.to_position(instance.node, ctx)
             has_type = self.type_factory.type_check(self_var_ref, instance.cls, instance_pos, ctx)
             implication = self.viper.Implies(has_type, current, instance_pos, no_info)
-            instance_type = self.type_factory.translate_type_literal(instance.cls,
-                                                                     instance_pos, ctx)
-            type_not_instance = self.viper.NeCmp(self.type_factory.typeof(self_var_ref, ctx), instance_type,
-                                                 instance_pos, no_info)
+            self_var_type_expr = self.type_factory.typeof(self_var_ref, ctx)
+            instance_type = self.type_factory.translate_type_literal(instance.cls, instance_pos, ctx,
+                                                                     alias=self_var_type_expr)
+            type_not_instance = self.viper.NeCmp(self_var_type_expr, instance_type, instance_pos, no_info)
             unknown_type_condition = self.viper.And(unknown_type_condition, type_not_instance, instance_pos, no_info)
             ctx.current_function = None
             if body:
@@ -154,18 +154,22 @@ class PredicateTranslator(CommonTranslator):
             # the call is never used, but the creation of the call while translating the predicate will be tracked.
             self.viper.MethodCall(self_frame_method_name, [], [], self.to_position(root.node, ctx), no_info)
         root_pos = self.to_position(root.node, ctx)
-        root_pos_with_rule = self.to_position(root.node, ctx, rules=rules.PRED_FAM_FOLD_UNKNOWN_RECEIVER)
-        rest_pred_name = root.module.get_fresh_name(root.name + '_abstract_rest')
-        rest_pred = self.viper.Predicate(rest_pred_name, args, None, root_pos, no_info)
-        rest_pred_acc = self.viper.PredicateAccess([arg.localVar() for arg in args],
-                                                   rest_pred_name, root_pos_with_rule, no_info)
-        rest_pred_acc_pred = self.viper.PredicateAccessPredicate(rest_pred_acc,
-                                                                 self.viper.FullPerm(root_pos_with_rule, no_info),
-                                                                 root_pos_with_rule, no_info)
-        body = self.viper.And(body, self.viper.Implies(unknown_type_condition, rest_pred_acc_pred,
-                                                       root_pos_with_rule, no_info),
-                              root_pos_with_rule, no_info)
+        all_preds = []
+        if not (root.name == 'invariant' and root.cls.name == 'Lock'):
+            root_pos_with_rule = self.to_position(root.node, ctx, rules=rules.PRED_FAM_FOLD_UNKNOWN_RECEIVER)
+            rest_pred_name = root.module.get_fresh_name(root.name + '_abstract_rest')
+            rest_pred = self.viper.Predicate(rest_pred_name, args, None, root_pos, no_info)
+            all_preds.append(rest_pred)
+            rest_pred_acc = self.viper.PredicateAccess([arg.localVar() for arg in args],
+                                                       rest_pred_name, root_pos_with_rule, no_info)
+            rest_pred_acc_pred = self.viper.PredicateAccessPredicate(rest_pred_acc,
+                                                                     self.viper.FullPerm(root_pos_with_rule, no_info),
+                                                                     root_pos_with_rule, no_info)
+            body = self.viper.And(body, self.viper.Implies(unknown_type_condition, rest_pred_acc_pred,
+                                                           root_pos_with_rule, no_info),
+                                  root_pos_with_rule, no_info)
         ctx.var_aliases = {}
         body = self.viper.And(arg_types, body, root_pos, no_info)
         family_pred = self.viper.Predicate(name, args, body, root_pos, no_info)
-        return [family_pred, rest_pred], self_framing_check_methods
+        all_preds.append(family_pred)
+        return all_preds, self_framing_check_methods

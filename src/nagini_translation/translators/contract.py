@@ -339,6 +339,8 @@ class ContractTranslator(CommonTranslator):
         """
         Translates a call to SplitOn().
         """
+        if ctx.sif:
+            raise UnsupportedException(node, 'Split currently not supported with SIF option.')
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
         stmt, split_exp = self.translate_expr(node.args[0], ctx, target_type=self.viper.Bool)

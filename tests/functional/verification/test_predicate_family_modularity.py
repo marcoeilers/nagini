@@ -14,7 +14,7 @@ class X:
 def outside_set(x: X) -> None:
     Requires(Acc(x.f1) and x.f1 > 0)
     #:: ExpectedOutput(fold.failed:unknown.family.receiver.type)
-    Fold(x.state())
+    Fold(x.state(0))
 
 
 class SubX(X):

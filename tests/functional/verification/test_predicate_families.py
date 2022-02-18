@@ -114,7 +114,7 @@ class B(A):
 
     @Predicate
     def pred1(self, a: int) -> bool:
-        return Acc(self.bfield) and self.bfield == self.afield
+        return Acc(self.bfield) and self.bfield == a
 
     def set2(self, oold: int) -> int:
         Requires(self.pred1(oold))

@@ -62,6 +62,7 @@ def m3_fail_3() -> None:
     #:: ExpectedOutput(application.precondition:assertion.false)
     d, (g, h), *e, z = t
     assert d[0] == 1
+    #:: ExpectedOutput(carbon)(assert.failed:assertion.false)
     assert len(e) == 1
     assert e[0][0] is 'asd'
     assert g == 4
