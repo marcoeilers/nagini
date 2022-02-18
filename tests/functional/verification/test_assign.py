@@ -21,6 +21,54 @@ def m() -> None:
     assert e[1] == 'asd'
 
 
+def m3_fail_1() -> None:
+    l1 = [1]  # type: List[object]
+    l2 = [4, 12, 15]  # type: List[object]
+    l3 = ['asd']  # type: List[object]
+    l4 = [A()]  # type: List[object]
+    t = [l1, l2, l3, l4]
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    d, (g, h), *e, z = t
+    assert d[0] == 1
+    assert len(e) == 1
+    assert e[0][0] is 'asd'
+    assert g == 4
+    assert h == 12
+    assert isinstance(e[0], tuple)
+
+
+def m3_fail_2() -> None:
+    l1 = [1]  # type: List[object]
+    l2 = [4]  # type: List[object]
+    l3 = ['asd']  # type: List[object]
+    l4 = [A()]  # type: List[object]
+    t = [l1, l2, l3, l4]
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    d, (g, h), *e, z = t
+    assert d[0] == 1
+    assert len(e) == 1
+    assert e[0][0] is 'asd'
+    assert g == 4
+    assert h == 12
+    assert isinstance(e[0], tuple)
+
+
+def m3_fail_3() -> None:
+    l1 = [1]  # type: List[object]
+    l2 = [4, 12]  # type: List[object]
+    l3 = ['asd']  # type: List[object]
+    l4 = [A()]  # type: List[object]
+    t = [l1, l2, l3]
+    #:: ExpectedOutput(application.precondition:assertion.false)
+    d, (g, h), *e, z = t
+    assert d[0] == 1
+    assert len(e) == 1
+    assert e[0][0] is 'asd'
+    assert g == 4
+    assert h == 12
+    assert isinstance(e[0], tuple)
+
+
 def m3() -> None:
     l1 = [1]  # type: List[object]
     l2 = [4, 12]  # type: List[object]
