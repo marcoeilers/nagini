@@ -1476,7 +1476,16 @@ class ProgramTranslator(CommonTranslator):
                 decl = self.viper.ast.Predicate(p.name(), p.formalArgs(), self.viper.none, p.pos(), p.info(), p.errT())
                 filtered_predicates.append(decl)
         predicates = filtered_predicates
-        functions = [f for f in functions if f.name() in all_used_names]
+        filtered_functions = []
+        for f in functions:
+            if f.name() in all_used_names:
+                filtered_functions.append(f)
+            elif f.name() + ' DECLARATION' in all_used_names:
+                decl = self.viper.ast.Function(f.name(), f.formalArgs(), f.typ(), f.pres(), f.posts(), self.viper.none,
+                                               f.pos(), f.info(), f.errT())
+                filtered_functions.append(decl)
+        functions = filtered_functions
+        # functions = [f for f in functions if f.name() in all_used_names]
         methods = [m for m in methods if m.name() in all_used_names]
         type_funcs = [fs for fname, fs in type_funcs.items() if fname in all_used_names]
         type_axioms = [axs for fname, axs in type_axioms.items() if fname in all_used_names]

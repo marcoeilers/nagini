@@ -39,6 +39,7 @@ class ViperAST:
         self.nodes = {}
         self.used_names = set()
         self.used_names_sets = {}
+        self.no_function_bodies = False
 
         def getconst(name):
             return getobject(ast, name)
@@ -374,7 +375,10 @@ class ViperAST:
         return self.ast.Implies(left, right, position, info, self.NoTrafos)
 
     def FuncApp(self, name, args, position, info, type, formalargs=None):
-        self.used_names.add(name)
+        if self.no_function_bodies:
+            self.used_names.add(name + ' DECLARATION')
+        else:
+            self.used_names.add(name)
         return self.ast.FuncApp(name, self.to_seq(args), position, info, type,
                                 self.NoTrafos)
 

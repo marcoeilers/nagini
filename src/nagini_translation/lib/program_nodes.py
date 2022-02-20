@@ -1018,6 +1018,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.threading_id = None
         self.definition_deps = set()
         self.call_deps = set()
+        self.spec_function_defs = None
+        self.body_function_defs = None
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:

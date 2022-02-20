@@ -106,6 +106,22 @@ def Exists(domain: 'Union[Iterable[T], Type[T]]', predicate: Callable[[T], bool]
     pass
 
 
+def SpecNeedsFunctionDefs(*funcs: Callable) -> Callable[[T], T]:
+    """
+    :param funcs:
+    :return:
+    """
+    pass
+
+
+def BodyNeedsFunctionDefs(*funcs: Callable) -> Callable[[T], T]:
+    """
+    :param funcs:
+    :return:
+    """
+    pass
+
+
 def Low(expr: T) -> bool:
     """
     Predicate to indicate that an expression has to be *low*.
@@ -498,4 +514,6 @@ __all__ = [
         'MaySet',
         'MayCreate',
         'SplitOn',
+        'SpecNeedsFunctionDefs',
+        'BodyNeedsFunctionDefs',
         ]

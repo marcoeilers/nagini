@@ -680,6 +680,11 @@ class Analyzer(ast.NodeVisitor):
         if self.preserves_low(node):
             self.has_all_low = True
             func.preserves_low = True
+        if self.has_unsupported_decorator(node):
+            raise InvalidProgramException(node, 'unsupported.decorator')
+        spec_reqs, body_reqs = self.get_required_functions(node)
+        func.spec_function_defs = spec_reqs
+        func.body_function_defs = body_reqs
 
         # TODO: When we want to support method type parameters, this would be
         # the place to find all type variables used in the parameters which
@@ -1422,9 +1427,13 @@ class Analyzer(ast.NodeVisitor):
         self.visit_default(node)
 
     def _incompatible_decorators(self, decorators) -> bool:
-        return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+        return ((('Predicate' in decorators) and (len(decorators) != 1)) or
+                (('Pure' in decorators) and not (len(decorators) == 1 or
+                                                 (len(decorators) == 2 and 'ContractOnly' in decorators))) or
+                (('BodyNeedsFunctionDefs' in decorators) and not ('SpecNeedsFunctionDefs' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
                 (('property' in decorators) and (len(decorators) != 1)) or
+                (('setter' in decorators) and (len(decorators) != 1)) or
                 (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
                 ((('AllLow' in decorators) or ('PreservesLow' in decorators)) and (
                     ('Predicate' in decorators) or ('Pure' in decorators)))
@@ -1465,8 +1474,6 @@ class Analyzer(ast.NodeVisitor):
 
     def has_decorator(self, func: ast.FunctionDef, decorator: str) -> bool:
         decorators = {d.id for d in func.decorator_list if isinstance(d, ast.Name)}
-        if self._incompatible_decorators(decorators):
-            raise InvalidProgramException(func, "decorators.incompatible")
         return decorator in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
@@ -1501,3 +1508,34 @@ class Analyzer(ast.NodeVisitor):
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'PreservesLow')
+
+    def get_required_functions(self, func: ast.FunctionDef) -> Tuple[Optional[List[ast.AST]], Optional[List[ast.AST]]]:
+        decorators = {d.func.id: d.args for d in func.decorator_list if isinstance(d, ast.Call) and
+                      isinstance(d.func, ast.Name) and d.func.id in ('BodyNeedsFunctionDefs', 'SpecNeedsFunctionDefs')}
+        return decorators.get('SpecNeedsFunctionDefs'), decorators.get('BodyNeedsFunctionDefs')
+
+    def has_unsupported_decorator(self, func: ast.FunctionDef) -> bool:
+        name_decorators = set()
+        func_decorators = set()
+        attr_decorators = set()
+
+        for d in func.decorator_list:
+            if isinstance(d, ast.Name):
+                name_decorators.add(d.id)
+            elif isinstance(d, ast.Attribute):
+                attr_decorators.add(d.attr)
+            elif isinstance(d, ast.Call) and isinstance(d.func, ast.Name):
+                func_decorators.add(d.func.id)
+            else:
+                return True
+
+        if self._incompatible_decorators(name_decorators.union(func_decorators, attr_decorators)):
+            raise InvalidProgramException(func, "decorators.incompatible")
+
+        supported_names = {'Predicate', 'Pure', 'IOOperation', 'property', 'AllLow', 'PreservesLow'}
+        supported_funcs = {'BodyNeedsFunctionDefs', 'SpecNeedsFunctionDefs'}
+        supported_attributes = {'setter'}
+        unsupported_names = name_decorators - supported_names
+        unsupported_attrs = attr_decorators - supported_attributes
+        unsupported_funcs = func_decorators - supported_funcs
+        return unsupported_names or unsupported_attrs or unsupported_funcs

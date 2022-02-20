@@ -495,6 +495,12 @@ class MethodTranslator(CommonTranslator):
         error_var.process(ERROR_NAME, self.translator)
         return error_var
 
+    def add_function_dependency(self, node: ast.AST, ctx: Context) -> None:
+        target = self.get_target(node, ctx)
+        if not isinstance(target, PythonMethod) or not target.pure:
+            raise InvalidProgramException(node, 'invalid.definition.dependency')
+        self.viper.used_names.add(target.sil_name)
+
     def translate_method(self, method: PythonMethod,
                          ctx: Context) -> 'silver.ast.Method':
         """
@@ -503,6 +509,11 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
+        if method.spec_function_defs is not None:
+            self.viper.no_function_bodies = True
+            for dep in method.spec_function_defs:
+                self.add_function_dependency(dep, ctx)
+
         args = self._translate_params(method, ctx)
         self.bind_type_vars(method, ctx)
 
@@ -517,6 +528,8 @@ class MethodTranslator(CommonTranslator):
             pres = init_pres + pres
         if method.declared_exceptions:
             results.append(error_var_decl)
+
+
 
         # Translate body
         body = []
@@ -539,6 +552,13 @@ class MethodTranslator(CommonTranslator):
             body.append(assume_false)
             locals = []
         else:
+            if method.body_function_defs is not None:
+                self.viper.no_function_bodies = True
+                for dep in method.body_function_defs:
+                    self.add_function_dependency(dep, ctx)
+            else:
+                self.viper.no_function_bodies = False
+
             body.append(self.viper.LocalVarAssign(error_var_ref,
                 self.viper.NullLit(self.no_position(ctx),
                                     self.no_info(ctx)),
@@ -554,6 +574,7 @@ class MethodTranslator(CommonTranslator):
             locals += [local.decl for local in method.get_locals()
                        if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
+        self.viper.no_function_bodies = False
         name = method.sil_name
         nodes = self.create_method_node(
             ctx, name, args, results, pres, posts, locals, body,
