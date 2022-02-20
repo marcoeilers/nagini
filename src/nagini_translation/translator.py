@@ -86,7 +86,7 @@ class Translator:
         self.prog_translator = config.prog_translator
         self.expr_translator = config.expr_translator
 
-    def translate_program(self, modules: List[PythonModule], sil_progs: List,
+    def translate_program(self, modules: List[PythonModule], sil_progs: List, builtin_function_names: str,
                           selected: Set[str] = None,
                           ignore_global: bool = False,
                           arp: bool = False,
@@ -97,7 +97,7 @@ class Translator:
         ctx.current_function = None
         ctx.module = modules[0]
         ctx.arp = arp
-        return self.prog_translator.translate_program(modules, sil_progs, ctx,
+        return self.prog_translator.translate_program(modules, sil_progs, builtin_function_names, ctx,
                                                       selected, ignore_global)
 
     def translate_pythonvar_decl(self, var: PythonVar,

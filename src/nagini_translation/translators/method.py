@@ -257,6 +257,7 @@ class MethodTranslator(CommonTranslator):
         pos = self.to_position(func.node, ctx)
         if not func.type:
             raise InvalidProgramException(func.node, 'function.type.none')
+        self.viper.set_used_name(func.sil_name + ' DECLARATION')
         type = self.translate_type(func.type, ctx)
         args = self._translate_params(func, ctx)
         if func.declared_exceptions:
@@ -282,6 +283,7 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
+        self.viper.set_used_name(func.sil_name)
         statements = func.node.body
         start, end = get_body_indices(statements)
         # Translate body

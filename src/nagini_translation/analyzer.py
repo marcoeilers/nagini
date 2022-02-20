@@ -95,6 +95,7 @@ class Analyzer(ast.NodeVisitor):
         self.selected = selected
         self.deferred_tasks = []
         self.has_all_low = False
+        self.builtin_function_names = set()
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -302,6 +303,7 @@ class Analyzer(ast.NodeVisitor):
                 method_name, if_method, cls, False, node_factory=node_factory)
         for method_name in if_cls.get('functions', []):
             if_method = if_cls['functions'][method_name]
+            self.builtin_function_names.add(class_name + '_' + method_name)
             self._add_native_silver_method(
                 method_name, if_method, cls, True, node_factory=node_factory)
         for pred_name in if_cls.get('predicates', []):

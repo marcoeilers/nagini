@@ -72,6 +72,14 @@ class ViperAST:
         self.sourcefile = sourcefile
         self.none = getobject(scala, 'None')
 
+    def set_used_name(self, name: str) -> None:
+        if name in self.used_names_sets:
+            used_names = self.used_names_sets[name]
+        else:
+            used_names = set()
+        self.used_names = used_names
+        self.used_names_sets[name] = used_names
+
     def is_available(self) -> bool:
         """
         Checks if the Viper AST is available, i.e., silver is on the Java classpath.

@@ -128,7 +128,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
         global sil_programs
         sil_programs = load_sil_files(jvm, sif)
     modules = [main_module.global_module] + list(analyzer.modules.values())
-    prog = translator.translate_program(modules, sil_programs, selected,
+    prog = translator.translate_program(modules, sil_programs, analyzer.builtin_function_names, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)

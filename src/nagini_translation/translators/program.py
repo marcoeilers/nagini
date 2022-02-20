@@ -565,7 +565,7 @@ class ProgramTranslator(CommonTranslator):
         functions += [
             function
             for function in self.viper.to_list(sil_progs.functions())
-            if function.name() in used_names]
+            if function.name() in used_names or function.name() + ' DECLARATION' in used_names]
         predicates += self.viper.to_list(sil_progs.predicates())
 
         return domains, predicates, functions, methods
@@ -581,12 +581,7 @@ class ProgramTranslator(CommonTranslator):
         names later used when computing which parts of the program to give to
         Viper.
         """
-        if node.sil_name in self.viper.used_names_sets:
-            used_names = self.viper.used_names_sets[node.sil_name]
-        else:
-            used_names = set()
-        self.viper.used_names = used_names
-        self.viper.used_names_sets[node.sil_name] = used_names
+        self.viper.set_used_name(node.sil_name)
         if selected_names is None:
             return
         if (node.name in selected or
@@ -1207,7 +1202,7 @@ class ProgramTranslator(CommonTranslator):
 
         return domains, functions
 
-    def translate_program(self, modules: List[PythonModule], sil_progs: Program,
+    def translate_program(self, modules: List[PythonModule], sil_progs: Program, builtin_function_names: str,
                           ctx: Context, selected: Set[str] = None,
                           ignore_global: bool = False) -> Program:
         """
@@ -1452,7 +1447,11 @@ class ProgramTranslator(CommonTranslator):
         i = 0
         while i < len(all_used_names):
             name = all_used_names[i]
+            i += 1
             to_add = set()
+            if name.endswith(' DECLARATION') and name[:-12] in builtin_function_names:
+                all_used_names.append(name[:-12])
+                continue
             if name in self.viper.used_names_sets:
                 to_add.update(self.viper.used_names_sets[name])
             if name in self.required_names:
@@ -1466,7 +1465,6 @@ class ProgramTranslator(CommonTranslator):
                 superclass = modules[0].global_module.classes[name].superclass
                 if superclass is not None:
                     all_used_names.append(superclass.sil_name)
-            i += 1
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.
