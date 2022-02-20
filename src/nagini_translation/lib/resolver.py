@@ -505,7 +505,7 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
         return value_type.type_args[0]
     elif value_type.name == SET_TYPE:
         return value_type.type_args[0]
-    elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+    elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict', 'defdict'):
         # FIXME: This is very unfortunate, but right now we cannot handle this
         # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[1]
@@ -527,7 +527,7 @@ def _get_iteration_type(value_type: PythonType, module: PythonModule,
                         node: ast.AST) -> PythonType:
     # Assuming that value_type is some sort of container which supports iteration,
     # returns the type of the iterator.
-    if value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
+    if value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict', 'defdict'):
         # FIXME: This is very unfortunate, but right now we cannot handle this
         # generically, so we have to hard code these two cases for the moment.
         return value_type.type_args[0]

@@ -56,7 +56,6 @@ class TypeTranslator(CommonTranslator):
         if isinstance(cls, SilverType):
             return cls.type
         elif cls.name == CALLABLE_TYPE:
-            ctx.are_function_constants_used = True
             return self.viper.function_domain_type()
         elif cls.name in PRIMITIVES:
             cls = cls.try_box()

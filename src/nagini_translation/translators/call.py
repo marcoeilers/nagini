@@ -1090,7 +1090,7 @@ class CallTranslator(CommonTranslator):
         is_predicate = True
         if isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
-            if (isinstance(receiver_target, PythonClass) and
+            if (isinstance(receiver_target, PythonType) and
                     (not isinstance(node.func.value, (ast.Call, ast.Str)) or
                              get_func_name(node.func.value) == 'super')):
                 if target.method_type == MethodType.static_method:
