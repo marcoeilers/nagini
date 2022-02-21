@@ -1430,8 +1430,7 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and (len(decorators) != 1)) or
-                (('Pure' in decorators) and not (len(decorators) == 1 or
-                                                 (len(decorators) == 2 and 'ContractOnly' in decorators))) or
+                (('Pure' in decorators) and (decorators - {'Pure', 'ContractOnly', 'classmethod', 'staticmethod'})) or
                 (('BodyNeedsFunctionDefs' in decorators) and not ('SpecNeedsFunctionDefs' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
                 (('property' in decorators) and (len(decorators) != 1)) or
@@ -1534,10 +1533,14 @@ class Analyzer(ast.NodeVisitor):
         if self._incompatible_decorators(name_decorators.union(func_decorators, attr_decorators)):
             raise InvalidProgramException(func, "decorators.incompatible")
 
-        supported_names = {'Predicate', 'Pure', 'IOOperation', 'property', 'AllLow', 'PreservesLow'}
+        supported_names = {'Predicate', 'Pure', 'IOOperation', 'property', 'AllLow', 'PreservesLow', 'ContractOnly',
+                           'classmethod', 'staticmethod', 'Ghost'}
         supported_funcs = {'BodyNeedsFunctionDefs', 'SpecNeedsFunctionDefs'}
         supported_attributes = {'setter'}
         unsupported_names = name_decorators - supported_names
         unsupported_attrs = attr_decorators - supported_attributes
         unsupported_funcs = func_decorators - supported_funcs
-        return unsupported_names or unsupported_attrs or unsupported_funcs
+        res = unsupported_names or unsupported_attrs or unsupported_funcs
+        if res:
+            print(res)
+        return res

@@ -511,6 +511,7 @@ class MethodTranslator(CommonTranslator):
         """
         old_function = ctx.current_function
         ctx.current_function = method
+        old_no_function_bodies = self.viper.no_function_bodies
         if method.spec_function_defs is not None:
             self.viper.no_function_bodies = True
             for dep in method.spec_function_defs:
@@ -559,7 +560,7 @@ class MethodTranslator(CommonTranslator):
                 for dep in method.body_function_defs:
                     self.add_function_dependency(dep, ctx)
             else:
-                self.viper.no_function_bodies = False
+                self.viper.no_function_bodies = old_no_function_bodies
 
             body.append(self.viper.LocalVarAssign(error_var_ref,
                 self.viper.NullLit(self.no_position(ctx),
@@ -576,7 +577,7 @@ class MethodTranslator(CommonTranslator):
             locals += [local.decl for local in method.get_locals()
                        if not local.name.startswith('lambda')]
             body += self._create_method_epilog(method, ctx)
-        self.viper.no_function_bodies = False
+        self.viper.no_function_bodies = old_no_function_bodies
         name = method.sil_name
         nodes = self.create_method_node(
             ctx, name, args, results, pres, posts, locals, body,

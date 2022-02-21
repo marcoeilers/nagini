@@ -107,15 +107,16 @@ class Silicon:
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
             raise Exception('Silicon backend not found on classpath.')
         self.silicon = jvm.viper.silicon.Silicon()
-        nargs = 6 if counterexample else 4
+        nargs = 7 if counterexample else 5
         args = jvm.scala.collection.mutable.ArraySeq(nargs)
         args.update(0, '--z3Exe')
         args.update(1, config.z3_path)
         args.update(2, '--disableCatchingExceptions')
+        args.update(3, '--alternativeFunctionVerificationOrder')
         if counterexample:
-            args.update(3, '--counterexample')
-            args.update(4, 'native')
-        args.update(5 if counterexample else 3, filename)
+            args.update(4, '--counterexample')
+            args.update(5, 'native')
+        args.update(6 if counterexample else 4, filename)
         self.silicon.parseCommandLine(args)
         self.silicon.start()
         self.ready = True

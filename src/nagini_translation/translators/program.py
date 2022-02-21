@@ -129,6 +129,7 @@ class ProgramTranslator(CommonTranslator):
         inherit or redefine it.
         """
         current_module = ctx.module
+        self.viper.set_used_name(root.sil_name + ' DECLARATION')
         type = self.translate_type(root.type, ctx)
         position = self.to_position(root.node, ctx)
         info = self.no_info(ctx)
@@ -1213,6 +1214,7 @@ class ProgramTranslator(CommonTranslator):
         predicates = []
         functions = []
         methods = []
+        self.viper.no_function_bodies = True
 
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
