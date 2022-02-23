@@ -15,6 +15,7 @@ from nagini_contracts.thread import Thread
 
 
 OBLIGATION_CONTRACT_FUNCS = [
+    'MeasureAbove',
     'MustTerminate',
     'MustRelease',
     'Level',
@@ -32,6 +33,8 @@ class LevelType:
     def __lt__(self, other: 'LevelType') -> bool:
         """We allow to compare only ``LevelType`` objects."""
 
+def MeasureAbove(o: object, i: int) -> bool:
+    """Specifies that the measure of obligation o is above i."""
 
 def WaitLevel() -> LevelType:
     """The wait level of the current thread."""
@@ -50,6 +53,7 @@ def MustTerminate(measure: int) -> bool:
 
 
 __all__ = (
+    'MeasureAbove',
     'MustRelease',
     'MustTerminate',
     'LevelType',

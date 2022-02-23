@@ -372,14 +372,15 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
         if args.benchmark >= 1:
-            print("Run, Total, Start, End, Time".format())
+            print("Run, Total, Start, End, Total Time, Translation Time, Verifier Time".format())
             for i in range(args.benchmark):
                 start = time.time()
                 modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir)
+                after_translate = time.time()
                 vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()
-                print("{}, {}, {}, {}, {}".format(
-                    i, args.benchmark, start, end, end - start))
+                print("{}, {}, {}, {}, {}, {}, {}".format(
+                    i, args.benchmark, start, end, end - start, after_translate - start, end - after_translate))
         else:
             vresult = verify(modules, prog, python_file, jvm,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)

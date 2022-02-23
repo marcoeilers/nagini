@@ -284,6 +284,7 @@ class MethodTranslator(CommonTranslator):
             posts = [check] + posts
 
         self.viper.set_used_name(func.sil_name)
+        self.viper.used_names.add(func.sil_name + " DECLARATION")
         statements = func.node.body
         start, end = get_body_indices(statements)
         # Translate body

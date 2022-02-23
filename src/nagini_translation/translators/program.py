@@ -1444,6 +1444,8 @@ class ProgramTranslator(CommonTranslator):
             sil_name = module.global_module.classes[cname].sil_name
             if sil_name not in selected_names:
                 selected_names.append(sil_name)
+        selected_names.append(CHECK_DEFINED_FUNC)
+        selected_names.append(IS_DEFINED_FUNC)
         # Compute all dependencies of directly selected methods/...
         all_used_names = list(selected_names)
         i = 0

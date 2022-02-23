@@ -63,6 +63,17 @@ class LoopObligationTranslator(CommonObligationTranslator):
             ctx: Context) -> sil.InhaleExhale:
         return obligation_instance.get_use_loop(ctx)
 
+    def translate_measure_below(
+            self, node: ast.Call, ctx: Context) -> 'StmtsAndExpr':
+        measures = self._get_obligation_info(ctx).loop_measure_map
+        obl = sil.PythonRefExpression(node.args[0])
+        bound = sil.PythonIntExpression(node.args[1])
+        check = measures.check(obl, bound)
+        info = self.no_info(ctx)
+        pos = self.to_position(node, ctx)
+        e = check.translate(self, ctx, pos, info)
+        return [], e
+
     def create_while_node(
             self, ctx: Context, cond: Expr,
             invariants: List[Expr],
