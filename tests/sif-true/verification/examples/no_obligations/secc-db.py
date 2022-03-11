@@ -65,6 +65,7 @@ def binsearch(elems: List[Elem], from_: int, l: int, key: int) -> Tuple[int, int
     else:
         if l == 1:
             return FAILURE, -1
+        Assume(SplitOn(k > key))
         if k > key:
             return binsearch(elems, from_, mid - 1, key)
         else:

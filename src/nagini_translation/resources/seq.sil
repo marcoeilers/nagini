@@ -52,3 +52,4 @@ function PSeq___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
     ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))
+    ensures result ==> self == other

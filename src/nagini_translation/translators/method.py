@@ -539,6 +539,8 @@ class MethodTranslator(CommonTranslator):
         body = []
         no_pos = self.no_position(ctx)
         no_info = self.no_info(ctx)
+        if ctx.sif == 'prob':
+            body.append(self.viper.Inhale(self.viper.LowEvent(no_pos, no_info), no_pos, no_info))
         if method.cls and method.method_type == MethodType.normal:
             body.append(self._check_self_type(method, ctx))
         if method.type:

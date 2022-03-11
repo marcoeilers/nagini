@@ -129,6 +129,7 @@ class ProgramTranslator(CommonTranslator):
         inherit or redefine it.
         """
         current_module = ctx.module
+        self.viper.used_names.add(root.sil_name + ' DECLARATION')
         self.viper.set_used_name(root.sil_name + ' DECLARATION')
         type = self.translate_type(root.type, ctx)
         position = self.to_position(root.node, ctx)
@@ -1214,7 +1215,7 @@ class ProgramTranslator(CommonTranslator):
         predicates = []
         functions = []
         methods = []
-        self.viper.no_function_bodies = True
+        self.viper.no_function_bodies = False
 
         # Predefined obligation stuff
         obl_predicates, obl_fields = self.get_obligation_preamble(ctx)
@@ -1446,6 +1447,7 @@ class ProgramTranslator(CommonTranslator):
                 selected_names.append(sil_name)
         selected_names.append(CHECK_DEFINED_FUNC)
         selected_names.append(IS_DEFINED_FUNC)
+        selected_names.append('bytes')
         # Compute all dependencies of directly selected methods/...
         all_used_names = list(selected_names)
         i = 0
@@ -1523,7 +1525,4 @@ class ProgramTranslator(CommonTranslator):
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
-
-        method_splitter = getattr(getattr(self.viper.ast.utility, "MethodSplitter$"), "MODULE$")
-        prog = method_splitter.split(prog)
         return prog

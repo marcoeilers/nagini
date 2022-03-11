@@ -243,10 +243,11 @@ class CDDC:
             self.hid_lock.acquire()
             temp = self.hid.keyboard_available
             self.hid_lock.release()
-
+            Assume(SplitOn(temp))
             if temp:
                 self.current_event_data = EventNone()
                 self.hid.current_event_type = EventTypeKeyboard()
+
 
                 if self.indicated_domain == DomainHigh():
                     self.hid_lock.acquire()
@@ -316,6 +317,7 @@ class CDDC:
                 done_rpc = True
             self.overlay_lock.release()
 
+        Assume(SplitOn(self.overlay_result != DomainInvalid()))
         if self.overlay_result != DomainInvalid():
             cursor_domain = DomainOverlay()
         else:
@@ -328,6 +330,7 @@ class CDDC:
             if cursor_domain == DomainInvalid():
                 cursor_domain = self.active_domain
 
+        #Assume(SplitOn(cursor_domain == DomainOverlay()))
         if cursor_domain == DomainOverlay():
             if (self.overlay_result != DomainOverlay() and self.overlay_result != DomainInvalid()
                     and self.current_event_data == EventMouseDown()

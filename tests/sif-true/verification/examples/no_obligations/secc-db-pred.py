@@ -51,6 +51,13 @@ def ar_sec_last(a: Optional[Elem], n: int) -> Optional[Elem]:
     Requires(ar_sec(a, n))
     return Unfolding(ar_sec(a, n), a if n == 0 else ar_sec_last(a.next, n - 1))
 
+@Pure
+def ar_sec_ith(a: Optional[Elem], n: int, i: int) -> Optional[Elem]:
+    Requires(n >= 0)
+    Requires(i >= 0 and i <= n)
+    Requires(ar_sec(a, n))
+    return Unfolding(ar_sec(a, n), a if i == 0 else ar_sec_ith(a.next, n - 1, i - 1))
+
 """
 void ar_sec_snoc(elem_t *a, int n)
 _(requires n >= 0)
@@ -115,6 +122,7 @@ def ar_sec_join(a: Optional[Elem], n: int, m: int) -> None:
     Requires(Low(n) and Low(m))
     Requires(ar_sec(a, n) and ar_sec(ar_sec_last(a, n), m))
     Ensures(ar_sec(a, n + m))
+    Ensures(ar_sec_last(a, n + m) is Old(ar_sec_last(ar_sec_last(a, n), m)))
     if n == 0:
         Assert(ar_sec_last(a, n) is a)
         Assert(n + m is m)
@@ -170,12 +178,8 @@ int lookup(elem_t *elems, int len, int key, int *valueOut)
 }
 """
 
-@Predicate
-def dummy(i: int) -> bool:
-    return Low(i) and Implies(i > 0, dummy(i - 1))
-
 def lookup(elems: Optional[Elem], len: int, key: int) -> Tuple[int, int]:
-    Requires(dummy(15))
+    Requires(type(len) == int)
     Requires(ar_sec(elems, len))
     Requires(Low(len) and Low(key))
     Requires(len >= 0)
@@ -184,121 +188,399 @@ def lookup(elems: Optional[Elem], len: int, key: int) -> Tuple[int, int]:
     Ensures(Implies(Result()[0] == SUCCESS, Implies(key > global_label(), Low(Result()[1]))))
     Ensures(Implies(Result()[0] == FAILURE, Result()[1] == -1))
     Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
-    Assume(type(len) == int)
+    i = 0
+    p = elems
+    Fold(ar_sec(elems, 0))
+    try:
+        while i < len:
+            Invariant(type(i) == int)
+            Invariant(i >= 0 and i <= len)
+            Invariant(Low(i) and LowExit())
+            Invariant(ar_sec(p, len-i))
+            Invariant(ar_sec(elems, i))
+            Invariant(ar_sec_last(elems, i) is p)
+            #Invariant(Acc(list_pred(elems)) and Low(len(elems)))
+            #Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
+            #Assert(ar_sec(p, len - i))
+            Unfold(ar_sec(p, len-i))
+            if p.key is key:
+                res = p.value
+                Fold(ar_sec(p, len-i))
+                #ar_sec_join(elems, i, len - i)
+                return (SUCCESS, res)
+            p = p.next
+            ar_sec_snoc(elems, i)
+            i += 1
+    finally:
+        ar_sec_join(elems, i, len - i)
+    return (FAILURE, -1)
+
+
+def split(a: Optional[Elem], i: int, n: int) -> None:
+    Requires(type(i) == int and type(n) == int)
+    Requires(Low(i))
+    Requires(0 <= i and i <= n)
+    Requires(ar_sec(a, n))
+    Ensures(ar_sec(a, i) and ar_sec(ar_sec_last(a, i), n - i))
+    Ensures(Old(ar_sec_ith(a, n, i)) is ar_sec_last(a, i))
+    Ensures(Old(ar_sec_last(a, n)) is ar_sec_last(ar_sec_last(a, i), n - i))
+    if i == 0:
+        Fold(ar_sec(a, 0))
+    else:
+        Unfold(ar_sec(a, n))
+        split(a.next, i - 1, n - 1)
+        Fold(ar_sec(a, i))
+
+"""
+void split(elem_t *a, int i, int n)
+  _(lemma)
+	_(requires i :: low)
+    _(requires 0 <= i && i <= n)
+    _(requires ar_sec(a, n))
+    _(ensures  ar_sec(a, i) && ar_sec(a + i, n - i))
+{
+	if(i == 0) {
+          _(fold ar_sec(a, 0))
+	} else {
+          _(unfold ar_sec(a, n))
+          _(apply split(a+1, i-1, n-1);)
+          _(fold ar_sec(a, i))
+	}
+}
+"""
+
+def expose(a: Optional[Elem], i: int, n: int) -> None:
+    Requires(type(i) == int and type(n) == int)
+    Requires(Low(i))
+    Requires(0 <= i and i < n)
+    Requires(ar_sec(a, n))
+    Ensures(ar_sec(a, i) )
+    Ensures(Acc(ar_sec_last(a, i).key) and Acc(ar_sec_last(a, i).value) and Acc(ar_sec_last(a, i).next) and
+            Low(ar_sec_last(a, i).key) and Implies(ar_sec_last(a, i).key > global_label(),
+                                                   Low(ar_sec_last(a, i).value)))
+    Ensures(ar_sec(ar_sec_last(a, i).next, n - i - 1))
+    Ensures(Old(ar_sec_last(a, n)) is ar_sec_last(ar_sec_last(a, i).next, n - i - 1))
+    if i == 0:
+        Unfold(ar_sec(a, n))
+        Fold(ar_sec(a, 0))
+    else:
+        Unfold(ar_sec(a, n))
+        expose(a.next, i - 1, n - 1)
+        Fold(ar_sec(a, i))
+
+"""
+void expose(elem_t *a, int i, int n)
+    _(lemma)
+	_(requires i :: low)
+    _(requires 0 <= i && i < n)
+     _(requires ar_sec(a, n))
+     _(ensures  exists int k, int v. &(a + i)->key |-> k && &(a + i)->value |-> v && k :: low && v :: label(k))
+     _(ensures  ar_sec(a, i) && ar_sec(a + i + 1, n - i - 1))
+{
+	if(i == 0) {
+          _(unfold ar_sec(a, n))
+          _(fold ar_sec(a, 0))
+	} else {
+	  _(unfold ar_sec(a, n))
+          _(apply expose(a+1, i-1, n-1);)
+          _(fold ar_sec(a, i))
+	}
+}
+"""
+
+def cover(a: Optional[Elem], i: int, n: int) -> None:
+    Requires(type(i) == int and type(n) == int)
+    Requires(Low(i))
+    Requires(0 <= i and i < n)
+    Requires(ar_sec(a, i))
+    Requires(Acc(ar_sec_last(a, i).key) and Acc(ar_sec_last(a, i).value) and Acc(ar_sec_last(a, i).next) and
+             Low(ar_sec_last(a, i).key) and Implies(ar_sec_last(a, i).key > global_label(),
+                                                    Low(ar_sec_last(a, i).value)))
+    Requires(ar_sec(ar_sec_last(a, i).next, n - i - 1))
+    Ensures(ar_sec(a, n))
+    Ensures(Old(ar_sec_last(a, i)) is ar_sec_ith(a, n, i))
+    Ensures(Old(ar_sec_last(a, i).next) is ar_sec_ith(a, n, i + 1))
+    Ensures(Old(ar_sec_last(ar_sec_last(a, i).next, n - i - 1)) is ar_sec_last(a, n))
+    if i == 0:
+        old_next = ar_sec_last(a, i).next
+        #Assert(old_next is a.next)
+        Unfold(ar_sec(a, 0))
+        Fold(ar_sec(a, n))
+        #Assert(ar_sec_ith(a, n, 1) is )
+        Assert(old_next is Unfolding(ar_sec(a, n), ar_sec_ith(a.next, n - 1, 0)))
+    else:
+        Unfold(ar_sec(a, i))
+        cover(a.next, i - 1, n - 1)
+        Fold(ar_sec(a, n))
+
+"""
+void cover(elem_t *a, int i, int n)
+    _(lemma)  
+	_(requires i :: low)
+    _(requires 0 <= i && i < n)
+     _(requires ar_sec(a, i) && ar_sec(a + i + 1, n - i - 1))
+     _(requires exists int k, int v. &(a + i)->key |-> k && &(a + i)->value |-> v && k :: low && v :: label(k))
+     _(ensures  ar_sec(a, n))
+{
+	if(i == 0) {
+          _(unfold ar_sec(a, 0))
+          _(fold   ar_sec(a, n))
+	} else {
+	  _(unfold ar_sec(a, i))
+          _(apply cover(a+1, i-1, n-1);)
+          _(fold ar_sec(a, n))
+	}
+}
+"""
+
+"""
+int binsearch(elem_t *elems, int len, int key, int *valueOut)
+  _(requires ar_sec(elems,len))
+  _(requires len :: low)
+  _(requires key :: low)
+  _(requires exists int oldOut. valueOut |-> oldOut)
+  _(ensures exists int out. valueOut |-> out)
+  _(ensures result :: low)
+  _(ensures result == SUCCESS || result == FAILURE)
+  _(ensures result == SUCCESS ==> out :: label(key))
+  _(ensures result == FAILURE ==> out == oldOut)
+  _(ensures ar_sec(elems,len))
+{
+  if (len <= 0){
+    return FAILURE;
+  }
+  int mid = len/2;
+  _(apply expose(elems,mid,len);)
+
+  int k = (elems + mid)->key;
+  if (k == key){
+    *valueOut = (elems + mid)->value;
+    _(apply cover(elems,mid,len);)
+    return SUCCESS;
+  }else{
+    if (len == 1){
+      _(apply cover(elems,mid,len);)      
+      return FAILURE;
+    }
+    if (k > key){
+      _(apply cover(elems,mid,len);)
+      _(apply split(elems,mid-1,len);)
+      int ret = binsearch(elems,mid-1,key,valueOut);
+      _(apply ar_sec_join(elems,mid-1,len-(mid-1));)
+      return ret;
+    }else{
+      _(apply cover(elems,mid,len);)
+      _(apply split(elems,mid+1,len);)
+      int ret = binsearch(elems+mid+1,len - mid - 1,key,valueOut);
+      _(apply ar_sec_join(elems,mid+1,len-(mid+1));)
+      return ret;
+    }
+  }
+}
+"""
+def binsearch(elems: Optional[Elem], len: int, key: int) -> Tuple[int, int]:
+    Requires(type(len) == int)
+    Requires(len >= 0)
+    Requires(ar_sec(elems, len))
+    Requires(Low(len) and Low(key))
+    Ensures(Low(Result()[0]))
+    Ensures(Implies(Result()[0] == SUCCESS, Implies(key > global_label(), Low(Result()[1]))))
+    Ensures(Implies(Result()[0] == FAILURE, Result()[1] == -1))
+    Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
+    Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
+    Ensures(ar_sec(elems, len))
+    Ensures(ar_sec_last(elems, len) is Old(ar_sec_last(elems, len)))
+    if len <= 0:
+        return FAILURE, -1
+
+    mid = len // 2
+    expose(elems, mid, len)
+    mid_el = ar_sec_last(elems, mid)
+    k = mid_el.key
+    if k == key:
+        res = mid_el.value
+        cover(elems, mid, len)
+        return SUCCESS, res
+    else:
+        if len == 1:
+            cover(elems, mid, len)
+            return FAILURE, -1
+        Assume(SplitOn(k > key))
+        if k > key:
+            cover(elems, mid, len)
+            split(elems, mid-1, len)
+            ret, outVal = binsearch(elems, mid-1, key)
+            ar_sec_join(elems, mid-1, len-(mid-1))
+            return ret, outVal
+        else:
+            mid_el_next = mid_el.next
+            cover(elems, mid, len)
+            #Assert(mid_el is ar_sec_ith(elems, len, mid))
+            Assert(mid_el_next is ar_sec_ith(elems, len, mid+1))
+            split(elems, mid+1, len)
+            #Assert(mid_el_next is ar_sec_last(elems, mid + 1))
+            ret, outVal = binsearch(mid_el_next, len - mid - 1, key)
+            ar_sec_join(elems, mid + 1, len - (mid + 1))
+            return ret, outVal
+
+"""
+int sum_all(elem_t *elems, int len, int key)
+  _(requires ar_sec(elems,len))
+  _(requires len :: low)
+  _(requires key :: low)
+  _(requires len >= 0)
+  _(ensures result :: label(key))
+  _(ensures ar_sec(elems,len))
+{
+  int sum = 0;
+  elem_t *p = elems;
+  int i = 0;
+  _(fold ar_sec(elems,0))
+  while (i < len)
+    _(invariant i >= 0 && i <= len)
+    _(invariant sum :: label(key) && i :: low)
+    _(invariant ar_sec(p,len-i))
+    _(invariant ar_sec(elems,i))
+    _(invariant p == elems + i)
+    {
+    _(unfold ar_sec(p,len - i))
+    if (p->key == key){
+      sum += p->value;
+    }
+    p++;
+    _(apply ar_sec_snoc(elems,i);)    
+    i++;
+  }
+  _(apply ar_sec_join(elems,i,len-i);)
+  return sum;
+}
+"""
+
+
+def sum_all(elems: Optional[Elem], len: int, key: int) -> int:
+    Requires(type(len) == int)
+    Requires(Low(len) and Low(key))
+    Requires(len >= 0)
+    Requires(ar_sec(elems, len))
+    Ensures(ar_sec(elems, len))
+    Ensures(Implies(key > global_label(), Low(Result())))
+    sum = 0
+    p = elems
+    i = 0
+    Fold(ar_sec(elems, 0))
+    while i < len:
+        Invariant(type(i) == int)
+        Invariant(i >= 0 and i <= len)
+        Invariant(Implies(key > global_label(), Low(sum)) and Low(i))
+        Invariant(ar_sec(p, len - i))
+        Invariant(ar_sec(elems, i))
+        Invariant(p is ar_sec_last(elems, i))
+        Unfold(ar_sec(p, len - i))
+        if p.key is key:
+            sum += p.value
+        p = p.next
+        ar_sec_snoc(elems, i)
+        i += 1
+    ar_sec_join(elems,i,len-i)
+    return sum
+
+
+"""
+/* returns the sum of all values associated to the given key. 0 otherwise
+   this shows in some sense the ease of the recursive reasoning. */
+int sum_all_rec(elem_t *p, int len, int key, int init)
+  _(requires ar_sec(p,len))
+  _(requires init :: label(key))
+  _(requires len :: low)
+  _(requires len >= 0)
+  _(requires key :: low)
+  _(ensures ar_sec(p,len))
+  _(ensures result :: label(key))
+{
+  if (len > 0)
+  {
+    _(unfold ar_sec(p,len))
+    if (p->key == key){
+      int s = sum_all_rec(p+1,len-1,key,init + p->value);
+      _(fold ar_sec(p,len))
+      return s;
+    }else{
+      int s = sum_all_rec(p+1,len-1,key,init);
+      _(fold ar_sec(p,len))
+      return s;
+    }
+  }else{
+    return init;
+  }
+}
+"""
+
+def sum_all_rec(p: Optional[Elem], len: int, key: int, init: int) -> int:
+    Requires(type(len) == int)
+    Requires(ar_sec(p, len))
+    Requires(Low(len) and Low(key))
+    Requires(len >= 0)
+    Requires(Implies(key > global_label(), Low(init)))
+    Ensures(ar_sec(p, len))
+    Ensures(Implies(key > global_label(), Low(Result())))
+    if len > 0:
+        Unfold(ar_sec(p, len))
+        if p.key == key:
+            s = sum_all_rec(p.next, len - 1, key, init + p.value)
+            Fold(ar_sec(p, len))
+            return s
+        else:
+            s = sum_all_rec(p.next, len - 1, key, init)
+            Fold(ar_sec(p, len))
+            return s
+    else:
+        return init
+
+"""
+void remove_all(elem_t *elems, int len, int key)
+  _(requires ar_sec(elems,len))
+  _(requires len :: low && key :: low && len >= 0)
+  _(ensures ar_sec(elems,len))
+{
+  int i = 0;
+  elem_t *p = elems;
+  _(fold ar_sec(elems,0))
+  while (i < len)
+    _(invariant i :: low && i >= 0 && i <= len)
+    _(invariant ar_sec(elems,i))
+    _(invariant ar_sec(p,len-i))
+    _(invariant p == elems + i)
+  {
+    _(unfold ar_sec(p,len-i))
+    if (p->key == key){
+      p->value = 0;
+    }
+    _(apply ar_sec_snoc(elems,i);)
+    p++;
+    i++;
+  }
+  _(unfold ar_sec(p,len-i))
+}
+"""
+
+def remove_all(elems: Optional[Elem], len: int, key: int) -> None:
+    Requires(type(len) == int)
+    Requires(ar_sec(elems, len))
+    Requires(Low(len) and Low(key) and len >= 0)
+    Ensures(ar_sec(elems, len))
     i = 0
     p = elems
     Fold(ar_sec(elems, 0))
     while i < len:
         Invariant(type(i) == int)
-        Invariant(i >= 0 and i <= len)
-        Invariant(Low(i) and LowExit())
-        Invariant(ar_sec(p, len-i))
+        Invariant(Low(i) and i >= 0 and i <= len)
         Invariant(ar_sec(elems, i))
-        Invariant(ar_sec_last(elems, i) is p)
-        Invariant(dummy(15))
-        #Invariant(Acc(list_pred(elems)) and Low(len(elems)))
-        #Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
-        #Assert(ar_sec(p, len - i))
-        Unfold(dummy(15))
-        Unfold(ar_sec(p, len-i))
-        if p.key is key:
-            res = p.value
-            Fold(ar_sec(p, len-i))
-            Assume(False)
-            return (SUCCESS, res)
+        Invariant(ar_sec(p, len - i))
+        Invariant(p is ar_sec_last(elems, i))
+        Unfold(ar_sec(p, len - i))
+        if p.key == key:
+            p.value = 0
         p = p.next
         ar_sec_snoc(elems, i)
         i += 1
-        Fold(dummy(15))
-    ar_sec_join(elems, i, len - i)
-    return (FAILURE, -1)
-
-
-# def binsearch(elems: List[Elem], from_: int, l: int, key: int) -> Tuple[int, int]:
-#     Requires(Acc(list_pred(elems)))
-#     Requires(Low(l) and Low(key) and Low(from_))
-#     Requires(0 <= from_ and from_ + l <= len(elems))
-#     Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#     Ensures(Acc(list_pred(elems)))
-#     Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#     Ensures(Implies(Result()[0] == SUCCESS, Low(Result()[1])))
-#     Ensures(Implies(Result()[0] == FAILURE, Result()[1] == -1))
-#     Ensures(Result()[0] == SUCCESS or Result()[0] == FAILURE)
-#
-#     if l <= 0:
-#         return FAILURE, -1
-#
-#     mid = l // 2
-#
-#     e = elems[from_ + mid]
-#     k = e.key
-#     if k is key:
-#         return SUCCESS, elems[from_ + mid].value
-#     else:
-#         if l == 1:
-#             return FAILURE, -1
-#         #Assume(SplitOn(k > key))
-#         if k > key:
-#             return binsearch(elems, from_, mid - 1, key)
-#         else:
-#             return binsearch(elems, from_ + mid + 1, l - (mid + 1), key)
-
-#
-# def sum_all(elems: List[Elem], key: int) -> int:
-#     Requires(Acc(list_pred(elems)))
-#     Requires(Low(len(elems)) and Low(key))
-#     Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#     Ensures(Acc(list_pred(elems)))
-#     Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#     Ensures(Low(Result()))
-#
-#     sum = 0
-#     i = 0
-#     while i < len(elems):
-#         Invariant(Acc(list_pred(elems)) and Low(len(elems)))
-#         Invariant(i >= 0 and i <= len(elems))
-#         Invariant(Low(sum) and Low(i))
-#         Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
-#
-#         if elems[i].key is key:
-#             sum += elems[i].value
-#         i += 1
-#     return sum
-#
-#
-# def sum_all_rec(elems: List[Elem], from_: int, l: int, key: int, init: int) -> int:
-#     Requires(Acc(list_pred(elems)))
-#     Requires(Low(l) and Low(key) and Low(from_) and Low(init))
-#     Requires(0 <= from_ and from_ + l <= len(elems))
-#     Requires(Forall(int, lambda i: Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
-#     Ensures(Acc(list_pred(elems)))
-#     Ensures(Forall(int, lambda i: Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value)))))
-#     Ensures(Low(Result()))
-#
-#     if l > 0:
-#         e = elems[from_]
-#         if e.key is key:
-#             return sum_all_rec(elems, from_ + 1, l - 1, key, init + e.value)
-#         else:
-#             return sum_all_rec(elems, from_ + 1, l - 1, key, init)
-#     else:
-#         return init
-#
-#
-# def remove_all(elems: List[Elem], key: int) -> None:
-#     Requires(Acc(list_pred(elems)))
-#     Requires(Low(len(elems)) and Low(key))
-#     Requires(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#     Ensures(Acc(list_pred(elems)))
-#     Ensures(Forall(int, lambda i: (Implies(i >= 0 and i < len(elems), Acc(elems[i].key) and Acc(elems[i].value) and Low(elems[i].key) and Implies(elems[i].key is key, Low(elems[i].value))), [[elems[i]]])))
-#
-#     i = 0
-#     while i < len(elems):
-#         Invariant(Acc(list_pred(elems)) and Low(len(elems)))
-#         Invariant(i >= 0 and i <= len(elems))
-#         Invariant(Low(i))
-#         Invariant(Forall(int, lambda j: (Implies(j >= 0 and j < len(elems), Acc(elems[j].key) and Acc(elems[j].value) and Low(elems[j].key) and Implies(elems[j].key is key, Low(elems[j].value))), [[elems[j]]])))
-#
-#         if elems[i].key is key:
-#             elems[i].value = 0
-#         i += 1
+    Unfold(ar_sec(p, len - i))

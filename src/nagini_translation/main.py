@@ -142,12 +142,15 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      act_opt=True,
                                      func_opt=True,
                                      all_low=analyzer.has_all_low)
+        print(prog)
         if counterexample:
             prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
         else:
             prog = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').transform(prog, False)
         if verbose:
             print('Transformation to MPP successful.')
+    method_splitter = getattr(getattr(jvm.viper.silver.ast.utility, "MethodSplitter$"), "MODULE$")
+    prog = method_splitter.split(prog)
     if arp:
         prog = get_arp_plugin(jvm).before_verify(prog)
         if verbose:
