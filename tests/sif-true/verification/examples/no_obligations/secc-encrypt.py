@@ -10,7 +10,7 @@ from typing import List
 
 
 def encrypt(cipher: List[int], plain: int, key: int) -> bool:
-    Requires(list_pred(cipher) and len(cipher) == 0)
+    Requires(list_pred(cipher) and len(cipher) == 0 and Low(type(cipher)))
     Ensures(list_pred(cipher) and len(cipher) == 1)
     Ensures(Low(Result()))
     Ensures(Implies(not Result(), Low(cipher[0])))

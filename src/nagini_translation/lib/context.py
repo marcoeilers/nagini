@@ -63,6 +63,7 @@ class Context:
         self.are_threading_constants_used = False
         self.sif = False
         self.allow_statements = False
+        self.equal_tuples = False
 
     def get_fresh_int(self) -> int:
         """

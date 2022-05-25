@@ -333,7 +333,7 @@ class Analyzer(ast.NodeVisitor):
         if if_method['type']:
             method.type = self.find_or_create_class(if_method['type'],
                                                     self.module.global_module)
-        if if_method.get('generic_type'):
+        if if_method.get('generic_type') is not None:
             method.generic_type = if_method['generic_type']
         if if_method.get('requires'):
             method.requires = if_method['requires']

@@ -67,8 +67,10 @@ def do_declassify(x: int) -> int:
         r = x
     return r
 
+# 52 total, 26 spec
+
 def do_declassify_without_asking(x: int) -> int:
-    # should fail
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Low(Result()))
     Ensures(Result() == x or Result() == 0)
     r = 0
@@ -131,6 +133,8 @@ def do_declassify3(x: int) -> int:
         Unfold(safe_to_declassify_2())
     return r
 
+# 49, 32 spec
+
 
 @Predicate
 def avg_state_correct(s: int, c: int, xs: PSeq[int]) -> bool:
@@ -159,17 +163,6 @@ class StateLock(Lock[AvgState]):
                 Acc(self.get_locked().sum) and type(self.get_locked().sum) == int and
                 avg_state_correct(self.get_locked().sum, self.get_locked().count, consumed_inputs_inps()))
 
-"""
-
-/* the invariant protected by the lock */
-_(predicate avg_inv(struct avg_state *st)
-  exists int c, int s, int m, list<int> inps. consumed_inputs(;inps) &&
-  &st->count |-> c && c :: low && c >= 0 &&
-  &st->sum |-> s && &st->min |-> m && m > 0 && m :: low &&
-  avg_state_correct(;s, c, inps)  
-)
-
-"""
 DUMMY = 1
 
 @Predicate
@@ -187,10 +180,7 @@ def ssum(xs: PSeq[int]) -> int:
         return 0
     return xs[0] + ssum(xs.drop(1))
 
-"""
-_(predicate avg_state_correct2(;int s, int c, list<int> xs)
-  c :: low && c == length(xs) && s == ssum(xs))
-"""
+
 @Predicate
 def avg_state_correct2(s: int, c: int, xs: PSeq[int]) -> bool:
     return Low(c) and c is len(xs) and s is ssum(xs)
@@ -204,16 +194,7 @@ def avg_safe_to_declassify(x: int, st: AvgState) -> bool:
             Low(st.min) and st.min > 0 and
             x == (ssum(consumed_inputs_inps()) // len(consumed_inputs_inps())))
 
-"""
-
-/* The security policy. */
-_(predicate avg_safe_to_declassify(int x, struct avg_state *st; list<int> inps)
-  exists int c, int s, int m. consumed_inputs(;inps) &&
-  c :: low && c == length(inps) && s == ssum(inps) &&
-  &st->min |-> m && m > 0 && m :: low &&
-  x == (s / c) && c > m
-)
-"""
+# 46 total, 40 spec
 
 @ContractOnly
 def avg_get_input() -> int:
@@ -239,20 +220,7 @@ def avg_sum_thread(st: AvgState, l: StateLock) -> None:
     Fold(avg_state_correct(st.sum, st.count, consumed_inputs_inps()))
     l.release()
 
-"""
-/* the thread that reads, counts and sums the inputs */
-void avg_sum_thread(){
-  struct avg_state * st = avg_lock();
-  _(unfold avg_inv(st))
-  _(assert exists list<int> inps. consumed_inputs(;inps))
-  int i = avg_get_input();
-  _(apply sum_lemma(st->sum, st->count, inps, i);)
-  st->count += 1;
-  st->sum += i;
-  _(fold avg_inv(st))  
-  avg_unlock(st);
-}
-"""
+# 21 total, 11 spec
 
 def avg_inc_min_thread(st: AvgState, l: StateLock) -> None:
     Requires(l.get_locked() is st and Low(l))
@@ -260,16 +228,7 @@ def avg_inc_min_thread(st: AvgState, l: StateLock) -> None:
     st.min += 1
     l.release()
 
-"""
-/* the thread that increments the 'min' variable */
-void avg_inc_min_thread(){
-  struct avg_state * st = avg_lock();
-  _(unfold avg_inv(st))
-  st->min += 1;
-  _(fold avg_inv(st))  
-  avg_unlock(st);
-}
-"""
+
 
 def avg_state_correct_implies(s: int, c: int, xs: PSeq[int]) -> None:
     Requires(avg_state_correct(s, c, xs))
@@ -287,24 +246,7 @@ def avg_state_correct_implies(s: int, c: int, xs: PSeq[int]) -> None:
         Assert(c == len(xs))
         Assert(c is len(xs))
         Fold(avg_state_correct2(s, c, xs))
-"""
-void avg_state_correct_implies(int s, int c, list<int> xs)
-_(requires avg_state_correct(;s,c,xs))
-_(ensures avg_state_correct2(;s,c,xs))
-_(lemma)
-{
-  _(unfold avg_state_correct(;s,c,xs))
-  if (xs == nil){
-    _(fold avg_state_correct2(;s,c,nil))
-  }else{
-    _(assert exists int y, list<int> ys. xs == cons(y,ys))
-    _(apply avg_state_correct_implies(s-y,c-1,ys);)
-    _(unfold avg_state_correct2(;s-y,c-1,ys))
-    _(fold avg_state_correct2(;s,c,xs))      
-  }
-}
 
-"""
 
 def avg_state_correct2_implies(s: int, c: int, xs: PSeq[int]) -> None:
     Requires(avg_state_correct2(s, c, xs))
@@ -320,25 +262,7 @@ def avg_state_correct2_implies(s: int, c: int, xs: PSeq[int]) -> None:
         avg_state_correct2_implies(s - y, c - 1, ys)
         Fold(avg_state_correct(s, c, xs))
 
-"""
-{
-  _(unfold avg_state_correct2(;s,c,xs))
-  length_low_nil_low(xs);
-  if (xs == nil){
-    _(fold avg_state_correct(;s,c,nil))
-  }else{
-    _(assert exists int y, list<int> ys. xs == cons(y,ys))
-      
-    // little bit annoying deriving length(ys) :: low
-    _(assert length(xs) == length(cons(y,ys)))
-    _(assert length(xs) == 1 + length(ys))      
-
-    _(fold avg_state_correct2(;s-y,c-1,ys))
-    avg_state_correct2_implies(s-y,c-1,ys);
-    _(fold avg_state_correct(;s,c,xs))      
-  }
-}
-"""
+# 34 total, 4 non-spec, 30 spec
 
 def avg_declass_thread(st: AvgState, l: StateLock) -> None:
     Requires(l.get_locked() is st and Low(l))
@@ -357,31 +281,4 @@ def avg_declass_thread(st: AvgState, l: StateLock) -> None:
         avg_state_correct2_implies(s, c, inps)
     l.release()
 
-
-"""
-
-/* the thread that does the declassification */
-void avg_declass_thread(){
-  struct avg_state * st = avg_lock();
-  _(unfold avg_inv(st))
-    _(assert exists list<int> inps. consumed_inputs(;inps))
-  if (st->count > st->min){
-    int avg = st->sum / st->count;
-    _(assert  consumed_inputs(;inps))
-    _(assert exists int c, int s. &st->sum |-> s && &st->count |-> c)
-    _(apply avg_state_correct_implies(s, c, inps);)
-    _(unfold avg_state_correct2(;s, c, inps))
-      
-    _(fold avg_safe_to_declassify(avg,st;inps))
-    _(assume (avg :: low))
-      
-    _(unfold avg_safe_to_declassify(avg,st;inps))
-    _(fold avg_state_correct2(;s, c, inps))
-    _(apply avg_state_correct2_implies(s, c, inps);)
-    _(fold avg_inv(st))
-  }else{
-    _(fold avg_inv(st))
-  }
-  avg_unlock(st);
-}
-"""
+# 16 total, 7 non-spec, 9 spec

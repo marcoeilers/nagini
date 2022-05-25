@@ -309,9 +309,10 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 self.visit(arg)
             self._in_property = False
             return
-        elif isinstance(node.func, ast.Name) and node.func.id in ('IOForall', 'Forall', 'Exists'):
+        elif isinstance(node.func, ast.Name) and node.func.id in ('IOForall', 'Forall', 'Exists', 'Forall2', 'Forall3', 'Forall6'):
             operation = self._current_io_operation
-            assert len(node.args[1].args.args) == 1
+            assert len(node.args[1].args.args) == (1 if node.func.id in ('IOForall', 'Forall') else
+                                                   int(node.func.id[-1]))
             arg_type = self._parent.get_target(node.args[0], operation.module)
             lambda_ = node.args[1]
             body_prefix = construct_lambda_prefix(lambda_.lineno,

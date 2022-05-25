@@ -20,9 +20,13 @@ function PSeq___contains__(self: Ref, item: Ref): Bool
 function PSeq___getitem__(self: Ref, index: Ref): Ref
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(index), int())
-    requires (int___unbox__(index) >= 0 && int___unbox__(index) < PSeq___len__(self))
-    ensures result == PSeq___sil_seq__(self)[int___unbox__(index)]
+    requires let ln == (PSeq___len__(self)) in ((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln))
+    //requires (int___unbox__(index) >= 0 && int___unbox__(index) < PSeq___len__(self))
+    //ensures result == PSeq___sil_seq__(self)[int___unbox__(index)]
+    ensures result == (int___unbox__(index) >= 0 ? PSeq___sil_seq__(self)[int___unbox__(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + int___unbox__(index)])
     ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
+    //requires let ln == (list___len__(self)) in ((int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln) && (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
+    //ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
 
 function PSeq___len__(self: Ref): Int
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
@@ -53,3 +57,23 @@ function PSeq___eq__(self: Ref, other: Ref): Bool
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
     ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))
     ensures result ==> self == other
+
+domain __MSHelper[T$] {
+    function __toMS(s: Seq[T$]): Multiset[T$]
+
+    axiom __toMS_def_1 {
+        __toMS(Seq[T$]()) == Multiset[T$]()
+    }
+
+    axiom __toMS_def_2 {
+        forall __t: T$ :: { __toMS(Seq(__t)) } __toMS(Seq(__t)) == Multiset(__t)
+    }
+
+    axiom __toMS_def_3 {
+        forall __ss1: Seq[T$], __ss2: Seq[T$] :: { __toMS(__ss1 ++ __ss2) } __toMS(__ss1 ++ __ss2) == __toMS(__ss1) union __toMS(__ss2)
+    }
+
+    axiom __toMS_def_4 {
+        forall __ss1: Seq[T$] :: { __toMS(__ss1) } |__toMS(__ss1)| == |__ss1|
+    }
+}

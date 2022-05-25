@@ -408,7 +408,7 @@ class ExpressionTranslator(CommonTranslator):
         args = vals + types
         # Also add a running integer s.t. other tuples with same contents are
         # not reference-identical (except for empty tuples).
-        if args:
+        if args and not ctx.equal_tuples:
             args.append(self.get_fresh_int_lit(ctx))
         arg_types = [None] * len(args)
         call = self.get_function_call(tuple_class, func_name, args, arg_types,

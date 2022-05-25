@@ -204,6 +204,8 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 if not isinstance(rec_target, PythonModule):
                     rectype = get_type(node.func.value, containers, container)
                     if target.generic_type != -1:
+                        if target.generic_type == -2:
+                            return rectype
                         return rectype.type_args[target.generic_type]
                     if isinstance(target.type, TypeVar):
                         while rectype.python_class is not target.cls:
@@ -403,7 +405,7 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 assert ctx
                 assert ctx.current_contract_exception is not None
                 return ctx.current_contract_exception
-            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'IOForall', 'Exists',
+            elif node.func.id in ('Acc', 'Rd', 'Read', 'Implies', 'Forall', 'IOForall', 'Exists', 'Forall2', 'Forall3',
                                   'MayCreate', 'MaySet', 'Low', 'LowVal', 'LowEvent', 'LowExit', 'SplitOn'):
                 return module.global_module.classes[BOOL_TYPE]
             elif node.func.id == 'Declassify':
@@ -417,6 +419,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 seq_class = module.global_module.classes[PSEQ_TYPE]
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(seq_class, [content_type])
+            elif node.func.id == 'ToMS':
+                arg_type = get_type(node.args[0], containers, container)
+                ms_class = module.global_module.classes[PMSET_TYPE]
+                content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(ms_class, [content_type])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[PSEQ_TYPE]

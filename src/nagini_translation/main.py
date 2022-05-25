@@ -76,20 +76,22 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-def load_sil_files(jvm: JVM, sif: bool = False):
+def load_sil_files(jvm: JVM, sif: bool = False, equal_tuples: bool = False):
     current_path = os.path.dirname(inspect.stack()[0][1])
     if sif:
         resources_path = os.path.join(current_path, 'sif', 'resources')
     else:
         resources_path = os.path.join(current_path, 'resources')
-    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
+    file_name = 'all.sil' if not equal_tuples else 'all_tuple_ref_equal.sil'
+    return parse_sil_file(os.path.join(resources_path, file_name), jvm)
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False,
-              counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
+              counterexample: bool = False,
+              equal_tuples: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -113,7 +115,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
 
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
+    preamble_name = 'preamble.index' if not equal_tuples else 'preamble_tuple_ref_equal.index'
+    with open(os.path.join(resources_path, preamble_name), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
     analyzer.initialize_io_analyzer()
@@ -126,10 +129,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
-        sil_programs = load_sil_files(jvm, sif)
+        sil_programs = load_sil_files(jvm, sif, equal_tuples)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, analyzer.builtin_function_names, selected,
-                                        arp=arp, ignore_global=ignore_global, sif=sif)
+                                        arp=arp, ignore_global=ignore_global, sif=sif, equal_tuples=equal_tuples)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -142,7 +145,6 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      act_opt=True,
                                      func_opt=True,
                                      all_low=analyzer.has_all_low)
-        print(prog)
         if counterexample:
             prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
         else:
@@ -310,6 +312,11 @@ def main() -> None:
         action='store_true',
         help='return a counterexample for every verification error if possible'
     )
+    parser.add_argument(
+        '--tuples-ref-equal',
+        action='store_true',
+        help='treat tuples with identical contents as identical objects; not sound but needed when using tuples as keys in maps'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -360,7 +367,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, counterexample=args.counterexample)
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, counterexample=args.counterexample,
+                                  equal_tuples=args.tuples_ref_equal)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -378,7 +386,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Run, Total, Start, End, Total Time, Translation Time, Verifier Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir)
+                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
+                                          equal_tuples=args.tuples_ref_equal)
                 after_translate = time.time()
                 vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
                 end = time.time()

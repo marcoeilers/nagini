@@ -160,6 +160,9 @@ method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     ensures acc(self.dict_acc) && acc(self.dict_acc2)
     ensures self.dict_acc == old(self.dict_acc) union Set(key)
     ensures dict___getitem__(self, key) == item
+    ensures forall k: Ref ::
+        { dict___contains__(self, k) }
+        dict___contains__(self, k) == (old(dict___contains__(self, k)) || k == key)
     ensures forall k : Ref ::
         {dict___getitem__(self, k)}
         ((old(dict___contains__(self, k)) && k != key)

@@ -90,13 +90,15 @@ class Translator:
                           selected: Set[str] = None,
                           ignore_global: bool = False,
                           arp: bool = False,
-                          sif = False) -> 'silver.ast.Program':
+                          sif: bool = False,
+                          equal_tuples: bool = False) -> 'silver.ast.Program':
         ctx = Context()
         ctx.sif = sif
         ctx.current_class = None
         ctx.current_function = None
         ctx.module = modules[0]
         ctx.arp = arp
+        ctx.equal_tuples = equal_tuples
         return self.prog_translator.translate_program(modules, sil_progs, builtin_function_names, ctx,
                                                       selected, ignore_global)
 

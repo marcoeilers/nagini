@@ -1,0 +1,111 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+function tuple___val__(self: Ref): Seq[Ref]
+function tuple___create0__(): Ref
+    ensures result != null
+    ensures typeof(result) == tuple(Seq[PyType]())
+    ensures tuple___len__(result) == 0
+    ensures tuple_args(typeof(result)) == Seq[PyType]()
+    ensures tuple___val__(result) == Seq[Ref]()
+
+function tuple___create1__(arg0 : Ref, t0: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    ensures typeof(result) == tuple(Seq(t0))
+    ensures tuple_args(typeof(result)) == Seq(t0)
+    ensures tuple___val__(result) == Seq(arg0)
+    ensures tuple___len__(result) == 1 && tuple___getitem__(result, 0) == arg0
+
+function tuple___create2__(arg0 : Ref, arg1: Ref, t0: PyType, t1: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    ensures result != null
+    ensures typeof(result) == tuple(Seq(t0, t1))
+    ensures tuple_args(typeof(result)) == Seq(t0, t1)
+    ensures tuple_args(typeof(result)) == Seq(t0, t1)
+    ensures tuple___val__(result) == Seq(arg0, arg1)
+    ensures tuple___len__(result) == 2 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1
+
+function tuple___create3__(arg0 : Ref, arg1: Ref, arg2: Ref, t0: PyType, t1: PyType, t2: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    ensures result != null
+    ensures typeof(result) == tuple(Seq(t0, t1, t2))
+    ensures tuple_args(typeof(result)) == Seq(t0, t1, t2)
+    ensures tuple___val__(result) == Seq(arg0, arg1, arg2)
+    ensures tuple___len__(result) == 3 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2
+
+function tuple___create4__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    ensures result != null
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3))
+    ensures tuple_args(typeof(result)) == Seq(t0, t1, t2, t3)
+    ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3)
+    ensures tuple___len__(result) == 4 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3
+
+function tuple___create5__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    requires issubtype(typeof(arg4), t4)
+    ensures result != null
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3, t4))
+    ensures tuple_args(typeof(result)) == Seq(t0, t1, t2, t3, t4)
+    ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3, arg4)
+    ensures tuple___len__(result) == 5 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4
+
+function tuple___create6__(arg0 : Ref, arg1: Ref, arg2: Ref, arg3: Ref, arg4: Ref, arg5: Ref, t0: PyType, t1: PyType, t2: PyType, t3: PyType, t4: PyType, t5: PyType): Ref
+    requires issubtype(typeof(arg0), t0)
+    requires issubtype(typeof(arg1), t1)
+    requires issubtype(typeof(arg2), t2)
+    requires issubtype(typeof(arg3), t3)
+    requires issubtype(typeof(arg4), t4)
+    requires issubtype(typeof(arg5), t5)
+    ensures result != null
+    ensures typeof(result) == tuple(Seq(t0, t1, t2, t3, t4, t5))
+    ensures tuple_args(typeof(result)) == Seq(t0, t1, t2, t3, t4, t5)
+    ensures tuple___val__(result) == Seq(arg0, arg1, arg2, arg3, arg4, arg5)
+    ensures tuple___len__(result) == 6 && tuple___getitem__(result, 0) == arg0 && tuple___getitem__(result, 1) == arg1 && tuple___getitem__(result, 2) == arg2 && tuple___getitem__(result, 3) == arg3 && tuple___getitem__(result, 4) == arg4 && tuple___getitem__(result, 5) == arg5
+
+function tuple___sil_seq__(self: Ref): Seq[Ref]
+    ensures |result| == tuple___len__(self)
+    ensures result == tuple___val__(self)
+
+function tuple___len__(self: Ref): Int
+    ensures result == |tuple_args(typeof(self))|
+    ensures result == |tuple___val__(self)|
+
+function tuple___getitem__(self: Ref, key: Int): Ref
+    requires let ln == (tuple___len__(self)) in ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))
+    ensures key >= 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), key))
+    ensures key < 0 ==> issubtype(typeof(result), tuple_arg(typeof(self), tuple___len__(self) + key))
+    ensures key >= 0 ==> result == tuple___val__(self)[key]
+    ensures key < 0 ==> result == tuple___val__(self)[tuple___len__(self) + key]
+
+function tuple___getitem_slice__(self: Ref, key: Ref): Ref
+    requires issubtype(typeof(key), slice())
+    requires (slice___start__(key, tuple___len__(self)) >= 0 && slice___start__(key, tuple___len__(self)) <= tuple___len__(self))
+    requires (slice___stop__(key, tuple___len__(self)) >= 0 && slice___stop__(key, tuple___len__(self)) <= tuple___len__(self))
+    ensures typeof(result) == tuple(tuple_args(typeof(self))[slice___start__(key, tuple___len__(self))..slice___stop__(key, tuple___len__(self))])
+    ensures forall i: Int :: {tuple_arg(typeof(result), i)} (i >= 0 && i < (slice___stop__(key, tuple___len__(self)) - slice___start__(key, tuple___len__(self)))) ==> tuple_arg(typeof(result), i) == tuple_arg(typeof(self), i + slice___start__(key, tuple___len__(self)))
+    ensures tuple___len__(result) == (slice___stop__(key, tuple___len__(self)) - slice___start__(key, tuple___len__(self)))
+    ensures tuple___val__(result) == tuple___val__(self)[slice___start__(key, tuple___len__(self))..slice___stop__(key, tuple___len__(self))]
+
+function tuple___contains__(self: Ref, item: Ref): Bool
+    ensures result == item in tuple___val__(self)
+
+function tuple___eq__(self: Ref, other: Ref): Bool
+    ensures (tuple___len__(self) == tuple___len__(other) &&
+             (forall i: Int :: {tuple___getitem__(self, i), tuple___getitem__(other, i)} i >= 0 && i < tuple___len__(self)
+                                ==> tuple___getitem__(self, i) == tuple___getitem__(other, i)))
+             ==> result
+    ensures result ==> self == other
