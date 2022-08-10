@@ -1,0 +1,230 @@
+from typing import List
+from nagini_contracts.contracts import *
+from nagini_contracts.obligations import MustTerminate
+
+
+class SR:
+    def __init__(self, runs: List[int], data: List[int]) -> None:
+        Requires(MustTerminate(1))
+        self.runs = runs
+        self.data = data
+        Ensures(Acc(self.runs) and Acc(self.data) and self.runs is runs and self.data is data)
+
+@Pure
+def triggera1(i: int) -> bool:
+    return True
+
+@Pure
+def triggerb1(i: int, j: int) -> bool:
+    return True
+
+@Pure
+def triggerc1(i: int) -> bool:
+    return True
+
+
+@Pure
+def runs_bounds(runs: PSeq[int], data: PSeq[int]) -> bool:
+    return (
+        (len(runs) > 0 and len(data) > 0) and
+        (runs[-1] == len(data)) and
+        (Forall(int, lambda i: (Implies(i >= 0 and i < len(runs) - 1, 0 < runs[i] and runs[i] < runs[i + 1]
+                                        and runs[i] < len(data)), [[runs[i]]])))
+    )
+
+
+@Pure
+def correct_runs_1(runs: PSeq[int], data: PSeq[int]) -> bool:
+    Requires(runs_bounds(runs, data))
+    return ((Implies(len(runs) > 1, data[0] < data[runs[0]])) and
+            (Forall(int, lambda j: (Implies(j > 0 and j < runs[0],
+                                            data[j] == data[0]), [[triggerc1(j)]]))) and
+            (Forall(int, lambda i: (Implies(i >= 0 and i < len(runs) - 1,
+                                            Implies(i < len(runs) - 2, data[runs[i]] < data[runs[i + 1]]) and
+                                            Forall(int, lambda j: (Implies(j > runs[i] and j < runs[i + 1],
+                                                                           data[j] == data[runs[i]]),
+                                                                   [[triggerb1(i, j)]]))),
+                                    [[triggera1(i)]]))))
+
+def merge(r1: SR, r2: SR) -> SR:
+    Requires(Acc(r1.runs, 1/2) and Acc(r1.data, 1/2) and Acc(list_pred(r1.runs), 1/2) and Acc(list_pred(r1.data), 1/2))
+    Requires(Acc(r2.runs, 1/2) and Acc(r2.data, 1/2) and Acc(list_pred(r2.runs), 1/2) and Acc(list_pred(r2.data), 1/2))
+    Requires(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)) and runs_bounds(ToSeq(r2.runs), ToSeq(r2.data)))
+    Requires(MustTerminate(4))
+    Ensures(Acc(Result().runs) and Acc(Result().data) and list_pred(Result().runs) and list_pred(Result().data))
+    Ensures(len(ToSeq(Result().data)) == Old(len(ToSeq(r1.data))) + Old(len(ToSeq(r2.data))))
+    Ensures(runs_bounds(ToSeq(Result().runs), ToSeq(Result().data)))
+
+    data = []  # type: List[int]
+    runs = []  # type: List[int]
+    res = SR(runs, data)
+
+    outer_loop(r1, r2, res)
+
+    return res
+
+def outer_loop(r1: SR, r2: SR, res: SR) -> None:
+    Requires(Acc(res.data, 1 / 4))
+    Requires(list_pred(res.data) and len(res.data) == 0)
+    Requires(Acc(res.runs, 1 / 4))
+    Requires(list_pred(res.runs) and len(res.runs) == 0)
+    Requires(Acc(r1.runs, 1 / 4) and Acc(list_pred(r1.runs), 1 / 4))
+    Requires(Acc(r2.runs, 1 / 4) and Acc(list_pred(r2.runs), 1 / 4))
+    Requires(Acc(r1.data, 1 / 4) and Acc(list_pred(r1.data), 1 / 4))
+    Requires(Acc(r2.data, 1 / 4) and Acc(list_pred(r2.data), 1 / 4))
+    Requires(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)) and runs_bounds(ToSeq(r2.runs), ToSeq(r2.data)))
+    Requires(MustTerminate(3))
+
+    Ensures(Acc(res.data, 1 / 4))
+    Ensures(list_pred(res.data))
+    Ensures(Acc(res.runs, 1 / 4))
+    Ensures(list_pred(res.runs))
+    Ensures(Acc(r1.runs, 1 / 4) and Acc(list_pred(r1.runs), 1 / 4))
+    Ensures(Acc(r2.runs, 1 / 4) and Acc(list_pred(r2.runs), 1 / 4))
+    Ensures(Acc(r1.data, 1 / 4) and Acc(list_pred(r1.data), 1 / 4))
+    Ensures(Acc(r2.data, 1 / 4) and Acc(list_pred(r2.data), 1 / 4))
+    Ensures(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)) and runs_bounds(ToSeq(r2.runs), ToSeq(r2.data)))
+    Ensures(len(ToSeq(res.data)) == Old(len(ToSeq(r1.data))) + Old(len(ToSeq(r2.data))))
+    Ensures(runs_bounds(ToSeq(res.runs), ToSeq(res.data)))
+
+    di1 = 0
+    di2 = 0
+    ri1 = 0
+    ri2 = 0
+
+    while ri1 < len(r1.runs) or ri2 < len(r2.runs):
+        Invariant(Acc(res.data, 1 / 6))
+        Invariant(list_pred(res.data))
+        Invariant(Acc(res.runs, 1 / 6))
+        Invariant(list_pred(res.runs))
+        Invariant(Acc(r1.runs, 1 / 6) and Acc(list_pred(r1.runs), 1 / 6))
+        Invariant(Acc(r2.runs, 1 / 6) and Acc(list_pred(r2.runs), 1 / 6))
+        Invariant(Acc(r1.data, 1 / 6) and Acc(list_pred(r1.data), 1 / 6))
+        Invariant(Acc(r2.data, 1 / 6) and Acc(list_pred(r2.data), 1 / 6))
+        Invariant(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)) and runs_bounds(ToSeq(r2.runs), ToSeq(r2.data)))
+        Invariant(ri1 >= 0 and ri2 >= 0)
+        Invariant(ri1 <= len(ToSeq(r1.runs)) and ri2 <= len(ToSeq(r2.runs)))
+        Invariant(di1 >= 0 and di2 >= 0)
+        Invariant(di1 <= len(ToSeq(r1.data)) and di2 <= len(ToSeq(r2.data)))
+        Invariant(Implies(ri1 == 0, di1 == 0))
+        Invariant(Implies(ri1 > 0, di1 == ToSeq(r1.runs)[ri1 - 1]))
+        Invariant(Implies(ri2 == 0, di2 == 0))
+        Invariant(Implies(ri2 > 0, di2 == ToSeq(r2.runs)[ri2 - 1]))
+        Invariant(len(ToSeq(res.data)) == di1 + di2)
+        Invariant(Implies(ri1 == 0 and ri2 == 0, len(ToSeq(res.runs)) == 0))
+        Invariant(Implies(ri1 > 0 or ri2 > 0, len(ToSeq(res.runs)) > 0 and ToSeq(res.runs)[-1] == len(ToSeq(res.data))))
+        Invariant(Forall(int, lambda i: (Implies(i >= 0 and i < len(ToSeq(res.runs)) - 1,
+                                                 0 < ToSeq(res.runs)[i] and ToSeq(res.runs)[i] < ToSeq(res.runs)[i + 1] and
+                                                 ToSeq(res.runs)[i] < len(ToSeq(res.data))), [[ToSeq(res.runs)[i]]])))
+
+        Invariant(MustTerminate(len(r1.runs) + len(r2.runs) + 1 - ri1 - ri2))
+
+        if ri1 == 0:
+            Assert(di1 == 0)
+        Assert(len(r1.data) > 0)
+        if ri2 == 0:
+            Assert(di2 == 0)
+        Assert(len(r2.data) > 0)
+        old_run_seq = ToSeq(res.runs)
+        Assert(Forall(int, lambda i: (Implies(i >= 0 and i < len(old_run_seq),
+                                              old_run_seq[i] is ToSeq(res.runs)[i]
+                                              )
+                                      , [[old_run_seq[i]]])))
+        Assert(Forall(int, lambda i: (Implies(i >= 0 and i < len(old_run_seq) - 1,
+                                              0 < old_run_seq[i] and old_run_seq[i] < old_run_seq[i + 1]),
+                                      [[old_run_seq[i]]])))
+
+        t1 = ri1 < len(r1.runs) and (ri2 == len(r2.runs) or r1.data[di1] <= r2.data[di2])
+        t2 = ri2 < len(r2.runs) and (ri1 == len(r1.runs) or r2.data[di2] <= r1.data[di1])
+
+        Assert(t1 or t2)
+
+        if t1:
+            di1 = inner_loop(r1, res, ri1, di1)
+            ri1 += 1
+
+        if t2:
+            di2 = inner_loop(r2, res, ri2, di2)
+            ri2 += 1
+
+        res.runs.append(len(res.data))
+
+        Assert(Forall(int, lambda i: (Implies(i >= 0 and i < len(old_run_seq),
+                                              old_run_seq[i] is ToSeq(res.runs)[i]
+                                              )
+                                      , [[ToSeq(res.runs)[i]]])))
+
+
+def inner_loop(r1: SR, res: SR, ri1: int, di1: int) -> int:
+    Requires(Acc(res.data, 1 / 8))
+    Requires(list_pred(res.data))
+    Requires(Acc(r1.data, 1 / 8))
+    Requires(Acc(list_pred(r1.data), 1 / 8))
+    Requires(Acc(r1.runs, 1 / 8))
+    Requires(Acc(list_pred(r1.runs), 1 / 8))
+    Requires(ri1 >= 0)
+    Requires(ri1 < len(ToSeq(r1.runs)))
+    Requires(di1 >= 0 and di1 <= ToSeq(r1.runs)[ri1])
+    Requires(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)))
+    Requires(MustTerminate(2))
+
+    Ensures(Result() == Old(r1.runs[ri1]))
+    Ensures(Acc(res.data, 1 / 8))
+    Ensures(list_pred(res.data))
+    Ensures(Acc(r1.data, 1 / 8))
+    Ensures(Acc(list_pred(r1.data), 1 / 8))
+    Ensures(Acc(r1.runs, 1 / 8))
+    Ensures(Acc(list_pred(r1.runs), 1 / 8))
+    Ensures(ri1 >= 0)
+    Ensures(ri1 < len(ToSeq(r1.runs)))
+    Ensures(di1 >= 0 and di1 <= ToSeq(r1.runs)[ri1])
+    Ensures(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)))
+    Ensures(len(ToSeq(res.data)) == Old(len(ToSeq(res.data))) + (Result() - di1))
+
+    old_di1 = di1
+    while di1 < r1.runs[ri1]:
+        Invariant(Acc(res.data, 1 / 8))
+        Invariant(list_pred(res.data))
+        Invariant(Acc(r1.data, 1 / 16))
+        Invariant(Acc(list_pred(r1.data), 1 / 16))
+        Invariant(Acc(r1.runs, 1 / 16))
+        Invariant(Acc(list_pred(r1.runs), 1 / 16))
+        Invariant(ri1 >= 0)
+        Invariant(ri1 < len(ToSeq(r1.runs)))
+        Invariant(di1 >= 0 and di1 <= ToSeq(r1.runs)[ri1])
+        Invariant(runs_bounds(ToSeq(r1.runs), ToSeq(r1.data)))
+        Invariant(len(ToSeq(res.data)) == Old(len(ToSeq(res.data)) + (di1 - old_di1)))
+        Invariant(MustTerminate(ToSeq(r1.runs)[ri1] + 1 - di1))
+
+        Assert(ToSeq(r1.runs)[ri1] <= len(ToSeq(r1.data)))
+        res.data.append(r1.data[di1])
+        di1 += 1
+    return di1
+
+
+def msort(a: List[int], l: int, h: int) -> SR:
+    Requires(list_pred(a))
+    Requires(h >= l)
+    Requires(l >= 0 and h <= len(a))
+    Requires(MustTerminate(h - l + 5))
+    Ensures(Acc(list_pred(a)))
+    Ensures(ToSeq(a) is Old(ToSeq(a)))
+    Ensures(Acc(Result().runs) and Acc(Result().data) and list_pred(Result().runs) and list_pred(Result().data))
+    Ensures(Implies(h > l, runs_bounds(ToSeq(Result().runs), ToSeq(Result().data))))
+    Ensures(len(ToSeq(Result().data)) == h - l)
+
+    data = []  # type: List[int]
+    runs = []  # type: List[int]
+    res = SR(runs, data)
+    if l == h:
+        return res
+    if h - l == 1:
+        res.data.append(a[l])
+        res.runs.append(len(res.data))
+        return res
+    m = l + (h - l) // 2
+    res1 = msort(a, l, m)
+    res2 = msort(a, m, h)
+    res = merge(res1, res2)
+
+    return res
