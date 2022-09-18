@@ -53,15 +53,15 @@ TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
+    parser = jvm.viper.silver.parser.FastParser() # getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
     parsed = parser.parse(text, path, none)
-    assert (isinstance(parsed, getattr(jvm.fastparse.core,
-                                       'Parsed$Success')))
+    # assert (isinstance(parsed, getattr(jvm.fastparse.core,
+    #                                    'Parsed$Success')))
     parse_result = parsed.value()
     parse_result.initProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
@@ -151,8 +151,8 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
             prog = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').transform(prog, False)
         if verbose:
             print('Transformation to MPP successful.')
-    method_splitter = getattr(getattr(jvm.viper.silver.ast.utility, "MethodSplitter$"), "MODULE$")
-    prog = method_splitter.split(prog)
+    #method_splitter = getattr(getattr(jvm.viper.silver.ast.utility, "MethodSplitter$"), "MODULE$")
+    #prog = method_splitter.split(prog)
     if arp:
         prog = get_arp_plugin(jvm).before_verify(prog)
         if verbose:

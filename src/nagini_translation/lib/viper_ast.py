@@ -103,9 +103,9 @@ class ViperAST:
             list.append(lsttoappend)
 
     def to_seq(self, list):
-        result = self.scala.collection.mutable.ArraySeq(len(list))
+        result = self.scala.collection.mutable.ArrayBuffer(len(list))
         for index in range(0, len(list)):
-            result.update(index, list[index])
+            result.append(list[index])
         return result.toList()
 
     def to_list(self, seq):
@@ -239,7 +239,7 @@ class ViperAST:
         type_passed_func = self.to_function0(type_passed_apply)
         result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
                                         self.to_map(type_var_map), position,
-                                        info, type_passed_func,
+                                        info, type_passed,
                                         domain_name, self.NoTrafos)
         return result
 

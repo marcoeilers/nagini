@@ -31,7 +31,7 @@ domain PyType {
     unique function bool(): PyType
     unique function bytes(): PyType
     unique function bytearray(): PyType
-    unique function range(): PyType
+    unique function range_0(): PyType
     unique function slice(): PyType
     unique function str(): PyType
     unique function NoneType(): PyType
