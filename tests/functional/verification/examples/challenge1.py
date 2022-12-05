@@ -239,7 +239,7 @@ def lemma_min_max(p: List[Point], coord: int, min: int, max: int, i: int, pt: Po
     Ensures(Acc(list_pred(p), 1/200))
     Ensures(min_max_properties(p, coord, min, max))
 
-    Assume(SplitOn(coord == X_VAL, falseSplit=SplitOn(coord == Y_VAL)))
+    # Assume(SplitOn(coord == X_VAL, falseSplit=SplitOn(coord == Y_VAL)))
 
     Unfold(min_max_properties(p, coord, min, max))
     if coord == X_VAL:
@@ -298,7 +298,7 @@ def find_min_max(p: List[Point], coord: int) -> Tuple[int, int]:
     Ensures(min_max_properties(p, coord, Result()[0], Result()[1]))
     Ensures(Result()[0] <= Result()[1])
 
-    Assume(SplitOn(coord == X_VAL, falseSplit=SplitOn(coord == Y_VAL)))
+    # Assume(SplitOn(coord == X_VAL, falseSplit=SplitOn(coord == Y_VAL)))
 
     j = 0
     min = None  # type: Optional[int]
@@ -541,14 +541,6 @@ def downSample(p: List[Point], voxel_size: int) -> List[Point]:
 
     non_zero_keys = first_loop(x_min, x_max, y_min, y_max, z_min, z_max, num_vox_x, num_vox_y, num_vox_z, voxel_size, voxel_map, count_map, p)
 
-    second_loop(num_vox_x, num_vox_y, num_vox_z, count_map, voxel_map, non_zero_keys)
-
-    res = []  # type: List[Point]
-    return res
-
-
-def second_loop(num_vox_x: int, num_vox_y: int, num_vox_z: int, count_map: Dict[Tuple[int, int, int], int],
-                voxel_map: Dict[Tuple[int, int, int], Point], non_zero_keys: PSet[Tuple[int, int, int]]) -> None:
     i, j, k = 0, 0, 0
     pd = []  # type: List[Point]
     non_zero_processed = PSet()  # type: PSet[Tuple[int, int, int]]
@@ -559,16 +551,24 @@ def second_loop(num_vox_x: int, num_vox_y: int, num_vox_z: int, count_map: Dict[
             while k < num_vox_z:
                 Invariant(k >= 0 and k <= num_vox_z)
                 Invariant(len(pd) == len(non_zero_processed))
-                Invariant(all upcoming are zero or in bla. )
+                # Invariant(all upcoming are zero or in bla. )
                 if count_map[(i, j, k)] != 0:
-                    p = voxel_map[(i, j, k)]
-                    p.div(count_map[(i, j, k)])
-                    pd.append(p)
+                    pnt = voxel_map[(i, j, k)]
+                    # p.div(count_map[(i, j, k)])
+                    #pd.append(p)
                 k += 1
             j += 1
         i += 1
+
+    res = []  # type: List[Point]
+    return res
+
+"""
+def second_loop(num_vox_x: int, num_vox_y: int, num_vox_z: int, count_map: Dict[Tuple[int, int, int], int],
+                voxel_map: Dict[Tuple[int, int, int], Point], non_zero_keys: PSet[Tuple[int, int, int]]) -> None:
+    
     return pd
-    """
+    
     i, j, k := 0, 0, 0;
     pd := [];
     for 0 ≤ i < num_vox_x
@@ -692,8 +692,8 @@ def first_loop(x_min: int, x_max: int, y_min: int, y_max: int, z_min: int, z_max
                                        [[(x, y, z) in count_map]])))
     Ensures(Forall3(int, int, int,
                       lambda x, y, z: (Implies((x, y, z) in count_map,
-                                               (count_map[(x, y, z)] == 0 and (x, y, z) not in non_zero_keys) or (
-                                                           count_map[(x, y, z)] > 0 and (x, y, z) in non_zero_keys)),
+                                               (count_map[(x, y, z)] == 0 and (x, y, z) not in Result()) or (
+                                                           count_map[(x, y, z)] > 0 and (x, y, z) in Result())),
                                        [[(x, y, z) in count_map]])))
     Ensures(min_max_properties(p, X_VAL, x_min, x_max))
     Ensures(min_max_properties(p, Y_VAL, y_min, y_max))

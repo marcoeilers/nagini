@@ -64,10 +64,10 @@ def correct_runs(runs: PSeq[int], data: PSeq[int], end: int) -> bool:
             )
 
 
-PROVE_CORRECT_RUNS = False
+PROVE_CORRECT_RUNS = True
 
 
-PROVE_PERMUTATION = True
+PROVE_PERMUTATION = False
 
 
 PROVE_RUNTIME = False
@@ -225,7 +225,7 @@ def outer_loop(r1: SR, r2: SR, res: SR) -> None:
         Assert(t1 or t2)
 
         end = len(res.data)
-        Assume(SplitOn(t1, SplitOn(t2)))
+        # Assume(SplitOn(t1, SplitOn(t2)))
         Assert(Implies(PROVE_CORRECT_RUNS and len(ToSeq(res.runs)) > 1, ToSeq(res.data)[0] < ToSeq(res.data)[ToSeq(res.runs)[0]]))
 
         if t1:
@@ -236,7 +236,7 @@ def outer_loop(r1: SR, r2: SR, res: SR) -> None:
 
             if PROVE_CORRECT_RUNS:
                 Assert(ToSeq(res.data)[len(res.data)-1] == to_add_d1)
-                Assume(SplitOn(len(ToSeq(res.runs)) == 1))
+                # Assume(SplitOn(len(ToSeq(res.runs)) == 1))
 
                 if len(ToSeq(res.runs)) == 1:
                     Assert(triggerd1(ri1 - 2))  # needed
@@ -258,7 +258,7 @@ def outer_loop(r1: SR, r2: SR, res: SR) -> None:
 
             if PROVE_CORRECT_RUNS:
                 Assert(ToSeq(res.data)[len(res.data) - 1] == to_add_d2)
-                Assume(SplitOn(len(ToSeq(res.runs)) == 1))
+                # Assume(SplitOn(len(ToSeq(res.runs)) == 1))
 
                 if len(ToSeq(res.runs)) == 1:
                     Assert(triggerd1(ri2 - 2))  # needed
@@ -337,7 +337,7 @@ def inner_loop(r1: SR, res: SR, ri1: int, di1: int, end: int) -> int:
     Ensures(Implies(PROVE_CORRECT_RUNS and Result() < len(ToSeq(r1.data)), ToSeq(r1.data)[Result()] > Old(ToSeq(r1.data))[di1]))
     Ensures(Implies(PROVE_PERMUTATION, ToSeq(res.data) == Old(ToSeq(res.data)) + ToSeq(r1.data).drop(di1).take(Result() - di1)))
 
-    Assume(SplitOn(ri1 == 0))
+    # Assume(SplitOn(ri1 == 0))
     old_data = ToSeq(res.data)
     old_data_d1 = ToSeq(r1.data)
     old_runs_d1 = ToSeq(r1.runs)
