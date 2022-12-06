@@ -11,6 +11,7 @@ from enum import Enum
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.lib.util import list_to_seq
 
 
 class ViperVerifier(Enum):
@@ -106,17 +107,17 @@ class Silicon:
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
             raise Exception('Silicon backend not found on classpath.')
-        self.silicon = jvm.viper.silicon.Silicon()
-        nargs = 6 if counterexample else 4
-        args = jvm.scala.collection.mutable.ArraySeq(nargs)
-        args.update(0, '--z3Exe')
-        args.update(1, config.z3_path)
-        args.update(2, '--disableCatchingExceptions')
-        if counterexample:
-            args.update(3, '--counterexample')
-            args.update(4, 'native')
-        args.update(5 if counterexample else 3, filename)
-        self.silicon.parseCommandLine(args)
+        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
+        self.silicon = jvm.viper.silicon.Silicon(reporter, list_to_seq([], jvm))
+        args = [
+            '--z3Exe', config.z3_path,
+            '--disableCatchingExceptions',
+            '--parallelizeBranches',
+            *(['--counterexample=native'] if counterexample else []),
+            filename
+        ]
+        args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
+        self.silicon.parseCommandLine(args_seq)
         self.silicon.start()
         self.ready = True
 

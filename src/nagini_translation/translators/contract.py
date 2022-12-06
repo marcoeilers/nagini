@@ -335,46 +335,6 @@ class ContractTranslator(CommonTranslator):
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         return [], self.get_may_set_predicate(rec, field, ctx, pos)
 
-    def translate_split(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        """
-        Translates a call to SplitOn().
-        """
-        if ctx.sif:
-            raise UnsupportedException(node, 'Split currently not supported with SIF option.')
-        pos = self.to_position(node, ctx)
-        info = self.no_info(ctx)
-        stmt, split_exp = self.translate_expr(node.args[0], ctx, target_type=self.viper.Bool)
-        true_split = None
-        false_split = None
-        if len(node.args) > 1:
-            true_split = node.args[1]
-        else:
-            true_split_args = [kw.value for kw in node.keywords if kw.arg == 'trueSplit']
-            if true_split_args:
-                true_split = true_split_args[0]
-        if len(node.args) > 2:
-            false_split = node.args[2]
-        else:
-            false_split_args = [kw.value for kw in node.keywords if kw.arg == 'falseSplit']
-            if false_split_args:
-                false_split = false_split_args[0]
-        if stmt:
-            raise InvalidProgramException(node.args[0], 'purity.violated')
-        if true_split:
-            if not (isinstance(true_split, ast.Call) and isinstance(true_split.func, ast.Name) and true_split.func.id == "SplitOn"):
-                raise InvalidProgramException(node, 'invalid.contract.position')
-            _, true_exp = self.translate_split(true_split, ctx)
-        else:
-            true_exp = self.viper.TrueLit(pos, info)
-        if false_split:
-            if not (isinstance(false_split, ast.Call) and isinstance(false_split.func, ast.Name) and false_split.func.id == "SplitOn"):
-                raise InvalidProgramException(node, 'invalid.contract.position')
-            _, false_exp = self.translate_split(false_split, ctx)
-        else:
-            false_exp = self.viper.TrueLit(pos, info)
-        res = self.viper.DomainFuncApp('____splitOn', [split_exp, true_exp, false_exp], self.viper.Bool, pos, info, '____SplitDomain')
-        return [], res
-
     def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to Assert().
@@ -1040,8 +1000,6 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
             return self.translate_may_create(node, ctx)
-        elif func_name == 'SplitOn':
-            return self.translate_split(node, ctx)
         elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold'):
             if not statement:
                 raise InvalidProgramException(node, 'invalid.contract.position')

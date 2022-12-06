@@ -25,5 +25,8 @@ class JVM:
     def get_proxy(self, supertype, instance):
         return jpype.JProxy(supertype, inst=instance)
 
+    def get_array(self, t, n):
+        return jpype.JArray(t)(n)
+
     def is_known_class(self, class_object) -> bool:
         return not isinstance(class_object, jpype.JPackage)

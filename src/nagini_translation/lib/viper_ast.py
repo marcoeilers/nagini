@@ -94,7 +94,8 @@ class ViperAST:
             list.append(lsttoappend)
 
     def to_seq(self, list):
-        result = self.scala.collection.mutable.ArraySeq(len(list))
+        arr = self.jvm.get_array(self.java.lang.Object, len(list))
+        result = self.scala.collection.mutable.ArraySeq.make(arr)
         for index in range(0, len(list)):
             result.update(index, list[index])
         return result.toList()
@@ -215,16 +216,9 @@ class ViperAST:
                                        arg.info())
                      for i, arg in enumerate(args)]
 
-        def type_passed_apply(slf):
-            return type_passed
-
-        def args_passed_apply(slf):
-            return self.to_seq(arg_decls)
-
-        type_passed_func = self.to_function0(type_passed_apply)
         result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
                                         self.to_map(type_var_map), position,
-                                        info, type_passed_func,
+                                        info, type_passed,
                                         domain_name, self.NoTrafos)
         return result
 

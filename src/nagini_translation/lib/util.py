@@ -426,3 +426,13 @@ def int_to_string(i: int) -> str:
         result += chr(i % 256)
         i = i // 256
     return result
+
+
+def list_to_seq(lst, jvm, t=None):
+    if not t:
+        t = jvm.java.lang.Object
+    arr = jvm.get_array(t, len(lst))
+    seq = jvm.scala.collection.mutable.ArraySeq.make(arr)
+    for i, element in enumerate(lst):
+        seq.update(i, element)
+    return seq.toSeq()
