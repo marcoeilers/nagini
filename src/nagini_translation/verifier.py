@@ -110,6 +110,7 @@ class Silicon:
         reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
         self.silicon = jvm.viper.silicon.Silicon(reporter, list_to_seq([], jvm))
         args = [
+            '--assumeInjectivityOnInhale',
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
             '--parallelizeBranches',
@@ -156,14 +157,16 @@ class Carbon:
             raise Exception('Carbon backend not found on classpath.')
         if config.boogie_path is None:
             raise Exception('Boogie not found.')
-        self.carbon = jvm.viper.carbon.CarbonVerifier()
-        args = jvm.scala.collection.mutable.ArraySeq(5)
-        args.update(0, '--boogieExe')
-        args.update(1, config.boogie_path)
-        args.update(2, '--z3Exe')
-        args.update(3, config.z3_path)
-        args.update(4, filename)
-        self.carbon.parseCommandLine(args)
+        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
+        self.carbon = jvm.viper.carbon.CarbonVerifier(reporter, list_to_seq([], jvm))
+        args = [
+            '--assumeInjectivityOnInhale',
+            '--boogieExe', config.boogie_path,
+            '--z3Exe', config.z3_path,
+            filename
+        ]
+        args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
+        self.carbon.parseCommandLine(args_seq)
         self.carbon.start()
         self.ready = True
         self.jvm = jvm

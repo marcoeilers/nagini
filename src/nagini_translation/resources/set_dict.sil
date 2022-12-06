@@ -153,7 +153,7 @@ method dict_values(self: Ref) returns (_res: Ref)
     ensures typeof(_res) == list(dict_arg(typeof(self), 1))
     ensures acc(_res.list_acc)
     ensures |_res.list_acc| == |self.dict_acc|
-    ensures forall r: Ref :: { list___contains__(_res, r) } issubtype(typeof(r), dict_arg(typeof(self), 1)) ==> (list___contains__(_res, r) == r in range(self.dict_acc))
+    ensures forall r: Ref :: { r in _res.list_acc } issubtype(typeof(r), dict_arg(typeof(self), 1)) ==> (r in _res.list_acc == r in range(self.dict_acc))
 
 function dict___len__(self: Ref): Int
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))

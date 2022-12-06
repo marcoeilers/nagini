@@ -174,7 +174,7 @@ def test_20(o: Union[A, B]) -> None:
 
 # Same class, different type
 def client1(a: Union[List[int], List[bool]]) -> None:
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
     b = a[0]
 
 
