@@ -10,6 +10,7 @@ from typing import Optional
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import MethodType
 from nagini_translation.lib.typedefs import DomainFuncApp
+from nagini_translation.lib.util import list_to_seq
 from nagini_translation.translators.type_domain_factory import TypeDomainFactory
 
 def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
@@ -35,19 +36,20 @@ def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
     else:
         transformer_object.clearPrimedFuncAppReplacement()
 
+
 def _to_scala_set(jvm, inset: set):
-    seq = jvm.scala.collection.mutable.ArraySeq(len(inset))
-    for i, elem in enumerate(inset):
-        seq.update(i, elem)
-    return seq.toSet()
+    return list_to_seq(inset, jvm).toSet()
+
 
 def set_all_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
     getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setAllLowMethods(scala_set)
 
+
 def set_preserves_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
     getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setPreservesLowMethods(scala_set)
+
 
 def set_equality_comp_functions(jvm, names: set) -> None:
     if not names:
@@ -57,6 +59,7 @@ def set_equality_comp_functions(jvm, names: set) -> None:
         names_seq.update(i, (elem, elem))
     hash_map = names_seq.toMap()
     jvm.viper.silver.sif.SIFExtendedTransformer.equalityCompFunctions = hash_map
+
 
 def in_postcondition_of_dyn_bound_call(type_factory: TypeDomainFactory,
                                        ctx: Context) -> Optional[DomainFuncApp]:
@@ -70,6 +73,7 @@ def in_postcondition_of_dyn_bound_call(type_factory: TypeDomainFactory,
         return type_factory.typeof(
             next(iter(ctx.actual_function.args.values())).ref(), ctx)
     return None
+
 
 def in_override_check(ctx: Context) -> bool:
     exceptional_positions = ['inheritance', 'override']

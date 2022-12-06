@@ -212,7 +212,7 @@ def pytest_configure(config: 'pytest.config.Config'):
         if jvm.is_known_class(jvm.viper.carbon.Carbon):
             verifiers.append('carbon')
         if not verifiers:
-            pytest.exit('No backend verifiers avaliable on the classpath.')
+            pytest.exit('No backend verifiers available on the classpath.')
         for verifier in verifiers:
             _pytest_config.add_verifier(verifier)
 

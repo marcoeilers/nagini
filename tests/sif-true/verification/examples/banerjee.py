@@ -73,7 +73,7 @@ class Main:
         xp.setHIV(hbuf)
         lbuf = hbuf
         #:: ExpectedOutput(call.precondition:assertion.false)
-        lp.setName(xp.getHIV()) # argument of setName needs to be low -> fails
+        lp.setName(xp.getHIV())  # argument of setName needs to be low -> fails
 
     def main_fixed(self) -> None:
         lbuf = None # type: Optional[str]
