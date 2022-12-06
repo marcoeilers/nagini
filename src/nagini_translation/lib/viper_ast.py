@@ -179,6 +179,9 @@ class ViperAST:
     def SetType(self, element_type):
         return self.ast.SetType(element_type)
 
+    def MapType(self, key_type, value_type):
+        return self.ast.MapType(key_type, value_type)
+
     def MultisetType(self, element_type):
         return self.ast.MultisetType(element_type)
 
@@ -403,6 +406,9 @@ class ViperAST:
 
     def AnySetSubset(self, left, right, position, info):
         return self.ast.AnySetSubset(left, right, position, info, self.NoTrafos)
+
+    def MapContains(self, key, m, position, info):
+        return self.ast.MapContains(key, m, position, info, self.NoTrafos)
 
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)

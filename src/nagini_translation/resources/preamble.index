@@ -165,7 +165,7 @@
             "args": ["dict", "object", "object"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__getitem__", "__contains__", "__values__"]
+            "requires": ["__getitem__", "__contains__"]
         },
         "__iter__": {
             "args": ["dict"],
@@ -177,7 +177,7 @@
             "args": ["dict"],
             "type": "list",
             "MustTerminate": true,
-            "requires": ["__contains__", "__getitem__", "__values__"]
+            "requires": ["__contains__", "__getitem__"]
         }
     },
     "functions": {
@@ -188,7 +188,7 @@
         "__getitem__": {
             "args": ["dict", "object"],
             "type": "object",
-            "requires": ["__contains__", "__values__"]
+            "requires": ["__contains__"]
         },
         "get": {
             "args": ["dict", "object"],
@@ -205,10 +205,6 @@
             "type": "__prim__int"
         },
         "__sil_seq__": {
-            "args": ["dict"],
-            "type": "__prim__Seq"
-        },
-        "__values__": {
             "args": ["dict"],
             "type": "__prim__Seq"
         }

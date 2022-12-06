@@ -234,7 +234,7 @@ class Converter:
                 receiver_type = field.cls
             else:
                 global_module = self.modules[0].global_module
-                if field in ('dict_acc', 'dict_acc2'):
+                if field == 'dict_acc':
                     receiver_type = global_module.classes['dict']
                 elif field == 'list_acc':
                     receiver_type = global_module.classes['list']

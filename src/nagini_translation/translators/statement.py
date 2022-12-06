@@ -446,6 +446,7 @@ class StatementTranslator(CommonTranslator):
         info = self.no_info(ctx)
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
+        map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
 
         iter_seq = self.get_sequence(iterable_type, iterable, None, node, ctx, pos)
         full_perm = self.viper.FullPerm(pos, info)
@@ -466,18 +467,12 @@ class StatementTranslator(CommonTranslator):
                                                          info)
             invariant.append(field_pred)
         elif iterable_type.name == DICT_TYPE:
-            acc_field = self.viper.Field('dict_acc', set_ref, pos, info)
-            acc_field2 = self.viper.Field('dict_acc2', self.viper.Ref, pos, info)
+            acc_field = self.viper.Field('dict_acc', map_ref_ref, pos, info)
             field_acc = self.viper.FieldAccess(iterable, acc_field, pos, info)
-            field_acc2 = self.viper.FieldAccess(iterable, acc_field2, pos, info)
             field_pred = self.viper.FieldAccessPredicate(field_acc,
                                                          frac_perm_120, pos,
                                                          info)
-            field_pred2 = self.viper.FieldAccessPredicate(field_acc2,
-                                                          frac_perm_120, pos,
-                                                          info)
             invariant.append(field_pred)
-            invariant.append(field_pred2)
         elif iterable_type.name == RANGE_TYPE:
             pass
         else:

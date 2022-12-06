@@ -570,8 +570,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if dom_type.name in (DICT_TYPE, SET_TYPE, PSEQ_TYPE, PSET_TYPE):
                 contains_constructor = self.viper.AnySetContains
                 if dom_type.name == DICT_TYPE:
-                    set_ref = self.viper.SetType(self.viper.Ref)
-                    field = self.viper.Field('dict_acc', set_ref, position, info)
+                    contains_constructor = self.viper.MapContains
+                    map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+                    field = self.viper.Field('dict_acc', map_ref_ref, position, info)
                     res = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == SET_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)

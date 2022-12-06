@@ -202,7 +202,9 @@ VIPER_KEYWORDS = [
     'epsilon',
     'perm',
     'unique',
-    'range']
+    'range',
+    'domain',
+    'Map']
 
 LEGAL_MAGIC_METHODS = {
     '__eq__',

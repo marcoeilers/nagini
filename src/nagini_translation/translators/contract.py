@@ -130,6 +130,7 @@ class ContractTranslator(CommonTranslator):
         name = node.func.id
         seq_ref = self.viper.SeqType(self.viper.Ref)
         set_ref = self.viper.SetType(self.viper.Ref)
+        map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
         pos = self.to_position(node, ctx)
         if name == 'list_pred':
             # field list_acc : Seq[Ref]
@@ -138,11 +139,7 @@ class ContractTranslator(CommonTranslator):
             # field set_acc : Set[Ref]
             return self._get_field_perm('set_acc', set_ref, perm, args[0], pos, ctx)
         elif name == 'dict_pred':
-            # field dict_acc : Set[Ref] && dict_acc2 : Ref
-            acc1 = self._get_field_perm('dict_acc', set_ref, perm, args[0], pos, ctx)
-            acc2 = self._get_field_perm('dict_acc2', self.viper.Ref, perm, args[0], pos,
-                                        ctx)
-            return self.viper.And(acc1, acc2, pos, self.no_info(ctx))
+            return self._get_field_perm('dict_acc', map_ref_ref, perm, args[0], pos, ctx)
         elif name == 'MayStart':
             return self.translate_may_start(node, args, perm, ctx)
         elif name == 'ThreadPost':

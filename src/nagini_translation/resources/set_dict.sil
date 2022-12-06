@@ -84,114 +84,84 @@ function set___sil_seq__(self: Ref): Seq[Ref]
     ensures (forall i: Int :: {result[i]} (i >= 0 && i < |result|) ==> !((result[i] in result[..i])))
     ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), set_arg(typeof(self), 0))
 
-field dict_acc : Set[Ref]
-field dict_acc2 : Ref
-
-domain _dict_ce_helper {
-    function dict_get_helper(___s: Set[Ref], ___s2: Ref, ___s3: Ref): Ref
-}
+field dict_acc : Map[Ref, Ref]
 
 method dict___init__() returns (res: Ref)
-    ensures acc(res.dict_acc) && acc(res.dict_acc2)
-    ensures res.dict_acc == Set[Ref]()
+    ensures acc(res.dict_acc)
+    ensures res.dict_acc == Map[Ref, Ref]()
     ensures typeof(res) == dict(dict_arg(typeof(res), 0), dict_arg(typeof(res), 1))
-{
-    assume false
-}
+
 
 function dict___contains__(self: Ref, item: Ref) : Bool
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires acc(self.dict_acc, wildcard)
     ensures result == (item in self.dict_acc)
 
 method dict___iter__(self: Ref) returns (_res: Ref)
   requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-  requires acc(self.dict_acc, 1 / 10) && acc(self.dict_acc2, 1 / 10)
+  requires acc(self.dict_acc, 1 / 10)
   ensures _res != self
   ensures acc(_res.list_acc, 1 / 20)
-  ensures acc(self.dict_acc, 1 / 20) && acc(self.dict_acc2, 1 / 20)
+  ensures acc(self.dict_acc, 1 / 20)
   ensures _res.list_acc == dict___sil_seq__(self)
   ensures acc(_res.__container, write) && (_res.__container == self)
   ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
   ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
   ensures issubtype(typeof(_res), Iterator(dict_arg(typeof(self), 0)))
-{
-  inhale false
-}
+
 
 function dict___bool__(self: Ref) : Bool
     requires self != null ==> issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires self != null ==> acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires self != null ==> acc(self.dict_acc, wildcard)
     ensures self == null ==> !result
     ensures self != null ==> result == (|self.dict_acc| != 0)
 
 method dict_keys(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
-    ensures acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
     ensures acc(res.set_acc)
-    ensures res.set_acc == self.dict_acc
-{
-    assume false
-}
+    ensures res.set_acc == domain(self.dict_acc)
+
 
 function dict___getitem__(self: Ref, key: Ref) : Ref
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires acc(self.dict_acc, wildcard)
     requires dict___contains__(self, key)
     ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
-    ensures result in dict___values__(self)
-    ensures dict_get_helper(self.dict_acc, self.dict_acc2, key) == result
-
-function dict___values__(self: Ref) : Seq[Ref]
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
-    ensures |result| == |self.dict_acc|
+    ensures result == self.dict_acc[key]
 
 function dict_get(self: Ref, key: Ref) : Ref
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires acc(self.dict_acc, wildcard)
     ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
 
 method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc) && acc(self.dict_acc2)
+    requires acc(self.dict_acc)
     requires issubtype(typeof(item), dict_arg(typeof(self), 1))
     requires issubtype(typeof(key), dict_arg(typeof(self), 0))
-    ensures acc(self.dict_acc) && acc(self.dict_acc2)
-    ensures self.dict_acc == old(self.dict_acc) union Set(key)
-    ensures dict___getitem__(self, key) == item
-    ensures forall k : Ref ::
-        {dict___getitem__(self, k)}
-        ((old(dict___contains__(self, k)) && k != key)
-        ==>
-        (dict___contains__(self, k) &&
-        (dict___getitem__(self, k) == old(dict___getitem__(self, k)))))
-    ensures |dict___values__(self)| == old(|dict___values__(self)|) + (old(dict___contains__(self, key)) ? 0 : 1)
-    ensures forall k : Ref ::
-        {k in dict___values__(self)}
-        (k == item || (k in old(dict___values__(self)) && (!old(dict___contains__(self, key)) || k != old(dict___getitem__(self, key))))
-        <==>
-        (k in dict___values__(self)))
-{
-    assume false
-}
+    ensures acc(self.dict_acc)
+    ensures self.dict_acc == old(self.dict_acc)[key := item]
+
 
 method dict_values(self: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
-    ensures acc(self.dict_acc, 1/100) && acc(self.dict_acc2, 1 / 100)
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
     ensures self.dict_acc == old(self.dict_acc)
     ensures typeof(_res) == list(dict_arg(typeof(self), 1))
     ensures acc(_res.list_acc)
-    ensures _res.list_acc == dict___values__(self)
+    ensures |_res.list_acc| == |self.dict_acc|
+    ensures forall r: Ref :: { list___contains__(_res, r) } issubtype(typeof(r), dict_arg(typeof(self), 1)) ==> (list___contains__(_res, r) == r in range(self.dict_acc))
 
 function dict___len__(self: Ref): Int
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires acc(self.dict_acc, wildcard)
     ensures result == |self.dict_acc|
 
 function dict___sil_seq__(self: Ref): Seq[Ref]
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard) && acc(self.dict_acc2, wildcard)
+    requires acc(self.dict_acc, wildcard)
     ensures |result| == |self.dict_acc|
     ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result

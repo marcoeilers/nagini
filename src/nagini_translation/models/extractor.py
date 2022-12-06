@@ -80,7 +80,7 @@ class Extractor:
             value = None
         if field_name in ('__iter_index', '__previous', '__container'):
             return
-        if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2', '_val', 'MustReleaseBounded', 'MustReleaseUnbounded'):
+        if field_name in ('list_acc', 'set_acc', 'dict_acc', '_val', 'MustReleaseBounded', 'MustReleaseUnbounded'):
             # Special handling,
             pyfield = field_name
         else:
