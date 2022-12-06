@@ -66,7 +66,7 @@ def MyListLow(l: Optional[ListClass]) -> bool:
 def size(l: Optional[ListClass]) -> int:
     Requires(MyList(l))
     Ensures(Result() >= 0)
-    return 0 if l is None else Unfolding(MyList(l), 1 + size(l.next))
+    return 0 if l is None else 1 + Unfolding(MyList(l), size(l.next))
 
 def m1() -> ListClass:
     Ensures(MyList(Result()))
