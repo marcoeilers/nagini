@@ -7,16 +7,17 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from nagini_translation.lib.constants import RESULT_NAME
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType
-from nagini_translation.lib.util import int_to_string, UnsupportedException
+from nagini_translation.lib.util import list_to_seq, int_to_string, UnsupportedException
 from collections import OrderedDict
 from typing import Dict, Tuple, Union
 
 
-ISSUBTYPE = 'issubtype<Bool>'
-UNBOX_INT = 'int___unbox__%limited'
-UNBOX_BOOL = 'bool___unbox__%limited'
-UNBOX_PSEQ = 'PSeq___sil_seq__%limited'
-TYPEOF = 'typeof<PyType>'
+ISSUBTYPE = 'issubtype'
+UNBOX_INT = 'int___unbox__'
+UNBOX_BOOL = 'bool___unbox__'
+UNBOX_PSEQ = 'PSeq___sil_seq__'
+PYTYPE = 'PyType'
+TYPEOF = 'typeof'
 SNAP_TO = '$SortWrappers.'
 SEQ_LENGTH = 'seq_ref_length<Int>'
 SEQ_INDEX = 'seq_ref_index<Ref>'
@@ -84,16 +85,14 @@ class NoFittingValueException(Exception):
     pass
 
 
-def get_func_value(model, name, args):
-    args = tuple([' '.join(a.split()) for a in args])
-    entry = model[name]
-    if args == () and isinstance(entry, str):
-        return entry
-    res = entry.get(args)
-    if res is not None:
-        return res
-    return model[name].get('else')
-
+def get_func_value(func, args, jvm):
+    args = tuple([a.asValueEntry() for a in args])
+    if args in func:
+        return func[args]
+    res = func["else"]
+    if "#unspecified" in res.toString():
+        return None
+    return res
 
 def get_func_values(model, name, args):
     args = tuple([' '.join(a.split()) for a in args])
@@ -184,10 +183,11 @@ def evaluate_term(jvm, term, model):
 
 class Converter:
 
-    def __init__(self, m: PythonMethod, model: Dict[str, Union[str, Dict[Tuple[str], str]]], store: Dict[str, str],
-                 heap: Dict[Tuple[str, str], str], old_heap, jvm, modules):
+    def __init__(self, m: PythonMethod, functions, domains, store: 'ExtractedModel',
+                 heap, old_heap, jvm, modules):
         self.method = m
-        self.model = model
+        self.functions = functions
+        self.domains = domains
         self.store = store
         self.heap = heap
         self.old_heap = old_heap
@@ -215,14 +215,13 @@ class Converter:
 
     def convert_python_variable(self, name, var, target):
         try:
-            if var.sil_name not in self.store:
-                return
             if not var.show_in_ce:
                 return
-            term = self.store[var.sil_name]
-            val = self.evaluate_term(term)
+            if var.sil_name not in self.store:
+                return
+            entry = self.store[var.sil_name]
             display_name = 'Result()' if var.name == RESULT_NAME else var.name
-            py_val = self.convert_value(val, var.type, display_name)
+            py_val = self.convert_value(entry, var.type, display_name)
             target[display_name] = py_val
         except NoFittingValueException:
             pass
@@ -351,19 +350,31 @@ class Converter:
         for name, var in locals:
             self.convert_python_variable(name, var, store)
 
-        for (recv, field), value in self.heap.items():
-            if isinstance(recv, tuple):
-                # this is a predicate
-                self.convert_python_predicate(recv, field, heap)
-            else:
+        for entry in self.heap:
+            if isinstance(entry, self.jvm.viper.silicon.reporting.FieldHeapEntry):
+                recv = entry.recv()
+                field = entry.field()
+                value = entry.entry()
                 self.convert_python_field(recv, field, value, self.heap, heap, store)
-
-        for (recv, field), value in self.old_heap.items():
-            if isinstance(recv, tuple):
-                # this is a predicate
-                self.convert_python_predicate(recv, field, old_heap)
             else:
-                self.convert_python_field(recv, field, value, self.old_heap, old_heap, old_store)
+                pass
+
+        for entry in self.old_heap:
+            pass
+
+        # for (recv, field), value in self.heap.items():
+        #     if isinstance(recv, tuple):
+        #         # this is a predicate
+        #         self.convert_python_predicate(recv, field, heap)
+        #     else:
+        #         self.convert_python_field(recv, field, value, self.heap, heap, store)
+        #
+        # for (recv, field), value in self.old_heap.items():
+        #     if isinstance(recv, tuple):
+        #         # this is a predicate
+        #         self.convert_python_predicate(recv, field, old_heap)
+        #     else:
+        #         self.convert_python_field(recv, field, value, self.old_heap, old_heap, old_store)
         if self.method.pure:
             # no old heap, no updated store.
             return Model(None, old_store, None, heap)
@@ -460,7 +471,7 @@ class Converter:
         return t
 
     def convert_pseq_value(self, val, t: PythonType, name):
-        sequence = self.get_func_value(UNBOX_PSEQ, (UNIT, val))
+        sequence = self.get_func_value(UNBOX_PSEQ, (val,))
         sequence_info = self.convert_sequence_value(sequence, t.type_args[0], name)
         return 'Sequence: {{ {} }}'.format(', '.join(['{} -> {}'.format(k, v) for k, v in sequence_info.items()]))
 
@@ -469,7 +480,7 @@ class Converter:
             return self.convert_bool_value(val)
         if not self.has_type(val, 'int'):
             raise NoFittingValueException
-        int_or_none = self.get_func_value(UNBOX_INT, (UNIT, val))
+        int_or_none = self.get_func_value(UNBOX_INT, (val,))
         if int_or_none is None:
             return self.generate_default_int()
         return self.parse_int(int_or_none)
@@ -477,7 +488,7 @@ class Converter:
     def convert_bool_value(self, val):
         if not self.has_type(val, 'bool'):
             raise NoFittingValueException
-        bool_or_none = self.get_func_value(UNBOX_BOOL, (UNIT, val))
+        bool_or_none = self.get_func_value(UNBOX_BOOL, (val,))
         if bool_or_none is None:
             return self.generate_default_bool()
         return self.parse_bool(bool_or_none)
@@ -487,7 +498,7 @@ class Converter:
             raise NoFittingValueException
         if self.has_len(val, t):
             pass
-        int_or_none = self.get_func_value(UNBOX_INT, (UNIT, val))
+        int_or_none = self.get_func_value(UNBOX_INT, (val,))
         if int_or_none is None:
             return self.generate_default_int()
         return self.parse_int(int_or_none)
@@ -497,17 +508,17 @@ class Converter:
 
     def get_type_val(self, t: Union[str, PythonType]):
         if isinstance(t, str):
-            return self.model[t + '<PyType>']
+            return self.domains[PYTYPE][t]["else"]
         else:
             if isinstance(t, GenericType):
                 func_name = t.python_class.sil_name + '<PyType>'
                 args = tuple([self.get_type_val(ta) for ta in t.type_args])
                 return self.get_func_value(func_name, args)
             else:
-                return self.model[t.python_class.sil_name + '<PyType>']
+                return self.domains[PYTYPE][t.python_class.sil_name]["else"]
 
     def has_type(self, val, t: Union[str, PythonType]) -> bool:
-        val_type = self.get_func_value(TYPEOF, (val,))
+        val_type = self.get_dom_func_value(PYTYPE, TYPEOF, (val,))
         if isinstance(t, PythonType) and t.python_class.name.startswith('__prim__'):
             return False
         if isinstance(t, PythonType) and t.python_class.name == 'tuple':
@@ -529,7 +540,7 @@ class Converter:
             type_val = self.get_type_val(t)
             if type_val == val_type:
                 return True
-            bool_or_none = self.get_func_value(ISSUBTYPE, (val_type, type_val))
+            bool_or_none = self.get_dom_func_value(PYTYPE, ISSUBTYPE, (val_type, type_val))
             if bool_or_none is None:
                 return False
             return self.parse_bool(bool_or_none)
@@ -537,17 +548,10 @@ class Converter:
             return False
 
     def parse_int(self, val):
-        if val.startswith('(-') and val.endswith(')'):
-            return - int(val[2:-1])
-        return int(val)
+        return val.value()
 
     def parse_bool(self, val):
-        if val == 'true':
-            return True
-        elif val == 'false':
-            return False
-        else:
-            raise Exception(val)
+        return val.value()
 
     def generate_default_value(self, t: PythonType):
         if t.python_class.name == 'int':
@@ -564,7 +568,10 @@ class Converter:
         return False
 
     def get_func_value(self, name, args):
-        return get_func_value(self.model, name, args)
+        return get_func_value(self.functions[name], args, self.jvm)
+
+    def get_dom_func_value(self, domain, name, args):
+        return get_func_value(self.domains[domain][name], args, self.jvm)
 
     def get_func_values(self, name, args):
         return get_func_values(self.model, name, args)

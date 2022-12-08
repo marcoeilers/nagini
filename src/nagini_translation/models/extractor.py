@@ -7,34 +7,59 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from collections import OrderedDict
 from nagini_translation.models.converter import Converter, evaluate_term, ScalaIterableWrapper, NoFittingValueException
+from nagini_translation.lib.util import iterable_to_list
 
 
 class Extractor:
 
     def extract_counterexample(self, jvm, pymethod, ce, modules):
-        scala_store = ce.store()
+        converter = ce.converter()
+
         store = OrderedDict()
-        for entry in ScalaIterableWrapper(scala_store):
-            store[entry._1()] = entry._2()
-        scala_model = ce.model()
-        model = OrderedDict()
-        for entry in ScalaIterableWrapper(scala_model.entries()):
-            self.extract_model_entry(entry, jvm, model)
+        for entry in ScalaIterableWrapper(converter.extractedModel().entries()):
+            name = entry._1()
+            store[name] = entry._2()
 
-        heap = OrderedDict()
-        for chunk in ScalaIterableWrapper(ce.heap()):
-            self.extract_chunk(chunk, jvm, modules, model, heap)
+        heap = iterable_to_list(converter.extractedHeap().entries())
+        oldHeap = converter.extractedHeaps().get("old")
+        if oldHeap.isDefined():
+            oldHeap = iterable_to_list(oldHeap.get().entries())
+        else:
+            oldHeap = None
 
-        oheap = OrderedDict()
-        if ce.oldHeaps().contains("old"):
-            for chunk in ScalaIterableWrapper(ce.oldHeaps().get('old').get()):
-                self.extract_chunk(chunk, jvm, modules, model, oheap)
+        functions = OrderedDict()
+        for func in ScalaIterableWrapper(converter.nonDomainFunctions()):
+            name = func.fname()
+            value = self.extract_function(func, True)
+            functions[name] = value
 
-        converter = Converter(pymethod, model, store, heap, oheap, jvm, modules)
+        domains = OrderedDict()
+        for domain in ScalaIterableWrapper(converter.domains()):
+            domain_name = domain.name()
+            dfunctions = OrderedDict()
+            for func in ScalaIterableWrapper(domain.functions()):
+                func_name = func.fname()
+                dfunctions[func_name] = self.extract_function(func, False)
+            domains[domain_name] = dfunctions
+
+        converter = Converter(pymethod, functions, domains, store, heap, oldHeap, jvm, modules)
         result = converter.generate_inputs()
+        # TODO
         if hasattr(ce, 'second'):
             second_exec_result = self.extract_counterexample(jvm, pymethod, ce.second(), modules)
             result = 'First execution:\n' + str(result) + '\nSecond execution:\n' + str(second_exec_result)
+        return result
+
+    def extract_function(self, entry, heapdep):
+        result = OrderedDict()
+        for option in ScalaIterableWrapper(entry.options()):
+            val = option._2()
+            args = iterable_to_list(option._1())
+            if heapdep:
+                args = args[1:]
+            const_args = tuple([arg.asValueEntry() for arg in args])
+            result[const_args] = val
+        result["else"] = entry.default()
         return result
 
     def extract_model_entry(self, entry, jvm, target):

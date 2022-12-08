@@ -111,10 +111,12 @@ class Silicon:
         self.silicon = jvm.viper.silicon.Silicon(reporter, list_to_seq([], jvm))
         args = [
             '--assumeInjectivityOnInhale',
+            '--proverArgs=:model.partial=true',
+            '--alternativeFunctionVerificationOrder',
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
             '--parallelizeBranches',
-            *(['--counterexample=native'] if counterexample else []),
+            *(['--counterexample=mapped'] if counterexample else []),
             filename
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
@@ -161,7 +163,6 @@ class Carbon:
         self.carbon = jvm.viper.carbon.CarbonVerifier(reporter, list_to_seq([], jvm))
         args = [
             '--assumeInjectivityOnInhale',
-            '--alternativeFunctionVerificationOrder',
             '--boogieExe', config.boogie_path,
             '--z3Exe', config.z3_path,
             filename

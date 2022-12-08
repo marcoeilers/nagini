@@ -436,3 +436,11 @@ def list_to_seq(lst, jvm, t=None):
     for i, element in enumerate(lst):
         seq.update(i, element)
     return seq.toSeq()
+
+
+def iterable_to_list(seq):
+    result = []
+    iterator = seq.toIterator()
+    while iterator.hasNext():
+        result.append(iterator.next())
+    return result
