@@ -12,7 +12,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
     steps:
