@@ -3,16 +3,12 @@
 
 name: Nagini Tests Ubuntu
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
     steps:
