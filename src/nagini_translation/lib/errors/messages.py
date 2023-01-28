@@ -139,7 +139,7 @@ REASONS = {
         lambda n: 'Global dependencies may not be defined.',
     'internal':
         lambda n: 'Internal Viper error.',
-    'receiver.not.injective':
+    'qp.not.injective':
         lambda n: 'Receiver expression of quantified permission is not injective.',
     'wait.level.invalid':
         lambda n: 'Thread level may not be lower than current thread.',

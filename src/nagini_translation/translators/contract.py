@@ -630,6 +630,29 @@ class ContractTranslator(CommonTranslator):
             result = self.viper.Old(result, pos, info)
         return dom_stmt, result, True
 
+    def translate_to_multiset(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+        # Use the same sequence conversion as for iterating over the
+        # iterable (which gives no information about order for unordered types).
+        seq_call = self.get_sequence(coll_type, arg, None, node, ctx)
+        ms_class = ctx.module.global_module.classes[PMSET_TYPE]
+        if coll_type.name == RANGE_TYPE:
+            type_arg = ctx.module.global_module.classes[INT_TYPE]
+        else:
+            type_arg = coll_type.type_args[0]
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        typ = self.translate_type(type_arg, ctx)
+        ms_typ = self.viper.MultisetType(typ)
+        tv = self.viper.TypeVar('T$')
+        ms_call = self.viper.DomainFuncApp('__toMS', [seq_call], ms_typ, pos, info, '__MSHelper', {tv: typ})
+        type_lit = self.type_factory.translate_type_literal(type_arg, pos, ctx)
+        result = self.get_function_call(ms_class, '__create__',
+                                        [ms_call, type_lit], [None, None],
+                                        node, ctx)
+        return stmt, result
+
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
@@ -715,8 +738,7 @@ class ContractTranslator(CommonTranslator):
         if node.args:
             vals = []
             for arg in node.args:
-                arg_stmt, arg_val = self.translate_expr(arg, ctx,
-                    target_type = viper_type)
+                arg_stmt, arg_val = self.translate_expr(arg, ctx, target_type = viper_type)
                 val_stmts += arg_stmt
                 vals.append(arg_val)
             result = self.viper.ExplicitMultiset(vals, self.to_position(node, ctx),
@@ -792,21 +814,28 @@ class ContractTranslator(CommonTranslator):
 
     def translate_forall(self, node: ast.Call, ctx: Context,
                          impure=False) -> StmtsAndExpr:
-        domain_node = node.args[0]
+        nargs = 1 if node.func.id in ('Forall', 'IOForall') else int(node.func.id[-1])
+        domain_nodes = node.args[:nargs]
 
-        lambda_ = node.args[1]
+        lambda_ = node.args[nargs]
         variables = []
+        args = []
+        vrs = []
         lambda_prefix = construct_lambda_prefix(lambda_.lineno,
                                                 getattr(lambda_, 'col_offset',
                                                         None))
         lambda_prefix += '$'
-        arg = lambda_.args.args[0]
-        var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
-        if var is None:
-            var = ctx.actual_function.get_variable(arg.arg)
-        variables.append(var.decl)
+        for ind in range(nargs):
+            arg = lambda_.args.args[ind]
+            args.append(arg)
+            var = ctx.actual_function.get_variable(lambda_prefix + arg.arg)
+            if var is None:
+                var = ctx.actual_function.get_variable(arg.arg)
+            vrs.append(var)
+            variables.append(var.decl)
 
-        ctx.set_alias(arg.arg, var, None)
+            ctx.set_alias(arg.arg, var, None)
+
         if isinstance(lambda_.body, ast.Tuple):
             if not len(lambda_.body.elts) == 2:
                 raise InvalidProgramException(node, 'invalid.forall')
@@ -822,17 +851,24 @@ class ContractTranslator(CommonTranslator):
                                                  self.viper.Bool, impure)
             triggers = []
 
-        ctx.remove_alias(arg.arg)
+        for arg in args:
+            ctx.remove_alias(arg.arg)
         if body_stmt:
             raise InvalidProgramException(node, 'purity.violated')
 
-        dom_stmt, lhs, always_use = self._create_quantifier_contains_expr(var.ref(),
-                                                                          domain_node,
-                                                                          ctx)
-        if dom_stmt:
-            raise InvalidProgramException(domain_node,
-                                          'purity.violated')
-        lhs = self.unwrap(lhs)
+        lhs = None
+
+        lhs_exprs = []
+        for i, domain_node in enumerate(domain_nodes):
+            dom_stmt, cur_lhs, always_use = self._create_quantifier_contains_expr(vrs[i].ref(),
+                                                                                  domain_node,
+                                                                                  ctx)
+            if dom_stmt:
+                raise InvalidProgramException(domain_node,
+                                              'purity.violated')
+            cur_lhs = self.unwrap(cur_lhs)
+            lhs = cur_lhs if lhs is None else self.viper.And(lhs, cur_lhs, self.no_position(ctx), self.no_info(ctx))
+            lhs_exprs.append(cur_lhs)
 
         implication = self.viper.Implies(lhs, rhs, self.to_position(node, ctx),
                                          self.no_info(ctx))
@@ -845,7 +881,7 @@ class ContractTranslator(CommonTranslator):
             try:
                 # Depending on the collection expression, this doesn't always
                 # work (malformed trigger); in that case, we just don't do it.
-                lhs_trigger = self.viper.Trigger([lhs], self.no_position(ctx),
+                lhs_trigger = self.viper.Trigger(lhs_exprs, self.no_position(ctx),
                                                  self.no_info(ctx))
                 triggers = [lhs_trigger] + triggers
             except Exception:
@@ -1026,7 +1062,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_declassify(node, ctx)
         elif func_name == 'TerminatesSif':
             return self.translate_terminates_sif(node, ctx)
-        elif func_name in ('Forall', 'IOForall'):
+        elif func_name in ('Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall4', 'Forall5', 'Forall6'):
             return self.translate_forall(node, ctx, impure)
         elif func_name == 'Exists':
             return self.translate_exists(node, ctx, impure)
@@ -1042,6 +1078,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_mset(node, ctx)
         elif func_name == 'ToSeq':
             return self.translate_to_sequence(node, ctx)
+        elif func_name == 'ToMS':
+            return self.translate_to_multiset(node, ctx)
         elif func_name == 'Joinable':
             return self.translate_joinable(node, ctx)
         elif func_name == 'getArg':

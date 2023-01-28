@@ -48,13 +48,14 @@ class Extractor:
             target[name] = value.toString()
         else:
             entry_val = OrderedDict()
+            value = value.resolveFunctionDefinition()
             for option in ScalaIterableWrapper(value.options()):
                 option_value = option._2()
                 option_key = ()
                 for option_key_entry in ScalaIterableWrapper(option._1()):
-                    option_key += (option_key_entry,)
+                    option_key += (str(option_key_entry),)
                 entry_val[option_key] = option_value.toString()
-            entry_val['else'] = value.default()
+            entry_val['else'] = str(value.default())
             target[name] = entry_val
 
     def extract_chunk(self, chunk, jvm, modules, model, target):

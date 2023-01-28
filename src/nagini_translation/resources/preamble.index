@@ -617,11 +617,13 @@
         "take": {
             "args": ["PSeq", "__prim__int"],
             "type": "PSeq",
+            "generic_type": -2,
             "requires": ["__sil_seq__", "__create__"]
         },
         "drop": {
             "args": ["PSeq", "__prim__int"],
             "type": "PSeq",
+            "generic_type": -2,
             "requires": ["__sil_seq__", "__create__"]
         },
         "update": {

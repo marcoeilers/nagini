@@ -113,6 +113,7 @@ class Silicon:
             '--assumeInjectivityOnInhale',
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
+            '--enableMoreCompleteExhale',
             '--parallelizeBranches',
             *(['--counterexample=native'] if counterexample else []),
             filename

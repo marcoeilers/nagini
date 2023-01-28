@@ -20,8 +20,9 @@ function PSeq___contains__(self: Ref, item: Ref): Bool
 function PSeq___getitem__(self: Ref, index: Ref): Ref
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(index), int())
-    requires (int___unbox__(index) >= 0 && int___unbox__(index) < PSeq___len__(self))
-    ensures result == PSeq___sil_seq__(self)[int___unbox__(index)]
+    requires let ln == (PSeq___len__(self)) in
+                ((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln))
+    ensures result == (int___unbox__(index) >= 0 ? PSeq___sil_seq__(self)[int___unbox__(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + int___unbox__(index)])
     ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
 
 function PSeq___len__(self: Ref): Int
@@ -52,3 +53,24 @@ function PSeq___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
     ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))
+
+
+domain __MSHelper[T$] {
+    function __toMS(s: Seq[T$]): Multiset[T$]
+
+    axiom __toMS_def_1 {
+        __toMS(Seq[T$]()) == Multiset[T$]()
+    }
+
+    axiom __toMS_def_2 {
+        forall __t: T$ :: { __toMS(Seq(__t)) } __toMS(Seq(__t)) == Multiset(__t)
+    }
+
+    axiom __toMS_def_3 {
+        forall __ss1: Seq[T$], __ss2: Seq[T$] :: { __toMS(__ss1 ++ __ss2) } __toMS(__ss1 ++ __ss2) == __toMS(__ss1) union __toMS(__ss2)
+    }
+
+    axiom __toMS_def_4 {
+        forall __ss1: Seq[T$] :: { __toMS(__ss1) } |__toMS(__ss1)| == |__ss1|
+    }
+}

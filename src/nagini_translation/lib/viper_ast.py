@@ -187,11 +187,11 @@ class ViperAST:
 
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
-                               self.to_seq(axioms), self.to_seq(typevars),
+                               self.to_seq(axioms), self.to_seq(typevars), self.none,
                                position, info, self.NoTrafos)
 
     def DomainFunc(self, name, args, type, unique, position, info, domain_name):
-        return self.ast.DomainFunc(name, self.to_seq(args), type, unique,
+        return self.ast.DomainFunc(name, self.to_seq(args), type, unique, self.none,
                                    position, info, domain_name, self.NoTrafos)
 
     def DomainAxiom(self, name, expr, position, info, domain_name):

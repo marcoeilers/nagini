@@ -309,7 +309,8 @@ class IOOperationAnalyzer(ast.NodeVisitor):
                 self.visit(arg)
             self._in_property = False
             return
-        elif isinstance(node.func, ast.Name) and node.func.id in ('IOForall', 'Forall', 'Exists'):
+        elif isinstance(node.func, ast.Name) and node.func.id in ('IOForall', 'Forall', 'Forall2', 'Forall3', 'Forall4',
+                                                                  'Forall5', 'Forall6', 'Exists'):
             operation = self._current_io_operation
             assert len(node.args[1].args.args) == 1
             arg_type = self._parent.get_target(node.args[0], operation.module)

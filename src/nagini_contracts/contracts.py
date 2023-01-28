@@ -25,15 +25,19 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'MaySet', 'MayCreate',
+                  'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'PMultiset', 'LowExit']
 
 T = TypeVar('T')
 V = TypeVar('V')
+U = TypeVar('U')
+U2 = TypeVar('U2')
+U3 = TypeVar('U3')
+U4 = TypeVar('U4')
 
 
 def Requires(expr: bool) -> bool:
@@ -91,6 +95,46 @@ def Forall(domain: 'Union[Iterable[T], Type[T]]',
            predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     forall x in domain: predicate(x)
+    """
+    pass
+
+
+def Forall2(domain1: 'Type[T]', domain2: Type[V],
+           predicate: Callable[[T, V], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    """
+    forall x in domain1, y in domain2: predicate(x, y)
+    """
+    pass
+
+
+def Forall3(domain1: 'Type[T]', domain2: Type[V], domain3: Type[U],
+           predicate: Callable[[T, V, U], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    """
+    forall x in domain1, y in domain2, z in domain3: predicate(x, y, z)
+    """
+    pass
+
+
+def Forall4(domain1: 'Type[T]', domain2: Type[V], domain3: Type[U], domain4: Type[U2],
+            predicate: Callable[[T, V, U, U2], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    """
+    forall x in domain1, y in domain2, z in domain3, ...: predicate(x, y, z, ...)
+    """
+    pass
+
+
+def Forall5(domain1: 'Type[T]', domain2: Type[V], domain3: Type[U], domain4: Type[U2], domain5: Type[U3],
+            predicate: Callable[[T, V, U, U2, U3], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    """
+    forall x in domain1, y in domain2, z in domain3, ...: predicate(x, y, z, ...)
+    """
+    pass
+
+
+def Forall6(domain1: 'Type[T]', domain2: Type[V], domain3: Type[U], domain4: Type[U2], domain5: Type[U3], domain6: Type[U4],
+            predicate: Callable[[T, V, U, U2, U3, U4], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
+    """
+    forall x in domain1, y in domain2, z in domain3, ...: predicate(x, y, z, ...)
     """
     pass
 
@@ -295,6 +339,12 @@ def ToSeq(l: Iterable[T]) -> PSeq[T]:
     """
 
 
+def ToMS(s: PSeq[T]) -> PMultiset[T]:
+    """
+    Multiset view of the given sequence.
+    """
+
+
 # The following annotations have no runtime semantics. They are only used for
 # the Python to Viper translation.
 
@@ -461,6 +511,11 @@ __all__ = [
         'RaisedException',
         'Implies',
         'Forall',
+        'Forall2',
+        'Forall3',
+        'Forall4',
+        'Forall5',
+        'Forall6',
         'Exists',
         'Let',
         'Low',
@@ -491,6 +546,7 @@ __all__ = [
         'PSet',
         'PMultiset',
         'ToSeq',
+        'ToMS',
         'MaySet',
         'MayCreate',
         ]
