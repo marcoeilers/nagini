@@ -273,8 +273,8 @@ class Converter:
                 elif field.startswith('MustRelease'):
                     lock_module = [m for m in self.modules if m.type_prefix == 'nagini_contracts.lock'][0]
                     lock_type = lock_module.classes['Lock']
-                    self.get_reference_name(smt_ref_val, lock_type)
-                    lock_name, _ = self.reference_values[smt_ref_val]
+
+                    lock_name = self.get_reference_name(smt_ref_val, lock_type)
                     if field == 'MustReleaseUnbounded':
                         target['MustRelease({})'.format(lock_name)] = OrderedDict()
                     else:

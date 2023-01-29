@@ -213,7 +213,6 @@ def binsearch(elems: Optional[Elem], len: int, key: int) -> Tuple[int, int]:
         if len == 1:
             cover(elems, mid, len)
             return FAILURE, -1
-        Assume(SplitOn(k > key))
         if k > key:
             cover(elems, mid, len)
             split(elems, mid-1, len)
