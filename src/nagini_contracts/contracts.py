@@ -139,7 +139,7 @@ def Forall6(domain1: 'Type[T]', domain2: Type[V], domain3: Type[U], domain4: Typ
     pass
 
 
-def Exists(domain: 'Union[Iterable[T], Type[T]]', predicate: Callable[[T], bool]) -> bool:
+def Exists(domain: 'Union[Iterable[T], Type[T]]', predicate: Callable[[T], Union[bool, Tuple[bool, List[List[Any]]]]]) -> bool:
     """
     exists x in domain: predicate(x)
     """

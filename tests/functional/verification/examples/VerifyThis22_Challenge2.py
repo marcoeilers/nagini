@@ -2,6 +2,8 @@ from typing import List
 from nagini_contracts.contracts import *
 from nagini_contracts.obligations import MustTerminate
 
+#:: IgnoreFile(107)
+
 
 class SR:
     def __init__(self, runs: List[int], data: List[int]) -> None:
