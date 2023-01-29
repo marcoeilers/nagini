@@ -114,7 +114,6 @@ class Silicon:
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
             '--enableMoreCompleteExhale',
-            '--parallelizeBranches',
             *(['--counterexample=native'] if counterexample else []),
             filename
         ]
@@ -162,7 +161,6 @@ class Carbon:
         self.carbon = jvm.viper.carbon.CarbonVerifier(reporter, list_to_seq([], jvm))
         args = [
             '--assumeInjectivityOnInhale',
-            '--alternativeFunctionVerificationOrder',
             '--boogieExe', config.boogie_path,
             '--z3Exe', config.z3_path,
             filename
