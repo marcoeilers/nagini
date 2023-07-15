@@ -292,8 +292,11 @@ class Converter:
             if smt_value is not None:
                 field_type = field.type
                 if isinstance(field.type, TypeVar) and isinstance(receiver_type, GenericType):
-                    index = list(receiver_type.python_class.type_vars.values()).index(field.type)
-                    field_type = receiver_type.type_args[index]
+                    relevant_type = receiver_type
+                    while field.cls != relevant_type.python_class:
+                        relevant_type = relevant_type.superclass
+                    index = list(relevant_type.python_class.type_vars.values()).index(field.type)
+                    field_type = relevant_type.type_args[index]
                 py_value = self.convert_value(smt_value, field_type)
             else:
                 py_value = '?'

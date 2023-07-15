@@ -342,7 +342,7 @@ class CallTranslator(CommonTranslator):
                                                 info))
             arg_type = self.get_type(node.args[0], ctx)
             arg_seq = self.get_sequence(arg_type, contents, None, node, ctx, position)
-            res_seq = self.get_sequence(set_type, result_var, None, node, ctx, position)
+            res_seq = self.get_sequence(list_type, result_var, None, node, ctx, position)
             seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
             stmts.append(self.viper.Inhale(seq_equal, position, info))
         return stmts, result_var
