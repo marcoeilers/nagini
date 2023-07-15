@@ -236,9 +236,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 # type arguments. We only support that if we can get it directly
                 # from mypy, i.e., when the result is assigned to a variable
                 # and we can get the variable type.
-                if hasattr(node, '_parent') and node._parent and isinstance(node._parent, ast.Assign):
-                    return get_type(node._parent.targets[0], containers,
-                                    container)
+                if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
+                    trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+                    return get_type(trgt, containers, container)
                 elif (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
@@ -316,13 +316,13 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         return _get_call_type(node, module, current_function, containers,
                               container)
     elif isinstance(node, ast.ListComp):
-        if (node._parent and isinstance(node._parent, ast.Assign) and
+        if (node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                     node is node._parent.value):
             # Constructor is assigned to variable;
             # we get the type of the dict from the type of the
             # variable it's assigned to.
-            return get_type(node._parent.targets[0], containers,
-                            container)
+            trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+            return get_type(trgt, containers, container)
         else:
             raise UnsupportedException(node, 'List comprehensions must be directly '
                                        'assigned to a local variable.')
@@ -340,12 +340,12 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
     literal which contain the contents of the literal (e.g. 'keys' and 'values'
     for a dict), returns the type of the collection.
     """
-    if hasattr(node, '_parent') and isinstance(node._parent, ast.Assign):
+    if hasattr(node, '_parent') and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.
-        args = get_type(node._parent.targets[0], containers,
-                        container).type_args
+        target = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+        args = get_type(target, containers, container).type_args
     elif all(getattr(node, arg_field) for arg_field in arg_fields):
         args = []
         for arg_field in arg_fields:
@@ -477,13 +477,13 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
-    if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, ast.Assign) and
+    if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
             node is node._parent.value):
         # Constructor is assigned to variable;
         # we get the type of the dict from the type of the
         # variable it's assigned to.
-        return get_type(node._parent.targets[0], containers,
-                        container)
+        trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+        return get_type(trgt, containers, container)
     value_type = get_type(node.value, containers, container)
     return _get_subscript_type(value_type, module, node)
 

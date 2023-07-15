@@ -1280,6 +1280,22 @@ class StatementTranslator(CommonTranslator):
         assign_val = self.viper.EqCmp(list_field_acc, seq_from, position, info)
         return stmt + [assign_stmt] + after_assign, val + [assign_val]
 
+    def translate_stmt_AnnAssign(self, node: ast.AnnAssign, ctx: Context) -> List[Stmt]:
+        if isinstance(node.target, ast.Name):
+            if node.target.id in ctx.module.type_vars:
+                # this is a type var assignment
+                return []
+            if node.target.id in ctx.module.classes:
+                # this is a type alias assignment
+                return []
+        rhs_type = self.get_type(node.value, ctx)
+        rhs_stmt, rhs = self.translate_expr(node.value, ctx)
+        assign_stmts = []
+        target_stmt, _ = self.assign_to(node.target, rhs, None, None, rhs_type,
+                                        node, ctx, allow_impure=True)
+        assign_stmts += target_stmt
+        return rhs_stmt + assign_stmts
+
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):

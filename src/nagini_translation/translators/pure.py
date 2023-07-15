@@ -138,6 +138,16 @@ class PureTranslator(CommonTranslator):
         wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
         return [wrapper]
 
+    def translate_pure_AnnAssign(self, conds: List, node: ast.AnnAssign,
+                                 ctx: Context) -> List[Wrapper]:
+        """
+        Translates an annotated assign statement to an AssignWrapper
+        """
+        if not isinstance(node.target, ast.Name):
+            raise UnsupportedException(node, "Only assignments to single variables are supported in pure functions.")
+        wrapper = AssignWrapper(node.target.id, conds, node.value, node)
+        return [wrapper]
+
     def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,
                                   function: PythonMethod,
                                   ctx: Context) -> Expr:

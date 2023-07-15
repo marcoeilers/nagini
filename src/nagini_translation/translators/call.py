@@ -318,16 +318,18 @@ class CallTranslator(CommonTranslator):
         constr_call = self.get_method_call(list_class, '__init__', [],
                                            [], targets, node, ctx)
         stmts.extend(constr_call)
-        # Inhale the type of the newly created set (including type arguments)
-        set_type = self.get_type(node, ctx)
-        if (node._parent and isinstance(node._parent, ast.Assign) and
-                    len(node._parent.targets) == 1):
-            set_type = self.get_type(node._parent.targets[0], ctx)
+        # Inhale the type of the newly created list (including type arguments)
+        list_type = self.get_type(node, ctx)
+        if node._parent:
+            if isinstance(node._parent, ast.Assign) and len(node._parent.targets) == 1:
+                list_type = self.get_type(node._parent.targets[0], ctx)
+            elif isinstance(node._parent, ast.AnnAssign):
+                list_type = self.get_type(node._parent.target, ctx)
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         result_var = res_var.ref(node, ctx)
         stmts.append(self.viper.Inhale(self.type_check(result_var,
-                                                       set_type, position, ctx),
+                                                       list_type, position, ctx),
                                        position, self.no_info(ctx)))
         if contents:
             sil_ref_seq = self.viper.SeqType(self.viper.Ref)
@@ -362,9 +364,11 @@ class CallTranslator(CommonTranslator):
         stmts.extend(constr_call)
         # Inhale the type of the newly created set (including type arguments)
         set_type = self.get_type(node, ctx)
-        if (node._parent and isinstance(node._parent, ast.Assign) and
-                len(node._parent.targets) == 1):
-            set_type = self.get_type(node._parent.targets[0], ctx)
+        if node._parent:
+            if isinstance(node._parent, ast.Assign) and len(node._parent.targets) == 1:
+                set_type = self.get_type(node._parent.targets[0], ctx)
+            elif isinstance(node._parent, ast.AnnAssign):
+                set_type = self.get_type(node._parent.target, ctx)
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
         result_var = res_var.ref(node, ctx)

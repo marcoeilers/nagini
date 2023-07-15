@@ -32,7 +32,7 @@ def test_in() -> None:
     super8 = Super()
     super55 = Super()
     myset = {super1, super5, super6}
-    empty_set = set() # type: Set[Super]
+    empty_set: Set[Super] = set()
     Assert(super1 in myset)
     Assert(super6 in myset)
     Assert(not (super8 in myset))

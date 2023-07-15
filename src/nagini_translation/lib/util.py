@@ -89,6 +89,9 @@ class AssignCollector(ast.NodeVisitor):
         for target in node.targets:
             self._track_assign(target)
 
+    def visit_AnnAssign(self, node: ast.Assign) -> None:
+        self._track_assign(node.target)
+
     def _track_assign(self, target: ast.AST) -> None:
         if isinstance(target, ast.Tuple):
             actual_targets = target.elts

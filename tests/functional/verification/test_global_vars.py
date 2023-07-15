@@ -10,7 +10,7 @@ def m1(a: int) -> int:
     return 56
 
 
-GLOBAL_VAR = m1(23)
+GLOBAL_VAR: int = m1(23)
 
 OTHER_GLOBAL_VAR = 57
 
