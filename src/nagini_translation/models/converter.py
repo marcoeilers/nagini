@@ -154,7 +154,7 @@ def evaluate_term(jvm, term, model):
         return '$Snap.unit'
     if isinstance(term, jvm.viper.silicon.state.terms.IntLiteral):
         return str(term)
-    if isinstance(term, jvm.viper.silicon.state.terms.Null):
+    if isinstance(term, getattr(jvm.viper.silicon.state.terms, "Null$")):
         return str(model['$Ref.null'])
     if isinstance(term, jvm.viper.silicon.state.terms.Var):
         key = str(term)
@@ -508,17 +508,20 @@ class Converter:
                     type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
             return GenericType(t.python_class, type_arg_results)
         elif t.python_class.type_vars:
-            type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
-                                                                    (val_type,))
-            type_arg_results = []
-            for i, tv in enumerate(t.python_class.type_vars.values()):
-                for ((key,), value) in type_args_explicit:
-                    if str(i) == key:
-                        type_arg_results.append(self.get_precise_type(value, tv.bound))
-                        break
-                else:
-                    type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
-            return GenericType(t.python_class, type_arg_results)
+            try:
+                type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
+                                                                        (val_type,))
+                type_arg_results = []
+                for i, tv in enumerate(t.python_class.type_vars.values()):
+                    for ((key,), value) in type_args_explicit:
+                        if str(i) == key:
+                            type_arg_results.append(self.get_precise_type(value, tv.bound))
+                            break
+                    else:
+                        type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
+                return GenericType(t.python_class, type_arg_results)
+            except:
+                return t.python_class
         else:
             return t
 

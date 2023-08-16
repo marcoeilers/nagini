@@ -97,62 +97,12 @@ def get_arp_plugin(jvm: JVM) -> ARPPlugin:
     return _ARP_PLUGIN
 
 
-class SiliconOld:
-    """
-    Provides access to the Silicon verifier
-    """
-
-    def __init__(self, jvm: JVM, filename: str, counterexample: bool):
-        self.jvm = jvm
-        self.silver = jvm.viper.silver
-        if not jvm.is_known_class(jvm.viper.silicon.Silicon):
-            raise Exception('Silicon backend not found on classpath.')
-        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
-        self.silicon = jvm.viper.silicon.Silicon(reporter, list_to_seq([], jvm))
-        args = [
-            '--assumeInjectivityOnInhale',
-            '--z3Exe', config.z3_path,
-            '--disableCatchingExceptions',
-            '--enableMoreCompleteExhale',
-            *(['--counterexample=native'] if counterexample else []),
-            filename
-        ]
-        args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
-        self.silicon.parseCommandLine(args_seq)
-        self.silicon.start()
-        self.ready = True
-
-    def verify(self, modules, prog: 'silver.ast.Program', arp=False, sif=False) -> VerificationResult:
-        """
-        Verifies the given program using Silicon
-        """
-        if not self.ready:
-            self.silicon.restart()
-        result = self.silicon.verify(prog)
-        if arp:
-            result = get_arp_plugin(self.jvm).map_result(result)
-        self.ready = False
-        if isinstance(result, self.silver.verifier.Failure):
-            it = result.errors().toIterator()
-            errors = []
-            while it.hasNext():
-                errors += [it.next()]
-            return Failure(errors, self.jvm, modules, sif)
-        else:
-            return Success()
-
-    def __del__(self):
-        if hasattr(self, 'silicon') and self.silicon:
-            self.silicon.stop()
-
-
 class Silicon:
     """
     Provides access to the Silicon verifier
     """
 
     def __init__(self, jvm: JVM, filename: str, counterexample: bool):
-        print("init")
         self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
@@ -163,7 +113,7 @@ class Silicon:
             '--assumeInjectivityOnInhale',
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
-            '--enableMoreCompleteExhale',
+            '--exhaleMode=2',
             *(['--counterexample=native'] if counterexample else []),
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
@@ -173,7 +123,6 @@ class Silicon:
         """
         Verifies the given program using Silicon
         """
-        print("verify")
         result = self.silicon.verify(prog)
         if arp:
             result = get_arp_plugin(self.jvm).map_result(result)
@@ -188,7 +137,6 @@ class Silicon:
 
     def __del__(self):
         if hasattr(self, 'silicon') and self.silicon:
-            print("stop")
             self.silicon.stop()
 
 
@@ -204,25 +152,20 @@ class Carbon:
         if config.boogie_path is None:
             raise Exception('Boogie not found.')
         reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
-        self.carbon = jvm.viper.carbon.CarbonVerifier(reporter, list_to_seq([], jvm))
+        self.carbon = jvm.viper.carbon.MinimalCarbonFrontendAPI(reporter)
         args = [
             '--assumeInjectivityOnInhale',
             '--boogieExe', config.boogie_path,
             '--z3Exe', config.z3_path,
-            filename
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
-        self.carbon.parseCommandLine(args_seq)
-        self.carbon.start()
-        self.ready = True
+        self.carbon.initialize(args_seq)
         self.jvm = jvm
 
     def verify(self, modules, prog: 'silver.ast.Program', arp=False, sif=False) -> VerificationResult:
         """
         Verifies the given program using Carbon
         """
-        if not self.ready:
-            self.carbon.restart()
         result = self.carbon.verify(prog)
         if arp:
             result = get_arp_plugin(self.jvm).map_result(result)
