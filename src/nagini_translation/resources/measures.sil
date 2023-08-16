@@ -29,6 +29,7 @@ domain Measure$ {
 }
 
 function Measure$check(map: Seq[Measure$], key: Ref, value: Int): Bool
+    decreases _
 {
     (forall m: Measure$ :: {m in map} m in map ==>
      ((Measure$guard(m) && Measure$key(m) == key) ==> Measure$value(m) > value))

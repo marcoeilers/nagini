@@ -916,3 +916,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
         return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int], pos, info,
                                   self.viper.Bool, [param])
+
+    def _conjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
+        """
+        Conjoin all expressions in the list.
+        """
+        return eqs[0] if len(eqs) == 1 else self.viper.And(eqs[0],
+               self._conjoin(eqs[1:], pos, info), pos, info)
+
+    def _disjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
+        """
+        Disjoin all expressions in the list.
+        """
+        return eqs[0] if len(eqs) == 1 else self.viper.Or(eqs[0],
+               self._disjoin(eqs[1:], pos, info), pos, info)

@@ -16,16 +16,19 @@ method set___init__() returns (res: Ref)
 }
 
 function set___len__(self: Ref): Int
+    decreases _
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures result == |self.set_acc|
 
 function set___contains__(self: Ref, item: Ref) : Bool
+    decreases _
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures result == (item in self.set_acc)
 
 function set___bool__(self: Ref) : Bool
+    decreases _
     requires self != null ==> issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires self != null ==> acc(self.set_acc, wildcard)
     ensures self == null ==> !result
@@ -77,6 +80,7 @@ method set_clear(self: Ref) returns ()
 }
 
 function set___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
     requires acc(self.set_acc, wildcard)
     ensures |result| == |self.set_acc|
@@ -93,6 +97,7 @@ method dict___init__() returns (res: Ref)
 
 
 function dict___contains__(self: Ref, item: Ref) : Bool
+    decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures result == (item in self.dict_acc)
@@ -111,6 +116,7 @@ method dict___iter__(self: Ref) returns (_res: Ref)
 
 
 function dict___bool__(self: Ref) : Bool
+    decreases _
     requires self != null ==> issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires self != null ==> acc(self.dict_acc, wildcard)
     ensures self == null ==> !result
@@ -125,6 +131,7 @@ method dict_keys(self: Ref) returns (res: Ref)
 
 
 function dict___getitem__(self: Ref, key: Ref) : Ref
+    decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     requires dict___contains__(self, key)
@@ -132,6 +139,7 @@ function dict___getitem__(self: Ref, key: Ref) : Ref
     ensures result == self.dict_acc[key]
 
 function dict_get(self: Ref, key: Ref) : Ref
+    decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
@@ -156,11 +164,13 @@ method dict_values(self: Ref) returns (_res: Ref)
     ensures forall r: Ref :: { r in _res.list_acc } issubtype(typeof(r), dict_arg(typeof(self), 1)) ==> (r in _res.list_acc == r in range(self.dict_acc))
 
 function dict___len__(self: Ref): Int
+    decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures result == |self.dict_acc|
 
 function dict___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
     ensures |result| == |self.dict_acc|

@@ -6,18 +6,22 @@
  */
 
 function PSeq___create__(prim: Seq[Ref], cont_type: PyType): Ref
+    decreases _
     ensures typeof(result) == PSeq(cont_type)
     ensures PSeq___sil_seq__(result) == prim
 
 function PSeq___sil_seq__(box: Ref): Seq[Ref]
+    decreases _
     requires issubtype(typeof(box), PSeq(PSeq_arg(typeof(box), 0)))
 
 function PSeq___contains__(self: Ref, item: Ref): Bool
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == (item in PSeq___sil_seq__(self))
     ensures result ==> issubtype(typeof(item), PSeq_arg(typeof(self), 0))
 
 function PSeq___getitem__(self: Ref, index: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(index), int())
     requires let ln == (PSeq___len__(self)) in
@@ -26,29 +30,35 @@ function PSeq___getitem__(self: Ref, index: Ref): Ref
     ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
 
 function PSeq___len__(self: Ref): Int
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == |PSeq___sil_seq__(self)|
 
 function PSeq_take(self: Ref, no: Int): Ref
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[..no], PSeq_arg(typeof(self), 0))
 
 function PSeq_drop(self: Ref, no: Int): Ref
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[no..], PSeq_arg(typeof(self), 0))
 
 function PSeq_update(self: Ref, index: Int, val: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires index >= 0 && index < PSeq___len__(self)
     ensures result == PSeq___create__(PSeq___sil_seq__(self)[index := val], PSeq_arg(typeof(self), 0))
 
 function PSeq___add__(self: Ref, other: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
     ensures result == PSeq___create__(PSeq___sil_seq__(self) ++ PSeq___sil_seq__(other), PSeq_arg(typeof(self), 0))
 
 function PSeq___eq__(self: Ref, other: Ref): Bool
+    decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
     requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)

@@ -342,6 +342,16 @@ class ContractTranslator(CommonTranslator):
                                       self.no_info(ctx))
         return stmt + [assertion], None
 
+    def translate_refute(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        """
+        Translates a call to Refute().
+        """
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Bool, True)
+        assertion = self.viper.Refute(expr, self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        return stmt + [assertion], None
+
     def translate_assume(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
         Translates a call to Assume().
@@ -1033,7 +1043,7 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_set(node, ctx)
         elif func_name == 'MayCreate':
             return self.translate_may_create(node, ctx)
-        elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold'):
+        elif func_name in ('Assert', 'Assume', 'Fold', 'Unfold', 'Refute'):
             if not statement:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Assert':
@@ -1044,6 +1054,8 @@ class ContractTranslator(CommonTranslator):
                 return self.translate_fold(node, ctx)
             elif func_name == 'Unfold':
                 return self.translate_unfold(node, ctx)
+            elif func_name == 'Refute':
+                return self.translate_refute(node, ctx)
         elif func_name == 'Implies':
             return self.translate_implies(node, ctx, impure)
         elif func_name == 'Old':

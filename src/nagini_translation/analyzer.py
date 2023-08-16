@@ -920,6 +920,11 @@ class Analyzer(ast.NodeVisitor):
             elif node.func.id == 'Ensures':
                 self.stmt_container.postcondition.append(
                     (node.args[0], self._aliases.copy()))
+            elif node.func.id == 'Decreases':
+                if not (isinstance(self.stmt_container, PythonMethod) and self.stmt_container.pure):
+                    raise InvalidProgramException(node, 'invalid.contract.position')
+                self.stmt_container.decreases_clauses.append(
+                    (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
                 if exception not in self.current_function.declared_exceptions:

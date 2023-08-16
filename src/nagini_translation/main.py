@@ -54,14 +54,16 @@ TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 def parse_sil_file(sil_path: str, jvm):
     parser = jvm.viper.silver.parser.FastParser()
+    tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
+    tp.beforeParse(text, False)
     parsed = parser.parse(text, path, none)
 
-    parse_result = parsed.value()
+    parse_result = parsed
     parse_result.initProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()

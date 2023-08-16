@@ -279,6 +279,18 @@ class ViperAST:
             return self.Seqn([], position, info)
         return self.ast.Assert(expr, position, info, self.NoTrafos)
 
+    def Refute(self, expr, position, info):
+        return self.jvm.viper.silver.plugin.standard.refute.Refute(expr, position, info, self.NoTrafos)
+
+    def DecreasesTuple(self, measures, condition, position, info):
+        measure_seq = self.to_seq(measures)
+        condition = self.scala.Some(condition) if condition is not None else self.none
+        return self.jvm.viper.silver.plugin.standard.termination.DecreasesTuple(measure_seq, condition, position, info, self.NoTrafos)
+
+    def DecreasesWildcard(self, condition, position, info):
+        condition = self.scala.Some(condition) if condition is not None else self.none
+        return self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard(condition, position, info, self.NoTrafos)
+
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info, self.NoTrafos)
 

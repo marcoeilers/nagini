@@ -9,6 +9,7 @@ import ast
 
 from typing import Dict, List, Union
 
+from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import BOOL_TYPE
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
@@ -16,6 +17,7 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     flatten,
+    get_func_name,
     InvalidProgramException,
     UnsupportedException,
 )
@@ -86,6 +88,8 @@ class PureTranslator(CommonTranslator):
         if isinstance(node.value, ast.Str):
             # Ignore docstrings.
             return []
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) in CONTRACT_WRAPPER_FUNCS:
+            raise InvalidProgramException(node, 'invalid.contract.position')
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If,

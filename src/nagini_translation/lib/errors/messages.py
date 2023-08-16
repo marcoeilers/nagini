@@ -80,7 +80,9 @@ ERRORS = {
     'probabilistic.sif.violated':
         lambda n: 'Probabilistic non-interference might not be satisfied.',
     'possibilistic.sif.violated':
-        lambda n: 'Possibilistic non-interference might not be satisfied.'
+        lambda n: 'Possibilistic non-interference might not be satisfied.',
+    'termination.failed':
+        lambda n: 'Function might not terminate.',
 }
 
 REASONS = {
@@ -182,7 +184,11 @@ REASONS = {
     'unknown.family.receiver.type':
         lambda n: 'Might not be able to satisfy constraints from currently unknown predicate family members.',
     'family.member.not.framed':
-        lambda n: 'Predicate family addition might not be self-framing.'
+        lambda n: 'Predicate family addition might not be self-framing.',
+    'tuple.false':
+        lambda n: 'Termination measure might not decrease or might not be bounded.',
+    'termination.condition.false':
+        lambda n: 'Termination condition might not hold.'
 }
 
 VAGUE_REASONS = {

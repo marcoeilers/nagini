@@ -97,7 +97,7 @@ def get_arp_plugin(jvm: JVM) -> ARPPlugin:
     return _ARP_PLUGIN
 
 
-class Silicon:
+class SiliconOld:
     """
     Provides access to the Silicon verifier
     """
@@ -143,6 +143,52 @@ class Silicon:
 
     def __del__(self):
         if hasattr(self, 'silicon') and self.silicon:
+            self.silicon.stop()
+
+
+class Silicon:
+    """
+    Provides access to the Silicon verifier
+    """
+
+    def __init__(self, jvm: JVM, filename: str, counterexample: bool):
+        print("init")
+        self.jvm = jvm
+        self.silver = jvm.viper.silver
+        if not jvm.is_known_class(jvm.viper.silicon.Silicon):
+            raise Exception('Silicon backend not found on classpath.')
+        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
+        self.silicon = jvm.viper.silicon.MinimalSiliconFrontendAPI(reporter)
+        args = [
+            '--assumeInjectivityOnInhale',
+            '--z3Exe', config.z3_path,
+            '--disableCatchingExceptions',
+            '--enableMoreCompleteExhale',
+            *(['--counterexample=native'] if counterexample else []),
+        ]
+        args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
+        self.silicon.initialize(args_seq)
+
+    def verify(self, modules, prog: 'silver.ast.Program', arp=False, sif=False) -> VerificationResult:
+        """
+        Verifies the given program using Silicon
+        """
+        print("verify")
+        result = self.silicon.verify(prog)
+        if arp:
+            result = get_arp_plugin(self.jvm).map_result(result)
+        if isinstance(result, self.silver.verifier.Failure):
+            it = result.errors().toIterator()
+            errors = []
+            while it.hasNext():
+                errors += [it.next()]
+            return Failure(errors, self.jvm, modules, sif)
+        else:
+            return Success()
+
+    def __del__(self):
+        if hasattr(self, 'silicon') and self.silicon:
+            print("stop")
             self.silicon.stop()
 
 

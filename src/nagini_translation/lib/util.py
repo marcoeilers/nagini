@@ -174,6 +174,10 @@ def is_pre(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Requires'
 
 
+def is_decreases(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Decreases'
+
+
 def is_post(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Ensures'
 
@@ -224,6 +228,8 @@ def get_body_indices(statements: List[ast.AST]) -> Tuple[int, int]:
         while is_invariant(statements[start_index]):
             start_index += 1
         while is_pre(statements[start_index]):
+            start_index += 1
+        while is_decreases(statements[start_index]):
             start_index += 1
         while is_post(statements[start_index]):
             start_index += 1

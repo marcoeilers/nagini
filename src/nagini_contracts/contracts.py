@@ -12,7 +12,8 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
-    List, Set,
+    List,
+    Optional,
     Sized,
     Tuple,
     Type,
@@ -23,14 +24,14 @@ from typing import (
 
 GHOST_PREFIX = "_gh_"
 
-CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant']
+CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decreases']
 
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit']
+                  'PMultiset', 'LowExit', 'Refute']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -56,11 +57,19 @@ def Invariant(expr: bool) -> bool:
     pass
 
 
+def Decreases(expr: Optional[int], condition: bool = True) -> bool:
+    pass
+
+
 def Assume(expr: bool) -> None:
     pass
 
 
 def Assert(expr: bool) -> bool:
+    pass
+
+
+def Refute(expr: bool) -> bool:
     pass
 
 
@@ -502,10 +511,12 @@ __all__ = [
         'Requires',
         'Ensures',
         'Exsures',
+        'Decreases',
         'Invariant',
         'Previous',
         'Assume',
         'Assert',
+        'Refute',
         'Old',
         'Result',
         'RaisedException',
