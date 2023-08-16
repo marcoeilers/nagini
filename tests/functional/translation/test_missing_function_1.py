@@ -6,4 +6,5 @@ from typing import List
 
 
 def test(r: List[int]) -> None:
+    #:: ExpectedOutput(type.error:Name 'foo' is not defined)
     Requires(Forall(r, lambda x: (foo(x), [])))

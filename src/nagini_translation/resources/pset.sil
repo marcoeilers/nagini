@@ -101,3 +101,4 @@ function PMultiset___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), PMultiset(PMultiset_arg(typeof(other), 0)))
     requires PMultiset_arg(typeof(self), 0) == PMultiset_arg(typeof(other), 0)
     ensures result == (PMultiset___unbox__(self) == PMultiset___unbox__(other))
+    ensures result ==> self == other // extensionality

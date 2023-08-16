@@ -114,6 +114,7 @@ class Silicon:
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
             '--exhaleMode=2',
+            '--alternativeFunctionVerificationOrder',
             *(['--counterexample=native'] if counterexample else []),
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
