@@ -8,6 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from abc import ABCMeta
 from enum import Enum
+from typing import List
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
 from nagini_translation.lib.jvmaccess import JVM
@@ -102,7 +103,7 @@ class Silicon:
     Provides access to the Silicon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str, counterexample: bool):
+    def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool):
         self.jvm = jvm
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.silicon.Silicon):
@@ -115,7 +116,10 @@ class Silicon:
             '--disableCatchingExceptions',
             '--exhaleMode=2',
             '--alternativeFunctionVerificationOrder',
+            '--disableDefaultPlugins',
+            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:viper.silver.plugin.standard.termination.TerminationPlugin',
             *(['--counterexample=native'] if counterexample else []),
+            *viper_args,
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
         self.silicon.initialize(args_seq)
@@ -146,7 +150,7 @@ class Carbon:
     Provides access to the Carbon verifier
     """
 
-    def __init__(self, jvm: JVM, filename: str):
+    def __init__(self, jvm: JVM, filename: str, viper_args: List[str]):
         self.silver = jvm.viper.silver
         if not jvm.is_known_class(jvm.viper.carbon.CarbonVerifier):
             raise Exception('Carbon backend not found on classpath.')
@@ -158,6 +162,7 @@ class Carbon:
             '--assumeInjectivityOnInhale',
             '--boogieExe', config.boogie_path,
             '--z3Exe', config.z3_path,
+            *viper_args
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
         self.carbon.initialize(args_seq)

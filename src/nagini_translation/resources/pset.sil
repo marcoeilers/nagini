@@ -51,6 +51,7 @@ function PSet___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), PSet(PSet_arg(typeof(other), 0)))
     requires PSet_arg(typeof(self), 0) == PSet_arg(typeof(other), 0)
     ensures result == (PSet___unbox__(self) == PSet___unbox__(other))
+    ensures result ==> self == other
 
 
 

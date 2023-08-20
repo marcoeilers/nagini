@@ -46,7 +46,7 @@ def fac4h(i: int) -> int:
 def fac5(i: int) -> int:
     Decreases(i)
     if i < 0:
-        #:: ExpectedOutput(termination.failed:tuple.false)
+        #:: ExpectedOutput(termination.failed:tuple.false)|ExpectedOutput(carbon)(termination.failed:tuple.false)
         return fac5(i)
     if i <= 1:
         return 1
