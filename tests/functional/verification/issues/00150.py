@@ -21,7 +21,7 @@ def can_node_be_compressed(marked_execution_tree: 'Node') -> int:
     Requires(Forall(int, lambda i: Implies(i >= 0 and i < len(marked_execution_tree.children),
                                            Acc(marked_execution_tree.children[i].function_name))))
     Requires(Acc(marked_execution_tree.function_name))
-    #:: ExpectedOutput(postcondition.violdated:assertion.false)
+    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Implies(len(marked_execution_tree.children) != 1, Result() == 0))
     Ensures(Result() == 0)
     if len(marked_execution_tree.children) != 1:
