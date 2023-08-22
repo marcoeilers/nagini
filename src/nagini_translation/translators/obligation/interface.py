@@ -177,7 +177,31 @@ class ObligationTranslator(CommonTranslator):
             raise InvalidProgramException(
                 node, 'obligation.must_terminate.in_postcondition')
         else:
+            if ctx.current_function and ctx.current_function.pure:
+                raise InvalidProgramException(node, 'invalid.contract.position')
             return self._method_translator.translate_must_terminate(node, ctx)
+
+    def _translate_pure_must_terminate(
+            self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        stmts, measure = self.translate_expr(node.args[0], ctx, target_type=self.viper.Int)
+        if stmts:
+            raise InvalidProgramException(node, "purity.violated")
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        obligation_info = self._method_translator._get_obligation_info(ctx)
+        guarded_obligation_instance = obligation_info.get_instance(node)
+        if guarded_obligation_instance.guard:
+            guards = []
+            for g in guarded_obligation_instance.guard:
+                stmts, new_guard = self.translate_expr(g, ctx, target_type=self.viper.Bool)
+                if stmts:
+                    raise InvalidProgramException(g, "purity.violated")
+                guards.append(new_guard)
+            guard_exp = self._conjoin(guards, pos, info)
+        else:
+            guard_exp = None
+        decreases = self.viper.DecreasesTuple([measure], guard_exp, pos, info)
+        return [], decreases
 
     def _translate_must_release(
             self, node: ast.Call, ctx: Context) -> StmtsAndExpr:

@@ -38,3 +38,19 @@ def test_pmultiset() -> None:
 
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert False
+
+
+def test_toMS() -> None:
+    no_ints_seq = PSeq()  # type: PSeq[int]
+    no_ints = ToMS(no_ints_seq)
+    assert len(no_ints) == 0
+    ints_seq = PSeq(1, 2, 3, 1)
+    ints = ToMS(ints_seq)
+    a = A()
+    ass_seq = PSeq(a)
+    ass = ToMS(ass_seq)
+    assert ass.num(a) == 1
+    assert ints.num(3) == 1 and ints.num(1) == 2
+    assert ints.num(4) == 0
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert ints.num(5) > 0

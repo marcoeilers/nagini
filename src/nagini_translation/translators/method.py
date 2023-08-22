@@ -90,6 +90,34 @@ class MethodTranslator(CommonTranslator):
 
         return pres
 
+    def _translate_decreases(self, method: PythonMethod,
+                             ctx: Context) -> List[Expr]:
+        """
+        Translates the decreases clauses specified for 'method'.
+        """
+        assert method.pure
+        decreases_pres = []
+        info = self.no_info(ctx)
+        for args, aliases in method.decreases_clauses:
+            with ctx.additional_aliases(aliases):
+                condition = None
+                pos = self.to_position(args[0], ctx)
+                if len(args) > 1:
+                    cond_stmt, condition = self.translate_expr(args[1], ctx, self.viper.Bool)
+                    if cond_stmt:
+                        raise InvalidProgramException(args[1], 'purity.violated')
+                measure_node = args[0]
+                if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
+                    decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
+                else:
+                    measure_stmt, measure = self.translate_expr(measure_node, ctx, target_type=self.viper.Int)
+                    decreases_clause = self.viper.DecreasesTuple([measure], condition, pos, info)
+                    if measure_stmt:
+                        raise InvalidProgramException(measure_node, 'purity.violated')
+            decreases_pres.append(decreases_clause)
+
+        return decreases_pres
+
     def _translate_posts(self, method: PythonMethod,
                          err_var: 'viper.ast.LocalVar',
                          ctx: Context) -> List[Expr]:
@@ -197,26 +225,18 @@ class MethodTranslator(CommonTranslator):
         info = self.no_info(ctx)
         if func.kw_arg:
             type_check = self.get_parameter_typeof(func.kw_arg, ctx)
-            set_ref = self.viper.SetType(self.viper.Ref)
-            dict_acc_field = self.viper.Field('dict_acc', set_ref,
-                                              pos, info)
-            dict_acc2_field = self.viper.Field('dict_acc2', self.viper.Ref,
+            map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+            dict_acc_field = self.viper.Field('dict_acc', map_ref_ref,
                                               pos, info)
             field_acc = self.viper.FieldAccess(func.kw_arg.ref(),
                                                dict_acc_field,
                                                pos, info)
-            field_acc2 = self.viper.FieldAccess(func.kw_arg.ref(),
-                                                dict_acc2_field,
-                                                pos, info)
             full_perm = self.viper.FullPerm(self.no_position(ctx),
                                             self.no_info(ctx))
             acc_pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
                                                        pos, info)
-            acc_pred2 = self.viper.FieldAccessPredicate(field_acc2, full_perm,
-                                                        pos, info)
             pres.append(type_check)
             pres.append(acc_pred)
-            pres.append(acc_pred2)
         if func.cls:
             # Add upper bound information for type variables.
             for name, var in func.cls.type_vars.items():
@@ -264,6 +284,8 @@ class MethodTranslator(CommonTranslator):
                                           'function.throws.exception')
         # Create preconditions
         pres = self._translate_pres(func, ctx)
+        decreases_pres = self._translate_decreases(func, ctx)
+        pres = pres + decreases_pres
         # Create postconditions
         posts = []
         for post, aliases in func.postcondition:

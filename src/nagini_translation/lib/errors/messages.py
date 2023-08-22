@@ -44,7 +44,8 @@ ERRORS = {
         lambda n: 'Assert might fail.',
     'postcondition.violated':
         lambda n: ('Postcondition of {} might not '
-                   'hold.').format(get_containing_member(n).name),
+                   'hold.').format(get_containing_member(n).name) if get_containing_member(n) is not None
+                    else 'Internal error.',
     'fold.failed':
         lambda n: 'Fold might fail.',
     'unfold.failed':
@@ -80,7 +81,11 @@ ERRORS = {
     'probabilistic.sif.violated':
         lambda n: 'Probabilistic non-interference might not be satisfied.',
     'possibilistic.sif.violated':
-        lambda n: 'Possibilistic non-interference might not be satisfied.'
+        lambda n: 'Possibilistic non-interference might not be satisfied.',
+    'termination.failed':
+        lambda n: 'Function might not terminate.',
+    'refute.failed':
+        lambda n: 'Refute holds in all cases or could not be reached.',
 }
 
 REASONS = {
@@ -139,7 +144,7 @@ REASONS = {
         lambda n: 'Global dependencies may not be defined.',
     'internal':
         lambda n: 'Internal Viper error.',
-    'receiver.not.injective':
+    'qp.not.injective':
         lambda n: 'Receiver expression of quantified permission is not injective.',
     'wait.level.invalid':
         lambda n: 'Thread level may not be lower than current thread.',
@@ -182,7 +187,13 @@ REASONS = {
     'unknown.family.receiver.type':
         lambda n: 'Might not be able to satisfy constraints from currently unknown predicate family members.',
     'family.member.not.framed':
-        lambda n: 'Predicate family addition might not be self-framing.'
+        lambda n: 'Predicate family addition might not be self-framing.',
+    'tuple.false':
+        lambda n: 'Termination measure might not decrease or might not be bounded.',
+    'termination.condition.false':
+        lambda n: 'Termination condition might not hold.',
+    'refutation.true':
+        lambda n: 'Assertion definitely holds.'
 }
 
 VAGUE_REASONS = {

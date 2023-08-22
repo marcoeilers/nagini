@@ -39,6 +39,20 @@ class Position:
         """Return ``start.column``."""
         return self._position.column()
 
+    @property
+    def line_end(self) -> int:
+        """Return ``end.line``."""
+        if self._position.end().isDefined():
+            return self._position.end().get().line()
+        return self._position.line()
+
+    @property
+    def column_end(self) -> int:
+        """Return ``end.column``."""
+        if self._position.end().isDefined():
+            return self._position.end().get().column()
+        return self._position.column()
+
     def __str__(self) -> str:
         return str(self._position)
 
@@ -165,10 +179,10 @@ class Error:
         explanations if no Python-level explanation is available.
         """
         if ide_mode:
-            return '{0}:{1}:{2}: error: {3} {4}'.format(
+            return '{0}:{1}:{2}:{3}:{4}: error: {5} {6}'.format(
                 self.position.file_name,
-                self.position.line, self.position.column, self.message,
-                self.reason)
+                self.position.line, self.position.column + 1, self.position.line_end, self.position.column_end + 1,
+                self.message, self.reason)
         else:
             if self._inputs is not None:
                 return '{0} {1} ({2}).\n{3}'.format(

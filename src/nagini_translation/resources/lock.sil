@@ -6,3 +6,4 @@
  */
 
 function Level(r: Ref): Perm
+    decreases _

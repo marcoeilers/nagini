@@ -107,7 +107,7 @@ def none_client_2(c: Container) -> None:
 
 
 def none_client_3(c: Container) -> None:
-    #:: ExpectedOutput(application.precondition:insufficient.permission)|ExpectedOutput(carbon)(application.precondition:assertion.false)
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
     a = c.needs_field()
 
 

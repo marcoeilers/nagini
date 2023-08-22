@@ -19,7 +19,7 @@ jobs:
         python-version: 3.8
     - name: Install Boogie
       run: |
-        dotnet tool install --global Boogie --version 2.4.21
+        dotnet tool install --global Boogie --version 2.15.9
     - name: Install Nagini
       run: |
         python -m pip install --upgrade pip

@@ -38,7 +38,7 @@ def m3_fail_1() -> None:
 
 
 def m3_fail_2() -> None:
-    l1 = [1]  # type: List[object]
+    l1: List[object] = [1]
     l2 = [4]  # type: List[object]
     l3 = ['asd']  # type: List[object]
     l4 = [A()]  # type: List[object]
@@ -101,11 +101,11 @@ def m4() -> None:
 
 def m5() -> None:
     a = [("asd", 'after')]
-    tmp = ['before']
+    tmp: List[str] = ['before']
     for b, *c in a:
         Invariant(Acc(list_pred(tmp)))
         tmpln = len(tmp)
-        cln = len(c)
+        cln: int = len(c)
         tmp.append('inside')
         assert len(tmp) == tmpln + 1
         assert len(c) == cln

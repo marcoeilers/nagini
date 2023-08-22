@@ -31,10 +31,10 @@ def test_list_2() -> None:
 def test_type_quantification() -> None:
     r = [3, 4, 5]
     Assert(r[1] > 3)
-    Assert(Exists(int, lambda i: i >= 0 and i < len(r) and r[i] > 3))
+    Assert(Exists(int, lambda i: (i >= 0 and i < len(r) and r[i] > 3, [[r[i]]])))
 
 
 def test_type_quantification_2() -> None:
     r = [3, 4, 5]
     #:: ExpectedOutput(assert.failed:assertion.false)
-    Assert(Exists(int, lambda i: i >= 0 and i < len(r) and r[i] > 6))
+    Assert(Exists(int, lambda i: (i >= 0 and i < len(r) and r[i] > 6, [[r[i]]])))

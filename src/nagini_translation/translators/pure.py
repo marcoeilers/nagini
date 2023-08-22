@@ -9,6 +9,7 @@ import ast
 
 from typing import Dict, List, Union
 
+from nagini_contracts.contracts import CONTRACT_WRAPPER_FUNCS
 from nagini_translation.lib.constants import BOOL_TYPE
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 from nagini_translation.lib.typedefs import (
@@ -16,6 +17,7 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     flatten,
+    get_func_name,
     InvalidProgramException,
     UnsupportedException,
 )
@@ -86,6 +88,8 @@ class PureTranslator(CommonTranslator):
         if isinstance(node.value, ast.Str):
             # Ignore docstrings.
             return []
+        if isinstance(node.value, ast.Call) and get_func_name(node.value) in CONTRACT_WRAPPER_FUNCS:
+            raise InvalidProgramException(node, 'invalid.contract.position')
         raise UnsupportedException(node)
 
     def translate_pure_If(self, conds: List, node: ast.If,
@@ -136,6 +140,16 @@ class PureTranslator(CommonTranslator):
         if not isinstance(node.targets[0], ast.Name):
             raise UnsupportedException(node, "Multi-target assignments are not supported in pure functions.")
         wrapper = AssignWrapper(node.targets[0].id, conds, node.value, node)
+        return [wrapper]
+
+    def translate_pure_AnnAssign(self, conds: List, node: ast.AnnAssign,
+                                 ctx: Context) -> List[Wrapper]:
+        """
+        Translates an annotated assign statement to an AssignWrapper
+        """
+        if not isinstance(node.target, ast.Name):
+            raise UnsupportedException(node, "Only assignments to single variables are supported in pure functions.")
+        wrapper = AssignWrapper(node.target.id, conds, node.value, node)
         return [wrapper]
 
     def _translate_return_wrapper(self, wrapper: Wrapper, previous: Expr,

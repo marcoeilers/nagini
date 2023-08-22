@@ -6,6 +6,7 @@
  */
 
 function slice___create__(start: Ref, stop: Ref): Ref
+    decreases _
     requires start == null || issubtype(typeof(start), int())
     requires stop == null || issubtype(typeof(stop), int())
     ensures slice___internal_start__(result) == start
@@ -13,9 +14,11 @@ function slice___create__(start: Ref, stop: Ref): Ref
     ensures typeof(result) == slice()
 
 function slice___internal_start__(self: Ref): Ref
+    decreases _
     ensures result == null || issubtype(typeof(result), int())
 
 function slice___start__(self: Ref, len: Int): Int
+    decreases _
 {
     slice___internal_start__(self) == null ?
       0 : (int___unbox__(slice___internal_start__(self)) < 0 ?
@@ -24,6 +27,7 @@ function slice___start__(self: Ref, len: Int): Int
 }
 
 function slice___stop__(self: Ref, len: Int): Int
+    decreases _
 {
     slice___internal_stop__(self) == null ?
       len : (int___unbox__(slice___internal_stop__(self)) < 0 ?
@@ -32,4 +36,5 @@ function slice___stop__(self: Ref, len: Int): Int
 }
 
 function slice___internal_stop__(self: Ref): Ref
+    decreases _
     ensures result == null || issubtype(typeof(result), int())

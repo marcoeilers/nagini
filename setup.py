@@ -36,6 +36,7 @@ setup(
         entry_points = {
              'console_scripts': [
                  'nagini = nagini_translation.main:main',
+                 'nagini_client = nagini_translation.client:main',
                  ]
              },
         url='http://www.pm.inf.ethz.ch/research/nagini.html',

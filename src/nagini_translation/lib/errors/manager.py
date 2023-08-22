@@ -128,9 +128,10 @@ class ErrorManager:
             rules = {}
         error_item = self._get_item(position)
 
-        if error_item is not None and original_error.counterexample().isDefined() and isinstance(error_item.py_node, PythonMethod):
+        if (error_item is not None and original_error.failureContexts().nonEmpty() and
+                original_error.failureContexts().head().counterExample().isDefined() and isinstance(error_item.py_node, PythonMethod)):
             pymethod = error_item.py_node
-            ce = original_error.counterexample().get()
+            ce = original_error.failureContexts().head().counterExample().get()
             if sif:
                 ce = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transformCounterexample(ce, pymethod.sil_name)
             inputs = Extractor().extract_counterexample(jvm, pymethod, ce, modules)

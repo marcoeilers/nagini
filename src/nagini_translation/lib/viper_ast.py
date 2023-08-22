@@ -94,7 +94,8 @@ class ViperAST:
             list.append(lsttoappend)
 
     def to_seq(self, list):
-        result = self.scala.collection.mutable.ArraySeq(len(list))
+        arr = self.jvm.get_array(self.java.lang.Object, len(list))
+        result = self.scala.collection.mutable.ArraySeq.make(arr)
         for index in range(0, len(list)):
             result.update(index, list[index])
         return result.toList()
@@ -178,16 +179,19 @@ class ViperAST:
     def SetType(self, element_type):
         return self.ast.SetType(element_type)
 
+    def MapType(self, key_type, value_type):
+        return self.ast.MapType(key_type, value_type)
+
     def MultisetType(self, element_type):
         return self.ast.MultisetType(element_type)
 
     def Domain(self, name, functions, axioms, typevars, position, info):
         return self.ast.Domain(name, self.to_seq(functions),
-                               self.to_seq(axioms), self.to_seq(typevars),
+                               self.to_seq(axioms), self.to_seq(typevars), self.none,
                                position, info, self.NoTrafos)
 
     def DomainFunc(self, name, args, type, unique, position, info, domain_name):
-        return self.ast.DomainFunc(name, self.to_seq(args), type, unique,
+        return self.ast.DomainFunc(name, self.to_seq(args), type, unique, self.none,
                                    position, info, domain_name, self.NoTrafos)
 
     def DomainAxiom(self, name, expr, position, info, domain_name):
@@ -215,16 +219,9 @@ class ViperAST:
                                        arg.info())
                      for i, arg in enumerate(args)]
 
-        def type_passed_apply(slf):
-            return type_passed
-
-        def args_passed_apply(slf):
-            return self.to_seq(arg_decls)
-
-        type_passed_func = self.to_function0(type_passed_apply)
         result = self.ast.DomainFuncApp(func_name, self.to_seq(args),
                                         self.to_map(type_var_map), position,
-                                        info, type_passed_func,
+                                        info, type_passed,
                                         domain_name, self.NoTrafos)
         return result
 
@@ -281,6 +278,18 @@ class ViperAST:
         if isinstance(expr, self.ast.TrueLit):
             return self.Seqn([], position, info)
         return self.ast.Assert(expr, position, info, self.NoTrafos)
+
+    def Refute(self, expr, position, info):
+        return self.jvm.viper.silver.plugin.standard.refute.Refute(expr, position, info, self.NoTrafos)
+
+    def DecreasesTuple(self, measures, condition, position, info):
+        measure_seq = self.to_seq(measures)
+        condition = self.scala.Some(condition) if condition is not None else self.none
+        return self.jvm.viper.silver.plugin.standard.termination.DecreasesTuple(measure_seq, condition, position, info, self.NoTrafos)
+
+    def DecreasesWildcard(self, condition, position, info):
+        condition = self.scala.Some(condition) if condition is not None else self.none
+        return self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard(condition, position, info, self.NoTrafos)
 
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info, self.NoTrafos)
@@ -409,6 +418,9 @@ class ViperAST:
 
     def AnySetSubset(self, left, right, position, info):
         return self.ast.AnySetSubset(left, right, position, info, self.NoTrafos)
+
+    def MapContains(self, key, m, position, info):
+        return self.ast.MapContains(key, m, position, info, self.NoTrafos)
 
     def SeqAppend(self, left, right, position, info):
         return self.ast.SeqAppend(left, right, position, info, self.NoTrafos)

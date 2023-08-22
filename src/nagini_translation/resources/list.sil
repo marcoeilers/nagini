@@ -30,17 +30,20 @@ method list___init__() returns (res: Ref)
 }
 
 function list___contains__(self: Ref, item: Ref): Bool
+    decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
     ensures result == (item in self.list_acc)
 
 function list___bool__(self: Ref) : Bool
+    decreases _
     requires self != null ==> issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires self != null ==> acc(self.list_acc, wildcard)
     ensures self == null ==> !result
     ensures self != null ==> result == (|self.list_acc| != 0)
 
 function list___len__(self: Ref) : Int
+    decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc, wildcard)
 {
@@ -48,12 +51,13 @@ function list___len__(self: Ref) : Int
 }
 
 function list___getitem__(self: Ref, key: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
     requires let ln == (list___len__(self)) in ((int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln) && (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
     ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
-    ensures [issubtype(typeof(result), list_arg(typeof(self), 0)), true]
+    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
 
 method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -147,6 +151,7 @@ method list___iter__(self: Ref) returns (_res: Ref)
 }
 
 function list___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
     requires acc(self.list_acc, wildcard)
 {
     self.list_acc

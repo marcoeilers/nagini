@@ -85,8 +85,8 @@ def func11(some_name: int, other_name: int, other_third: bool) -> bool:
     Ensures(Result() == other_third)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() == False)
-    a = some_name
-    c = 22
+    a: int = some_name
+    c: int = 22
     b = (a + other_name > c)
     res = other_third == b
     return res

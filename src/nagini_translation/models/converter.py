@@ -6,7 +6,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from nagini_translation.lib.constants import RESULT_NAME
-from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType
+from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType, TypeVar
 from nagini_translation.lib.util import int_to_string, UnsupportedException
 from collections import OrderedDict
 from typing import Dict, Tuple, Union
@@ -21,7 +21,9 @@ SNAP_TO = '$SortWrappers.'
 SEQ_LENGTH = 'seq_ref_length<Int>'
 SEQ_INDEX = 'seq_ref_index<Ref>'
 SET_CARD = 'Set_card'
-DICT_GET = 'dict_get_helper<Ref>'
+DICT_GET = 'Map_apply'
+MAP_CARD = 'Map_card'
+
 
 UNIT = '$Snap.unit'
 
@@ -91,23 +93,38 @@ def get_func_value(model, name, args):
         return entry
     res = entry.get(args)
     if res is not None:
-        return res
-    return model[name].get('else')
+        return str(res)
+    return str(model[name].get('else'))
 
 
 def get_func_values(model, name, args):
     args = tuple([' '.join(a.split()) for a in args])
     options = [(k[len(args):], v) for k, v in model[name].items() if k != 'else' and k[:len(args)] == args]
-    els= model[name].get('else')
+    els = str(model[name].get('else'))
     return options, els
 
 
 def get_parts(jvm, val):
-    parser = getattr(getattr(jvm.viper.silver.verifier, 'ModelParser$'), 'MODULE$')
-    res = []
-    for part in ScalaIterableWrapper(parser.getApplication(val)):
-        res.append(part)
-    return res
+    app_string = val[1:][:-1]
+    func_until = app_string.index(' ')
+    first = app_string[:func_until]
+    rest = app_string[func_until + 1:]
+    lastindex = 0
+    openparens = 0
+    results = [first]
+    for i in range(len(rest)):
+        if rest[i] == '(':
+            openparens += 1
+        elif rest[i] == ')':
+            openparens -= 1
+        elif rest[i] == ' ' and openparens == 0:
+            results.append(rest[lastindex:i])
+            lastindex = i + 1
+    results.append(rest[lastindex:])
+    return results
+
+
+
 
 def translate_sort(jvm, s):
     terms = jvm.viper.silicon.state.terms
@@ -118,6 +135,8 @@ def translate_sort(jvm, s):
 
     if isinstance(s, get_sort_class('Set')):
         return 'Set<{}>'.format(translate_sort(jvm, s.elementsSort()))
+    elif isinstance(s, get_sort_class('Map')):
+        return 'Map<{}~_{}>'.format(translate_sort(jvm, s.keySort()), translate_sort(jvm, s.valueSort()))
     elif isinstance(s, get_sort_object('Ref')):
         return '$Ref'
     elif isinstance(s, get_sort_object('Snap')):
@@ -135,13 +154,13 @@ def evaluate_term(jvm, term, model):
         return '$Snap.unit'
     if isinstance(term, jvm.viper.silicon.state.terms.IntLiteral):
         return str(term)
-    if isinstance(term, jvm.viper.silicon.state.terms.Null):
-        return model['$Ref.null']
+    if isinstance(term, getattr(jvm.viper.silicon.state.terms, "Null$")):
+        return str(model['$Ref.null'])
     if isinstance(term, jvm.viper.silicon.state.terms.Var):
         key = str(term)
         if key not in model:
             raise NoFittingValueException
-        return model[key]
+        return str(model[key])
     elif isinstance(term, jvm.viper.silicon.state.terms.App):
         fname = str(term.applicable().id()) + '%limited'
         if fname not in model:
@@ -234,7 +253,7 @@ class Converter:
                 receiver_type = field.cls
             else:
                 global_module = self.modules[0].global_module
-                if field in ('dict_acc', 'dict_acc2'):
+                if field == 'dict_acc':
                     receiver_type = global_module.classes['dict']
                 elif field == 'list_acc':
                     receiver_type = global_module.classes['list']
@@ -254,8 +273,8 @@ class Converter:
                 elif field.startswith('MustRelease'):
                     lock_module = [m for m in self.modules if m.type_prefix == 'nagini_contracts.lock'][0]
                     lock_type = lock_module.classes['Lock']
-                    self.get_reference_name(smt_ref_val, lock_type)
-                    lock_name, _ = self.reference_values[smt_ref_val]
+
+                    lock_name = self.get_reference_name(smt_ref_val, lock_type)
                     if field == 'MustReleaseUnbounded':
                         target['MustRelease({})'.format(lock_name)] = OrderedDict()
                     else:
@@ -263,6 +282,7 @@ class Converter:
                     return
                 else:
                     raise Exception
+            receiver_type = self.ref_get_actual_type(smt_ref_val, receiver_type)
             self.get_reference_name(smt_ref_val, receiver_type)
             object_name, t = self.reference_values[smt_ref_val]
             smt_value = value
@@ -270,7 +290,14 @@ class Converter:
                 target[object_name] = self.convert_special_field(recv, heap_contents, object_name, t, smt_value)
                 return
             if smt_value is not None:
-                py_value = self.convert_value(smt_value, field.type)
+                field_type = field.type
+                if isinstance(field.type, TypeVar) and isinstance(receiver_type, GenericType):
+                    relevant_type = receiver_type
+                    while field.cls != relevant_type.python_class:
+                        relevant_type = relevant_type.superclass
+                    index = list(relevant_type.python_class.type_vars.values()).index(field.type)
+                    field_type = relevant_type.type_args[index]
+                py_value = self.convert_value(smt_value, field_type)
             else:
                 py_value = '?'
             if object_name not in target:
@@ -382,7 +409,7 @@ class Converter:
             for ((index,), value) in indices:
                 converted_value = self.convert_value(value, content_type)
                 res['{}[{}]'.format(object_name, index)] = converted_value
-            if els_index is not None and self.has_type(els_index, content_type):
+            if els_index is not None and self.ref_has_type(els_index, content_type):
                 converted_value = self.convert_value(els_index, content_type)
                 res['{}[_]'.format(object_name)] = converted_value
         return res
@@ -403,18 +430,17 @@ class Converter:
             parsed_length = self.parse_int(length)
             res['len({})'.format(object_name)] = parsed_length
         elif t.python_class.name == 'dict':
-            length = self.get_func_value(SET_CARD, (smt_value,))
+            length = self.get_func_value(MAP_CARD, (smt_value,))
             parsed_length = self.parse_int(length)
             res['len({})'.format(object_name)] = parsed_length
-            if parsed_length > 0:
-                set_val = heap[(recv, 'dict_acc')]
-                ref_val = heap[(recv, 'dict_acc2')]
-                keys, els_val = self.get_func_values(DICT_GET, (set_val, ref_val))
+            if parsed_length >= 0:
+                map_val = heap[(recv, 'dict_acc')]
+                keys, els_val = self.get_func_values(DICT_GET, (map_val,))
                 for ((key,), value) in keys:
                     converted_value = self.convert_value(value, t.type_args[1])
                     converted_key = self.convert_value(key, t.type_args[0])
                     res['{}[{}]'.format(object_name, converted_key)] = converted_value
-                if els_val is not None and self.has_type(els_val, t.type_args[1]):
+                if els_val is not None and self.ref_has_type(els_val, t.type_args[1]):
                     converted_value = self.convert_value(els_val, t.type_args[1])
                     res['{}[_]'.format(object_name)] = converted_value
         return res
@@ -429,35 +455,75 @@ class Converter:
         else:
             return self.get_reference_name(val, t)
 
+    def get_type_name(self, t: PythonType) -> str:
+        if isinstance(t, GenericType):
+            return t.python_class.name + '<' + ','.join([self.get_type_name(arg) for arg in t.type_args]) + '>'
+        else:
+            return t.python_class.name
+
     def get_reference_name(self, val, t: PythonType):
         if val in self.reference_values:
             return self.reference_values[val][0]
         else:
-            actual_type = self.get_actual_type(val, t)
-            if actual_type.name == 'NoneType':
-                self.reference_values[val] = ('None', actual_type)
-                return 'None'
-            actual_type_name = actual_type.python_class.name
-            i = 0
-            ref_name = actual_type_name + str(i)
-            while (ref_name, actual_type) in self.reference_values.values():
-                i += 1
+            try:
+                actual_type = self.ref_get_actual_type(val, t)
+                if actual_type.name == 'NoneType':
+                    self.reference_values[val] = ('None', actual_type)
+                    return 'None'
+                actual_type_name = self.get_type_name(actual_type)
+                i = 0
                 ref_name = actual_type_name + str(i)
-            self.reference_values[val] = (ref_name, actual_type)
-            return ref_name
+                while (ref_name, actual_type) in self.reference_values.values():
+                    i += 1
+                    ref_name = actual_type_name + str(i)
+                self.reference_values[val] = (ref_name, actual_type)
+                return ref_name
+            except:
+                return '?'
 
-    def get_actual_type(self, val, t: PythonType):
+    def ref_get_actual_type(self, val, t: PythonType):
+        val_type = self.get_func_value(TYPEOF, (val,))
+        return self.get_precise_type(val_type, t)
+
+    def get_precise_type(self, val_type, t: PythonType):
         cls = t.python_class
-        if not self.has_type(val, cls):
+        if not self.is_type(val_type, cls):
             if isinstance(t, OptionalType):
                 none_type = self.modules[0].global_module.classes['NoneType']
-                if self.has_type(val, none_type) or '$Ref.null' in self.model and val == self.model['$Ref.null']:
+                if self.is_type(val_type, none_type): # or '$Ref.null' in self.model and val == str(self.model['$Ref.null']):
                     return none_type
             raise NoFittingValueException
         for sc in cls.direct_subclasses:
-            if self.has_type(val, sc):
-                return self.get_actual_type(val, sc)
-        return t
+            if self.is_type(val_type, sc):
+                return self.get_precise_type(val_type, sc)
+        if isinstance(t, GenericType):
+            type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>', (val_type,))
+            type_arg_results = []
+            for i, tv in enumerate(t.python_class.type_vars.values()):
+                for ((key,), value) in type_args_explicit:
+                    if str(i) == key:
+                        type_arg_results.append(self.get_precise_type(value, tv.bound))
+                        break
+                else:
+                    type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
+            return GenericType(t.python_class, type_arg_results)
+        elif t.python_class.type_vars:
+            try:
+                type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
+                                                                        (val_type,))
+                type_arg_results = []
+                for i, tv in enumerate(t.python_class.type_vars.values()):
+                    for ((key,), value) in type_args_explicit:
+                        if str(i) == key:
+                            type_arg_results.append(self.get_precise_type(value, tv.bound))
+                            break
+                    else:
+                        type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
+                return GenericType(t.python_class, type_arg_results)
+            except:
+                return t.python_class
+        else:
+            return t
 
     def convert_pseq_value(self, val, t: PythonType, name):
         sequence = self.get_func_value(UNBOX_PSEQ, (UNIT, val))
@@ -465,9 +531,9 @@ class Converter:
         return 'Sequence: {{ {} }}'.format(', '.join(['{} -> {}'.format(k, v) for k, v in sequence_info.items()]))
 
     def convert_int_value(self, val):
-        if self.has_type(val, 'bool'):
+        if self.ref_has_type(val, 'bool'):
             return self.convert_bool_value(val)
-        if not self.has_type(val, 'int'):
+        if not self.ref_has_type(val, 'int'):
             raise NoFittingValueException
         int_or_none = self.get_func_value(UNBOX_INT, (UNIT, val))
         if int_or_none is None:
@@ -475,7 +541,7 @@ class Converter:
         return self.parse_int(int_or_none)
 
     def convert_bool_value(self, val):
-        if not self.has_type(val, 'bool'):
+        if not self.ref_has_type(val, 'bool'):
             raise NoFittingValueException
         bool_or_none = self.get_func_value(UNBOX_BOOL, (UNIT, val))
         if bool_or_none is None:
@@ -483,7 +549,7 @@ class Converter:
         return self.parse_bool(bool_or_none)
 
     def convert_list_value(self, val, t: PythonType):
-        if not self.has_type(val, t):
+        if not self.ref_has_type(val, t):
             raise NoFittingValueException
         if self.has_len(val, t):
             pass
@@ -497,17 +563,20 @@ class Converter:
 
     def get_type_val(self, t: Union[str, PythonType]):
         if isinstance(t, str):
-            return self.model[t + '<PyType>']
+            return str(self.model[t + '<PyType>'])
         else:
             if isinstance(t, GenericType):
                 func_name = t.python_class.sil_name + '<PyType>'
                 args = tuple([self.get_type_val(ta) for ta in t.type_args])
                 return self.get_func_value(func_name, args)
             else:
-                return self.model[t.python_class.sil_name + '<PyType>']
+                return str(self.model[t.python_class.sil_name + '<PyType>'])
 
-    def has_type(self, val, t: Union[str, PythonType]) -> bool:
+    def ref_has_type(self, val, t: Union[str, PythonType]) -> bool:
         val_type = self.get_func_value(TYPEOF, (val,))
+        return self.is_type(val_type, t)
+
+    def is_type(self, val_type, t: Union[str, PythonType]) -> bool:
         if isinstance(t, PythonType) and t.python_class.name.startswith('__prim__'):
             return False
         if isinstance(t, PythonType) and t.python_class.name == 'tuple':

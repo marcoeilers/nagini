@@ -26,8 +26,8 @@ class Extractor:
             self.extract_chunk(chunk, jvm, modules, model, heap)
 
         oheap = OrderedDict()
-        if ce.oldHeap().isDefined():
-            for chunk in ScalaIterableWrapper(ce.oldHeap().get()):
+        if ce.oldHeaps().contains("old"):
+            for chunk in ScalaIterableWrapper(ce.oldHeaps().get('old').get()):
                 self.extract_chunk(chunk, jvm, modules, model, oheap)
 
         converter = Converter(pymethod, model, store, heap, oheap, jvm, modules)
@@ -40,17 +40,22 @@ class Extractor:
     def extract_model_entry(self, entry, jvm, target):
         name = entry._1()
         value = entry._2()
-        if isinstance(value, jvm.viper.silver.verifier.SingleEntry):
+        if isinstance(value, jvm.viper.silver.verifier.ConstantEntry):
             target[name] = value.value()
+        elif isinstance(value, jvm.viper.silver.verifier.ApplicationEntry):
+            # if value.name == "/":
+            #    target[name] = str(value.arguments.)
+            target[name] = value.toString()
         else:
             entry_val = OrderedDict()
+            value = value.resolveFunctionDefinition()
             for option in ScalaIterableWrapper(value.options()):
                 option_value = option._2()
                 option_key = ()
                 for option_key_entry in ScalaIterableWrapper(option._1()):
-                    option_key += (option_key_entry,)
-                entry_val[option_key] = option_value
-            entry_val['else'] = value.els()
+                    option_key += (str(option_key_entry),)
+                entry_val[option_key] = option_value.toString()
+            entry_val['else'] = str(value.default())
             target[name] = entry_val
 
     def extract_chunk(self, chunk, jvm, modules, model, target):
@@ -76,7 +81,7 @@ class Extractor:
             value = None
         if field_name in ('__iter_index', '__previous', '__container'):
             return
-        if field_name in ('list_acc', 'set_acc', 'dict_acc', 'dict_acc2', '_val', 'MustReleaseBounded', 'MustReleaseUnbounded'):
+        if field_name in ('list_acc', 'set_acc', 'dict_acc', '_val', 'MustReleaseBounded', 'MustReleaseUnbounded'):
             # Special handling,
             pyfield = field_name
         else:

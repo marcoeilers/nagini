@@ -53,16 +53,17 @@ TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
 def parse_sil_file(sil_path: str, jvm):
-    parser = getattr(getattr(jvm.viper.silver.parser, "FastParser$"), "MODULE$")
+    parser = jvm.viper.silver.parser.FastParser()
+    tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
+    tp.beforeParse(text, False)
     parsed = parser.parse(text, path, none)
-    assert (isinstance(parsed, getattr(jvm.fastparse.core,
-                                       'Parsed$Success')))
-    parse_result = parsed.value()
+
+    parse_result = parsed
     parse_result.initProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
@@ -177,16 +178,16 @@ def collect_modules(analyzer: Analyzer, path: str) -> None:
         task()
 
 
-def verify(modules, prog: 'viper.silver.ast.Program', path: str,
-           jvm: JVM, backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
+def verify(modules, prog: 'viper.silver.ast.Program', path: str, jvm: JVM, viper_args: List[str],
+           backend=ViperVerifier.silicon, arp=False, counterexample=False, sif=False) -> VerificationResult:
     """
     Verifies the given Viper program
     """
     try:
         if backend == ViperVerifier.silicon:
-            verifier = Silicon(jvm, path, counterexample)
+            verifier = Silicon(jvm, path, viper_args, counterexample)
         elif backend == ViperVerifier.carbon:
-            verifier = Carbon(jvm, path)
+            verifier = Carbon(jvm, path, viper_args)
         vresult = verifier.verify(modules, prog, arp=arp, sif=sif)
         return vresult
     except JException as je:
@@ -307,6 +308,10 @@ def main() -> None:
         action='store_true',
         help='return a counterexample for every verification error if possible'
     )
+    parser.add_argument(
+        '--viper-arg',
+        help='Arguments to be forwarded to Viper, separated by commas'
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -371,17 +376,18 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             backend = ViperVerifier.carbon
         else:
             raise ValueError('Unknown verifier specified: ' + args.verifier)
+        viper_args = [] if args.viper_arg is None else args.viper_arg.split(",")
         if args.benchmark >= 1:
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
                 modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir)
-                vresult = verify(modules, prog, python_file, jvm, backend=backend, arp=arp)
+                vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
-            vresult = verify(modules, prog, python_file, jvm,
+            vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
         if args.verbose:
             print("Verification completed.")

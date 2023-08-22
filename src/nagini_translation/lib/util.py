@@ -89,6 +89,9 @@ class AssignCollector(ast.NodeVisitor):
         for target in node.targets:
             self._track_assign(target)
 
+    def visit_AnnAssign(self, node: ast.Assign) -> None:
+        self._track_assign(node.target)
+
     def _track_assign(self, target: ast.AST) -> None:
         if isinstance(target, ast.Tuple):
             actual_targets = target.elts
@@ -171,6 +174,10 @@ def is_pre(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Requires'
 
 
+def is_decreases(stmt: ast.AST) -> bool:
+    return get_func_name(stmt) == 'Decreases'
+
+
 def is_post(stmt: ast.AST) -> bool:
     return get_func_name(stmt) == 'Ensures'
 
@@ -221,6 +228,8 @@ def get_body_indices(statements: List[ast.AST]) -> Tuple[int, int]:
         while is_invariant(statements[start_index]):
             start_index += 1
         while is_pre(statements[start_index]):
+            start_index += 1
+        while is_decreases(statements[start_index]):
             start_index += 1
         while is_post(statements[start_index]):
             start_index += 1
@@ -426,3 +435,13 @@ def int_to_string(i: int) -> str:
         result += chr(i % 256)
         i = i // 256
     return result
+
+
+def list_to_seq(lst, jvm, t=None):
+    if not t:
+        t = jvm.java.lang.Object
+    arr = jvm.get_array(t, len(lst))
+    seq = jvm.scala.collection.mutable.ArraySeq.make(arr)
+    for i, element in enumerate(lst):
+        seq.update(i, element)
+    return seq.toSeq()

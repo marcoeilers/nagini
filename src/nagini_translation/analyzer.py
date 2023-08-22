@@ -351,7 +351,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_Module(self, node: ast.Module) -> None:
         for stmt in node.body:
             if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.Import,
-                                 ast.ImportFrom, ast.Assign)):
+                                 ast.ImportFrom, ast.Assign, ast.AnnAssign)):
                 continue
             if (isinstance(stmt, ast.Expr) and
                     isinstance(stmt.value, ast.Str)):
@@ -728,33 +728,57 @@ class Analyzer(ast.NodeVisitor):
     def visit_For(self, node: ast.While) -> None:
         self.visit_loop(node)
 
+    def _visit_single_name_assign(self, name: ast.Name, node: ast.Assign) -> Tuple[bool, bool]:
+        is_alias = False
+        is_type_var = False
+        actual_prefix = []
+        if self.module.type_prefix:
+            actual_prefix = self.module.type_prefix.split('.')
+        actual_prefix.append(name.id)
+        lhs_name = tuple(actual_prefix)
+        # If it's a type alias marked by mypy
+        if lhs_name in self.types.type_aliases:
+            type_name = self.types.type_aliases[lhs_name]
+            aliased_type = self.convert_type(type_name, node)
+            self.module.classes[name.id] = aliased_type
+            is_alias = True
+        # If it's a type variable marked by mypy
+        elif lhs_name in self.types.type_vars:
+            var = self.types.type_vars[lhs_name]
+            self.module.type_vars[name.id] = var
+            is_type_var = True
+        # Could still be a type alias if RHS refers to class
+        elif not isinstance(node.value, ast.Call):
+            target = self.get_target(node.value, self.module)
+            if isinstance(target, PythonType):
+                self.module.classes[name.id] = target
+                is_alias = True
+        return is_alias, is_type_var
+
     def visit_Assign(self, node: ast.Assign) -> None:
         is_alias = False
         is_type_var = False
         # Check if this is a type alias
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            actual_prefix = []
-            if self.module.type_prefix:
-                actual_prefix = self.module.type_prefix.split('.')
-            actual_prefix.append(node.targets[0].id)
-            lhs_name = tuple(actual_prefix)
-            # If it's a type alias marked by mypy
-            if lhs_name in self.types.type_aliases:
-                type_name = self.types.type_aliases[lhs_name]
-                aliased_type = self.convert_type(type_name, node)
-                self.module.classes[node.targets[0].id] = aliased_type
-                is_alias = True
-            # If it's a type variable marked by mypy
-            elif lhs_name in self.types.type_vars:
-                var = self.types.type_vars[lhs_name]
-                self.module.type_vars[node.targets[0].id] = var
-                is_type_var = True
-            # Could still be a type alias if RHS refers to class
-            elif not isinstance(node.value, ast.Call):
-                target = self.get_target(node.value, self.module)
-                if isinstance(target, PythonType):
-                    self.module.classes[node.targets[0].id] = target
-                    is_alias = True
+            is_alias, is_type_var = self._visit_single_name_assign(node.targets[0], node)
+
+        # Nothing else to do for type aliases and type vars, for all other
+        # cases proceed as usual.
+        if is_alias:
+            if self.current_function or self.current_class:
+                raise InvalidProgramException(node, 'local.type.alias')
+        elif is_type_var:
+            if self.current_function or self.current_class:
+                raise InvalidProgramException(node, 'local.typevar')
+        else:
+            self.visit_default(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        is_alias = False
+        is_type_var = False
+        # Check if this is a type alias
+        if isinstance(node.target, ast.Name):
+            is_alias, is_type_var = self._visit_single_name_assign(node.target, node)
 
         # Nothing else to do for type aliases and type vars, for all other
         # cases proceed as usual.
@@ -896,6 +920,11 @@ class Analyzer(ast.NodeVisitor):
             elif node.func.id == 'Ensures':
                 self.stmt_container.postcondition.append(
                     (node.args[0], self._aliases.copy()))
+            elif node.func.id == 'Decreases':
+                if not (isinstance(self.stmt_container, PythonMethod) and self.stmt_container.pure):
+                    raise InvalidProgramException(node, 'invalid.contract.position')
+                self.stmt_container.decreases_clauses.append(
+                    (node.args, self._aliases.copy()))
             elif node.func.id == 'Exsures':
                 exception = self.get_target(node.args[0], self.module)
                 if exception not in self.current_function.declared_exceptions:
@@ -1009,7 +1038,7 @@ class Analyzer(ast.NodeVisitor):
                         var = self.node_factory.create_python_global_var(
                             node.id, node, cls, self.module)
                     assign = node._parent
-                    if isinstance(assign, ast.Assign) and len(assign.targets) == 1:
+                    if (isinstance(assign, ast.Assign) and len(assign.targets) == 1) or isinstance(assign, ast.AnnAssign):
                         var.value = assign.value
                     self.module.global_vars[node.id] = var
                 current_module = self.module

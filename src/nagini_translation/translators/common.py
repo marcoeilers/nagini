@@ -570,8 +570,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if dom_type.name in (DICT_TYPE, SET_TYPE, PSEQ_TYPE, PSET_TYPE):
                 contains_constructor = self.viper.AnySetContains
                 if dom_type.name == DICT_TYPE:
-                    set_ref = self.viper.SetType(self.viper.Ref)
-                    field = self.viper.Field('dict_acc', set_ref, position, info)
+                    contains_constructor = self.viper.MapContains
+                    map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+                    field = self.viper.Field('dict_acc', map_ref_ref, position, info)
                     res = self.viper.FieldAccess(dom_arg, field, position, info)
                 elif dom_type.name == SET_TYPE:
                     set_ref = self.viper.SetType(self.viper.Ref)
@@ -915,3 +916,17 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
         return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int], pos, info,
                                   self.viper.Bool, [param])
+
+    def _conjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
+        """
+        Conjoin all expressions in the list.
+        """
+        return eqs[0] if len(eqs) == 1 else self.viper.And(eqs[0],
+               self._conjoin(eqs[1:], pos, info), pos, info)
+
+    def _disjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:
+        """
+        Disjoin all expressions in the list.
+        """
+        return eqs[0] if len(eqs) == 1 else self.viper.Or(eqs[0],
+               self._disjoin(eqs[1:], pos, info), pos, info)

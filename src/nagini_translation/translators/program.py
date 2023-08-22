@@ -476,11 +476,7 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('dict_acc',
-                                       self.viper.SetType(self.viper.Ref),
-                                       self.no_position(ctx),
-                                       self.no_info(ctx)))
-        fields.append(self.viper.Field('dict_acc2',
-                                       self.viper.Ref,
+                                       self.viper.MapType(self.viper.Ref, self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('Measure$acc',
@@ -1079,6 +1075,7 @@ class ProgramTranslator(CommonTranslator):
                                         [result], pos, info, adt_type)
         postconds.append(self.viper.EqCmp(unbox_func, adt_obj_use, pos, info))
         box_func_name = adt.fresh('box_' + adt.adt_domain_name)
+        terminates_wildcard = self.viper.DecreasesWildcard(None, pos, info)
         for cons in adt.all_subclasses[1:]:
             is_cons_call = self.viper.DomainFuncApp(adt.fresh(adt.adt_prefix + 'is_'
                                                     + cons.name), [adt_obj_use],
@@ -1100,11 +1097,11 @@ class ProgramTranslator(CommonTranslator):
             quant = self.viper.Forall([adt_other_decl], [trigger], both_equal, pos, info)
             postconds.append(quant)
         yield self.viper.Function(box_func_name,
-                                  [adt_obj_decl], self.viper.Ref, [], postconds,
+                                  [adt_obj_decl], self.viper.Ref, [terminates_wildcard], postconds,
                                   None, pos, info)
 
         ## Create unbox function
-        preconds = []
+        preconds = [terminates_wildcard]
         postconds = []
         adt_ref_use = self.viper.LocalVar('ref', self.viper.Ref, pos, info)
         preconds.append(self.type_factory.type_check(adt_ref_use, adt, pos, ctx))
@@ -1482,6 +1479,4 @@ class ProgramTranslator(CommonTranslator):
                                   methods, self.no_position(ctx),
                                   self.no_info(ctx))
 
-        method_splitter = getattr(getattr(self.viper.ast.utility, "MethodSplitter$"), "MODULE$")
-        prog = method_splitter.split(prog)
         return prog

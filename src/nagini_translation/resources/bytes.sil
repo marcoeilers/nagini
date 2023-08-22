@@ -6,6 +6,7 @@
  */
 
 function bytes___len__(self: Ref): Int
+    decreases _
     requires issubtype(typeof(self), bytes())
 	ensures result >= 0
 {
@@ -13,28 +14,34 @@ function bytes___len__(self: Ref): Int
 }
 
 function bytes___val__(self: Ref): Seq[Ref]
+    decreases _
 
 function bytes___create__(value: Seq[Ref], ctr: Int) : Ref
+    decreases _
     ensures typeof(result) == bytes()
 	ensures bytes___len__(result) == |value|
 	ensures bytes___val__(result) == value
 
 function bytes___bool__(self: Ref) : Bool
+    decreases _
     requires self != null ==> issubtype(typeof(self), bytes())
     ensures self == null ==> !result
 	ensures self != null ==> result == (bytes___len__(self) != 0)
 
 function bytes___eq__(self: Ref, other: Ref): Bool
+    decreases _
     requires issubtype(typeof(self), bytes())
     ensures (bytes___val__(self) == bytes___val__(other)) == result
     ensures result ==> (issubtype(typeof(other), bytes()) && bytes___len__(self) == bytes___len__(other))
 
 function bytes___sil_seq__(self: Ref) : Seq[Ref]
+    decreases _
 {
     bytes___val__(self)
 }
 
 function bytes___add__(self: Ref, other: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), bytes())
     requires issubtype(typeof(other), bytes())
     ensures typeof(result) == bytes()
@@ -42,6 +49,7 @@ function bytes___add__(self: Ref, other: Ref): Ref
     ensures bytes___val__(result) == bytes___val__(self) ++ bytes___val__(other)
 
 function bytes___mul__(self: Ref, factor: Int): Ref
+  decreases _
   requires issubtype(typeof(self), bytes())
   requires factor >= 0
   ensures typeof(result) == bytes()
@@ -50,6 +58,7 @@ function bytes___mul__(self: Ref, factor: Int): Ref
 
 // Helper function for defining the meaning of byte multiplication
 function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
+  decreases _
   requires factor >= 0
   ensures (forall e: Ref :: {e in result} {e in seq} (e in result) ==> (e in seq))
   ensures |result| == factor * |seq|
@@ -58,6 +67,7 @@ function bytes___mul__helper(seq: Seq[Ref], factor: Int): Seq[Ref]
 }
 
 function bytes_join(self: Ref, other: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), bytes())
     requires issubtype(typeof(other), list(bytes()))
     requires acc(other.list_acc, wildcard)
@@ -66,6 +76,7 @@ function bytes_join(self: Ref, other: Ref): Ref
 
 // Helper function for defining the meaning of byte join
 function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
+    decreases _
     requires issubtype(typeof(l), list(bytes()))
     requires acc(l.list_acc, wildcard)
     requires index >= 0 && index < list___len__(l)
@@ -79,6 +90,7 @@ function bytes_join_val_helper(l: Ref, sep: Seq[Ref], index: Int) : Seq[Ref]
 }
 
 function bytes___getitem__(self: Ref, index: Int): Ref
+    decreases _
     requires issubtype(typeof(self), bytes())
     requires index >= 0 ==> index < bytes___len__(self)
     requires index < 0 ==> index >= -bytes___len__(self)
@@ -87,6 +99,7 @@ function bytes___getitem__(self: Ref, index: Int): Ref
     ensures index < 0 ==> result == bytes___val__(self)[bytes___len__(self) + index]
 
 function bytes___getitem_slice__(self: Ref, index: Ref): Ref
+    decreases _
     requires issubtype(typeof(self), bytes())
     requires issubtype(typeof(index), slice())
     requires (slice___start__(index, bytes___len__(self)) >= 0 && slice___start__(index, bytes___len__(self)) <= bytes___len__(self))
