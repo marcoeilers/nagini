@@ -296,6 +296,13 @@ class ProgramTranslator(CommonTranslator):
             params.append(method.overrides.args[arg].decl)
             args.append(method.overrides.args[arg].ref())
 
+        if method.overrides.var_arg:
+            params.append(method.overrides.var_arg.decl)
+            args.append(method.overrides.var_arg.ref())
+        if method.overrides.kw_arg:
+            params.append(method.overrides.kw_arg.decl)
+            args.append(method.overrides.kw_arg.ref())
+
         self.bind_type_vars(method.overrides, ctx)
 
         mname = ctx.module.get_fresh_name(method.sil_name + '_override_check')

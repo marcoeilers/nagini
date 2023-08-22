@@ -542,7 +542,8 @@
         },
         "__len__": {
             "args": ["tuple"],
-            "type": "__prim__int"
+            "type": "__prim__int",
+            "requires": ["__val__", "args"]
         },
         "__val__": {
             "args": ["tuple"],
