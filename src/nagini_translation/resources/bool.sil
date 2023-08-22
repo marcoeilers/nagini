@@ -18,10 +18,6 @@ function NoneType___bool__(self: Ref) : Bool
     decreases _
     ensures self == null ==> !result
 
-function object___str__(self: Ref) : Ref
-    decreases _
-    ensures issubtype(typeof(result), str())
-
 function bool___bool__(self: Ref) : Bool
     decreases _
     requires self != null ==> issubtype(typeof(self), bool())
@@ -259,3 +255,5 @@ function abs(a: Int): Int
     ensures result == (a >= 0 ? a : -a)
 
 method print(r: Ref)
+    requires Low(r)
+    requires LowEvent()
