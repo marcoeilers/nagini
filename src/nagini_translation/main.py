@@ -97,7 +97,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
     path = os.path.abspath(path)
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
-    resources_path = os.path.join(current_path, 'resources')
+    if sif:
+        preamble_path = os.path.join(current_path, 'sif', 'resources')
+    else:
+        preamble_path = os.path.join(current_path, 'resources')
 
     if sif:
         viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
@@ -114,7 +117,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
 
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    with open(os.path.join(resources_path, 'preamble.index'), 'r') as file:
+    with open(os.path.join(preamble_path, 'preamble.index'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
     analyzer.initialize_io_analyzer()

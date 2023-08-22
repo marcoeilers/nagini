@@ -10,13 +10,16 @@
             "args": ["object", "object"],
             "type": "__prim__bool"
         },
-        "__str__": {
-            "args": ["object"],
-            "type": "str"
-        },
         "__cast__": {
             "args": ["type", "object"],
             "type": "object"
+        }
+    },
+    "methods": {
+        "__str__": {
+            "args": ["object"],
+            "type": "str",
+            "MustTerminate": true
         }
     }
 },

@@ -5,11 +5,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+import <decreases/int.vpr>
+
 domain SIFDomain[T] {
     function Low(x: T): Bool
+    function LowEvent(): Bool
 }
 
 import "../../resources/bool.sil"
+import "references.sil"
 import "../../resources/bytes.sil"
 import "../../resources/iterator.sil"
 import "../../resources/list.sil"

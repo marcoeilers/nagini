@@ -12,10 +12,15 @@ domain SIFDomain[T] {
     axiom low_true {
         forall x: T :: {Low(x)} Low(x)
     }
+    axiom lowevent_true {
+        LowEvent()
+    }
+    function LowEvent(): Bool
 }
 
 
 import "bool.sil"
+import "references.sil"
 import "bytes.sil"
 import "iterator.sil"
 import "list.sil"
