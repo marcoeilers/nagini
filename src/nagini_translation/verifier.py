@@ -120,7 +120,7 @@ class Silicon:
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
-            *(['--counterexample=native'] if counterexample else []),
+            *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
             *viper_args,
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)

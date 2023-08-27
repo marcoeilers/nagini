@@ -378,14 +378,14 @@ class Converter:
         for name, var in locals:
             self.convert_python_variable(name, var, store)
 
-        for (recv, field), value in self.heap.items():
+        for (recv, field), value in self.real_fields_first(self.heap.items()):
             if isinstance(recv, tuple):
                 # this is a predicate
                 self.convert_python_predicate(recv, field, heap)
             else:
                 self.convert_python_field(recv, field, value, self.heap, heap, store)
 
-        for (recv, field), value in self.old_heap.items():
+        for (recv, field), value in self.real_fields_first(self.old_heap.items()):
             if isinstance(recv, tuple):
                 # this is a predicate
                 self.convert_python_predicate(recv, field, old_heap)
@@ -396,6 +396,16 @@ class Converter:
             return Model(None, old_store, None, heap)
         return Model(old_store, store, old_heap, heap)
 
+    def real_fields_first(self, heap_items):
+        real_fields = []
+        internal_fields = []
+        for (recv, field), value in heap_items:
+            if isinstance(field, str):
+                internal_fields.append(((recv, field), value))
+            else:
+                real_fields.append(((recv, field), value))
+        return real_fields + internal_fields
+
     def evaluate_term(self, term):
         return evaluate_term(self.jvm, term, self.model)
 
@@ -404,14 +414,13 @@ class Converter:
         length = self.get_func_value(SEQ_LENGTH, (val,))
         parsed_length = self.parse_int(length)
         res['len({})'.format(object_name)] = parsed_length
-        if parsed_length > 0:
-            indices, els_index = self.get_func_values(SEQ_INDEX, (val,))
-            for ((index,), value) in indices:
-                converted_value = self.convert_value(value, content_type)
-                res['{}[{}]'.format(object_name, index)] = converted_value
-            if els_index is not None and self.ref_has_type(els_index, content_type):
-                converted_value = self.convert_value(els_index, content_type)
-                res['{}[_]'.format(object_name)] = converted_value
+        indices, els_index = self.get_func_values(SEQ_INDEX, (val,))
+        for ((index,), value) in indices:
+            converted_value = self.convert_value(value, content_type)
+            res['{}[{}]'.format(object_name, index)] = converted_value
+        if els_index is not None and self.ref_has_type(els_index, content_type):
+            converted_value = self.convert_value(els_index, content_type)
+            res['{}[_]'.format(object_name)] = converted_value
         return res
 
     def convert_special_field(self, recv, heap, object_name, t, smt_value):
@@ -433,16 +442,15 @@ class Converter:
             length = self.get_func_value(MAP_CARD, (smt_value,))
             parsed_length = self.parse_int(length)
             res['len({})'.format(object_name)] = parsed_length
-            if parsed_length >= 0:
-                map_val = heap[(recv, 'dict_acc')]
-                keys, els_val = self.get_func_values(DICT_GET, (map_val,))
-                for ((key,), value) in keys:
-                    converted_value = self.convert_value(value, t.type_args[1])
-                    converted_key = self.convert_value(key, t.type_args[0])
-                    res['{}[{}]'.format(object_name, converted_key)] = converted_value
-                if els_val is not None and self.ref_has_type(els_val, t.type_args[1]):
-                    converted_value = self.convert_value(els_val, t.type_args[1])
-                    res['{}[_]'.format(object_name)] = converted_value
+            map_val = heap[(recv, 'dict_acc')]
+            keys, els_val = self.get_func_values(DICT_GET, (map_val,))
+            for ((key,), value) in keys:
+                converted_value = self.convert_value(value, t.type_args[1])
+                converted_key = self.convert_value(key, t.type_args[0])
+                res['{}[{}]'.format(object_name, converted_key)] = converted_value
+            if els_val is not None and self.ref_has_type(els_val, t.type_args[1]):
+                converted_value = self.convert_value(els_val, t.type_args[1])
+                res['{}[_]'.format(object_name)] = converted_value
         return res
 
     def convert_value(self, val, t: PythonType, name: str = None):
@@ -479,9 +487,19 @@ class Converter:
                 self.reference_values[val] = (ref_name, actual_type)
                 return ref_name
             except:
-                return '?'
+                actual_type_name = '?'
+                actual_type = t
+                i = 0
+                ref_name = actual_type_name + str(i)
+                while (ref_name, actual_type) in self.reference_values.values():
+                    i += 1
+                    ref_name = actual_type_name + str(i)
+                self.reference_values[val] = (ref_name, actual_type)
+                return ref_name
 
     def ref_get_actual_type(self, val, t: PythonType):
+        if val in self.reference_values:
+            return self.reference_values[val][1]
         val_type = self.get_func_value(TYPEOF, (val,))
         return self.get_precise_type(val_type, t)
 
@@ -490,7 +508,7 @@ class Converter:
         if not self.is_type(val_type, cls):
             if isinstance(t, OptionalType):
                 none_type = self.modules[0].global_module.classes['NoneType']
-                if self.is_type(val_type, none_type): # or '$Ref.null' in self.model and val == str(self.model['$Ref.null']):
+                if self.is_type(val_type, none_type): 
                     return none_type
             raise NoFittingValueException
         for sc in cls.direct_subclasses:
@@ -499,31 +517,56 @@ class Converter:
         if isinstance(t, GenericType):
             type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>', (val_type,))
             type_arg_results = []
+            for i, ta in enumerate(t.type_args):
+                for ((key,), value) in type_args_explicit:
+                    if str(i) == key:
+                        type_arg_results.append(self.get_precise_type(value, ta))
+                        break
+                else:
+                    type_arg_results.append(self.get_precise_type(type_arg_els, ta))
+            return GenericType(t.python_class, type_arg_results)
+        elif t.python_class.type_vars:
+            type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
+                                                                    (val_type,))
+            type_arg_results = []
             for i, tv in enumerate(t.python_class.type_vars.values()):
                 for ((key,), value) in type_args_explicit:
                     if str(i) == key:
-                        type_arg_results.append(self.get_precise_type(value, tv.bound))
+                        type_arg_results.append(self.get_precise_type(value, self.get_basic_type(value, tv.bound)))
                         break
                 else:
-                    type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
+                    type_arg_results.append(tv.bound)
             return GenericType(t.python_class, type_arg_results)
-        elif t.python_class.type_vars:
-            try:
-                type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
-                                                                        (val_type,))
-                type_arg_results = []
-                for i, tv in enumerate(t.python_class.type_vars.values()):
-                    for ((key,), value) in type_args_explicit:
-                        if str(i) == key:
-                            type_arg_results.append(self.get_precise_type(value, tv.bound))
-                            break
-                    else:
-                        type_arg_results.append(self.get_precise_type(type_arg_els, tv.bound))
-                return GenericType(t.python_class, type_arg_results)
-            except:
-                return t.python_class
         else:
             return t
+
+    def get_basic_type(self, val, bound):
+        basic_func = self.model['get_basic<PyType>']
+        if (val,) in basic_func:
+            basic_type = basic_func[(val,)]
+            is_generic = basic_type != val
+            classes_to_search = [bound]
+            while classes_to_search:
+                current = classes_to_search[0]
+                classes_to_search = classes_to_search[1:]
+                if current.python_class.type_vars and is_generic:
+                    basic_type_key = current.python_class.sil_name + '_basic<PyType>'
+                    if basic_type_key not in self.model:
+                        continue
+                    basic_type_name = self.model[current.python_class.sil_name + '_basic<PyType>']
+                    if basic_type_name == basic_type:
+                        return current
+                elif not current.python_class.type_vars and not is_generic:
+                    type_key = current.python_class.sil_name + '<PyType>'
+                    if type_key not in self.model:
+                        continue
+                    type_name = self.get_type_val(current)
+                    if type_name == basic_type:
+                        return current
+                classes_to_search.extend(current.python_class.direct_subclasses)
+
+        else:
+            return bound
 
     def convert_pseq_value(self, val, t: PythonType, name):
         sequence = self.get_func_value(UNBOX_PSEQ, (UNIT, val))
@@ -608,7 +651,10 @@ class Converter:
     def parse_int(self, val):
         if val.startswith('(-') and val.endswith(')'):
             return - int(val[2:-1])
-        return int(val)
+        try:
+            return int(val)
+        except:
+            return '?'
 
     def parse_bool(self, val):
         if val == 'true':
@@ -616,7 +662,7 @@ class Converter:
         elif val == 'false':
             return False
         else:
-            raise Exception(val)
+            return '?'
 
     def generate_default_value(self, t: PythonType):
         if t.python_class.name == 'int':
