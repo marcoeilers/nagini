@@ -117,7 +117,9 @@ class Silicon:
             '--exhaleMode=2',
             '--alternativeFunctionVerificationOrder',
             '--disableDefaultPlugins',
-            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:viper.silver.plugin.standard.termination.TerminationPlugin',
+            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
+            'viper.silver.plugin.standard.termination.TerminationPlugin:'
+            'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
             *(['--counterexample=native'] if counterexample else []),
             *viper_args,
         ]
@@ -162,6 +164,10 @@ class Carbon:
             '--assumeInjectivityOnInhale',
             '--boogieExe', config.boogie_path,
             '--z3Exe', config.z3_path,
+            '--disableDefaultPlugins',
+            '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
+            'viper.silver.plugin.standard.termination.TerminationPlugin:'
+            'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
             *viper_args
         ]
         args_seq = list_to_seq(args, jvm, jvm.java.lang.String)
