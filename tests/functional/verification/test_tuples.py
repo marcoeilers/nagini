@@ -28,7 +28,7 @@ def something_2(s: str, a: Tuple[str, int]) -> Tuple[str, str, int]:
 def something_3(s: int, hurgh: Tuple[int, ...]) -> None:
     Requires(len(hurgh) > 2 and hurgh[1] > 8)
     if len(hurgh) > 5:
-        #:: ExpectedOutput(assert.violated:assertion.false)
+        #:: ExpectedOutput(assert.failed:assertion.false)
         Assert(hurgh[4] != s)
 
 

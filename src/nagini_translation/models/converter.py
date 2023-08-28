@@ -425,6 +425,8 @@ class Converter:
 
     def convert_tuple_value(self, val, tuple_type: GenericType, object_name):
         res = OrderedDict()
+        if 'tuple___getitem__' not in self.model:
+            return '?'
         value_func = self.model['tuple___getitem__']
         if tuple_type.exact_length:
             res['len({})'.format(object_name)] = len(tuple_type.type_args)
