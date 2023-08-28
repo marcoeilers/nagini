@@ -25,6 +25,13 @@ def something_2(s: str, a: Tuple[str, int]) -> Tuple[str, str, int]:
     return c, 'asd', a[1] + 2
 
 
+def something_3(s: int, hurgh: Tuple[int, ...]) -> None:
+    Requires(len(hurgh) > 2 and hurgh[1] > 8)
+    if len(hurgh) > 5:
+        #:: ExpectedOutput(assert.violated:assertion.false)
+        Assert(hurgh[4] != s)
+
+
 def something_else() -> int:
     Ensures(Result() == 15)
     a, b, c = something('asd', ('assaa', 15))

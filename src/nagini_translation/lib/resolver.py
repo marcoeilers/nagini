@@ -483,14 +483,18 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
-    # if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
-    #         node is node._parent.value):
-    #     # Constructor is assigned to variable;
-    #     # we get the type of the dict from the type of the
-    #     # variable it's assigned to.
-    #     trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-    #     return get_type(trgt, containers, container)
     value_type = get_type(node.value, containers, container)
+    if value_type.python_class.name == TUPLE_TYPE and isinstance(node.slice, ast.Slice):
+        if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
+                node is node._parent.value):
+            # Constructor is assigned to variable;
+            # we get the type of the dict from the type of the
+            # variable it's assigned to.
+            trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+            ann_type = get_type(trgt, containers, container)
+            if isinstance(ann_type, GenericType) and ann_type.python_class.name == TUPLE_TYPE:
+                return ann_type
+        raise UnsupportedException(node, 'tuple slicing')
     return _get_subscript_type(value_type, module, node)
 
 

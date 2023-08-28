@@ -423,6 +423,27 @@ class Converter:
             res['{}[_]'.format(object_name)] = converted_value
         return res
 
+    def convert_tuple_value(self, val, tuple_type: GenericType, object_name):
+        res = OrderedDict()
+        value_func = self.model['tuple___getitem__']
+        if tuple_type.exact_length:
+            res['len({})'.format(object_name)] = len(tuple_type.type_args)
+            for i, ta in enumerate(tuple_type.type_args):
+                key = (UNIT, val, str(i))
+                if key in value_func:
+                    value = value_func[key]
+                    converted_value = self.convert_value(value, ta)
+                    res['{}[{}]'.format(object_name, i)] = converted_value
+        else:
+            length = self.get_func_value('tuple___len__', (val,))
+            parsed_length = self.parse_int(length)
+            res['len({})'.format(object_name)] = parsed_length
+            indices, els_index = self.get_func_values('tuple___getitem__', (UNIT, val,))
+            for (i, ((index,), value)) in enumerate(indices):
+                converted_value = self.convert_value(value, tuple_type.type_args[0])
+                res['{}[{}]'.format(object_name, index)] = converted_value
+        return '( {} )'.format(', '.join(['{} -> {}'.format(k, v) for k, v in res.items()]))
+
     def convert_special_field(self, recv, heap, object_name, t, smt_value):
         res = OrderedDict()
         if isinstance(t, PythonClass):
@@ -469,6 +490,8 @@ class Converter:
             return self.convert_pseq_value(val, t, name)
         elif t.python_class.is_adt:
             return self.convert_adt_value(val, t)
+        elif isinstance(t, GenericType) and t.python_class.name == 'tuple':
+            return self.convert_tuple_value(val, t, name)
         else:
             return self.get_reference_name(val, t)
 
@@ -528,6 +551,8 @@ class Converter:
             if self.is_type(val_type, sc):
                 return self.get_precise_type(val_type, sc)
         if isinstance(t, GenericType):
+            if isinstance(t, OptionalType):
+                return self.get_precise_type(val_type, t.optional_type)
             return t
         elif basic.type_vars:
             type_args_explicit, type_arg_els = self.get_func_values(basic.sil_name + '_arg<PyType>',
