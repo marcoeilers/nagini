@@ -238,8 +238,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 # and we can get the variable type.
                 if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
                     trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-                    return get_type(trgt, containers, container)
-                elif (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
+                    ann_type = get_type(trgt, containers, container)
+                    if isinstance(ann_type, GenericType) and ann_type.python_class == target:
+                        return ann_type
+                if (target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
                           isinstance(node, ast.Call) and node.args):
                     arg_types = [get_type(arg, containers, container)
                                  for arg in node.args]
@@ -319,12 +321,13 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         if (node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
                     node is node._parent.value):
             # Constructor is assigned to variable;
-            # we get the type of the dict from the type of the
+            # we get the type of the list from the type of the
             # variable it's assigned to.
             trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-            return get_type(trgt, containers, container)
-        else:
-            raise UnsupportedException(node, 'List comprehensions must be directly '
+            ann_type = get_type(trgt, containers, container)
+            if isinstance(ann_type, GenericType) and ann_type.python_class.name == 'list':
+                return ann_type
+        raise UnsupportedException(node, 'List comprehensions must be directly '
                                        'assigned to a local variable.')
     else:
         raise UnsupportedException(node)
@@ -345,8 +348,11 @@ def _get_collection_literal_type(node: ast.AST, arg_fields: List[str],
         # we get the type of the dict from the type of the
         # variable it's assigned to.
         target = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-        args = get_type(target, containers, container).type_args
-    elif all(getattr(node, arg_field) for arg_field in arg_fields):
+        ann_type = get_type(target, containers, container)
+        if isinstance(ann_type, GenericType) and ann_type.python_class.name == coll_type:
+            return GenericType(module.global_module.classes[coll_type],
+                               ann_type.type_args)
+    if all(getattr(node, arg_field) for arg_field in arg_fields):
         args = []
         for arg_field in arg_fields:
             arg_types = [get_type(arg, containers, container) for arg in
@@ -477,13 +483,13 @@ def _get_call_type(node: ast.Call, module: PythonModule,
 def get_subscript_type(node: ast.Subscript, module: PythonModule,
                         containers: List[ContainerInterface],
                         container: PythonNode) -> PythonType:
-    if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
-            node is node._parent.value):
-        # Constructor is assigned to variable;
-        # we get the type of the dict from the type of the
-        # variable it's assigned to.
-        trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
-        return get_type(trgt, containers, container)
+    # if (hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)) and
+    #         node is node._parent.value):
+    #     # Constructor is assigned to variable;
+    #     # we get the type of the dict from the type of the
+    #     # variable it's assigned to.
+    #     trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+    #     return get_type(trgt, containers, container)
     value_type = get_type(node.value, containers, container)
     return _get_subscript_type(value_type, module, node)
 

@@ -418,7 +418,7 @@ class Converter:
         for ((index,), value) in indices:
             converted_value = self.convert_value(value, content_type)
             res['{}[{}]'.format(object_name, index)] = converted_value
-        if els_index is not None and self.ref_has_type(els_index, content_type):
+        if els_index is not None and els_index != '#unspecified' and self.ref_has_type(els_index, content_type):
             converted_value = self.convert_value(els_index, content_type)
             res['{}[_]'.format(object_name)] = converted_value
         return res
@@ -448,18 +448,27 @@ class Converter:
                 converted_value = self.convert_value(value, t.type_args[1])
                 converted_key = self.convert_value(key, t.type_args[0])
                 res['{}[{}]'.format(object_name, converted_key)] = converted_value
-            if els_val is not None and self.ref_has_type(els_val, t.type_args[1]):
+            if els_val is not None and els_val != '#unspecified' and self.ref_has_type(els_val, t.type_args[1]):
                 converted_value = self.convert_value(els_val, t.type_args[1])
                 res['{}[_]'.format(object_name)] = converted_value
         return res
 
     def convert_value(self, val, t: PythonType, name: str = None):
+        if t.python_class.name.startswith('__prim__'):
+            if t.python_class.name == '__prim__int':
+                return self.parse_int(val)
+            if t.python_class.name == '__prim__bool':
+                return self.parse_bool(val)
+            if t.python_class.name == '__prim__Seq':
+                raise Exception # TODO
         if t.python_class.name == 'int':
             return self.convert_int_value(val)
         elif t.python_class.name == 'bool':
             return self.convert_bool_value(val)
         elif t.python_class.name == 'PSeq':
             return self.convert_pseq_value(val, t, name)
+        elif t.python_class.is_adt:
+            return self.convert_adt_value(val, t)
         else:
             return self.get_reference_name(val, t)
 
@@ -486,7 +495,7 @@ class Converter:
                     ref_name = actual_type_name + str(i)
                 self.reference_values[val] = (ref_name, actual_type)
                 return ref_name
-            except:
+            except NoFittingValueException as e:
                 actual_type_name = '?'
                 actual_type = t
                 i = 0
@@ -505,38 +514,33 @@ class Converter:
 
     def get_precise_type(self, val_type, t: PythonType):
         cls = t.python_class
+        if cls.name == 'tuple':
+            # tuples are special and the existing code doesn't really work for them.
+            return t
         if not self.is_type(val_type, cls):
             if isinstance(t, OptionalType):
                 none_type = self.modules[0].global_module.classes['NoneType']
                 if self.is_type(val_type, none_type): 
                     return none_type
             raise NoFittingValueException
-        for sc in cls.direct_subclasses:
+        basic = self.get_basic_type(val_type, cls)
+        for sc in basic.direct_subclasses:
             if self.is_type(val_type, sc):
                 return self.get_precise_type(val_type, sc)
         if isinstance(t, GenericType):
-            type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>', (val_type,))
-            type_arg_results = []
-            for i, ta in enumerate(t.type_args):
-                for ((key,), value) in type_args_explicit:
-                    if str(i) == key:
-                        type_arg_results.append(self.get_precise_type(value, ta))
-                        break
-                else:
-                    type_arg_results.append(self.get_precise_type(type_arg_els, ta))
-            return GenericType(t.python_class, type_arg_results)
-        elif t.python_class.type_vars:
-            type_args_explicit, type_arg_els = self.get_func_values(t.python_class.sil_name + '_arg<PyType>',
+            return t
+        elif basic.type_vars:
+            type_args_explicit, type_arg_els = self.get_func_values(basic.sil_name + '_arg<PyType>',
                                                                     (val_type,))
             type_arg_results = []
-            for i, tv in enumerate(t.python_class.type_vars.values()):
+            for i, tv in enumerate(basic.type_vars.values()):
                 for ((key,), value) in type_args_explicit:
                     if str(i) == key:
                         type_arg_results.append(self.get_precise_type(value, self.get_basic_type(value, tv.bound)))
                         break
                 else:
                     type_arg_results.append(tv.bound)
-            return GenericType(t.python_class, type_arg_results)
+            return GenericType(basic, type_arg_results)
         else:
             return t
 
@@ -564,9 +568,7 @@ class Converter:
                     if type_name == basic_type:
                         return current
                 classes_to_search.extend(current.python_class.direct_subclasses)
-
-        else:
-            return bound
+        return bound
 
     def convert_pseq_value(self, val, t: PythonType, name):
         sequence = self.get_func_value(UNBOX_PSEQ, (UNIT, val))
@@ -582,6 +584,68 @@ class Converter:
         if int_or_none is None:
             return self.generate_default_int()
         return self.parse_int(int_or_none)
+
+    def get_type_suffix(self, cls):
+        if cls.name == '__prim__int':
+            return 'Int'
+        if cls.name == '__prim__bool':
+            return 'Bool'
+        if cls.name == '__prim__Seq':
+            return 'Seq'
+        if cls.name == '__prim__Set':
+            return 'Set'
+        if cls.is_adt:
+            return cls.adt_def.adt_domain_name
+        return 'Ref'
+
+    def convert_adt_value(self, val, cls):
+        adt_def_class = cls.adt_def
+        unbox_func_name = 'unbox_' + adt_def_class.adt_domain_name
+        unbox_entries = self.model[unbox_func_name]
+        box_func_name = 'box_' + adt_def_class.adt_domain_name
+        box_entries = self.model[box_func_name]
+        if not val.startswith('$Ref!'):
+            unboxed_val = val
+        elif (UNIT, val) in unbox_entries:
+            unboxed_val = unbox_entries[(UNIT, val)]
+        else:
+            for k, v in box_entries.items():
+                if len(k) < 2:
+                    continue
+                if v == val:
+                    unboxed_val = k[1]
+                    break
+            else:
+                unboxed_val = None
+
+        if unboxed_val is not None:
+            type_func = adt_def_class.name + '_cons_type<Int>'
+            type_func_entries = self.model[type_func]
+            type_key = (unboxed_val,)
+            if type_key in type_func_entries:
+                type_id = type_func_entries[type_key]
+                for constr in adt_def_class.direct_subclasses:
+                    constr_type_name = adt_def_class.name + '_' + constr.name + '_type<Int>'
+                    if constr_type_name in self.model and self.model[constr_type_name] == type_id:
+                        constr_class = constr
+                        break
+                else:
+                    constr_class = None
+                if constr_class:
+                    field_values = OrderedDict()
+                    for fld_name, fld in constr_class.fields.items():
+                        fld_getter_name = adt_def_class.name + '_' + fld.sil_name + '<' + self.get_type_suffix(fld.type.python_class) + '>'
+                        if fld_getter_name in self.model:
+                            getter_entries = self.model[fld_getter_name]
+                            if (unboxed_val,) in getter_entries:
+                                field_val = getter_entries[(unboxed_val,)]
+                                try:
+                                    fld_val_converted = self.convert_value(field_val, fld.type)
+                                except NoFittingValueException:
+                                    fld_val_converted = '?'
+                                field_values[fld_name] = fld_val_converted
+                    return '{}: {{ {} }}'.format(constr_class.name, ', '.join(['{} -> {}'.format(k, v) for k, v in field_values.items()]))
+        return self.get_reference_name(val, cls)  # fallback
 
     def convert_bool_value(self, val):
         if not self.ref_has_type(val, 'bool'):

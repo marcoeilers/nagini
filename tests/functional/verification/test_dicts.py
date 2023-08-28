@@ -93,6 +93,7 @@ def test_set() -> None:
 
 
 def test_change() -> None:
+    o2: object = {1: 2}
     a = {1 : 2}
     a[2] = 4
     a[2] = 5
