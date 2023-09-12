@@ -3,7 +3,8 @@ from nagini_contracts.contracts import *
 from nagini_contracts.obligations import MustTerminate
 
 #:: IgnoreFile(107)
-
+# Ignored because it takes a while (2-3 minutes on my eight core laptop); 
+# To verify, use Nagini arguments --verifier=silicon --viper-arg=--parallelizeBranches
 
 class SR:
     def __init__(self, runs: List[int], data: List[int]) -> None:

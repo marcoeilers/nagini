@@ -86,6 +86,8 @@ ERRORS = {
         lambda n: 'Function might not terminate.',
     'refute.failed':
         lambda n: 'Refute holds in all cases or could not be reached.',
+    'predicateinstance.no.access':
+        lambda n: 'Predicate access might fail.'
 }
 
 REASONS = {

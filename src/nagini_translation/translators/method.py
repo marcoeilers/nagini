@@ -110,7 +110,15 @@ class MethodTranslator(CommonTranslator):
                 if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
                     decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
                 else:
-                    measure_stmt, measure = self.translate_expr(measure_node, ctx, target_type=self.viper.Int)
+                    measure = None
+                    if isinstance(measure_node, ast.Call):
+                        target = self.get_target(measure_node, ctx)
+                        if isinstance(target, PythonMethod) and target.predicate:
+                            measure_stmt, measure_args, _ = self.translate_args(target, measure_node.args,
+                                                                                measure_node.keywords, measure_node, ctx)
+                            measure = self.viper.PredicateInstance(measure_args, target.sil_name, pos, info)
+                    if measure is None:
+                        measure_stmt, measure = self.translate_expr(measure_node, ctx, target_type=self.viper.Int)
                     decreases_clause = self.viper.DecreasesTuple([measure], condition, pos, info)
                     if measure_stmt:
                         raise InvalidProgramException(measure_node, 'purity.violated')

@@ -291,6 +291,10 @@ class ViperAST:
         condition = self.scala.Some(condition) if condition is not None else self.none
         return self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard(condition, position, info, self.NoTrafos)
 
+    def PredicateInstance(self, args, pred_name, position, info):
+        args_seq = self.to_seq(args)
+        return self.jvm.viper.silver.plugin.standard.predicateinstance.PredicateInstance(args_seq, pred_name, position, info, self.NoTrafos)
+
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info, self.NoTrafos)
 

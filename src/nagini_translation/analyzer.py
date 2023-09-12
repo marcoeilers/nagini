@@ -1184,6 +1184,8 @@ class Analyzer(ast.NodeVisitor):
                     arg = GenericType(tuple_class, [int_type, args[0]])
                     args = [arg]
                 result = GenericType(result, args)
+                if result.name == TUPLE_TYPE:
+                    result.exact_length = False
         elif self.types.is_normal_type(mypy_type):
             return self._convert_normal_type(mypy_type)
         elif self.types.is_tuple_type(mypy_type):

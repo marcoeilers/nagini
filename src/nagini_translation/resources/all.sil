@@ -6,6 +6,7 @@
  */
 
 import <decreases/int.vpr>
+import <decreases/predicate_instance.vpr>
 
 domain SIFDomain[T] {
     function Low(x: T): Bool

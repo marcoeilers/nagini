@@ -14,14 +14,14 @@ Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely 
 
     sudo apt-get install python3-dev
 
-For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.4.21).
+For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
 ==========================
 
 1.  Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely *will not work*).
 
-2.  Install either Visual C++ Build Tools 2015 (http://go.microsoft.com/fwlink/?LinkId=691126) or Visual Studio 2015. For the latter, make sure to choose the option "Common Tools for Visual C++ 2015" in the setup (see https://blogs.msdn.microsoft.com/vcblog/2015/07/24/setup-changes-in-visual-studio-2015-affecting-c-developers/ for an explanation).
+2.  Install the required version of either Visual C++ Build Tools or Visual Studio. 
 
 
 Getting Started
@@ -45,6 +45,9 @@ Getting Started
         cd nagini
         pip install .
 
+4.  Optionally, try running the tests::
+
+        pytest src/nagini_translation/tests.py --silicon
 
 Command Line Usage
 ==================
@@ -112,16 +115,9 @@ Troubleshooting
 
 1.  On Windows: During the setup, you get an error like ``Microsoft Visual C++ 14.0 is required.`` or ``Unable to fnd vcvarsall.bat``: 
 
-    Python cannot find the required Visual Studio 2015 C++ installation, make sure you have either installed the Build Tools or checked the "Common Tools" option in your regular VS 2015 installation (see above).
+    Python cannot find the required Visual Studio C++ installation, make sure you have either installed the Build Tools or checked the "Common Tools" option in your regular Visual Studio installation (see above).
 
 2.  While verifying a file, you get a stack trace ending with something like ``No matching overloads found``:
 
     The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
 
-
-Build Status
-============
-
-.. image:: https://pmbuilds.inf.ethz.ch/buildStatus/icon?job=nagini&style=plastic
-   :alt: Build Status
-   :target: https://pmbuilds.inf.ethz.ch/job/nagini

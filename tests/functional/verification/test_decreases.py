@@ -2,6 +2,7 @@
 # http://creativecommons.org/publicdomain/zero/1.0/
 
 from nagini_contracts.contracts import *
+from typing import Optional
 
 @Pure
 def fac1(i: int) -> int:
@@ -81,3 +82,35 @@ def fac5pre(i: int) -> int:
     if i <= 1:
         return 1
     return i * fac5pre(i - 1)
+
+
+class Node:
+    def __init__(self) -> None:
+        self.value = 0
+        self.next : Optional[Node] = None
+
+
+@Predicate
+def tree(n: Node) -> bool:
+    return (
+        Acc(n.next) and Acc(n.value) and Implies(n.next is not None, tree(n.next))
+    )
+
+
+@Pure
+def size1(n: Node) -> int:
+    Requires(tree(n))
+    Decreases(tree(n))
+    if Unfolding(tree(n), n.next) is None:
+        return 1
+    return 1 + Unfolding(tree(n), size1(n.next))
+
+
+@Pure
+def size2(n: Node) -> int:
+    Requires(tree(n))
+    Decreases(tree(n))
+    if Unfolding(tree(n), n.next) is None:
+        return 1
+    #:: ExpectedOutput(termination.failed:tuple.false)
+    return 1 + size2(n)

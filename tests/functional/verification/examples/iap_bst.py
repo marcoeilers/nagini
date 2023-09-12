@@ -68,6 +68,7 @@ def tree(n : TreeNode) -> bool:
 @Pure
 def sorted(n: TreeNode, upper: Optional[int], lower: Optional[int]) -> bool:
     Requires(tree(n))
+    Decreases(tree(n))
     return (Unfolding(tree(n),
             Implies(upper is not None, n.key < upper) and
             Implies(lower is not None, n.key > lower) and
