@@ -594,6 +594,20 @@ class ContractTranslator(CommonTranslator):
                         if valid and not part_stmt and not lhs_stmt:
                             trigger.append(part)
                             continue
+                    elif isinstance(inner, ast.Subscript) and isinstance(inner.slice, ast.Index):
+                        recv_type = self.get_type(inner.value, ctx)
+                        if recv_type.python_class.name == "list":
+                            recv_stmt, recv = self.translate_expr(inner.value, ctx)
+                            index_stmt, index = self.translate_expr(inner.slice.value, ctx, target_type=self.viper.Int)
+                            if not recv_stmt and not index_stmt:
+                                pos = self.to_position(inner, ctx)
+                                info = self.no_info(ctx)
+                                seq_ref = self.viper.SeqType(self.viper.Ref)
+                                fieldAcc = self.viper.FieldAccess(recv, self.viper.Field("list_acc", seq_ref, pos, info), pos, info)
+                                seqIndex = self.viper.SeqIndex(fieldAcc, index, pos, info)
+                                trigger.append(seqIndex)
+                                continue
+
 
                     part_stmt, part = self.translate_expr(inner, ctx)
                     if part_stmt:
