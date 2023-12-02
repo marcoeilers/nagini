@@ -584,6 +584,7 @@
 "__prim__Seq": {},
 "__prim__Set": {},
 "__prim__Multiset": {},
+"__prim__Map": {},
 "PSeq": {
     "functions": {
         "__create__": {
@@ -736,6 +737,32 @@
         }
     },
     "type_vars": 1,
+    "extends": "object"
+},
+"PMap": {
+    "functions": {
+        "__getitem__": {
+            "args": ["PMap", "object"],
+            "type": "object",
+            "requires": ["__unbox__"]
+        },
+        "keys": {
+            "args": ["PMap"],
+            "type": "PSet",
+            "requires": ["PSet___create__", "__unbox__"]
+        },
+        "__create__": {
+            "args": ["__prim__Map", "type", "type"],
+            "type": "PMap",
+            "requires": ["__unbox__"]
+        },
+        "__unbox__": {
+            "args": ["PMap"],
+            "type": "__prim__Map",
+            "requires": []
+        }
+    },
+    "type_vars": 2,
     "extends": "object"
 },
 "slice": {

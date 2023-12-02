@@ -244,6 +244,8 @@ PSET_TYPE = 'PSet'
 
 PMSET_TYPE = 'PMultiset'
 
+PMAP_TYPE = 'PMap'
+
 TUPLE_TYPE = 'tuple'
 
 UNION_TYPE = 'Union'

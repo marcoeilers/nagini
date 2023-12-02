@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     PMSET_TYPE,
     PSEQ_TYPE,
     PSET_TYPE,
+    PMAP_TYPE,
     RANGE_TYPE,
     SET_TYPE,
     STRING_TYPE,
@@ -431,6 +432,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                 ms_class = module.global_module.classes[PMSET_TYPE]
                 content_type = _get_iteration_type(arg_type, module, node)
                 return GenericType(ms_class, [content_type])
+            elif node.func.id == 'ToMap':
+                arg_type = get_type(node.args[0], containers, container)
+                ms_class = module.global_module.classes[PMAP_TYPE]
+                # content_type = _get_iteration_type(arg_type, module, node)
+                return GenericType(ms_class, [*arg_type.type_args])
             elif node.func.id == 'Previous':
                 arg_type = get_type(node.args[0], containers, container)
                 list_class = module.global_module.classes[PSEQ_TYPE]

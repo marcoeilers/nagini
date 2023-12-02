@@ -19,6 +19,7 @@ from nagini_translation.lib.constants import (
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
     PMSET_TYPE,
+    PMAP_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
     PSET_TYPE,
@@ -663,6 +664,25 @@ class ContractTranslator(CommonTranslator):
                                         node, ctx)
         return stmt, result
 
+    def translate_to_map(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        coll_type = self.get_type(node.args[0], ctx)
+        stmt, arg = self.translate_expr(node.args[0], ctx)
+
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        ms_class = ctx.module.global_module.classes[PMAP_TYPE]
+        map_ref_ref = self.viper.MapType(self.viper.Ref, self.viper.Ref)
+        field = self.viper.Field("dict_acc", map_ref_ref, pos, info)
+        argument = self.viper.FieldAccess(arg, field, pos, info)
+
+        key_type = self.type_factory.translate_type_literal(coll_type.type_args[0], pos, ctx)
+        val_type = self.type_factory.translate_type_literal(coll_type.type_args[1], pos, ctx)
+
+        result = self.get_function_call(ms_class, '__create__',
+                                        [argument, key_type, val_type], [None, None, None],
+                                        node, ctx)
+        return stmt, result
+
     def translate_to_sequence(self, node: ast.Call,
                               ctx: Context) -> StmtsAndExpr:
         coll_type = self.get_type(node.args[0], ctx)
@@ -1092,6 +1112,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_to_sequence(node, ctx)
         elif func_name == 'ToMS':
             return self.translate_to_multiset(node, ctx)
+        elif func_name == 'ToMap':
+            return self.translate_to_map(node, ctx)
         elif func_name == 'Joinable':
             return self.translate_joinable(node, ctx)
         elif func_name == 'getArg':

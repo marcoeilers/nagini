@@ -25,6 +25,8 @@ domain PyType {
     function PSet_arg(t: PyType, i: Int): PyType
     function PMultiset(t: PyType): PyType
     function PMultiset_arg(t: PyType, i: Int): PyType
+    function PMap(t: PyType, v: PyType): PyType
+    function PMap_arg(t: PyType, i: Int): PyType
 
     unique function int(): PyType
     unique function float(): PyType

@@ -29,7 +29,7 @@ CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decrea
 CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
-                  'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
+                  'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'ToMap', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
                   'PMultiset', 'LowExit', 'Refute']
 
@@ -341,6 +341,18 @@ class PMultiset(Generic[T], Sized, Iterable[T]):
         """
 
 
+class PMap(Generic[T, V], Sized, Iterable[T]):
+    def __getitem__(self, name: T) -> V:
+        """
+        Returns the item with the given key.
+        """
+
+    def keys(self) -> PSet[T]:
+        """
+        Returns the set of all keys.
+        """
+
+
 def ToSeq(l: Iterable[T]) -> PSeq[T]:
     """
     Converts the given iterable of a built-in type (list, set, dict, range) to
@@ -351,6 +363,12 @@ def ToSeq(l: Iterable[T]) -> PSeq[T]:
 def ToMS(s: PSeq[T]) -> PMultiset[T]:
     """
     Multiset view of the given sequence.
+    """
+
+
+def ToMap(s: Dict[T, V]) -> PMap[T, V]:
+    """
+    Pure Map view of the given dictionary.
     """
 
 
@@ -556,8 +574,10 @@ __all__ = [
         'PSeq',
         'PSet',
         'PMultiset',
+        'PMap',
         'ToSeq',
         'ToMS',
+        'ToMap',
         'MaySet',
         'MayCreate',
         ]
