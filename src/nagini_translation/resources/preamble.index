@@ -280,7 +280,8 @@
     "functions": {
         "__create__": {
             "args": ["__prim__int"],
-            "type": "float"
+            "type": "float",
+            "requires": ["__prim__perm___box__"]
         },
         "__unbox__": {
             "args": ["float"],
@@ -290,7 +291,7 @@
         "__bool__": {
             "args": ["float"],
             "type": "__prim__bool",
-            "requires": ["int___bool__", "int___unbox__", "unbox", "__prim__perm___box__"]
+            "requires": ["int___bool__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
         "__eq__": {
             "args": ["float", "object"],
@@ -315,7 +316,7 @@
         "__div__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___div__", "int___unbox__", "unbox", "__prim__perm___box__"]
+            "requires": ["int___div__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
         "__ge__": {
             "args": ["float", "float"],

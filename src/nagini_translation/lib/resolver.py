@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     BUILTINS,
     BYTES_TYPE,
     DICT_TYPE,
+    FLOAT_TYPE,
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
@@ -261,7 +262,10 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # the node refers to something unknown in the given context.
         return None
     if isinstance(node, ast.Num):
-        return module.global_module.classes[INT_TYPE]
+        if isinstance(node.n, int):
+            return module.global_module.classes[INT_TYPE]
+        if isinstance(node.n, float):
+            return module.global_module.classes[FLOAT_TYPE]
     elif isinstance(node, ast.Tuple):
         args = [get_type(arg, containers, container) for arg in node.elts]
         return GenericType(module.global_module.classes[TUPLE_TYPE],
