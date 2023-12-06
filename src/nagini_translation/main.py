@@ -52,12 +52,16 @@ TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
-def parse_sil_file(sil_path: str, jvm):
+def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     parser = jvm.viper.silver.parser.FastParser()
     tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
+    if float_option == "real":
+        text = text.replace("float.sil", "float_real.sil")
+    if float_option == "ieee32":
+        text = text.replace("float.sil", "float_ieee32.sil")
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
     tp.beforeParse(text, False)
@@ -77,19 +81,19 @@ def parse_sil_file(sil_path: str, jvm):
     return program.get()
 
 
-def load_sil_files(jvm: JVM, sif: bool = False):
+def load_sil_files(jvm: JVM, sif: bool = False, float_option: str = None):
     current_path = os.path.dirname(inspect.stack()[0][1])
     if sif:
         resources_path = os.path.join(current_path, 'sif', 'resources')
     else:
         resources_path = os.path.join(current_path, 'resources')
-    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm)
+    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm, float_option)
 
 
 def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
-              check_consistency: bool = False,
+              check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
@@ -130,10 +134,10 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
-        sil_programs = load_sil_files(jvm, sif)
+        sil_programs = load_sil_files(jvm, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
-                                        arp=arp, ignore_global=ignore_global, sif=sif)
+                                        arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -315,6 +319,10 @@ def main() -> None:
         '--viper-arg',
         help='Arguments to be forwarded to Viper, separated by commas'
     )
+    parser.add_argument(
+        '--float-encoding',
+        help='float encoding to be used (real or ieee32)',
+        default=None)
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -329,12 +337,16 @@ def main() -> None:
         parser.error('missing argument: --viper-jar-path')
     if not config.z3_path:
         parser.error('missing argument: --z3')
+    if args.verifier and (args.verifier not in ('silicon', 'carbon')):
+        parser.error('invalid value for --verifier option')
     if args.verifier == 'carbon' and not config.classpath:
         parser.error('missing argument: --boogie')
     if args.verifier != 'silicon' and args.counterexample:
         parser.error('counterexamples only supported with Silicon backend')
     if args.sif not in ('true', False, 'poss', 'prob'):
         parser.error('invalid value for --sif option')
+    if args.float_encoding and (args.float_encoding not in ('real', 'ieee32')):
+        parser.error('invalid value for --float-encoding option')
 
     logging.basicConfig(level=args.log)
 
@@ -345,7 +357,7 @@ def main() -> None:
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
         global sil_programs
-        sil_programs = load_sil_files(jvm, args.sif)
+        sil_programs = load_sil_files(jvm, args.sif, args.float_encoding)
 
         while True:
             file = socket.recv_string()
@@ -365,7 +377,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, counterexample=args.counterexample)
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
+                                  counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
             if args.verbose:
                 print('Result:')
@@ -384,7 +397,8 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir)
+                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
+                                          ignore_global=args.ignore_global, float_encoding=args.float_encoding)
                 vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
                 end = time.time()
                 print("{}, {}, {}, {}, {}".format(

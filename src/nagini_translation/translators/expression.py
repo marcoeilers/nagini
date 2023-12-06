@@ -25,6 +25,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
+    PRIMITIVE_PERM_TYPE,
     SET_TYPE,
     STRING_TYPE,
     THREAD_DOMAIN,
@@ -245,6 +246,24 @@ class ExpressionTranslator(CommonTranslator):
             boxed_lit = self.get_function_call(int_class, '__box__', [lit],
                                                [None], node, ctx)
             return [], boxed_lit
+        if isinstance(node.n, float) and ctx.float_encoding == "real":
+            prim_perm_class = ctx.module.global_module.classes[PRIMITIVE_PERM_TYPE]
+            num, den = node.n.as_integer_ratio()
+            num_lit = self.viper.IntLit(num, pos, info)
+            den_lit = self.viper.IntLit(den, pos, info)
+            frac = self.viper.FractionalPerm(num_lit, den_lit, pos, info)
+            float_val = self.get_function_call(prim_perm_class, '__box__', [frac],
+                                               [None], node, ctx, pos)
+            return [], float_val
+        if isinstance(node.n, float) and ctx.float_encoding == "ieee32":
+            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
+            import struct
+            bytes_val = struct.pack('!f', node.n)
+            int_val = int.from_bytes(bytes_val, "big")
+            int_lit = self.viper.IntLit(int_val, pos, info)
+            float_val = self.get_function_call(float_class, '__create__', [int_lit],
+                                               [None], node, ctx, pos)
+            return [], float_val
         if isinstance(node.n, float):
             float_class = ctx.module.global_module.classes[FLOAT_TYPE]
             index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
