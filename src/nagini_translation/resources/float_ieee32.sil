@@ -92,8 +92,6 @@ domain ___float32 interpretation (Boogie: "float24e8", SMTLIB: "(_ FloatingPoint
   function ___float32_from_real(r: Perm): ___float32 interpretation "(_ to_fp 8 24) RNE"
   function ___float32_eq(___float32, ___float32): Bool interpretation "fp.eq"
 
-  //function ___float32_fp_min(f1: ___float32, f2: ___float32): ___float32 interpretation "fp.min"
-  //function ___float32_fp_max(f1: ___float32, f2: ___float32): ___float32 interpretation "fp.max"
   function ___float32_add(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.add RNE"
   function ___float32_sub(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.sub RNE"
   function ___float32_mul(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.mul RNE"
@@ -103,6 +101,7 @@ domain ___float32 interpretation (Boogie: "float24e8", SMTLIB: "(_ FloatingPoint
 
   function real____to_int(p: Perm): Int interpretation "to_int"
   function ___float32_to_real(p: ___float32): Perm interpretation "fp.to_real"
+  function ___float32_NaN(): ___float32 interpretation "(_ NaN 8 24)"
 }
 
 function ___float32_zero(): ___float32

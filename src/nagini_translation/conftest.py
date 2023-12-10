@@ -250,10 +250,18 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             files = _test_files(test_dir)
             test_files.extend(files)
             reload_triggers.add(files[0])
+            print(files[0])
         if _pytest_config.single_test and 'verification' in _pytest_config.single_test:
             test_files.append(_pytest_config.single_test)
+        float_encoding = None
         for file in test_files:
             ignore_obligations = 'no_obligations' in file
+            if 'float_real' in file:
+                new_float_encoding = 'real'
+            elif 'float_ieee32' in file:
+                new_float_encoding = 'ieee32'
+            else:
+                new_float_encoding = None
             if 'sif-true' in file:
                 sif = True
             elif 'sif-poss' in file:
@@ -264,12 +272,14 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
                 sif = False
             if _pytest_config.force_product:
                 sif = True
-            reload_resources = file in reload_triggers
+            reload_resources = (file in reload_triggers) or (new_float_encoding != float_encoding)
+            float_encoding = new_float_encoding
             arp = 'arp' in file
             base = file.partition('verification')[0] + 'verification'
-            params.extend([(file, base, verifier, sif, reload_resources, arp, ignore_obligations, _pytest_config.store_viper) for verifier
+            params.extend([(file, base, verifier, sif, reload_resources, arp, ignore_obligations,
+                            _pytest_config.store_viper, float_encoding) for verifier
                            in _pytest_config.verifiers])
-        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print', params)
+        metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding', params)
     else:
         pytest.exit('Unrecognized test function.')
 

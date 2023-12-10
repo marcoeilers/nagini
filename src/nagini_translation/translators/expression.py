@@ -265,6 +265,9 @@ class ExpressionTranslator(CommonTranslator):
                                                [None], node, ctx, pos)
             return [], float_val
         if isinstance(node.n, float):
+            import logging
+            logging.warning("Floating point operations are uninterpreted by default. To use interpreted "
+                            "floating point operations, use option --float-encoding")
             float_class = ctx.module.global_module.classes[FLOAT_TYPE]
             index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
             float_val = self.get_function_call(float_class, '__create__', [index_lit],
