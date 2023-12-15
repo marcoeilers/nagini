@@ -1,0 +1,121 @@
+import "./keydict_definition.vpr"
+
+field string_val: Seq[Int]
+field int_val: Int
+field bool_val: Bool
+
+function check_if_int_val_positive(key: Ref): Bool
+    requires acc(keydict___item__(key).keydict_val, 1/10)
+    requires keydict___contains__(key)
+    requires acc(keydict___getitem__(key).int_val, 1/10)
+    ensures result == keydict___getitem__(key).int_val >= 0
+
+method make_int_val_positive(key: Ref)
+    requires acc(keydict___item__(key).keydict_val)
+    requires keydict___contains__(key)
+
+    ensures acc(keydict___item__(key).keydict_val)
+    ensures keydict___contains__(key)
+    ensures acc(keydict___item__(key).keydict_val.value.int_val)
+
+    ensures keydict___item__(key).keydict_val.value.int_val >= 0
+{
+    var my_int: Ref
+    my_int := new(int_val)
+    my_int.int_val := 100
+
+    keydict___setitem__(key, my_int)
+}
+
+function check_key1_and_key2_only(key1: Ref, key2: Ref): Set[Ref]
+    requires acc(keydict___item__(key1).keydict_val, 1/10)
+    requires acc(keydict___item__(key2).keydict_val, 1/10)
+    ensures result == keydict_keys_specific(Set(key1, key2))
+
+
+method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int], some_val1: Ref, some_val2: Ref, some_val3: Ref)
+    requires acc(some_val1.string_val)
+    requires acc(some_val2.int_val)
+    requires acc(some_val3.bool_val)
+    requires some_val1 != some_val2 && some_val1 != some_val3 && some_val2 != some_val3
+    requires keystring_1 != keystring_2 && keystring_1 != keystring_3 && keystring_2 != keystring_3
+{
+    
+    inhale forall key: Ref :: {keydict___item__(key)} acc(keydict___item__(key).keydict_val) && !keydict___contains__(key)
+    var key1: Ref := string___box__(keystring_1)
+    var key2: Ref := string___box__(keystring_2)
+    var key3: Ref := string___box__(keystring_3) 
+
+    // keydict == {}
+    assert keydict___len__() == 0
+    assert !keydict___contains__(key1)
+    assert !keydict___contains__(key2)
+    assert !keydict___contains__(key3)
+    assert !(key1 in keydict_keys())
+    assert !(key2 in keydict_keys())
+    assert !(key3 in keydict_keys())
+    assert !(key1 in check_key1_and_key2_only(key1, key2))
+    assert !(key2 in check_key1_and_key2_only(key1, key2))
+    assert !(some_val1 in keydict_values())
+    assert !(some_val2 in keydict_values())
+    assert !(some_val3 in keydict_values())
+    
+
+    // keydict == {key1: some_val1}
+    keydict___setitem__(key1, some_val1)
+    assert keydict___getitem__(key1) == some_val1
+    assert !keydict___contains__(key2)
+    assert !keydict___contains__(key3)
+    assert key1 in keydict_keys()
+    assert !(key2 in keydict_keys())
+    assert !(key3 in keydict_keys())
+    assert key1 in check_key1_and_key2_only(key1, key2)
+    assert !(key2 in check_key1_and_key2_only(key1, key2))
+    assert some_val1 in keydict_values()
+    assert !(some_val2 in keydict_values())
+    assert !(some_val3 in keydict_values())
+
+    // keydict == {key1: some_val1, key2: some_val2}
+    keydict___setitem__(key2, some_val2)
+    assert keydict___getitem__(key1) == some_val1
+    assert keydict___getitem__(key2) == some_val2
+    assert !keydict___contains__(key3)
+    assert key1 in keydict_keys()
+    assert key2 in keydict_keys()
+    assert !(key3 in keydict_keys())
+    assert key1 in check_key1_and_key2_only(key1, key2)
+    assert key2 in check_key1_and_key2_only(key1, key2)
+    assert some_val1 in keydict_values()
+    assert some_val2 in keydict_values()
+    assert !(some_val3 in keydict_values())
+
+    // keydict == {key1: some_val1, key2: some_val2, key3: some_val3}
+    keydict___setitem__(key3, some_val3)
+    assert keydict___getitem__(key1) == some_val1
+    assert keydict___getitem__(key2) == some_val2
+    assert keydict___getitem__(key3) == some_val3
+    assert key1 in keydict_keys()
+    assert key2 in keydict_keys()
+    assert key3 in keydict_keys()
+    assert key1 in check_key1_and_key2_only(key1, key2)
+    assert key2 in check_key1_and_key2_only(key1, key2)
+    assert some_val1 in keydict_values()
+    assert some_val2 in keydict_values()
+    assert some_val3 in keydict_values()
+
+    // keydict == {key1: some_val1, key2: 100, key3: some_val3}
+    make_int_val_positive(key2)
+    assert keydict___getitem__(key1) == some_val1
+    assert check_if_int_val_positive(key2)
+    assert keydict___getitem__(key3) == some_val3
+    assert key1 in keydict_keys()
+    assert key2 in keydict_keys()
+    assert key3 in keydict_keys()
+    assert key1 in check_key1_and_key2_only(key1, key2)
+    assert key2 in check_key1_and_key2_only(key1, key2)
+    assert some_val1 in keydict_values()
+    assert some_val3 in keydict_values()
+
+    // assert keydict___len__() == 3     // Assert might fail. Assertion keydict___len__() == 3 might not hold.
+}
+
