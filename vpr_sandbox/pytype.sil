@@ -1,0 +1,460 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+domain PyType  {
+  
+  function extends_(sub: PyType, super: PyType): Bool 
+  
+  function issubtype(sub: PyType, super: PyType): Bool 
+  
+  function isnotsubtype(sub: PyType, super: PyType): Bool 
+  
+  function tuple_args(t: PyType): Seq[PyType] 
+  
+  function typeof(obj: Ref): PyType 
+  
+  function get_basic(t: PyType): PyType 
+  
+  function union_type_1(arg_1: PyType): PyType 
+  
+  function union_type_2(arg_1: PyType, arg_2: PyType): PyType 
+  
+  function union_type_3(arg_1: PyType, arg_2: PyType, arg_3: PyType): PyType 
+  
+  function union_type_4(arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType): PyType 
+  
+  unique function object(): PyType 
+  
+  unique function list_basic(): PyType 
+  
+  function list(arg0: PyType): PyType 
+  
+  function list_arg(typ: PyType, index: Int): PyType 
+  
+  unique function set_basic(): PyType 
+  
+  function set(arg0: PyType): PyType 
+  
+  function set_arg(typ: PyType, index: Int): PyType 
+  
+  unique function dict_basic(): PyType 
+  
+  function dict(arg0: PyType, arg1: PyType): PyType 
+  
+  function dict_arg(typ: PyType, index: Int): PyType 
+  
+  unique function int(): PyType 
+  
+  unique function float(): PyType 
+  
+  unique function bool(): PyType 
+  
+  unique function NoneType(): PyType 
+  
+  unique function Exception(): PyType 
+  
+  unique function ConnectionRefusedError(): PyType 
+  
+  unique function traceback(): PyType 
+  
+  unique function str(): PyType 
+  
+  unique function bytes(): PyType 
+  
+  unique function tuple_basic(): PyType 
+  
+  function tuple(args: Seq[PyType]): PyType 
+  
+  function tuple_arg(typ: PyType, index: Int): PyType 
+  
+  unique function __prim__Map(): PyType 
+  
+  unique function PSeq_basic(): PyType 
+  
+  function PSeq(arg0: PyType): PyType 
+  
+  function PSeq_arg(typ: PyType, index: Int): PyType 
+  
+  unique function PSet_basic(): PyType 
+  
+  function PSet(arg0: PyType): PyType 
+  
+  function PSet_arg(typ: PyType, index: Int): PyType 
+  
+  unique function PMultiset_basic(): PyType 
+  
+  function PMultiset(arg0: PyType): PyType 
+  
+  function PMultiset_arg(typ: PyType, index: Int): PyType 
+  
+  unique function PMap_basic(): PyType 
+  
+  function PMap(arg0: PyType, arg1: PyType): PyType 
+  
+  function PMap_arg(typ: PyType, index: Int): PyType 
+  
+  unique function slice(): PyType 
+  
+  unique function range_0(): PyType 
+  
+  unique function Iterator_basic(): PyType 
+  
+  function Iterator(arg0: PyType): PyType 
+  
+  function Iterator_arg(typ: PyType, index: Int): PyType 
+  
+  unique function Thread_0(): PyType 
+  
+  unique function LevelType(): PyType 
+  
+  unique function type(): PyType 
+  
+  unique function Place(): PyType 
+  
+  unique function __prim__Seq_type(): PyType 
+  
+  unique function CustomException(): PyType 
+  
+  unique function Dynamic(): PyType 
+  
+  axiom issubtype_transitivity {
+    (forall sub: PyType, middle: PyType, super: PyType ::
+      { issubtype(sub, middle), issubtype(middle, super) }
+      issubtype(sub, middle) && issubtype(middle, super) ==>
+      issubtype(sub, super))
+  }
+  
+  axiom issubtype_reflexivity {
+    (forall type_: PyType ::
+      { issubtype(type_, type_) }
+      issubtype(type_, type_))
+  }
+  
+  axiom extends_implies_subtype {
+    (forall sub: PyType, sub2: PyType ::
+      { extends_(sub, sub2) }
+      extends_(sub, sub2) ==> issubtype(sub, sub2))
+  }
+  
+  axiom null_nonetype {
+    (forall r: Ref ::
+      { typeof(r) }
+      issubtype(typeof(r), NoneType()) == (r == null))
+  }
+  
+  axiom issubtype_object {
+    (forall type_: PyType ::
+      { issubtype(type_, object()) }
+      issubtype(type_, object()))
+  }
+  
+  axiom issubtype_exclusion {
+    (forall sub: PyType, sub2: PyType, super: PyType ::
+      { extends_(sub, super), extends_(sub2, super) }
+      extends_(sub, super) && extends_(sub2, super) && sub != sub2 ==>
+      isnotsubtype(sub, sub2) && isnotsubtype(sub2, sub))
+  }
+  
+  axiom issubtype_exclusion_2 {
+    (forall sub: PyType, super: PyType ::
+      { issubtype(sub, super) }
+      { issubtype(super, sub) }
+      issubtype(sub, super) && sub != super ==> !issubtype(super, sub))
+  }
+  
+  axiom issubtype_exclusion_propagation {
+    (forall sub: PyType, middle: PyType, super: PyType ::
+      { issubtype(sub, middle), isnotsubtype(middle, super) }
+      issubtype(sub, middle) && isnotsubtype(middle, super) ==>
+      !issubtype(sub, super))
+  }
+  
+  axiom tuple_arg_def {
+    (forall seq: Seq[PyType], i: Int, Z: PyType ::
+      { tuple(seq), tuple_arg(Z, i) }
+      issubtype(Z, tuple(seq)) ==> issubtype(tuple_arg(Z, i), seq[i]))
+  }
+  
+  axiom tuple_args_def {
+    (forall seq: Seq[PyType], Z: PyType ::
+      { issubtype(Z, tuple(seq)) }
+      issubtype(Z, tuple(seq)) ==> |tuple_args(Z)| == |seq|)
+  }
+  
+  axiom tuple_self_subtype {
+    (forall seq1: Seq[PyType], seq2: Seq[PyType] ::seq1 != seq2 &&
+      |seq1| == |seq2| &&
+      (forall i: Int ::i >= 0 && i < |seq1| ==> issubtype(seq1[i], seq2[i])) ==>
+      issubtype(tuple(seq1), tuple(seq2)))
+  }
+  
+  axiom union_subtype_1 {
+    (forall arg_1: PyType, X: PyType ::
+      { issubtype(X, union_type_1(arg_1)) }
+      issubtype(X, union_type_1(arg_1)) == (false || issubtype(X, arg_1)))
+  }
+  
+  axiom union_subtype_2 {
+    (forall arg_1: PyType, arg_2: PyType, X: PyType ::
+      { issubtype(X, union_type_2(arg_1, arg_2)) }
+      issubtype(X, union_type_2(arg_1, arg_2)) ==
+      (false || issubtype(X, arg_1) || issubtype(X, arg_2)))
+  }
+  
+  axiom union_subtype_3 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, X: PyType ::
+      { issubtype(X, union_type_3(arg_1, arg_2, arg_3)) }
+      issubtype(X, union_type_3(arg_1, arg_2, arg_3)) ==
+      (false || issubtype(X, arg_1) || issubtype(X, arg_2) ||
+      issubtype(X, arg_3)))
+  }
+  
+  axiom union_subtype_4 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType, X: PyType ::
+      { issubtype(X, union_type_4(arg_1, arg_2, arg_3, arg_4)) }
+      issubtype(X, union_type_4(arg_1, arg_2, arg_3, arg_4)) ==
+      (false || issubtype(X, arg_1) || issubtype(X, arg_2) ||
+      issubtype(X, arg_3) ||
+      issubtype(X, arg_4)))
+  }
+  
+  axiom subtype_union_1 {
+    (forall arg_1: PyType, X: PyType ::
+      { issubtype(union_type_1(arg_1), X) }
+      issubtype(union_type_1(arg_1), X) == (true && issubtype(arg_1, X)))
+  }
+  
+  axiom subtype_union_2 {
+    (forall arg_1: PyType, arg_2: PyType, X: PyType ::
+      { issubtype(union_type_2(arg_1, arg_2), X) }
+      issubtype(union_type_2(arg_1, arg_2), X) ==
+      (true && issubtype(arg_1, X) && issubtype(arg_2, X)))
+  }
+  
+  axiom subtype_union_3 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, X: PyType ::
+      { issubtype(union_type_3(arg_1, arg_2, arg_3), X) }
+      issubtype(union_type_3(arg_1, arg_2, arg_3), X) ==
+      (true && issubtype(arg_1, X) && issubtype(arg_2, X) &&
+      issubtype(arg_3, X)))
+  }
+  
+  axiom subtype_union_4 {
+    (forall arg_1: PyType, arg_2: PyType, arg_3: PyType, arg_4: PyType, X: PyType ::
+      { issubtype(union_type_4(arg_1, arg_2, arg_3, arg_4), X) }
+      issubtype(union_type_4(arg_1, arg_2, arg_3, arg_4), X) ==
+      (true && issubtype(arg_1, X) && issubtype(arg_2, X) &&
+      issubtype(arg_3, X) &&
+      issubtype(arg_4, X)))
+  }
+  
+  axiom subtype_list {
+    (forall var0: PyType ::
+      { list(var0) }
+      extends_(list(var0), object()) &&
+      get_basic(list(var0)) == list_basic())
+  }
+  
+  axiom list_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { list(arg0), list_arg(Z, 0) }
+      issubtype(Z, list(arg0)) ==> list_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_set {
+    (forall var0: PyType ::
+      { set(var0) }
+      extends_(set(var0), object()) && get_basic(set(var0)) == set_basic())
+  }
+  
+  axiom set_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { set(arg0), set_arg(Z, 0) }
+      issubtype(Z, set(arg0)) ==> set_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_dict {
+    (forall var0: PyType, var1: PyType ::
+      { dict(var0, var1) }
+      extends_(dict(var0, var1), object()) &&
+      get_basic(dict(var0, var1)) == dict_basic())
+  }
+  
+  axiom dict_args0 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType ::
+      { dict(arg0, arg1), dict_arg(Z, 0) }
+      issubtype(Z, dict(arg0, arg1)) ==> dict_arg(Z, 0) == arg0)
+  }
+  
+  axiom dict_args1 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType ::
+      { dict(arg0, arg1), dict_arg(Z, 1) }
+      issubtype(Z, dict(arg0, arg1)) ==> dict_arg(Z, 1) == arg1)
+  }
+  
+  axiom subtype_int {
+    extends_(int(), float()) && get_basic(int()) == int()
+  }
+  
+  axiom subtype_float {
+    extends_(float(), object()) && get_basic(float()) == float()
+  }
+  
+  axiom subtype_bool {
+    extends_(bool(), int()) && get_basic(bool()) == bool()
+  }
+  
+  axiom subtype_NoneType {
+    extends_(NoneType(), object()) && get_basic(NoneType()) == NoneType()
+  }
+  
+  axiom subtype_Exception {
+    extends_(Exception(), object()) &&
+    get_basic(Exception()) == Exception()
+  }
+  
+  axiom subtype_ConnectionRefusedError {
+    extends_(ConnectionRefusedError(), Exception()) &&
+    get_basic(ConnectionRefusedError()) == ConnectionRefusedError()
+  }
+  
+  axiom subtype_traceback {
+    extends_(traceback(), object()) &&
+    get_basic(traceback()) == traceback()
+  }
+  
+  axiom subtype_str {
+    extends_(str(), object()) && get_basic(str()) == str()
+  }
+  
+  axiom subtype_bytes {
+    extends_(bytes(), object()) && get_basic(bytes()) == bytes()
+  }
+  
+  axiom subtype_tuple {
+    (forall args: Seq[PyType] ::
+      { tuple(args) }
+      ((forall e: PyType ::(e in args) ==> e == object()) ==>
+      extends_(tuple(args), object())) &&
+      get_basic(tuple(args)) == tuple_basic())
+  }
+  
+  axiom subtype___prim__Map {
+    extends_(__prim__Map(), object()) &&
+    get_basic(__prim__Map()) == __prim__Map()
+  }
+  
+  axiom subtype_PSeq {
+    (forall var0: PyType ::
+      { PSeq(var0) }
+      extends_(PSeq(var0), object()) &&
+      get_basic(PSeq(var0)) == PSeq_basic())
+  }
+  
+  axiom PSeq_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { PSeq(arg0), PSeq_arg(Z, 0) }
+      issubtype(Z, PSeq(arg0)) ==> PSeq_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_PSet {
+    (forall var0: PyType ::
+      { PSet(var0) }
+      extends_(PSet(var0), object()) &&
+      get_basic(PSet(var0)) == PSet_basic())
+  }
+  
+  axiom PSet_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { PSet(arg0), PSet_arg(Z, 0) }
+      issubtype(Z, PSet(arg0)) ==> PSet_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_PMultiset {
+    (forall var0: PyType ::
+      { PMultiset(var0) }
+      extends_(PMultiset(var0), object()) &&
+      get_basic(PMultiset(var0)) == PMultiset_basic())
+  }
+  
+  axiom PMultiset_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { PMultiset(arg0), PMultiset_arg(Z, 0) }
+      issubtype(Z, PMultiset(arg0)) ==> PMultiset_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_PMap {
+    (forall var0: PyType, var1: PyType ::
+      { PMap(var0, var1) }
+      extends_(PMap(var0, var1), object()) &&
+      get_basic(PMap(var0, var1)) == PMap_basic())
+  }
+  
+  axiom PMap_args0 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType ::
+      { PMap(arg0, arg1), PMap_arg(Z, 0) }
+      issubtype(Z, PMap(arg0, arg1)) ==> PMap_arg(Z, 0) == arg0)
+  }
+  
+  axiom PMap_args1 {
+    (forall Z: PyType, arg0: PyType, arg1: PyType ::
+      { PMap(arg0, arg1), PMap_arg(Z, 1) }
+      issubtype(Z, PMap(arg0, arg1)) ==> PMap_arg(Z, 1) == arg1)
+  }
+  
+  axiom subtype_slice {
+    extends_(slice(), object()) && get_basic(slice()) == slice()
+  }
+  
+  axiom subtype_range_0 {
+    extends_(range_0(), object()) && get_basic(range_0()) == range_0()
+  }
+  
+  axiom subtype_Iterator {
+    (forall var0: PyType ::
+      { Iterator(var0) }
+      extends_(Iterator(var0), object()) &&
+      get_basic(Iterator(var0)) == Iterator_basic())
+  }
+  
+  axiom Iterator_args0 {
+    (forall Z: PyType, arg0: PyType ::
+      { Iterator(arg0), Iterator_arg(Z, 0) }
+      issubtype(Z, Iterator(arg0)) ==> Iterator_arg(Z, 0) == arg0)
+  }
+  
+  axiom subtype_Thread_0 {
+    extends_(Thread_0(), object()) && get_basic(Thread_0()) == Thread_0()
+  }
+  
+  axiom subtype_LevelType {
+    extends_(LevelType(), object()) &&
+    get_basic(LevelType()) == LevelType()
+  }
+  
+  axiom subtype_type {
+    extends_(type(), object()) && get_basic(type()) == type()
+  }
+  
+  axiom subtype_Place {
+    extends_(Place(), object()) && get_basic(Place()) == Place()
+  }
+  
+  axiom subtype___prim__Seq_type {
+    extends_(__prim__Seq_type(), object()) &&
+    get_basic(__prim__Seq_type()) == __prim__Seq_type()
+  }
+  
+  axiom subtype_CustomException {
+    extends_(CustomException(), object()) &&
+    get_basic(CustomException()) == CustomException()
+  }
+  
+  axiom subtype_Dynamic {
+    extends_(Dynamic(), object()) && get_basic(Dynamic()) == Dynamic()
+  }
+}
