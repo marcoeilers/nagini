@@ -1,3 +1,5 @@
+import "./pytype.sil"
+
 field keydict_key: Seq[Int]
 field keydict_val: Option[Ref]
 
@@ -13,48 +15,49 @@ function string___box__(prim: Seq[Int]): Ref
 function string___unbox__(box: Ref): Seq[Int]
     ensures  string___box__(result) == box
 
+method keydict___init__() returns (self: Ref)
+    ensures forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val) && !keydict___contains__(self, key)
 
-function keydict___item__(key: Ref): Ref
-    ensures keydict___item__inv(result) == key
+function keydict___item__(self: Ref, key: Ref): Ref
+    ensures keydict___item__inv(self, result) == key
 
-function keydict___item__inv(val_ref: Ref): Ref
+function keydict___item__inv(self: Ref, val_ref: Ref): Ref
 
+function keydict___contains__(self: Ref, key: Ref) : Bool
+    requires acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures result == keydict___item__(self, key).keydict_val.isSome
 
-function keydict___contains__(key: Ref) : Bool
-    requires acc(keydict___item__(key).keydict_val, 1/10)
-    ensures result == keydict___item__(key).keydict_val.isSome
+function keydict___getitem__(self: Ref, key: Ref) : Ref
+    requires acc(keydict___item__(self, key).keydict_val, wildcard)
+    requires keydict___contains__(self, key)
+    ensures result == keydict___item__(self, key).keydict_val.value
 
-function keydict___getitem__(key: Ref) : Ref
-    requires acc(keydict___item__(key).keydict_val, 1/10)
-    requires keydict___contains__(key)
-    ensures result == keydict___item__(key).keydict_val.value
-
-method keydict___setitem__(key: Ref, item: Ref)
-    requires acc(keydict___item__(key).keydict_val)
-    ensures acc(keydict___item__(key).keydict_val)
-    ensures keydict___item__(key).keydict_val.value == item
-    ensures keydict___contains__(key)
-    ensures keydict___getitem__(key) == item
+method keydict___setitem__(self: Ref, key: Ref, item: Ref)
+    requires acc(keydict___item__(self, key).keydict_val)
+    ensures acc(keydict___item__(self, key).keydict_val)
+    ensures keydict___item__(self, key).keydict_val.value == item
+    ensures keydict___contains__(self, key)
+    ensures keydict___getitem__(self, key) == item
 {
-    keydict___item__(key).keydict_val := Some(item)
+    keydict___item__(self, key).keydict_val := Some(item)
 }
 
 // Of all possible keys, which have been set in the keydict
-function keydict_keys(): Set[Ref]
-    requires forall key: Ref :: {keydict___item__(key)} acc(keydict___item__(key).keydict_val, 1/10)
-    ensures forall key: Ref :: {keydict___contains__(key)} {key in result} keydict___contains__(key) == (key in result)
+function keydict_keys(self:Ref ): Set[Ref]
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures forall key: Ref :: {keydict___contains__(self, key)} {key in result} keydict___contains__(self, key) == (key in result)
 
 // Of the keys in the Set[Ref], which have been set in the keydict
-function keydict_keys_specific(keys: Set[Ref]): Set[Ref]
-    requires forall key: Ref :: {key in keys} key in keys ==> acc(keydict___item__(key).keydict_val, 1/10)
-    ensures forall key: Ref :: {key in keys} key in keys ==> keydict___contains__(key) == (key in result)
+function keydict_keys_specific(self: Ref, keys: Set[Ref]): Set[Ref]
+    requires forall key: Ref :: {key in keys} key in keys ==> acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures forall key: Ref :: {key in keys} key in keys ==> keydict___contains__(self, key) == (key in result)
 
-function keydict_values(): Set[Ref]
-    requires forall key: Ref :: {keydict___item__(key)} acc(keydict___item__(key).keydict_val, 1/10)
+function keydict_values(self: Ref): Set[Ref]
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
     ensures forall value: Ref :: {value in result}
-    (exists key:Ref :: {keydict___contains__(key)} (keydict___contains__(key) && (keydict___getitem__(key) == value))) == value in result
+    (exists key:Ref :: {keydict___contains__(self, key)} (keydict___contains__(self, key) && (keydict___getitem__(self, key) == value))) == value in result
 
 
-function keydict___len__(): Int
-    requires forall key: Ref :: {keydict___item__(key)} acc(keydict___item__(key).keydict_val, 1/10)
-    ensures result == |keydict_keys()|
+function keydict___len__(self: Ref): Int
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures result == |keydict_keys(self)|
