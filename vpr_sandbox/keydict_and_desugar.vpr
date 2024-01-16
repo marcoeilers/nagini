@@ -6,15 +6,15 @@ field bool_val: Bool
 
 field Dynamic_custom__dict__: Ref
 
-function Dynamic_custom__get_hidden(self: Ref, name: Ref): Ref
-    requires acc(self.Dynamic_custom__dict__, wildcard)
-    requires issubtype(typeof(self.Dynamic_custom__dict__), dict(dict_arg(typeof(self.Dynamic_custom__dict__), 0), dict_arg(typeof(self.Dynamic_custom__dict__), 1)))
-    requires acc(keydict___item__(self.Dynamic_custom__dict__, name).keydict_val, wildcard)
+function Dynamic_custom__get_hidden(Dynamic_res: Ref, name: Ref): Ref
+    // requires acc(self.Dynamic_custom__dict__, wildcard)
+    requires issubtype(typeof(custom__dict__(Dynamic_res)), dict(dict_arg(typeof(custom__dict__(Dynamic_res)), 0), dict_arg(typeof(custom__dict__(Dynamic_res)), 1)))
+    requires acc(keydict___item__(custom__dict__(Dynamic_res), name).keydict_val, wildcard)
     ensures issubtype(typeof(result), object())   // this comes from "-> object" in the python file, for mypy
 {
-    keydict___contains__(self.Dynamic_custom__dict__, name) ?
-        keydict___getitem__(self.Dynamic_custom__dict__, name) :
-        Dynamic_custom__get_attr_pure(self.Dynamic_custom__dict__, name)
+    keydict___contains__(custom__dict__(Dynamic_res), name) ?
+        keydict___getitem__(custom__dict__(Dynamic_res), name) :
+        Dynamic_custom__get_attr_pure(custom__dict__(Dynamic_res), name)
 }
 
 function Dynamic_custom__get_attr_pure(self_0: Ref, name: Ref): Ref
@@ -33,16 +33,16 @@ function check_key1_and_key2_only(__dict__: Ref, key1: Ref, key2: Ref): Set[Ref]
     ensures result == keydict_keys_specific(__dict__, Set(key1, key2))
 
 method Dynamic___init__(Dynamic_res: Ref) returns (_current_wait_level_161: Perm)
-    ensures acc(Dynamic_res.Dynamic_custom__dict__, write)
+    // ensures acc(custom__dict__(Dynamic_res), wildcard)
 
     // any way to avoid this copy from keydict_definition?
-    ensures issubtype(typeof(Dynamic_res.Dynamic_custom__dict__), dict(object(), object()))
-    ensures forall key: Ref :: {keydict___item__(Dynamic_res.Dynamic_custom__dict__, key)} acc(keydict___item__(Dynamic_res.Dynamic_custom__dict__, key).keydict_val) && !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key)
-{
-    inhale acc(Dynamic_res.Dynamic_custom__dict__, write)
-    Dynamic_res.Dynamic_custom__dict__ := keydict___init__()
-    inhale issubtype(typeof(Dynamic_res.Dynamic_custom__dict__), dict(object(), object()))
-}
+    ensures issubtype(typeof(custom__dict__(Dynamic_res)), dict(object(), object()))
+    ensures forall key: Ref :: {keydict___item__(custom__dict__(Dynamic_res), key)} acc(keydict___item__(custom__dict__(Dynamic_res), key).keydict_val) && !keydict___contains__(custom__dict__(Dynamic_res), key)
+
+function custom__dict__(class_instance: Ref): Ref
+    ensures custom__dict__inv(result) == class_instance
+
+function custom__dict__inv(custom__dict__instance: Ref): Ref
 
 
 method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int], some_val1: Ref, some_val2: Ref, some_val3: Ref)
@@ -61,54 +61,54 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
     var _cwl_163: Perm
     inhale typeof(Dynamic_res) == Dynamic()
     _cwl_163 := Dynamic___init__(Dynamic_res)
-    assert issubtype(typeof(Dynamic_res.Dynamic_custom__dict__), dict(object(), object()))
-    assert keydict___len__(Dynamic_res.Dynamic_custom__dict__) == 0
+    assert issubtype(typeof(custom__dict__(Dynamic_res)), dict(object(), object()))
+    assert keydict___len__(custom__dict__(Dynamic_res)) == 0
 
     var key1: Ref := string___box__(keystring_1)
     var key2: Ref := string___box__(keystring_2)
     var key3: Ref := string___box__(keystring_3) 
 
     // keydict == {}
-    assert keydict___len__(Dynamic_res.Dynamic_custom__dict__) == 0
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key1)
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key2)
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key3)
-    assert !(key1 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert !(key2 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert !(key3 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert !(key1 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2))
-    assert !(key2 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2))
-    assert !(some_val1 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
-    assert !(some_val2 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
-    assert !(some_val3 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
+    assert keydict___len__(custom__dict__(Dynamic_res)) == 0
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key1)
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key2)
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key3)
+    assert !(key1 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert !(key2 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert !(key3 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert !(key1 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2))
+    assert !(key2 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2))
+    assert !(some_val1 in keydict_values(custom__dict__(Dynamic_res)))
+    assert !(some_val2 in keydict_values(custom__dict__(Dynamic_res)))
+    assert !(some_val3 in keydict_values(custom__dict__(Dynamic_res)))
 
-    // in python: d.key1 == 15
+    // in python: assert d.key1 == 15
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == __prim__int___box__(15)
     assert Dynamic_custom__get_hidden(Dynamic_res, key2) == string___box__(Seq(97, 98, 99, 100))
     assert Dynamic_custom__get_hidden(Dynamic_res, key3) == string___box__(Seq(97, 98, 99, 100))
 
     // keydict == {key1: some_val1}
     assert issubtype(typeof(some_val1), object())
-    assert issubtype(dict_arg(typeof(Dynamic_res.Dynamic_custom__dict__), 1), object())
-    assert (issubtype(typeof(some_val1), dict_arg(typeof(Dynamic_res.Dynamic_custom__dict__), 1)))
-    keydict___setitem__(Dynamic_res.Dynamic_custom__dict__, key1, some_val1)
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key1) == some_val1
+    assert issubtype(dict_arg(typeof(custom__dict__(Dynamic_res)), 1), object())
+    assert (issubtype(typeof(some_val1), dict_arg(typeof(custom__dict__(Dynamic_res)), 1)))
+    keydict___setitem__(custom__dict__(Dynamic_res), key1, some_val1)
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key1) == some_val1
 
     // check if typeof(__dict__[key1]) == typeof(some_val1)
     // which in python is
     // Assert(isinstance(d.key1, type(some_value1)))
-    assert issubtype(typeof(keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key1)), typeof(some_val1))
+    assert issubtype(typeof(keydict___getitem__(custom__dict__(Dynamic_res), key1)), typeof(some_val1))
 
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key2)
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key3)
-    assert key1 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert !(key2 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert !(key3 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert key1 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2)
-    assert !(key2 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2))
-    assert some_val1 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
-    assert !(some_val2 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
-    assert !(some_val3 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key2)
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key3)
+    assert key1 in keydict_keys(custom__dict__(Dynamic_res))
+    assert !(key2 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert !(key3 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert key1 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2)
+    assert !(key2 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2))
+    assert some_val1 in keydict_values(custom__dict__(Dynamic_res))
+    assert !(some_val2 in keydict_values(custom__dict__(Dynamic_res)))
+    assert !(some_val3 in keydict_values(custom__dict__(Dynamic_res)))
 
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == some_val1
     assert Dynamic_custom__get_hidden(Dynamic_res, key2) == string___box__(Seq(97, 98, 99, 100))
@@ -116,41 +116,41 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
 
 
     // keydict == {key1: some_val1, key2: some_val2}
-    keydict___setitem__(Dynamic_res.Dynamic_custom__dict__, key2, some_val2)
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key1) == some_val1
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key2) == some_val2
-    assert !keydict___contains__(Dynamic_res.Dynamic_custom__dict__, key3)
-    assert key1 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert key2 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert !(key3 in keydict_keys(Dynamic_res.Dynamic_custom__dict__))
-    assert key1 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2)
-    assert key2 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2)
-    assert some_val1 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
-    assert some_val2 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
-    assert !(some_val3 in keydict_values(Dynamic_res.Dynamic_custom__dict__))
+    keydict___setitem__(custom__dict__(Dynamic_res), key2, some_val2)
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key1) == some_val1
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key2) == some_val2
+    assert !keydict___contains__(custom__dict__(Dynamic_res), key3)
+    assert key1 in keydict_keys(custom__dict__(Dynamic_res))
+    assert key2 in keydict_keys(custom__dict__(Dynamic_res))
+    assert !(key3 in keydict_keys(custom__dict__(Dynamic_res)))
+    assert key1 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2)
+    assert key2 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2)
+    assert some_val1 in keydict_values(custom__dict__(Dynamic_res))
+    assert some_val2 in keydict_values(custom__dict__(Dynamic_res))
+    assert !(some_val3 in keydict_values(custom__dict__(Dynamic_res)))
 
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == some_val1
     assert Dynamic_custom__get_hidden(Dynamic_res, key2) == some_val2
     assert Dynamic_custom__get_hidden(Dynamic_res, key3) == string___box__(Seq(97, 98, 99, 100))
 
     // keydict == {key1: some_val1, key2: some_val2, key3: some_val3}
-    keydict___setitem__(Dynamic_res.Dynamic_custom__dict__, key3, some_val3)
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key1) == some_val1
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key2) == some_val2
-    assert keydict___getitem__(Dynamic_res.Dynamic_custom__dict__, key3) == some_val3
-    assert key1 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert key2 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert key3 in keydict_keys(Dynamic_res.Dynamic_custom__dict__)
-    assert key1 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2)
-    assert key2 in check_key1_and_key2_only(Dynamic_res.Dynamic_custom__dict__, key1, key2)
-    assert some_val1 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
-    assert some_val2 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
-    assert some_val3 in keydict_values(Dynamic_res.Dynamic_custom__dict__)
+    keydict___setitem__(custom__dict__(Dynamic_res), key3, some_val3)
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key1) == some_val1
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key2) == some_val2
+    assert keydict___getitem__(custom__dict__(Dynamic_res), key3) == some_val3
+    assert key1 in keydict_keys(custom__dict__(Dynamic_res))
+    assert key2 in keydict_keys(custom__dict__(Dynamic_res))
+    assert key3 in keydict_keys(custom__dict__(Dynamic_res))
+    assert key1 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2)
+    assert key2 in check_key1_and_key2_only(custom__dict__(Dynamic_res), key1, key2)
+    assert some_val1 in keydict_values(custom__dict__(Dynamic_res))
+    assert some_val2 in keydict_values(custom__dict__(Dynamic_res))
+    assert some_val3 in keydict_values(custom__dict__(Dynamic_res))
 
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == some_val1
     assert Dynamic_custom__get_hidden(Dynamic_res, key2) == some_val2
     assert Dynamic_custom__get_hidden(Dynamic_res, key3) == some_val3
 
-    // assert keydict___len__(Dynamic_res.Dynamic_custom__dict__) == 3     // Assert might fail. Assertion keydict___len__(Dynamic_res.Dynamic_custom__dict__) == 3 might not hold.
+    // assert keydict___len__(custom__dict__(Dynamic_res)) == 3     // Assert might fail. Assertion keydict___len__(custom__dict__(Dynamic_res)) == 3 might not hold.
 }
 
