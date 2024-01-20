@@ -143,6 +143,18 @@ class CallTranslator(CommonTranslator):
                                                          [None], node, ctx)
         return stmt + str_stmt, str_val
 
+    def _translate_float(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        if isinstance(node.args[0], ast.Str):
+            string_val = node.args[0].s
+            try:
+                float_val = float(string_val)
+                return [], self.translate_float_literal(float_val, node, ctx)
+            except ValueError:
+                raise InvalidProgramException(node, 'invalid.float.val')
+        msg = 'float() is currently only supported with arguments NaN and inf.'
+        raise UnsupportedException(node, msg)
+
     def _translate_bool(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -486,6 +498,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_str(node, ctx)
         elif func_name == 'int':
             return self._translate_int(node, ctx)
+        elif func_name == 'float':
+            return self._translate_float(node, ctx)
         elif func_name == 'bool':
             return self._translate_bool(node, ctx)
         elif func_name == 'set':

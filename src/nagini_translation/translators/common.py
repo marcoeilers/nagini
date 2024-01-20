@@ -13,6 +13,7 @@ from nagini_translation.lib.constants import (
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
     DICT_TYPE,
+    FLOAT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
     LIST_TYPE,
@@ -710,6 +711,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return chain_cond_exp(guarded_functions, self.viper, position,
                                   self.no_info(ctx), ctx)
         else:
+            if receiver.python_class.name == FLOAT_TYPE:
+                if ctx.float_encoding is None:
+                    import logging
+                    logging.warning("Floating point operations are uninterpreted by default. To use interpreted "
+                                    "floating point operations, use option --float-encoding")
             # Pass-through
             return self._get_function_call(receiver, func_name, args,
                                            arg_types, node, ctx, position)
