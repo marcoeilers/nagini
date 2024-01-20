@@ -232,6 +232,12 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
         if _pytest_config.single_test and 'translation' in _pytest_config.single_test:
             test_files.append(_pytest_config.single_test)
         for file in test_files:
+            if 'float_real' in file:
+                float_encoding = 'real'
+            elif 'float_ieee32' in file:
+                float_encoding = 'ieee32'
+            else:
+                float_encoding = None
             if 'sif-true' in file:
                 sif = True
             elif 'sif-poss' in file:
@@ -243,8 +249,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             reload_resources = file in reload_triggers
             arp = 'arp' in file
             base = file.partition('translation')[0] + 'translation'
-            params.append((file, base, sif, reload_resources, arp))
-        metafunc.parametrize('path,base,sif,reload_resources,arp', params)
+            params.append((file, base, sif, reload_resources, arp, float_encoding))
+        metafunc.parametrize('path,base,sif,reload_resources,arp,float_encoding', params)
     elif func_name == _VERIFICATION_TEST_FUNCTION_NAME:
         for test_dir in _pytest_config.verification_test_dirs:
             files = _test_files(test_dir)

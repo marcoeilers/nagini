@@ -15,6 +15,7 @@ LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['cast',
             'int',
+            'float',
             'isinstance',
             'bool',
             'len',
