@@ -1072,6 +1072,7 @@ class Analyzer(ast.NodeVisitor):
                     # (non-static) field, and created the field. We remove it
                     # again now that we now it's actually static.
                     del self.current_class.fields[node.id]
+                self.track_access(node, var)
                 return
         # We're in a function
         if isinstance(node.ctx, ast.Store):
