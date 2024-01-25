@@ -674,6 +674,8 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+        if func.predicate:
+            func.contract_only = self.is_declared_contract_only(node)
         if self.is_all_low(node):
             self.has_all_low = True
             func.all_low = True

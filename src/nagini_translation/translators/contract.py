@@ -414,6 +414,8 @@ class ContractTranslator(CommonTranslator):
         if (target_pred and
                 (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if target_pred and target_pred.contract_only:
+            raise InvalidProgramException(node, 'abstract.predicate.fold')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
         if self._is_family_fold(node):
@@ -473,6 +475,8 @@ class ContractTranslator(CommonTranslator):
         if (target_pred and
                 (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if target_pred and target_pred.contract_only:
+            raise InvalidProgramException(node, 'abstract.predicate.fold')
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
         if self._is_family_fold(node):
@@ -502,6 +506,8 @@ class ContractTranslator(CommonTranslator):
         if (target_pred and
                 (not isinstance(target_pred, PythonMethod) or not target_pred.predicate)):
             raise InvalidProgramException(node, 'invalid.contract.call')
+        if target_pred and target_pred.contract_only:
+            raise InvalidProgramException(node, 'abstract.predicate.fold')
 
         pred_stmt, pred = self.translate_expr(node.args[0], ctx,
                                               self.viper.Bool, True)
