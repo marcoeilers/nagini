@@ -13,4 +13,5 @@ class MyClass:
 def huhFunc(mc: MyClass) -> int:
     Ensures(Result() > 0)
     #:: ExpectedOutput(invalid.program:abstract.predicate.fold)
-    return Fold(mc.huh())
+    Fold(mc.huh())
+    return 4

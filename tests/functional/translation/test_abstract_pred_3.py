@@ -12,4 +12,5 @@ def huh(mc: MyClass) -> bool:
 def huhFunc(mc: MyClass) -> int:
     Ensures(Result() > 0)
     #:: ExpectedOutput(invalid.program:abstract.predicate.fold)
-    return Fold(huh(mc))
+    Fold(huh(mc))
+    return 4

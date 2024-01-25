@@ -13,4 +13,5 @@ def huhFunc(mc: MyClass) -> int:
     Requires(huh(mc))
     Ensures(Result() > 0)
     #:: ExpectedOutput(invalid.program:abstract.predicate.fold)
-    return Unfold(huh(mc))
+    Unfold(huh(mc))
+    return 3
