@@ -1,6 +1,5 @@
 import "./pytype.sil"
 
-field keydict_key: Seq[Int]
 field keydict_val: Option[Ref]
 
 adt Option[T] {
@@ -9,11 +8,13 @@ adt Option[T] {
 }
 
 
-function string___box__(prim: Seq[Int]): Ref
-    ensures string___unbox__(result) == prim
+function seq_int_str___box__(prim: Seq[Int]): Ref
+    ensures typeof(result) == seq_int_str()
+    ensures seq_int_str___unbox__(result) == prim
 
-function string___unbox__(box: Ref): Seq[Int]
-    ensures  string___box__(result) == box
+function seq_int_str___unbox__(box: Ref): Seq[Int]
+    requires issubtype(typeof(box), seq_int_str())
+    ensures  seq_int_str___box__(result) == box
 
 function __prim__int___box__(prim: Int): Ref
   decreases _
@@ -27,6 +28,26 @@ function int___unbox__(box: Ref): Int
     __prim__int___box__(result) == box
   ensures issubtype(typeof(box), bool()) ==>
     __prim__bool___box__(result != 0) == box
+
+function int___gt__(self: Int, other: Int): Bool
+  decreases _
+{
+  self > other
+}
+
+function int___lt__(self: Int, other: Int): Bool
+  decreases _
+{
+  self < other
+}
+
+function int___eq__(self: Ref, other: Ref): Bool
+  decreases _
+  requires issubtype(typeof(self), int())
+  requires issubtype(typeof(other), int())
+{
+  int___unbox__(self) == int___unbox__(other)
+}
 
 function __prim__bool___box__(prim: Bool): Ref
   decreases _

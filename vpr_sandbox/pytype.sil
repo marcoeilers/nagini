@@ -62,6 +62,8 @@ domain PyType  {
   unique function traceback(): PyType 
   
   unique function str(): PyType 
+
+  unique function seq_int_str(): PyType 
   
   unique function bytes(): PyType 
   
@@ -120,6 +122,10 @@ domain PyType  {
   unique function CustomException(): PyType 
   
   unique function Dynamic(): PyType 
+
+  unique function Parent(): PyType 
+  
+  unique function Child(): PyType
   
   axiom issubtype_transitivity {
     (forall sub: PyType, middle: PyType, super: PyType ::
@@ -330,6 +336,10 @@ domain PyType  {
   axiom subtype_str {
     extends_(str(), object()) && get_basic(str()) == str()
   }
+
+  axiom subtype_seq_int_str {
+    extends_(seq_int_str(), object()) && get_basic(seq_int_str()) == seq_int_str()
+  }
   
   axiom subtype_bytes {
     extends_(bytes(), object()) && get_basic(bytes()) == bytes()
@@ -456,5 +466,13 @@ domain PyType  {
   
   axiom subtype_Dynamic {
     extends_(Dynamic(), object()) && get_basic(Dynamic()) == Dynamic()
+  }
+
+  axiom subtype_Parent {
+    extends_(Parent(), object()) && get_basic(Parent()) == Parent()
+  }
+  
+  axiom subtype_Child {
+    extends_(Child(), Parent()) && get_basic(Child()) == Child()
   }
 }

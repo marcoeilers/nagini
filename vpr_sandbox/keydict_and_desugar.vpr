@@ -8,6 +8,7 @@ field Dynamic_custom__dict__: Ref
 
 function Dynamic_custom__get_hidden(Dynamic_res: Ref, name: Ref): Ref
     // requires acc(self.Dynamic_custom__dict__, wildcard)
+    requires issubtype(typeof(name), seq_int_str())
     requires issubtype(typeof(custom__dict__(Dynamic_res)), dict(dict_arg(typeof(custom__dict__(Dynamic_res)), 0), dict_arg(typeof(custom__dict__(Dynamic_res)), 1)))
     requires acc(keydict___item__(custom__dict__(Dynamic_res), name).keydict_val, wildcard)
     ensures issubtype(typeof(result), object())   // this comes from "-> object" in the python file, for mypy
@@ -18,11 +19,12 @@ function Dynamic_custom__get_hidden(Dynamic_res: Ref, name: Ref): Ref
 }
 
 function Dynamic_custom__get_attr_pure(self_0: Ref, name: Ref): Ref
+    requires issubtype(typeof(name), seq_int_str())
     ensures issubtype(typeof(result), object())   // this comes from "-> object" in the python file, for mypy
 {
-    string___unbox__(name) == Seq(1, 0, 0, 0) ?
+    seq_int_str___unbox__(name) == Seq(1, 0, 0, 0) ?
     __prim__int___box__(15) :
-    string___box__(Seq(97, 98, 99, 100))
+    seq_int_str___box__(Seq(97, 98, 99, 100))
 }
 
 
@@ -64,9 +66,9 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
     assert issubtype(typeof(custom__dict__(Dynamic_res)), dict(object(), object()))
     assert keydict___len__(custom__dict__(Dynamic_res)) == 0
 
-    var key1: Ref := string___box__(keystring_1)
-    var key2: Ref := string___box__(keystring_2)
-    var key3: Ref := string___box__(keystring_3) 
+    var key1: Ref := seq_int_str___box__(keystring_1)
+    var key2: Ref := seq_int_str___box__(keystring_2)
+    var key3: Ref := seq_int_str___box__(keystring_3) 
 
     // keydict == {}
     assert keydict___len__(custom__dict__(Dynamic_res)) == 0
@@ -84,8 +86,8 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
 
     // in python: assert d.key1 == 15
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == __prim__int___box__(15)
-    assert Dynamic_custom__get_hidden(Dynamic_res, key2) == string___box__(Seq(97, 98, 99, 100))
-    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == string___box__(Seq(97, 98, 99, 100))
+    assert Dynamic_custom__get_hidden(Dynamic_res, key2) == seq_int_str___box__(Seq(97, 98, 99, 100))
+    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == seq_int_str___box__(Seq(97, 98, 99, 100))
 
     // keydict == {key1: some_val1}
     assert issubtype(typeof(some_val1), object())
@@ -111,8 +113,8 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
     assert !(some_val3 in keydict_values(custom__dict__(Dynamic_res)))
 
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == some_val1
-    assert Dynamic_custom__get_hidden(Dynamic_res, key2) == string___box__(Seq(97, 98, 99, 100))
-    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == string___box__(Seq(97, 98, 99, 100))
+    assert Dynamic_custom__get_hidden(Dynamic_res, key2) == seq_int_str___box__(Seq(97, 98, 99, 100))
+    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == seq_int_str___box__(Seq(97, 98, 99, 100))
 
 
     // keydict == {key1: some_val1, key2: some_val2}
@@ -131,7 +133,7 @@ method main(keystring_1: Seq[Int], keystring_2: Seq[Int], keystring_3: Seq[Int],
 
     assert Dynamic_custom__get_hidden(Dynamic_res, key1) == some_val1
     assert Dynamic_custom__get_hidden(Dynamic_res, key2) == some_val2
-    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == string___box__(Seq(97, 98, 99, 100))
+    assert Dynamic_custom__get_hidden(Dynamic_res, key3) == seq_int_str___box__(Seq(97, 98, 99, 100))
 
     // keydict == {key1: some_val1, key2: some_val2, key3: some_val3}
     keydict___setitem__(custom__dict__(Dynamic_res), key3, some_val3)
