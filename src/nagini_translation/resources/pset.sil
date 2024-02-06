@@ -52,6 +52,7 @@ function PSet___eq__(self: Ref, other: Ref): Bool
     requires PSet_arg(typeof(self), 0) == PSet_arg(typeof(other), 0)
     ensures result == (PSet___unbox__(self) == PSet___unbox__(other))
     ensures result ==> self == other
+    ensures result == object___eq__(self, other)
 
 
 
@@ -103,3 +104,4 @@ function PMultiset___eq__(self: Ref, other: Ref): Bool
     requires PMultiset_arg(typeof(self), 0) == PMultiset_arg(typeof(other), 0)
     ensures result == (PMultiset___unbox__(self) == PMultiset___unbox__(other))
     ensures result ==> self == other // extensionality
+    ensures result == object___eq__(self, other)

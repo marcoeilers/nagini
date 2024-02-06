@@ -1130,7 +1130,7 @@ class ExpressionTranslator(CommonTranslator):
             comparison = self.get_function_call(left_type, compare_func,
                                                 [left, right],
                                                 [left_type, right_type],
-                                                node, ctx)
+                                                node, ctx, position)
         elif compare_func == '__ne__' and left_type.get_function('__eq__'):
             # The default behavior if __ne__ is not explicitly defined
             # is to invert the result of __eq__.

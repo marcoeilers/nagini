@@ -56,17 +56,17 @@ function int___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), int())
     requires issubtype(typeof(other), int())
-{
-    int___unbox__(self) == int___unbox__(other)
-}
+    ensures result == int___unbox__(self) == int___unbox__(other)
+    ensures result == object___eq__(self, other)
+
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), bool())
     requires issubtype(typeof(other), bool())
-{
-    bool___unbox__(self) == bool___unbox__(other)
-}
+    ensures result == bool___unbox__(self) == bool___unbox__(other)
+    ensures result == object___eq__(self, other)
+
 
 function int___ge__(self: Int, other: Int): Bool
     decreases _
@@ -135,10 +135,25 @@ function int___int__(self: Ref): Ref
     requires issubtype(typeof(self), int())
     ensures result == self
 
-function object___eq__(self: Ref, other: Ref): Bool
-    decreases _
-    ensures self == other ==> result
-    ensures ((self == null) != (other == null)) ==> !result
+domain __ObjectEquality {
+    function object___eq__(Ref, Ref): Bool
+
+    axiom {
+        forall o1: Ref, o2: Ref, o3: Ref ::
+            { object___eq__(o1, o2), object___eq__(o2, o3) }
+            { object___eq__(o1, o2), object___eq__(o1, o3) }
+            { object___eq__(o2, o3), object___eq__(o1, o3) }
+            object___eq__(o1, o2) && object___eq__(o2, o3) ==> object___eq__(o1, o3)
+    }
+
+    axiom {
+        forall o1: Ref, o2: Ref :: { object___eq__(o1, o2) }
+            (object___eq__(o1, o2) == object___eq__(o2, o1)) &&
+            (o1 == o2 ==> object___eq__(o1, o2)) &&
+            (((o1 == null) != (o2 == null)) ==> !object___eq__(o1, o2))
+    }
+
+}
 
 function Place___eq__(self: Ref, other: Ref): Bool
     decreases _

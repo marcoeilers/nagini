@@ -559,7 +559,7 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__"]
+            "requires": ["__len__", "__getitem__", "object___eq__"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
