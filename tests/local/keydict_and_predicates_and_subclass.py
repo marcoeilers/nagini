@@ -10,11 +10,10 @@ class Parent:
         self.x = x
         self.y = y
         self.z = z
-        self.d = ...        # not set
         Ensures(Acc(self.x) and self.x == x)
         Ensures(Acc(self.y) and self.y == y)
         Ensures(Acc(self.z) and self.z == z)
-        Ensures(Acc(self.d))
+        Ensures(MayCreate(self.d))
 
     @Predicate
     def pred_parent(self) -> bool:

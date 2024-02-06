@@ -144,17 +144,17 @@ function Parent_gethidden_parent(self: Ref, name: Ref): Ref
   keydict___contains__(custom__dict__(self), name) ? 
     keydict___getitem__(custom__dict__(self), name) : 
     (Child() == typeof(self) ? 
-      Child_getattr_child(self) :
-      Parent_getattr_parent(self)
+      Child_getattr_child(self, name) :
+      Parent_getattr_parent(self, name)
     )
 }
 
-function Parent_getattr_parent(self: Ref): Ref
+function Parent_getattr_parent(self: Ref, name: Ref): Ref
   requires issubtype(typeof(self), Parent())
   ensures issubtype(typeof(result), int())
   ensures int___gt__(int___unbox__(result), 10)
 
-function Child_getattr_child(self: Ref): Ref
+function Child_getattr_child(self: Ref, name: Ref): Ref
   requires issubtype(typeof(self), Child())
   ensures issubtype(typeof(result), int())
   ensures int___gt__(int___unbox__(result), 20)
