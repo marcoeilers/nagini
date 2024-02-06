@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
+    OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
@@ -710,6 +711,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             # expression
             return chain_cond_exp(guarded_functions, self.viper, position,
                                   self.no_info(ctx), ctx)
+        elif func_name == '__eq__' and receiver.python_class.name == OBJECT_TYPE:
+            assert len(args) == 2
+            arg1 = self.to_ref(args[0], ctx)
+            arg2 = self.to_ref(args[1], ctx)
+            return self.viper.DomainFuncApp('object___eq__', [arg1, arg2], self.viper.Bool, position,
+                                            self.no_info(ctx), '__ObjectEquality')
         else:
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:
