@@ -12,7 +12,7 @@ Dependencies (Ubuntu Linux)
 
 Install Java 11 or newer (64 bit) and Python 3.10 (64 bit, other versions likely *will not work*) and the required libraries::
 
-    sudo apt-get install python3-dev
+    sudo apt-get install python3.10-dev
 
 For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
@@ -47,7 +47,7 @@ Getting Started
 
 4.  Optionally, try running the tests::
 
-        pytest src/nagini_translation/tests.py --silicon
+        pytest -p no:faulthandler src/nagini_translation/tests.py --silicon
 
 Command Line Usage
 ==================
