@@ -9,10 +9,10 @@ import types
 
 from nagini_translation.lib.constants import FUNCTION_DOMAIN_NAME
 from nagini_translation.lib.errors import error_manager, Rules
-
-
-def getobject(package, name):
-    return getattr(getattr(package, name + '$'), 'MODULE$')
+from nagini_translation.lib.jvmaccess import (
+    getclass,
+    getobject
+)
 
 
 class Function0:
@@ -41,8 +41,8 @@ class ViperAST:
         self.used_names_sets = {}
 
         def getconst(name):
-            return getobject(ast, name)
-        self.QPs = getobject(ast.utility, 'QuantifiedPermissions')
+            return getobject(java, ast, name)
+        self.QPs = getobject(java, ast.utility, 'QuantifiedPermissions')
         self.AddOp = getconst('AddOp')
         self.AndOp = getconst('AndOp')
         self.DivOp = getconst('DivOp')
@@ -69,13 +69,13 @@ class ViperAST:
         self.Ref = getconst('Ref')
         self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
-        self.none = getobject(scala, 'None')
+        self.none = getobject(java, scala, 'None')
 
     def is_available(self) -> bool:
         """
         Checks if the Viper AST is available, i.e., silver is on the Java classpath.
         """
-        return self.jvm.is_known_class(self.ast.Program)
+        return self.jvm.is_known_class(self.ast, 'Program')
 
     def function_domain_type(self):
         return self.DomainType(FUNCTION_DOMAIN_NAME, {}, [])
@@ -142,7 +142,7 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        method = getobject(self.ast, "MethodWithLabelsInScope")
+        method = getobject(self.java, self.ast, "MethodWithLabelsInScope")
         return method.apply(name, self.to_seq(args), self.to_seq(returns),
                             self.to_seq(pres), self.to_seq(posts),
                             body_with_locals, position, info,
@@ -528,7 +528,7 @@ class ViperAST:
                     rules: Rules=None, file: str = None, py_node=None):
         if expr is None:
             return self.NoPosition
-        if not hasattr(expr, 'lineno'):
+        if not hasattr(expr, 'lineno') or expr.lineno is None:
             # TODO: this should never happen (because all nodes that the parser
             # creates have this field), but it does, because in the SIF code we
             # create artificial ast.Name objects which don't have it. That
@@ -540,7 +540,8 @@ class ViperAST:
         start = self.ast.LineColumnPosition(expr.lineno, expr.col_offset)
         id = error_manager.add_error_information(
             expr, list(vias), error_string, py_node, rules)
-        if hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset'):
+        if (hasattr(expr, 'end_lineno') and hasattr(expr, 'end_col_offset') and
+                expr.end_lineno is not None and expr.end_col_offset is not None):
             end = self.ast.LineColumnPosition(expr.end_lineno,
                                               expr.end_col_offset)
             end = self.scala.Some(end)

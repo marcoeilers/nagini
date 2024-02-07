@@ -450,12 +450,12 @@ class Analyzer(ast.NodeVisitor):
             return self.find_or_create_class(node.attr, module=ctx)
         elif isinstance(node, ast.Subscript):
             cls = self.find_or_create_target_class(node.value)
-            if isinstance(node.slice.value, ast.Name):
-                ast_args = [node.slice.value]
-            elif isinstance(node.slice.value, ast.Str):
-                ast_args = [node.slice.value]
+            if isinstance(node.slice, ast.Name):
+                ast_args = [node.slice]
+            elif isinstance(node.slice, ast.Str):
+                ast_args = [node.slice]
             else:
-                ast_args = node.slice.value.elts
+                ast_args = node.slice.elts
             args = [self.find_or_create_target_class(arg) for arg in ast_args]
             result = GenericType(cls, args)
             return result
@@ -542,10 +542,10 @@ class Analyzer(ast.NodeVisitor):
         current_index = 0
         for base in node.bases:
             if isinstance(base, ast.Subscript) and base.value.id == 'Generic':
-                if isinstance(base.slice.value, ast.Name):
-                    arg_names = [base.slice.value.id]
+                if isinstance(base.slice, ast.Name):
+                    arg_names = [base.slice.id]
                 else:
-                    arg_names = [elmt.id for elmt in base.slice.value.elts]
+                    arg_names = [elmt.id for elmt in base.slice.elts]
                 for arg_name in arg_names:
                     assert arg_name in self.module.type_vars
                     var_info = self.module.type_vars[arg_name]

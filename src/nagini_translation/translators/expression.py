@@ -454,13 +454,13 @@ class ExpressionTranslator(CommonTranslator):
         target_type = self.get_type(node.value, ctx)
         target_stmt, target = self.translate_expr(node.value, ctx,
                                                   target_type=self.viper.Ref)
-        if not isinstance(node.slice, ast.Index):
+        if isinstance(node.slice, ast.Slice):
             return self._translate_slice_subscript(node, target, target_type,
                                                    target_stmt, ctx)
 
-        index_stmt, index = self.translate_expr(node.slice.value, ctx,
+        index_stmt, index = self.translate_expr(node.slice, ctx,
                                                 target_type=self.viper.Ref)
-        index_type = self.get_type(node.slice.value, ctx)
+        index_type = self.get_type(node.slice, ctx)
         args = [target, index]
         arg_types = [target_type, index_type]
         call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,

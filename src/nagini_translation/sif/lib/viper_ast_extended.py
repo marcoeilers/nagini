@@ -35,7 +35,7 @@ class ViperASTExtended(ViperAST):
         Checks if the extended AST is available, i.e., the SIF AST extension is on the
         Java classpath.
         """
-        return self.jvm.is_known_class(self.ast_extensions.SIFReturnStmt)
+        return self.jvm.is_known_class(self.ast_extensions, 'SIFReturnStmt')
 
     def Return(self, expr: Optional[Expr], res_var: Optional[Var], position: Position,
                info: Info):

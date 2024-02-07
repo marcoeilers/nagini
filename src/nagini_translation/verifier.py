@@ -11,7 +11,10 @@ from enum import Enum
 from typing import List
 from nagini_translation.lib import config
 from nagini_translation.lib.errors import error_manager
-from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.lib.jvmaccess import (
+    getobject,
+    JVM
+)
 from nagini_translation.lib.util import list_to_seq
 
 
@@ -66,7 +69,7 @@ class ARPPlugin:
     def __init__(self, jvm: JVM):
         self.jvm = jvm
         self.silver = jvm.viper.silver
-        if not jvm.is_known_class(jvm.viper.silver.plugin.ARPPlugin):
+        if not jvm.is_known_class(jvm.viper.silver.plugin, 'ARPPlugin'):
             raise Exception('ARP plugin not found on classpath.')
         self.arpplugin = jvm.viper.silver.plugin.ARPPlugin()
         self.set_ignored_fields()
@@ -106,9 +109,9 @@ class Silicon:
     def __init__(self, jvm: JVM, filename: str, viper_args: List[str], counterexample: bool):
         self.jvm = jvm
         self.silver = jvm.viper.silver
-        if not jvm.is_known_class(jvm.viper.silicon.Silicon):
+        if not jvm.is_known_class(jvm.viper.silicon, 'Silicon'):
             raise Exception('Silicon backend not found on classpath.')
-        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
+        reporter = getobject(jvm.java, jvm.viper.silver.reporter, 'NoopReporter')
         self.silicon = jvm.viper.silicon.MinimalSiliconFrontendAPI(reporter)
         args = [
             '--assumeInjectivityOnInhale',
@@ -154,11 +157,11 @@ class Carbon:
 
     def __init__(self, jvm: JVM, filename: str, viper_args: List[str]):
         self.silver = jvm.viper.silver
-        if not jvm.is_known_class(jvm.viper.carbon.CarbonVerifier):
+        if not jvm.is_known_class(jvm.viper.carbon, 'CarbonVerifier'):
             raise Exception('Carbon backend not found on classpath.')
         if config.boogie_path is None:
             raise Exception('Boogie not found.')
-        reporter = getattr(getattr(jvm.viper.silver.reporter, 'NoopReporter$'), 'MODULE$')
+        reporter = getobject(jvm.java, jvm.viper.silver.reporter, 'NoopReporter')
         self.carbon = jvm.viper.carbon.MinimalCarbonFrontendAPI(reporter)
         args = [
             '--assumeInjectivityOnInhale',

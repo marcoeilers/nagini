@@ -135,22 +135,22 @@ def get_target(node: ast.AST,
                     type_class = possible_class
             if type_class:
                 # Look up the type arguments. Also consider string arguments.
-                if isinstance(node.slice.value, ast.Tuple):
+                if isinstance(node.slice, ast.Tuple):
                     args = [get_target(arg, containers, container, True)
-                            for arg in node.slice.value.elts]
+                            for arg in node.slice.elts]
                 else:
-                    args = [get_target(node.slice.value, containers, container, True)]
+                    args = [get_target(node.slice, containers, container, True)]
                 return GenericType(type_class, args)
             if node.value.id == 'Optional':
-                option = get_target(node.slice.value, containers, container, True)
+                option = get_target(node.slice, containers, container, True)
                 return OptionalType(option)
             if node.value.id == 'Union':
-                if isinstance(node.slice.value, ast.Tuple):
+                if isinstance(node.slice, ast.Tuple):
                     elts = [get_target(e, containers, container, True)
-                            for e in node.slice.value.elts]
+                            for e in node.slice.elts]
                     return UnionType(elts)
                 else:
-                    return get_target(node.slice.value, containers, container, True)
+                    return get_target(node.slice, containers, container, True)
 
     else:
         return None
@@ -512,14 +512,14 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
                 raise UnsupportedException(node, 'tuple slicing')
             if len(value_type.type_args) == 1:
                 return value_type.type_args[0]
-            if isinstance(node.slice.value, ast.UnaryOp):
-                if (isinstance(node.slice.value.op, ast.USub) and
-                        isinstance(node.slice.value.operand, ast.Num)):
-                    index = -node.slice.value.operand.n
+            if isinstance(node.slice, ast.UnaryOp):
+                if (isinstance(node.slice.op, ast.USub) and
+                        isinstance(node.slice.operand, ast.Num)):
+                    index = -node.slice.operand.n
                 else:
                     raise UnsupportedException(node, 'dynamic subscript type')
-            elif isinstance(node.slice.value, ast.Num):
-                index = node.slice.value.n
+            elif isinstance(node.slice, ast.Num):
+                index = node.slice.n
             return value_type.type_args[index]
         else:
             return common_supertype(value_type.type_args)

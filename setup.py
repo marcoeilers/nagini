@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='1.0.0',
+        version='1.1.0',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -26,14 +26,13 @@ setup(
         install_requires=[
             'mypy==0.782',
             'toposort==1.5',
-            'jpype1==0.7.0',
+            'jpype1==1.0.1',
             'astunparse==1.6.2',
-            'typed-ast==1.4.0',
             'pytest==4.3.0',
             'pytest-xdist==1.27.0',
             'z3-solver==4.8.7.0'
             ],
-        entry_points = {
+        entry_points={
              'console_scripts': [
                  'nagini = nagini_translation.main:main',
                  'nagini_client = nagini_translation.client:main',
@@ -50,7 +49,7 @@ setup(
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
             'Operating System :: OS Independent',
-            'Programming Language :: Python :: 3 :: Only',
+            'Programming Language :: Python :: 3.9',
             'Topic :: Software Development',
             ],
         )

@@ -28,5 +28,12 @@ class JVM:
     def get_array(self, t, n):
         return jpype.JArray(t)(n)
 
-    def is_known_class(self, class_object) -> bool:
-        return not isinstance(class_object, jpype.JPackage)
+    def is_known_class(self, package_object, class_name) -> bool:
+        return hasattr(package_object, class_name)
+
+
+def getobject(java, package, name):
+    return java.lang.Class.forName(str(package) + "." + name + "$").getDeclaredField('MODULE$').get(None)
+
+def getclass(java, package, name):
+    return jpype.JClass(java.lang.Class.forName(str(package) + "." + name))
