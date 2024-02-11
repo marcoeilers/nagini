@@ -9,10 +9,10 @@ function str___len__(self: Ref): Int
     decreases _
 	ensures result >= 0
 
-function str___val__(self: Ref): Int
+function str___val__(self: Ref): Seq[Ref]
     decreases _
 
-function str___create__(len: Int, value: Int) : Ref
+function str___create__(len: Int, value: Seq[Ref]) : Ref
     decreases _
 	ensures str___len__(result) == len
 	ensures str___val__(result) == value
@@ -35,6 +35,7 @@ function str___add__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), str())
     ensures str___len__(result) == str___len__(self) + str___len__(other)
     ensures typeof(result) == str()
+    ensures str___val__(result) == str___val__(self) ++ str___val__(other)
 
 function str_join(self: Ref, other: Ref): Ref
     decreases _
