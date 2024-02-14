@@ -357,7 +357,10 @@ class ExpressionTranslator(CommonTranslator):
             _, el = self.translate_expr(ast.Constant(value=ord(c)), ctx)
             elements.append(el)
 
-        val_arg = self.viper.ExplicitSeq(elements, self.no_position(ctx), self.no_info(ctx))
+        if elements:
+            val_arg = self.viper.ExplicitSeq(elements, self.no_position(ctx), self.no_info(ctx))
+        else:
+            val_arg = self.viper.EmptySeq(self.viper.Ref, self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
         str_type = ctx.module.global_module.classes[STRING_TYPE]
