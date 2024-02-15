@@ -349,6 +349,9 @@ class AbstractTranslator(metaclass=ABCMeta):
                           ctx: Context) -> List[Stmt]:
         return self.config.method_translator.translate_finally(block, ctx)
 
+    def translate_float_literal(self, lit: float, node: ast.AST, ctx: Context) -> Expr:
+        return self.config.expr_translator.translate_float_literal(lit, node, ctx)
+
     def type_check(self, lhs: Expr, type: PythonType,
                    position: 'silver.ast.Position', ctx: Context,
                    inhale_exhale: bool=True) -> Expr:

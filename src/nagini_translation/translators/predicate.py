@@ -41,18 +41,21 @@ class PredicateTranslator(CommonTranslator):
             raise InvalidProgramException(pred.node,
                                           'invalid.predicate')
 
-        content = pred.node.body[0]
-        if isinstance(content, ast.Return):
-            content = content.value
-        stmt, body = self.translate_expr(
-            content,
-            ctx, impure=True,
-            target_type=self.viper.Bool)
-        if stmt:
-            raise InvalidProgramException(pred.node,
-                                          'invalid.predicate')
-        body = self.viper.And(arg_types, body, self.no_position(ctx),
-                              self.no_info(ctx))
+        if pred.contract_only:
+            body = None
+        else:
+            content = pred.node.body[0]
+            if isinstance(content, ast.Return):
+                content = content.value
+            stmt, body = self.translate_expr(
+                content,
+                ctx, impure=True,
+                target_type=self.viper.Bool)
+            if stmt:
+                raise InvalidProgramException(pred.node,
+                                              'invalid.predicate')
+            body = self.viper.And(arg_types, body, self.no_position(ctx),
+                                  self.no_info(ctx))
         ctx.current_function = None
         return self.viper.Predicate(pred.sil_name, args, body,
                                     self.to_position(pred.node, ctx),
@@ -70,6 +73,8 @@ class PredicateTranslator(CommonTranslator):
         for pred in preds:
             value = {pred.overrides} if pred.overrides else set()
             dependencies[pred] = value
+            if pred.contract_only != root.contract_only:
+                raise InvalidProgramException(pred.node, 'partially.abstract.predicate.family')
         sorted = toposort_flatten(dependencies, False)
 
         name = root.sil_name
@@ -90,6 +95,9 @@ class PredicateTranslator(CommonTranslator):
         body = None
         assert not ctx.var_aliases
         for instance in sorted:
+            if root.contract_only:
+                # do not generate any body
+                continue
             ctx.var_aliases = {}
             assert not ctx.current_function
             if instance.type.name != BOOL_TYPE:
@@ -155,7 +163,7 @@ class PredicateTranslator(CommonTranslator):
             self.viper.MethodCall(self_frame_method_name, [], [], self.to_position(root.node, ctx), no_info)
         root_pos = self.to_position(root.node, ctx)
         all_preds = []
-        if not (root.name == 'invariant' and root.cls.name == 'Lock'):
+        if not root.contract_only and not (root.name == 'invariant' and root.cls.name == 'Lock'):
             root_pos_with_rule = self.to_position(root.node, ctx, rules=rules.PRED_FAM_FOLD_UNKNOWN_RECEIVER)
             rest_pred_name = root.module.get_fresh_name(root.name + '_abstract_rest')
             rest_pred = self.viper.Predicate(rest_pred_name, args, None, root_pos, no_info)
@@ -169,7 +177,8 @@ class PredicateTranslator(CommonTranslator):
                                                            root_pos_with_rule, no_info),
                                   root_pos_with_rule, no_info)
         ctx.var_aliases = {}
-        body = self.viper.And(arg_types, body, root_pos, no_info)
+        if not root.contract_only:
+            body = self.viper.And(arg_types, body, root_pos, no_info)
         family_pred = self.viper.Predicate(name, args, body, root_pos, no_info)
         all_preds.append(family_pred)
         return all_preds, self_framing_check_methods

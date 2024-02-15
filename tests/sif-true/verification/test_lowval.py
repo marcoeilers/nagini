@@ -60,7 +60,6 @@ def example_tuple_low(secret: bool) -> Example:
 
 def example_tuple_lowval(secret: bool) -> Example:
     Ensures(Acc(Result().f) and Acc(Result().g))
-    #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(LowVal((Result().f, Result().g)))
     a = Example()
     b = Example()

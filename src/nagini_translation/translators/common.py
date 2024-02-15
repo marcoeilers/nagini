@@ -13,12 +13,14 @@ from nagini_translation.lib.constants import (
     ASSERTING_FUNC,
     COMBINE_NAME_FUNC,
     DICT_TYPE,
+    FLOAT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
     LIST_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
     NAME_DOMAIN,
+    OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
     RANGE_TYPE,
@@ -698,9 +700,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 guard = self.type_check(args[0], cls, position, ctx)
 
                 # Translate the function call on this particular receiver's class
-                function = self._get_function_call(cls, func_name, args,
-                                                   arg_types, node, ctx,
-                                                   position)
+                function = self.get_function_call(cls, func_name, args,
+                                                  arg_types, node, ctx,
+                                                  position)
 
                 # Stores guard and translated function call as tuple in a list
                 guarded_functions.append((guard, function))
@@ -710,6 +712,19 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return chain_cond_exp(guarded_functions, self.viper, position,
                                   self.no_info(ctx), ctx)
         else:
+            if func_name == '__eq__':
+                func_cls = receiver.get_function(func_name).cls
+                if func_cls.name == OBJECT_TYPE:
+                    assert len(args) == 2
+                    arg1 = self.to_ref(args[0], ctx)
+                    arg2 = self.to_ref(args[1], ctx)
+                    return self.viper.DomainFuncApp('object___eq__', [arg1, arg2], self.viper.Bool, position,
+                                                    self.no_info(ctx), '__ObjectEquality')
+            if receiver.python_class.name == FLOAT_TYPE:
+                if ctx.float_encoding is None:
+                    import logging
+                    logging.warning("Floating point operations are uninterpreted by default. To use interpreted "
+                                    "floating point operations, use option --float-encoding")
             # Pass-through
             return self._get_function_call(receiver, func_name, args,
                                            arg_types, node, ctx, position)

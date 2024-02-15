@@ -15,6 +15,7 @@ LITERALS = ['True', 'False', 'None']
 
 BUILTINS = ['cast',
             'int',
+            'float',
             'isinstance',
             'bool',
             'len',
@@ -260,6 +261,8 @@ BYTES_TYPE = 'bytes'
 
 INT_TYPE = 'int'
 
+PERM_TYPE = 'perm'
+
 FLOAT_TYPE = 'float'
 
 BOOL_TYPE = 'bool'
@@ -267,6 +270,8 @@ BOOL_TYPE = 'bool'
 PRIMITIVE_PREFIX = '__prim__'
 
 PRIMITIVE_INT_TYPE = PRIMITIVE_PREFIX + INT_TYPE
+
+PRIMITIVE_PERM_TYPE = PRIMITIVE_PREFIX + PERM_TYPE
 
 PRIMITIVE_BOOL_TYPE = PRIMITIVE_PREFIX + BOOL_TYPE
 

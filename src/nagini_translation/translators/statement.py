@@ -1097,6 +1097,8 @@ class StatementTranslator(CommonTranslator):
         after_assign = []
         if isinstance(target, PythonGlobalVar):
             if target.is_final:
+                if lhs not in target.writes:
+                    raise UnsupportedException(lhs, "Internal error: Variable may have been incorrectly tagged as final.")
                 # For final variables, we assume that the function representing the
                 # variable is equal to the RHS of the assignment. For pure values,
                 # this will do nothing, since the postcondition will already say the same;

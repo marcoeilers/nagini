@@ -280,61 +280,68 @@
     "functions": {
         "__create__": {
             "args": ["__prim__int"],
-            "type": "float"
+            "type": "float",
+            "requires": ["__prim__perm___box__"]
+        },
+        "__unbox__": {
+            "args": ["float"],
+            "type": "__prim__perm",
+            "requires": ["int___unbox__"]
         },
         "__bool__": {
             "args": ["float"],
             "type": "__prim__bool",
-            "requires": ["int___bool__", "int___unbox__"]
+            "requires": ["int___bool__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
-            "requires": ["int___eq__"]
+            "requires": ["int___eq__", "unbox"]
         },
         "__add__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___add__", "int___unbox__"]
+            "requires": ["int___add__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__sub__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___sub__", "int___unbox__"]
+            "requires": ["int___sub__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__mul__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___mul__", "int___unbox__"]
+            "requires": ["int___mul__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__div__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___div__", "int___unbox__"]
+            "requires": ["int___div__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
         "__ge__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___ge__", "int___unbox__"]
+            "requires": ["int___ge__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__gt__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___gt__", "int___unbox__"]
+            "requires": ["int___gt__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__lt__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___lt__", "int___unbox__"]
+            "requires": ["int___lt__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__le__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___le__", "int___unbox__"]
+            "requires": ["int___le__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
         "__int__": {
             "args": ["float"],
-            "type": "int"
+            "type": "int",
+            "requires": ["unbox", "__prim__int___box__"]
         }
     },
     "extends": "object"
@@ -552,7 +559,7 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__"]
+            "requires": ["__len__", "__getitem__", "object___eq__"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
@@ -569,6 +576,15 @@
             "args": ["__prim__int"],
             "type": "int",
             "requires": ["int___unbox__"]
+        }
+    }
+},
+"__prim__perm": {
+    "functions": {
+        "__box__": {
+            "args": ["__prim__perm"],
+            "type": "int",
+            "requires": ["float___unbox__"]
         }
     }
 },

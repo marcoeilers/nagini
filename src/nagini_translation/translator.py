@@ -90,6 +90,7 @@ class Translator:
                           selected: Set[str] = None,
                           ignore_global: bool = False,
                           arp: bool = False,
+                          float_encoding : str = None,
                           sif = False) -> 'silver.ast.Program':
         ctx = Context()
         ctx.sif = sif
@@ -97,6 +98,7 @@ class Translator:
         ctx.current_function = None
         ctx.module = modules[0]
         ctx.arp = arp
+        ctx.float_encoding = float_encoding
         return self.prog_translator.translate_program(modules, sil_progs, ctx,
                                                       selected, ignore_global)
 
