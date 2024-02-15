@@ -864,18 +864,7 @@ class CallTranslator(CommonTranslator):
         str_type = ctx.module.global_module.classes[STRING_TYPE]
         for key, val in args.items():
             # Key string literal
-            length = len(key)
-            length_arg = self.viper.IntLit(length, self.no_position(ctx),
-                                           self.no_info(ctx))
-            val_arg = self.viper.IntLit(self._get_string_value(key),
-                                        self.no_position(ctx),
-                                        self.no_info(ctx))
-            str_create_args = [length_arg, val_arg]
-            str_create_arg_types = [None, None]
-            func_name = '__create__'
-            key_val = self.get_function_call(str_type, func_name,
-                                             str_create_args,
-                                             str_create_arg_types, node, ctx)
+            key_val = self.translate_string(key, node, ctx)
             val_stmt, val_val = self.translate_expr(val, ctx)
             val_type = self.get_type(val, ctx)
             args = [res_var.ref(), key_val, val_val]
