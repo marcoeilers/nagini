@@ -188,3 +188,42 @@ function abs(a: Int): Int
 method print(r: Ref)
     requires Low(r)
     requires LowEvent()
+
+method sorted(r: Ref) returns (rs: Ref)
+    requires issubtype(typeof(r), list(int()))
+    requires acc(r.list_acc, 1/1000)
+    ensures issubtype(typeof(rs), list(int()))
+    ensures acc(r.list_acc, 1/1000)
+    ensures acc(rs.list_acc)
+    ensures list___len__(rs) == list___len__(r)
+    ensures __toMS(r.list_acc) == __toMS(rs.list_acc)
+    ensures forall i1: Int, i2: Int :: { rs.list_acc[i1], rs.list_acc[i2] } i1 >= 0 && i1 < i2 && i2 < list___len__(rs) ==>
+            int___unbox__(list___getitem__(rs, __prim__int___box__(i1))) <= int___unbox__(list___getitem__(rs, __prim__int___box__(i2)))
+
+function sum(r: Ref): Int
+    requires issubtype(typeof(r), list(int()))
+    requires acc(r.list_acc, 1/1000)
+    ensures result == __sum(__seq_ref_to_seq_int(r))
+
+function __seq_ref_to_seq_int(r: Ref): Seq[Int]
+    requires issubtype(typeof(r), list(int()))
+    requires acc(r.list_acc, 1/1000)
+    ensures |result| == |r.list_acc|
+    ensures forall i: Int :: { result[i] } i >= 0 && i < |result| ==>  result[i] == int___unbox__(list___getitem__(r, __prim__int___box__(i)))
+
+
+domain __SumHelper[T$] {
+    function __sum(s: Seq[Int]): Int
+
+    axiom __sum_def_1 {
+        __sum(Seq[Int]()) == 0
+    }
+
+    axiom __sum_def_2 {
+        forall __t: Int :: { __sum(Seq(__t)) } __sum(Seq(__t)) == __t
+    }
+
+    axiom __sum_def_3 {
+        forall __ss1: Seq[Int], __ss2: Seq[Int] :: { __sum(__ss1 ++ __ss2) } __sum(__ss1 ++ __ss2) == __sum(__ss1) + __sum(__ss2)
+    }
+}
