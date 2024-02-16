@@ -804,7 +804,7 @@
         "__getitem__": {
             "args": ["range", "__prim__int"],
             "type": "__prim__int",
-            "requires": ["__val__"]
+            "requires": ["__val__", "__len__"]
         },
         "__getitem_slice__": {
             "args": ["range", "slice"],
