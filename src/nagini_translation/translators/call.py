@@ -416,13 +416,22 @@ class CallTranslator(CommonTranslator):
         return stmts, result_var
 
     def _translate_range(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        if len(node.args) != 2:
-            msg = 'range() is currently only supported with two args.'
+        if node.keywords:
+            msg = 'range() with keyword args is currently not supported.'
+            raise UnsupportedException(node, msg)
+        if len(node.args) == 2:
+            start_arg = node.args[0]
+            end_arg = node.args[1]
+        elif len(node.args) == 1:
+            start_arg = None
+            end_arg = node.args[0]
+        else:
+            msg = 'range() step is currently not supported.'
             raise UnsupportedException(node, msg)
         range_class = ctx.module.global_module.classes[RANGE_TYPE]
-        start_stmt, start = self.translate_expr(node.args[0], ctx,
-                                                self.viper.Int)
-        end_stmt, end = self.translate_expr(node.args[1], ctx, self.viper.Int)
+        start_stmt, start = (self.translate_expr(start_arg, ctx, self.viper.Int) if start_arg
+                             else ([], self.viper.IntLit(0, self.to_position(node, ctx), self.no_info(ctx))))
+        end_stmt, end = self.translate_expr(end_arg, ctx, self.viper.Int)
         # Add unique integer to make new instance different from other ranges.
         args = [start, end, self.get_fresh_int_lit(ctx)]
         arg_types = [None, None, None]
