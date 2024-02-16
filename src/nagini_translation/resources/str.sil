@@ -9,10 +9,10 @@ function str___len__(self: Ref): Int
     decreases _
 	ensures result >= 0
 
-function str___val__(self: Ref): Seq[Ref]
+function str___val__(self: Ref): Seq[Int]
     decreases _
 
-function str___create__(len: Int, value: Seq[Ref]) : Ref
+function str___create__(len: Int, value: Seq[Int]) : Ref
     decreases _
 	ensures str___len__(result) == len
 	ensures str___val__(result) == value
