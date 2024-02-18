@@ -1161,12 +1161,12 @@ class StatementTranslator(CommonTranslator):
                                                                           List[Expr]]:
         # Special treatment for subscript; instead of an assignment, we
         # need to call a setitem method.
-        if not isinstance(node.targets[0].slice, ast.Index):
+        if isinstance(node.targets[0].slice, ast.Slice):
             raise UnsupportedException(node, 'assignment to slice')
         position = self.to_position(node, ctx)
         target_cls = self.get_type(lhs.value, ctx)
         lhs_stmt, target = self.translate_expr(lhs.value, ctx)
-        ind_stmt, index = self.translate_expr(lhs.slice.value, ctx,
+        ind_stmt, index = self.translate_expr(lhs.slice, ctx,
                                               target_type=self.viper.Int)
         args = [target, index, rhs]
         arg_types = [None, None, None]

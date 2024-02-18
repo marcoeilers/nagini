@@ -6,6 +6,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from nagini_translation.lib.constants import RESULT_NAME
+from nagini_translation.lib.jvmaccess import (
+    getclass,
+    getobject
+)
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, GenericType, PythonField, PythonClass, OptionalType, TypeVar
 from nagini_translation.lib.util import int_to_string, UnsupportedException
 from collections import OrderedDict
@@ -129,9 +133,9 @@ def get_parts(jvm, val):
 def translate_sort(jvm, s):
     terms = jvm.viper.silicon.state.terms
     def get_sort_object(name):
-        return getattr(terms, 'sorts$' + name + '$')
+        return getclass(jvm.java, terms, 'sorts$' + name + '$')
     def get_sort_class(name):
-        return getattr(terms, 'sorts$' + name)
+        return getclass(jvm.java, terms, 'sorts$' + name)
 
     if isinstance(s, get_sort_class('Set')):
         return 'Set<{}>'.format(translate_sort(jvm, s.elementsSort()))
@@ -150,11 +154,11 @@ def translate_sort(jvm, s):
 
 
 def evaluate_term(jvm, term, model):
-    if isinstance(term, getattr(jvm.viper.silicon.state.terms, 'Unit$')):
+    if isinstance(term, getclass(jvm.java, jvm.viper.silicon.state.terms, 'Unit$')):
         return '$Snap.unit'
     if isinstance(term, jvm.viper.silicon.state.terms.IntLiteral):
         return str(term)
-    if isinstance(term, getattr(jvm.viper.silicon.state.terms, "Null$")):
+    if isinstance(term, getclass(jvm.java, jvm.viper.silicon.state.terms, 'Null$')):
         return str(model['$Ref.null'])
     if isinstance(term, jvm.viper.silicon.state.terms.Var):
         key = str(term)
@@ -191,8 +195,7 @@ def evaluate_term(jvm, term, model):
         return get_func_value(model, SNAP_TO + from_sort_name + 'To' + to_sort_name, (sub,))
     elif isinstance(term, jvm.viper.silicon.state.terms.PredicateLookup):
         lookup_func_name = '$PSF.lookup_' + term.predname()
-        toSnapTree = getattr(jvm.viper.silicon.state.terms, 'toSnapTree$')
-        obj = getattr(toSnapTree, 'MODULE$')
+        obj = getobject(jvm.java, jvm.viper.silicon.state.terms, 'toSnapTree')
         snap = obj.apply(term.args())
         psf_value = evaluate_term(jvm, term.psf(), model)
         snap_value = evaluate_term(jvm, snap, model)

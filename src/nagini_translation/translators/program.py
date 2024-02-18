@@ -30,6 +30,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
 )
+from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
     MethodType,
     PythonClass,
@@ -649,7 +650,7 @@ class ProgramTranslator(CommonTranslator):
         domain = self.viper.Domain(THREAD_DOMAIN, [get_method, get_arg, get_old], [], [],
                                    pos, info)
         if isinstance(self.viper, ViperASTExtended):
-            getattr(getattr(self.viper.ast_extensions, 'SIFExtendedTransformer$'), 'MODULE$').addDomainFuncToDuplicate(
+            getobject(self.jvm.java, self.viper.ast_extensions, 'SIFExtendedTransformer').addDomainFuncToDuplicate(
                 self.viper.to_seq([get_method, get_arg, get_old]))
         return domain
 
