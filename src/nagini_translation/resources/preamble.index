@@ -804,7 +804,7 @@
         "__getitem__": {
             "args": ["range", "__prim__int"],
             "type": "__prim__int",
-            "requires": ["__val__"]
+            "requires": ["__val__", "__len__"]
         },
         "__getitem_slice__": {
             "args": ["range", "slice"],
@@ -897,6 +897,11 @@
         "abs": {
             "args": ["__prim__int"],
             "type": "__prim__int"
+        },
+        "sum": {
+            "args": ["list"],
+            "type": "__prim__int",
+            "requires": ["__seq_ref_to_seq_int", "int___unbox__", "__prim__int___box__", "list___getitem__"]
         }
     },
     "methods": {
@@ -904,6 +909,12 @@
             "args": ["object"],
             "type": null,
             "MustTerminate": true
+        },
+        "sorted": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true,
+            "requires": ["list___len__", "list___getitem__", "__prim__int___box__", "int___unbox__"]
         }
     }
 }
