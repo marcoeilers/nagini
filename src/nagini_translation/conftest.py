@@ -183,9 +183,9 @@ def pytest_configure(config: 'pytest.config.Config'):
         # Default: all tests that are available, SIF tests only if the extension is
         # present.
         tests = ['functional', 'io', 'obligations']
-        if jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+        if jvm.is_known_class(jvm.viper.silver.sif, 'SIFReturnStmt'):
             tests.extend(['sif-true', 'sif-poss', 'sif-prob'])
-        if jvm.is_known_class(jvm.viper.silver.plugin.ARPPlugin):
+        if jvm.is_known_class(jvm.viper.silver.plugin, 'ARPPlugin'):
             tests.append('arp')
         for test in tests:
             _pytest_config.add_test(test)
@@ -207,9 +207,9 @@ def pytest_configure(config: 'pytest.config.Config'):
     if not _pytest_config.verifiers:
         # Default: all available verifiers.
         verifiers = []
-        if jvm.is_known_class(jvm.viper.silicon.SiliconRunner):
+        if jvm.is_known_class(jvm.viper.silicon, 'SiliconRunner'):
             verifiers.append('silicon')
-        if jvm.is_known_class(jvm.viper.carbon.Carbon):
+        if jvm.is_known_class(jvm.viper.carbon, 'Carbon'):
             verifiers.append('carbon')
         if not verifiers:
             pytest.exit('No backend verifiers available on the classpath.')
