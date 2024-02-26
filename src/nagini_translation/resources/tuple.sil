@@ -192,13 +192,6 @@ domain tuple_types {
       )
   }
 
-  axiom subtype_tuple_var_arg_def {
-    (forall var0: PyType, var1: PyType ::
-      { issubtype(var0, tuple_var(var1)) }
-      issubtype(var0, tuple_var(var1)) <==> issubtype(tuple_var_arg(var0), var1)
-      )
-  }
-
   axiom tuple_args_subtype_1 {
     (forall seq: Seq[PyType], Z: PyType ::
       { issubtype(Z, tuple(seq)), issubtype(Z, tuple(tuple_args(Z))) }
