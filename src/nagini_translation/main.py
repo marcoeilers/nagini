@@ -55,6 +55,7 @@ TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     parser = jvm.viper.silver.parser.FastParser()
     tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
+    adtp = jvm.viper.silver.plugin.standard.adt.AdtPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
@@ -65,10 +66,12 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
     tp.beforeParse(text, False)
+    adtp.beforeParse(text, False)
     parsed = parser.parse(text, path, none)
 
     parse_result = parsed
     parse_result.initProperties()
+    parse_result = adtp.beforeResolve(parse_result)
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
@@ -385,7 +388,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print(str(prog))
         if args.write_viper_to_file:
             with open(args.write_viper_to_file, 'w') as fp:
-                fp.write(str(prog))
+                fp.write(str(prog).replace("requires decreases _", "decreases _"))
         if args.verifier == 'silicon':
             backend = ViperVerifier.silicon
         elif args.verifier == 'carbon':

@@ -572,6 +572,10 @@ class Analyzer(ast.NodeVisitor):
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
+        # check if a class is complex (when it or one of its parents had a @Complex class decorator)
+        # complex class instance attributes are stored in __dict__
+        cls.is_complex = self.is_complex_class(node)
+
         for member in node.body:
             self.visit(member, node)
         self.current_class = None
@@ -1535,3 +1539,13 @@ class Analyzer(ast.NodeVisitor):
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'PreservesLow')
+
+    @staticmethod
+    def has_complex_class_decorator(cls: ast.ClassDef) -> bool:
+        if not hasattr(cls, 'decorator_list'):
+            return False
+        return any(d.id == 'Complex' for d in cls.decorator_list)
+
+    def is_complex_class(self, cls: ast.ClassDef) -> bool:
+        parents_is_complex = self.current_class.superclass.is_complex
+        return self.has_complex_class_decorator(cls) or parents_is_complex

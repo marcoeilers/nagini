@@ -18,6 +18,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
+    KEYDICT_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -554,6 +555,17 @@ class MethodTranslator(CommonTranslator):
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
             body.append(self._check_self_type(method, ctx))
+        if method.cls and method.name == '__init__':
+            args2 = []
+            arg_types = []
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            func_name = '__init__'
+            res_var = ctx.current_function.create_variable('keydict',
+                                                           keydict_type, self.translator)
+            targets = [res_var.ref()]
+            call = self.get_method_call(keydict_type, func_name, args2, arg_types,
+                                          targets, no_pos, ctx)
+            # body.append(call)
         if method.type:
             # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),

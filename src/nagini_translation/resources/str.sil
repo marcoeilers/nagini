@@ -53,3 +53,69 @@ method str_split(self: Ref) returns (res: Ref)
     requires issubtype(typeof(self), str())
     ensures issubtype(typeof(res), list(str()))
     ensures acc(res.list_acc)
+
+adt Option[T] {
+    Some(value:T)
+    None()
+}
+
+field keydict_val: Option[Ref]
+
+method keydict___init__() returns (self: Ref)
+    ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    ensures forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val) && !keydict___contains__(self, key)
+
+function keydict___item__(self: Ref, key: Ref): Ref
+    ensures keydict___item__inv(self, result) == key
+
+function keydict___item__inv(self: Ref, val_ref: Ref): Ref
+
+function keydict___contains__(self: Ref, key: Ref) : Bool
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures result == keydict___item__(self, key).keydict_val.isSome
+
+function keydict___getitem__(self: Ref, key: Ref) : Ref
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(keydict___item__(self, key).keydict_val, wildcard)
+    requires keydict___contains__(self, key)
+    ensures result == keydict___item__(self, key).keydict_val.value
+    ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
+
+method keydict___setitem__(self: Ref, key: Ref, item: Ref)
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(keydict___item__(self, key).keydict_val)
+    requires issubtype(typeof(item), dict_arg(typeof(self), 1))
+    requires issubtype(typeof(key), dict_arg(typeof(self), 0))
+    ensures acc(keydict___item__(self, key).keydict_val)
+    ensures keydict___item__(self, key).keydict_val.value == item
+    ensures keydict___contains__(self, key)
+    ensures keydict___getitem__(self, key) == item
+{
+    keydict___item__(self, key).keydict_val := Some(item)
+}
+
+// Of all possible keys, which have been set in the keydict
+function keydict_keys(self:Ref ): Set[Ref]
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures forall key: Ref :: {keydict___contains__(self, key)} {key in result} keydict___contains__(self, key) == (key in result)
+
+// Of the keys in the Set[Ref], which have been set in the keydict
+function keydict_keys_specific(self: Ref, keys: Set[Ref]): Set[Ref]
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires forall key: Ref :: {key in keys} key in keys ==> acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures forall key: Ref :: {key in keys} key in keys ==> keydict___contains__(self, key) == (key in result)
+
+function keydict_values(self: Ref): Set[Ref]
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures forall value: Ref :: {value in result}
+    (exists key:Ref :: {keydict___contains__(self, key)} (keydict___contains__(self, key) && (keydict___getitem__(self, key) == value))) == value in result
+
+
+function keydict___len__(self: Ref): Int
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
+    ensures result == |keydict_keys(self)|
+

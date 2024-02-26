@@ -253,6 +253,8 @@ UNION_TYPE = 'Union'
 
 DICT_TYPE = 'dict'
 
+KEYDICT_TYPE = 'keydict'
+
 SET_TYPE = 'set'
 
 STRING_TYPE = 'str'

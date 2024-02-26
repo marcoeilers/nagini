@@ -490,6 +490,10 @@ class ProgramTranslator(CommonTranslator):
                                        self.viper.SeqType(self.viper.Ref),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
+        fields.append(self.viper.Field('keydict_val',
+                                       self.viper.Ref,
+                                       self.no_position(ctx),
+                                       self.no_info(ctx)))
         return fields
 
     def _add_all_used_names(self, initial: Set[str]) -> None:

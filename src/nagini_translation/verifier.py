@@ -119,6 +119,7 @@ class Silicon:
             '--disableDefaultPlugins',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
+            'viper.silver.plugin.standard.adt.AdtPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
             *(['--counterexample=native', '--proverArgs=model.partial=true'] if counterexample else []),
             *viper_args,
@@ -167,6 +168,7 @@ class Carbon:
             '--disableDefaultPlugins',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
             'viper.silver.plugin.standard.termination.TerminationPlugin:'
+            'viper.silver.plugin.standard.adt.AdtPlugin:'
             'viper.silver.plugin.standard.predicateinstance.PredicateInstancePlugin',
             *viper_args
         ]

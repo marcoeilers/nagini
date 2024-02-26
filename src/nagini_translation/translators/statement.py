@@ -1300,6 +1300,9 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
+        if ctx.current_class and ctx.current_class.is_complex:
+            # call keydict___setitem__ instead
+            assign_stmts = None
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             if node.targets[0].id in ctx.module.type_vars:
                 # this is a type var assignment
