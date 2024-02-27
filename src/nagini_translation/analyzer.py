@@ -1547,5 +1547,5 @@ class Analyzer(ast.NodeVisitor):
         return any(d.id == 'Complex' for d in cls.decorator_list)
 
     def is_complex_class(self, cls: ast.ClassDef) -> bool:
-        parents_is_complex = self.current_class.superclass.is_complex
+        parents_is_complex = getattr(self.current_class.superclass, 'is_complex', False)
         return self.has_complex_class_decorator(cls) or parents_is_complex

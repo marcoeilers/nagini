@@ -81,7 +81,8 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     # built-in silver files.
     jvm.viper.silver.ast.utility.Consistency.resetMessages()
     program = translator.translate()
-    return program.get()
+    result = adtp.beforeVerify(program.get())
+    return result
 
 
 def load_sil_files(jvm: JVM, sif: bool = False, float_option: str = None):
