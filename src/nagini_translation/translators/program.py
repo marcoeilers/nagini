@@ -491,7 +491,9 @@ class ProgramTranslator(CommonTranslator):
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         fields.append(self.viper.Field('keydict_val',
-                                       self.viper.Ref,
+                                       self.viper.DomainType("Option",
+                                                             {self.viper.TypeVar("T"): self.viper.Ref},
+                                                             [self.viper.TypeVar("T")]),
                                        self.no_position(ctx),
                                        self.no_info(ctx)))
         return fields
