@@ -27,4 +27,4 @@ jobs:
         pip install .
     - name: Test with pytest
       run: |
-        pytest -n 4 src/nagini_translation/tests.py --carbon
+        pytest src/nagini_translation/tests.py --carbon
