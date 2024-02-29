@@ -4,13 +4,12 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   hello_world_job:
-    runs-on: ubuntu-latest
-    name: A job to say hello
+    runs-on: ubuntu-20.04
+    name: Run nagini tests with Dockerfile
     steps:
       - name: Checkout
-        uses: edgarsvitolins/nagini
-      - name: Hello world action step
-        uses: ./ # Uses an action in the root directory
-        id: hello
-        with:
-          who-to-greet: 'nothing'
+        uses: actions/checkout@v3
+      - name: Build docker image
+        run: docker build -t private_mirror .
+      - name: Run tests
+        run: docker run --rm private_mirror:latest nothing
