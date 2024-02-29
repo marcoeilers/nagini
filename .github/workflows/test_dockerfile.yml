@@ -12,4 +12,4 @@ jobs:
       - name: Build docker image
         run: docker build -t private_mirror .
       - name: Run tests
-        run: docker run --rm private_mirror:latest nothing
+        run: docker run --rm private_mirror:latest run_all_tests

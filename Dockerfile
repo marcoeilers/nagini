@@ -32,6 +32,3 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 COPY entrypoint.sh ./entrypoint.sh
 ENTRYPOINT ["./entrypoint.sh"]
-
-#RUN nagini --verifier silicon --write-viper-to-file iap_bst.vpr tests/functional/verification/examples/iap_bst.py
-#RUN nagini --verifier carbon  --write-viper-to-file iap_bst.vpr tests/functional/verification/examples/iap_bst.py
