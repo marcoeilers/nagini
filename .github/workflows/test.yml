@@ -3,7 +3,7 @@
 
 name: Nagini Tests Ubuntu
 
-on: [workflow_dispatch]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
