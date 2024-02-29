@@ -1,0 +1,14 @@
+name: Nagini Tests Ubuntu with Dockerfile
+
+on: [workflow_dispatch]
+
+jobs:
+  hello_world_job:
+    runs-on: ubuntu-latest
+    name: A job to say hello
+    steps:
+      - name: Hello world action step
+        id: hello
+        uses: ./
+        with:
+          who-to-greet: 'Mona the Octocat'
