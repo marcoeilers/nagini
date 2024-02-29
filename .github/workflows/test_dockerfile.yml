@@ -1,6 +1,6 @@
 name: Nagini Tests Ubuntu with Dockerfile
 
-on: [push, pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   hello_world_job:
