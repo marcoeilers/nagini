@@ -1,4 +1,3 @@
-# make sure to run 'python setup.py egg_info to' create /nagini.egg-info/requires.txt
 FROM python:3.8.18
 
 # add dotnet repo
@@ -14,8 +13,8 @@ ENV BOOGIE_EXE=/root/.dotnet/tools/boogie
 
 # install openjdk 21 and all required nagini python packages
 RUN apt install -y msopenjdk-21
-COPY src/nagini.egg-info/requires.txt ./
-RUN pip install -r ./requires.txt
+COPY ./requirements.txt ./
+RUN pip install -r ./requirements.txt
 
 # copy over and install nagini source code
 WORKDIR /installation
