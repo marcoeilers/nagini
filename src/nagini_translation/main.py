@@ -318,8 +318,8 @@ def main() -> None:
     parser.add_argument(
         '--submit-for-evaluation',
         help='Whether to allow storing the current program for future evaluation.',
+        action='store_true',
         default=False,
-        type=bool
     )
     args = parser.parse_args()
 
@@ -405,7 +405,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
             
             if(submitter != None):
-                submitter.setSuccess(vresult.__bool__)
+                submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
         if args.verbose:
             print("Verification completed.")
