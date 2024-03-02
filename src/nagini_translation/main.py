@@ -398,8 +398,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         else:
             submitter = None
             if(args.submit_for_evaluation):
-                _, filename = os.path.split(python_file)
-                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, filename, "", "Nagini", backend.name.capitalize, viper_args)
+                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize, viper_args)
                 submitter.setProgram(prog)
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
