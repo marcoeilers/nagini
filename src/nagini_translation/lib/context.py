@@ -64,6 +64,12 @@ class Context:
         self.sif = False
         self.allow_statements = False
         self.float_encoding = None
+        self.is_acc = False             # set True within translate_acc_field
+                                        # used by translate_Attribute to determine how to retreive
+                                        # is_complex class instance atributes (as rhs)
+                                        #                     python                  viper
+                                        # is_acc == False -> complex.x == keydict___getitem__(complex, x)
+                                        # is_acc == True  -> complex.x == keydict___item__(complex, x).keydict_val
 
     def get_fresh_int(self) -> int:
         """

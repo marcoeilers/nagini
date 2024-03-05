@@ -28,6 +28,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_PERM_TYPE,
     SET_TYPE,
     STRING_TYPE,
+    KEYDICT_TYPE,
     THREAD_DOMAIN,
     TUPLE_TYPE,
 )
@@ -875,6 +876,46 @@ class ExpressionTranslator(CommonTranslator):
                 return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
                                                 self.no_info(ctx), property_type,
                                                 [target_param])
+            if hasattr(recv_type, 'is_complex') and recv_type.is_complex:
+                if ctx.is_acc:
+                    # need to return keydict___item__(receiver, node).keydict_val
+                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                    key = self.translate_string(node.attr, None, ctx)
+
+                    args = [receiver, key]
+                    arg_types = [keydict_type, string_type]
+                    func_name = '__item__'
+                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                  node, ctx)
+
+                    keydict_val_field = self.viper.Field('keydict_val',
+                                                         self.viper.DomainType("Option",
+                                                                               {self.viper.TypeVar(
+                                                                                   "T"): self.viper.Ref},
+                                                                               [self.viper.TypeVar("T")]),
+                                                         self.no_position(ctx),
+                                                         self.no_info(ctx))
+
+                    ret = (stmt, self.viper.FieldAccess(call, keydict_val_field,
+                                                        position, self.no_info(ctx)))
+                    return ret
+                else:
+                    # need to return keydict___getitem__(receiver, node)
+                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                    key = self.translate_string(node.attr, None, ctx)
+
+                    args = [receiver, key]
+                    arg_types = [keydict_type, string_type]
+                    func_name = '__getitem__'
+                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                  node, ctx)
+
+                    ret = (stmt, call)
+                    return ret
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 

@@ -215,13 +215,13 @@
 "keydict": {
     "methods": {
         "__init__": {
-            "args": [],
+            "args": ["object"],
             "type": null,
             "MustTerminate": true,
             "requires": ["__item__", "__contains__"]
         },
         "__setitem__": {
-            "args": ["dict", "object", "object"],
+            "args": ["dict", "str", "object"],
             "type": null,
             "MustTerminate": true,
             "requires": ["__getitem__", "__contains__"]
@@ -229,7 +229,7 @@
     },
     "functions": {
         "__item__": {
-            "args": ["keydict", "object"],
+            "args": ["keydict", "str"],
             "type": "object",
             "requires": ["__item__inv"]
         },
@@ -238,12 +238,12 @@
             "type": "object"
         },
         "__contains__": {
-            "args": ["keydict", "object"],
+            "args": ["keydict", "str"],
             "type": "__prim__bool",
             "requires": ["__item__"]
         },
         "__getitem__": {
-            "args": ["keydict", "object"],
+            "args": ["keydict", "str"],
             "type": "object",
             "requires": ["__contains__", "__item__"]
         }

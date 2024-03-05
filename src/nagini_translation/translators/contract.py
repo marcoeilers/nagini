@@ -236,6 +236,7 @@ class ContractTranslator(CommonTranslator):
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
+        ctx.is_acc = True
         assert isinstance(node.args[0], ast.Attribute)
         field = self.get_target(node.args[0], ctx)
         if not isinstance(field, PythonField):
@@ -246,6 +247,7 @@ class ContractTranslator(CommonTranslator):
         field_type = self.get_type(node.args[0], ctx)
         pred = self._translate_acc_field(field_acc, field_type, perm,
                                          self.to_position(node, ctx), ctx)
+        ctx.is_acc = False
         return [], pred
 
     def translate_acc_global(self, node: ast.Call, perm: Expr,
@@ -280,6 +282,9 @@ class ContractTranslator(CommonTranslator):
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
                                                pos, info)
+
+        if ctx.current_class and ctx.current_class.is_complex and ctx.is_acc:
+            return pred
         # Add type information
         if field_type.name not in PRIMITIVES:
             type_info = self.type_check(field_acc, field_type,

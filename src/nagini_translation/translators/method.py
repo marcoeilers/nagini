@@ -555,17 +555,16 @@ class MethodTranslator(CommonTranslator):
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
             body.append(self._check_self_type(method, ctx))
-        if method.cls and method.name == '__init__':
-            args2 = []
-            arg_types = []
+        if method.cls and method.cls.is_complex and method.name == '__init__':
+            args2 = [method.args['self'].ref()]
+            arg_types = [None]
             keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
             func_name = '__init__'
-            res_var = ctx.current_function.create_variable('keydict',
-                                                           keydict_type, self.translator)
-            targets = [res_var.ref()]
+
+            targets = []
             call = self.get_method_call(keydict_type, func_name, args2, arg_types,
                                           targets, no_pos, ctx)
-            # body.append(call)
+            body += call
         if method.type:
             # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),

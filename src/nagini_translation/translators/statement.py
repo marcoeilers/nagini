@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     RANGE_TYPE,
     SET_TYPE,
     TUPLE_TYPE,
+    KEYDICT_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -1075,6 +1076,16 @@ class StatementTranslator(CommonTranslator):
             return arg_stmt + call, [getter_equal]
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
+            if ctx.current_class and ctx.current_class.is_complex:
+                target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
+                lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+                key = self.translate_string(lhs.attr, None, ctx)
+                args = [target, key, rhs]
+                arg_types = [None, None, None]
+                stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                            arg_types, [], node, ctx)
+
+                return lhs_stmt + stmt, None
             if isinstance(type, UnionType) and not isinstance(type, OptionalType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []
