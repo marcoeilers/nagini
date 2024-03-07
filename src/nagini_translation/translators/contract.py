@@ -27,6 +27,8 @@ from nagini_translation.lib.constants import (
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
+    KEYDICT_TYPE,
+    STRING_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -236,18 +238,41 @@ class ContractTranslator(CommonTranslator):
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
-        ctx.is_acc = True
         assert isinstance(node.args[0], ast.Attribute)
         field = self.get_target(node.args[0], ctx)
         if not isinstance(field, PythonField):
             raise InvalidProgramException(node, 'invalid.acc')
+
+        #############################################################
+
+        # when handling complex class instance attributes, need to make sure that
+        # acc is called on keydict___item__(self, key).keydict_val (of type Option[Ref])
+        # however, the field itself is read with
+        # keydict___getitem__(self, key) (of type Ref)
+
+        # self.translate_expr(node.args[0], ctx) can handle both cases depending on ctx.is_acc
+
+        ctx.is_acc = True
         stmt, field_acc = self.translate_expr(node.args[0], ctx)
+        ctx.is_acc = False
+
+        receiver_type = self.get_type(node.args[0].value, ctx)
+        if hasattr(receiver_type, 'is_complex') and receiver_type.is_complex:
+            stmt2, receiver = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
+            stmt += stmt2
+            key = self.translate_string(node.args[0].attr, None, ctx)
+            stmt2, complex_field_acc = self.translate_expr(node.args[0], ctx)
+            stmt += stmt2
+        else:
+            receiver, key, complex_field_acc = None, None, None
+
+        #############################################################
+
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
         field_type = self.get_type(node.args[0], ctx)
         pred = self._translate_acc_field(field_acc, field_type, perm,
-                                         self.to_position(node, ctx), ctx)
-        ctx.is_acc = False
+                                         self.to_position(node, ctx), ctx, receiver, key, complex_field_acc)
         return [], pred
 
     def translate_acc_global(self, node: ast.Call, perm: Expr,
@@ -276,17 +301,32 @@ class ContractTranslator(CommonTranslator):
         return [], pred
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
-                             perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
+                             perm: Expr, pos: Position, ctx: Context,
+                             receiver: Expr = None, key: Expr = None, complex_field_acc: Expr = None) -> StmtsAndExpr:
         info = self.no_info(ctx)
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
                                                pos, info)
 
-        if ctx.current_class and ctx.current_class.is_complex and ctx.is_acc:
-            return pred
+        if complex_field_acc:
+            pass
+            # need to include keydict___contains__(self, key) == true
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            args = [receiver, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__contains__'
+            call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                          None, ctx)
+
+            pred = self.viper.And(pred, call, pos, info)
+
         # Add type information
         if field_type.name not in PRIMITIVES:
+            if complex_field_acc:
+                field_acc = complex_field_acc
             type_info = self.type_check(field_acc, field_type,
                                         self.no_position(ctx), ctx)
             pred = self.viper.And(pred, type_info, pos, info)
@@ -305,6 +345,10 @@ class ContractTranslator(CommonTranslator):
         if not isinstance(node.args[1], ast.Str):
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
         field = rec_type.get_field(node.args[1].s)
+        # need to include a case for is_complex
+        # in which case its
+        # acc keydict___item__(self, key).keydict_val
+        # and that's it. say nothing about keydict___contains__(self, key)
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.set')
         may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
@@ -334,6 +378,10 @@ class ContractTranslator(CommonTranslator):
         if not isinstance(node.args[1], ast.Str):
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         field = rec_type.get_field(node.args[1].s)
+        # need to include a case for is_complex
+        # in which case its
+        # acc keydict___item__(self, key).keydict_val
+        # and keydict___contains__(self, key) == false
         if not field:
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         return [], self.get_may_set_predicate(rec, field, ctx, pos)

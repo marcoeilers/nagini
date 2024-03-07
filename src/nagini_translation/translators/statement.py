@@ -1076,7 +1076,7 @@ class StatementTranslator(CommonTranslator):
             return arg_stmt + call, [getter_equal]
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
-            if ctx.current_class and ctx.current_class.is_complex:
+            if hasattr(type, 'is_complex') and type.is_complex:
                 target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
                 lhs_stmt, target = self.translate_expr(lhs.value, ctx)
                 key = self.translate_string(lhs.attr, None, ctx)
