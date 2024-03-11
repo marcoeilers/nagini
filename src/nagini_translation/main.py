@@ -65,7 +65,8 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
     tp.beforeParse(text, False)
-    parsed = parser.parse(text, path, none)
+    diskloader = getattr(getattr(jvm.viper.silver.ast.utility, "DiskLoader$"), "MODULE$")
+    parsed = parser.parse(text, path, none, diskloader)
 
     parse_result = parsed
     parse_result.initProperties()
