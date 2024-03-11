@@ -70,6 +70,8 @@ class Context:
                                         #                     python                  viper
                                         # is_acc == False -> complex.x == keydict___getitem__(complex, x)
                                         # is_acc == True  -> complex.x == keydict___item__(complex, x).keydict_val
+        self.is_mayset = False
+        self.is_maycreate = False
 
     def get_fresh_int(self) -> int:
         """

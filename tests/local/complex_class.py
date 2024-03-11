@@ -27,17 +27,27 @@ class Parent:
         Ensures(self.x == "15")
         Ensures(Acc(self.y))
         Ensures(self.y == 20)
-        # Ensures(MayCreate(self, 'y'))
-        # Ensures(MayCreate(self, 'z'))
+        Ensures(MaySet(self, 'z'))
+        # Ensures(MayCreate(self, 'a'))
+
+    def some_method(self) -> None:
+        Requires(MaySet(self, 'z'))
+        # Requires(MayCreate(self, 'a'))
+        self.z = 10
+        # self.a = 100
+        Ensures(Acc(self.z))
+        Ensures(self.z == 10)
+        # Ensures(Acc(self.a))
+        # Ensures(self.a == 100)
 
 
-class Child(Parent):
-    def __init__(self) -> None:
-        super().__init__()
-        Ensures(Acc(self.x))
-        Ensures(self.x == "15")
-        Ensures(Acc(self.y))
-        Ensures(self.y == 20)
+# class Child(Parent):
+#     def __init__(self) -> None:
+#         super().__init__()
+#         Ensures(Acc(self.x))
+#         Ensures(self.x == "15")
+#         Ensures(Acc(self.y))
+#         Ensures(self.y == 20)
 
 
 class Normal:
@@ -47,22 +57,25 @@ class Normal:
         Ensures(self.x == "25")
 
 
-def some_func(c: Parent) -> None:
-    Requires(Acc(c.x))
-    Requires(Acc(c.y))
-    c.x = "30"
-    c.y = 40
-    Ensures(Acc(c.x))
-    Ensures(c.x == "30")
-    Ensures(Acc(c.y))
-    Ensures(c.y == 40)
+# def some_func(c: Parent) -> None:
+#     Requires(Acc(c.x))
+#     Requires(Acc(c.y))
+#     c.x = "30"
+#     c.y = 40
+#     Ensures(Acc(c.x))
+#     Ensures(c.x == "30")
+#     Ensures(Acc(c.y))
+#     Ensures(c.y == 40)
 
 
 def main() -> None:
-    c = Child()
+    c = Parent()
     Assert(c.x == "15")
     Assert(c.y == 20)
-    some_func(c)
+    c.some_method()
+    Assert(c.z == 10)
+    # Assert(c.a == 100)
+    # some_func(c)
 
 
 if __name__ == "__main__":

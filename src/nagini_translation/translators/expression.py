@@ -877,7 +877,7 @@ class ExpressionTranslator(CommonTranslator):
                                                 self.no_info(ctx), property_type,
                                                 [target_param])
             if hasattr(recv_type, 'is_complex') and recv_type.is_complex:
-                if ctx.is_acc:
+                if ctx.is_acc or ctx.is_mayset:
                     # need to return keydict___item__(receiver, node).keydict_val
                     keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                     string_type = ctx.module.global_module.classes[STRING_TYPE]
