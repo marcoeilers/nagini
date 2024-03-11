@@ -58,7 +58,7 @@ def tuple_union_1(t: Union[Tuple[int, ...], int]) -> int:
     return c
 
 
-def tuple_union_1_fail(t: Union[Tuple[int, ...], int]) -> int:
+def tuple_union_1_fail(t: Union[Tuple[int, ...], int]) -> None:
     assert isinstance(t, int) or isinstance(t, tuple)
     if isinstance(t, tuple):
         a: Tuple[int, ...] = cast(tuple, t)
@@ -66,7 +66,6 @@ def tuple_union_1_fail(t: Union[Tuple[int, ...], int]) -> int:
         c = a[0]
     else:
         c = cast(int, t)
-    return c
 
 
 def tuple_union_2(t: Union[Tuple[int, int], int]) -> int:
@@ -79,7 +78,7 @@ def tuple_union_2(t: Union[Tuple[int, int], int]) -> int:
     return c
 
 
-def tuple_union_2_fail(t: Union[Tuple[int, int], int]) -> int:
+def tuple_union_2_fail(t: Union[Tuple[int, int], int]) -> None:
     assert isinstance(t, int) or isinstance(t, tuple)
     if isinstance(t, tuple):
         a: Tuple[int, ...] = cast(tuple, t)
@@ -87,8 +86,6 @@ def tuple_union_2_fail(t: Union[Tuple[int, int], int]) -> int:
         c = a[3]
     else:
         c = cast(int, t)
-    return c
-
 
 def take_var_tuple(t: Tuple[int, ...]) -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
