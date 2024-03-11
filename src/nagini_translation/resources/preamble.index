@@ -47,7 +47,7 @@
             "args": ["list", "__prim__int", "object"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__"]
+            "requires": ["__len__", "__getitem__"]
         },
         "__iter__": {
             "args": ["list"],
@@ -76,7 +76,7 @@
         "__getitem__": {
             "args": ["list", "int"],
             "type": "object",
-            "requires": ["__len__"]
+            "requires": ["__len__", "int___unbox__"]
         },
         "__contains__": {
             "args": ["list", "object"],
