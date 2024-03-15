@@ -957,7 +957,6 @@ class CallTranslator(CommonTranslator):
         if method in ctx.inlined_calls:
             raise InvalidProgramException(node, 'recursive.static.call')
         position = self.to_position(node, ctx)
-        old_position = ctx.position
         ctx.position.append((inline_reason, position))
         arg_stmts, arg_vals, arg_types = self._translate_call_args(node, ctx)
         args = []
@@ -965,8 +964,10 @@ class CallTranslator(CommonTranslator):
 
         # Create local vars for parameters and assign args to them
         if is_super:
-            arg_vals = ([next(iter(ctx.actual_function.args.values())).ref()] +
-                        arg_vals)
+            self_var_name = next(iter(ctx.actual_function.args.keys()))
+            self_var = (ctx.var_aliases[self_var_name] if self_var_name in ctx.var_aliases
+                        else next(iter(ctx.actual_function.args.values())))
+            arg_vals = [self_var.ref()] + arg_vals
         for arg_val, (_, arg) in zip(arg_vals, method.args.items()):
             arg_var = ctx.current_function.create_variable('arg', arg.type,
                                                            self.translator)
