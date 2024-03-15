@@ -4,19 +4,6 @@
 from nagini_contracts.contracts import *
 from typing import Any
 
-# using this will generate
-#   self_5 := self_1
-#   arg_13 := self_1
-#   arg_15 := self_0
-# inside Child___init__, where self_0 is not found
-# and should be self_1, just like the two lines above it
-# @Complex
-# class Grandparent:
-#     def __init__(self) -> None:
-#         self.x = 1
-#         Ensures(Acc(self.x))
-#         Ensures(self.x > 0)
-
 
 @Complex
 class Parent:
@@ -28,26 +15,17 @@ class Parent:
         Ensures(Acc(self.y))
         Ensures(self.y == 20)
         Ensures(MaySet(self, 'z'))
-        # Ensures(MayCreate(self, 'a'))
+        Ensures(MayCreate(self, 'a'))
 
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
-        # Requires(MayCreate(self, 'a'))
+        Requires(MayCreate(self, 'a'))
         self.z = 10
-        # self.a = 100
+        self.a = 100
         Ensures(Acc(self.z))
         Ensures(self.z == 10)
-        # Ensures(Acc(self.a))
-        # Ensures(self.a == 100)
-
-
-# class Child(Parent):
-#     def __init__(self) -> None:
-#         super().__init__()
-#         Ensures(Acc(self.x))
-#         Ensures(self.x == "15")
-#         Ensures(Acc(self.y))
-#         Ensures(self.y == 20)
+        Ensures(Acc(self.a))
+        Ensures(self.a == 100)
 
 
 class Normal:
@@ -57,24 +35,18 @@ class Normal:
         Ensures(self.x == "25")
 
 
-# def some_func(c: Parent) -> None:
-#     Requires(Acc(c.x))
-#     Requires(Acc(c.y))
-#     c.x = "30"
-#     c.y = 40
-#     Ensures(Acc(c.x))
-#     Ensures(c.x == "30")
-#     Ensures(Acc(c.y))
-#     Ensures(c.y == 40)
-
-
 def main() -> None:
     c = Parent()
     Assert(c.x == "15")
     Assert(c.y == 20)
+    c.z = 22
+
+    # c.a = 22      # this would create an error
+                    # because some_method has Requires(MayCreate(self, 'a'))
+
     c.some_method()
     Assert(c.z == 10)
-    # Assert(c.a == 100)
+    Assert(c.a == 100)
     # some_func(c)
 
 
