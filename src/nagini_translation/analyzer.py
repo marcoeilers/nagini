@@ -577,6 +577,7 @@ class Analyzer(ast.NodeVisitor):
         cls.is_complex = self.is_complex_class(node)
 
         for member in node.body:
+            member.is_complex = cls.is_complex
             self.visit(member, node)
         self.current_class = None
 
@@ -629,7 +630,7 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function:
             raise InvalidProgramException(node, 'nested.function.declaration')
         name = node.name
-        if self._is_illegal_magic_method_name(name):
+        if self._is_illegal_magic_method_name(name) and not node.is_complex:
             raise InvalidProgramException(node, 'illegal.magic.method')
         assert isinstance(name, str)
         if self.is_io_operation(node):

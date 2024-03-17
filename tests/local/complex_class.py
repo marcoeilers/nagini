@@ -17,6 +17,10 @@ class Parent:
         Ensures(MaySet(self, 'z'))
         Ensures(MayCreate(self, 'a'))
 
+    @Pure
+    def __getattr__(self, name: str) -> object:
+        return 99
+
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
         Requires(MayCreate(self, 'a'))
@@ -40,6 +44,8 @@ def main() -> None:
     Assert(c.x == "15")
     Assert(c.y == 20)
     c.z = 22
+
+    Assert(c.a == 99)
 
     # c.a = 22      # this would create an error
                     # because some_method has Requires(MayCreate(self, 'a'))

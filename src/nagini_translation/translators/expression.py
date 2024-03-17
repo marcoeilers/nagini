@@ -902,7 +902,15 @@ class ExpressionTranslator(CommonTranslator):
                                                         position, self.no_info(ctx)))
                     return ret
                 else:
-                    # need to return keydict___getitem__(receiver, node)
+                    # need to return
+                    # keydict___contains__(receiver, node) ?
+                    #   keydict___getitem__(receiver, node):
+                    #   (Child() == typeof(receiver) ?
+                    #     Child_getattr_child(receiver, node):
+                    #     Parent_getattr_parent(receiver, node)
+                    # )
+                    # but only if __getattr__ is defined
+                    info = self.no_info(ctx)
                     keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                     string_type = ctx.module.global_module.classes[STRING_TYPE]
 
@@ -910,9 +918,25 @@ class ExpressionTranslator(CommonTranslator):
 
                     args = [receiver, key]
                     arg_types = [keydict_type, string_type]
+
+
                     func_name = '__getitem__'
                     call = self.get_function_call(keydict_type, func_name, args, arg_types,
                                                   node, ctx)
+
+                    # when __getattr__ is defined, need to create a cond exp to call it when needed
+                    if '__getattr__' in recv_type.functions:
+                        func_name = '__contains__'
+                        keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                      node, ctx)
+
+                        args = [receiver, key]
+                        arg_types = [recv_type, string_type]
+
+                        func_name = '__getattr__'
+                        recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+
+                        call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
 
                     ret = (stmt, call)
                     return ret
