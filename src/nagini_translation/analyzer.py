@@ -1224,6 +1224,16 @@ class Analyzer(ast.NodeVisitor):
             return self._convert_callable_type(mypy_type, node)
         elif self.types.is_type_alias_type(mypy_type):
             return self.convert_type(mypy_type.alias.target, node)
+        elif self.types.is_partial_type(mypy_type):
+            try:
+                partial_type = self.convert_type(mypy_type.type, node)
+            except:
+                partial_type = None
+            if partial_type:
+                msg = f'Type {partial_type.python_class.name} could not be fully inferred (this usually means that a type argument is unknown)'
+            else:
+                msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
+            raise InvalidProgramException(node, 'partial.type', message=msg)
         else:
             msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)

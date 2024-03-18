@@ -134,7 +134,7 @@ function dict___getitem__(self: Ref, key: Ref) : Ref
     decreases _
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc, wildcard)
-    requires dict___contains__(self, key)
+    requires @error("Key might not be present in dictionary.")dict___contains__(self, key)
     ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
     ensures result == self.dict_acc[key]
 

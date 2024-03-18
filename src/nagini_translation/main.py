@@ -11,6 +11,7 @@ import inspect
 import json
 import logging
 import os
+import sys
 import re
 import time
 import traceback
@@ -45,6 +46,7 @@ from nagini_translation.verifier import (
     VerificationResult,
     ViperVerifier
 )
+from nagini_translation import verifier
 from typing import List, Set, Tuple
 
 
@@ -67,7 +69,8 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
     tp.beforeParse(text, False)
     adtp.beforeParse(text, False)
-    parsed = parser.parse(text, path, none)
+    diskloader = getattr(getattr(jvm.viper.silver.ast.utility, "DiskLoader$"), "MODULE$")
+    parsed = parser.parse(text, path, none, diskloader)
 
     parse_result = parsed
     parse_result.initProperties()
@@ -373,10 +376,16 @@ def main() -> None:
             translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
             socket.send_string(response[0])
     else:
-        translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        sys.exit(0 if success else 1)
 
 
-def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None):
+def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None) -> bool:
+    """
+    Translates input file to viper code and dispatches result to backend for verification
+
+    :returns: Whether translation and verification was successful
+    """
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
@@ -415,6 +424,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
         duration = '{:.2f}'.format(time.time() - start)
         print('Verification took ' + duration + ' seconds.')
+        return isinstance(vresult, verifier.Success)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
@@ -446,8 +456,10 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
                 else:
                     print(msg)
+        return False
     except ConsistencyException as e:
         print(e.message + ': Translated AST contains inconsistencies.')
+        return False
 
     except JException as e:
         print(e.stacktrace())
