@@ -6,6 +6,7 @@
  */
 
 domain PyType {
+    function extends_(sub: PyType, super: PyType): Bool
     function typeof(r: Ref): PyType
     function issubtype(t1: PyType, t2: PyType):Bool
     function list(t: PyType): PyType
@@ -17,6 +18,7 @@ domain PyType {
     function tuple(s: Seq[PyType]): PyType
     function tuple_args(t: PyType): Seq[PyType]
     function tuple_arg(t: PyType, i: Int): PyType
+    function tuple_basic(): PyType
     function Iterator(t: PyType): PyType
     function Iterator_arg(t: PyType, i: Int): PyType
     function PSeq(t: PyType): PyType
@@ -25,6 +27,7 @@ domain PyType {
     function PSet_arg(t: PyType, i: Int): PyType
     function PMultiset(t: PyType): PyType
     function PMultiset_arg(t: PyType, i: Int): PyType
+    function get_basic(PyType): PyType
 
     unique function int(): PyType
     unique function float(): PyType
@@ -34,5 +37,6 @@ domain PyType {
     unique function range_0(): PyType
     unique function slice(): PyType
     unique function str(): PyType
+    unique function object(): PyType
     unique function NoneType(): PyType
 }
