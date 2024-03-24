@@ -468,6 +468,13 @@ class ExpressionTranslator(CommonTranslator):
                                                 target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
+
+        if hasattr(node.value, 'value'):
+            target_cls = self.get_type(node.value.value, ctx)
+            if getattr(target_cls, 'is_complex', False):
+                target_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                index_type = ctx.module.global_module.classes[STRING_TYPE]
+
         arg_types = [target_type, index_type]
         call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,
                                                        arg_types, node, ctx)
@@ -902,7 +909,11 @@ class ExpressionTranslator(CommonTranslator):
                                                         position, self.no_info(ctx)))
                     return ret
                 else:
-                    # need to return
+
+                    if field.name == '__dict__':
+                        return stmt, receiver
+                    else:
+                   # need to return
                     # keydict___contains__(receiver, node) ?
                     #   keydict___getitem__(receiver, node):
                     #   (Child() == typeof(receiver) ?
@@ -910,36 +921,36 @@ class ExpressionTranslator(CommonTranslator):
                     #     Parent_getattr_parent(receiver, node)
                     # )
                     # but only if __getattr__ is defined
-                    info = self.no_info(ctx)
-                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
-                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+                        info = self.no_info(ctx)
+                        keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                        string_type = ctx.module.global_module.classes[STRING_TYPE]
 
-                    key = self.translate_string(node.attr, None, ctx)
-
-                    args = [receiver, key]
-                    arg_types = [keydict_type, string_type]
-
-
-                    func_name = '__getitem__'
-                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                                  node, ctx)
-
-                    # when __getattr__ is defined, need to create a cond exp to call it when needed
-                    if '__getattr__' in recv_type.functions:
-                        func_name = '__contains__'
-                        keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                                      node, ctx)
+                        key = self.translate_string(node.attr, None, ctx)
 
                         args = [receiver, key]
-                        arg_types = [recv_type, string_type]
+                        arg_types = [keydict_type, string_type]
 
-                        func_name = '__getattr__'
-                        recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
 
-                        call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+                        func_name = '__getitem__'
+                        call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                      node, ctx)
 
-                    ret = (stmt, call)
-                    return ret
+                        # when __getattr__ is defined, need to create a cond exp to call it when needed
+                        if '__getattr__' in recv_type.functions:
+                            func_name = '__contains__'
+                            keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                          node, ctx)
+
+                            args = [receiver, key]
+                            arg_types = [recv_type, string_type]
+
+                            func_name = '__getattr__'
+                            recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+
+                            call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+
+                        ret = (stmt, call)
+                        return ret
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 

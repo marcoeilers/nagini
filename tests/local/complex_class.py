@@ -10,6 +10,7 @@ class Parent:
     def __init__(self) -> None:
         self.x = "15"
         self.y = 20
+        self.qwe: int = 0
         Ensures(Acc(self.x))
         Ensures(self.x == "15")
         Ensures(Acc(self.y))
@@ -17,9 +18,15 @@ class Parent:
         Ensures(MaySet(self, 'z'))
         Ensures(MayCreate(self, 'a'))
 
+        Ensures(Acc(self.qwe))
+        Ensures(self.qwe == 0)
+
     @Pure
     def __getattr__(self, name: str) -> object:
         return 99
+
+    def __setattr__(self, name: str, value: object) -> None:
+        pass
 
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
@@ -30,6 +37,13 @@ class Parent:
         Ensures(self.z == 10)
         Ensures(Acc(self.a))
         Ensures(self.a == 100)
+
+    def another_method(self) -> None:
+        Requires(Acc(self.qwe))
+        self.__dict__['qw' + 'e'] = 1_000_000
+        Assert(self.__dict__['qw' + 'e'] == 1_000_000)
+        Ensures(Acc(self.qwe))
+        # Ensures(self.qwe == 1_000_000)
 
 
 class Normal:

@@ -229,6 +229,11 @@ LEGAL_MAGIC_METHODS = {
     '__setitem__',
 }
 
+LEGAL_COMPLEX_MAGIC_METHODS = {
+    '__getattr__',
+    '__setattr__',
+}
+
 RESULT_NAME = '_res'
 
 ERROR_NAME = '_err'

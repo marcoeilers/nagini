@@ -22,6 +22,7 @@ from nagini_translation.lib.constants import (
     IGNORED_IMPORTS,
     INT_TYPE,
     LEGAL_MAGIC_METHODS,
+    LEGAL_COMPLEX_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
@@ -581,14 +582,14 @@ class Analyzer(ast.NodeVisitor):
             self.visit(member, node)
         self.current_class = None
 
-    def _is_illegal_magic_method_name(self, name: str) -> bool:
+    def _is_illegal_magic_method_name(self, name: str, is_complex: bool = False) -> bool:
         """
         Anything that could potentially be a magic method, i.e. anything that
         has __this__ form, is considered illegal unless it is one of the names
         we explicitly support.
         """
         if name.startswith('__') and name.endswith('__'):
-            if name not in LEGAL_MAGIC_METHODS:
+            if name not in LEGAL_MAGIC_METHODS and not (is_complex and name in LEGAL_COMPLEX_MAGIC_METHODS):
                 return True
         return False
 
@@ -630,7 +631,7 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function:
             raise InvalidProgramException(node, 'nested.function.declaration')
         name = node.name
-        if self._is_illegal_magic_method_name(name) and not node.is_complex:
+        if self._is_illegal_magic_method_name(name, node.is_complex if hasattr(node, 'is_complex') else False):
             raise InvalidProgramException(node, 'illegal.magic.method')
         assert isinstance(name, str)
         if self.is_io_operation(node):
@@ -1234,6 +1235,8 @@ class Analyzer(ast.NodeVisitor):
             else:
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
+        elif getattr(node, 'attr', False) == '__dict__':
+            result = self.module.global_module.classes[OBJECT_TYPE]
         else:
             msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)
