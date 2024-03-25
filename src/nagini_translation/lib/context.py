@@ -70,6 +70,7 @@ class Context:
                                         #                     python                  viper
                                         # is_acc == False -> complex.x == keydict___getitem__(complex, x)
                                         # is_acc == True  -> complex.x == keydict___item__(complex, x).keydict_val
+        self.is_acc_inner = False       # Needed to avoid recursive calls to __getattr__!!
         self.is_mayset = False
         self.is_maycreate = False
 

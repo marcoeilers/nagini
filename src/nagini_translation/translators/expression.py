@@ -868,23 +868,24 @@ class ExpressionTranslator(CommonTranslator):
 
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
-            field = self._lookup_field(node, ctx)
-            if isinstance(field, PythonGlobalVar):
-                field_func = self.translate_static_field_access(field, receiver,
-                                                                node, ctx)
-                return [], field_func
-            if isinstance(field, PythonMethod):
-                # This is a reference to a property, so we translate it to a call of
-                # the property getter function.
-                target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
-                target_param = self.viper.LocalVarDecl('self', target_type, position,
-                                                       self.no_info(ctx))
-                property_type = self.translate_type(field.type, ctx)
-                return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
-                                                self.no_info(ctx), property_type,
-                                                [target_param])
-            if hasattr(recv_type, 'is_complex') and recv_type.is_complex:
-                if ctx.is_acc or ctx.is_mayset:
+            if not(hasattr(recv_type, 'is_complex') and recv_type.is_complex):
+                field = self._lookup_field(node, ctx)
+                if isinstance(field, PythonGlobalVar):
+                    field_func = self.translate_static_field_access(field, receiver,
+                                                                    node, ctx)
+                    return [], field_func
+                if isinstance(field, PythonMethod):
+                    # This is a reference to a property, so we translate it to a call of
+                    # the property getter function.
+                    target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
+                    target_param = self.viper.LocalVarDecl('self', target_type, position,
+                                                           self.no_info(ctx))
+                    property_type = self.translate_type(field.type, ctx)
+                    return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
+                                                    self.no_info(ctx), property_type,
+                                                    [target_param])
+            else:
+                if ctx.is_acc == node or ctx.is_mayset:
                     # need to return keydict___item__(receiver, node).keydict_val
                     keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                     string_type = ctx.module.global_module.classes[STRING_TYPE]
@@ -910,7 +911,7 @@ class ExpressionTranslator(CommonTranslator):
                     return ret
                 else:
 
-                    if field.name == '__dict__':
+                    if node.attr == '__dict__':
                         return stmt, receiver
                     else:
                    # need to return
@@ -936,7 +937,7 @@ class ExpressionTranslator(CommonTranslator):
                                                       node, ctx)
 
                         # when __getattr__ is defined, need to create a cond exp to call it when needed
-                        if '__getattr__' in recv_type.functions:
+                        if '__getattr__real' in recv_type.functions and ctx.current_function.func_constant != '__getattr__real':
                             func_name = '__contains__'
                             keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
                                                           node, ctx)
@@ -944,7 +945,7 @@ class ExpressionTranslator(CommonTranslator):
                             args = [receiver, key]
                             arg_types = [recv_type, string_type]
 
-                            func_name = '__getattr__'
+                            func_name = '__getattr__real'
                             recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
 
                             call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
@@ -1208,10 +1209,13 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node.ops[0])
         if left_type.get_function(compare_func):
-            comparison = self.get_function_call(left_type, compare_func,
-                                                [left, right],
-                                                [left_type, right_type],
-                                                node, ctx, position)
+            if getattr(left_type, 'is_complex', False) and getattr(right_type, 'is_complex', False):
+                comparison = self.viper.EqCmp(left, right, position, info)
+            else:
+                comparison = self.get_function_call(left_type, compare_func,
+                                                    [left, right],
+                                                    [left_type, right_type],
+                                                    node, ctx, position)
         elif compare_func == '__ne__' and left_type.get_function('__eq__'):
             # The default behavior if __ne__ is not explicitly defined
             # is to invert the result of __eq__.

@@ -4,34 +4,73 @@
 from nagini_contracts.contracts import *
 from typing import Any
 
+@Complex
+class Foobar:
+    def __init__(self) -> None:
+        self.x = 10
+        Ensures(Acc(self.x))
+        Ensures(self.x == 10)
+
+    def __getattr__(self, name: str) -> object:
+        pass
+
+@Complex
+class WrapsFoobar:
+    def __init__(self, wraps: Foobar) -> None:
+        self.f = wraps
+        Ensures(Acc(self.f))
+        Ensures(self.f == wraps)
+        Ensures(MayCreate(self, 'x'))
+
+    def __getattr__(self, name: str) -> object:
+        pass
+
+    @Pure
+    def __getattr__real(self, item: str) -> object:
+        Requires(Acc(self.f))
+        Requires(Acc(self.f.__dict__[item]))
+        return self.f.__dict__[item]
+
+
+def wrap_example() -> None:
+    f = Foobar()
+    wf = WrapsFoobar(f)
+    Assert(wf.x == 10)
+
+
 
 @Complex
 class Parent:
     def __init__(self) -> None:
         self.x = "15"
         self.y = 20
-        self.qwe: int = 0
+        self.__dict__['qwe'] = 0
         Ensures(Acc(self.x))
         Ensures(self.x == "15")
         Ensures(Acc(self.y))
         Ensures(self.y == 20)
         Ensures(MaySet(self, 'z'))
         Ensures(MayCreate(self, 'a'))
+        Ensures(Acc(self.__dict__['qwe']))
+        Ensures(self.__dict__['qwe'] == 0)
 
-        Ensures(Acc(self.qwe))
-        Ensures(self.qwe == 0)
+    def __getattr__(self, name: str) -> object:
+        pass
 
     @Pure
-    def __getattr__(self, name: str) -> object:
+    def __getattr__real(self, name: str) -> object:
         return 99
 
-    def __setattr__(self, name: str, value: object) -> None:
-        pass
+    # def __setattr__(self, name: str, value: object) -> None:
+    #     Requires(Acc(self.__dict__[name]))
+    #     self.__dict__[name] = value
+    #     Ensures(Acc(self.__dict__[name]))
+    #     Ensures(self.__dict__[name] == value)
 
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
         Requires(MayCreate(self, 'a'))
-        self.z = 10
+        self.z: object = 10
         self.a = 100
         Ensures(Acc(self.z))
         Ensures(self.z == 10)
@@ -39,11 +78,12 @@ class Parent:
         Ensures(self.a == 100)
 
     def another_method(self) -> None:
-        Requires(Acc(self.qwe))
-        self.__dict__['qw' + 'e'] = 1_000_000
-        Assert(self.__dict__['qw' + 'e'] == 1_000_000)
-        Ensures(Acc(self.qwe))
-        # Ensures(self.qwe == 1_000_000)
+        Requires(Acc(self.__dict__['qwe']))
+        self.__dict__['qwe'] = 1_000_000
+        Assert(self.__dict__['qwe'] == 1_000_000)
+        Ensures(Acc(self.__dict__['qwe']))
+        Ensures(self.__dict__['qwe'] == 1_000_000)
+        Ensures(self.qwe == 1_000_000)
 
 
 class Normal:
