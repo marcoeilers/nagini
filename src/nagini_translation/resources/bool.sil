@@ -68,28 +68,44 @@ function bool___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
 
 
-function int___ge__(self: Int, other: Int): Bool
+function int___ge__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self >= other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) >= int___unbox__(other)
+        : float___ge__(self, other)
 }
 
-function int___gt__(self: Int, other: Int): Bool
+function int___gt__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self > other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) >= int___unbox__(other)
+        : float___gt__(self, other)
 }
 
-function int___le__(self: Int, other: Int): Bool
+function int___le__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self <= other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) >= int___unbox__(other)
+        : float___le__(self, other)
 }
 
-function int___lt__(self: Int, other: Int): Bool
+function int___lt__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self < other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) >= int___unbox__(other)
+        : float___lt__(self, other)
 }
 
 function int___add__(self: Int, other: Int): Int
