@@ -256,22 +256,22 @@
         "__ge__": {
             "args": ["int", "float"],
             "type": "__prim__bool",
-            "requires": []
+            "requires": ["int___unbox__", "float___ge__"]
         },
         "__gt__": {
             "args": ["int", "float"],
             "type": "__prim__bool",
-            "requires": []
+            "requires": ["int___unbox__", "float___gt__"]
         },
         "__lt__": {
             "args": ["int", "float"],
             "type": "__prim__bool",
-            "requires": []
+            "requires": ["int___unbox__", "float___lt__"]
         },
         "__le__": {
             "args": ["int", "float"],
             "type": "__prim__bool",
-            "requires": []
+            "requires": ["int___unbox__", "float___le__"]
         },
         "__int__": {
             "args": ["int"],

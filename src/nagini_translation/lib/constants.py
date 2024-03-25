@@ -237,7 +237,7 @@ LEGAL_MAGIC_METHODS = {
     '__rfloordiv__',
     '__rmod__',
     '__rdivmod__',
-    '__rpow__(self,',
+    '__rpow__',
     '__rlshift__',
     '__rrshift__',
     '__rand__',

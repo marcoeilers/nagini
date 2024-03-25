@@ -84,7 +84,7 @@ function int___gt__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), float())
 {
     issubtype(typeof(other), int())
-        ? int___unbox__(self) >= int___unbox__(other)
+        ? int___unbox__(self) > int___unbox__(other)
         : float___gt__(self, other)
 }
 
@@ -94,7 +94,7 @@ function int___le__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), float())
 {
     issubtype(typeof(other), int())
-        ? int___unbox__(self) >= int___unbox__(other)
+        ? int___unbox__(self) <= int___unbox__(other)
         : float___le__(self, other)
 }
 
@@ -104,7 +104,7 @@ function int___lt__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(other), float())
 {
     issubtype(typeof(other), int())
-        ? int___unbox__(self) >= int___unbox__(other)
+        ? int___unbox__(self) < int___unbox__(other)
         : float___lt__(self, other)
 }
 
