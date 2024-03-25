@@ -1177,7 +1177,8 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd', 'Wildcard'):
-            if not impure and not getattr(self.get_type(node.args[0].value, ctx), 'is_complex', False):
+            complex_skip = hasattr(node.args[0], 'value') and getattr(self.get_type(node.args[0].value, ctx), 'is_complex', False)
+            if not impure and not complex_skip:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
                 perm = self.get_arp_for_context(node, ctx)
@@ -1219,7 +1220,9 @@ class ContractTranslator(CommonTranslator):
                 target = self.get_target(node.args[0], ctx)
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)
-                elif hasattr(node.args[0], 'value') and node.args[0].value.attr == '__dict__':
+                elif hasattr(node.args[0], 'value') and \
+                        hasattr(node.args[0].value, 'attr') and \
+                        node.args[0].value.attr == '__dict__':
                     # ctx.is_acc = True
                     stmt_rec, rec = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
                     # ctx.is_acc = False
