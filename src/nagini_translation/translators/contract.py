@@ -1223,9 +1223,9 @@ class ContractTranslator(CommonTranslator):
                 elif hasattr(node.args[0], 'value') and \
                         hasattr(node.args[0].value, 'attr') and \
                         node.args[0].value.attr == '__dict__':
-                    # ctx.is_acc = True
+                    ctx.is_acc = node.args[0].value
                     stmt_rec, rec = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
-                    # ctx.is_acc = False
+                    ctx.is_acc = False
                     pos = self.to_position(node, ctx)
 
                     # need to return keydict___item__(receiver, node).keydict_val

@@ -471,7 +471,7 @@ class ExpressionTranslator(CommonTranslator):
 
         if hasattr(node.value, 'value'):
             target_cls = self.get_type(node.value.value, ctx)
-            if getattr(target_cls, 'is_complex', False):
+            if getattr(target_cls, 'is_complex', False) or getattr(node.value, 'attr', False) == '__dict__':
                 target_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                 index_type = ctx.module.global_module.classes[STRING_TYPE]
 
@@ -868,7 +868,7 @@ class ExpressionTranslator(CommonTranslator):
 
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
-            if not(hasattr(recv_type, 'is_complex') and recv_type.is_complex):
+            if not(hasattr(recv_type, 'is_complex') and recv_type.is_complex) and getattr(node, 'attr', False) != '__dict__':
                 field = self._lookup_field(node, ctx)
                 if isinstance(field, PythonGlobalVar):
                     field_func = self.translate_static_field_access(field, receiver,
@@ -886,6 +886,8 @@ class ExpressionTranslator(CommonTranslator):
                                                     [target_param])
             else:
                 if ctx.is_acc == node or ctx.is_mayset:
+                    if node.attr == '__dict__':
+                        return stmt, receiver
                     # need to return keydict___item__(receiver, node).keydict_val
                     keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                     string_type = ctx.module.global_module.classes[STRING_TYPE]
@@ -937,7 +939,7 @@ class ExpressionTranslator(CommonTranslator):
                                                       node, ctx)
 
                         # when __getattr__ is defined, need to create a cond exp to call it when needed
-                        if '__getattr__real' in recv_type.functions and ctx.current_function.func_constant != '__getattr__real':
+                        if '__getattr__real' in recv_type.functions: # and ctx.current_function.func_constant != '__getattr__real':
                             func_name = '__contains__'
                             keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
                                                           node, ctx)
