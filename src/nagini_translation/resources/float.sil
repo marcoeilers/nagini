@@ -14,28 +14,28 @@ function float___ge__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___ge__(int___unbox__(self), int___unbox__(other)))
+            (result == int___ge__(self, other))
 
 function float___gt__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___gt__(int___unbox__(self), int___unbox__(other)))
+            (result == int___gt__(self, other))
 
 function float___le__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___le__(int___unbox__(self), int___unbox__(other)))
+            (result == int___le__(self, other))
 
 function float___lt__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___lt__(int___unbox__(self), int___unbox__(other)))
+            (result == int___lt__(self, other))
 
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
