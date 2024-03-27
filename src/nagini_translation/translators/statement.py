@@ -1067,7 +1067,6 @@ class StatementTranslator(CommonTranslator):
                 arg_types = [None, None, None]
                 stmt = self.get_method_call(target_cls, '__setitem__', args,
                                             arg_types, [], node, ctx)
-
                 return lhs_stmt + slice_stmt + stmt, None
             else:
                 return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
@@ -1093,15 +1092,28 @@ class StatementTranslator(CommonTranslator):
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
             if hasattr(type, 'is_complex') and type.is_complex:
-                target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
-                lhs_stmt, target = self.translate_expr(lhs.value, ctx)
-                key = self.translate_string(lhs.attr, None, ctx)
-                args = [target, key, rhs]
-                arg_types = [None, None, None]
-                stmt = self.get_method_call(target_cls, '__setitem__', args,
-                                            arg_types, [], node, ctx)
+                if '__setattr__' not in type.methods:
+                    target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+                    key = self.translate_string(lhs.attr, None, ctx)
+                    args = [target, key, rhs]
+                    arg_types = [None, None, None]
+                    stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                                arg_types, [], node, ctx)
 
-                return lhs_stmt + stmt, None
+                    return lhs_stmt + stmt, None
+                else:
+                    ###################################
+                    lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+                    key = self.translate_string(lhs.attr, None, ctx)
+                    args = [target, key, rhs]
+                    arg_types = [None, None, None]
+                    call = self.translate_normal_call(type.methods['__setattr__'], lhs_stmt, args, arg_types, node,
+                                                      ctx)
+
+                    return call
+                    ############################
+
             if isinstance(type, UnionType) and not isinstance(type, OptionalType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []

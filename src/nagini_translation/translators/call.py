@@ -583,7 +583,7 @@ class CallTranslator(CommonTranslator):
             error_var = self.get_error_var(node, ctx)
             targets.append(error_var)
         defined_check = []
-        if target.module is not target.module.global_module:
+        if target.module is not target.module.global_module and target.name != '__setattr__':
             # Mark the current function as depending on the called method. If we're in
             # a global context, assert that the called method and its dependencies are
             # defined.
@@ -1105,7 +1105,8 @@ class CallTranslator(CommonTranslator):
         name = get_func_name(node)
         position = self.to_position(node, ctx)
         is_predicate = True
-        if isinstance(node.func, ast.Attribute):
+        complex_skip = getattr(target.cls, 'is_complex', False) and target.name == '__setattr__'
+        if not complex_skip and isinstance(node.func, ast.Attribute):
             receiver_target = self.get_target(node.func.value, ctx)
             if (isinstance(receiver_target, PythonClass) and
                     (not isinstance(node.func.value, (ast.Call, ast.Str)) or

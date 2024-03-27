@@ -353,11 +353,14 @@ class ContractTranslator(CommonTranslator):
         info = self.no_info(ctx)
         stmt, rec = self.translate_expr(node.args[0], ctx)
         rec_type = self.get_type(node.args[0], ctx)
-        if stmt:
-            raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
-            raise InvalidProgramException(node.args[1], 'invalid.may.set')
-        field = rec_type.get_field(node.args[1].s)
+        if getattr(rec_type, 'is_complex', False):
+            field = None
+        else:
+            if stmt:
+                raise InvalidProgramException(node.args[0], 'purity.violated')
+            if not isinstance(node.args[1], ast.Str) and not getattr(rec_type, 'is_complex', False):
+                raise InvalidProgramException(node.args[1], 'invalid.may.set')
+            field = rec_type.get_field(node.args[1].s)
         # need to include a case for is_complex
         # in which case its
         # acc keydict___item__(self, key).keydict_val
@@ -368,7 +371,12 @@ class ContractTranslator(CommonTranslator):
             keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
             string_type = ctx.module.global_module.classes[STRING_TYPE]
 
-            key = self.translate_string(node.args[1].value, None, ctx)
+            # index_stmt, index = self.translate_expr(node.slice.value, ctx,
+            #                                         target_type=self.viper.Ref)
+            if isinstance(node.args[1], ast.Str):
+                key = self.translate_string(node.args[1].value, None, ctx)
+            else:
+                _, key = self.translate_expr(node.args[1], ctx, target_type=self.viper.Ref)
 
             args = [rec, key]
             arg_types = [keydict_type, string_type]
@@ -402,7 +410,10 @@ class ContractTranslator(CommonTranslator):
         if getattr(rec_type, 'is_complex', False):
             stmt2, receiver = self.translate_expr(node.args[0], ctx, target_type=self.viper.Ref)
             stmt += stmt2
-            key = self.translate_string(node.args[1].value, None, ctx)
+            if isinstance(node.args[1], ast.Str):
+                key = self.translate_string(node.args[1].value, None, ctx)
+            else:
+                _, key = self.translate_expr(node.args[1], ctx, target_type=self.viper.Ref)
 
             # need to return keydict___getitem__(receiver, node)
             keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]

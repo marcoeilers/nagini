@@ -5,6 +5,28 @@ from nagini_contracts.contracts import *
 from typing import Any
 
 @Complex
+class SetattrStuff:
+    def __init__(self) -> None:
+        Ensures(MaySet(self, 'a'))
+
+    def __getattr__(self, name: str) -> None:
+        pass
+
+    def __setattr__(self, name: str, value: int) -> None:
+        Requires(MaySet(self, name))
+        self.__dict__[name] = value + 1
+        Ensures(Acc(self.__dict__[name]))
+        Ensures(self.__dict__[name] == value + 1)
+        Ensures(type(self.__dict__[name]) is int)
+
+
+def setattr_example() -> None:
+    s = SetattrStuff()
+    s.a = 10
+    Assert(s.a == 11)
+
+
+@Complex
 class Foobar:
     def __init__(self) -> None:
         self.x = 10
@@ -64,11 +86,11 @@ class Parent:
     def __getattr__real(self, name: str) -> object:
         return 99
 
-    def __setattr__(self, name: str, value: object) -> None:
-        Requires(Acc(self.__dict__[name]))
-        self.__dict__[name] = value
-        Ensures(Acc(self.__dict__[name]))
-        Ensures(self.__dict__[name] == value)
+    # def __setattr__(self, name: str, value: object) -> None:
+    #     Requires(MaySet(self, name))
+    #     self.__dict__[name] = value
+    #     Ensures(Acc(self.__dict__[name]))
+    #     Ensures(self.__dict__[name] == value)
 
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
