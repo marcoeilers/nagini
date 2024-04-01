@@ -9,8 +9,8 @@ class SetattrStuff:
     def __init__(self) -> None:
         Ensures(MaySet(self, 'a'))
 
-    def __getattr__(self, name: str) -> None:
-        pass
+    def __getattr__(self, name: str) -> object:
+        return None
 
     def __setattr__(self, name: str, value: int) -> None:
         Requires(MaySet(self, name))
@@ -34,7 +34,7 @@ class Foobar:
         Ensures(self.x == 10)
 
     def __getattr__(self, name: str) -> object:
-        pass
+        return None
 
 @Complex
 class WrapsFoobar:
@@ -44,14 +44,11 @@ class WrapsFoobar:
         Ensures(self.f is wraps)
         Ensures(MayCreate(self, 'x'))
 
+    # @Pure assumed
     def __getattr__(self, name: str) -> object:
-        pass
-
-    @Pure
-    def __getattr__real(self, item: str) -> object:
         Requires(Acc(self.__dict__['f']))
-        Requires(Acc(self.__dict__['f'].__dict__[item]))
-        return self.f.__dict__[item]
+        Requires(Acc(self.__dict__['f'].__dict__[name]))
+        return self.f.__dict__[name]
 
 
 def wrap_example() -> None:
@@ -80,17 +77,8 @@ class Parent:
         Ensures(self.__dict__['q' + 'we'] == 0)
 
     def __getattr__(self, name: str) -> object:
-        pass
-
-    @Pure
-    def __getattr__real(self, name: str) -> object:
         return 99
 
-    # def __setattr__(self, name: str, value: object) -> None:
-    #     Requires(MaySet(self, name))
-    #     self.__dict__[name] = value
-    #     Ensures(Acc(self.__dict__[name]))
-    #     Ensures(self.__dict__[name] == value)
 
     def some_method(self) -> None:
         Requires(MaySet(self, 'z'))
