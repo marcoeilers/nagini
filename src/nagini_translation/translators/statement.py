@@ -1059,15 +1059,28 @@ class StatementTranslator(CommonTranslator):
             else:
                 t = None
             if t and hasattr(t, 'is_complex') and t.is_complex:
-                target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
-                lhs_stmt, target = self.translate_expr(lhs.value.value, ctx)
-                slice_stmt, slice_index = self.translate_expr(lhs.slice.value, ctx)
-                # key = self.translate_string(slice_index, None, ctx)
-                args = [target, slice_index, rhs]
-                arg_types = [None, None, None]
-                stmt = self.get_method_call(target_cls, '__setitem__', args,
-                                            arg_types, [], node, ctx)
-                return lhs_stmt + slice_stmt + stmt, None
+                if '__setattr__' not in t.methods or ctx.current_function.name == '__setattr__':
+                    target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    lhs_stmt, target = self.translate_expr(lhs.value.value, ctx)
+                    slice_stmt, slice_index = self.translate_expr(lhs.slice.value, ctx)
+                    # key = self.translate_string(slice_index, None, ctx)
+                    args = [target, slice_index, rhs]
+                    arg_types = [None, None, None]
+                    stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                                arg_types, [], node, ctx)
+                    return lhs_stmt + slice_stmt + stmt, None
+
+                else:
+                    ###################################
+                    lhs_stmt, target = self.translate_expr(lhs.value.value, ctx)
+                    slice_stmt, slice_index = self.translate_expr(lhs.slice.value, ctx)
+                    args = [target, slice_index, rhs]
+                    arg_types = [None, None, None]
+                    call = self.translate_normal_call(t.methods['__setattr__'], lhs_stmt + slice_stmt, args, arg_types, node,
+                                                      ctx)
+                    return call
+                    ############################
+
             else:
                 return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
 
@@ -1092,7 +1105,7 @@ class StatementTranslator(CommonTranslator):
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
             if hasattr(type, 'is_complex') and type.is_complex:
-                if '__setattr__' not in type.methods:
+                if '__setattr__' not in type.methods or ctx.current_function.name == '__setattr__':
                     target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
                     lhs_stmt, target = self.translate_expr(lhs.value, ctx)
                     key = self.translate_string(lhs.attr, None, ctx)

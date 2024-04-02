@@ -7,10 +7,22 @@ from typing import Any
 @Complex
 class SetattrStuff:
     def __init__(self) -> None:
+        self.foo = 10
+        self.__dict__['bar'] = 10
+        Ensures(Acc(self.foo))
+        Ensures(self.foo == 11)
+        Ensures(Acc(self.__dict__['bar']))
+        Ensures(self.__dict__['bar'] == 11)
         Ensures(MaySet(self, 'a'))
 
     def __getattr__(self, name: str) -> object:
         return None
+
+    # def foo(self) -> int:
+    #     return 32
+
+    # def bar(self) -> int:
+    #     return 23
 
     def __setattr__(self, name: str, value: int) -> None:
         Requires(MaySet(self, name))
@@ -22,8 +34,8 @@ class SetattrStuff:
 
 def setattr_example() -> None:
     s = SetattrStuff()
-    s.a = 10
-    Assert(s.a == 11)
+    s.a = 20
+    Assert(s.a == 21)
 
 
 @Complex
