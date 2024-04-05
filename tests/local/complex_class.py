@@ -4,6 +4,49 @@
 from nagini_contracts.contracts import *
 from typing import Any
 
+
+@Complex
+class GetattributeStuff:
+    def __init__(self) -> None:
+        self.x = 10
+        self.y = 20
+        Ensures(Acc(self.x))
+        Ensures(self.x == 10)
+        Ensures(Acc(self.y))
+        Ensures(self.y == 20)
+
+        # init still exhales write acc to all function names, which includes "foo" and "bar"
+
+    def foo(self) -> object:
+        Ensures(Result() == 50)
+        return 50
+
+    def bar(self) -> object:
+        Ensures(Result() == 50)
+        return 50
+
+    @Pure       # this will be assumed @Pure
+    def __getattribute(self, name: str) -> object:
+        Requires(Acc(self.__dict__[name]))
+
+        # generate these for every function name
+        Ensures(Implies(name == "foo", Result() == self.__dict__[name]))
+        Ensures(Implies(name == "bar", Result() == self.__dict__[name]))
+
+        if name == "foo" or name == "bar":
+            # the user makes sure function names still return those same functions
+            return self.__dict__[name]
+        else:
+            # whatever else goes here
+            return "abcd"
+
+
+def getattribute_example() -> None:
+    g = GetattributeStuff()
+    Assert(g.x == 10)       # call __getattribute__
+    Assert(g.foo() == 50)   # still call foo(). does not call __getattribute__
+
+
 @Complex
 class SetattrStuff:
     def __init__(self) -> None:
@@ -82,6 +125,8 @@ class Parent:
         Ensures(self.y == 20)
         Ensures(MaySet(self, 'z'))
         Ensures(MayCreate(self, 'a'))
+
+        Ensures(MayCreate(self, 'b'))
         
         Ensures('qw' + 'e' == 'qwe')
         Ensures('q' + 'we' == 'qwe')
@@ -110,6 +155,11 @@ class Parent:
         Ensures(self.__dict__['qwe'] == 1_000_000)
         # Ensures(self.qwe == 1_000_000)
 
+    def last_method(self) -> None:
+        Requires(MaySet(self, 'b'))
+        Requires(self.b == 99)
+        Ensures(MaySet(self, 'b'))
+
 
 class Normal:
     def __init__(self) -> None:
@@ -132,6 +182,8 @@ def main() -> None:
     c.some_method()
     Assert(c.z == 10)
     Assert(c.a == 100)
+
+    c.last_method()
     # some_func(c)
 
 
