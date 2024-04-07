@@ -576,7 +576,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return None
         
         for param_type, arg_type in zip(param_types, arg_types):
-            if not arg_type.try_box().issubtype(param_type.try_box()):
+            if isinstance(param_type, UnionType):
+                if not any([arg_type.try_box().issubtype(union_type_part.try_box()) for union_type_part in param_type.get_types()]):
+                    return None
+            elif not arg_type.try_box().issubtype(param_type.try_box()):
                 return None
             
         return func
