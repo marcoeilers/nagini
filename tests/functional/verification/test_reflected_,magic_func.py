@@ -111,3 +111,26 @@ class Q(P):
   pass
 
 r9 = P() + Q()
+
+class R():
+  pass
+  
+class S(R):
+  def __radd__(self, other: 'R') -> 'R':
+    return R()
+
+r10 = R() + S()
+
+class T():
+  pass
+
+class U(T):
+  def __radd__(self: 'U', other: 'U') -> 'U':
+    Requires(False)
+    assert False
+  
+class V(U):
+  def __radd__(self: 'V', other: 'T') -> 'V':
+    return self
+
+r11 = U() + V()
