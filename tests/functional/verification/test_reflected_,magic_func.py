@@ -1,5 +1,9 @@
 from nagini_contracts.contracts import *
 
+############################################
+##  Basic tests                           ##
+############################################
+
 class A():
   def __add__(self, other: 'B') -> 'A':
     return A()
@@ -9,6 +13,8 @@ class B():
   
 r1 = A() + B()
 
+
+# __add__ of left operand takes priority
 class C():
   def __add__(self, other: 'D') -> 'C':
     return C()
@@ -20,6 +26,8 @@ class D():
   
 r2 = C() + D()
 
+
+# __add__ prefered over __radd__
 class E():
   def __add__(self, other: 'E') -> 'E':
     return E()
@@ -30,6 +38,8 @@ class E():
   
 r3 = E() + E()
 
+
+# Left operand takes precedence over right operand
 class F():
   def __add__(self, other: 'G') -> 'F':
     return F()
@@ -49,6 +59,8 @@ class G():
 
 r4 = F() + G()
 
+
+# If left operand has no matching __add__, check for __radd__ on right operand
 class H():
   pass
 
@@ -58,6 +70,37 @@ class I():
   
 r5 = H() + I()
 
+
+class F1():
+  def __radd__(self, other: 'G1') -> 'F1':
+    Requires(False)
+    assert False
+
+class G1():
+  def __radd__(self, other: 'F1') -> 'F1':
+    return F1()
+
+r41 = F1() + G1()
+
+
+class H1():
+  def __add__(self, other: int) -> 'H1':
+    Requires(False)
+    assert False
+
+class I1(H1):
+  def __radd__(self, other: 'H1') -> 'H1':
+    return I1()
+  
+r51 = H1() + I1()
+
+
+############################################
+##  Subtyped operands                     ##
+############################################
+
+# If operand inherits magic functions from supertype
+# without overriding them, treat operand as usual
 class J():
   def __add__(self, other: int) -> 'J':
     Requires(False)
@@ -84,21 +127,6 @@ class M(L):
 
 r7 = M() + 2
 
-class N():
-  def __add__(self, other: 'N') -> 'N':
-    Requires(False)
-    assert False
-  
-  def __radd__(self, other: 'N') -> 'N':
-    Requires(False)
-    assert False
-  
-class O(N):
-  def __radd__(self, other: 'N') -> 'O':
-    return O()
-  
-r8 = N() + O()
-
 class P():
   def __add__(self, other: 'P') -> 'P':
     return P()
@@ -121,6 +149,26 @@ class S(R):
 
 r10 = R() + S()
 
+
+# If right operand is subtype of left operand, and
+# right operand provides its own implementation of
+# __radd__, prefer this reflected function before
+# __add__ from left operand
+class N():
+  def __add__(self, other: 'N') -> 'N':
+    Requires(False)
+    assert False
+  
+  def __radd__(self, other: 'N') -> 'N':
+    Requires(False)
+    assert False
+  
+class O(N):
+  def __radd__(self, other: 'N') -> 'N':
+    return O()
+  
+r8 = N() + O()
+
 class T():
   pass
 
@@ -134,3 +182,21 @@ class V(U):
     return self
 
 r11 = U() + V()
+
+class W():
+  pass
+
+class X(W):
+  def __add__(self: 'X', other: 'X') -> 'X':
+    Requires(False)
+    assert False
+
+  def __radd__(self: 'X', other: 'X') -> 'X':
+    Requires(False)
+    assert False
+  
+class Y(X):
+  def __radd__(self: 'Y', other: 'W') -> 'Y':
+    return self
+
+r12 = X() + Y()
