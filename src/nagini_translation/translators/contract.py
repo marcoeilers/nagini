@@ -1198,7 +1198,12 @@ class ContractTranslator(CommonTranslator):
                                                self.no_info(ctx))
             else:
                 perm = self._get_perm(node, ctx)
-            if isinstance(node.args[0], ast.Call):
+            call_skip =     hasattr(node.args[0], 'func') and \
+                            getattr(node.args[0].func, 'attr', False) == '__getattribute__' and \
+                            hasattr(node.args[0].func, 'value') and \
+                            getattr(node.args[0].func.value, 'id', False) == 'object' and \
+                            getattr(self.get_type(node.args[0].args[0], ctx), 'is_complex', False)
+            if isinstance(node.args[0], ast.Call) and not call_skip:
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
                 if isinstance(node.args[0], ast.Attribute):
@@ -1231,21 +1236,34 @@ class ContractTranslator(CommonTranslator):
                 target = self.get_target(node.args[0], ctx)
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)
-                elif hasattr(node.args[0], 'value') and \
+                elif (hasattr(node.args[0], 'value') and \
                         hasattr(node.args[0].value, 'attr') and \
-                        node.args[0].value.attr == '__dict__':
-                    ctx.is_acc = node.args[0].value
-                    stmt_rec, rec = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
-                    ctx.is_acc = False
-                    pos = self.to_position(node, ctx)
+                        node.args[0].value.attr == '__dict__') or call_skip:
 
-                    # need to return keydict___item__(receiver, node).keydict_val
                     keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
                     string_type = ctx.module.global_module.classes[STRING_TYPE]
 
-                    # ctx.is_acc = True
-                    slice_stmt, slice_index = self.translate_expr(node.args[0].slice.value, ctx)
-                    # ctx.is_acc = False
+                    if call_skip:
+                        ctx.is_acc = node.args[0].args[0]
+                        stmt_rec, rec = self.translate_expr(node.args[0].args[0], ctx, target_type=self.viper.Ref)
+                        ctx.is_acc = False
+
+                        pos = self.to_position(node, ctx)
+
+                        slice_stmt, slice_index = self.translate_expr(node.args[0].args[1], ctx)
+
+                    else:
+                        ctx.is_acc = node.args[0].value
+                        stmt_rec, rec = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
+                        ctx.is_acc = False
+                        pos = self.to_position(node, ctx)
+
+                        # need to return keydict___item__(receiver, node).keydict_val
+
+
+                        # ctx.is_acc = True
+                        slice_stmt, slice_index = self.translate_expr(node.args[0].slice.value, ctx)
+                        # ctx.is_acc = False
 
                     args = [rec, slice_index]
                     arg_types = [keydict_type, string_type]

@@ -382,6 +382,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             return container.cls.superclass
         else:
             raise InvalidProgramException(node, 'invalid.super.call')
+    if func_name == '__getattribute__':
+        object_class = module.global_module.classes[OBJECT_TYPE]
+        return object_class
     if func_name == 'len':
         return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):

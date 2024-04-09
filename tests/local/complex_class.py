@@ -14,6 +14,7 @@ class GetattributeStuff:
         Ensures(self.x == 10)
         Ensures(Acc(self.y))
         Ensures(self.y == 20)
+        Ensures(MayCreate(self, 'xyz'))
 
         # init still exhales write acc to all function names, which includes "foo" and "bar"
 
@@ -25,25 +26,52 @@ class GetattributeStuff:
         Ensures(Result() == 50)
         return 50
 
+    def __getattr__(self, name: str) -> object:
+        Ensures(Result() == 1_000)
+        return 1_000
+
     @Pure       # this will be assumed @Pure
     def __getattribute(self, name: str) -> object:
-        Requires(Acc(self.__dict__[name]))
 
-        # generate these for every function name
-        Ensures(Implies(name == "foo", Result() == self.__dict__[name]))
-        Ensures(Implies(name == "bar", Result() == self.__dict__[name]))
+        # Auto generated:
+        Requires(Implies(name == "foo",      MaySet(self, name)))
+        Requires(Implies(name == "bar",      MaySet(self, name)))
+        Requires(Implies(name == "__dict__", MaySet(self, name)))
 
-        if name == "foo" or name == "bar":
-            # the user makes sure function names still return those same functions
-            return self.__dict__[name]
+        # From the user:
+        Requires(Implies(name == "xyz", MaySet(self, name)))
+        Requires(Acc(object.__getattribute__(self, "x")))
+
+
+        # Auto generated:
+        Ensures(Implies(name == "foo",      Result() == object.__getattribute__(self, name)))
+        Ensures(Implies(name == "bar",      Result() == object.__getattribute__(self, name)))
+        Ensures(Implies(name == "__dict__", Result() == object.__getattribute__(self, name)))
+
+        #  func name        func name        important!            anything else the user wants
+        if name == "foo" or name == "bar" or name == "__dict__" or name == "xyz":
+            return object.__getattribute__(self, name)
+        elif name == "x":
+            return object.__getattribute__(self, "x")
         else:
             # whatever else goes here
-            return "abcd"
+            return 1_000_000
 
 
 def getattribute_example() -> None:
     g = GetattributeStuff()
+    Assert(g.__dict__['x'] == 10)
+    Assert(g.xyz == 1_000)
+    Assert(object.__getattribute__(g, "x") == 10)
+    # Assert(object.__getattribute__(g, "xyz") == 1_000)    # this won't work because __getattr__ is not called
+
     Assert(g.x == 10)       # call __getattribute__
+    Assert(g.__getattribute('x') == 10)
+    Assert(g.__getattribute('xyz') == 1_000)
+    Assert(g.__getattribute('hello_world') == 1_000_000)
+
+    # Assert(g.__getattribute('hello_world') == 1_000_001)    # sanity check
+
     Assert(g.foo() == 50)   # still call foo(). does not call __getattribute__
 
 
