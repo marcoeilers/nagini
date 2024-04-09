@@ -308,9 +308,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             return left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)]).type
 
         else:
-            right_func = right_type.get_compatible_func_or_method(RIGHT_OPERATOR_FUNCTIONS[type(node.op)], [right_type, left_type])
+            right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
+            right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
 
-            if right_type.issubtype(left_type) and right_func and right_func.overrides:
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
                     return right_func.type
             
             left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])

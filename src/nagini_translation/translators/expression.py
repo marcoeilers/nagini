@@ -990,7 +990,10 @@ class ExpressionTranslator(CommonTranslator):
         else:
             right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
             right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
-            if right_type.issubtype(left_type) and right_func and right_func.overrides:
+
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
                     call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
                     return stmt + call_stmt, call
 
