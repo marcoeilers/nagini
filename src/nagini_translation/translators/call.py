@@ -1284,7 +1284,7 @@ class CallTranslator(CommonTranslator):
             # when __getattr__ is defined, need to create a cond exp to call it when needed
             if '__getattr__' in recv_type.functions and ctx.current_function.name == "__getattribute__":
 
-                if not (getattr(ctx, 'is_pre_or_post', False) or getattr(ctx, 'is_return', True)):
+                if not (getattr(ctx, 'is_pre_or_post', False) or getattr(ctx, 'is_return', False)):
                     raise InvalidProgramException(node, 'cannot.have.object.__getattribute__.here')
 
                 func_name = '__contains__'

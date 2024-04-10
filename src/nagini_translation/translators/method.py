@@ -292,14 +292,18 @@ class MethodTranslator(CommonTranslator):
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')
         # Create preconditions
+        ctx.is_pre_or_post = True
         pres = self._translate_pres(func, ctx)
+        ctx.is_pre_or_post = False
         decreases_pres = self._translate_decreases(func, ctx)
         pres = pres + decreases_pres
         # Create postconditions
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
+                ctx.is_pre_or_post = True
                 stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                ctx.is_pre_or_post = False
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
