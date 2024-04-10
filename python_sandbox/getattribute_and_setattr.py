@@ -15,7 +15,8 @@ class Dynamic:
             return object.__getattribute__(self, name)
         elif name == "attr_error_elsewhere":
             e = Empty()
-            return object.__getattribute__(e, name)
+            some_val = object.__getattribute__(e, name)
+            return some_val + "HEY THERE"
         else:
             return "world"
 

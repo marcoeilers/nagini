@@ -51,6 +51,11 @@ class GetattributeStuff:
 
         #  func name        func name        important!            anything else the user wants
         if name == "foo" or name == "bar" or name == "__dict__" or name == "xyz":
+
+            # cannot.have.object.__getattribute__.here
+            # my_attr: object = object.__getattribute__(self, name)
+            # return my_attr
+
             return object.__getattribute__(self, name)
         elif name == "x":
             return object.__getattribute__(self, name)
