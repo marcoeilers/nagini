@@ -1522,7 +1522,9 @@ class Analyzer(ast.NodeVisitor):
         return decorator in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Pure') or func.name == "__getattr__"
+        return (self.has_decorator(func, 'Pure')
+                or func.name == '__getattr__'
+                or func.name == '__getattribute__')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')

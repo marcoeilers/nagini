@@ -232,6 +232,7 @@ LEGAL_MAGIC_METHODS = {
 LEGAL_COMPLEX_MAGIC_METHODS = {
     '__getattr__',
     '__setattr__',
+    '__getattribute__'
 }
 
 RESULT_NAME = '_res'

@@ -30,8 +30,8 @@ class GetattributeStuff:
         Ensures(Result() == 1_000)
         return 1_000
 
-    @Pure       # this will be assumed @Pure
-    def __getattribute(self, name: str) -> object:
+    # @Pure       # assumed @Pure
+    def __getattribute__(self, name: str) -> object:
 
         # Auto generated:
         Requires(Implies(name == "foo",      MaySet(self, name)))
@@ -40,7 +40,8 @@ class GetattributeStuff:
 
         # From the user:
         Requires(Implies(name == "xyz", MaySet(self, name)))
-        Requires(Acc(object.__getattribute__(self, "x")))
+        Requires(Implies(name == "x", Acc(object.__getattribute__(self, name))))
+        # Requires(MaySet(self, name))
 
 
         # Auto generated:
@@ -52,7 +53,7 @@ class GetattributeStuff:
         if name == "foo" or name == "bar" or name == "__dict__" or name == "xyz":
             return object.__getattribute__(self, name)
         elif name == "x":
-            return object.__getattribute__(self, "x")
+            return object.__getattribute__(self, name)
         else:
             # whatever else goes here
             return 1_000_000
@@ -65,10 +66,12 @@ def getattribute_example() -> None:
     Assert(object.__getattribute__(g, "x") == 10)
     # Assert(object.__getattribute__(g, "xyz") == 1_000)    # this won't work because __getattr__ is not called
 
-    Assert(g.x == 10)       # call __getattribute__
-    Assert(g.__getattribute('x') == 10)
-    Assert(g.__getattribute('xyz') == 1_000)
-    Assert(g.__getattribute('hello_world') == 1_000_000)
+    Assert(g.x == 10)                                           # call __getattribute__
+
+    # calling g.__getattribute__ directly won't be allowed!
+    Assert(g.__getattribute__('x') == 10)                       # g.x == 10.
+    Assert(g.__getattribute__('xyz') == 1_000)                  # g.xyz == 1_000
+    Assert(g.__getattribute__('hello_world') == 1_000_000)      # g.hello_world == 1_000_000
 
     # Assert(g.__getattribute('hello_world') == 1_000_001)    # sanity check
 

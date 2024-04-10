@@ -10,7 +10,7 @@ class Dynamic:
 
     def __getattribute__(self, name):
         print(f"__getattribute__({name})")
-        if name == "__dict__" or name == "x" or name == "foo" or name == "my_func":
+        if name == "__dict__" or name == "x" or name == "foo" or name == "my_func" or name == "__getattribute__":
             # for foo this actually works because AttributeError here will call __getattr__
             return object.__getattribute__(self, name)
         elif name == "attr_error_elsewhere":
@@ -65,6 +65,13 @@ print()
 
 print('d.attr_error_elsewhere')
 print(d.attr_error_elsewhere)
+
+print()
+print()
+
+# this doesn't work because object.__getattribute__ outside of a __getattribute__ doesn't call __getattr__
+# print('d.__getattribute__("foo")')
+# print(d.__getattribute__("foo"))
 
 print()
 print()
