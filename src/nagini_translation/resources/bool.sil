@@ -130,6 +130,21 @@ function int___mod__(self: Int, other: Int): Int
     self % other
 }
 
+function int___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == self
+
+function int___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == __prim__int___box__(-int___unbox__(self))
+
+function int___invert__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == __prim__int___box__(-(1 + int___unbox__(self)))
+
 function int___int__(self: Ref): Ref
     decreases _
     requires issubtype(typeof(self), int())

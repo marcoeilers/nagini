@@ -275,6 +275,20 @@
         "__int__": {
             "args": ["int"],
             "type": "int"
+        },
+        "__pos__": {
+            "args": ["int"],
+            "type": "int"
+        },
+        "__neg__": {
+            "args": ["int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__"]
+        },
+        "__invert__": {
+            "args": ["int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__"]
         }
     },
     "extends": "float"
@@ -334,6 +348,16 @@
             "args": ["float", "float"],
             "type": "__prim__bool",
             "requires": ["int___le__", "int___unbox__"]
+        },
+        "__pos__": {
+            "args": ["float"],
+            "type": "float",
+            "requires": ["int___pos__"]
+        },
+        "__neg__": {
+            "args": ["float"],
+            "type": "float",
+            "requires": ["int___neg__", "__prim__perm___box__", "unbox"]
         },
         "__int__": {
             "args": ["float"],
