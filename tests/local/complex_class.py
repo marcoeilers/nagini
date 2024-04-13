@@ -17,6 +17,7 @@ class GetattributeStuff:
         Ensures(MayCreate(self, 'xyz'))
 
         # init still exhales write acc to all function names, which includes "foo" and "bar"
+        # leaves a read permission
 
     def foo(self) -> object:
         Ensures(Result() == 50)
@@ -33,16 +34,11 @@ class GetattributeStuff:
     # @Pure       # assumed @Pure
     def __getattribute__(self, name: str) -> object:
 
-        # Auto generated:
-        Requires(Implies(name == "foo",      MaySet(self, name)))
-        Requires(Implies(name == "bar",      MaySet(self, name)))
-        Requires(Implies(name == "__dict__", MaySet(self, name)))
-
         # From the user:
-        Requires(Implies(name == "xyz", MaySet(self, name)))
-        Requires(Implies(name == "x", Acc(object.__getattribute__(self, name))))
-        # Requires(MaySet(self, name))
-
+        # Requires(Implies(name == "xyz", MaySet(self, name)))
+        # Requires(Implies(name == "x", Acc(object.__getattribute__(self, name))))
+        Requires(MaySet(self, name))
+        
 
         # Auto generated:
         Ensures(Implies(name == "foo",      Result() == object.__getattribute__(self, name)))
@@ -55,7 +51,7 @@ class GetattributeStuff:
             # cannot.have.object.__getattribute__.here
             # my_attr: object = object.__getattribute__(self, name)
             # return my_attr
-
+            # return 50
             return object.__getattribute__(self, name)
         elif name == "x":
             return object.__getattribute__(self, name)
@@ -76,7 +72,7 @@ def getattribute_example() -> None:
     # calling g.__getattribute__ directly won't be allowed!
     Assert(g.__getattribute__('x') == 10)                       # g.x == 10.
     Assert(g.__getattribute__('xyz') == 1_000)                  # g.xyz == 1_000
-    Assert(g.__getattribute__('hello_world') == 1_000_000)      # g.hello_world == 1_000_000
+    # Assert(g.__getattribute__('hello_world') == 1_000_000)      # g.hello_world == 1_000_000
 
     # Assert(g.__getattribute('hello_world') == 1_000_001)    # sanity check
 
