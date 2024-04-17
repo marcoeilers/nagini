@@ -309,7 +309,8 @@ class MethodTranslator(CommonTranslator):
             posts.append(expr)
         # Create typeof preconditions
 
-        if func.name == '__getattribute__':
+        # ERROR: class viper.silver.ast.LocalVar cannot be cast to class viper.silver.ast.AnyLocalVarDecl
+        if func.name == '__getattribute__' and False:
 
             keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
             string_type = ctx.module.global_module.classes[STRING_TYPE]

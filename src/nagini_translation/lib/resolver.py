@@ -534,6 +534,8 @@ def _get_subscript_type(value_type: PythonType, module: PythonModule,
             return common_supertype(value_type.type_args)
     elif value_type.name == LIST_TYPE:
         return value_type.type_args[0]
+    elif value_type.name == STRING_TYPE:
+        return module.global_module.classes[STRING_TYPE]
     elif value_type.name == SET_TYPE:
         return value_type.type_args[0]
     elif value_type.name in (DICT_TYPE, 'defaultdict', 'ExpiringDict'):
