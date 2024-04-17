@@ -482,6 +482,12 @@ def ContractOnly(func: T) -> T:
     """
     return func
 
+def Complex(cls: T) -> T:
+    """
+    Decorator to mark a class as complex. It's a no-op.
+    """
+    return cls
+
 
 def GhostReturns(start_index: int) -> Callable[[T], T]:
     """
@@ -567,6 +573,7 @@ __all__ = [
         'Predicate',
         'Ghost',
         'ContractOnly',
+        'Complex',
         'GhostReturns',
         'list_pred',
         'dict_pred',

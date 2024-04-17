@@ -215,6 +215,45 @@
     "type_vars": 2,
     "extends": "object"
 },
+"keydict": {
+    "methods": {
+        "__init__": {
+            "args": [],
+            "type": null,
+            "MustTerminate": true,
+            "requires": ["__item__", "__contains__"]
+        },
+        "__setitem__": {
+            "args": ["dict", "object", "object"],
+            "type": null,
+            "MustTerminate": true,
+            "requires": ["__getitem__", "__contains__"]
+        }
+    },
+    "functions": {
+        "__item__": {
+            "args": ["keydict", "object"],
+            "type": "object",
+            "requires": ["__item__inv"]
+        },
+        "__item__inv": {
+            "args": ["keydict", "object"],
+            "type": "object"
+        },
+        "__contains__": {
+            "args": ["keydict", "object"],
+            "type": "__prim__bool",
+            "requires": ["__item__"]
+        },
+        "__getitem__": {
+            "args": ["keydict", "object"],
+            "type": "object",
+            "requires": ["__contains__", "__item__"]
+        }
+    },
+    "type_vars": 2,
+    "extends": "object"
+},
 "int": {
     "functions": {
         "__bool__": {

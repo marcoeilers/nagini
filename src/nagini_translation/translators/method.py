@@ -18,6 +18,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
+    KEYDICT_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -291,14 +292,18 @@ class MethodTranslator(CommonTranslator):
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')
         # Create preconditions
+        ctx.is_pre_or_post = True
         pres = self._translate_pres(func, ctx)
+        ctx.is_pre_or_post = False
         decreases_pres = self._translate_decreases(func, ctx)
         pres = pres + decreases_pres
         # Create postconditions
         posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
+                ctx.is_pre_or_post = True
                 stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                ctx.is_pre_or_post = False
             if stmt:
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
@@ -554,6 +559,50 @@ class MethodTranslator(CommonTranslator):
         no_info = self.no_info(ctx)
         if method.cls and method.method_type == MethodType.normal:
             body.append(self._check_self_type(method, ctx))
+        if method.cls and method.cls.is_complex and method.name == '__init__':
+            args2 = [method.args['self'].ref()]
+            arg_types = [None]
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            func_name = '__init__'
+
+            targets = []
+            call = self.get_method_call(keydict_type, func_name, args2, arg_types,
+                                          targets, no_pos, ctx)
+            body += call
+
+            ############################################
+            for m in list(method.cls.all_methods) + list(method.cls.functions.keys()):
+
+                key = self.translate_string(m, None, ctx)
+                string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                args3 = [args2[0], key]
+                arg_types = [keydict_type, string_type]
+                func_name = '__item__'
+                call = self.get_function_call(keydict_type, func_name, args3, arg_types,
+                                              no_pos, ctx)
+
+                keydict_val_field = self.viper.Field('keydict_val',
+                                                     self.viper.DomainType("Option",
+                                                                           {self.viper.TypeVar(
+                                                                               "T"): self.viper.Ref},
+                                                                           [self.viper.TypeVar("T")]),
+                                                     self.no_position(ctx),
+                                                     self.no_info(ctx))
+
+                field_acc = self.viper.FieldAccess(call, keydict_val_field, no_pos, self.no_info(ctx))
+
+                ############################################
+                full_perm = self.viper.FullPerm(no_pos, no_info)
+                pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                                                       no_pos, no_info)
+
+
+                exhale_false = self.viper.Exhale(pred, no_pos, no_info)
+
+                body += [exhale_false]
+
+
         if method.type:
             # Assign null as the default return value to the return variable.
             assign_none = self.viper.LocalVarAssign(method.result.ref(),

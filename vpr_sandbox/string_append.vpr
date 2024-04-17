@@ -1,0 +1,50 @@
+function str___len__(self: Ref): Int
+  decreases _
+  ensures result >= 0
+
+
+function str___val__(self: Ref): Seq[Int]
+  decreases _
+
+
+function str___create__(len: Int, value: Seq[Int]): Ref
+  decreases _
+  ensures str___len__(result) == len
+  ensures str___val__(result) == value
+
+
+function str___add__(self: Ref, other: Ref): Ref
+  decreases _
+  ensures str___len__(result) == str___len__(self) + str___len__(other)
+  ensures result == str___create__(str___len__(self) + str___len__(other), str___val__(self) ++ str___val__(other))
+
+function str___eq__(self: Ref, other: Ref): Bool
+  decreases _
+  ensures (str___val__(self) == str___val__(other)) == result
+  ensures result ==> str___len__(self) == str___len__(other)
+
+method main()
+{
+  // this verifies just fine
+  assert str___add__(str___create__(2, Seq(113, 119)), str___create__(1, Seq(101))) == str___create__(3, Seq(113, 119, 101))
+
+
+  assert str___add__(str___create__(1, Seq(113)), str___create__(2, Seq(119))) == str___create__(3, Seq(113, 119))
+  
+
+
+  // need to uncomment line below, otherwise does not verify (both silicon and carbon). why?
+  // assert Seq(113) ++ Seq(119, 101) == Seq(113, 119, 101) 
+  // assert str___add__(str___create__(1, Seq(113)), str___create__(2, Seq(119, 101))) == str___create__(3, Seq(113, 119, 101))
+
+  assert str___val__(str___add__(str___create__(1, Seq(113)), str___create__(2, Seq(119, 101)))) == str___val__(str___create__(3, Seq(113, 119, 101)))
+
+  // same problem
+  // assert Seq(113) ++ Seq(119, 101, 100) == Seq(113, 119, 101, 100)
+  // assert str___add__(str___create__(1, Seq(113)), str___create__(2, Seq(119, 101, 100))) == str___create__(3, Seq(113, 119, 101, 100))
+
+
+  
+  
+
+}

@@ -1,0 +1,15 @@
+name: Nagini Tests Ubuntu with Dockerfile
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  hello_world_job:
+    runs-on: ubuntu-20.04
+    name: Run nagini tests with Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build docker image
+        run: docker build -t private_mirror .
+      - name: Run tests
+        run: docker run --rm private_mirror:latest run_all_tests

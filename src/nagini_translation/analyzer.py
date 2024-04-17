@@ -22,6 +22,7 @@ from nagini_translation.lib.constants import (
     IGNORED_IMPORTS,
     INT_TYPE,
     LEGAL_MAGIC_METHODS,
+    LEGAL_COMPLEX_MAGIC_METHODS,
     LITERALS,
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
@@ -572,18 +573,23 @@ class Analyzer(ast.NodeVisitor):
         if cls.python_class not in cls.superclass.python_class.direct_subclasses:
             cls.superclass.python_class.direct_subclasses.append(cls.python_class)
 
+        # check if a class is complex (when it or one of its parents had a @Complex class decorator)
+        # complex class instance attributes are stored in __dict__
+        cls.is_complex = self.is_complex_class(node)
+
         for member in node.body:
+            member.is_complex = cls.is_complex
             self.visit(member, node)
         self.current_class = None
 
-    def _is_illegal_magic_method_name(self, name: str) -> bool:
+    def _is_illegal_magic_method_name(self, name: str, is_complex: bool = False) -> bool:
         """
         Anything that could potentially be a magic method, i.e. anything that
         has __this__ form, is considered illegal unless it is one of the names
         we explicitly support.
         """
         if name.startswith('__') and name.endswith('__'):
-            if name not in LEGAL_MAGIC_METHODS:
+            if name not in LEGAL_MAGIC_METHODS and not (is_complex and name in LEGAL_COMPLEX_MAGIC_METHODS):
                 return True
         return False
 
@@ -625,7 +631,7 @@ class Analyzer(ast.NodeVisitor):
         if self.current_function:
             raise InvalidProgramException(node, 'nested.function.declaration')
         name = node.name
-        if self._is_illegal_magic_method_name(name):
+        if self._is_illegal_magic_method_name(name, node.is_complex if hasattr(node, 'is_complex') else False):
             raise InvalidProgramException(node, 'illegal.magic.method')
         assert isinstance(name, str)
         if self.is_io_operation(node):
@@ -1229,6 +1235,8 @@ class Analyzer(ast.NodeVisitor):
             else:
                 msg = f'Type could not be fully inferred (this usually means that a type argument is unknown)'
             raise InvalidProgramException(node, 'partial.type', message=msg)
+        elif getattr(node, 'attr', False) == '__dict__':
+            result = self.module.global_module.classes[OBJECT_TYPE]
         else:
             msg = 'Unsupported type: {}'.format(mypy_type.__class__.__name__)
             raise UnsupportedException(node, desc=msg)
@@ -1514,7 +1522,9 @@ class Analyzer(ast.NodeVisitor):
         return decorator in decorators
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Pure')
+        return (self.has_decorator(func, 'Pure')
+                or func.name == '__getattr__'
+                or func.name == '__getattribute__')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')
@@ -1545,3 +1555,13 @@ class Analyzer(ast.NodeVisitor):
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'PreservesLow')
+
+    @staticmethod
+    def has_complex_class_decorator(cls: ast.ClassDef) -> bool:
+        if not hasattr(cls, 'decorator_list'):
+            return False
+        return any(d.id == 'Complex' for d in cls.decorator_list)
+
+    def is_complex_class(self, cls: ast.ClassDef) -> bool:
+        parents_is_complex = getattr(self.current_class.superclass, 'is_complex', False)
+        return self.has_complex_class_decorator(cls) or parents_is_complex

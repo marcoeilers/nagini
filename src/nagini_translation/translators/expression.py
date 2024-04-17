@@ -28,6 +28,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_PERM_TYPE,
     SET_TYPE,
     STRING_TYPE,
+    KEYDICT_TYPE,
     THREAD_DOMAIN,
     TUPLE_TYPE,
 )
@@ -467,6 +468,13 @@ class ExpressionTranslator(CommonTranslator):
                                                 target_type=self.viper.Ref)
         index_type = self.get_type(node.slice.value, ctx)
         args = [target, index]
+
+        if hasattr(node.value, 'value'):
+            target_cls = self.get_type(node.value.value, ctx)
+            if getattr(target_cls, 'is_complex', False) or getattr(node.value, 'attr', False) == '__dict__':
+                target_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                index_type = ctx.module.global_module.classes[STRING_TYPE]
+
         arg_types = [target_type, index_type]
         call_stmt, call = self.get_func_or_method_call(target_type, '__getitem__', args,
                                                        arg_types, node, ctx)
@@ -860,21 +868,92 @@ class ExpressionTranslator(CommonTranslator):
 
             stmt, receiver = self.translate_expr(node.value, ctx,
                                                  target_type=self.viper.Ref)
-            field = self._lookup_field(node, ctx)
-            if isinstance(field, PythonGlobalVar):
-                field_func = self.translate_static_field_access(field, receiver,
-                                                                node, ctx)
-                return [], field_func
-            if isinstance(field, PythonMethod):
-                # This is a reference to a property, so we translate it to a call of
-                # the property getter function.
-                target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
-                target_param = self.viper.LocalVarDecl('self', target_type, position,
-                                                       self.no_info(ctx))
-                property_type = self.translate_type(field.type, ctx)
-                return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
-                                                self.no_info(ctx), property_type,
-                                                [target_param])
+            if not(hasattr(recv_type, 'is_complex') and recv_type.is_complex) and getattr(node, 'attr', False) != '__dict__':
+                field = self._lookup_field(node, ctx)
+                if isinstance(field, PythonGlobalVar):
+                    field_func = self.translate_static_field_access(field, receiver,
+                                                                    node, ctx)
+                    return [], field_func
+                if isinstance(field, PythonMethod):
+                    # This is a reference to a property, so we translate it to a call of
+                    # the property getter function.
+                    target_type = self.translate_type(self.get_type(node.value, ctx), ctx)
+                    target_param = self.viper.LocalVarDecl('self', target_type, position,
+                                                           self.no_info(ctx))
+                    property_type = self.translate_type(field.type, ctx)
+                    return stmt, self.viper.FuncApp(field.sil_name, [receiver], position,
+                                                    self.no_info(ctx), property_type,
+                                                    [target_param])
+            else:
+                if ctx.is_acc == node or ctx.is_mayset:
+                    if node.attr == '__dict__':
+                        return stmt, receiver
+                    # need to return keydict___item__(receiver, node).keydict_val
+                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                    key = self.translate_string(node.attr, None, ctx)
+
+                    args = [receiver, key]
+                    arg_types = [keydict_type, string_type]
+                    func_name = '__item__'
+                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                  node, ctx)
+
+                    keydict_val_field = self.viper.Field('keydict_val',
+                                                         self.viper.DomainType("Option",
+                                                                               {self.viper.TypeVar(
+                                                                                   "T"): self.viper.Ref},
+                                                                               [self.viper.TypeVar("T")]),
+                                                         self.no_position(ctx),
+                                                         self.no_info(ctx))
+
+                    ret = (stmt, self.viper.FieldAccess(call, keydict_val_field,
+                                                        position, self.no_info(ctx)))
+                    return ret
+                else:
+
+                    if node.attr == '__dict__':
+                        return stmt, receiver
+                    else:
+                   # need to return
+                    # keydict___contains__(receiver, node) ?
+                    #   keydict___getitem__(receiver, node):
+                    #   (Child() == typeof(receiver) ?
+                    #     Child_getattr_child(receiver, node):
+                    #     Parent_getattr_parent(receiver, node)
+                    # )
+                    # but only if __getattr__ is defined
+                        info = self.no_info(ctx)
+                        keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                        string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                        key = self.translate_string(node.attr, None, ctx)
+
+                        args = [receiver, key]
+                        arg_types = [keydict_type, string_type]
+
+
+                        func_name = '__getitem__'
+                        call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                      node, ctx)
+
+                        # when __getattr__ is defined, need to create a cond exp to call it when needed
+                        if '__getattr__' in recv_type.functions: # and ctx.current_function.func_constant != '__getattr__real':
+                            func_name = '__contains__'
+                            keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                          node, ctx)
+
+                            args = [receiver, key]
+                            arg_types = [recv_type, string_type]
+
+                            func_name = '__getattr__'
+                            recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+
+                            call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+
+                        ret = (stmt, call)
+                        return ret
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 
@@ -1132,10 +1211,13 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node.ops[0])
         if left_type.get_function(compare_func):
-            comparison = self.get_function_call(left_type, compare_func,
-                                                [left, right],
-                                                [left_type, right_type],
-                                                node, ctx, position)
+            if getattr(left_type, 'is_complex', False) and getattr(right_type, 'is_complex', False):
+                comparison = self.viper.EqCmp(left, right, position, info)
+            else:
+                comparison = self.get_function_call(left_type, compare_func,
+                                                    [left, right],
+                                                    [left_type, right_type],
+                                                    node, ctx, position)
         elif compare_func == '__ne__' and left_type.get_function('__eq__'):
             # The default behavior if __ne__ is not explicitly defined
             # is to invert the result of __eq__.

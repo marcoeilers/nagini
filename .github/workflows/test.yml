@@ -3,7 +3,7 @@
 
 name: Nagini Tests Ubuntu
 
-on: [push, pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   build:
@@ -27,4 +27,4 @@ jobs:
         pip install .
     - name: Test with pytest
       run: |
-        pytest src/nagini_translation/tests.py --silicon --carbon
+        pytest src/nagini_translation/tests.py --carbon

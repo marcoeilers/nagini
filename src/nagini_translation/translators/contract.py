@@ -27,6 +27,8 @@ from nagini_translation.lib.constants import (
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
+    KEYDICT_TYPE,
+    STRING_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -236,16 +238,55 @@ class ContractTranslator(CommonTranslator):
 
     def translate_acc_field(self, node: ast.Call, perm: Expr,
                             ctx: Context) -> StmtsAndExpr:
+        # if getattr(node.args[0].value, 'attr', False) != '__dict__':
         assert isinstance(node.args[0], ast.Attribute)
         field = self.get_target(node.args[0], ctx)
         if not isinstance(field, PythonField):
             raise InvalidProgramException(node, 'invalid.acc')
+
+        #############################################################
+
+        # when handling complex class instance attributes, need to make sure that
+        # acc is called on keydict___item__(self, key).keydict_val (of type Option[Ref])
+        # however, the field itself is read with
+        # keydict___getitem__(self, key) (of type Ref)
+
+        # self.translate_expr(node.args[0], ctx) can handle both cases depending on ctx.is_acc
+
+        ctx.is_acc = node.args[0]
+        # if getattr(node.args[0].value, 'attr', False) != '__dict__':
         stmt, field_acc = self.translate_expr(node.args[0], ctx)
+        # else:
+        #     stmt, field_acc = self.translate_expr(node.args[0].slice.value, ctx)
+
+        ctx.is_acc = False
+
+        # if getattr(node.args[0].value, 'attr', False) != '__dict__':
+        receiver_type = self.get_type(node.args[0].value, ctx)
+        # else:
+        #     receiver_type = self.get_type(node.args[0].value.value, ctx)
+        if hasattr(receiver_type, 'is_complex') and receiver_type.is_complex:
+            ctx.is_acc_inner = True
+            stmt2, receiver = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
+            ctx.is_acc_inner = False
+            stmt += stmt2
+            key = self.translate_string(node.args[0].attr, None, ctx)
+            ctx.is_acc_inner = True
+            stmt2, complex_field_acc = self.translate_expr(node.args[0], ctx)
+            ctx.is_acc_inner = False
+            stmt += stmt2
+        else:
+            receiver, key, complex_field_acc = None, None, None
+
+        #############################################################
+
         if stmt:
             raise InvalidProgramException(node, 'purity.violated')
         field_type = self.get_type(node.args[0], ctx)
+        ctx.is_acc = True
         pred = self._translate_acc_field(field_acc, field_type, perm,
-                                         self.to_position(node, ctx), ctx)
+                                         self.to_position(node, ctx), ctx, receiver, key, complex_field_acc)
+        ctx.is_acc = False
         return [], pred
 
     def translate_acc_global(self, node: ast.Call, perm: Expr,
@@ -274,14 +315,31 @@ class ContractTranslator(CommonTranslator):
         return [], pred
 
     def _translate_acc_field(self, field_acc: Expr, field_type: PythonType,
-                             perm: Expr, pos: Position, ctx: Context) -> StmtsAndExpr:
+                             perm: Expr, pos: Position, ctx: Context,
+                             receiver: Expr = None, key: Expr = None, complex_field_acc: Expr = None) -> StmtsAndExpr:
         info = self.no_info(ctx)
         if ctx.perm_factor:
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm,
                                                pos, info)
+
+        if complex_field_acc and ctx.is_acc:
+            # need to include keydict___contains__(self, key) == true
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            args = [receiver, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__contains__'
+            call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                          None, ctx)
+
+            pred = self.viper.And(pred, call, pos, info)
+
         # Add type information
-        if field_type.name not in PRIMITIVES:
+        if not ctx.is_mayset and field_type.name not in PRIMITIVES:
+            if complex_field_acc:
+                field_acc = complex_field_acc
             type_info = self.type_check(field_acc, field_type,
                                         self.no_position(ctx), ctx)
             pred = self.viper.And(pred, type_info, pos, info)
@@ -295,19 +353,86 @@ class ContractTranslator(CommonTranslator):
         info = self.no_info(ctx)
         stmt, rec = self.translate_expr(node.args[0], ctx)
         rec_type = self.get_type(node.args[0], ctx)
-        if stmt:
-            raise InvalidProgramException(node.args[0], 'purity.violated')
-        if not isinstance(node.args[1], ast.Str):
-            raise InvalidProgramException(node.args[1], 'invalid.may.set')
-        field = rec_type.get_field(node.args[1].s)
-        if not field:
-            raise InvalidProgramException(node.args[1], 'invalid.may.set')
-        may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
-        sil_field = self.viper.Field(field.sil_name, self.translate_type(field.type, ctx),
-                                     pos, info)
-        field_acc = self.viper.FieldAccess(rec, sil_field, pos, info)
+        if getattr(rec_type, 'is_complex', False):
+            field = None
+        else:
+            if stmt:
+                raise InvalidProgramException(node.args[0], 'purity.violated')
+            if not isinstance(node.args[1], ast.Str) and not getattr(rec_type, 'is_complex', False):
+                raise InvalidProgramException(node.args[1], 'invalid.may.set')
+            field = rec_type.get_field(node.args[1].s)
+        # need to include a case for is_complex
+        # in which case its
+        # acc keydict___item__(self, key).keydict_val
+        # and that's it. say nothing about keydict___contains__(self, key)
+
+        if getattr(rec_type, 'is_complex', False):
+            # need to return keydict___item__(receiver, node).keydict_val
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            # index_stmt, index = self.translate_expr(node.slice.value, ctx,
+            #                                         target_type=self.viper.Ref)
+            if isinstance(node.args[1], ast.Str):
+                key = self.translate_string(node.args[1].value, None, ctx)
+            else:
+                _, key = self.translate_expr(node.args[1], ctx, target_type=self.viper.Ref)
+
+            args = [rec, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__item__'
+            call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                          node, ctx)
+
+            keydict_val_field = self.viper.Field('keydict_val',
+                                                 self.viper.DomainType("Option",
+                                                                       {self.viper.TypeVar(
+                                                                           "T"): self.viper.Ref},
+                                                                       [self.viper.TypeVar("T")]),
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx))
+
+            field_acc = self.viper.FieldAccess(call, keydict_val_field, pos, self.no_info(ctx))
+        else:
+            if not field:
+                raise InvalidProgramException(node.args[1], 'invalid.may.set')
+            may_set_pred = self.get_may_set_predicate(rec, field, ctx, pos)
+            sil_field = self.viper.Field(field.sil_name, self.translate_type(field.type, ctx),
+                                         pos, info)
+
+            field_acc = self.viper.FieldAccess(rec, sil_field, pos, info)
+
         full_perm = self.viper.FullPerm(pos, info)
-        normal_acc = self._translate_acc_field(field_acc, field.type, full_perm, pos, ctx)
+
+        #########################################
+
+
+        if getattr(rec_type, 'is_complex', False):
+            stmt2, receiver = self.translate_expr(node.args[0], ctx, target_type=self.viper.Ref)
+            stmt += stmt2
+            if isinstance(node.args[1], ast.Str):
+                key = self.translate_string(node.args[1].value, None, ctx)
+            else:
+                _, key = self.translate_expr(node.args[1], ctx, target_type=self.viper.Ref)
+
+            # need to return keydict___getitem__(receiver, node)
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            args = [receiver, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__getitem__'
+            complex_field_acc = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                          node, ctx)
+        else:
+            receiver, key, complex_field_acc = None, None, None
+
+        ###############################################
+        ctx.is_mayset = True
+        normal_acc = self._translate_acc_field(field_acc, field.type if hasattr(field, 'type') else None, full_perm, pos, ctx, receiver, key, complex_field_acc)
+        ctx.is_mayset = False
+        if getattr(rec_type, 'is_complex', False):
+            return [], normal_acc
         normal_perm = self.viper.CurrentPerm(field_acc, pos, info)
         have_normal_perm = self.viper.PermGtCmp(normal_perm, self.viper.NoPerm(pos, info),
                                                 pos, info)
@@ -329,9 +454,55 @@ class ContractTranslator(CommonTranslator):
         if not isinstance(node.args[1], ast.Str):
             raise InvalidProgramException(node.args[1], 'invalid.may.create')
         field = rec_type.get_field(node.args[1].s)
-        if not field:
-            raise InvalidProgramException(node.args[1], 'invalid.may.create')
-        return [], self.get_may_set_predicate(rec, field, ctx, pos)
+
+        ##############################################
+
+        # need to include a case for is_complex
+        # in which case its
+        # acc keydict___item__(self, key).keydict_val
+        # and keydict___contains__(self, key) == false
+
+        if hasattr(rec_type, 'is_complex') and rec_type.is_complex:
+            # need to return keydict___item__(receiver, node).keydict_val
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            key = self.translate_string(node.args[1].value, None, ctx)
+            info = self.no_info(ctx)
+            args = [rec, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__item__'
+            call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                          node, ctx)
+
+            keydict_val_field = self.viper.Field('keydict_val',
+                                                 self.viper.DomainType("Option",
+                                                                       {self.viper.TypeVar(
+                                                                           "T"): self.viper.Ref},
+                                                                       [self.viper.TypeVar("T")]),
+                                                 self.no_position(ctx),
+                                                 self.no_info(ctx))
+
+            field_acc = self.viper.FieldAccess(call, keydict_val_field, pos, self.no_info(ctx))
+
+            full_perm = self.viper.FullPerm(pos, info)
+            field_acc = self.viper.FieldAccessPredicate(field_acc, full_perm, pos, info)
+
+            # need to include !keydict___contains__(self, key) == true
+            args = [rec, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__contains__'
+            call = self.get_function_call(keydict_type, func_name, args, arg_types,None, ctx)
+
+            field_acc = self.viper.And(field_acc, self.viper.Not(call, pos, info), pos, info)
+
+            return [], field_acc
+
+        ##############################################
+        else:
+            if not field:
+                raise InvalidProgramException(node.args[1], 'invalid.may.create')
+            return [], self.get_may_set_predicate(rec, field, ctx, pos)
 
     def translate_assert(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         """
@@ -1017,7 +1188,8 @@ class ContractTranslator(CommonTranslator):
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd', 'Wildcard'):
-            if not impure:
+            complex_skip = hasattr(node.args[0], 'value') and getattr(self.get_type(node.args[0].value, ctx), 'is_complex', False)
+            if not impure and not complex_skip:
                 raise InvalidProgramException(node, 'invalid.contract.position')
             if func_name == 'Rd':
                 perm = self.get_arp_for_context(node, ctx)
@@ -1026,7 +1198,12 @@ class ContractTranslator(CommonTranslator):
                                                self.no_info(ctx))
             else:
                 perm = self._get_perm(node, ctx)
-            if isinstance(node.args[0], ast.Call):
+            call_skip =     hasattr(node.args[0], 'func') and \
+                            getattr(node.args[0].func, 'attr', False) == '__getattribute__' and \
+                            hasattr(node.args[0].func, 'value') and \
+                            getattr(node.args[0].func.value, 'id', False) == 'object' and \
+                            getattr(self.get_type(node.args[0].args[0], ctx), 'is_complex', False)
+            if isinstance(node.args[0], ast.Call) and not call_skip:
                 return self.translate_acc_predicate(node, perm, ctx)
             else:
                 if isinstance(node.args[0], ast.Attribute):
@@ -1059,6 +1236,65 @@ class ContractTranslator(CommonTranslator):
                 target = self.get_target(node.args[0], ctx)
                 if isinstance(target, PythonField):
                     return self.translate_acc_field(node, perm, ctx)
+                elif (hasattr(node.args[0], 'value') and \
+                        hasattr(node.args[0].value, 'attr') and \
+                        node.args[0].value.attr == '__dict__') or call_skip:
+
+                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                    if call_skip:
+                        ctx.is_acc = node.args[0].args[0]
+                        stmt_rec, rec = self.translate_expr(node.args[0].args[0], ctx, target_type=self.viper.Ref)
+                        ctx.is_acc = False
+
+                        pos = self.to_position(node, ctx)
+
+                        slice_stmt, slice_index = self.translate_expr(node.args[0].args[1], ctx)
+
+                    else:
+                        ctx.is_acc = node.args[0].value
+                        stmt_rec, rec = self.translate_expr(node.args[0].value, ctx, target_type=self.viper.Ref)
+                        ctx.is_acc = False
+                        pos = self.to_position(node, ctx)
+
+                        # need to return keydict___item__(receiver, node).keydict_val
+
+
+                        # ctx.is_acc = True
+                        slice_stmt, slice_index = self.translate_expr(node.args[0].slice.value, ctx)
+                        # ctx.is_acc = False
+
+                    args = [rec, slice_index]
+                    arg_types = [keydict_type, string_type]
+                    func_name = '__item__'
+                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                  node, ctx)
+
+                    keydict_val_field = self.viper.Field('keydict_val',
+                                                         self.viper.DomainType("Option",
+                                                                               {self.viper.TypeVar(
+                                                                                   "T"): self.viper.Ref},
+                                                                               [self.viper.TypeVar("T")]),
+                                                         self.no_position(ctx),
+                                                         self.no_info(ctx))
+
+                    field_acc = self.viper.FieldAccess(call, keydict_val_field, pos, self.no_info(ctx))
+                    pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, self.no_info(ctx))
+
+                    # need to include keydict___contains__(self, key) == true
+                    keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+                    args = [rec, slice_index]
+                    arg_types = [keydict_type, string_type]
+                    func_name = '__contains__'
+                    call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                  None, ctx)
+
+                    pred = self.viper.And(pred, call, pos, self.no_info(ctx))
+
+                    return stmt_rec + slice_stmt, pred
                 else:
                     if not isinstance(target, PythonGlobalVar):
                         raise InvalidProgramException(node, 'invalid.acc')

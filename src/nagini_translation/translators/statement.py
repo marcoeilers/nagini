@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     RANGE_TYPE,
     SET_TYPE,
     TUPLE_TYPE,
+    KEYDICT_TYPE
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -1053,7 +1054,35 @@ class StatementTranslator(CommonTranslator):
         definedness_expr = self.viper.TrueLit(position, info)
 
         if isinstance(lhs, ast.Subscript):
-            return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
+            if hasattr(lhs.value, 'value'):
+                t = self.get_type(lhs.value.value, ctx)
+            else:
+                t = None
+            if t and hasattr(t, 'is_complex') and t.is_complex:
+                if '__setattr__' not in t.methods or ctx.current_function.name == '__setattr__':
+                    target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    lhs_stmt, target = self.translate_expr(lhs.value.value, ctx)
+                    slice_stmt, slice_index = self.translate_expr(lhs.slice.value, ctx)
+                    # key = self.translate_string(slice_index, None, ctx)
+                    args = [target, slice_index, rhs]
+                    arg_types = [None, None, None]
+                    stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                                arg_types, [], node, ctx)
+                    return lhs_stmt + slice_stmt + stmt, None
+
+                else:
+                    ###################################
+                    lhs_stmt, target = self.translate_expr(lhs.value.value, ctx)
+                    slice_stmt, slice_index = self.translate_expr(lhs.slice.value, ctx)
+                    args = [target, slice_index, rhs]
+                    arg_types = [None, None, None]
+                    call = self.translate_normal_call(t.methods['__setattr__'], lhs_stmt + slice_stmt, args, arg_types, node,
+                                                      ctx)
+                    return call
+                    ############################
+
+            else:
+                return self._assign_with_subscript(lhs, rhs, node, ctx, allow_impure)
 
         target = self.get_target(lhs, ctx)
         if isinstance(target, PythonType):
@@ -1075,6 +1104,29 @@ class StatementTranslator(CommonTranslator):
             return arg_stmt + call, [getter_equal]
         if isinstance(lhs, ast.Attribute):
             type = self.get_type(lhs.value, ctx)
+            if hasattr(type, 'is_complex') and type.is_complex:
+                if '__setattr__' not in type.methods or ctx.current_function.name == '__setattr__':
+                    target_cls = ctx.module.global_module.classes[KEYDICT_TYPE]
+                    lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+                    key = self.translate_string(lhs.attr, None, ctx)
+                    args = [target, key, rhs]
+                    arg_types = [None, None, None]
+                    stmt = self.get_method_call(target_cls, '__setitem__', args,
+                                                arg_types, [], node, ctx)
+
+                    return lhs_stmt + stmt, None
+                else:
+                    ###################################
+                    lhs_stmt, target = self.translate_expr(lhs.value, ctx)
+                    key = self.translate_string(lhs.attr, None, ctx)
+                    args = [target, key, rhs]
+                    arg_types = [None, None, None]
+                    call = self.translate_normal_call(type.methods['__setattr__'], lhs_stmt, args, arg_types, node,
+                                                      ctx)
+
+                    return call
+                    ############################
+
             if isinstance(type, UnionType) and not isinstance(type, OptionalType):
                 stmt, receiver = self.translate_expr(lhs.value, ctx)
                 guarded_field_assign = []
@@ -1300,6 +1352,9 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_Assign(self, node: ast.Assign,
                               ctx: Context) -> List[Stmt]:
+        if ctx.current_class and ctx.current_class.is_complex:
+            # call keydict___setitem__ instead
+            assign_stmts = None
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             if node.targets[0].id in ctx.module.type_vars:
                 # this is a type var assignment

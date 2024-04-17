@@ -1,65 +1,65 @@
-/*
- * Copyright (c) 2019 ETH Zurich
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
+import "./pytype.sil"
 
-function str___len__(self: Ref): Int
-    decreases _
-	ensures result >= 0
-
-function str___val__(self: Ref): Seq[Int]
-    decreases _
-
-function str___create__(len: Int, value: Seq[Int]) : Ref
-    decreases _
-	ensures str___len__(result) == len
-	ensures str___val__(result) == value
-	ensures typeof(result) == str()
-
-function str___bool__(self: Ref) : Bool
-    decreases _
-    requires self != null ==> issubtype(typeof(self), str())
-	ensures self != null ==> result == str___len__(self) != 0
-	ensures self == null ==> !result
-
-function str___eq__(self: Ref, other: Ref): Bool
-    decreases _
-    requires issubtype(typeof(self), str())
-    ensures (str___val__(self) == str___val__(other)) == result
-    ensures result ==> (str___len__(self) == str___len__(other))
-    ensures result == object___eq__(self, other)
-
-function str___add__(self: Ref, other: Ref): Ref
-    decreases _
-    requires issubtype(typeof(self), str())
-    ensures str___len__(result) == str___len__(self) + str___len__(other)
-    ensures typeof(result) == str()
-    ensures result == str___create__(str___len__(self) + str___len__(other), str___val__(self) ++ str___val__(other))
-
-function str_join(self: Ref, other: Ref): Ref
-    decreases _
-    requires issubtype(typeof(self), str())
-    ensures issubtype(typeof(result), str())
-
-function str___mod__(self: Ref, other: Ref): Ref
-    decreases _
-    requires issubtype(typeof(self), str())
-    ensures issubtype(typeof(result), str())
-
-method str_split(self: Ref) returns (res: Ref)
-    decreases _
-    requires issubtype(typeof(self), str())
-    ensures issubtype(typeof(res), list(str()))
-    ensures acc(res.list_acc)
+field keydict_val: Option[Ref]
 
 adt Option[T] {
     Some(value:T)
     None()
 }
 
-field keydict_val: Option[Ref]
+
+function seq_int_str___box__(prim: Seq[Int]): Ref
+    ensures typeof(result) == seq_int_str()
+    ensures seq_int_str___unbox__(result) == prim
+
+function seq_int_str___unbox__(box: Ref): Seq[Int]
+    requires issubtype(typeof(box), seq_int_str())
+    ensures  seq_int_str___box__(result) == box
+
+function __prim__int___box__(prim: Int): Ref
+  decreases _
+  ensures typeof(result) == int()
+  ensures int___unbox__(result) == prim
+
+function int___unbox__(box: Ref): Int
+  decreases _
+  requires issubtype(typeof(box), int())
+  ensures !issubtype(typeof(box), bool()) ==>
+    __prim__int___box__(result) == box
+  ensures issubtype(typeof(box), bool()) ==>
+    __prim__bool___box__(result != 0) == box
+
+function int___gt__(self: Int, other: Int): Bool
+  decreases _
+{
+  self > other
+}
+
+function int___lt__(self: Int, other: Int): Bool
+  decreases _
+{
+  self < other
+}
+
+function int___eq__(self: Ref, other: Ref): Bool
+  decreases _
+  requires issubtype(typeof(self), int())
+  requires issubtype(typeof(other), int())
+{
+  int___unbox__(self) == int___unbox__(other)
+}
+
+function __prim__bool___box__(prim: Bool): Ref
+  decreases _
+  ensures typeof(result) == bool()
+  ensures bool___unbox__(result) == prim
+  ensures int___unbox__(result) == (prim ? 1 : 0)
+
+function bool___unbox__(box: Ref): Bool
+  decreases _
+  requires issubtype(typeof(box), bool())
+  ensures __prim__bool___box__(result) == box
+
 
 method keydict___init__(self: Ref)
     ensures forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val) && !keydict___contains__(self, key)

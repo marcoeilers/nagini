@@ -157,7 +157,9 @@ class PureTranslator(CommonTranslator):
                                   ctx: Context) -> Expr:
         info = self.no_info(ctx)
         position = self.to_position(wrapper.node, ctx)
+        ctx.is_return = True
         val = self._translate_wrapper_expr(wrapper, ctx)
+        ctx.is_return = False
         if wrapper.cond:
             cond = self._translate_condition(wrapper.cond,
                                              wrapper.names, ctx)

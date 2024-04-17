@@ -1,0 +1,181 @@
+import "./no_types_keydict_definition.vpr"
+
+method Parent___init__(self: Ref, x: Ref, y: Ref, z: Ref)
+  requires self != null
+  requires issubtype(typeof(self), Parent())
+  requires issubtype(typeof(x), int())
+  requires issubtype(typeof(y), int())
+  requires issubtype(typeof(z), int())
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(120))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(120)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(120))) == x
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(121))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(121)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(121))) == y
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(122))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(122)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(122))) == z 
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(100))).keydict_val)
+  ensures !keydict___contains__(self, seq_int_str___box__(Seq(100)))
+{
+  keydict___init__(self)
+
+  assert keydict___len__(self) == 0
+  keydict___setitem__(self, seq_int_str___box__(Seq(120)), x)
+  keydict___setitem__(self, seq_int_str___box__(Seq(121)), y)
+  keydict___setitem__(self, seq_int_str___box__(Seq(122)), z)
+}
+
+method Child___init__(self: Ref, x: Ref, y: Ref, z: Ref)
+  requires self != null
+  requires issubtype(typeof(self), Child())
+  requires issubtype(typeof(x), int())
+  requires issubtype(typeof(y), int())
+  requires issubtype(typeof(z), int())
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(120))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(120)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(120))) == x
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(121))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(121)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(121))) == y
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(122))).keydict_val)
+  ensures keydict___contains__(self, seq_int_str___box__(Seq(122)))
+  ensures keydict___getitem__(self, seq_int_str___box__(Seq(122))) == z 
+
+  ensures acc(keydict___item__(self, seq_int_str___box__(Seq(100))).keydict_val)
+  ensures !keydict___contains__(self, seq_int_str___box__(Seq(100)))
+{
+  keydict___init__(self)
+
+  assert keydict___len__(self) == 0
+  keydict___setitem__(self, seq_int_str___box__(Seq(120)), x)
+  keydict___setitem__(self, seq_int_str___box__(Seq(121)), y)
+  keydict___setitem__(self, seq_int_str___box__(Seq(122)), z)
+}
+
+predicate Parent_pred_fam(self: Ref) {
+  true &&
+  (
+    issubtype(typeof(self), Parent()) ==> (
+      acc(keydict___item__(self, seq_int_str___box__(Seq(120))).keydict_val, wildcard) &&
+      keydict___contains__(self, seq_int_str___box__(Seq(120))) &&
+      issubtype(typeof(keydict___getitem__(self, seq_int_str___box__(Seq(120)))), int()) &&
+      int___gt__(int___unbox__(keydict___getitem__(self, seq_int_str___box__(Seq(120)))), 0)
+    )
+  ) &&
+  (
+    issubtype(typeof(self), Child()) ==> (
+      acc(keydict___item__(self, seq_int_str___box__(Seq(121))).keydict_val, wildcard) &&
+      keydict___contains__(self, seq_int_str___box__(Seq(121))) &&
+      issubtype(typeof(keydict___getitem__(self, seq_int_str___box__(Seq(121)))), int()) &&
+      int___gt__(int___unbox__(keydict___getitem__(self, seq_int_str___box__(Seq(121)))), 0)
+    )
+  )
+}
+
+predicate Parent_pred_parent(self: Ref) {
+  true &&
+  Parent() == typeof(self) &&
+  acc(keydict___item__(self, seq_int_str___box__(Seq(122))).keydict_val, wildcard) &&
+  keydict___contains__(self, seq_int_str___box__(Seq(122))) &&
+  issubtype(typeof(keydict___getitem__(self, seq_int_str___box__(Seq(122)))), int()) &&
+  int___gt__(int___unbox__(keydict___getitem__(self, seq_int_str___box__(Seq(122)))), 0)
+}
+
+predicate Child_pred_child(self: Ref) {
+  true && 
+  Child() == typeof(self) &&
+  acc(keydict___item__(self, seq_int_str___box__(Seq(122))).keydict_val, wildcard) &&
+  keydict___contains__(self, seq_int_str___box__(Seq(122))) &&
+  issubtype(typeof(keydict___getitem__(self, seq_int_str___box__(Seq(122)))), int()) &&
+  int___lt__(int___unbox__(keydict___getitem__(self, seq_int_str___box__(Seq(122)))), 0)
+}
+
+function Parent_gethidden_parent(self: Ref, name: Ref): Ref
+  requires issubtype(typeof(self), Parent())
+  requires acc(keydict___item__(self, name).keydict_val, wildcard)
+{
+  keydict___contains__(self, name) ? 
+    keydict___getitem__(self, name) : 
+    (Child() == typeof(self) ? 
+      Child_getattr_child(self, name) :
+      Parent_getattr_parent(self, name)
+    )
+}
+
+function Parent_getattr_parent(self: Ref, name: Ref): Ref
+  requires issubtype(typeof(self), Parent())
+  ensures issubtype(typeof(result), int())
+  ensures int___gt__(int___unbox__(result), 10)
+
+function Child_getattr_child(self: Ref, name: Ref): Ref
+  requires issubtype(typeof(self), Child())
+  ensures issubtype(typeof(result), int())
+  ensures int___gt__(int___unbox__(result), 20)
+
+method my_func_1(c: Ref)
+  requires issubtype(typeof(c), Child())
+  requires acc(Parent_pred_fam(c), write)
+  ensures acc(Parent_pred_fam(c), write)
+{
+  unfold acc(Parent_pred_fam(c), 1 / 2)
+  assert int___gt__(int___unbox__(Parent_gethidden_parent(c, seq_int_str___box__(Seq(120)))), 0)
+  assert int___gt__(int___unbox__(Parent_gethidden_parent(c, seq_int_str___box__(Seq(121)))), 0)
+  fold acc(Parent_pred_fam(c), 1 / 2)
+}
+
+method my_func_2(p: Ref)
+  requires issubtype(typeof(p), Parent())
+  requires acc(Parent_pred_parent(p), write)
+  ensures acc(Parent_pred_parent(p), write)
+{
+  unfold acc(Parent_pred_parent(p), 1 / 2)
+  assert int___gt__(int___unbox__(Parent_gethidden_parent(p, seq_int_str___box__(Seq(122)))), 0)
+  fold acc(Parent_pred_parent(p), 1 / 2)
+}
+
+method my_func_3(c: Ref)
+  requires issubtype(typeof(c), Child())
+  requires acc(Child_pred_child(c), write)
+  ensures acc(Child_pred_child(c), write)
+{
+  unfold acc(Child_pred_child(c), 1 / 2)
+  assert int___lt__(int___unbox__(Parent_gethidden_parent(c, seq_int_str___box__(Seq(122)))), 0)
+  fold acc(Child_pred_child(c), 1 / 2)
+}
+
+method main()
+{
+  var p: Ref
+  p := new()
+  inhale typeof(p) == Parent()
+  Parent___init__(p, __prim__int___box__(1), __prim__int___box__(1), __prim__int___box__(1))
+
+  var c: Ref
+  c := new()
+  inhale typeof(c) == Child()
+  Child___init__(c, __prim__int___box__(1), __prim__int___box__(1), __prim__int___box__(-1))
+
+  fold acc(Parent_pred_fam(p), write)
+  fold acc(Parent_pred_fam(c), write)
+  fold acc(Parent_pred_parent(p), write)
+  fold acc(Child_pred_child(c), write)
+
+  // assert int___unbox__(Parent_gethidden_parent(Parent_res, seq_int_str___box__(Seq(120)))) > 0
+  assert (unfolding acc(Parent_pred_fam(p), 1 / 2) in int___gt__(int___unbox__(Parent_gethidden_parent(p, seq_int_str___box__(Seq(120)))), 0))
+  assert int___gt__(int___unbox__(Parent_gethidden_parent(p, seq_int_str___box__(Seq(100)))), 10)
+  assert int___gt__(int___unbox__(Parent_gethidden_parent(c, seq_int_str___box__(Seq(100)))), 20)
+
+  my_func_1(c)
+  my_func_2(p)
+  my_func_3(c)
+
+  // assert 10 == 15   // sanity check
+}

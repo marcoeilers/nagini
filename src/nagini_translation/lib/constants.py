@@ -229,6 +229,12 @@ LEGAL_MAGIC_METHODS = {
     '__setitem__',
 }
 
+LEGAL_COMPLEX_MAGIC_METHODS = {
+    '__getattr__',
+    '__setattr__',
+    '__getattribute__'
+}
+
 RESULT_NAME = '_res'
 
 ERROR_NAME = '_err'
@@ -252,6 +258,8 @@ TUPLE_TYPE = 'tuple'
 UNION_TYPE = 'Union'
 
 DICT_TYPE = 'dict'
+
+KEYDICT_TYPE = 'keydict'
 
 SET_TYPE = 'set'
 
