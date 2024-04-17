@@ -644,7 +644,7 @@ class CallTranslator(CommonTranslator):
         whose constructor is called, for everything else the method.
         """
         target = self.get_target(node.func, ctx)
-        if ctx.actual_function.name == '__init__' and ctx.actual_function.cls.is_complex:
+        if getattr(ctx.actual_function, 'name', False) == '__init__' and getattr(ctx.actual_function.cls, 'is_complex', False):
             target.cls.is_complex = True
         if target:
             return target
