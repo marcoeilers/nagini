@@ -15,6 +15,7 @@ class GetattributeStuff:
         Ensures(Acc(self.y))
         Ensures(self.y == 20)
         Ensures(MayCreate(self, 'xyz'))
+        Ensures(MayCreate(self, 'qwe'))
 
         # init still exhales write acc to all function names, which includes "foo" and "bar"
         # leaves a read permission
@@ -46,18 +47,14 @@ class GetattributeStuff:
         Ensures(Implies(name == "__dict__", Result() == object.__getattribute__(self, name)))
 
         #  func name        func name        important!            anything else the user wants
-        if name == "foo" or name == "bar" or name == "__dict__" or name == "xyz":
-
+        if name == "xyz":
             # cannot.have.object.__getattribute__.here
             # my_attr: object = object.__getattribute__(self, name)
             # return my_attr
             # return 50
-            return object.__getattribute__(self, name)
-        elif name == "x":
-            return object.__getattribute__(self, name)
-        else:
-            # whatever else goes here
             return 1_000_000
+        else:
+            return object.__getattribute__(self, name)
 
 
 def getattribute_example() -> None:
@@ -65,13 +62,15 @@ def getattribute_example() -> None:
     Assert(g.__dict__['x'] == 10)
     Assert(g.xyz == 1_000)
     Assert(object.__getattribute__(g, "x") == 10)
-    # Assert(object.__getattribute__(g, "xyz") == 1_000)    # this won't work because __getattr__ is not called
+    # Assert(object.__getattribute__(g, "qwe") == 1_000)    # this won't work because __getattr__ is not called
 
     Assert(g.x == 10)                                           # call __getattribute__
 
     # calling g.__getattribute__ directly won't be allowed!
-    Assert(g.__getattribute__('x') == 10)                       # g.x == 10.
-    Assert(g.__getattribute__('xyz') == 1_000)                  # g.xyz == 1_000
+    Assert(g.__getattribute__('x') == 10)                       # g.x == 10
+    Assert(g.__getattribute__('qwe') == 1_000)
+    Assert(g.__getattribute__('xyz') == 1_000_000)              # g.xyz == 1_000
+
     # Assert(g.__getattribute__('hello_world') == 1_000_000)      # g.hello_world == 1_000_000
 
     # Assert(g.__getattribute('hello_world') == 1_000_001)    # sanity check
