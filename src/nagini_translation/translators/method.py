@@ -308,6 +308,36 @@ class MethodTranslator(CommonTranslator):
                 raise InvalidProgramException(post, 'purity.violated')
             posts.append(expr)
         # Create typeof preconditions
+
+        if func.name == '__getattribute__':
+
+            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+            string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+            # stmt, receiver = self.translate_expr(func.args['self'], ctx,
+            #                                      target_type=self.viper.Ref)
+
+            receiver = func.args['self'].ref()
+
+            key = self.translate_string('abcd', None, ctx)
+
+            args = [receiver, key]
+            arg_types = [keydict_type, string_type]
+            func_name = '__contains__'
+
+            keydict_func = keydict_type.get_function(func_name)
+
+            keydict_func_type = self.translate_type(keydict_func.type, ctx)
+
+            call = self.viper.FuncApp(keydict_func.sil_name, args, pos, self.no_info(ctx), keydict_func_type)
+
+            ret = self.viper.EqCmp(call, call, pos, self.no_info(ctx))
+
+            # ret = self.get_function_call(keydict_type, func_name, args, arg_types,
+            #                        self.no_position(ctx), self.no_info(ctx))
+
+            posts.append(ret)
+
         pres = self._create_typeof_pres(func, False, ctx) + pres
         if func.type.name not in PRIMITIVES:
             res_type_pos = self.to_position(func.node, ctx,
