@@ -257,20 +257,24 @@
             "type": "__prim__int"
         },
         "__ge__": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__bool"
+            "args": ["int", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___unbox__", "float___ge__"]
         },
         "__gt__": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__bool"
+            "args": ["int", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___unbox__", "float___gt__"]
         },
         "__lt__": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__bool"
+            "args": ["int", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___unbox__", "float___lt__"]
         },
         "__le__": {
-            "args": ["__prim__int", "__prim__int"],
-            "type": "__prim__bool"
+            "args": ["int", "float"],
+            "type": "__prim__bool",
+            "requires": ["int___unbox__", "float___le__"]
         },
         "__int__": {
             "args": ["int"],

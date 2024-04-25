@@ -1232,6 +1232,10 @@ class ExpressionTranslator(CommonTranslator):
             bool_parts.append(bool_expression)
             types_parts.append(typ)
 
+        if isinstance(node.op, ast.Or) and not all_pure:
+            raise InvalidProgramException(node, 'impure.disjunction',
+                                          'Disjunctions must be pure. Use implications to express impure disjunctions.')
+
         all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
 
         if isinstance(node.op, ast.And):
