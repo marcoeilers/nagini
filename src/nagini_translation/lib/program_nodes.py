@@ -565,7 +565,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return self.get_function(name)
         else:
             return self.get_method(name)
-    
+
     def get_compatible_func_or_method(self, name: str, arg_types: List[PythonType]) -> Optional['PythonMethod']:
         func = self.get_func_or_method(name)
         if not func:
