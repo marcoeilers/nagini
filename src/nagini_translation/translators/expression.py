@@ -882,13 +882,20 @@ class ExpressionTranslator(CommonTranslator):
                                              target_type=self.viper.Bool)
             return (stmt, self.viper.Not(expr, self.to_position(node, ctx),
                                          self.no_info(ctx)))
-        stmt, expr = self.translate_expr(node.operand, ctx,
-                                         target_type=self.viper.Int)
-        if isinstance(node.op, ast.USub):
-            return (stmt, self.viper.Minus(expr, self.to_position(node, ctx),
-                                           self.no_info(ctx)))
+        
+        stmt, expr = self.translate_expr(node.operand, ctx)
+        operand_type = self.get_type(node.operand, ctx)
+
+        if isinstance(node.op, ast.UAdd):
+            func_name = '__pos__'
+        elif isinstance(node.op, ast.USub):
+            func_name = '__neg__'
+        elif isinstance(node.op, ast.Invert):
+            func_name = '__invert__'
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f"Unsupported unary operator {node.op}")
+
+        return self.get_func_or_method_call(operand_type, func_name, [expr], [operand_type], node, ctx)
 
     def translate_IfExp(self, node: ast.IfExp, ctx: Context,
                         impure=False) -> StmtsAndExpr:

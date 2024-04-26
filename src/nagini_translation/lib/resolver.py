@@ -262,6 +262,21 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, str):
+            return module.global_module.classes[STRING_TYPE]
+        elif isinstance(node.value, bytes):
+            return module.global_module.classes[BYTES_TYPE]
+        elif isinstance(node.value, bool):
+            return module.global_module.classes[BOOL_TYPE]
+        elif isinstance(node.value, int):
+            return module.global_module.classes[INT_TYPE]
+        elif isinstance(node.value, float):
+            return module.global_module.classes[FLOAT_TYPE]
+        elif node.value is None:
+            return module.global_module.classes['NoneType']
+        else:
+            raise UnsupportedException(node.value, f"Unsupported contant value type {type(node.value)}")
     if isinstance(node, ast.Num):
         if isinstance(node.n, int):
             return module.global_module.classes[INT_TYPE]
@@ -325,8 +340,12 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.UnaryOp):
         if isinstance(node.op, ast.Not):
             return module.global_module.classes[BOOL_TYPE]
+        elif isinstance(node.op, ast.UAdd):
+            return get_type(node.operand, containers, container).get_func_or_method('__pos__').type
         elif isinstance(node.op, ast.USub):
-            return module.global_module.classes[INT_TYPE]
+            return get_type(node.operand, containers, container).get_func_or_method('__neg__').type
+        elif isinstance(node.op, ast.Invert):
+            return get_type(node.operand, containers, container).get_func_or_method('__invert__').type
         else:
             raise UnsupportedException(node)
     elif isinstance(node, ast.NameConstant):

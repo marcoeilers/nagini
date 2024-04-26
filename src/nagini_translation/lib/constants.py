@@ -221,6 +221,10 @@ LEGAL_MAGIC_METHODS = {
     '__truediv__',
     '__floordiv__',
     '__mod__',
+    '__neg__',
+    '__pos__',
+    '__invert__',
+  
     '__divmod__',
     '__pow__',
     '__lshift__',

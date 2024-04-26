@@ -98,6 +98,17 @@ function float___div__(self: Ref, other: Ref): Ref
     ensures issubtype(typeof(result), float())
     ensures result == __prim__perm___box__(float___unbox__(self) / float___unbox__(other))
 
+function float___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures result == self
+
+function float___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(-float___unbox__(self))
+
 function float___rdiv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())

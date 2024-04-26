@@ -98,6 +98,18 @@ function float___div__(self: Ref, other: Ref): Ref
     ensures issubtype(typeof(result), float())
     ensures result == __prim__perm___box__(___float32_div(float___unbox__(self), float___unbox__(other)))
 
+function float___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == self
+
+function float___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_neg(float___unbox__(self)))
+
 function float___rdiv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
@@ -125,6 +137,7 @@ domain ___float32 interpretation (Boogie: "float24e8", SMTLIB: "(_ FloatingPoint
   function ___float32_sub(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.sub RNE"
   function ___float32_mul(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.mul RNE"
   function ___float32_div(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.div RNE"
+  function ___float32_neg(d1: ___float32): ___float32 interpretation "fp.neg" 
   function ___float32_gt(___float32, ___float32): Bool interpretation "fp.gt"
   function ___float32_ge(___float32, ___float32): Bool interpretation "fp.geq"
 
