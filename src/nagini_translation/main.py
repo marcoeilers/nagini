@@ -329,7 +329,7 @@ def main() -> None:
     )
     parser.add_argument(
         '--submit-for-evaluation',
-        help='Whether to allow storing the current program for future evaluation.',
+        help='Allow Nagini and Viper developers to store the current program for future evaluation.',
         action='store_true',
         default=False,
     )
@@ -421,14 +421,14 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     i, args.benchmark, start, end, end - start))
         else:
             submitter = None
-            if(args.submit_for_evaluation):
-                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize, viper_args)
+            if args.submit_for_evaluation:
+                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
                 submitter.setProgram(prog)
 
             vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
             
-            if(submitter != None):
+            if submitter is not None:
                 submitter.setSuccess(vresult.__bool__())
                 submitter.submit()
         if args.verbose:
