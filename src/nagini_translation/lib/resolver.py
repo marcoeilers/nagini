@@ -135,13 +135,20 @@ def get_target(node: ast.AST,
                 if isinstance(possible_class, PythonType):
                     type_class = possible_class
             if type_class:
+                fixed_size = True
                 # Look up the type arguments. Also consider string arguments.
                 if isinstance(node.slice.value, ast.Tuple):
-                    args = [get_target(arg, containers, container, True)
-                            for arg in node.slice.value.elts]
+                    if len(node.slice.value.elts) == 2 and isinstance(node.slice.value.elts[1], ast.Ellipsis):
+                        args = [get_target(node.slice.value.elts[0], containers, container, True)]
+                        fixed_size = False
+                    else:
+                        args = [get_target(arg, containers, container, True)
+                                for arg in node.slice.value.elts]
                 else:
                     args = [get_target(node.slice.value, containers, container, True)]
-                return GenericType(type_class, args)
+                res = GenericType(type_class, args)
+                res.exact_length = fixed_size
+                return res
             if node.value.id == 'Optional':
                 option = get_target(node.slice.value, containers, container, True)
                 return OptionalType(option)
