@@ -7,7 +7,8 @@ from nagini_contracts.contracts import (
     Result,
 )
 from nagini_contracts.io_contracts import *
-from typing import Tuple
+from nagini_contracts.obligations import MustTerminate
+from typing import Tuple, Union
 
 from resources.library import (
     read_int_io,
@@ -78,6 +79,11 @@ def write_four_ints_2(t1: Place) -> Place:
         )
     )
 
+    # See comment below.
+    marco = (t1, True)
+    wow(marco)
+    wow2(marco)
+
     Open(write_two_ints_io(t1))
 
     t2 = write_int(t1, 4)
@@ -145,3 +151,21 @@ def write_four_ints_4(t1: Place) -> Place:
     t5 = write_int(t4, 3)
 
     return t5
+
+
+# ME: This test at some point had missing errors in Carbon after changing tuple-related axioms that I cannot reproduce
+# any more.
+# Here I'm adding some calls that should trigger any dangerous cases I can think of related to those changes, hoping
+# that if there is actually a problem, it will be triggered again in the future.
+
+def wow(t: Tuple[Place, int]) -> None:
+    Requires(MustTerminate(1))
+    pass
+
+
+def wow2(t: Tuple[object, bool]) -> Union[int, Tuple[object, object]]:
+    Requires(MustTerminate(1))
+    Ensures(Result() is t)
+    Ensures(isinstance(Result(), object))
+    Ensures(isinstance(t[1], int))
+    return t
