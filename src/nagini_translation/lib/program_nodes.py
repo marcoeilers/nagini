@@ -572,9 +572,6 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             return None
         
         param_types = [arg.type for arg in func.get_args()]
-        if len(param_types) != len(arg_types):
-            return None
-        
         for param_type, arg_type in zip(param_types, arg_types):
             if isinstance(param_type, UnionType):
                 if not any([arg_type.try_box().issubtype(union_type_part.try_box()) for union_type_part in param_type.get_types()]):
