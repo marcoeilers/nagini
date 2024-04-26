@@ -310,34 +310,24 @@ class MethodTranslator(CommonTranslator):
         # Create typeof preconditions
 
         # ERROR: class viper.silver.ast.LocalVar cannot be cast to class viper.silver.ast.AnyLocalVarDecl
-        if func.name == '__getattribute__' and False:
-
-            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
-            string_type = ctx.module.global_module.classes[STRING_TYPE]
-
-            # stmt, receiver = self.translate_expr(func.args['self'], ctx,
-            #                                      target_type=self.viper.Ref)
-
+        if func.name == '__getattribute__':
             receiver = func.args['self'].ref()
+            name = func.args['name'].ref()
 
-            key = self.translate_string('abcd', None, ctx)
+            pset_literal = self.viper.ExplicitSet(
+                [self.translate_string(s, None, ctx) for s in func.cls.illegal_attribute_names],
+                pos,
+                self.no_info(ctx))
+            pset_contains = self.viper.AnySetContains(name, pset_literal, pos, self.no_info(ctx))
 
-            args = [receiver, key]
-            arg_types = [keydict_type, string_type]
-            func_name = '__contains__'
+            _, get_attr = self.get_complex_attr(func.node, name, receiver, func.cls, ctx, pos)
+            result_translate = self.viper.Result(self.translate_type(func.type, ctx),
+                                          self.to_position(func.node, ctx),
+                                          self.no_info(ctx))
+            result_equals = self.viper.EqCmp(result_translate, get_attr, pos, self.no_info(ctx))
 
-            keydict_func = keydict_type.get_function(func_name)
-
-            keydict_func_type = self.translate_type(keydict_func.type, ctx)
-
-            call = self.viper.FuncApp(keydict_func.sil_name, args, pos, self.no_info(ctx), keydict_func_type)
-
-            ret = self.viper.EqCmp(call, call, pos, self.no_info(ctx))
-
-            # ret = self.get_function_call(keydict_type, func_name, args, arg_types,
-            #                        self.no_position(ctx), self.no_info(ctx))
-
-            posts.append(ret)
+            pset_impl = self.viper.Implies(pset_contains, result_equals, pos, self.no_info(ctx))
+            posts.append(pset_impl)
 
         pres = self._create_typeof_pres(func, False, ctx) + pres
         if func.type.name not in PRIMITIVES:

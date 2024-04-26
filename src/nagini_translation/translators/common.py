@@ -16,6 +16,7 @@ from nagini_translation.lib.constants import (
     FLOAT_TYPE,
     INT_TYPE,
     IS_DEFINED_FUNC,
+    KEYDICT_TYPE,
     LIST_TYPE,
     MAIN_METHOD_NAME,
     MAY_SET_PRED,
@@ -27,6 +28,7 @@ from nagini_translation.lib.constants import (
     PSEQ_TYPE,
     PSET_TYPE,
     SET_TYPE,
+    STRING_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
 )
@@ -728,6 +730,41 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             # Pass-through
             return self._get_function_call(receiver, func_name, args,
                                            arg_types, node, ctx, position)
+
+    def get_complex_attr(self,
+                         node,
+                         key,
+                         receiver,
+                         recv_type,
+                         ctx: Context,
+                         position: Position = None) -> StmtsAndExpr:
+        info = self.no_info(ctx)
+        keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+        string_type = ctx.module.global_module.classes[STRING_TYPE]
+
+        args = [receiver, key]
+        arg_types = [keydict_type, string_type]
+
+        func_name = '__getitem__'
+        call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                      node, ctx)
+
+        # when __getattr__ is defined, need to create a cond exp to call it when needed
+        if '__getattr__' in recv_type.functions:  # and ctx.current_function.func_constant != '__getattr__real':
+            func_name = '__contains__'
+            keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                      node, ctx)
+
+            args = [receiver, key]
+            arg_types = [recv_type, string_type]
+
+            func_name = '__getattr__'
+            recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+
+            call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+
+        ret = ([], call)
+        return ret
 
     def _get_method_call(self, receiver: PythonType,
                         func_name: str, args: List[Expr],

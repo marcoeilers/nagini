@@ -916,43 +916,21 @@ class ExpressionTranslator(CommonTranslator):
                     if node.attr == '__dict__':
                         return stmt, receiver
                     else:
-                   # need to return
-                    # keydict___contains__(receiver, node) ?
-                    #   keydict___getitem__(receiver, node):
-                    #   (Child() == typeof(receiver) ?
-                    #     Child_getattr_child(receiver, node):
-                    #     Parent_getattr_parent(receiver, node)
-                    # )
-                    # but only if __getattr__ is defined
-                        info = self.no_info(ctx)
-                        keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
-                        string_type = ctx.module.global_module.classes[STRING_TYPE]
-
-                        key = self.translate_string(node.attr, None, ctx)
-
-                        args = [receiver, key]
-                        arg_types = [keydict_type, string_type]
-
-
-                        func_name = '__getitem__'
-                        call = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                                      node, ctx)
-
-                        # when __getattr__ is defined, need to create a cond exp to call it when needed
-                        if '__getattr__' in recv_type.functions: # and ctx.current_function.func_constant != '__getattr__real':
-                            func_name = '__contains__'
-                            keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                                          node, ctx)
-
-                            args = [receiver, key]
-                            arg_types = [recv_type, string_type]
-
-                            func_name = '__getattr__'
-                            recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
-
-                            call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
-
-                        ret = (stmt, call)
+                        # need to return
+                        # keydict___contains__(receiver, node) ?
+                        #   keydict___getitem__(receiver, node):
+                        #   (Child() == typeof(receiver) ?
+                        #     Child_getattr_child(receiver, node):
+                        #     Parent_getattr_parent(receiver, node)
+                        # )
+                        # but only if __getattr__ is defined
+                        # all of that is done by self.get_complex_attr()
+                        ret = self.get_complex_attr(node,
+                                                    self.translate_string(node.attr, None, ctx),
+                                                    receiver,
+                                                    recv_type,
+                                                    ctx,
+                                                    position)
                         return ret
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))

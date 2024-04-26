@@ -50,24 +50,16 @@ class GetattributeStuff:
 
     # @Pure       # assumed @Pure
     def __getattribute__(self, name: str) -> object:
-
         # From the user:
-        # Requires(Implies(name == "xyz", MaySet(self, name)))
-        # Requires(Implies(name == "x", Acc(object.__getattribute__(self, name))))
         Requires(MaySet(self, name))
-        
 
         # Auto generated:
-        Ensures(Implies(name == "foo",      Result() == object.__getattribute__(self, name)))
-        Ensures(Implies(name == "bar",      Result() == object.__getattribute__(self, name)))
-        Ensures(Implies(name == "__dict__", Result() == object.__getattribute__(self, name)))
+        # Ensures(Implies(name in PSet("foo", "bar", "__dict__", ...), Result() == object.__getattribute__(self, name)))
 
-        #  func name        func name        important!            anything else the user wants
-        if name == "xyz":
+        if name == "xyz" or name == "__dict_":
             # cannot.have.object.__getattribute__.here
             # my_attr: object = object.__getattribute__(self, name)
             # return my_attr
-            # return 50
             return 1_000_000
         else:
             return object.__getattribute__(self, name)
@@ -307,7 +299,10 @@ def main() -> None:
     s = "hello world"
     Assert(s[2:5] == "llo")
 
-
+    x = "abcd"
+    y = x + "efg"
+    Assert(y == "abcdefg")
+    Assert(y[2:6] == "cdef")
 
 if __name__ == "__main__":
     main()

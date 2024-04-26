@@ -235,6 +235,12 @@ LEGAL_COMPLEX_MAGIC_METHODS = {
     '__getattribute__'
 }
 
+ILLEGAL_COMPLEX_ATTRIBUTES = {
+    '__dict__',
+    '__slots__',
+} | LEGAL_COMPLEX_MAGIC_METHODS
+
+
 RESULT_NAME = '_res'
 
 ERROR_NAME = '_err'
