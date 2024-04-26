@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     RANGE_TYPE,
     SET_TYPE,
     TUPLE_TYPE,
+    INPLACE_OPERATOR_FUNCTIONS,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -386,15 +387,23 @@ class StatementTranslator(CommonTranslator):
 
     def translate_stmt_AugAssign(self, node: ast.AugAssign,
                                  ctx: Context) -> List[Stmt]:
+        left_type = self.get_type(node.target, ctx)
+        right_type = self.get_type(node.value, ctx)
+
         left_stmt, left = self.translate_expr(node.target, ctx, as_read=True)
         if left_stmt:
             raise InvalidProgramException(node, 'purity.violated')
         stmt, right = self.translate_expr(node.value, ctx)
-        left_type = self.get_type(node.target, ctx)
-        right_type = self.get_type(node.value, ctx)
-        op_stmt, result = self.translate_operator(left, right, left_type,
-                                                  right_type, node, ctx)
-        stmt += op_stmt
+
+        inplace_func_name = INPLACE_OPERATOR_FUNCTIONS[type(node.op)]
+        inplace_func = left_type.get_compatible_func_or_method(inplace_func_name, [left_type, right_type])
+        if inplace_func:
+            call_stmt, result = self.get_func_or_method_call(left_type, inplace_func_name, [left, right], [left_type, right_type], node, ctx)
+            stmt += call_stmt
+        else:
+            op_stmt, result = self.translate_operator(left, right, left_type, right_type, node, ctx)
+            stmt += op_stmt
+
         result = self.to_ref(result, ctx)
         assign_stmts, _ = self.assign_to(node.target, result, None, None, right_type,
                                          node, ctx)

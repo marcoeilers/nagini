@@ -257,6 +257,20 @@ LEGAL_MAGIC_METHODS = {
 
     '__getitem__',
     '__setitem__',
+
+    '__iadd__',
+    '__isub__',
+    '__imul__',
+    '__imatmul__',
+    '__idiv__',
+    '__ifloordiv__',
+    '__imod__',
+    '__ipow__',
+    '__ilshift__',
+    '__irshift__',
+    '__iand__',
+    '__ior__',
+    '__ixor__',
 }
 
 RESULT_NAME = '_res'
@@ -373,6 +387,22 @@ LEFT_OPERATOR_FUNCTIONS = {
     ast.BitAnd: '__and__',
     ast.BitOr: '__or__',
     ast.BitXor: '__xor__',
+}
+
+INPLACE_OPERATOR_FUNCTIONS = {
+    ast.Add: '__iadd__',
+    ast.Sub: '__isub__',
+    ast.Mult: '__imul__',
+    ast.MatMult: '__imatmul__',
+    ast.Div: '__idiv__',
+    ast.FloorDiv: '__ifloordiv__',
+    ast.Mod: '__imod__',
+    ast.Pow: '__ipow__',
+    ast.LShift: '__ilshift__',
+    ast.RShift: '__irshift__',
+    ast.BitAnd: '__iand__',
+    ast.BitOr: '__ior__',
+    ast.BitXor: '__ixor__',
 }
 
 RIGHT_OPERATOR_FUNCTIONS = {
