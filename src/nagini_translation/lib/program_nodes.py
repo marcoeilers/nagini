@@ -566,6 +566,21 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         else:
             return self.get_method(name)
 
+    def get_compatible_func_or_method(self, name: str, arg_types: List[PythonType]) -> Optional['PythonMethod']:
+        func = self.get_func_or_method(name)
+        if not func:
+            return None
+
+        param_types = [arg.type for arg in func.get_args()]
+        for param_type, arg_type in zip(param_types, arg_types):
+            if isinstance(param_type, UnionType):
+                if not any([arg_type.try_box().issubtype(union_type_part.try_box()) for union_type_part in param_type.get_types()]):
+                    return None
+            elif not arg_type.try_box().issubtype(param_type.try_box()):
+                return None
+
+        return func
+
     def get_predicate(self, name: str) -> Optional['PythonMethod']:
         """
         Returns the predicate with the given name in this class or a superclass.
@@ -803,6 +818,9 @@ class GenericType(PythonType):
         superclass.
         """
         return self.python_class.get_func_or_method(name)
+    
+    def get_compatible_func_or_method(self, name: str, param_types: List[PythonType]) -> Optional['PythonMethod']:
+        return self.python_class.get_compatible_func_or_method(name, param_types)
 
     @property
     def all_methods(self) -> Set[str]:

@@ -55,7 +55,8 @@ function list___getitem__(self: Ref, key: Ref): Ref
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), int())
     requires acc(self.list_acc, wildcard)
-    requires let ln == (list___len__(self)) in ((int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln) && (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
+    requires @error("List index may be out of bounds.")(let ln == (list___len__(self)) in (int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln))
+    requires @error("List index may be out of bounds.")(let ln == (list___len__(self)) in (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
     ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
     ensures issubtype(typeof(result), list_arg(typeof(self), 0))
 

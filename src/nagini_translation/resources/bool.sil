@@ -68,28 +68,44 @@ function bool___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
 
 
-function int___ge__(self: Int, other: Int): Bool
+function int___ge__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self >= other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) >= int___unbox__(other)
+        : float___ge__(self, other)
 }
 
-function int___gt__(self: Int, other: Int): Bool
+function int___gt__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self > other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) > int___unbox__(other)
+        : float___gt__(self, other)
 }
 
-function int___le__(self: Int, other: Int): Bool
+function int___le__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self <= other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) <= int___unbox__(other)
+        : float___le__(self, other)
 }
 
-function int___lt__(self: Int, other: Int): Bool
+function int___lt__(self: Ref, other: Ref): Bool
     decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), float())
 {
-    self < other
+    issubtype(typeof(other), int())
+        ? int___unbox__(self) < int___unbox__(other)
+        : float___lt__(self, other)
 }
 
 function int___add__(self: Int, other: Int): Int
@@ -119,7 +135,7 @@ function int___floordiv__(self: Int, other: Int): Int
 
 function int___div__(self: Int, other: Int): Ref
     decreases _
-    requires other != 0
+    requires @error("Divisor may be zero.")(other != 0)
     ensures (self % other == 0) ==> (typeof(result) == int() && int___unbox__(result) == self \ other)
     ensures (self % other != 0) ==> typeof(result) == float()
 
@@ -129,6 +145,21 @@ function int___mod__(self: Int, other: Int): Int
 {
     self % other
 }
+
+function int___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == self
+
+function int___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == __prim__int___box__(-int___unbox__(self))
+
+function int___invert__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    ensures result == __prim__int___box__(-(1 + int___unbox__(self)))
 
 function int___int__(self: Ref): Ref
     decreases _
@@ -161,7 +192,7 @@ function Place___eq__(self: Ref, other: Ref): Bool
 
 function object___cast__(typ: PyType, obj: Ref): Ref
     decreases _
-    requires issubtype(typeof(obj), typ)
+    requires @error("Cast may not succeed.")issubtype(typeof(obj), typ)
     ensures result == obj
     ensures issubtype(typeof(obj), typ)
 

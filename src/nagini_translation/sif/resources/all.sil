@@ -15,6 +15,7 @@ domain SIFDomain[T] {
 }
 
 import "../../resources/bool.sil"
+import "../../resources/float.sil"
 import "references.sil"
 import "../../resources/bytes.sil"
 import "../../resources/iterator.sil"

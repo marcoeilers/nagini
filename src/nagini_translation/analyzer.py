@@ -934,6 +934,8 @@ class Analyzer(ast.NodeVisitor):
                 self.current_function.declared_exceptions[exception].append(
                     (node.args[1], self._aliases.copy()))
             elif node.func.id == 'Invariant':
+                if self.current_loop_invariant is None:
+                    raise InvalidProgramException(node, 'invalid.contract.position')
                 self.current_loop_invariant.append(
                     (node, self._aliases.copy()))
         if (isinstance(node.func, ast.Name) and
