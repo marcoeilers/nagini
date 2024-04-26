@@ -325,7 +325,14 @@ def main() -> None:
     parser.add_argument(
         '--float-encoding',
         help='float encoding to be used (real or ieee32)',
-        default=None)
+        default=None
+    )
+    parser.add_argument(
+        '--submit-for-evaluation',
+        help='Whether to allow storing the current program for future evaluation.',
+        action='store_true',
+        default=False,
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -413,8 +420,17 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
+            submitter = None
+            if(args.submit_for_evaluation):
+                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize, viper_args)
+                submitter.setProgram(prog)
+
             vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
+            
+            if(submitter != None):
+                submitter.setSuccess(vresult.__bool__())
+                submitter.submit()
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
