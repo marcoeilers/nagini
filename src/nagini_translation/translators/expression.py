@@ -23,7 +23,8 @@ from nagini_translation.lib.constants import (
     LIST_TYPE,
     METHOD_ID_DOMAIN,
     OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
+    LEFT_OPERATOR_FUNCTIONS,
+    RIGHT_OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PERM_TYPE,
     SET_TYPE,
@@ -43,6 +44,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonTryBlock,
     PythonType,
+    TypeVar,
     PythonVar,
     UnionType,
     toposort_classes,
@@ -965,7 +967,7 @@ class ExpressionTranslator(CommonTranslator):
             wrap = self.to_bool
         result = op(wrap(left, ctx), wrap(right, ctx), pos, self.no_info(ctx))
         return result
-
+        
     def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
                            right_type: PythonType, node: ast.AST,
                            ctx: Context) -> StmtsAndExpr:
@@ -980,12 +982,29 @@ class ExpressionTranslator(CommonTranslator):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
-        func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        call_stmt, call = self.get_func_or_method_call(left_type, func_name,
-                                                       [left, right],
-                                                       [left_type, right_type],
-                                                       node, ctx)
-        return stmt + call_stmt, call
+        
+        if left_type == right_type or isinstance(right_type, TypeVar):
+            call_stmt, call = self.get_func_or_method_call(left_type, LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left, right], [left_type, right_type], node, ctx)
+            return stmt + call_stmt, call
+            
+        else:
+            right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
+            right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
+                    call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
+                    return stmt + call_stmt, call
+
+            left_func_name = LEFT_OPERATOR_FUNCTIONS[type(node.op)]
+            left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
+            if left_func:
+                call_stmt, call = self.get_func_or_method_call(left_type, left_func_name, [left, right], [left_type, right_type], node, ctx)
+                return stmt + call_stmt, call
+            if right_func:
+                call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
+                return stmt + call_stmt, call
 
     def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
         """
