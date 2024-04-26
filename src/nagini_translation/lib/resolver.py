@@ -17,7 +17,8 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
+    LEFT_OPERATOR_FUNCTIONS,
+    RIGHT_OPERATOR_FUNCTIONS,
     PMSET_TYPE,
     PSEQ_TYPE,
     PSET_TYPE,
@@ -317,8 +318,25 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.BinOp):
         left_type = get_type(node.left, containers, container)
         right_type = get_type(node.right, containers, container)
-        operator_func = OPERATOR_FUNCTIONS[type(node.op)]
-        return left_type.get_func_or_method(operator_func).type
+
+        if left_type == right_type or isinstance(right_type, TypeVar):
+            return left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)]).type
+
+        else:
+            right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
+            right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
+                    return right_func.type
+            
+            left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
+            if left_func:
+                return left_func.type
+            if right_func:
+                return right_func.type
+
     elif isinstance(node, ast.UnaryOp):
         if isinstance(node.op, ast.Not):
             return module.global_module.classes[BOOL_TYPE]
