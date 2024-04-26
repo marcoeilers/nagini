@@ -5,6 +5,7 @@ from nagini_contracts.contracts import (
     Ensures,
     Requires,
     Result,
+    Implies
 )
 from nagini_contracts.io_contracts import *
 from nagini_contracts.obligations import MustTerminate
@@ -160,12 +161,18 @@ def write_four_ints_4(t1: Place) -> Place:
 
 def wow(t: Tuple[Place, int]) -> None:
     Requires(MustTerminate(1))
+    Requires(bool(t[1]))
+    Ensures(Implies(isinstance(t[1], bool), t[1] is True))
+    Ensures(t == (t[0], t[1]))
+    Ensures(Implies(isinstance(t[1], bool), t == (t[0], True)))
+    Ensures((t, t, 3) == (t, t, 1 + 2))
     pass
 
 
 def wow2(t: Tuple[object, bool]) -> Union[int, Tuple[object, object]]:
     Requires(MustTerminate(1))
     Ensures(Result() is t)
+    Ensures(Result() == t)
     Ensures(isinstance(Result(), object))
     Ensures(isinstance(t[1], int))
     return t
