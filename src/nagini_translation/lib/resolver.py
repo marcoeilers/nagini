@@ -17,7 +17,8 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     LIST_TYPE,
     OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
+    LEFT_OPERATOR_FUNCTIONS,
+    RIGHT_OPERATOR_FUNCTIONS,
     PMSET_TYPE,
     PSEQ_TYPE,
     PSET_TYPE,
@@ -134,13 +135,20 @@ def get_target(node: ast.AST,
                 if isinstance(possible_class, PythonType):
                     type_class = possible_class
             if type_class:
+                fixed_size = True
                 # Look up the type arguments. Also consider string arguments.
                 if isinstance(node.slice, ast.Tuple):
-                    args = [get_target(arg, containers, container, True)
-                            for arg in node.slice.elts]
+                    if len(node.slice.elts) == 2 and isinstance(node.slice.elts[1], ast.Ellipsis):
+                        args = [get_target(node.slice.elts[0], containers, container, True)]
+                        fixed_size = False
+                    else:
+                        args = [get_target(arg, containers, container, True)
+                                for arg in node.slice.elts]
                 else:
                     args = [get_target(node.slice, containers, container, True)]
-                return GenericType(type_class, args)
+                res = GenericType(type_class, args)
+                res.exact_length = fixed_size
+                return res
             if node.value.id == 'Optional':
                 option = get_target(node.slice, containers, container, True)
                 return OptionalType(option)
@@ -261,6 +269,21 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         # All these cases should be handled by get_target, so if we get here,
         # the node refers to something unknown in the given context.
         return None
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, str):
+            return module.global_module.classes[STRING_TYPE]
+        elif isinstance(node.value, bytes):
+            return module.global_module.classes[BYTES_TYPE]
+        elif isinstance(node.value, bool):
+            return module.global_module.classes[BOOL_TYPE]
+        elif isinstance(node.value, int):
+            return module.global_module.classes[INT_TYPE]
+        elif isinstance(node.value, float):
+            return module.global_module.classes[FLOAT_TYPE]
+        elif node.value is None:
+            return module.global_module.classes['NoneType']
+        else:
+            raise UnsupportedException(node.value, f"Unsupported contant value type {type(node.value)}")
     if isinstance(node, ast.Num):
         if isinstance(node.n, int):
             return module.global_module.classes[INT_TYPE]
@@ -302,13 +325,34 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
     elif isinstance(node, ast.BinOp):
         left_type = get_type(node.left, containers, container)
         right_type = get_type(node.right, containers, container)
-        operator_func = OPERATOR_FUNCTIONS[type(node.op)]
-        return left_type.get_func_or_method(operator_func).type
+
+        if left_type == right_type or isinstance(right_type, TypeVar):
+            return left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)]).type
+
+        else:
+            right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
+            right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
+                    return right_func.type
+            
+            left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
+            if left_func:
+                return left_func.type
+            if right_func:
+                return right_func.type
+
     elif isinstance(node, ast.UnaryOp):
         if isinstance(node.op, ast.Not):
             return module.global_module.classes[BOOL_TYPE]
+        elif isinstance(node.op, ast.UAdd):
+            return get_type(node.operand, containers, container).get_func_or_method('__pos__').type
         elif isinstance(node.op, ast.USub):
-            return module.global_module.classes[INT_TYPE]
+            return get_type(node.operand, containers, container).get_func_or_method('__neg__').type
+        elif isinstance(node.op, ast.Invert):
+            return get_type(node.operand, containers, container).get_func_or_method('__invert__').type
         else:
             raise UnsupportedException(node)
     elif isinstance(node, ast.NameConstant):

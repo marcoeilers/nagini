@@ -48,7 +48,7 @@ setup(
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
             'Operating System :: OS Independent',
-            'Programming Language :: Python :: 3.9',
+            'Programming Language :: Python :: 3.10',
             'Topic :: Software Development',
             ],
         )

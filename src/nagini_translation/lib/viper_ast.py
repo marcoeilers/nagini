@@ -142,11 +142,10 @@ class ViperAST:
             body_with_locals = self.none
         else:
             body_with_locals = self.scala.Some(self.Seqn([body], position, info, locals))
-        method = getobject(self.java, self.ast, "MethodWithLabelsInScope")
-        return method.apply(name, self.to_seq(args), self.to_seq(returns),
-                            self.to_seq(pres), self.to_seq(posts),
-                            body_with_locals, position, info,
-                            self.NoTrafos)
+        return self.ast.Method(name, self.to_seq(args), self.to_seq(returns),
+                               self.to_seq(pres), self.to_seq(posts),
+                               body_with_locals, position, info,
+                               self.NoTrafos)
 
     def Field(self, name, type, position, info):
         return self.ast.Field(name, type, position, info, self.NoTrafos)
@@ -293,7 +292,7 @@ class ViperAST:
 
     def PredicateInstance(self, args, pred_name, position, info):
         args_seq = self.to_seq(args)
-        return self.jvm.viper.silver.plugin.standard.predicateinstance.PredicateInstance(args_seq, pred_name, position, info, self.NoTrafos)
+        return self.jvm.viper.silver.plugin.standard.predicateinstance.PredicateInstance(pred_name, args_seq, position, info, self.NoTrafos)
 
     def FullPerm(self, position, info):
         return self.ast.FullPerm(position, info, self.NoTrafos)
