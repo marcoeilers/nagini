@@ -241,7 +241,7 @@
             "args": ["__prim__int", "__prim__int"],
             "type": "__prim__int"
         },
-        "__div__": {
+        "__truediv__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "float"
         },
@@ -346,15 +346,15 @@
             "type": "float",
             "requires": ["int___mul__", "int___unbox__", "unbox", "__prim__perm___box__"]
         },
-        "__div__": {
+        "__truediv__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___div__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
+            "requires": ["int___truediv__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
-        "__rdiv__": {
+        "__rtruediv__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___div__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
+            "requires": ["int___truediv__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero"]
         },
         "__ge__": {
             "args": ["float", "float"],

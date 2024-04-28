@@ -92,7 +92,7 @@ function float___rmul__(self: Ref, other: Ref): Ref
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
             (result == __prim__int___box__(int___mul__(int___unbox__(other), int___unbox__(self))))
 
-function float___div__(self: Ref, other: Ref): Ref
+function float___truediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
@@ -100,7 +100,7 @@ function float___div__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(other), int())  // cannot express non-zero at the moment
     ensures issubtype(typeof(result), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___div__(int___unbox__(self), int___unbox__(other)))
+            (result == int___truediv__(int___unbox__(self), int___unbox__(other)))
 
 function float___pos__(self: Ref): Ref
     decreases _
@@ -114,7 +114,7 @@ function float___neg__(self: Ref): Ref
     ensures issubtype(typeof(result), float())
     ensures issubtype(typeof(self), int()) ==> result == int___neg__(self)
 
-function float___rdiv__(self: Ref, other: Ref): Ref
+function float___rtruediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
@@ -122,7 +122,7 @@ function float___rdiv__(self: Ref, other: Ref): Ref
     requires issubtype(typeof(self), int())  // cannot express non-zero at the moment
     ensures issubtype(typeof(result), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
-            (result == int___div__(int___unbox__(other), int___unbox__(self)))
+            (result == int___truediv__(int___unbox__(other), int___unbox__(self)))
 
 function float___int__(self: Ref): Ref
     decreases _
