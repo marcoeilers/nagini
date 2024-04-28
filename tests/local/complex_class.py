@@ -68,20 +68,17 @@ class GetattributeStuff:
 def getattribute_example() -> None:
     g = GetattributeStuff()
     Assert(g.__dict__['x'] == 10)
-    Assert(g.xyz == 1_000)
+    Assert(g.xyz == 1_000_000)
     Assert(object.__getattribute__(g, "x") == 10)
     # Assert(object.__getattribute__(g, "qwe") == 1_000)    # this won't work because __getattr__ is not called
 
     Assert(g.x == 10)                                           # call __getattribute__
 
-    # calling g.__getattribute__ directly won't be allowed!
-    Assert(g.__getattribute__('x') == 10)                       # g.x == 10
-    Assert(g.__getattribute__('qwe') == 1_000)
-    Assert(g.__getattribute__('xyz') == 1_000_000)              # g.xyz == 1_000
+    # calling g.__getattribute__ directly not allowed!
 
-    # Assert(g.__getattribute__('hello_world') == 1_000_000)      # g.hello_world == 1_000_000
-
-    # Assert(g.__getattribute('hello_world') == 1_000_001)    # sanity check
+    Assert(g.x == 10)                                   # g.__getattribute__('x')   == 10        WITH __getattr__
+    Assert(g.qwe == 1_000)                              # g.__getattribute__('qwe') == 1_000     WITH __getattr__
+    Assert(g.xyz == 1_000_000)                          # g.__getattribute__('xyz') == 1_000_000 WITH __getattr__
 
     Assert(g.foo() == 50)   # still call foo(). does not call __getattribute__
 

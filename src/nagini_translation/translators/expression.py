@@ -916,6 +916,7 @@ class ExpressionTranslator(CommonTranslator):
                     if node.attr == '__dict__':
                         return stmt, receiver
                     else:
+                        # if __getattribute__ is defined, then need to call it, otherwise
                         # need to return
                         # keydict___contains__(receiver, node) ?
                         #   keydict___getitem__(receiver, node):
@@ -923,14 +924,27 @@ class ExpressionTranslator(CommonTranslator):
                         #     Child_getattr_child(receiver, node):
                         #     Parent_getattr_parent(receiver, node)
                         # )
-                        # but only if __getattr__ is defined
-                        # all of that is done by self.get_complex_attr()
-                        ret = self.get_complex_attr(node,
-                                                    self.translate_string(node.attr, None, ctx),
-                                                    receiver,
-                                                    recv_type,
-                                                    ctx,
-                                                    position)
+                        # but only if __getattr__ is defined (done by self.get_complex_attr())
+                        # when __getattr__ is defined, need to create a cond exp to call it when needed
+
+
+                        if '__getattribute__' in recv_type.functions:  # and ctx.current_function.func_constant != '__getattr__real':
+                            string_type = ctx.module.global_module.classes[STRING_TYPE]
+                            args = [receiver, self.translate_string(node.attr, None, ctx)]
+                            arg_types = [recv_type, string_type]
+
+                            func_name = '__getattribute__'
+                            recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx,
+                                                                   position)
+
+                            ret = ([], recv_getattr)
+                        else:
+                            ret = self.get_complex_attr(node,
+                                                        self.translate_string(node.attr, None, ctx),
+                                                        receiver,
+                                                        recv_type,
+                                                        ctx,
+                                                        position)
                         return ret
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))

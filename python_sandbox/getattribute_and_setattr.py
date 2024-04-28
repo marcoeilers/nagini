@@ -45,6 +45,13 @@ print(d.foo)
 print()
 print()
 
+# this doesn't work because object.__getattribute__ outside of a __getattribute__ doesn't call __getattr__
+print('object.__getattribute__(d, "foo")')
+print(object.__getattribute__(d, "foo"))
+
+print()
+print()
+
 print("d.hello")
 print(d.hello)
 
