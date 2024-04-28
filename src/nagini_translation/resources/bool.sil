@@ -133,7 +133,7 @@ function int___floordiv__(self: Int, other: Int): Int
     self \ other
 }
 
-function int___div__(self: Int, other: Int): Ref
+function int___truediv__(self: Int, other: Int): Ref
     decreases _
     requires @error("Divisor may be zero.")(other != 0)
     ensures (self % other == 0) ==> (typeof(result) == int() && int___unbox__(result) == self \ other)
