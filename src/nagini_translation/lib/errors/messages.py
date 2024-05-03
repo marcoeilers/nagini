@@ -87,7 +87,9 @@ ERRORS = {
     'refute.failed':
         lambda n: 'Refute holds in all cases or could not be reached.',
     'predicateinstance.no.access':
-        lambda n: 'Predicate access might fail.'
+        lambda n: 'Predicate access might fail.',
+    'invalid.getattribute':
+        lambda n: 'Invalid definition of __getattribute__.'
 }
 
 REASONS = {
@@ -195,7 +197,9 @@ REASONS = {
     'termination.condition.false':
         lambda n: 'Termination condition might not hold.',
     'refutation.true':
-        lambda n: 'Assertion definitely holds.'
+        lambda n: 'Assertion definitely holds.',
+    'methods.or.internals.rerouted':
+        lambda n: '__getattribute__ may have non-standard behavior for calls to class methods or internals like __dict__.',
 }
 
 VAGUE_REASONS = {

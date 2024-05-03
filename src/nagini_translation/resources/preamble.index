@@ -457,6 +457,12 @@
         "__mod__": {
             "args": ["str", "tuple"],
             "type": "str"
+        },
+        "__getitem_slice__": {
+            "args": ["str", "slice"],
+            "type": "str",
+            "display_name": "__getitem__",
+            "requires": ["__len__", "__val__", "slice___start__", "slice___stop__"]
         }
     },
     "methods": {

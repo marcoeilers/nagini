@@ -644,6 +644,8 @@ class CallTranslator(CommonTranslator):
         whose constructor is called, for everything else the method.
         """
         target = self.get_target(node.func, ctx)
+        if getattr(ctx.actual_function, 'name', False) == '__init__' and getattr(ctx.actual_function.cls, 'is_complex', False):
+            target.cls.is_complex = True
         if target:
             return target
         name = get_func_name(node)
@@ -1257,50 +1259,52 @@ class CallTranslator(CommonTranslator):
             return self._translate_thread_start(node, ctx)
         elif self._is_thread_method_call(node, 'join', ctx):
             return self._translate_thread_join(node, ctx)
-        elif getattr(node.func, 'attr', False) == '__getattribute__' and \
-                getattr(node.func.value, 'id', False) == 'object' and \
+        elif getattr(node.func, 'attr', False) == '__getattribute__':
+            if  getattr(node.func.value, 'id', False) == 'object' and \
                 getattr(self.get_type(node.args[0], ctx), 'is_complex', False):
-            # need to treat as if this were self.__dict__ access
-            # return self.translate_normal_call_node(node, ctx, impure)
+                # need to treat as if this were self.__dict__ access
+                # return self.translate_normal_call_node(node, ctx, impure)
 
-            stmt, receiver = self.translate_expr(node.args[0], ctx,
-                                                 target_type=self.viper.Ref)
-            recv_type = self.get_type(node.args[0], ctx)
-            position = self.to_position(node, ctx)
+                stmt, receiver = self.translate_expr(node.args[0], ctx,
+                                                     target_type=self.viper.Ref)
+                recv_type = self.get_type(node.args[0], ctx)
+                position = self.to_position(node, ctx)
 
-            info = self.no_info(ctx)
-            keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
-            string_type = ctx.module.global_module.classes[STRING_TYPE]
+                info = self.no_info(ctx)
+                keydict_type = ctx.module.global_module.classes[KEYDICT_TYPE]
+                string_type = ctx.module.global_module.classes[STRING_TYPE]
 
-            slice_stmt, slice_index = self.translate_expr(node.args[1], ctx)
-
-            args = [receiver, slice_index]
-            arg_types = [keydict_type, string_type]
-
-            func_name = '__getitem__'
-            call = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                          node, ctx)
-
-            # when __getattr__ is defined, need to create a cond exp to call it when needed
-            if '__getattr__' in recv_type.functions and ctx.current_function.name == "__getattribute__":
-
-                if not (getattr(ctx, 'is_pre_or_post', False) or getattr(ctx, 'is_return', False)):
-                    raise InvalidProgramException(node, 'cannot.have.object.__getattribute__.here')
-
-                func_name = '__contains__'
-                keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
-                                                          node, ctx)
+                slice_stmt, slice_index = self.translate_expr(node.args[1], ctx)
 
                 args = [receiver, slice_index]
-                arg_types = [recv_type, string_type]
+                arg_types = [keydict_type, string_type]
 
-                func_name = '__getattr__'
-                recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+                func_name = '__getitem__'
+                call = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                              node, ctx)
 
-                call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+                # when __getattr__ is defined, need to create a cond exp to call it when needed
+                if '__getattr__' in recv_type.functions and ctx.current_function.name == "__getattribute__":
 
-            ret = (slice_stmt + stmt, call)
-            return ret
+                    if not (getattr(ctx, 'is_pre_or_post', False) or getattr(ctx, 'is_return', False)):
+                        raise InvalidProgramException(node, 'cannot.have.object.__getattribute__.here')
+
+                    func_name = '__contains__'
+                    keydict_contains = self.get_function_call(keydict_type, func_name, args, arg_types,
+                                                              node, ctx)
+
+                    args = [receiver, slice_index]
+                    arg_types = [recv_type, string_type]
+
+                    func_name = '__getattr__'
+                    recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx, position)
+
+                    call = self.viper.CondExp(keydict_contains, call, recv_getattr, position, info)
+
+                ret = (slice_stmt + stmt, call)
+                return ret
+            else:
+                raise InvalidProgramException(node, 'can.only.call.__getattribute__.on.object')
 
         else:
             return self.translate_normal_call_node(node, ctx, impure)

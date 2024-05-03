@@ -23,6 +23,7 @@ from nagini_translation.lib.constants import (
     INT_TYPE,
     LEGAL_MAGIC_METHODS,
     LEGAL_COMPLEX_MAGIC_METHODS,
+    ILLEGAL_COMPLEX_ATTRIBUTES,
     LITERALS,
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
@@ -581,6 +582,13 @@ class Analyzer(ast.NodeVisitor):
             member.is_complex = cls.is_complex
             self.visit(member, node)
         self.current_class = None
+
+        if cls.is_complex:
+            cls.illegal_attribute_names |= (set(cls.functions)
+                                           | set(cls.methods)
+                                           | set(cls.static_fields)
+                                           | set(cls.static_methods)
+                                           | ILLEGAL_COMPLEX_ATTRIBUTES)
 
     def _is_illegal_magic_method_name(self, name: str, is_complex: bool = False) -> bool:
         """
