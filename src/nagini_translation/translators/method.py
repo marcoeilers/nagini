@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     KEYDICT_TYPE
 )
+from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
     GenericType,
     MethodType,
@@ -313,20 +314,21 @@ class MethodTranslator(CommonTranslator):
         if func.name == '__getattribute__':
             receiver = func.args['self'].ref()
             name = func.args['name'].ref()
+            post_pos = self.to_position(func.node, ctx, rules=rules.GETATTRIBUTE_REROUTES_METHODS_OR_INTERNALS)
 
             pset_literal = self.viper.ExplicitSet(
                 [self.translate_string(s, None, ctx) for s in func.cls.illegal_attribute_names],
-                pos,
+                post_pos,
                 self.no_info(ctx))
-            pset_contains = self.viper.AnySetContains(name, pset_literal, pos, self.no_info(ctx))
+            pset_contains = self.viper.AnySetContains(name, pset_literal, post_pos, self.no_info(ctx))
 
-            _, get_attr = self.get_complex_attr(func.node, name, receiver, func.cls, ctx, pos)
+            _, get_attr = self.get_complex_attr(func.node, name, receiver, func.cls, ctx, post_pos)
             result_translate = self.viper.Result(self.translate_type(func.type, ctx),
-                                          self.to_position(func.node, ctx),
-                                          self.no_info(ctx))
-            result_equals = self.viper.EqCmp(result_translate, get_attr, pos, self.no_info(ctx))
+                                                 post_pos,
+                                                 self.no_info(ctx))
+            result_equals = self.viper.EqCmp(result_translate, get_attr, post_pos, self.no_info(ctx))
 
-            pset_impl = self.viper.Implies(pset_contains, result_equals, pos, self.no_info(ctx))
+            pset_impl = self.viper.Implies(pset_contains, result_equals, post_pos, self.no_info(ctx))
             posts.append(pset_impl)
 
         pres = self._create_typeof_pres(func, False, ctx) + pres

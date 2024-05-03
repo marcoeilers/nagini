@@ -150,6 +150,12 @@ PRED_FAM_MEMBER_NOT_FRAMED = {
     ('not.wellformed', 'insufficient.permission'):
         ('predicate.not.wellformed', 'family.member.not.framed')
 }
+GETATTRIBUTE_REROUTES_METHODS_OR_INTERNALS = {
+    ('postcondition.violated', 'assertion.false'):
+        ('invalid.getattribute', 'methods.or.internals.rerouted'),
+    ('postcondition.violated', 'insufficient.permission'):
+        ('invalid.getattribute', 'methods.or.internals.rerouted'),
+}
 
 __all__ = (
     'Rules',
@@ -172,4 +178,5 @@ __all__ = (
     'EXCEPTION_TYPE_LOW',
     'SHORT_CIRCUIT_LOW',
     'COMPREHENSION_LOW',
+    'GETATTRIBUTE_REROUTES_METHODS_OR_INTERNALS',
 )
