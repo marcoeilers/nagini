@@ -616,8 +616,8 @@ class MethodTranslator(CommonTranslator):
                 field_acc = self.viper.FieldAccess(call, keydict_val_field, no_pos, self.no_info(ctx))
 
                 ############################################
-                full_perm = self.viper.FullPerm(no_pos, no_info)
-                pred = self.viper.FieldAccessPredicate(field_acc, full_perm,
+                wildcard_perm = self.viper.WildcardPerm(no_pos, no_info)
+                pred = self.viper.FieldAccessPredicate(field_acc, wildcard_perm,
                                                        no_pos, no_info)
 
 
