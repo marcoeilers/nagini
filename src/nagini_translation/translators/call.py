@@ -645,7 +645,8 @@ class CallTranslator(CommonTranslator):
         """
         target = self.get_target(node.func, ctx)
         if getattr(ctx.actual_function, 'name', False) == '__init__' and getattr(ctx.actual_function.cls, 'is_complex', False):
-            target.cls.is_complex = True
+            if target.name == '__init__':
+                target.cls.is_complex = True
         if target:
             return target
         name = get_func_name(node)
