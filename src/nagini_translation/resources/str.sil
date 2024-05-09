@@ -75,17 +75,21 @@ method keydict___init__(self: Ref)
     ensures forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val) && !keydict___contains__(self, key)
 
 function keydict___item__(self: Ref, key: Ref): Ref
+    decreases _
     ensures keydict___item__inv(self, result) == key
 
 function keydict___item__inv(self: Ref, val_ref: Ref): Ref
+    decreases _
 
 function keydict___contains__(self: Ref, key: Ref) : Bool
+    decreases _
     requires acc(keydict___item__(self, key).keydict_val, wildcard)
 {
   keydict___item__(self, key).keydict_val.isSome
 }
 
 function keydict___getitem__(self: Ref, key: Ref) : Ref
+    decreases _
     requires acc(keydict___item__(self, key).keydict_val, wildcard)
     requires keydict___contains__(self, key)
 {
@@ -105,20 +109,24 @@ method keydict___setitem__(self: Ref, key: Ref, item: Ref)
 
 // Of all possible keys, which have been set in the keydict
 function keydict_keys(self:Ref ): Set[Ref]
+    decreases _
     requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
     ensures forall key: Ref :: {keydict___contains__(self, key)} {key in result} keydict___contains__(self, key) == (key in result)
 
 // Of the keys in the Set[Ref], which have been set in the keydict
 function keydict_keys_specific(self: Ref, keys: Set[Ref]): Set[Ref]
+    decreases _
     requires forall key: Ref :: {key in keys} key in keys ==> acc(keydict___item__(self, key).keydict_val, wildcard)
     ensures forall key: Ref :: {key in keys} key in keys ==> keydict___contains__(self, key) == (key in result)
 
 function keydict_values(self: Ref): Set[Ref]
+    decreases _
     requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
     ensures forall value: Ref :: {value in result}
     (exists key:Ref :: {keydict___contains__(self, key)} (keydict___contains__(self, key) && (keydict___getitem__(self, key) == value))) == value in result
 
 
 function keydict___len__(self: Ref): Int
+    decreases _
     requires forall key: Ref :: {keydict___item__(self, key)} acc(keydict___item__(self, key).keydict_val, wildcard)
     ensures result == |keydict_keys(self)|

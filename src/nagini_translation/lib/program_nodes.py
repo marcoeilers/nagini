@@ -384,7 +384,8 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         self.is_adt = name == 'ADT' # This flag is set when the class is
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
-        self.is_complex = False
+        # ME: Set to true to make all classes complex by default and test if things still work.
+        self.is_complex = True #  False
         self.illegal_attribute_names = set()
 
     @property
