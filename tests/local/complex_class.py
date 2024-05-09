@@ -24,8 +24,8 @@ def main2() -> None:
 @Complex
 class GetattributeStuff:
     def __init__(self) -> None:
-        self.x = 10
-        self.y = 20
+        self.x, self.y = 10, 20
+        # self.y = 20
         Ensures(Acc(self.x))
         Ensures(self.x == 10)
         Ensures(Acc(self.y))

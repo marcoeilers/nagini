@@ -1067,7 +1067,7 @@ class StatementTranslator(CommonTranslator):
                 arg_types = [None, None, None]
                 stmt = self.get_method_call(target_cls, '__setitem__', args,
                                             arg_types, [], node, ctx)
-                return lhs_stmt + slice_stmt + stmt, None
+                return lhs_stmt + slice_stmt + stmt, []
 
 
             else:
@@ -1103,7 +1103,7 @@ class StatementTranslator(CommonTranslator):
                     stmt = self.get_method_call(target_cls, '__setitem__', args,
                                                 arg_types, [], node, ctx)
 
-                    return lhs_stmt + stmt, None
+                    return lhs_stmt + stmt, []
                 else:
                     ###################################
                     lhs_stmt, target = self.translate_expr(lhs.value, ctx)
@@ -1132,7 +1132,7 @@ class StatementTranslator(CommonTranslator):
                     guarded_field_assign.append((assign_guard, block))
                 chained_field_assign = chain_if_stmts(guarded_field_assign, self.viper,
                                                        position, info, ctx)
-                return stmt + [chained_field_assign], None
+                return stmt + [chained_field_assign], []
         lhs_stmt, var = self.translate_expr(lhs, ctx)
         before_assign = []
         after_assign = []

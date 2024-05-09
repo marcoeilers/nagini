@@ -11,8 +11,8 @@ class LockClass:
         Ensures(Acc(self.__dict__['lock']))
         Ensures(self.__dict__['lock'] == True)
 
-    # def __getattr__(self, item: str) -> object:
-    #     return None
+    def __getattr__(self, item: str) -> object:
+        return None
 
     def __setattr__(self, name: str, value: int) -> None:
         Requires(MaySet(self, name))
