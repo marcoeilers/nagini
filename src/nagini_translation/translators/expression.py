@@ -873,7 +873,7 @@ class ExpressionTranslator(CommonTranslator):
                 if isinstance(field, PythonGlobalVar):
                     field_func = self.translate_static_field_access(field, receiver,
                                                                     node, ctx)
-                    return [], field_func
+                    return stmt, field_func
                 if isinstance(field, PythonMethod):
                     # This is a reference to a property, so we translate it to a call of
                     # the property getter function.
@@ -937,15 +937,15 @@ class ExpressionTranslator(CommonTranslator):
                             recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx,
                                                                    position)
 
-                            ret = ([], recv_getattr)
+                            ret = (stmt, recv_getattr)
                         else:
-                            ret = self.get_complex_attr(node,
+                            ret_stmt, ret_val = self.get_complex_attr(node,
                                                         self.translate_string(node.attr, None, ctx),
                                                         receiver,
                                                         recv_type,
                                                         ctx,
                                                         position)
-                        return ret
+                        return stmt + ret_stmt, ret_val
             return (stmt, self.viper.FieldAccess(receiver, field.sil_field,
                                                  position, self.no_info(ctx)))
 
