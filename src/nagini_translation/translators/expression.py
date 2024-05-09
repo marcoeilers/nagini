@@ -1203,7 +1203,8 @@ class ExpressionTranslator(CommonTranslator):
         else:
             raise UnsupportedException(node.ops[0])
         if left_type.get_function(compare_func):
-            if getattr(left_type, 'is_complex', False) and getattr(right_type, 'is_complex', False) and (isinstance(node.ops[0], ast.Eq) or isinstance(node.ops[0], ast.Is)):
+            if (getattr(left_type, 'is_complex', False) and getattr(right_type, 'is_complex', False) and
+                    (isinstance(node.ops[0], ast.Eq) or isinstance(node.ops[0], ast.Is))) and not left_type.interface and not right_type.interface:
                 comparison = self.viper.EqCmp(left, right, position, info)  # ME: Why are we doing this?
             else:
                 comparison = self.get_function_call(left_type, compare_func,
