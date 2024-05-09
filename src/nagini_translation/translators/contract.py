@@ -312,7 +312,7 @@ class ContractTranslator(CommonTranslator):
                                                 pos, info)
         result_ex = self.viper.CondExp(have_normal_perm, normal_acc, may_set_pred, pos,
                                        info)
-        unknown = self.get_unknown_bool(ctx)
+        unknown = self.get_unknown_bool(rec, ctx)
         result_in = self.viper.CondExp(unknown, normal_acc, may_set_pred, pos, info)
         return [], self.viper.InhaleExhaleExp(result_in, result_ex, pos, info)
 
