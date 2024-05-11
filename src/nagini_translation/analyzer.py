@@ -576,6 +576,7 @@ class Analyzer(ast.NodeVisitor):
 
         # check if a class is complex (when it or one of its parents had a @Complex class decorator)
         # complex class instance attributes are stored in __dict__
+        # ME: Set to true to make all classes complex by default and test if things still work.
         cls.is_complex = self.is_complex_class(node)
 
         for member in node.body:

@@ -293,7 +293,7 @@ class MustTerminateObligation(Obligation):
         if self.is_interface_method_terminating(interface_dict):
             cthread = sil.RefVar(obligation_info.current_thread_var)
             check = obligation_info.caller_measure_map.check(
-                cthread, sil.RawIntExpression(1))
+                cthread, sil.RawIntExpression(0))
             return [check]
         else:
             return []
