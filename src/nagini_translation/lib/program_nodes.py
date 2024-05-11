@@ -385,7 +385,7 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         # defining an algebraic data type or one of its constructors.
         # This flag is set transitively across subclasses.
         # ME: Set to true to make all classes complex by default and test if things still work.
-        self.is_complex = True #  False
+        self.is_complex = False
         self.illegal_attribute_names = set()
 
     @property

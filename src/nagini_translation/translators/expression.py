@@ -937,7 +937,9 @@ class ExpressionTranslator(CommonTranslator):
                             recv_getattr = self._get_function_call(recv_type, func_name, args, arg_types, node, ctx,
                                                                    position)
 
-                            ret = (stmt, recv_getattr)
+                            # ret = (stmt, recv_getattr)
+                            ret_stmt = []
+                            ret_val = recv_getattr
                         else:
                             ret_stmt, ret_val = self.get_complex_attr(node,
                                                         self.translate_string(node.attr, None, ctx),
