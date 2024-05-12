@@ -291,7 +291,7 @@ class ObligationMethodNodeConstructor:
                     self._python_method.interface_dict):
                 exhale = self._obligation_info.caller_measure_map.check(
                     sil.RefVar(self._obligation_info.current_thread_var),
-                    sil.RawIntExpression(0))
+                    sil.RawIntExpression(1))
             else:
                 exhale = sil.BigAnd([termination_leak_check, leak_check])
         else:
