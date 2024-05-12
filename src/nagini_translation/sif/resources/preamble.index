@@ -229,7 +229,7 @@
         "__eq__": {
             "args": ["int", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__"]
+            "requires": ["__unbox__", "float___eq__"]
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
@@ -303,6 +303,31 @@
             "args": ["__prim__int"],
             "type": "float"
         },
+        "__unbox__": {
+            "args": ["float"],
+            "type": "__prim__perm",
+            "requires": ["int___unbox__", "float___is_nan__", "float___is_inf__"]
+        },
+        "__box_nan": {
+            "args": [],
+            "type": "float",
+            "requires": ["float___is_nan__", "float___is_inf__"]
+        },
+        "__box_inf": {
+            "args": ["__prim__bool"],
+            "type": "float",
+            "requires": ["float___is_nan__", "float___is_inf__"]
+        },
+        "__is_nan__": {
+            "args": ["float"],
+            "type": "__prim__bool",
+            "requires": []
+        },
+        "__is_inf__": {
+            "args": ["float", "__prim__bool"],
+            "type": "__prim__bool",
+            "requires": []
+        },
         "__bool__": {
             "args": ["float"],
             "type": "__prim__bool",
@@ -311,47 +336,67 @@
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
-            "requires": ["int___eq__"]
+            "requires": ["int___eq__", "unbox", "float___is_nan__", "float___is_inf__"]
         },
         "__add__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___add__", "int___unbox__"]
+            "requires": ["int___add__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
+        },
+        "__radd__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___add__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
         },
         "__sub__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___sub__", "int___unbox__"]
+            "requires": ["int___sub__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
+        },
+        "__rsub__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___sub__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
         },
         "__mul__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___mul__", "int___unbox__"]
+            "requires": ["int___mul__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
+        },
+        "__rmul__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___mul__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
         },
         "__truediv__": {
             "args": ["float", "float"],
             "type": "float",
-            "requires": ["int___truediv__", "int___unbox__"]
+            "requires": ["int___truediv__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
+        },
+        "__rtruediv__": {
+            "args": ["float", "float"],
+            "type": "float",
+            "requires": ["int___truediv__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
         },
         "__ge__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___ge__", "int___unbox__"]
+            "requires": ["int___ge__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___is_inf__"]
         },
         "__gt__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___gt__", "int___unbox__"]
+            "requires": ["int___gt__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___is_inf__"]
         },
         "__lt__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___lt__", "int___unbox__"]
+            "requires": ["int___lt__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___is_inf__"]
         },
         "__le__": {
             "args": ["float", "float"],
             "type": "__prim__bool",
-            "requires": ["int___le__", "int___unbox__"]
+            "requires": ["int___le__", "int___unbox__", "unbox", "__prim__perm___box__", "float___is_nan__", "float___is_inf__"]
         },
         "__pos__": {
             "args": ["float"],
@@ -361,11 +406,12 @@
         "__neg__": {
             "args": ["float"],
             "type": "float",
-            "requires": ["int___neg__", "__prim__perm___box__", "unbox"]
+            "requires": ["int___neg__", "__prim__perm___box__", "unbox", "float___is_nan__", "float___box_nan", "float___is_inf__", "float___box_inf"]
         },
         "__int__": {
             "args": ["float"],
-            "type": "int"
+            "type": "int",
+            "requires": ["unbox", "__prim__int___box__", "float___is_nan__", "float___is_inf__"]
         }
     },
     "extends": "object"
