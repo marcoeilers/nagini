@@ -181,10 +181,10 @@ function float___sub__(self: Ref, other: Ref): Ref
     ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
             (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
                 result == float___box_nan()
-    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false && float___is_nan__(other)) == false  ||
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false && float___is_nan__(other) == false)  ||
             (float___is_inf__(self, false) == false && float___is_inf__(self, true) == false && float___is_nan__(self) == false && float___is_inf__(other, true) == true) ==>
                 result == float___box_inf(false)
-    ensures (float___is_inf__(self, true) == true && float___is_inf__(other, true) == false) && float___is_nan__(other) == false ||
+    ensures (float___is_inf__(self, true) == true && float___is_inf__(other, true) == false && float___is_nan__(other) == false) ||
             (float___is_inf__(self, false) == false && float___is_inf__(self, true) == false && float___is_nan__(self) == false && float___is_inf__(other, false) == true) ==>
                 result == float___box_inf(true)
     ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
@@ -202,10 +202,10 @@ function float___rsub__(self: Ref, other: Ref): Ref
     ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == true) ||
             (float___is_inf__(other, true) == true && float___is_inf__(self, true) == true) ==>
                 result == float___box_nan()
-    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false && float___is_nan__(self)) == false  ||
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false && float___is_nan__(self) == false)  ||
             (float___is_inf__(other, false) == false && float___is_inf__(other, true) == false && float___is_nan__(other) == false && float___is_inf__(self, true) == true) ==>
                 result == float___box_inf(false)
-    ensures (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false) && float___is_nan__(self) == false ||
+    ensures (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false && float___is_nan__(self) == false) ||
             (float___is_inf__(other, false) == false && float___is_inf__(other, true) == false && float___is_nan__(other) == false && float___is_inf__(self, false) == true) ==>
                 result == float___box_inf(true)
     ensures float___is_nan__(other) == false && float___is_nan__(self) == false &&

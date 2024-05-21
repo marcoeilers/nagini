@@ -172,7 +172,7 @@ def test_add() -> None:
   assert 1.0 + float('nan') is float('nan')
   assert float('nan') + float('nan') is float('nan')
 
-  assert 1 + 1.3 == 2.3
+  assert 1 + 1.5 == 2.5
   assert 1 + inf == inf
   assert inf + 1 == inf
   assert ninf + 1 == ninf
@@ -186,7 +186,7 @@ def test_add() -> None:
 def test_subtract() -> None:
   inf = float('inf')
   ninf = float('-inf')
-  assert 2.0 - 0.6 == 1.4
+  assert 2.0 - 0.5 == 1.5
   assert 1.0 - inf == ninf
   assert inf - 1.0 == inf
   assert ninf - 1.0 == ninf
@@ -203,7 +203,7 @@ def test_subtract() -> None:
   assert 1.0 - float('nan') is float('nan')
   assert float('nan') - float('nan') is float('nan')
 
-  assert 1 - 1.2 == -0.2
+  assert 1 - 1.5 == -0.5
   assert 1 - inf == ninf
   assert inf - 1 == inf
   assert ninf - 1 == ninf
@@ -217,7 +217,7 @@ def test_subtract() -> None:
 def test_multiply() -> None:
   inf = float('inf')
   ninf = float('-inf')
-  assert 1.2 * -1.3 == -1.56
+  assert 1.5 * -2.0 == -3
   assert 1.0 * inf == inf
   assert inf * 1.0 == inf
   assert -1.0 * inf == ninf
@@ -242,7 +242,7 @@ def test_multiply() -> None:
   assert 1.0 * float('nan') is float('nan')
   assert float('nan') * float('nan') is float('nan')
 
-  assert 1.2 * -1.3 == -1.56
+  assert 1 * -2.0 == -2
   assert 1 * inf == inf
   assert inf * 1 == inf
   assert -1 * inf == ninf
