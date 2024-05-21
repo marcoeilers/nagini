@@ -410,6 +410,11 @@
             "args": ["float"],
             "type": "int",
             "requires": ["unbox", "__prim__int___box__", "float___is_nan__", "float___is_inf__"]
+        },
+        "__isNaN": {
+            "args": ["float"],
+            "type": "__prim__bool",
+            "requires": ["float___is_nan__", "float___unbox__"]
         }
     },
     "extends": "object"

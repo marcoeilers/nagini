@@ -18,6 +18,11 @@ function float___bool__(self: Ref): Bool
     ensures self == null ==> !result
     ensures result == (float___unbox__(self) != ___float32_zero())
 
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures result == ___float32_isNaN(float___unbox__(f)) 
+
 function float___ge__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
@@ -144,6 +149,7 @@ domain ___float32 interpretation (Boogie: "float24e8", SMTLIB: "(_ FloatingPoint
   function real____to_int(p: Perm): Int interpretation "to_int"
   function ___float32_to_real(p: ___float32): Perm interpretation "fp.to_real"
   function ___float32_NaN(): ___float32 interpretation "(_ NaN 8 24)"
+  function ___float32_isNaN(___float32): Bool interpretation "fp.isNaN"
 }
 
 function ___float32_zero(): ___float32

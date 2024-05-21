@@ -42,6 +42,11 @@ function float___is_inf__(r: Ref, negative: Bool): Bool
     requires issubtype(typeof(r), float())
     ensures issubtype(typeof(r), int()) ==> result == false
 
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures result == float___is_nan__(f)
+
 function float___bool__(self: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
