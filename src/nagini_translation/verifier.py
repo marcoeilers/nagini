@@ -114,7 +114,8 @@ class Silicon:
             '--assumeInjectivityOnInhale',
             '--z3Exe', config.z3_path,
             '--disableCatchingExceptions',
-            '--exhaleMode=2',
+            '--exhaleMode=1',
+            '--enableKInduction=1',
             '--alternativeFunctionVerificationOrder',
             '--disableDefaultPlugins',
             '--plugin=viper.silver.plugin.standard.refute.RefutePlugin:'
