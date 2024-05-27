@@ -67,3 +67,13 @@ def main_6() -> int:
     Fold(other_pred(s))
     #:: ExpectedOutput(assignment.failed:insufficient.permission)
     return Unfolding(some_pred(s, 34, 34), s.field3)
+
+
+@Predicate
+def pure(i: int) -> bool:
+    return i > 0
+
+
+def previously_unsound() -> None:
+    #:: ExpectedOutput(unfold.failed:permission.not.positive)
+    Unfold(Acc(pure(-5), 0/1))
