@@ -16,6 +16,7 @@ from nagini_translation.lib.constants import (
     GET_OLD_FUNC,
     GLOBAL_VAR_FIELD,
     INT_TYPE,
+    FLOAT_TYPE,
     JOINABLE_FUNC,
     METHOD_ID_DOMAIN,
     PMSET_TYPE,
@@ -312,7 +313,7 @@ class ContractTranslator(CommonTranslator):
                                                 pos, info)
         result_ex = self.viper.CondExp(have_normal_perm, normal_acc, may_set_pred, pos,
                                        info)
-        unknown = self.get_unknown_bool(ctx)
+        unknown = self.get_unknown_bool(rec, ctx)
         result_in = self.viper.CondExp(unknown, normal_acc, may_set_pred, pos, info)
         return [], self.viper.InhaleExhaleExp(result_in, result_ex, pos, info)
 
@@ -985,6 +986,13 @@ class ContractTranslator(CommonTranslator):
                                    self.to_position(node, ctx),
                                    self.no_info(ctx))
         return dom_stmt, exists
+    
+    def translate_isNaN(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, expr = self.translate_expr(node.args[0], ctx, self.viper.Perm, True)
+        float_class = ctx.module.global_module.classes[FLOAT_TYPE]
+        call = self.get_function_call(float_class, '__isNaN', [expr], [None], node, ctx, self.to_position(node, ctx))
+        return stmt, call
 
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
                                     impure=False, statement=False) -> StmtsAndExpr:
@@ -1104,6 +1112,8 @@ class ContractTranslator(CommonTranslator):
             return self.translate_get_arg(node, ctx)
         elif func_name == 'getOld':
             return self.translate_get_old(node, ctx)
+        elif func_name == 'isNaN':
+            return self.translate_isNaN(node, ctx)
         elif func_name == 'getMethod':
             raise InvalidProgramException(node, 'invalid.get.method.use')
         elif func_name == 'arg':

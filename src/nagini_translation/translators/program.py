@@ -689,7 +689,8 @@ class ProgramTranslator(CommonTranslator):
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
         i_param_decl = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
-        return self.viper.Function(ARBITRARY_BOOL_FUNC, [i_param_decl],
+        r_param_decl = self.viper.LocalVarDecl('r', self.viper.Ref, pos, info)
+        return self.viper.Function(ARBITRARY_BOOL_FUNC, [i_param_decl, r_param_decl],
                                    self.viper.Bool, [], [], None, pos, info)
 
     def create_may_set_predicate(self, ctx: Context) -> 'silver.ast.Predicate':

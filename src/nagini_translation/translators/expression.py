@@ -27,6 +27,7 @@ from nagini_translation.lib.constants import (
     RIGHT_OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PERM_TYPE,
+    PRIMITIVE_BOOL_TYPE,
     SET_TYPE,
     STRING_TYPE,
     THREAD_DOMAIN,
@@ -68,6 +69,7 @@ from nagini_translation.lib.util import (
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from typing import List, Optional, Tuple, Union
+from math import isnan, isinf
 
 
 # Maps function names to bools; caches which functions take an additonal argument
@@ -255,24 +257,25 @@ class ExpressionTranslator(CommonTranslator):
     def translate_float_literal(self, lit: float, node: ast.AST, ctx: Context) -> Expr:
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
+
+        float_class = ctx.module.global_module.classes[FLOAT_TYPE]
         if ctx.float_encoding == "real":
+            if isnan(lit):
+                return self.get_function_call(float_class, '__box_nan', [], [], node, ctx, pos)
+            if isinf(lit) and lit > 0:
+                return self.get_function_call(float_class, '__box_inf', [self.viper.FalseLit(pos, info)], [None], node, ctx, pos)
+            if isinf(lit) and lit < 0:
+                return self.get_function_call(float_class, '__box_inf', [self.viper.TrueLit(pos, info)], [None], node, ctx, pos)
+
             prim_perm_class = ctx.module.global_module.classes[PRIMITIVE_PERM_TYPE]
-            try:
-                num, den = lit.as_integer_ratio()
-                num_lit = self.viper.IntLit(num, pos, info)
-                den_lit = self.viper.IntLit(den, pos, info)
-                frac = self.viper.FractionalPerm(num_lit, den_lit, pos, info)
-                float_val = self.get_function_call(prim_perm_class, '__box__', [frac],
-                                                   [None], node, ctx, pos)
-                return float_val
-            except ValueError:
-                # NaN
-                raise InvalidProgramException(node, 'non.real.float')
-            except OverflowError:
-                # Inf
-                raise InvalidProgramException(node, 'non.real.float')
+            num, den = lit.as_integer_ratio()
+            num_lit = self.viper.IntLit(num, pos, info)
+            den_lit = self.viper.IntLit(den, pos, info)
+            frac = self.viper.FractionalPerm(num_lit, den_lit, pos, info)
+            float_val = self.get_function_call(prim_perm_class, '__box__', [frac],
+                                               [None], node, ctx, pos)
+            return float_val
         if ctx.float_encoding == "ieee32":
-            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
             import struct
             bytes_val = struct.pack('!f', lit)
             int_val = int.from_bytes(bytes_val, "big")
@@ -283,7 +286,6 @@ class ExpressionTranslator(CommonTranslator):
         import logging
         logging.warning("Floating point operations are uninterpreted by default. To use interpreted "
                         "floating point operations, use option --float-encoding")
-        float_class = ctx.module.global_module.classes[FLOAT_TYPE]
         index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
         float_val = self.get_function_call(float_class, '__create__', [index_lit],
                                            [None], node, ctx, pos)
