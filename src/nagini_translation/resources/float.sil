@@ -9,6 +9,11 @@ function float___bool__(self: Ref): Bool
     ensures self == null ==> !result
     ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
 
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures issubtype(typeof(f), int()) ==> result == false
+
 function float___ge__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())

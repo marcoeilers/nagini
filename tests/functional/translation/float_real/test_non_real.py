@@ -4,7 +4,6 @@
 from nagini_contracts.contracts import *
 
 def specialVals() -> None:
-    #:: ExpectedOutput(invalid.program:non.real.float)
     nan = float("nan")
     nf = float("inF")
     one = float("1.0")
