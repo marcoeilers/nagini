@@ -227,14 +227,14 @@ domain tuple_types {
   axiom tuple_type_basic_1 {
     (forall seq: Seq[PyType], Z: PyType, arg1: PyType ::
       { issubtype(Z, tuple(seq)), issubtype(Z, arg1) }
-      issubtype(Z, tuple(seq)) && issubtype(Z, arg1) ==> (get_basic(arg1) == tuple_basic() || get_basic(arg1) == object())
+      issubtype(Z, tuple(seq)) && issubtype(Z, arg1) ==> (get_basic(arg1) == tuple_basic() || get_basic(arg1) == object() || get_basic(arg1) == union_basic())
       )
   }
 
   axiom tuple_type_basic_2 {
     (forall arg0: PyType, arg1: PyType, Z: PyType ::
       { issubtype(Z, tuple_var(arg0)), issubtype(Z, arg1) }
-      issubtype(Z, tuple_var(arg0)) && issubtype(Z, arg1)  ==> (get_basic(arg1) == tuple_basic() || get_basic(arg1) == object())
+      issubtype(Z, tuple_var(arg0)) && issubtype(Z, arg1)  ==> (get_basic(arg1) == tuple_basic() || get_basic(arg1) == object() || get_basic(arg1) == union_basic())
       )
   }
 }
