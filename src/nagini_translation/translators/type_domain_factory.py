@@ -54,6 +54,7 @@ class TypeDomainFactory:
             self.create_subtype_exclusion_axiom_2(ctx),
             self.create_subtype_exclusion_propagation_axiom(ctx),
         ]
+        result.extend(self.create_union_basic_axioms(ctx))
         result.extend(self.create_union_subtype_axioms(ctx))
         result.extend(self.create_subtype_union_axioms(ctx))
         return result
@@ -65,6 +66,7 @@ class TypeDomainFactory:
             self.issubtype_func(ctx),
             self.isnotsubtype_func(ctx),
             self.tuple_args_func(ctx),
+            self.union_basic_func(ctx),
             self.typeof_func(ctx),
             self.basic_func(ctx),
         ]
@@ -87,6 +89,42 @@ class TypeDomainFactory:
                                          self.type_type(), False, position,
                                          info, self.type_domain)
             result.append(func)
+        return result
+
+    def create_union_basic_axioms(self,
+            ctx: Context) -> List['silver.ast.DomainAxiom']:
+        """
+        Creates UNION_TYPE_SIZE axioms of the following form:
+        (forall arg_1: PyType, ..., arg_n: PyType ::
+        { union_type_n(arg_1, ..., arg_n)) }
+          get_basic(union_type_n(arg_1, ..., arg_n)) ==
+          union_basic())
+        """
+        result = []
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        arg_decls = []
+        args = []
+        union_basic = self.viper.DomainFuncApp('union_basic', [], self.type_type(),
+                                               position, info, self.type_domain)
+        for i in range(1, self.UNION_TYPE_SIZE + 1):
+            arg_decl = self.viper.LocalVarDecl('arg_' + str(i), self.type_type(),
+                                                position, info)
+            arg = self.viper.LocalVar('arg_' + str(i), self.type_type(), position,
+                                      info)
+            arg_decls.append(arg_decl)
+            args.append(arg)
+            union = self.viper.DomainFuncApp('union_type_' + str(i), args,
+                                             self.type_type(), position,
+                                             info, self.type_domain)
+            basic = self.viper.DomainFuncApp('get_basic', [union], self.type_type(),
+                                             position, info, self.type_domain)
+            body = self.viper.EqCmp(basic, union_basic, position, info)
+            trigger = self.viper.Trigger([union], position, info)
+            forall = self.viper.Forall(arg_decls, [trigger], body,
+                                       position, info)
+            axiom = self.viper.DomainAxiom('union_basic_' + str(i), forall,
+                                           position, info, self.type_domain)
+            result.append(axiom)
         return result
 
     def create_union_subtype_axioms(self,
@@ -121,6 +159,12 @@ class TypeDomainFactory:
             arg_subtype = self.viper.Or(arg_subtype, current_arg_subtype,
                                         position, info)
             body = self.viper.EqCmp(subtype_union, arg_subtype, position, info)
+            basic = self.viper.DomainFuncApp('get_basic', [sub_var], self.type_type(),
+                                             position, info, self.type_domain)
+            union_basic = self.viper.DomainFuncApp('union_basic', [], self.type_type(),
+                                                   position, info, self.type_domain)
+            not_union = self.viper.NeCmp(basic, union_basic, position, info)
+            body = self.viper.Implies(not_union, body, position, info)
             trigger = self.viper.Trigger([subtype_union], position, info)
             forall = self.viper.Forall(arg_decls + [sub_decl], [trigger], body,
                                        position, info)
@@ -175,6 +219,13 @@ class TypeDomainFactory:
         result = self.viper.DomainFunc('tuple_args', args,
                                        self.viper.SeqType(self.type_type()),
                                        False, position, info, self.type_domain)
+        return result
+
+    def union_basic_func(self, ctx: Context) -> 'silver.ast.DomainFunc':
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        result = self.viper.DomainFunc('union_basic', [],
+                                       self.type_type(),
+                                       True, position, info, self.type_domain)
         return result
 
     def create_type(self, cls: 'PythonClass',
