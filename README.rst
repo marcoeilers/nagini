@@ -6,10 +6,7 @@ Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely *will not work*) and the required libraries::
-
-    sudo apt-get install python3-dev
-
+Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely *will not work*) and the required libraries.
 For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
@@ -71,10 +68,8 @@ The following command line options are available::
     --sif=v         
                     Enable verification of secure information flow. v can be true for ordinary 
                     non-interference (for sequential programs only), poss for possiblistic 
-                    non-intererence (for concurrent programs) or prob for probabilisitc non-
+                    non-intererence (for concurrent programs) or prob for probabilistic non-
                     interference (for concurrent programs).
-                    Requires silver-sif-extension to be on the classpath, and silicon-sif-
-                    extension when used with counterexamples.
 
     --z3           
                     Sets the path of the Z3 executable. Alternatively, the
