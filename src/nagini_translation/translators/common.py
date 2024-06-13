@@ -370,9 +370,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         res = []
         if isinstance(ref, ast.Subscript):
             if isinstance(ref.value, ast.Name) and ref.value.id in ('Optional', 'Union'):
-                if not isinstance(ref.slice.value, ast.Tuple):
-                    return self.extract_identifiers(ref.slice.value, pos, info)
-                for e in ref.slice.value.elts:
+                if not isinstance(ref.slice, ast.Tuple):
+                    return self.extract_identifiers(ref.slice, pos, info)
+                for e in ref.slice.elts:
                     res.extend(self.extract_identifiers(e, pos, info))
                 return res
 
