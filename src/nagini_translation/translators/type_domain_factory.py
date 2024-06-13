@@ -49,6 +49,7 @@ class TypeDomainFactory:
             self.create_reflexivity_axiom(ctx),
             self.create_extends_implies_subtype_axiom(ctx),
             self.create_null_type_axiom(ctx),
+            self.create_union_basic_axiom(ctx),
             self.create_object_subtype_axiom(ctx),
             self.create_subtype_exclusion_axiom(ctx),
             self.create_subtype_exclusion_axiom_2(ctx),
@@ -620,6 +621,28 @@ class TypeDomainFactory:
         body = self.viper.Forall([arg_r], [trigger],
                                  biimplication, position, info)
         return self.viper.DomainAxiom('null_nonetype', body, position, info,
+                                      self.type_domain)
+
+    def create_union_basic_axiom(self, ctx: Context) -> 'silver.ast.DomainAxiom':
+        """
+        Creates an axiom that states that the type of null is None:
+
+        forall r: Ref :: { typeof(r) }
+          get_basic(typeof(r)) != union_basic()
+        """
+        position, info = self.no_position(ctx), self.no_info(ctx)
+        arg_r = self.viper.LocalVarDecl('r', self.viper.Ref, position, info)
+        var_r = self.viper.LocalVar('r', self.viper.Ref, position, info)
+        typeof = self.typeof(var_r, ctx)
+        basic = self.viper.DomainFuncApp('get_basic', [typeof], self.type_type(),
+                                         position, info, self.type_domain)
+        union_basic = self.viper.DomainFuncApp('union_basic', [], self.type_type(),
+                                               position, info, self.type_domain)
+        inequality = self.viper.NeCmp(basic, union_basic, position, info)
+        trigger = self.viper.Trigger([typeof], position, info)
+        body = self.viper.Forall([arg_r], [trigger],
+                                 inequality, position, info)
+        return self.viper.DomainAxiom('nothing_has_union_type', body, position, info,
                                       self.type_domain)
 
     def create_object_type(self, ctx: Context) -> 'silver.ast.DomainFunc':
