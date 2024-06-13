@@ -19,6 +19,7 @@ domain PyType {
     function tuple_args(t: PyType): Seq[PyType]
     function tuple_arg(t: PyType, i: Int): PyType
     function tuple_basic(): PyType
+    function union_basic(): PyType
     function Iterator(t: PyType): PyType
     function Iterator_arg(t: PyType, i: Int): PyType
     function PSeq(t: PyType): PyType
