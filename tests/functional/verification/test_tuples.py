@@ -7,7 +7,7 @@ from typing import Tuple, Union, cast
 
 def something(s: str, a: Tuple[str, int]) -> Tuple[str, str, int]:
     Requires(a[1] > 8)
-    Ensures(ResultT(Tuple[str, str, int])[1] == 'asd')
+    Ensures(Result()[1] == 'asd')
     Ensures(Result()[2] == a[1])
     Ensures(Result()[2] > 6)
     c = s + 'asdasd'
