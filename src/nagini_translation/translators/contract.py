@@ -100,7 +100,7 @@ class ContractTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
-            return ([], self.viper.Result(self.translate_type(type, ctx),
+            return ([], self.viper.Result(self.translate_type(actual_type, ctx),
                                           self.to_position(node, ctx),
                                           self.no_info(ctx)))
 
