@@ -457,6 +457,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         if node.func.id in CONTRACT_FUNCS:
             if node.func.id  == 'Result':
                 return current_function.type
+            elif node.func.id  == 'ResultT':
+                return get_target(node.args[0], containers, container)
             elif node.func.id == 'RaisedException':
                 ctxs = [cont for cont in containers if
                         hasattr(cont, 'var_aliases')]

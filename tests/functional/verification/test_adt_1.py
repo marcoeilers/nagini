@@ -72,7 +72,7 @@ def constructor_instance_2(l: LinkedList) -> None:
 def deconstructor_in_contract_1(l: Node) -> int:
     Requires(isinstance(l.elem, int))
     Requires(l.elem == 5)
-    Ensures(Result() == 10)
+    Ensures(ResultT(int) == 10)
     return l.elem * 2
 
 def deconstructor_in_constract_2(l: LinkedList) -> int:
