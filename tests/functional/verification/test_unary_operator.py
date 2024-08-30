@@ -46,7 +46,7 @@ class Test():
 
   def __pos__(self) -> 'Test':
     Requires(Acc(self.a, 1/2))
-    Ensures(Acc(self.a, 1/2) and Acc(Result().a))
+    Ensures(Acc(self.a, 1/2) and Acc(ResultT(Test).a))
     Ensures(Result().a == self.a)
     return Test(self.a)
 

@@ -15,7 +15,7 @@ class Sub(Super):
 @Pure
 def test_ifexp(a: int) -> int:
     Ensures(Implies(a == 0, Result() == 66))
-    Ensures(Implies(a != 0, Result() == 55))
+    Ensures(Implies(a != 0, ResultT(int) == 55))
     return 55 if a else 66
 
 

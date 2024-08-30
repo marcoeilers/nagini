@@ -89,8 +89,12 @@ class ContractTranslator(CommonTranslator):
         Translates a call to the Result() contract function to a result
         expression.
         """
-        assert len(node.args) == 0
-        type = ctx.actual_function.type
+        actual_type = ctx.actual_function.type
+        if len(node.args) == 1:
+            declared_type = self.get_target(node.args[0], ctx)
+            if declared_type != actual_type:
+                raise InvalidProgramException(node, 'incorrect.declared.type',
+                                              'ResultT declares incorrect result type.')
         if not ctx.actual_function.pure:
             if ctx.result_var is None:
                 raise InvalidProgramException(node, 'invalid.result')
@@ -1000,7 +1004,7 @@ class ContractTranslator(CommonTranslator):
         Translates calls to contract functions like Result() and Acc()
         """
         func_name = get_func_name(node)
-        if func_name == 'Result':
+        if func_name in ('Result', 'ResultT'):
             return self.translate_result(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)

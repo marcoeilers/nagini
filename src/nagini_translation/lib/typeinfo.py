@@ -213,6 +213,8 @@ class TypeVisitor(TraverserVisitor):
             return
         if isinstance(node.callee, mypy.nodes.SuperExpr):
             return
+        if isinstance(node.callee, mypy.nodes.NameExpr) and node.callee.name == 'ResultT':
+            return
         for a in node.args:
             self.visit(a)
         self.visit(node.callee)
