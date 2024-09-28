@@ -75,8 +75,8 @@ method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
 method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires acc(self.list_acc)
-    requires key >= 0
-    requires key < list___len__(self)
+    requires @error("List index may be negative.")(key >= 0)
+    requires @error("List index may be out of bounds.")(key < list___len__(self))
     requires issubtype(typeof(item), list_arg(typeof(self), 0))
     ensures acc(self.list_acc)
     ensures self.list_acc == old(self.list_acc)[key := item]

@@ -130,7 +130,7 @@ function int___mul__(self: Int, other: Int): Int
 
 function int___floordiv__(self: Int, other: Int): Int
     decreases _
-    requires other != 0
+    requires @error("Divisor may be zero.")(other != 0)
 {
     self \ other
 }
