@@ -24,8 +24,8 @@ function PSeq___getitem__(self: Ref, index: Ref): Ref
     decreases _
     requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
     requires issubtype(typeof(index), int())
-    requires let ln == (PSeq___len__(self)) in
-                ((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln))
+    requires @error("Index may be out of bounds.")(let ln == (PSeq___len__(self)) in
+                @error("Index may be out of bounds.")((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln)))
     ensures result == (int___unbox__(index) >= 0 ? PSeq___sil_seq__(self)[int___unbox__(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + int___unbox__(index)])
     ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
 

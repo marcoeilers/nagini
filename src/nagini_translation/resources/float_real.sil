@@ -330,8 +330,8 @@ function float___truediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
-    requires float___is_nan__(other) == false && float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
-        float___unbox__(other) != 0 / 1
+    requires @error("Divisor may be zero.")(float___is_nan__(other) == false && float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        @error("Divisor may be zero.")(float___unbox__(other) != 0 / 1))
     ensures issubtype(typeof(result), float())
     ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
         result == float___box_nan()
@@ -366,8 +366,8 @@ function float___rtruediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
-    requires float___is_nan__(self) == false && float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
-        float___unbox__(self) != 0 / 1
+    requires @error("Divisor may be zero.")(float___is_nan__(self) == false && float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        @error("Divisor may be zero.")(float___unbox__(self) != 0 / 1))
     ensures issubtype(typeof(result), float())
     ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
         result == float___box_nan()

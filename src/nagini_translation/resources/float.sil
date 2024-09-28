@@ -101,7 +101,7 @@ function float___truediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
-    requires issubtype(typeof(other), int()) ==> int___unbox__(other) != 0
+    requires @error("Divisor may be zero.")(issubtype(typeof(other), int()) ==> @error("Divisor may be zero.")(int___unbox__(other) != 0))
     requires issubtype(typeof(other), int())  // cannot express non-zero at the moment
     ensures issubtype(typeof(result), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
@@ -123,7 +123,7 @@ function float___rtruediv__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
     requires issubtype(typeof(other), float())
-    requires issubtype(typeof(self), int()) ==> int___unbox__(self) != 0
+    requires @error("Divisor may be zero.")(issubtype(typeof(self), int()) ==> @error("Divisor may be zero.")(int___unbox__(self) != 0))
     requires issubtype(typeof(self), int())  // cannot express non-zero at the moment
     ensures issubtype(typeof(result), float())
     ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
