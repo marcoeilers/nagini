@@ -290,6 +290,36 @@
             "args": ["int"],
             "type": "int",
             "requires": ["__prim__int___box__", "int___unbox__"]
+        },
+        "__and__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rand__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
+        },
+        "__or__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__ror__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
+        },
+        "__xor__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rxor__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
         }
     },
     "extends": "float"
@@ -434,6 +464,18 @@
             "args": ["bool", "object"],
             "type": "__prim__bool",
             "requires": ["__unbox__"]
+        },
+        "__and__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
+        },
+        "__or__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
+        },
+        "__xor__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
         }
     },
     "extends": "int"

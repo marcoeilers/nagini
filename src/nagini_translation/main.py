@@ -54,12 +54,16 @@ TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
-def parse_sil_file(sil_path: str, jvm, float_option: str = None):
+def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option: str = None):
     parser = jvm.viper.silver.parser.FastParser()
     tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
+    with open(bv_path, 'r') as file:
+        int_min = -(2 ** (bv_size - 1))
+        int_max = 2 ** (bv_size - 1) - 1
+        text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
     if float_option == "ieee32":
@@ -84,16 +88,16 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     return program.get()
 
 
-def load_sil_files(jvm: JVM, sif: bool = False, float_option: str = None):
+def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str = None):
     current_path = os.path.dirname(inspect.stack()[0][1])
     if sif:
         resources_path = os.path.join(current_path, 'sif', 'resources')
     else:
         resources_path = os.path.join(current_path, 'resources')
-    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm, float_option)
+    return parse_sil_file(os.path.join(resources_path, 'all.sil'), os.path.join(resources_path, 'intbv.sil'), bv_size, jvm, float_option)
 
 
-def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
+def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
@@ -137,7 +141,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
-        sil_programs = load_sil_files(jvm, sif, float_encoding)
+        sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
@@ -333,6 +337,12 @@ def main() -> None:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--int-bitops-size',
+        help='Maximium size of integers for which bitwise operations are allowed.',
+        type=int,
+        default=8
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -367,7 +377,7 @@ def main() -> None:
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
         global sil_programs
-        sil_programs = load_sil_files(jvm, args.sif, args.float_encoding)
+        sil_programs = load_sil_files(args.int_bitops_size, args.jvm, args.sif, args.float_encoding)
 
         while True:
             file = socket.recv_string()
@@ -392,7 +402,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
-        modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
+        modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:

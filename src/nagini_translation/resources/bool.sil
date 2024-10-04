@@ -24,6 +24,99 @@ function bool___bool__(self: Ref) : Bool
     ensures self == null ==> !result
     ensures self != null ==> result == bool___unbox__(self)
 
+function bool___and__(self: Bool, other: Bool): Bool
+    decreases _
+{ self && other }
+
+function bool___or__(self: Bool, other: Bool): Bool
+    decreases _
+{ self || other }
+
+function bool___xor__(self: Bool, other: Bool): Bool
+    decreases _
+{ self != other }
+
+function int___and__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+    ensures issubtype(typeof(result), int())
+    ensures result == int___and__(other, self)
+    ensures result ==
+    ((issubtype(typeof(self), bool()) && issubtype(typeof(other), bool())) ?
+        __prim__bool___box__(bool___unbox__(self) && bool___unbox__(other)) :
+        __prim__int___box__(fromBVInt(andBVInt(toBVInt(int___unbox__(self)), toBVInt(int___unbox__(other))))))
+
+function int___rand__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+{
+    int___and__(self, other)
+}
+
+function int___or__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+    ensures issubtype(typeof(result), int())
+    ensures result == int___or__(other, self)
+    ensures result ==
+    ((issubtype(typeof(self), bool()) && issubtype(typeof(other), bool())) ?
+        __prim__bool___box__(bool___unbox__(self) || bool___unbox__(other)) :
+        __prim__int___box__(fromBVInt(orBVInt(toBVInt(int___unbox__(self)), toBVInt(int___unbox__(other))))))
+
+function int___ror__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+{
+    int___or__(self, other)
+}
+
+function int___xor__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+    ensures issubtype(typeof(result), int())
+    ensures result == int___xor__(other, self)
+    ensures result ==
+    ((issubtype(typeof(self), bool()) && issubtype(typeof(other), bool())) ?
+        __prim__bool___box__(bool___unbox__(self) != bool___unbox__(other)) :
+        __prim__int___box__(fromBVInt(xorBVInt(toBVInt(int___unbox__(self)), toBVInt(int___unbox__(other))))))
+
+function int___rxor__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), int())
+    requires issubtype(typeof(other), int())
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(self), bool()) ==> int___unbox__(self) <= _INT_MAX)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) >= _INT_MIN)
+    requires @error("Bitwise operations on ints can only be performed in the range set by the --int-bitops-size setting (default: 8 bits).")(!issubtype(typeof(other), bool()) ==> int___unbox__(other) <= _INT_MAX)
+{
+    int___xor__(self, other)
+}
+
 function int___bool__(self: Ref) : Bool
     decreases _
     requires self != null ==> issubtype(typeof(self), int())
