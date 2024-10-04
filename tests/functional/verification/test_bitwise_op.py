@@ -140,7 +140,7 @@ def or_4(a: int, b: bool, c: int) -> None:
 
 def xor_3(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -128 and c < 127)
+    Requires(c >= -128 and c <= 127)
     intbool = a ^ b
     boolint = b ^ a
     intint = a ^ c
@@ -159,7 +159,7 @@ def xor_3(a: int, b: bool, c: int) -> None:
 
 def xor_3a(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -128 and c < 127)
+    Requires(c >= -128 and c <= 127)
     intbool = a ^ b
     boolint = b ^ a
     if a == 5:
@@ -169,6 +169,6 @@ def xor_3a(a: int, b: bool, c: int) -> None:
 
 def xor_4(a: int, b: bool, c: int) -> None:
     Requires(a > -100 and a < 100)
-    Requires(c > -130 and c < 127)
+    Requires(c >= -128 and c < 129)
     #:: ExpectedOutput(application.precondition:assertion.false)
     intint = a ^ c
