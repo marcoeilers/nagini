@@ -11,6 +11,7 @@ import inspect
 import json
 import logging
 import os
+import sys
 import re
 import time
 import traceback
@@ -49,6 +50,7 @@ from nagini_translation.verifier import (
     VerificationResult,
     ViperVerifier
 )
+from nagini_translation import verifier
 from typing import List, Set, Tuple
 
 
@@ -56,12 +58,16 @@ TYPE_ERROR_PATTERN = r"^(?P<file>.*):(?P<line>\d+): error: (?P<msg>.*)$"
 TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
-def parse_sil_file(sil_path: str, jvm, float_option: str = None):
+def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option: str = None):
     parser = getclass(jvm.java, jvm.viper.silver.parser, "FastParser")()
     tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
         text = file.read()
+    with open(bv_path, 'r') as file:
+        int_min = -(2 ** (bv_size - 1))
+        int_max = 2 ** (bv_size - 1) - 1
+        text += "\n" + file.read().replace("NBITS", str(bv_size)).replace("INT_MIN_VAL", str(int_min)).replace("INT_MAX_VAL", str(int_max))
     if float_option == "real":
         text = text.replace("float.sil", "float_real.sil")
     if float_option == "ieee32":
@@ -69,14 +75,15 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     path = jvm.java.nio.file.Paths.get(sil_path, [])
     none = getobject(jvm.java, jvm.scala, "None")
     tp.beforeParse(text, False)
-    parsed = parser.parse(text, path, none)
+    diskloader = getobject(jvm.java, jvm.viper.silver.ast.utility, "DiskLoader")
+    parsed = parser.parse(text, path, none, diskloader)
 
     parse_result = parsed
     parse_result.initProperties()
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
-    translator = jvm.viper.silver.parser.Translator(resolved)
+    translator = getobject(jvm.java, jvm.viper.silver.parser, 'Translator').apply(resolved)
     # Reset messages in global Consistency object. Otherwise, left-over
     # translation errors from previous translations prevent loading of the
     # built-in silver files.
@@ -85,16 +92,17 @@ def parse_sil_file(sil_path: str, jvm, float_option: str = None):
     return program.get()
 
 
-def load_sil_files(jvm: JVM, sif: bool = False, float_option: str = None):
+def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str = None):
     current_path = os.path.dirname(inspect.stack()[0][1])
+    default_path = os.path.join(current_path, 'resources')
     if sif:
         resources_path = os.path.join(current_path, 'sif', 'resources')
     else:
-        resources_path = os.path.join(current_path, 'resources')
-    return parse_sil_file(os.path.join(resources_path, 'all.sil'), jvm, float_option)
+        resources_path = default_path
+    return parse_sil_file(os.path.join(resources_path, 'all.sil'), os.path.join(default_path, 'intbv.sil'), bv_size, jvm, float_option)
 
 
-def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = None,
+def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
@@ -138,7 +146,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
     analyzer.process(translator)
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
-        sil_programs = load_sil_files(jvm, sif, float_encoding)
+        sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
@@ -155,7 +163,7 @@ def translate(path: str, jvm: JVM, selected: Set[str] = set(), base_dir: str = N
                                      func_opt=True,
                                      all_low=analyzer.has_all_low)
         if counterexample:
-            prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
+            prog = getobject(jvm.java, jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
         else:
             prog = getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer').transform(prog, False)
         if verbose:
@@ -326,7 +334,20 @@ def main() -> None:
     parser.add_argument(
         '--float-encoding',
         help='float encoding to be used (real or ieee32)',
-        default=None)
+        default=None
+    )
+    parser.add_argument(
+        '--submit-for-evaluation',
+        help='Allow Nagini and Viper developers to store the current program for future evaluation.',
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
+        '--int-bitops-size',
+        help='Maximium size of integers for which bitwise operations are allowed.',
+        type=int,
+        default=8
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -361,7 +382,7 @@ def main() -> None:
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
         global sil_programs
-        sil_programs = load_sil_files(jvm, args.sif, args.float_encoding)
+        sil_programs = load_sil_files(args.int_bitops_size, args.jvm, args.sif, args.float_encoding)
 
         while True:
             file = socket.recv_string()
@@ -373,14 +394,20 @@ def main() -> None:
             translate_and_verify(file, jvm, args, add_response, arp=args.arp, base_dir=args.base_dir)
             socket.send_string(response[0])
     else:
-        translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        success = translate_and_verify(args.python_file, jvm, args, arp=args.arp, base_dir=args.base_dir)
+        sys.exit(0 if success else 1)
 
 
-def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None):
+def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_dir=None) -> bool:
+    """
+    Translates input file to viper code and dispatches result to backend for verification
+
+    :returns: Whether translation and verification was successful
+    """
     try:
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
-        modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, base_dir=base_dir,
+        modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
@@ -408,13 +435,23 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
+            submitter = None
+            if args.submit_for_evaluation:
+                submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)
+                submitter.setProgram(prog)
+
             vresult = verify(modules, prog, python_file, jvm, viper_args,
                              backend=backend, arp=arp, counterexample=args.counterexample, sif=args.sif)
+            
+            if submitter is not None:
+                submitter.setSuccess(vresult.__bool__())
+                submitter.submit()
         if args.verbose:
             print("Verification completed.")
         print(vresult.to_string(args.ide_mode, args.show_viper_errors))
         duration = '{:.2f}'.format(time.time() - start)
         print('Verification took ' + duration + ' seconds.')
+        return isinstance(vresult, verifier.Success)
     except (TypeException, InvalidProgramException, UnsupportedException) as e:
         print("Translation failed")
         if isinstance(e, (InvalidProgramException, UnsupportedException)):
@@ -446,8 +483,10 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                     print('Type error: ' + msg + ' (' + file + '@' + line + '.0)')
                 else:
                     print(msg)
+        return False
     except ConsistencyException as e:
         print(e.message + ': Translated AST contains inconsistencies.')
+        return False
 
     except JException as e:
         print(e.stacktrace())

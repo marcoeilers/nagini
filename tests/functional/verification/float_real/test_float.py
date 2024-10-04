@@ -49,6 +49,7 @@ def sqr3(num : float) -> float:
     return num * num
 
 def arith(num: float) -> float:
+    Requires(not isNaN(num))
     Ensures(Result() == num + 3)
     return num + 1.0 + 2.0
 

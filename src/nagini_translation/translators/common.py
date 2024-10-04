@@ -921,15 +921,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         return self.viper.IntLit(ctx.get_fresh_int(), self.no_position(ctx),
                                  self.no_info(ctx))
 
-    def get_unknown_bool(self, ctx: Context) -> Expr:
+    def get_unknown_bool(self, arg: Expr, ctx: Context) -> Expr:
         """
-        Returns an arbitrary but fixed boolean value.
+        Returns an arbitrary but fixed boolean value that depends on the value of arg.
         """
         pos = self.no_position(ctx)
         info = self.no_info(ctx)
         fresh_int = self.get_fresh_int_lit(ctx)
         param = self.viper.LocalVarDecl('i', self.viper.Int, pos, info)
-        return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int], pos, info,
+        return self.viper.FuncApp(ARBITRARY_BOOL_FUNC, [fresh_int, self.to_ref(arg, ctx)], pos, info,
                                   self.viper.Bool, [param])
 
     def _conjoin(self, eqs: List[Expr], pos: Position, info: Info) -> Expr:

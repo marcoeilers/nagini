@@ -84,7 +84,10 @@ class Reason:
         """
         reason = self._reason_string or self._node
         if reason is None and self.identifier in VAGUE_REASONS:
-            if not show_viper_reason:
+            if (self.offending_node.info().getClass().getSimpleName() == "AnnotationInfo" and
+                    self.offending_node.info().values().contains("error")):
+                return self.offending_node.info().values().get("error").get().head()
+            elif not show_viper_reason:
                 return VAGUE_REASONS[self.identifier]
             else:
                 return self._reason.readableMessage()

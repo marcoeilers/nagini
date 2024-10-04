@@ -174,7 +174,7 @@ def pytest_configure(config: 'pytest.config.Config'):
         for test in tests:
             _pytest_config.add_test(test)
         if 'sif-true' in tests or 'sif-poss' in tests or 'sif-prob' in tests:
-            if not jvm.is_known_class(jvm.viper.silver.sif.SIFReturnStmt):
+            if not jvm.is_known_class(jvm.viper.silver.sif, 'SIFReturnStmt'):
                 pytest.exit('Viper SIF extension not avaliable on the classpath.')
     elif config.option.single_test:
         _pytest_config.clear_tests()

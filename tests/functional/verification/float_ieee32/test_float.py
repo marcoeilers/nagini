@@ -28,6 +28,14 @@ def specialVals() -> None:
 def cmpLits() -> None:
     Assert(3.0 > 2.0)
     Assert(1.0 <= 40.0)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(44.0 < 10.2)
+
+def cmpLitsNeg() -> None:
+    Assert(-3.0 < 2.0)
+    Assert(-1.0 >= -40.0)
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(8345.3454 < -2323.15345)
 
 def divSave(f: float, g: float) -> None:
     #:: ExpectedOutput(application.precondition:assertion.false)

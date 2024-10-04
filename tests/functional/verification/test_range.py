@@ -16,10 +16,22 @@ def rangetest() -> None:
 
 
 def rangetest2() -> None:
-    a = range(0, 5)
+    a = range(5)
     for i in a:
         assert i < 6
     assert i == 4
     for b in a:
         #:: ExpectedOutput(assert.failed:assertion.false)
         assert b > 2
+
+
+def rangetest3() -> None:
+    a = range(1, 5)
+    Assert(a[2] == 3)
+    Assert(3 in a)
+    Assert(7 not in a)
+    Assert(5 not in a)
+    Assert(Forall(a, lambda x: (x < 5, [])))
+    Assert(Forall(a, lambda x: (x > 0, [])))
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    Assert(Forall(a, lambda x: (x > 1, [])))

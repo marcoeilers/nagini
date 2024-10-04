@@ -99,6 +99,8 @@ REASONS = {
         lambda n: 'Divisor {} might be zero.'.format(pprint(n)),
     'negative.permission':
         lambda n: 'Fraction {} might be negative.'.format(pprint(n)),
+    'permission.not.positive':
+        lambda n: 'Fraction {} might not be positive'.format(pprint(n)),
     'insufficient.permission':
         lambda n: ('There might be insufficient permission to '
                    'access {}.').format(pprint(n)),
@@ -203,6 +205,7 @@ VAGUE_REASONS = {
     'receiver.null': 'Receiver might be null.',
     'division.by.zero': 'Divisor might be zero.',
     'negative.permission': 'Fraction might be negative.',
+    'permission.not.positive': 'Fraction might not be positive.',
     'insufficient.permission': 'There might be insufficient permission.',
     'termination_measure.non_positive': 'Termination measure might be non-positive.',
     'measure.non_decreasing': 'Termination measure might not be smaller.',

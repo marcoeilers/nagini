@@ -1,19 +1,12 @@
 
-Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Nagini is being developed at the `Chair of Programming Methodology <https://www.pm.inf.ethz.ch/research/nagini.html>`_ at ETH Zurich.
+Nagini is an automatic verifier for statically typed Python programs, based on the `Viper <http://viper.ethz.ch>`_ verification infrastructure. Nagini is being developed at the `Programming Methodology Group <https://www.pm.inf.ethz.ch/research/nagini.html>`_ at ETH Zurich.
 
 Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz.ch/publications/getpdf.php?bibname=Own&id=EilersMueller18.pdf>`_, and a more detailed description of its encoding can be found in `Marco Eilers' thesis <https://pm.inf.ethz.ch/publications/Eilers2022.pdf>`_. Also see `the Wiki <https://github.com/marcoeilers/nagini/wiki>`_ for the documentation of Nagini's specification language. 
-
-You can try a (rather slow) online version of Nagini `on this website <http://viper.ethz.ch/nagini-examples/>`_.
-
-For use with the PyCharm IDE, try the `Nagini PyCharm plugin <https://github.com/marcoeilers/nagini-pycharm>`_.
 
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries::
-
-    sudo apt-get install python3-dev
-
+Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries.
 For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
@@ -75,10 +68,8 @@ The following command line options are available::
     --sif=v         
                     Enable verification of secure information flow. v can be true for ordinary 
                     non-interference (for sequential programs only), poss for possiblistic 
-                    non-intererence (for concurrent programs) or prob for probabilisitc non-
+                    non-intererence (for concurrent programs) or prob for probabilistic non-
                     interference (for concurrent programs).
-                    Requires silver-sif-extension to be on the classpath, and silicon-sif-
-                    extension when used with counterexamples.
 
     --z3           
                     Sets the path of the Z3 executable. Alternatively, the

@@ -26,12 +26,12 @@ GHOST_PREFIX = "_gh_"
 
 CONTRACT_WRAPPER_FUNCS = ['Requires', 'Ensures', 'Exsures', 'Invariant', 'Decreases']
 
-CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
+CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Forall', 'IOForall', 'Forall2', 'Forall3', 'Forall6',
                   'Exists', 'Low', 'LowVal', 'LowEvent', 'Declassify', 'TerminatesSif',
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute']
+                  'PMultiset', 'LowExit', 'Refute', 'isNaN']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -80,6 +80,11 @@ def Old(expr: T) -> T:
 def Result() -> Any:
     pass
 
+def ResultT(t: Type[V]) -> V:
+    """
+    Like Result() but explicitly typed to avoid Any types.
+    """
+    pass
 
 def RaisedException() -> Any:
     pass
@@ -506,6 +511,8 @@ def dict_pred(d: object) -> bool:
     be folded or unfolded.
     """
 
+def isNaN(f: float) -> bool:
+    pass
 
 __all__ = [
         'Requires',
@@ -519,6 +526,7 @@ __all__ = [
         'Refute',
         'Old',
         'Result',
+        'ResultT',
         'RaisedException',
         'Implies',
         'Forall',
@@ -560,4 +568,5 @@ __all__ = [
         'ToMS',
         'MaySet',
         'MayCreate',
+        'isNaN'
         ]

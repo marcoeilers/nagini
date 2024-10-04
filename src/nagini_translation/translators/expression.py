@@ -23,7 +23,8 @@ from nagini_translation.lib.constants import (
     LIST_TYPE,
     METHOD_ID_DOMAIN,
     OBJECT_TYPE,
-    OPERATOR_FUNCTIONS,
+    LEFT_OPERATOR_FUNCTIONS,
+    RIGHT_OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PERM_TYPE,
     SET_TYPE,
@@ -43,6 +44,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonTryBlock,
     PythonType,
+    TypeVar,
     PythonVar,
     UnionType,
     toposort_classes,
@@ -66,6 +68,7 @@ from nagini_translation.lib.util import (
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from typing import List, Optional, Tuple, Union
+from math import isnan, isinf
 
 
 # Maps function names to bools; caches which functions take an additonal argument
@@ -253,24 +256,25 @@ class ExpressionTranslator(CommonTranslator):
     def translate_float_literal(self, lit: float, node: ast.AST, ctx: Context) -> Expr:
         pos = self.to_position(node, ctx)
         info = self.no_info(ctx)
+
+        float_class = ctx.module.global_module.classes[FLOAT_TYPE]
         if ctx.float_encoding == "real":
+            if isnan(lit):
+                return self.get_function_call(float_class, '__box_nan', [], [], node, ctx, pos)
+            if isinf(lit) and lit > 0:
+                return self.get_function_call(float_class, '__box_inf', [self.viper.FalseLit(pos, info)], [None], node, ctx, pos)
+            if isinf(lit) and lit < 0:
+                return self.get_function_call(float_class, '__box_inf', [self.viper.TrueLit(pos, info)], [None], node, ctx, pos)
+
             prim_perm_class = ctx.module.global_module.classes[PRIMITIVE_PERM_TYPE]
-            try:
-                num, den = lit.as_integer_ratio()
-                num_lit = self.viper.IntLit(num, pos, info)
-                den_lit = self.viper.IntLit(den, pos, info)
-                frac = self.viper.FractionalPerm(num_lit, den_lit, pos, info)
-                float_val = self.get_function_call(prim_perm_class, '__box__', [frac],
-                                                   [None], node, ctx, pos)
-                return float_val
-            except ValueError:
-                # NaN
-                raise InvalidProgramException(node, 'non.real.float')
-            except OverflowError:
-                # Inf
-                raise InvalidProgramException(node, 'non.real.float')
+            num, den = lit.as_integer_ratio()
+            num_lit = self.viper.IntLit(num, pos, info)
+            den_lit = self.viper.IntLit(den, pos, info)
+            frac = self.viper.FractionalPerm(num_lit, den_lit, pos, info)
+            float_val = self.get_function_call(prim_perm_class, '__box__', [frac],
+                                               [None], node, ctx, pos)
+            return float_val
         if ctx.float_encoding == "ieee32":
-            float_class = ctx.module.global_module.classes[FLOAT_TYPE]
             import struct
             bytes_val = struct.pack('!f', lit)
             int_val = int.from_bytes(bytes_val, "big")
@@ -281,7 +285,6 @@ class ExpressionTranslator(CommonTranslator):
         import logging
         logging.warning("Floating point operations are uninterpreted by default. To use interpreted "
                         "floating point operations, use option --float-encoding")
-        float_class = ctx.module.global_module.classes[FLOAT_TYPE]
         index_lit = self.viper.IntLit(ctx.get_fresh_int(), pos, info)
         float_val = self.get_function_call(float_class, '__create__', [index_lit],
                                            [None], node, ctx, pos)
@@ -880,13 +883,20 @@ class ExpressionTranslator(CommonTranslator):
                                              target_type=self.viper.Bool)
             return (stmt, self.viper.Not(expr, self.to_position(node, ctx),
                                          self.no_info(ctx)))
-        stmt, expr = self.translate_expr(node.operand, ctx,
-                                         target_type=self.viper.Int)
-        if isinstance(node.op, ast.USub):
-            return (stmt, self.viper.Minus(expr, self.to_position(node, ctx),
-                                           self.no_info(ctx)))
+        
+        stmt, expr = self.translate_expr(node.operand, ctx)
+        operand_type = self.get_type(node.operand, ctx)
+
+        if isinstance(node.op, ast.UAdd):
+            func_name = '__pos__'
+        elif isinstance(node.op, ast.USub):
+            func_name = '__neg__'
+        elif isinstance(node.op, ast.Invert):
+            func_name = '__invert__'
         else:
-            raise UnsupportedException(node)
+            raise UnsupportedException(node, f"Unsupported unary operator {node.op}")
+
+        return self.get_func_or_method_call(operand_type, func_name, [expr], [operand_type], node, ctx)
 
     def translate_IfExp(self, node: ast.IfExp, ctx: Context,
                         impure=False) -> StmtsAndExpr:
@@ -965,7 +975,7 @@ class ExpressionTranslator(CommonTranslator):
             wrap = self.to_bool
         result = op(wrap(left, ctx), wrap(right, ctx), pos, self.no_info(ctx))
         return result
-
+        
     def translate_operator(self, left: Expr, right: Expr, left_type: PythonType,
                            right_type: PythonType, node: ast.AST,
                            ctx: Context) -> StmtsAndExpr:
@@ -976,16 +986,34 @@ class ExpressionTranslator(CommonTranslator):
         """
         position = self.to_position(node, ctx)
         stmt = []
+
         if self._is_primitive_operation(node.op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
             return stmt, result
-        func_name = OPERATOR_FUNCTIONS[type(node.op)]
-        call_stmt, call = self.get_func_or_method_call(left_type, func_name,
-                                                       [left, right],
-                                                       [left_type, right_type],
-                                                       node, ctx)
-        return stmt + call_stmt, call
+        
+        if left_type == right_type or isinstance(right_type, TypeVar):
+            call_stmt, call = self.get_func_or_method_call(left_type, LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left, right], [left_type, right_type], node, ctx)
+            return stmt + call_stmt, call
+            
+        else:
+            right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
+            right_func = right_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+
+            if right_type.issubtype(left_type) and right_func:
+                base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
+                if right_func.overrides or base_right_func == None:
+                    call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
+                    return stmt + call_stmt, call
+
+            left_func_name = LEFT_OPERATOR_FUNCTIONS[type(node.op)]
+            left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
+            if left_func:
+                call_stmt, call = self.get_func_or_method_call(left_type, left_func_name, [left, right], [left_type, right_type], node, ctx)
+                return stmt + call_stmt, call
+            if right_func:
+                call_stmt, call = self.get_func_or_method_call(right_type, right_func_name, [right, left], [right_type, left_type], node, ctx)
+                return stmt + call_stmt, call
 
     def is_thread_method_definition(self, node: ast.Compare, ctx: Context) -> bool:
         """
@@ -1224,6 +1252,10 @@ class ExpressionTranslator(CommonTranslator):
                 expression_parts.append(self.to_ref(expression_part, ctx))
             bool_parts.append(bool_expression)
             types_parts.append(typ)
+
+        if isinstance(node.op, ast.Or) and not all_pure:
+            raise InvalidProgramException(node, 'impure.disjunction',
+                                          'Disjunctions must be pure. Use implications to express impure disjunctions.')
 
         all_bool = all(typ and typ.name == 'bool' for typ in types_parts)
 

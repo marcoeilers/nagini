@@ -45,7 +45,7 @@ def MustRelease_context_2(lock: Lock[object]) -> None:
         i += 1
 
 
-#:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def MustInvoke_body_1(t1: Place) -> None:
     Requires(token(t1, 1))
     i = 0
@@ -55,7 +55,7 @@ def MustInvoke_body_1(t1: Place) -> None:
         i += 1
 
 
-#:: ExpectedOutput(leak_check.failed:method_body.leaks_obligations)
+#:: ExpectedOutput(carbon)(leak_check.failed:method_body.leaks_obligations)
 def MustRelease_body_1(lock: Lock[object]) -> None:
     Requires(MustRelease(lock, 1))
     i = 0
