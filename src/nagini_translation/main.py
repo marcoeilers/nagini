@@ -114,9 +114,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     error_manager.clear()
     current_path = os.path.dirname(inspect.stack()[0][1])
     if sif:
-        preamble_path = os.path.join(current_path, 'sif', 'resources')
+        builtins_index_path = os.path.join(current_path, 'sif', 'resources')
     else:
-        preamble_path = os.path.join(current_path, 'resources')
+        builtins_index_path = os.path.join(current_path, 'resources')
 
     if sif:
         viper_ast = ViperASTExtended(jvm, jvm.java, jvm.scala, jvm.viper, path)
@@ -133,7 +133,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
 
     analyzer = Analyzer(types, path, selected)
     main_module = analyzer.module
-    with open(os.path.join(preamble_path, 'preamble.index'), 'r') as file:
+    with open(os.path.join(builtins_index_path, 'builtins.json'), 'r') as file:
         analyzer.add_native_silver_builtins(json.loads(file.read()))
 
     analyzer.initialize_io_analyzer()
