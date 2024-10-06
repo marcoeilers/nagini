@@ -10,6 +10,7 @@ from typing import Optional
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import MethodType
 from nagini_translation.lib.typedefs import DomainFuncApp
+from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.util import list_to_seq
 from nagini_translation.translators.type_domain_factory import TypeDomainFactory
 
@@ -23,7 +24,7 @@ def configure_mpp_transformation(jvm, ctrl_opt: bool, seq_opt: bool,
     - act_opt:  at the beginning of each method add an 'assume p1' statement.
     - func_opt: only apply the _checkDefined and _isDefined functions in the first execution.
     """
-    transformer_object = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$')
+    transformer_object = getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer')
     transformer_object.optimizeControlFlow(ctrl_opt)
     transformer_object.optimizeSequential(seq_opt)
     transformer_object.optimizeRestrictActVars(act_opt)
@@ -43,12 +44,12 @@ def _to_scala_set(jvm, inset: set):
 
 def set_all_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
-    getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setAllLowMethods(scala_set)
+    getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer').setAllLowMethods(scala_set)
 
 
 def set_preserves_low_methods(jvm, names: set) -> None:
     scala_set = _to_scala_set(jvm, names)
-    getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').setPreservesLowMethods(scala_set)
+    getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer').setPreservesLowMethods(scala_set)
 
 
 def set_equality_comp_functions(jvm, names: set) -> None:

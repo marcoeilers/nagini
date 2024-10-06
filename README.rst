@@ -6,13 +6,13 @@ Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely *will not work*) and the required libraries.
+Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries.
 For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
 ==========================
 
-1.  Install Java 11 or newer (64 bit) and Python 3.8 (64 bit, newer versions likely *will not work*).
+1.  Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*).
 
 2.  Install the required version of either Visual C++ Build Tools or Visual Studio. 
 

@@ -23,7 +23,11 @@ from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
 from nagini_translation.lib.errors import error_manager
-from nagini_translation.lib.jvmaccess import JVM
+from nagini_translation.lib.jvmaccess import (
+    getclass,
+    getobject,
+    JVM
+)
 from nagini_translation.lib.typedefs import Program
 from nagini_translation.lib.typeinfo import TypeException, TypeInfo
 from nagini_translation.lib.util import (
@@ -55,7 +59,7 @@ TYPE_ERROR_MATCHER = re.compile(TYPE_ERROR_PATTERN)
 
 
 def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option: str = None):
-    parser = jvm.viper.silver.parser.FastParser()
+    parser = getclass(jvm.java, jvm.viper.silver.parser, "FastParser")()
     tp = jvm.viper.silver.plugin.standard.termination.TerminationPlugin(None, None, None, parser)
     assert parser
     with open(sil_path, 'r') as file:
@@ -69,9 +73,9 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     if float_option == "ieee32":
         text = text.replace("float.sil", "float_ieee32.sil")
     path = jvm.java.nio.file.Paths.get(sil_path, [])
-    none = getattr(getattr(jvm.scala, 'None$'), 'MODULE$')
+    none = getobject(jvm.java, jvm.scala, "None")
     tp.beforeParse(text, False)
-    diskloader = getattr(getattr(jvm.viper.silver.ast.utility, "DiskLoader$"), "MODULE$")
+    diskloader = getobject(jvm.java, jvm.viper.silver.ast.utility, "DiskLoader")
     parsed = parser.parse(text, path, none, diskloader)
 
     parse_result = parsed
@@ -79,7 +83,7 @@ def parse_sil_file(sil_path: str, bv_path: str, bv_size: int, jvm, float_option:
     resolver = jvm.viper.silver.parser.Resolver(parse_result)
     resolved = resolver.run()
     resolved = resolved.get()
-    translator = jvm.viper.silver.parser.Translator(resolved)
+    translator = getobject(jvm.java, jvm.viper.silver.parser, 'Translator').apply(resolved)
     # Reset messages in global Consistency object. Otherwise, left-over
     # translation errors from previous translations prevent loading of the
     # built-in silver files.
@@ -159,9 +163,9 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
                                      func_opt=True,
                                      all_low=analyzer.has_all_low)
         if counterexample:
-            prog = getattr(jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
+            prog = getobject(jvm.java, jvm.viper.silicon.sif, 'CounterexampleSIFTransformerO').transform(prog, False)
         else:
-            prog = getattr(getattr(jvm.viper.silver.sif, 'SIFExtendedTransformer$'), 'MODULE$').transform(prog, False)
+            prog = getobject(jvm.java, jvm.viper.silver.sif, 'SIFExtendedTransformer').transform(prog, False)
         if verbose:
             print('Transformation to MPP successful.')
     if arp:
