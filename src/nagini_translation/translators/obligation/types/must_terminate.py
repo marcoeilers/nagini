@@ -100,7 +100,7 @@ obligation type.
 .. note::
 
     For axiomatic methods (the ones that are defined in
-    ``preamble.index``) we add additional precondition:
+    ``builtins.json``) we add additional precondition:
 
     1.  If method is marked as terminating, we add a check that caller
         termination measure is bigger than 1:
