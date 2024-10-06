@@ -569,7 +569,7 @@ class VerificationTest(AnnotatedTest):
             pytest.skip('Ignored')
         abspath = os.path.abspath(path)
         absbase = os.path.abspath(base)
-        modules, prog = translate(abspath, jvm, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources,
+        modules, prog = translate(abspath, jvm, 8, base_dir=absbase, sif=sif, arp=arp, reload_resources=reload_resources,
                                   float_encoding=float_encoding)
         assert prog is not None
         if store_viper:
@@ -638,7 +638,7 @@ class TranslationTest(AnnotatedTest):
         path = os.path.abspath(path)
         base = os.path.abspath(base)
         try:
-            translate(path, jvm, base_dir=base, sif=sif, arp=arp, reload_resources=reload_resources,
+            translate(path, jvm, 8, base_dir=base, sif=sif, arp=arp, reload_resources=reload_resources,
                       float_encoding=float_encoding)
             actual_errors = []
         except InvalidProgramException as exp1:

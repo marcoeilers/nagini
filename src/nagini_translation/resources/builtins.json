@@ -10,16 +10,13 @@
             "args": ["object", "object"],
             "type": "__prim__bool"
         },
+        "__str__": {
+            "args": ["object"],
+            "type": "str"
+        },
         "__cast__": {
             "args": ["type", "object"],
             "type": "object"
-        }
-    },
-    "methods": {
-        "__str__": {
-            "args": ["object"],
-            "type": "str",
-            "MustTerminate": true
         }
     }
 },
@@ -50,7 +47,7 @@
             "args": ["list", "__prim__int", "object"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__"]
+            "requires": ["__len__", "__getitem__"]
         },
         "__iter__": {
             "args": ["list"],
@@ -79,7 +76,7 @@
         "__getitem__": {
             "args": ["list", "int"],
             "type": "object",
-            "requires": ["__len__"]
+            "requires": ["__len__", "int___unbox__"]
         },
         "__contains__": {
             "args": ["list", "object"],
@@ -293,6 +290,36 @@
             "args": ["int"],
             "type": "int",
             "requires": ["__prim__int___box__", "int___unbox__"]
+        },
+        "__and__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rand__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
+        },
+        "__or__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__ror__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
+        },
+        "__xor__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__prim__int___box__", "int___unbox__", "__prim__bool___box__", "bool___unbox__"]
+        },
+        "__rxor__": {
+            "args": ["int", "int"],
+            "type": "int",
+            "requires": ["__and__"]
         }
     },
     "extends": "float"
@@ -301,7 +328,8 @@
     "functions": {
         "__create__": {
             "args": ["__prim__int"],
-            "type": "float"
+            "type": "float",
+            "requires": ["__prim__perm___box__"]
         },
         "__unbox__": {
             "args": ["float"],
@@ -331,7 +359,7 @@
         "__bool__": {
             "args": ["float"],
             "type": "__prim__bool",
-            "requires": ["int___bool__", "int___unbox__"]
+            "requires": ["int___bool__", "int___unbox__", "unbox", "__prim__perm___box__", "___float32_zero", "float___is_nan__", "float___is_inf__"]
         },
         "__eq__": {
             "args": ["float", "object"],
@@ -412,6 +440,11 @@
             "args": ["float"],
             "type": "int",
             "requires": ["unbox", "__prim__int___box__", "float___is_nan__", "float___is_inf__"]
+        },
+        "__isNaN": {
+            "args": ["float"],
+            "type": "__prim__bool",
+            "requires": ["float___is_nan__", "float___unbox__"]
         }
     },
     "extends": "object"
@@ -431,6 +464,18 @@
             "args": ["bool", "object"],
             "type": "__prim__bool",
             "requires": ["__unbox__"]
+        },
+        "__and__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
+        },
+        "__or__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
+        },
+        "__xor__": {
+            "args": ["__prim__bool", "__prim__bool"],
+            "type": "__prim__bool"
         }
     },
     "extends": "int"
@@ -629,7 +674,7 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__"]
+            "requires": ["__len__", "__getitem__", "object___eq__"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
@@ -646,6 +691,15 @@
             "args": ["__prim__int"],
             "type": "int",
             "requires": ["int___unbox__"]
+        }
+    }
+},
+"__prim__perm": {
+    "functions": {
+        "__box__": {
+            "args": ["__prim__perm"],
+            "type": "int",
+            "requires": ["float___unbox__", "float___is_nan__", "float___is_inf__"]
         }
     }
 },
@@ -865,7 +919,7 @@
         "__getitem__": {
             "args": ["range", "__prim__int"],
             "type": "__prim__int",
-            "requires": ["__val__"]
+            "requires": ["__val__", "__len__"]
         },
         "__getitem_slice__": {
             "args": ["range", "slice"],
@@ -958,6 +1012,11 @@
         "abs": {
             "args": ["__prim__int"],
             "type": "__prim__int"
+        },
+        "sum": {
+            "args": ["list"],
+            "type": "__prim__int",
+            "requires": ["__seq_ref_to_seq_int", "int___unbox__", "__prim__int___box__", "list___getitem__"]
         }
     },
     "methods": {
@@ -965,6 +1024,12 @@
             "args": ["object"],
             "type": null,
             "MustTerminate": true
+        },
+        "sorted": {
+            "args": ["list"],
+            "type": "list",
+            "MustTerminate": true,
+            "requires": ["list___len__", "list___getitem__", "__prim__int___box__", "int___unbox__"]
         }
     }
 }

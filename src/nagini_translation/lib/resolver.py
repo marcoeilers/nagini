@@ -326,8 +326,9 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
         left_type = get_type(node.left, containers, container)
         right_type = get_type(node.right, containers, container)
 
+        func = None
         if left_type == right_type or isinstance(right_type, TypeVar):
-            return left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)]).type
+            func = left_type.get_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)])
 
         else:
             right_func_name = RIGHT_OPERATOR_FUNCTIONS[type(node.op)]
@@ -336,13 +337,17 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
             if right_type.issubtype(left_type) and right_func:
                 base_right_func = left_type.get_compatible_func_or_method(right_func_name, [right_type, left_type])
                 if right_func.overrides or base_right_func == None:
-                    return right_func.type
-            
-            left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
-            if left_func:
-                return left_func.type
-            if right_func:
-                return right_func.type
+                    func = right_func
+
+            if func is None:
+                left_func = left_type.get_compatible_func_or_method(LEFT_OPERATOR_FUNCTIONS[type(node.op)], [left_type, right_type])
+                if left_func:
+                    func = left_func
+                if right_func:
+                    func = right_func
+        if func is None:
+            raise UnsupportedException(node, 'Unsupported operator')
+        return func.type
 
     elif isinstance(node, ast.UnaryOp):
         if isinstance(node.op, ast.Not):
@@ -452,6 +457,8 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         if node.func.id in CONTRACT_FUNCS:
             if node.func.id  == 'Result':
                 return current_function.type
+            elif node.func.id  == 'ResultT':
+                return get_target(node.args[0], containers, container)
             elif node.func.id == 'RaisedException':
                 ctxs = [cont for cont in containers if
                         hasattr(cont, 'var_aliases')]

@@ -27,7 +27,6 @@ from nagini_translation.lib.constants import (
     RIGHT_OPERATOR_FUNCTIONS,
     PRIMITIVE_INT_TYPE,
     PRIMITIVE_PERM_TYPE,
-    PRIMITIVE_BOOL_TYPE,
     SET_TYPE,
     STRING_TYPE,
     THREAD_DOMAIN,
@@ -987,6 +986,7 @@ class ExpressionTranslator(CommonTranslator):
         """
         position = self.to_position(node, ctx)
         stmt = []
+
         if self._is_primitive_operation(node.op, left_type, right_type):
             result = self._translate_primitive_operation(left, right, left_type,
                                                          node.op, position, ctx)
