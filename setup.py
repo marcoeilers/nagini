@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='1.1.0',
+        version='1.1.1',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -26,7 +26,7 @@ setup(
         install_requires=[
             'mypy==0.782',
             'toposort==1.5',
-            'jpype1==1.0.1',
+            'jpype1==1.2.1',
             'astunparse==1.6.2',
             'pytest==4.3.0',
             'pytest-xdist==1.27.0',
