@@ -20,6 +20,8 @@ Dependencies (Windows)
 Getting Started
 ===============
 
+Execute the following commands (on Windows, you may have to use ``cmd`` and not PowerShell):
+
 1.  Create a virtual environment::
 
         virtualenv --python=python3 <env>
@@ -27,6 +29,12 @@ Getting Started
 2.  Activate it::
 
         source env/bin/activate
+
+    on Linux, or::
+
+        env\Scripts\activate
+
+    on Windows.
         
 3.  Install Nagini::
 
@@ -49,6 +57,9 @@ To verify a specific file from the nagini directory, run::
 
     nagini [OPTIONS] path-to-file.py
 
+You may have to explicitly supply a path to a Z3 executable (use version 4.8.7, other versions may offer significantly worse performance) using the command line parameter ``--z3=path/to/z3``.
+Additionally, you may have to set the environment variable ``JAVA_HOME`` to point to your Java installation.
+
 
 The following command line options are available::
 
@@ -66,14 +77,23 @@ The following command line options are available::
                     Enable outputting counterexamples for verification errors (experimental).
                     
     --sif=v         
-                    Enable verification of secure information flow. v can be true for ordinary 
-                    non-interference (for sequential programs only), poss for possiblistic 
-                    non-intererence (for concurrent programs) or prob for probabilistic non-
+                    Enable verification of secure information flow. v can be 'true' for ordinary 
+                    non-interference (for sequential programs only), 'poss' for possiblistic 
+                    non-intererence (for concurrent programs) or 'prob' for probabilistic non-
                     interference (for concurrent programs).
 
-    --z3           
-                    Sets the path of the Z3 executable. Alternatively, the
-                    'Z3_EXE' environment variable can be set.
+    --float-encoding           
+                    Selects a different encoding of floating point values. The default is to model floats
+                    as abstract values and all float operations as uninterpreted functions, so that essentially 
+                    nothing can be proved about them. Legal values for this option are 'real' to model floats
+                    as real numbers (i.e., not modeling floating point imprecision), or 'ieee32' to model them
+                    as proper IEEE 32 bit floats. The latter option unfortunately usually leads to very long
+                    verification times or non-termination.
+    --int-bitops-size
+                    Bitwise operations on integers (e.g. 12 ^ -5) are supported only for integers which can
+                    be proven to be in a specific range, namely the range of n-bit signed integers.
+                    This parameter sets the value of n.
+                    Default: 8.
                     
     --boogie        
                     Sets the path of the Boogie executable. Required if the Carbon backend
