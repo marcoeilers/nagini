@@ -112,6 +112,27 @@ The following command line options are available::
 To see all possible command line options, invoke ``nagini`` without arguments.
 
 
+Server Mode / Faster Verification Mode
+======================================
+
+Nagini has to do a significant amount of work on startup, and has to start a JVM to run Viper.
+To avoid some of that startup work and speed up Viper's runtime, Nagini has a server mode.
+To use it,
+
+1. Start a Nagini server::
+
+        nagini --server <otherArgs> dummyFile.py
+   Note that all required arguments, including ``JAVA_HOME`` and other potentially required  
+   environment variables, have to be set here. The dummy file does not need to exist, it is 
+   never read, but some file name has to be supplied.
+
+2. Wait a few seconds to allow the server to start up
+
+3. While the server is running, run a client to instruct the server to verify a specific file::
+
+        nagini_client path/to/file.py 
+   
+
 Alternative Viper Versions
 ==========================
 
