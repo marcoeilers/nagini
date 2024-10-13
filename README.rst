@@ -16,6 +16,8 @@ Dependencies (Windows)
 
 2.  Install the required version of either Visual C++ Build Tools or Visual Studio. 
 
+Note that we have observed *significantly* worse performance when using Nagini on Windows on some
+systems. We currently do not know why this happens, but will investigate the issue when possible.
 
 Getting Started
 ===============
