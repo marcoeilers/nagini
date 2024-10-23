@@ -24,9 +24,10 @@ setup(
             'distribute',
             ],
         install_requires=[
-            'mypy==0.782',
+            'mypy==0.900',
+            'typed-ast==1.5.4',
             'toposort==1.5',
-            'jpype1==1.4.0',
+            'jpype1==1.4.1',
             'astunparse==1.6.2',
             'pytest==7.0.0',
             'z3-solver==4.8.7.0'
