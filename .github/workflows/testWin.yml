@@ -17,6 +17,7 @@ jobs:
       uses: actions/setup-java@v4.4.0
       with:
         java-version: 11
+        distribution: oracle
     - name: Set up Python 3.9
       uses: actions/setup-python@v2
       with:
