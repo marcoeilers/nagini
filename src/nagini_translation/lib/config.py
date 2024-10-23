@@ -208,11 +208,20 @@ def _get_z3_path():
     defined, then checks the OS specific directories.
     """
 
+    print("looking for z3")
+
     z3_exe = os.environ.get('Z3_EXE')
     if z3_exe:
         return z3_exe
 
-    script_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'z3')
+    script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+    print(script_dir)
+    script_path = os.path.join(script_dir, 'z3')
+    print(script_path)
+    print(os.path.exists(script_path))
+    print(os.listdir(script_dir))
+
+    raise Exception
     if os.path.exists(script_path):
         return script_path
 
