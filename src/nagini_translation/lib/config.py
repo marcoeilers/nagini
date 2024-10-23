@@ -223,6 +223,10 @@ def _get_z3_path():
     pydir = os.path.abspath(os.path.dirname(script_dir))
     print(pydir)
     print(os.listdir(pydir))
+    bindir = os.path.join(pydir, 'bin')
+    print(bindir)
+    print(os.listdir(bindir))
+
 
     raise Exception
     if os.path.exists(script_path):
