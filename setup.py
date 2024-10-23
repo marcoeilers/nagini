@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='1.1.0',
+        version='1.1.1',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
