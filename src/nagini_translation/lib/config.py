@@ -220,6 +220,9 @@ def _get_z3_path():
     print(script_path)
     print(os.path.exists(script_path))
     print(os.listdir(script_dir))
+    pydir = os.path.abspath(os.path.dirname(script_dir))
+    print(pydir)
+    print(os.listdir(pydir))
 
     raise Exception
     if os.path.exists(script_path):
