@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 
 setup(
         name='nagini',
-        version='1.1.1',
+        version='1.1.3',
         author='Viper Team',
         author_email='viper@inf.ethz.ch',
         license='MPL-2.0',
@@ -49,7 +49,7 @@ setup(
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
             'Operating System :: OS Independent',
-            'Programming Language :: Python :: 3.10',
+            'Programming Language :: Python :: 3.12',
             'Topic :: Software Development',
             ],
         )
