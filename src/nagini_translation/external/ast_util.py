@@ -107,14 +107,14 @@ def fix_ast_problems(tree, source_lines, tokens):
         #for child in ast.iter_child_nodes(node):
             fix_node(child)
 
-        if isinstance(node, ast.Str):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
             # fix triple-quote problem
             # get position from tokens
             token = string_tokens.pop(0)
             node.lineno, node.col_offset = token.start
 
         elif ((isinstance(node, ast.Expr) or isinstance(node, ast.Attribute))
-            and isinstance(node.value, ast.Str)):
+            and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)):
             # they share the wrong offset of their triple-quoted child
             # get position from already fixed child
             # TODO: try whether this works when child is in parentheses

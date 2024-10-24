@@ -1314,7 +1314,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         If it was not set, it sets a default ``False``.
         """
         if self._terminates is None:
-            self._terminates = ast.NameConstant(False)
+            self._terminates = ast.Constant(False)
             self._terminates.lineno = self.node.lineno
             self._terminates.col_offset = self.node.col_offset
         return self._terminates
@@ -1336,7 +1336,7 @@ class PythonIOOperation(PythonNode, PythonScope, ContainerInterface):
         If it was not set, it sets a default ``1``.
         """
         if self._termination_measure is None:
-            self._termination_measure = ast.Num(1)
+            self._termination_measure = ast.Constant(1)
             self._termination_measure.lineno = self.node.lineno
             self._termination_measure.col_offset = self.node.col_offset
         return self._termination_measure

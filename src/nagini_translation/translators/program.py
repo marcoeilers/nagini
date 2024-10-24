@@ -59,6 +59,8 @@ from nagini_translation.lib.typedefs import (
 )
 from nagini_translation.lib.util import (
     InvalidProgramException,
+    isNameConstant,
+    isStr
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translators.abstract import Context
@@ -439,7 +441,7 @@ class ProgramTranslator(CommonTranslator):
             definition_deps = method.cls.definition_deps
         for arg in method.args.values():
             if (arg.node and arg.node.annotation and
-                    not isinstance(arg.node.annotation, (ast.Str, ast.NameConstant))):
+                    not (isStr(arg.node.annotation) or isNameConstant(arg.node.annotation))):
                 type = self.get_target(arg.node.annotation, ctx)
                 if type and not type.python_class.interface:
                     definition_deps.add((arg.node.annotation, type.python_class,
@@ -449,7 +451,7 @@ class ProgramTranslator(CommonTranslator):
                 if not stmt and expr:
                     arg.default_expr = expr
         if (method.node and method.node.returns and
-                not isinstance(method.node.returns, (ast.Str, ast.NameConstant))):
+                not (isStr(method.node.returns) or isNameConstant(method.node.returns))):
             type = self.get_target(method.node.returns, ctx)
             if type and not type.python_class.interface:
                 definition_deps.add((method.node.returns, type.python_class,

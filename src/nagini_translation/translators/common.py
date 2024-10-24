@@ -59,6 +59,7 @@ from nagini_translation.lib.typedefs import (
 from nagini_translation.lib.util import (
     get_surrounding_try_blocks,
     InvalidProgramException,
+    isStr,
     string_to_int,
     UnsupportedException
 )
@@ -445,7 +446,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(node, ast.Attribute):
             pref = self._get_name_parts(node.value)
             return pref + [node.attr]
-        if isinstance(node, ast.Str):
+        if isStr(node):
             return []
         return [node.name]
 

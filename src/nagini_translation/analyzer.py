@@ -57,6 +57,7 @@ from nagini_translation.lib.util import (
     get_parent_of_type,
     InvalidProgramException,
     is_io_existential,
+    isStr,
     UnsupportedException,
 )
 from nagini_translation.lib.views import PythonModuleView
@@ -354,7 +355,7 @@ class Analyzer(ast.NodeVisitor):
                                  ast.ImportFrom, ast.Assign, ast.AnnAssign)):
                 continue
             if (isinstance(stmt, ast.Expr) and
-                    isinstance(stmt.value, ast.Str)):
+                    isStr(stmt.value)):
                 # A docstring.
                 continue
             if get_func_name(stmt) == 'Import':
@@ -443,8 +444,8 @@ class Analyzer(ast.NodeVisitor):
         """
         if isinstance(node, ast.Name):
             return self.find_or_create_class(node.id)
-        elif isinstance(node, ast.Str):
-            return self.find_or_create_class(node.s)
+        elif isStr(node):
+            return self.find_or_create_class(node.value)
         elif isinstance(node, ast.Attribute):
             ctx = self.get_target(node.value, self.module)
             return self.find_or_create_class(node.attr, module=ctx)
@@ -452,7 +453,7 @@ class Analyzer(ast.NodeVisitor):
             cls = self.find_or_create_target_class(node.value)
             if isinstance(node.slice, ast.Name):
                 ast_args = [node.slice]
-            elif isinstance(node.slice, ast.Str):
+            elif isStr(node.slice):
                 ast_args = [node.slice]
             else:
                 ast_args = node.slice.elts
@@ -491,7 +492,7 @@ class Analyzer(ast.NodeVisitor):
                     'used to define constructors')
             # The name of the NamedTuple should match the ADT constructor being
             # defined
-            if not (adt.name == actual_bases[1].args[0].s):
+            if not (adt.name == actual_bases[1].args[0].value):
                 raise InvalidProgramException(actual_bases[1], 'malformed.adt',
                     'malformed algebraic data type: name of NamedTuple has to ' +
                     'be the same of the class (ADT Constructor)')
@@ -523,7 +524,7 @@ class Analyzer(ast.NodeVisitor):
             # Parse NamedTuple's fields and their respective types
             for field_decl in actual_bases[1].args[1].elts:
                 field_name, field_type = field_decl.elts
-                cls.add_field(field_name.s, field_decl,
+                cls.add_field(field_name.value, field_decl,
                     self.get_target(field_type, self.module).try_unbox())
             # Consider ADTs as a special case of single inheritance
             actual_bases = [actual_bases[0]]
