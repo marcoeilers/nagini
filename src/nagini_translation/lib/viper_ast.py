@@ -70,6 +70,7 @@ class ViperAST:
         self.Perm = getconst('Perm')
         self.sourcefile = sourcefile
         self.none = getobject(java, scala, 'None')
+        self.converters = getobject(java, scala.jdk.javaapi, 'CollectionConverters')
 
     def is_available(self) -> bool:
         """
@@ -94,18 +95,10 @@ class ViperAST:
             list.append(lsttoappend)
 
     def to_seq(self, list):
-        arr = self.jvm.get_array(self.java.lang.Object, len(list))
-        result = self.scala.collection.mutable.ArraySeq.make(arr)
-        for index in range(0, len(list)):
-            result.update(index, list[index])
-        return result.toList()
+        return self.converters.asScala(self.java.util.ArrayList(list)).toSeq()
 
     def to_list(self, seq):
-        result = []
-        iterator = seq.toIterator()
-        while iterator.hasNext():
-            result.append(iterator.next())
-        return result
+        return list(self.converters.asJava(seq))
 
     def to_map(self, dict):
         result = self.scala.collection.immutable.HashMap()
