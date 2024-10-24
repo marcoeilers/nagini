@@ -212,12 +212,33 @@ def _get_z3_path():
     if z3_exe:
         return z3_exe
 
-    script_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'z3')
+    script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+    script_path = os.path.join(script_dir, 'z3')
     if os.path.exists(script_path):
         return script_path
 
-    path = os.path.join(os.path.dirname(sys.executable),
-                        'z3.exe' if sys.platform.startswith('win') else 'z3')
+    script_path = os.path.join(script_dir, 'z3.exe')
+    if os.path.exists(script_path):
+        return script_path
+
+    # On Windows, the script dir is Script, but the Z3 executable seems to be in bin.
+    python_dir = os.path.abspath(os.path.dirname(script_dir))
+    bin_dir = os.path.join(python_dir, 'bin')
+
+    bin_path = os.path.join(bin_dir, 'z3')
+    if os.path.exists(bin_path):
+        return bin_path
+
+    bin_path = os.path.join(bin_dir, 'z3.exe')
+    if os.path.exists(bin_path):
+        return bin_path
+
+
+    path = os.path.join(os.path.dirname(sys.executable), 'z3')
+    if os.path.exists(path):
+        return path
+
+    path = os.path.join(os.path.dirname(sys.executable), 'z3.exe')
     if os.path.exists(path):
         return path
 
