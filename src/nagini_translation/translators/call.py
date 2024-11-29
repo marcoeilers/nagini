@@ -922,12 +922,11 @@ class CallTranslator(CommonTranslator):
         locals_to_copy = method.locals.copy()
         for local_name, local in locals_to_copy.items():
             if type(local).__name__ == 'SilverVar':
-                newName = ctx.current_function.get_fresh_name(local_name)
-                print(local_name)
                 continue
             local_var = ctx.current_function.create_variable(local_name,
                                                              local.type,
                                                              self.translator)
+            local_var.writes = local.writes
             ctx.set_alias(local_name, local_var, local)
 
         # Create label aliases

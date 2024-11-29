@@ -219,7 +219,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
     def _create_level_below(
             self, expr: sil.PermExpression,
             ctx: Context) -> sil.BoolExpression:
-        residue_level_var = sil.PermVar(ctx.actual_function.obligation_info.residue_level)
+        residue_level_var = sil.PermVar(ctx.current_function.obligation_info.residue_level)
         obligation = self._obligation_manager.must_release_obligation
         fields = obligation.create_fields_untranslated()
         var = ctx.current_function.create_variable(

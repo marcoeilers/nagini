@@ -1314,7 +1314,7 @@ class ProgramTranslator(CommonTranslator):
             for method in module.methods.values():
                 id_constant = self.translate_method_id_to_constant(method, ctx)
                 threading_ids_constants.append(id_constant)
-                if method.interface:
+                if method.interface or method.inline:
                     continue
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
@@ -1351,7 +1351,7 @@ class ProgramTranslator(CommonTranslator):
                     method = cls.methods[method_name]
                     threading_ids_constants.append(
                         self.translate_method_id_to_constant(method, ctx))
-                    if method.interface:
+                    if method.interface or method.inline:
                         continue
                     self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))
