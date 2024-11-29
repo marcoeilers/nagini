@@ -223,7 +223,7 @@ function int___mul__(self: Int, other: Int): Int
 
 function int___pow__(self: Int, other: Int): Int
     decreases _
-    requires other >= 0
+    requires @error("** is currently only supported for non-negative exponents.")(other >= 0)
 {
     ___pow(self, other)
 }
