@@ -120,7 +120,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         arg_vars = []
         stmts = []
         for index, arg in enumerate(method._args.values()):
-            arg_var = self._ctx.actual_function.create_variable(
+            arg_var = self._ctx.current_function.create_variable(
                 'thread_arg', arg.type, self._translator.translator)
             arg_vars.append(arg_var)
             index_lit = self.viper.IntLit(index, self._position, self._info)

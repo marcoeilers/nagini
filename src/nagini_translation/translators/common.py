@@ -544,7 +544,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         method = receiver.get_method(func_name)
         if method:
             assert method.type
-            target_var = ctx.actual_function.create_variable('target', method.type,
+            target_var = ctx.current_function.create_variable('target', method.type,
                                                              self.translator)
             val = target_var.ref(node, ctx)
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,

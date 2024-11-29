@@ -1018,6 +1018,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
         self.predicate = False
+        self.inline = False
         self.all_low = False
         self.preserves_low = False
         self.contract_only = contract_only
@@ -1080,6 +1081,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 # Could be overridden by anything, so we have to check if there's
                 # anything with the same name.
                 self.overrides = self.cls.superclass.get_contents(False)[self.name]
+                if self.overrides is not None:
+                    if self.overrides.inline:
+                        raise InvalidProgramException(self.node, 'overriding.inline.method',
+                                                      'Functions marked to be inlined cannot be overridden.')
             except KeyError:
                 pass
         for local in self.locals:
@@ -1577,6 +1582,8 @@ class PythonVar(PythonVarBase, abc.ABC):
         this Python variable.
         """
         super().process(sil_name, translator)
+        if sil_name == "iterable_1":
+            print("++")
         self._translator = translator
         module = self.type.module
         self.decl = translator.translate_pythonvar_decl(self, module)

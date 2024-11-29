@@ -674,6 +674,8 @@ class Analyzer(ast.NodeVisitor):
             func.method_type = MethodType.class_method
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
+        if self.is_inline_method(node):
+            func.inline = True
         if func.predicate:
             func.contract_only = self.is_declared_contract_only(node)
         if self.is_all_low(node):
@@ -1469,6 +1471,8 @@ class Analyzer(ast.NodeVisitor):
 
     def _incompatible_decorators(self, decorators) -> bool:
         return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+                (('Predicate' in decorators) and ('Inline' in decorators)) or
+                (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
                 (('property' in decorators) and (len(decorators) != 1)) or
                 (('AllLow' in decorators) and ('PreservesLow' in decorators)) or
@@ -1520,6 +1524,9 @@ class Analyzer(ast.NodeVisitor):
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')
+
+    def is_inline_method(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Inline')
 
     def is_static_method(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'staticmethod')
