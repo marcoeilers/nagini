@@ -1430,14 +1430,14 @@ class StatementTranslator(CommonTranslator):
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         if ctx.actual_function.type:
             result_none = self.viper.LocalVarAssign(
-                ctx.actual_function.result.ref(),
+                ctx.result_var.ref(),
                 null, self.no_position(ctx),
                 self.no_info(ctx))
             result.append(result_none)
         # Do the same for the error variable
-        if ctx.actual_function.declared_exceptions:
+        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
             error_none = self.viper.LocalVarAssign(
-                ctx.actual_function.error_var.ref(),
+                ctx.error_var.ref(),
                 null, self.no_position(ctx), self.no_info(ctx))
             result.append(error_none)
         return result

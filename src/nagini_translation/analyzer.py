@@ -675,6 +675,11 @@ class Analyzer(ast.NodeVisitor):
             self.current_class._has_classmethod = True
         func.predicate = self.is_predicate(node)
         if self.is_inline_method(node):
+            if name == '__init__':
+                raise UnsupportedException(node, 'Inlining constructors is currently not supported.')
+            decorators = {d.id for d in node.decorator_list if isinstance(d, ast.Name)}
+            if len(decorators) > 1:
+                raise UnsupportedException(node, 'Unsupported decorator for inline function.')
             func.inline = True
         if func.predicate:
             func.contract_only = self.is_declared_contract_only(node)
@@ -911,6 +916,11 @@ class Analyzer(ast.NodeVisitor):
         elif isinstance(node.ctx, ast.Store):
             var.writes.append(node)
 
+    def _check_not_in_inline_method(self, node: ast.Call) -> None:
+        if isinstance(self.stmt_container, PythonMethod) and self.stmt_container.inline:
+            raise InvalidProgramException(node, 'contract.in.inline.method',
+                                          'Inline methods must not have specifications.')
+
     def visit_Call(self, node: ast.Call) -> None:
         """
         Collects preconditions, postconditions, raised exceptions and
@@ -918,6 +928,9 @@ class Analyzer(ast.NodeVisitor):
         """
         if (isinstance(node.func, ast.Name) and
                 node.func.id in CONTRACT_WRAPPER_FUNCS):
+            if node.func.id != 'Invariant':
+                self._check_not_in_inline_method(node)
+
             if node.func.id == 'Requires':
                 self.stmt_container.precondition.append(
                     (node.args[0], self._aliases.copy()))

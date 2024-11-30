@@ -815,7 +815,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             return err_var.ref()
-        if ctx.actual_function.declared_exceptions:
+        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
             return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',

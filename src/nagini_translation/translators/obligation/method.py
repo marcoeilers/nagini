@@ -55,7 +55,7 @@ class MethodObligationTranslator(CommonObligationTranslator):
     """Class for translating obligations in methods."""
 
     def _get_obligation_info(self, ctx: Context) -> BaseObligationInfo:
-        return ctx.current_function.obligation_info
+        return ctx.actual_function.obligation_info
 
     def _create_obligation_instance_use(
             self, obligation_instance: ObligationInstance,

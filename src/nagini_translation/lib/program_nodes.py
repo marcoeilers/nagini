@@ -1085,6 +1085,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                     if self.overrides.inline:
                         raise InvalidProgramException(self.node, 'overriding.inline.method',
                                                       'Functions marked to be inlined cannot be overridden.')
+                    if self.inline:
+                        raise InvalidProgramException(self.node, 'overriding.inline.method',
+                                                      'Functions marked to be inlined cannot override other methods.')
             except KeyError:
                 pass
         for local in self.locals:
@@ -1582,8 +1585,6 @@ class PythonVar(PythonVarBase, abc.ABC):
         this Python variable.
         """
         super().process(sil_name, translator)
-        if sil_name == "iterable_1":
-            print("++")
         self._translator = translator
         module = self.type.module
         self.decl = translator.translate_pythonvar_decl(self, module)

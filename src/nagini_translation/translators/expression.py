@@ -523,7 +523,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             end_label = ctx.get_label_name(END_LABEL)
             goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
-            if ctx.actual_function.declared_exceptions:
+            if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
                 uncaught_option = self.translate_block([assignerror, goto_end],

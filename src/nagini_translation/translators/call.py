@@ -942,6 +942,11 @@ class CallTranslator(CommonTranslator):
         start, end = get_body_indices(method.node.body)
         stmts = []
 
+        if error_var:
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            stmts.append(self.viper.LocalVarAssign(error_var.ref(), self.viper.NullLit(pos, info), pos, info))
+
         for stmt in method.node.body[start:end]:
             stmts += self.translate_stmt(stmt, ctx)
 
@@ -989,7 +994,7 @@ class CallTranslator(CommonTranslator):
                                                            self.translator)
         optional_error_var = None
         error_var = self.get_error_var(node, ctx)
-        if method.declared_exceptions:
+        if method.declared_exceptions or method.inline:
             var = PythonVar(ERROR_NAME, None,
                             ctx.module.global_module.classes['Exception'])
             var._ref = error_var
@@ -1002,7 +1007,7 @@ class CallTranslator(CommonTranslator):
         stmts += inline_stmts
         if end_lbl:
             stmts.append(end_lbl)
-        if method.declared_exceptions:
+        if method.declared_exceptions or method.inline:
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         # Return result
