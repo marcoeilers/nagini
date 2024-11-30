@@ -257,7 +257,7 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null, new_type] + pres
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
-                                            error_var, ctx)
+                                            optional_error_var, ctx)
 
         self._create_inherit_check_postamble(stmts, end_lbl, ctx)
 
