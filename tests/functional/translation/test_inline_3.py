@@ -11,6 +11,6 @@ class A:
 
 class B(A):
 
-    @Inline
-    def test1(self) -> int:  #:: ExpectedOutput(invalid.program:overriding.inline.method)
+    @Inline  #:: ExpectedOutput(invalid.program:overriding.inline.method)
+    def test1(self) -> int:
         return 6

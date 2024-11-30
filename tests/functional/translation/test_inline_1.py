@@ -5,6 +5,6 @@ from nagini_contracts.contracts import *
 
 
 @Predicate
-@Inline
-def test1() -> int:  #:: ExpectedOutput(invalid.program:decorators.incompatible)
+@Inline  #:: ExpectedOutput(invalid.program:decorators.incompatible)
+def test1() -> int:
     return 5

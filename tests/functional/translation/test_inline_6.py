@@ -6,5 +6,6 @@ from nagini_contracts.contracts import *
 
 @Inline
 def test1(i: int) -> int:
-    Requires(i > 0)  #:: ExpectedOutput(invalid.program:contract.in.inline.method)
+    #:: ExpectedOutput(invalid.program:contract.in.inline.method)
+    Requires(i > 0)
     return 6
