@@ -126,7 +126,7 @@ class ObligationLoopNodeConstructor(StatementNodeConstructorBase):
 
     def _add_leak_check(self) -> None:
         """Add leak checks to invariant."""
-        reference_name = self._ctx.actual_function.get_fresh_name('_r')
+        reference_name = self._ctx.current_function.get_fresh_name('_r')
         leak_check = self._obligation_manager.create_leak_check(reference_name)
         loop_check_before = sil.BoolVar(
             self._loop_obligation_info.loop_check_before_var)

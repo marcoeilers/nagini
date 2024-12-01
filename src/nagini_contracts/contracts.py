@@ -441,6 +441,13 @@ def Predicate(func: T) -> T:
     return func
 
 
+def Inline(func: T) -> T:
+    """
+    Decorator to mark functions that should be inlined during verification, and not treated modularly. It's a no-op.
+    """
+    return func
+
+
 def Ghost(func: T) -> T:
     """
     Decorator for ghost functions. It's a no-op.
@@ -555,6 +562,7 @@ __all__ = [
         'Unfolding',
         'Pure',
         'Predicate',
+        'Inline',
         'Ghost',
         'ContractOnly',
         'GhostReturns',

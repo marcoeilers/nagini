@@ -177,7 +177,7 @@ class ExpressionTranslator(CommonTranslator):
         if body_stmt:
             raise InvalidProgramException(node, 'impure.list.comprehension.body')
         ctx.remove_alias(target.id)
-        result_var = ctx.actual_function.create_variable('listcomp', list_type,
+        result_var = ctx.current_function.create_variable('listcomp', list_type,
                                                          self.translator)
         stmt = self._create_list_comp_inhale(result_var, list_type, element_var,
                                              body, node, ctx)
@@ -213,7 +213,7 @@ class ExpressionTranslator(CommonTranslator):
         len_equal = self.viper.EqCmp(self.to_int(result_len, ctx), seq_len, position,
                                      info)
         int_class = ctx.module.global_module.classes[PRIMITIVE_INT_TYPE]
-        index_var = ctx.actual_function.create_variable('i', int_class, self.translator,
+        index_var = ctx.current_function.create_variable('i', int_class, self.translator,
                                                         False)
         index_positive = self.viper.GeCmp(index_var.ref(),
                                           self.viper.IntLit(0, position, info),
@@ -491,7 +491,7 @@ class ExpressionTranslator(CommonTranslator):
         stmt = target_stmt + start_stmt + stop_stmt
         getitem = target_type.get_func_or_method('__getitem_slice__')
         if not getitem.pure:
-            result_var = ctx.actual_function.create_variable(
+            result_var = ctx.current_function.create_variable(
                 'slice_res', target_type, self.translator)
             call = self.get_method_call(target_type, '__getitem_slice__',
                                         args, [None, None],
@@ -523,7 +523,7 @@ class ExpressionTranslator(CommonTranslator):
         else:
             end_label = ctx.get_label_name(END_LABEL)
             goto_end = self.viper.Goto(end_label, position, self.no_info(ctx))
-            if ctx.actual_function.declared_exceptions:
+            if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
                 assignerror = self.viper.LocalVarAssign(err_var, var, position,
                                                         self.no_info(ctx))
                 uncaught_option = self.translate_block([assignerror, goto_end],
@@ -665,7 +665,7 @@ class ExpressionTranslator(CommonTranslator):
                     self.to_position(node, ctx), ctx)
             if node.id == '_':
                 object_type = ctx.module.global_module.classes[OBJECT_TYPE]
-                temp_var = ctx.actual_function.create_variable('wildcard', object_type, self.translator)
+                temp_var = ctx.current_function.create_variable('wildcard', object_type, self.translator)
                 return [], temp_var.ref(node, ctx)
             if node.id in ctx.var_aliases:
                 var = ctx.var_aliases[node.id]
