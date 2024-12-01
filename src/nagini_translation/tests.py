@@ -502,11 +502,12 @@ class AnnotationManager:
             else:
                 unexpected_errors.append(error)
         if unexpected_errors:
+            print("Got unexpected verification error(s):")
             print(unexpected_errors)
-            assert False
         if annotations:
+            print("Did not get some expected verification error(s):")
             print(annotations)
-            assert False
+        assert not (unexpected_errors or annotations)
 
     def has_unexpected_missing(self) -> bool:
         """Check if there are unexpected or missing output annotations."""
