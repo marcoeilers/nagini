@@ -6,16 +6,16 @@ Our CAV 2018 tool paper describing Nagini can be found `here <http://pm.inf.ethz
 Dependencies (Ubuntu Linux)
 ===================================
 
-Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries
-(in particular, python3.9-dev). For usage with Viper's verification condition generation backend Carbon, you will also need 
-to install Boogie (version 2.15.9).
+Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*) and the required libraries (in particular, python3.9-dev). 
+Experimental support for newer Python versions is available on the branches `py310 <https://github.com/marcoeilers/nagini/tree/py310>`_, `py311 <https://github.com/marcoeilers/nagini/tree/py311>`_ and `py312 <https://github.com/marcoeilers/nagini/tree/py312>`_ but may offer significantly worse performance.
+For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Dependencies (Windows)
 ==========================
 
-1.  Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*).
-
-2.  Install the required version of either Visual C++ Build Tools or Visual Studio. 
+Install Java 11 or newer (64 bit) and Python 3.9 (64 bit, other versions likely *will not work*), as well as the required version of either Visual C++ Build Tools or Visual Studio if necessary.
+Experimental support for newer Python versions is available on the branches `py310 <https://github.com/marcoeilers/nagini/tree/py310>`_, `py311 <https://github.com/marcoeilers/nagini/tree/py311>`_ and `py312 <https://github.com/marcoeilers/nagini/tree/py312>`_ but may offer significantly worse performance and is currently untested on Windows.
+For usage with Viper's verification condition generation backend Carbon, you will also need to install Boogie (version 2.15.9).
 
 Note that we have observed *significantly* worse performance when using Nagini on Windows on some
 systems. We currently do not know why this happens, but will investigate the issue when possible.
