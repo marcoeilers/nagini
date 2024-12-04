@@ -43,7 +43,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
         pip install nagini
 
-    Alternatively, to get the most up-to-date version, install from source; this will require manually getting and compiling Viper (most likely the most recent development version)::
+    Alternatively, to get the most up-to-date version, install from source::
 
         git clone https://github.com/marcoeilers/nagini.git
         cd nagini
@@ -51,7 +51,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
 4.  Optionally, try running the tests::
 
-        pytest src/nagini_translation/tests.py --silicon
+        pytest -v src/nagini_translation/tests.py --silicon
 
 Command Line Usage
 ==================
