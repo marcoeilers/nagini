@@ -62,6 +62,7 @@ To verify a specific file from the nagini directory, run::
 
 You may have to explicitly supply a path to a Z3 executable (use version 4.8.7, other versions may offer significantly worse performance) using the command line parameter ``--z3=path/to/z3``.
 Additionally, you may have to set the environment variable ``JAVA_HOME`` to point to your Java installation.
+See the `wiki <https://github.com/marcoeilers/nagini/wiki>`_ for information on how to write specifications in Nagini.
 
 
 The following command line options are available::
