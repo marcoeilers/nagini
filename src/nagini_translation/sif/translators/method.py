@@ -29,7 +29,7 @@ class SIFMethodTranslator(MethodTranslator):
     def _create_method_epilog(self, method: PythonMethod, ctx: Context) -> List[Stmt]:
         # With the extended AST we don't need a label at the end of the method.
         # Check that no undeclared exceptions are raised. (but not for main method)
-        if not method.declared_exceptions:
+        if not (method.declared_exceptions or method.inline):
             no_info = self.no_info(ctx)
             error_string = '"method raises no exceptions"'
             error_pos = self.to_position(method.node, ctx, error_string)

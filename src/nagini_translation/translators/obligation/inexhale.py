@@ -179,7 +179,7 @@ class InexhaleObligationInstanceMixin(abc.ABC):
             self, ctx: Context) -> List[Tuple[sil.Expression, Rules]]:
         """Default implementation for obligation use in method contract."""
         inexhale = self._get_inexhale(ctx)
-        obligation_info = ctx.actual_function.obligation_info
+        obligation_info = ctx.current_function.obligation_info
         if self.is_fresh():
             return [(inexhale.construct_use_method_unbounded(), None)]
         else:

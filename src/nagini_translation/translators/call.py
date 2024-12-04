@@ -347,7 +347,7 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_seq = self.viper.SeqType(self.viper.Ref)
             ref_seq = SilverType(sil_ref_seq, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_seq', ref_seq,
+            havoc_var = ctx.current_function.create_variable('havoc_seq', ref_seq,
                                                             self.translator)
             seq_field = self.viper.Field('list_acc', sil_ref_seq, position, info)
             content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
@@ -391,7 +391,7 @@ class CallTranslator(CommonTranslator):
         if contents:
             sil_ref_set = self.viper.SetType(self.viper.Ref)
             ref_set = SilverType(sil_ref_set, ctx.module)
-            havoc_var = ctx.actual_function.create_variable('havoc_set', ref_set,
+            havoc_var = ctx.current_function.create_variable('havoc_set', ref_set,
                                                             self.translator)
             set_field = self.viper.Field('set_acc', sil_ref_set, position, info)
             content_field = self.viper.FieldAccess(result_var, set_field, position, info)
@@ -455,7 +455,7 @@ class CallTranslator(CommonTranslator):
         arg_type = self.get_type(node.args[0], ctx)
         arg_stmt, arg = self.translate_expr(node.args[0], ctx)
         arg_contents = self.get_sequence(arg_type, arg, None, node.args[0], ctx)
-        new_list = ctx.actual_function.create_variable('enumerate_res', result_type,
+        new_list = ctx.current_function.create_variable('enumerate_res', result_type,
                                                        self.translator)
         sil_ref_seq = self.viper.SeqType(self.viper.Ref)
         seq_field = self.viper.Field('list_acc', sil_ref_seq, pos, info)
@@ -470,7 +470,7 @@ class CallTranslator(CommonTranslator):
         type_inhale = self.viper.Inhale(self.viper.And(list_type_info, list_len_info,
                                                        pos, info),
                                         pos, info)
-        i_var = ctx.actual_function.create_variable('i', prim_int_type, self.translator,
+        i_var = ctx.current_function.create_variable('i', prim_int_type, self.translator,
                                                     False)
         orig_seq_i = self.viper.SeqIndex(arg_contents, i_var.ref(), pos, info)
         content_type = result_type.type_args[0].type_args[1]
@@ -921,9 +921,12 @@ class CallTranslator(CommonTranslator):
         # Create local var aliases
         locals_to_copy = method.locals.copy()
         for local_name, local in locals_to_copy.items():
+            if type(local).__name__ == 'SilverVar':
+                continue
             local_var = ctx.current_function.create_variable(local_name,
                                                              local.type,
                                                              self.translator)
+            local_var.writes = local.writes
             ctx.set_alias(local_name, local_var, local)
 
         # Create label aliases
@@ -938,6 +941,11 @@ class CallTranslator(CommonTranslator):
         # Translate body
         start, end = get_body_indices(method.node.body)
         stmts = []
+
+        if error_var:
+            pos = self.no_position(ctx)
+            info = self.no_info(ctx)
+            stmts.append(self.viper.LocalVarAssign(error_var.ref(), self.viper.NullLit(pos, info), pos, info))
 
         for stmt in method.node.body[start:end]:
             stmts += self.translate_stmt(stmt, ctx)
@@ -986,7 +994,7 @@ class CallTranslator(CommonTranslator):
                                                            self.translator)
         optional_error_var = None
         error_var = self.get_error_var(node, ctx)
-        if method.declared_exceptions:
+        if method.declared_exceptions or method.inline:
             var = PythonVar(ERROR_NAME, None,
                             ctx.module.global_module.classes['Exception'])
             var._ref = error_var
@@ -999,7 +1007,7 @@ class CallTranslator(CommonTranslator):
         stmts += inline_stmts
         if end_lbl:
             stmts.append(end_lbl)
-        if method.declared_exceptions:
+        if method.declared_exceptions or method.inline:
             stmts += self.create_exception_catchers(error_var,
                 ctx.actual_function.try_blocks, node, ctx)
         # Return result
@@ -1201,6 +1209,9 @@ class CallTranslator(CommonTranslator):
             return self._translate_function_call(target, args, formal_args,
                                                  arg_stmts, position, node, ctx)
         else:
+            if target.inline:
+                return self._inline_call(target, node, False, 'inlined call',
+                                         ctx)
             return self._translate_method_call(target, args, arg_stmts,
                                                position, node, ctx)
 
@@ -1355,7 +1366,7 @@ class CallTranslator(CommonTranslator):
 
         # Create thread object
         thread_class = ctx.module.global_module.classes['Thread']
-        thread_var = ctx.actual_function.create_variable('threadingVar', thread_class,
+        thread_var = ctx.current_function.create_variable('threadingVar', thread_class,
                                                          self.translator)
         thread = thread_var.ref(node, ctx)
         newstmt = self.viper.NewStmt(thread, [], pos, info)
@@ -1501,7 +1512,7 @@ class CallTranslator(CommonTranslator):
         ctx.perm_factor = post_perm
 
         object_class = ctx.module.global_module.classes[OBJECT_TYPE]
-        res_var = ctx.actual_function.create_variable('join_result', object_class,
+        res_var = ctx.current_function.create_variable('join_result', object_class,
                                                       self.translator)
 
         # Resolve list of possible thread target methods.
@@ -1544,7 +1555,7 @@ class CallTranslator(CommonTranslator):
 
         # Set arg aliases with types
         for index, arg in enumerate(method._args.values()):
-            arg_var = ctx.actual_function.create_variable('thread_arg', arg.type,
+            arg_var = ctx.current_function.create_variable('thread_arg', arg.type,
                                                           self.translator)
             ctx.set_alias(arg.name, arg_var)
             id = self.viper.IntLit(index, pos, info)

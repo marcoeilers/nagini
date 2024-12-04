@@ -46,9 +46,9 @@ class LoopObligationTranslator(CommonObligationTranslator):
             err_var: PythonVar = None) -> None:
         """Update context with info needed to translate loop."""
         info = PythonLoopObligationInfo(
-            self._obligation_manager, node, self, ctx.actual_function,
+            self._obligation_manager, node, self, ctx.current_function,
             err_var)
-        info.traverse_invariants()
+        info.traverse_invariants(ctx.actual_function)
         ctx.obligation_context.push_loop_info(info)
 
     def leave_loop_translation(self, ctx: Context) -> None:

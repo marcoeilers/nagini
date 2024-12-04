@@ -428,11 +428,11 @@ class PythonLoopObligationInfo(BaseObligationInfo):
         """Return the variable that denotes current thread in method."""
         return self._method.obligation_info.current_thread_var
 
-    def traverse_invariants(self) -> None:
+    def traverse_invariants(self, actual_method: PythonMethod) -> None:
         """Collect all needed information about obligations."""
         assert self._current_instance_map is None
         self._current_instance_map = self._instances
-        for invariant, _ in self._method.loop_invariants[self.node]:
+        for invariant, _ in actual_method.loop_invariants[self.node]:
             if isinstance(invariant, ast.Expr):
                 self.traverse(invariant.value.args[0])
             else:

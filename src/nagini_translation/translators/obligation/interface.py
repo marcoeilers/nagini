@@ -129,7 +129,7 @@ class ObligationTranslator(CommonTranslator):
             return self._loop_translator.translate_may_invoke(
                 node, ctx)
         elif ctx.obligation_context.is_translating_posts:
-            if ctx.actual_function.name != 'Gap':
+            if ctx.current_function.name != 'Gap':
                 raise InvalidProgramException(
                     node, 'invalid.postcondition.ctoken_not_allowed')
             else:

@@ -170,7 +170,7 @@ class SIFStatementTranslator(StatementTranslator):
         err_type_arg = self.type_factory.typeof(error_var, ctx)
 
         tb_class = ctx.module.global_module.classes['traceback']
-        traceback_var = ctx.actual_function.create_variable('tb', tb_class,
+        traceback_var = ctx.current_function.create_variable('tb', tb_class,
                                                             self.translator)
         tb_type = self.type_check(traceback_var.ref(), tb_class, no_pos, ctx)
         inhale_types = self.viper.Inhale(tb_type, no_pos, no_info)
