@@ -8,15 +8,16 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   build:
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v2
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
       with:
-        python-version: 3.9
+        python-version: "3.10"
+        architecture: "x64"
     - name: Install Boogie
       run: |
         dotnet tool install --global Boogie --version 2.15.9
@@ -27,4 +28,4 @@ jobs:
         pip install .
     - name: Test with pytest
       run: |
-        pytest src/nagini_translation/tests.py --silicon --carbon
+        pytest -p no:faulthandler src/nagini_translation/tests.py --silicon --carbon
