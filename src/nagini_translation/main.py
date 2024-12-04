@@ -382,7 +382,7 @@ def main() -> None:
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
         global sil_programs
-        sil_programs = load_sil_files(args.int_bitops_size, args.jvm, args.sif, args.float_encoding)
+        sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
         while True:
             file = socket.recv_string()

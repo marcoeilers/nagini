@@ -122,6 +122,10 @@ Nagini has to do a significant amount of work on startup, and has to start a JVM
 To avoid some of that startup work and speed up Viper's runtime, Nagini has a server mode.
 To use it,
 
+0. Install pyzmq::
+
+        pip install pyzmq
+
 1. Start a Nagini server::
 
         nagini --server <otherArgs> dummyFile.py
