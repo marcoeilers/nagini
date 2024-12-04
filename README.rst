@@ -51,7 +51,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
 4.  Optionally, try running the tests::
 
-        pytest -v src/nagini_translation/tests.py --silicon
+        pytest -v -p no:faulthandler src/nagini_translation/tests.py --silicon
 
 Command Line Usage
 ==================
