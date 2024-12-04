@@ -120,7 +120,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
         arg_vars = []
         stmts = []
         for index, arg in enumerate(method._args.values()):
-            arg_var = self._ctx.actual_function.create_variable(
+            arg_var = self._ctx.current_function.create_variable(
                 'thread_arg', arg.type, self._translator.translator)
             arg_vars.append(arg_var)
             index_lit = self.viper.IntLit(index, self._position, self._info)
@@ -219,7 +219,7 @@ class ObligationMethodForkConstructor(StatementNodeConstructorBase):
     def _create_level_below(
             self, expr: sil.PermExpression,
             ctx: Context) -> sil.BoolExpression:
-        residue_level_var = sil.PermVar(ctx.actual_function.obligation_info.residue_level)
+        residue_level_var = sil.PermVar(ctx.current_function.obligation_info.residue_level)
         obligation = self._obligation_manager.must_release_obligation
         fields = obligation.create_fields_untranslated()
         var = ctx.current_function.create_variable(

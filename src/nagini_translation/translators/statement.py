@@ -602,7 +602,7 @@ class StatementTranslator(CommonTranslator):
                       node: ast.AST, ctx: Context) -> Tuple[PythonVar,
                                                             List[Stmt]]:
         iter_class = ctx.module.global_module.classes['Iterator']
-        iter_var = ctx.actual_function.create_variable('iter', iter_class,
+        iter_var = ctx.current_function.create_variable('iter', iter_class,
                                                        self.translator)
         assert not node in ctx.loop_iterators
         ctx.loop_iterators[node] = iter_var
@@ -617,7 +617,7 @@ class StatementTranslator(CommonTranslator):
                        node: ast.For,
                        ctx: Context) -> Tuple[PythonVar, List[Stmt]]:
         exc_class = ctx.module.global_module.classes['Exception']
-        err_var = ctx.actual_function.create_variable('iter_err', exc_class,
+        err_var = ctx.current_function.create_variable('iter_err', exc_class,
                                                       self.translator)
         iter_class = ctx.module.global_module.classes['Iterator']
         args = [iter_var.ref()]
@@ -702,7 +702,7 @@ class StatementTranslator(CommonTranslator):
         node.end_label = end_label
         iterable_type = self.get_type(node.iter, ctx)
         iterable_stmt, iterable = self.translate_expr(node.iter, ctx)
-        iterable_var = ctx.actual_function.create_variable('iterable', iterable_type,
+        iterable_var = ctx.current_function.create_variable('iterable', iterable_type,
                                                            self.translator, True)
         iterable_assign = self.viper.LocalVarAssign(iterable_var.ref(), iterable,
                                                     position, info)
@@ -719,7 +719,7 @@ class StatementTranslator(CommonTranslator):
             raise UnsupportedException(node, 'unknown.iterable')
 
         # Create artificial new variable to store current iteration content.
-        target_var = ctx.actual_function.create_variable('loop_target',
+        target_var = ctx.current_function.create_variable('loop_target',
                                                          target_type,
                                                          self.translator)
 
@@ -1431,14 +1431,14 @@ class StatementTranslator(CommonTranslator):
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         if ctx.actual_function.type:
             result_none = self.viper.LocalVarAssign(
-                ctx.actual_function.result.ref(),
+                ctx.result_var.ref(),
                 null, self.no_position(ctx),
                 self.no_info(ctx))
             result.append(result_none)
         # Do the same for the error variable
-        if ctx.actual_function.declared_exceptions:
+        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
             error_none = self.viper.LocalVarAssign(
-                ctx.actual_function.error_var.ref(),
+                ctx.error_var.ref(),
                 null, self.no_position(ctx), self.no_info(ctx))
             result.append(error_none)
         return result

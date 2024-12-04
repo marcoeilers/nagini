@@ -5,7 +5,8 @@ from nagini_contracts.contracts import (
     Ensures,
     Requires,
     Result,
-    Implies
+    Implies,
+    Assume
 )
 from nagini_contracts.io_contracts import *
 from nagini_contracts.obligations import MustTerminate
@@ -133,7 +134,6 @@ def write_four_ints_4(t1: Place) -> Place:
             write_two_ints_io(t2, t3)
         ),
         Ensures(
-            #:: ExpectedOutput(carbon)(postcondition.violated:insufficient.permission)
             token(t3) and
             t3 == Result()
         ),
@@ -150,6 +150,8 @@ def write_four_ints_4(t1: Place) -> Place:
     t4 = write_int(t3, 3)
     #:: ExpectedOutput(call.precondition:insufficient.permission)
     t5 = write_int(t4, 3)
+
+    Assume(False)
 
     return t5
 

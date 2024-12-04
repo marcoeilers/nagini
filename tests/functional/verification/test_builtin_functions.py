@@ -11,6 +11,15 @@ def test_abs(x: int) -> None:
     #:: ExpectedOutput(assert.failed:assertion.false)
     assert abs(x) > 0
 
+def test_pow(x: int) -> None:
+    a = -2
+    b = a ** 0
+    assert b == 1
+    c = x ** 4
+    assert c == x * x * x * x
+    #:: ExpectedOutput(assert.failed:assertion.false)
+    assert 3 ** 2 == 8
+
 def test_max() -> None:
     assert max(1,max(-3, 6)) == 6
     c = max(2, -5) + max(-3, -2)

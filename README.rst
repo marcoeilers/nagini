@@ -43,7 +43,7 @@ Execute the following commands (on Windows, you may have to use ``cmd`` and not 
 
         pip install nagini
 
-    Alternatively, to get the most up-to-date version, install from source; this will require manually getting and compiling Viper (most likely the most recent development version)::
+    Alternatively, to get the most up-to-date version, install from source::
 
         git clone https://github.com/marcoeilers/nagini.git
         cd nagini
@@ -62,6 +62,7 @@ To verify a specific file from the nagini directory, run::
 
 You may have to explicitly supply a path to a Z3 executable (use version 4.8.7, other versions may offer significantly worse performance) using the command line parameter ``--z3=path/to/z3``.
 Additionally, you may have to set the environment variable ``JAVA_HOME`` to point to your Java installation.
+See the `wiki <https://github.com/marcoeilers/nagini/wiki>`_ for information on how to write specifications in Nagini.
 
 
 The following command line options are available::
@@ -122,6 +123,10 @@ Nagini has to do a significant amount of work on startup, and has to start a JVM
 To avoid some of that startup work and speed up Viper's runtime, Nagini has a server mode.
 To use it,
 
+0. Install pyzmq::
+
+        pip install pyzmq
+
 1. Start a Nagini server::
 
         nagini --server <otherArgs> dummyFile.py
@@ -155,4 +160,8 @@ Troubleshooting
 2.  While verifying a file, you get a stack trace ending with something like ``No matching overloads found``:
 
     The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
+
+3.  Nagini cannot prove trivial properties about the return values of functions: 
+
+    This is likely due to a lack of specifications, see the discussion in the ``General Contracts`` section of the  `wiki <https://github.com/marcoeilers/nagini/wiki>`_.
 

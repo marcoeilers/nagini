@@ -259,7 +259,7 @@ class ProgramTranslator(CommonTranslator):
             pres = [not_null, new_type] + pres
 
         stmts, end_lbl = self.inline_method(method, args, method.result,
-                                            error_var, ctx)
+                                            optional_error_var, ctx)
 
         self._create_inherit_check_postamble(stmts, end_lbl, ctx)
 
@@ -1316,7 +1316,7 @@ class ProgramTranslator(CommonTranslator):
             for method in module.methods.values():
                 id_constant = self.translate_method_id_to_constant(method, ctx)
                 threading_ids_constants.append(id_constant)
-                if method.interface:
+                if method.interface or method.inline:
                     continue
                 self.track_dependencies(selected_names, selected, method, ctx)
                 methods.append(self.translate_method(method, ctx))
@@ -1353,7 +1353,7 @@ class ProgramTranslator(CommonTranslator):
                     method = cls.methods[method_name]
                     threading_ids_constants.append(
                         self.translate_method_id_to_constant(method, ctx))
-                    if method.interface:
+                    if method.interface or method.inline:
                         continue
                     self.track_dependencies(selected_names, selected, method, ctx)
                     methods.append(self.translate_method(method, ctx))

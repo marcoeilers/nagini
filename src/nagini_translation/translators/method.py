@@ -751,7 +751,7 @@ class MethodTranslator(CommonTranslator):
             goto_continue = self.viper.Goto(loop.end_label, pos, info)
             break_block = [goto_break]
             continue_block = [goto_continue]
-        if ctx.actual_function.declared_exceptions:
+        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
             # Assign error to error output var
             error_var = ctx.error_var.ref()
             block_error_var = block.get_error_var(self.translator)

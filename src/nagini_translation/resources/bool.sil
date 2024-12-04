@@ -221,6 +221,24 @@ function int___mul__(self: Int, other: Int): Int
     self * other
 }
 
+function int___pow__(self: Int, other: Int): Int
+    decreases _
+    requires @error("** is currently only supported for non-negative exponents.")(other >= 0)
+{
+    ___pow(self, other)
+}
+
+domain ____pow_helper {
+  function ___pow(Int, Int): Int
+  axiom {
+    forall i1: Int :: { ___pow(i1, 0) } ___pow(i1, 0) == 1
+  }
+
+  axiom {
+    forall i1: Int, i2: Int :: { ___pow(i1, i2) } i2 > 0 ==> ___pow(i1, i2) == i1 * ___pow(i1, i2 - 1)
+  }
+}
+
 function int___floordiv__(self: Int, other: Int): Int
     decreases _
     requires @error("Divisor may be zero.")(other != 0)
