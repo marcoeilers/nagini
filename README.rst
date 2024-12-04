@@ -160,3 +160,7 @@ Troubleshooting
 
     The version of Viper you're using does not match your version of Nagini. Try updating both to the newest version.
 
+3.  Nagini cannot prove trivial properties about the return values of functions: 
+
+    This is likely due to a lack of specifications, see the discussion in the ``General Contracts`` section of the  `wiki <https://github.com/marcoeilers/nagini/wiki>`_.
+
