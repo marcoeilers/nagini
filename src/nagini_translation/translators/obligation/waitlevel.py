@@ -190,8 +190,9 @@ class WaitLevelTranslator(CommonTranslator):
         position = self.to_position(node, ctx)
         info = self.no_info(ctx)
 
-        obligation_info = ctx.actual_function.obligation_info
-        guard = obligation_info.get_wait_level_guard(node.left)
+        obligation_info = ctx.current_function.obligation_info
+        actual_obligation_info = ctx.actual_function.obligation_info
+        guard = actual_obligation_info.get_wait_level_guard(node.left)
         exhale = self._create_level_below_inex(
             guard, expr, obligation_info.residue_level, ctx)
         translated_exhale = exhale.translate(self, ctx, position, info)

@@ -382,7 +382,7 @@ def main() -> None:
         socket = context.socket(zmq.REP)
         socket.bind(DEFAULT_SERVER_SOCKET)
         global sil_programs
-        sil_programs = load_sil_files(args.int_bitops_size, args.jvm, args.sif, args.float_encoding)
+        sil_programs = load_sil_files(jvm, args.int_bitops_size, args.sif, args.float_encoding)
 
         while True:
             file = socket.recv_string()
@@ -428,7 +428,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
             print("Run, Total, Start, End, Time".format())
             for i in range(args.benchmark):
                 start = time.time()
-                modules, prog = translate(python_file, jvm, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
+                modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, arp=arp, base_dir=base_dir,
                                           ignore_global=args.ignore_global, float_encoding=args.float_encoding)
                 vresult = verify(modules, prog, python_file, jvm, viper_args, backend=backend, arp=arp)
                 end = time.time()

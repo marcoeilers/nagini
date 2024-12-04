@@ -544,7 +544,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         method = receiver.get_method(func_name)
         if method:
             assert method.type
-            target_var = ctx.actual_function.create_variable('target', method.type,
+            target_var = ctx.current_function.create_variable('target', method.type,
                                                              self.translator)
             val = target_var.ref(node, ctx)
             call = self.get_method_call(receiver, func_name, args, arg_types, [val], node,
@@ -815,7 +815,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if err_var.sil_name in ctx.var_aliases:
                 err_var = ctx.var_aliases[err_var.sil_name]
             return err_var.ref()
-        if ctx.actual_function.declared_exceptions:
+        if ctx.actual_function.declared_exceptions or ctx.actual_function.inline:
             return ctx.error_var.ref()
         else:
             new_var = ctx.current_function.create_variable('error',

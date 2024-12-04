@@ -172,7 +172,7 @@ class Context:
                 self.old_aliases[name] = []
             self.old_aliases[name].append(self.var_aliases[name])
         if replaces:
-            if replaces.alt_types:
+            if hasattr(replaces, 'alt_types') and replaces.alt_types:
                 assert not var.alt_types
                 var.alt_types = replaces.alt_types
         self.var_aliases[name] = var

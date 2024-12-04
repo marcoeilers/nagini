@@ -7,6 +7,14 @@ from nagini_contracts.contracts import *
 class Super:
     def some_method(self) -> int:
         Ensures(Result() >= 14)
+
+        # some code that is just here to make sure loops can be properly inlined
+        input = 2
+        out_a = input
+        for i in range(2):
+            Invariant(out_a == input * (input ** len(Previous(i))))
+            out_a = out_a * input
+
         return 14
     
     

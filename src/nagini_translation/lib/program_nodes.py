@@ -1018,6 +1018,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
         self.predicate = False
+        self.inline = False
         self.all_low = False
         self.preserves_low = False
         self.contract_only = contract_only
@@ -1080,6 +1081,13 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 # Could be overridden by anything, so we have to check if there's
                 # anything with the same name.
                 self.overrides = self.cls.superclass.get_contents(False)[self.name]
+                if self.overrides is not None:
+                    if self.overrides.inline:
+                        raise InvalidProgramException(self.node, 'overriding.inline.method',
+                                                      'Functions marked to be inlined cannot be overridden.')
+                    if self.inline:
+                        raise InvalidProgramException(self.node, 'overriding.inline.method',
+                                                      'Functions marked to be inlined cannot override other methods.')
             except KeyError:
                 pass
         for local in self.locals:
