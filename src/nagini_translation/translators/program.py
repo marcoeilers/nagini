@@ -351,9 +351,6 @@ class ProgramTranslator(CommonTranslator):
             method_type, default_checks, body = self._create_override_check_body_pure(
                 method, has_subtype, called_name, args, ctx)
             pres = default_checks + pres
-            pres.insert(0, self.viper.DecreasesWildcard(
-                None, self.no_position(ctx), self.no_info(ctx)
-            ))
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
                 body, self.no_position(ctx), self.no_info(ctx)
