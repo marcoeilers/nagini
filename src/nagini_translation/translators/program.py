@@ -334,17 +334,85 @@ class ProgramTranslator(CommonTranslator):
                          for f in fields])
 
         called_name = method.sil_name
-        ctx.position.pop()
-        results, targets, body = self._create_override_check_body_impure(
-            method, has_subtype, called_name, args, ctx)
-        result = self.create_method_node(
-            ctx, mname, params, results, pres, posts, [], body,
-            self.no_position(ctx), self.no_info(ctx),
-            method=method.overrides, overriding_check=True)
+
+        if method.pure:
+            t = self.translate_type(method.result.type, ctx)
+            result = self.viper.Result(
+                t, self.to_position(method.node, ctx), self.no_info(ctx)
+            )
+            posts.insert(0,
+                self.type_check(
+                    result, method.result.type,
+                    self.to_position(result, ctx), ctx
+                )
+            )
+
+            ctx.position.pop()
+
+            method_type, default_checks, body = self._create_override_check_body_pure(
+                method, has_subtype, called_name, args, ctx)
+            pres = default_checks + pres
+            pres.insert(0, self.viper.DecreasesWildcard(
+                None, self.no_position(ctx), self.no_info(ctx)
+            ))
+            result = self.viper.Function(
+                mname, params, method_type, pres, posts,
+                body, self.no_position(ctx), self.no_info(ctx)
+            )
+
+        else:
+            results, targets, body = self._create_override_check_body_impure(
+                method, has_subtype, called_name, args, ctx)
+            result = self.create_method_node(
+                ctx, mname, params, results, pres, posts, [], body,
+                self.no_position(ctx), self.no_info(ctx),
+                method=method.overrides, overriding_check=True)
 
         ctx.current_function = old_function
         self.info = None
         return result
+
+    def _create_override_check_body_pure(self, method: PythonMethod,
+            has_subtype: Expr, calledname: str,
+            args: List[Expr], ctx: Context) -> Tuple['silver.ast.Callable', List[Expr], Expr]:
+        
+        if method.type:
+            method_type = self.translate_type(method.type, ctx)
+        else:
+            raise InvalidProgramException(method.node, 'invalid.override')
+
+        # Check that arg names match and default args are equal
+        default_checks = []
+        for (name1, arg1), (name2, arg2) in zip(method.args.items(),
+                                                method.overrides.args.items()):
+            error_string = ('"default value matches overridden method '
+                            'for argument {0}"').format(name1)
+            assert_pos = self.to_position(arg1.node, ctx, error_string)
+            if name1 != name2:
+                raise InvalidProgramException(arg1.node, 'invalid.override')
+            if arg1.default or arg2.default:
+                if not (arg1.default and arg2.default):
+                    raise InvalidProgramException(arg1.node, 'invalid.override')
+                val1 = arg1.default_expr
+                val2 = arg2.default_expr
+                eq = self.viper.EqCmp(val1, val2, assert_pos,
+                                      self.no_info(ctx))
+                assertion = self.viper.Assert(eq, assert_pos,
+                                              self.no_info(ctx))
+                default_checks.append(assertion)
+        ctx.position.append(('overridden method',
+                             self.viper.to_position(method.overrides.node,
+                                                    ctx.position, py_node=method)))
+
+        func_app = self.viper.FuncApp(
+            calledname, args, self.to_position(method.node, ctx),
+            self.no_info(ctx), method_type
+        )
+        ctx.position.pop()
+
+        if has_subtype:
+            default_checks.append(has_subtype)
+        return method_type, default_checks, func_app
 
     def _create_override_check_body_impure(self, method: PythonMethod,
             has_subtype: Expr, calledname: str,

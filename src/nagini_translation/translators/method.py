@@ -346,8 +346,9 @@ class MethodTranslator(CommonTranslator):
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
 
-        result_post = self._create_result_type_post(method, error_var_ref, ctx)
-        posts = result_post + posts
+        if not method.pure:
+            result_post = self._create_result_type_post(method, error_var_ref, ctx)
+            posts = result_post + posts
         return pres, posts
 
     def _create_result_type_post(self, method: PythonMethod, error_var_ref,
