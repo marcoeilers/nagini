@@ -282,7 +282,6 @@ class ProgramTranslator(CommonTranslator):
         function which calls the overriding function, to check behavioural
         subtyping.
         """
-        assert not method.pure
         old_function = ctx.current_function
         ctx.current_function = method.overrides
         pos = self.viper.to_position(method.node, ctx.position, py_node=method)
@@ -1408,13 +1407,11 @@ class ProgramTranslator(CommonTranslator):
                     self.track_dependencies(selected_names, selected, func, ctx)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
-                                                func.overrides.cls.name == 'object') or
-                                               (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
-                        # We allow overriding certain methods, since the basic versions
-                        # in object are already minimal.
-                        raise InvalidProgramException(func.node,
-                                                      'invalid.override')
+                    if ((func_name != '__init__' or
+                             (cls.superclass and
+                              cls.superclass.python_class.has_classmethod)) and
+                            func.overrides):
+                        functions.append(self.create_override_check(func, ctx))
                 for method_name in cls.methods:
                     method = cls.methods[method_name]
                     threading_ids_constants.append(
