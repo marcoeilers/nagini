@@ -351,6 +351,40 @@ class ProgramTranslator(CommonTranslator):
             method_type, default_checks, body = self._create_override_check_body_pure(
                 method, has_subtype, called_name, args, ctx)
             pres = default_checks + pres
+
+            # add decreases class of superclass function to preconditions
+            superclass_func = method.cls.superclass.get_function(method.name)
+            if superclass_func:
+                info = self.no_info(ctx)
+                for args, aliases in superclass_func.decreases_clauses:
+                    with ctx.additional_aliases(aliases):
+                        condition = None
+                        pos = self.to_position(args[0], ctx)
+                        if len(args) > 1:
+                            cond_stmt, condition = self.translate_expr(args[1], ctx, self.viper.Bool)
+                            if cond_stmt:
+                                raise InvalidProgramException(args[1], 'purity.violated')
+                        measure_node = args[0]
+                        if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
+                            decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
+                        else:
+                            measure = None
+                            if isinstance(measure_node, ast.Call):
+                                target = self.get_target(measure_node, ctx)
+                                if isinstance(target, PythonMethod) and target.predicate:
+                                    measure_stmt, measure_args, _ = self.translate_args(target, measure_node.args,
+                                                                                        measure_node.keywords, measure_node, ctx)
+                                    measure = self.viper.PredicateInstance(measure_args, target.sil_name, pos, info)
+                            if measure is None:
+                                measure_stmt, measure = self.translate_expr(measure_node, ctx, target_type=self.viper.Int)
+                            decreases_clause = self.viper.DecreasesTuple([measure], condition, pos, info)
+                            if measure_stmt:
+                                raise InvalidProgramException(measure_node, 'purity.violated')
+                    pres.insert(0, decreases_clause)
+            else:
+                raise InvalidProgramException(method.node, 'invalid.override')
+
+            # create function viper AST node
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
                 body, self.no_position(ctx), self.no_info(ctx)
