@@ -994,7 +994,8 @@ class ExpressionTranslator(CommonTranslator):
         
         if left_type == right_type or isinstance(right_type, TypeVar):
             func_name = LEFT_OPERATOR_FUNCTIONS[type(node.op)]
-            if isinstance(node.op, ast.Pow) and left_type.python_class.name == INT_TYPE and isNum(node.right):
+            if (isinstance(node.op, ast.Pow) and left_type.python_class.name == INT_TYPE and
+                    isinstance(node.right, ast.Constant) and isinstance(node.right.value, int)):
                 func_name = "__pow_unrolled__"
             call_stmt, call = self.get_func_or_method_call(left_type, func_name, [left, right], [left_type, right_type], node, ctx)
             if call is None:
