@@ -245,6 +245,11 @@
             "args": ["__prim__int", "__prim__int"],
             "type": "__prim__int"
         },
+        "__pow_unrolled__": {
+            "args": ["__prim__int", "__prim__int"],
+            "type": "__prim__int",
+            "requires": ["__pow__"]
+        },
         "__truediv__": {
             "args": ["__prim__int", "__prim__int"],
             "type": "float"
