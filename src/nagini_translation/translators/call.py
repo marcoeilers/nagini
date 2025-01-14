@@ -964,7 +964,8 @@ class CallTranslator(CommonTranslator):
         """
         assert ctx.current_function
         if method in ctx.inlined_calls:
-            raise InvalidProgramException(node, 'recursive.static.call')
+            raise InvalidProgramException(node, 'recursive.static.call',
+                                          "Recursive call to inlined or statically-bound function")
         position = self.to_position(node, ctx)
         ctx.position.append((inline_reason, position))
         arg_stmts, arg_vals, arg_types = self._translate_call_args(node, ctx)
