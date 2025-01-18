@@ -1038,7 +1038,7 @@
             "args": ["list"],
             "type": "list",
             "MustTerminate": true,
-            "requires": ["list___len__", "list___getitem__", "__prim__int___box__", "int___unbox__"]
+            "requires": ["list___len__", "list___getitem__", "__prim__int___box__", "int___unbox__", "sum"]
         }
     }
 }
