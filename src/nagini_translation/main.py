@@ -36,6 +36,7 @@ from nagini_translation.lib.util import (
     UnsupportedException,
 )
 from nagini_translation.lib.viper_ast import ViperAST
+from nagini_translation.native.extractor import NativeSpecExtractor
 from nagini_translation.sif.lib.util import (
     configure_mpp_transformation,
     set_all_low_methods,
@@ -43,6 +44,7 @@ from nagini_translation.sif.lib.util import (
 )
 from nagini_translation.sif.lib.viper_ast_extended import ViperASTExtended
 from nagini_translation.translator import Translator
+from nagini_translation.translators.abstract import Context
 from nagini_translation.verifier import (
     Carbon,
     get_arp_plugin,
@@ -104,7 +106,7 @@ def load_sil_files(jvm: JVM, bv_size: int, sif: bool = False, float_option: str 
 
 def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), base_dir: str = None,
               sif: bool = False, arp: bool = False, ignore_global: bool = False,
-              reload_resources: bool = False, verbose: bool = False,
+              reload_resources: bool = False, verbose: bool = False, skip_verification: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
@@ -148,6 +150,12 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
     modules = [main_module.global_module] + list(analyzer.modules.values())
+
+    extract_native_contracts(modules)
+
+    if skip_verification:
+        return modules, None
+
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding)
     if sif:
@@ -181,6 +189,24 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
             raise ConsistencyException('consistency.error')
     return modules, prog
 
+
+def extract_native_contracts(modules: List['PythonModule']) -> None:
+    for m in modules:
+        for f in m.methods.values():
+            if f.native:
+                extract_native_contract(m, None, f)
+        for c in m.classes.values():
+            for f in c.methods.values():
+                if f.native:
+                    extract_native_contract(m, c, f)
+
+def extract_native_contract(m: 'PythonModule', c: 'PythonClass', f: 'PythonMethod') -> None:
+    ctx = Context()
+    ctx.module = m
+    ctx.current_function = f
+    ctx.current_class = c
+    extractor = NativeSpecExtractor(f, ctx)
+    extractor.extract()
 
 def collect_modules(analyzer: Analyzer, path: str) -> None:
     """
@@ -348,6 +374,12 @@ def main() -> None:
         type=int,
         default=8
     )
+    parser.add_argument(
+        '--skip-verification',
+        help='Skip verification of the program (extract native specs only).',
+        action='store_true',
+        default=False
+    )
     args = parser.parse_args()
 
     config.classpath = args.viper_jar_path
@@ -408,7 +440,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         start = time.time()
         selected = set(args.select.split(',')) if args.select else set()
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
-                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
+                                  ignore_global=args.ignore_global, arp=arp, verbose=args.verbose, skip_verification=args.skip_verification,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding)
         if args.print_viper:
             if args.verbose:
@@ -435,6 +467,9 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
                 print("{}, {}, {}, {}, {}".format(
                     i, args.benchmark, start, end, end - start))
         else:
+            if args.skip_verification:
+                return True
+
             submitter = None
             if args.submit_for_evaluation:
                 submitter = jvm.viper.silver.utility.ManualProgramSubmitter(True, "", "Nagini", backend.name.capitalize(), viper_args)

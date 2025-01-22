@@ -683,6 +683,11 @@ class Analyzer(ast.NodeVisitor):
             func.inline = True
         if func.predicate:
             func.contract_only = self.is_declared_contract_only(node)
+        if self.is_native(node):
+            func.native = True
+            if not func.contract_only:
+                raise InvalidProgramException(node, "native.not.contract.only",
+                                              "Native methods must be marked contract only.")
         if self.is_all_low(node):
             self.has_all_low = True
             func.all_low = True
@@ -1483,7 +1488,8 @@ class Analyzer(ast.NodeVisitor):
         self.visit_default(node)
 
     def _incompatible_decorators(self, decorators) -> bool:
-        return ((('Predicate' in decorators) and ('Pure' in decorators)) or
+        return (('Native' in decorators and (len(decorators) > 2 or (len(decorators) > 1 and 'ContractOnly' not in decorators))) or
+                (('Predicate' in decorators) and ('Pure' in decorators)) or
                 (('Predicate' in decorators) and ('Inline' in decorators)) or
                 (('Inline' in decorators) and ('Pure' in decorators)) or
                 (('IOOperation' in decorators) and (len(decorators) != 1)) or
@@ -1567,3 +1573,6 @@ class Analyzer(ast.NodeVisitor):
 
     def preserves_low(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'PreservesLow')
+
+    def is_native(self, func: ast.FunctionDef) -> bool:
+        return self.has_decorator(func, 'Native')

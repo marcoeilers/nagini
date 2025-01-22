@@ -493,6 +493,14 @@ def GhostReturns(start_index: int) -> Callable[[T], T]:
     return wrap
 
 
+def Native(func: T) -> T:
+    """
+    Decorator indicating that this method is natively implemented in C and Nagini should generate C specifications
+    for its implementation.
+    """
+    return func
+
+
 def list_pred(l: object) -> bool:
     """
     Special, predefined predicate that represents the permissions belonging
@@ -566,6 +574,7 @@ __all__ = [
         'Ghost',
         'ContractOnly',
         'GhostReturns',
+        'Native',
         'list_pred',
         'dict_pred',
         'set_pred',
