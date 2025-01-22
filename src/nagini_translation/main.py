@@ -19,6 +19,7 @@ import traceback
 
 from jpype._jexception import JException
 from nagini_translation.analyzer import Analyzer
+from nagini_translation.lib.program_nodes import PythonClass
 from nagini_translation.sif_translator import SIFTranslator
 from nagini_translation.lib import config
 from nagini_translation.lib.constants import DEFAULT_SERVER_SOCKET
@@ -196,6 +197,8 @@ def extract_native_contracts(modules: List['PythonModule']) -> None:
             if f.native:
                 extract_native_contract(m, None, f)
         for c in m.classes.values():
+            if not isinstance(c, PythonClass):
+                continue
             for f in c.methods.values():
                 if f.native:
                     extract_native_contract(m, c, f)
