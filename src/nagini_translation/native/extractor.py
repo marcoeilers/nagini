@@ -16,42 +16,11 @@ class VF_expr:
 class VF_PyObj_t(VF_expr):
     pass
 class VF_PyObj_v(VF_expr):
-    pass
-class VF_PyLong_v(VF_PyObj_v):
-    def __init__(self, value:int):
-        self.value = value
-    def __str__(self):
-        return "PyLong_v("+str(self.value)+")"
-class VF_PyFloat_v(VF_PyObj_v):
-    def __init__(self, value:float):
-        self.value = value
-    def __str__(self):
-        return "PyFloat_v("+str(self.value)+")"
-class VF_PyUnicode_v(VF_PyObj_v):
-    def __init__(self, value:str):
-        self.value = value
-    def __str__(self):
-        return "PyUnicode_v(\""+self.value+"\")"
-class VF_PyClass():
-    def __init__(self, name:str, superclass:"VF_PyClass"=None):
-        self.name = name
-        self.superclass = superclass
-    def __init__(self):
-        self.name = "object"
-        self.superclass = None
-    def __str__(self):
-        if(self.superclass is not None):
-            return "PyClass(\""+self.name+"\", "+str(self.superclass)+")"
-        else:
-            return "ObjectType"
-            
-class VF_PyClassInstance_v(VF_PyObj_v):
-    def __init__(self, cls:VF_PyClass):
-        self.cls = cls
-    def __str__(self):
-        return "PyClassInstance_v("+str(self.cls)+")"
+    def __init__(self, vf: VF_expr):
+        self.vf = vf
 
-
+#    PyFloat_v(float) |
+#    PyUnicode_v(list<char>) |
 #    PyClassInstance_v(PyClass) |
 #    PyType_v(PyObj_Type) |
 #    PyExc_v(PyExc_Raised_Val) |
@@ -61,8 +30,6 @@ class VF_pair(VF_expr):
     def __init__(self, e1:VF_expr, e2:VF_expr):
         self.e1 = e1
         self.e2 = e2
-    def __str__(self):
-        return "pair("+str(self.e1)+", "+str(self.e2)+")"
 class VF_fact:
     pass
 class VF_fact_pred(VF_fact):#a fact built using a predicate
@@ -85,24 +52,22 @@ class NativeSpecExtractor:
             'mycoolclass': 'PyClassInstance_v("mycoolclass", ObjectType)'
         }[p.name]
     def setup(self, f: PythonMethod, ctx: Context) -> string:
-        print(self.get_type(f.node.args.args[0].annotation,ctx))
         for value in f.node.args.args:
             #print(value)
             thetype=self.get_type(value.annotation, ctx)
             print(value, thetype.name)
-        pytuple_entries= ", \n\t".join(list(map(lambda v: "pair(?arg_"+v.arg+"_ptr, "+self.pytype__to__PyObj_t(self.get_type(v.annotation, ctx))+")",
-                       f.node.args.args)))
-        main_tuple="pyobj_hasval(PyTuple_v(\n\t"+pytuple_entries+"\n))"
-
-        print(main_tuple)
+        
+        #pytuple_entries= ", \n\t".join(list(map(lambda v: print(v),"pair(?arg_"+v.arg+"_ptr, "+")",f.args)))
+        pytuple_entries= ", \n\t".join(list(
+            map(lambda a: "(?arg_"+a[0]+"_ptr"+","+self.pytype__to__PyObj_t(a[1].type)+")",f.args.items())))
+        print(pytuple_entries)
+        #main_tuple="pyobj_hasval(PyTuple_v(\n\t"+pytuple_entries+"\n))"
+        #print(main_tuple)
 
 
     def __init__(self, f: PythonMethod, ctx: Context):
-        print("Hello")
-        print(self.get_type(f.node.body[0].targets[0], ctx))
-        print(self.get_target(f.node.body[0].targets[0], ctx))
-        print(f.node.args.args[0])
-        print(self.get_type(f.node.args.args[0].annotation, ctx))
+        print("HELLO223")
+        print(f.args['i'].type.name)
         # self.get_target(f.node.body[0].targets[0], ctx)
         self.setup(f, ctx)
         pass
@@ -114,6 +79,7 @@ class NativeSpecExtractor:
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
         container = ctx.actual_function if ctx.actual_function else ctx.module
         containers = [ctx]
+        
         if ctx.current_class:
             containers.append(ctx.current_class)
         if isinstance(container, PythonMethod):
