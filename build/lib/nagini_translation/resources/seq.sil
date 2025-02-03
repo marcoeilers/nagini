@@ -1,0 +1,88 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+function PSeq___create__(prim: Seq[Ref], cont_type: PyType): Ref
+    decreases _
+    ensures typeof(result) == PSeq(cont_type)
+    ensures PSeq___sil_seq__(result) == prim
+
+function PSeq___sil_seq__(box: Ref): Seq[Ref]
+    decreases _
+    requires issubtype(typeof(box), PSeq(PSeq_arg(typeof(box), 0)))
+
+function PSeq___contains__(self: Ref, item: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == (item in PSeq___sil_seq__(self))
+    ensures result ==> issubtype(typeof(item), PSeq_arg(typeof(self), 0))
+
+function PSeq___getitem__(self: Ref, index: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires issubtype(typeof(index), int())
+    requires @error("Index may be out of bounds.")(let ln == (PSeq___len__(self)) in
+                @error("Index may be out of bounds.")((int___unbox__(index) < 0 ==> int___unbox__(index) >= -ln) && (int___unbox__(index) >= 0 ==> int___unbox__(index) < ln)))
+    ensures result == (int___unbox__(index) >= 0 ? PSeq___sil_seq__(self)[int___unbox__(index)] : PSeq___sil_seq__(self)[PSeq___len__(self) + int___unbox__(index)])
+    ensures issubtype(typeof(result), PSeq_arg(typeof(self), 0))
+
+function PSeq___len__(self: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == |PSeq___sil_seq__(self)|
+
+function PSeq_take(self: Ref, no: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[..no], PSeq_arg(typeof(self), 0))
+
+function PSeq_drop(self: Ref, no: Int): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[no..], PSeq_arg(typeof(self), 0))
+
+function PSeq_update(self: Ref, index: Int, val: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires index >= 0 && index < PSeq___len__(self)
+    ensures result == PSeq___create__(PSeq___sil_seq__(self)[index := val], PSeq_arg(typeof(self), 0))
+
+function PSeq___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
+    requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
+    ensures result == PSeq___create__(PSeq___sil_seq__(self) ++ PSeq___sil_seq__(other), PSeq_arg(typeof(self), 0))
+
+function PSeq___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), PSeq(PSeq_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), PSeq(PSeq_arg(typeof(other), 0)))
+    requires PSeq_arg(typeof(self), 0) == PSeq_arg(typeof(other), 0)
+    ensures result == (PSeq___sil_seq__(self) == PSeq___sil_seq__(other))
+    ensures result ==> self == other // extensionality
+    ensures result == object___eq__(self, other)
+
+
+domain __MSHelper[T$] {
+    function __toMS(s: Seq[T$]): Multiset[T$]
+
+    axiom __toMS_def_1 {
+        __toMS(Seq[T$]()) == Multiset[T$]()
+    }
+
+    axiom __toMS_def_2 {
+        forall __t: T$ :: { __toMS(Seq(__t)) } __toMS(Seq(__t)) == Multiset(__t)
+    }
+
+    axiom __toMS_def_3 {
+        forall __ss1: Seq[T$], __ss2: Seq[T$] :: { __toMS(__ss1 ++ __ss2) } __toMS(__ss1 ++ __ss2) == __toMS(__ss1) union __toMS(__ss2)
+    }
+
+    axiom __toMS_def_4 {
+        forall __ss1: Seq[T$] :: { __toMS(__ss1) } |__toMS(__ss1)| == |__ss1|
+    }
+}

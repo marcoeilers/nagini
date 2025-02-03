@@ -1,0 +1,39 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+import <decreases/int.vpr>
+import <decreases/predicate_instance.vpr>
+
+domain SIFDomain[T] {
+    function Low(x: T): Bool
+    axiom low_true {
+        forall x: T :: {Low(x)} Low(x)
+    }
+    axiom lowevent_true {
+        LowEvent()
+    }
+    function LowEvent(): Bool
+}
+
+
+import "bool.sil"
+import "float.sil"
+import "references.sil"
+import "bytes.sil"
+import "iterator.sil"
+import "list.sil"
+import "lock.sil"
+import "measures.sil"
+import "pytype.sil"
+import "range.sil"
+import "seq.sil"
+import "pset.sil"
+import "set_dict.sil"
+import "slice.sil"
+import "str.sil"
+import "tuple.sil"
+import "name_domain.sil"

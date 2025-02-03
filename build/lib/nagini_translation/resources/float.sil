@@ -1,0 +1,135 @@
+
+function float___create__(i: Int): Ref
+    decreases _
+    ensures typeof(result) == float()
+
+function float___bool__(self: Ref): Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), float())
+    ensures self == null ==> !result
+    ensures issubtype(typeof(self), int()) ==> (result == int___bool__(self))
+
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures issubtype(typeof(f), int()) ==> result == false
+
+function float___ge__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___ge__(self, other))
+
+function float___gt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___gt__(self, other))
+
+function float___le__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___le__(self, other))
+
+function float___lt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___lt__(self, other))
+
+function float___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___eq__(self, other))
+
+function float___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___add__(int___unbox__(self), int___unbox__(other))))
+
+function float___radd__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___add__(int___unbox__(other), int___unbox__(self))))
+
+function float___sub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___sub__(int___unbox__(self), int___unbox__(other))))
+
+function float___rsub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___sub__(int___unbox__(other), int___unbox__(self))))
+
+function float___mul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___mul__(int___unbox__(self), int___unbox__(other))))
+
+function float___rmul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == __prim__int___box__(int___mul__(int___unbox__(other), int___unbox__(self))))
+
+function float___truediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(issubtype(typeof(other), int()) ==> @error("Divisor may be zero.")(int___unbox__(other) != 0))
+    requires issubtype(typeof(other), int())  // cannot express non-zero at the moment
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___truediv__(int___unbox__(self), int___unbox__(other)))
+
+function float___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures issubtype(typeof(self), int()) ==> result == int___pos__(self)
+
+function float___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures issubtype(typeof(self), int()) ==> result == int___neg__(self)
+
+function float___rtruediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(issubtype(typeof(self), int()) ==> @error("Divisor may be zero.")(int___unbox__(self) != 0))
+    requires issubtype(typeof(self), int())  // cannot express non-zero at the moment
+    ensures issubtype(typeof(result), float())
+    ensures (issubtype(typeof(self), int()) && issubtype(typeof(other), int())) ==>
+            (result == int___truediv__(int___unbox__(other), int___unbox__(self)))
+
+function float___int__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures typeof(result) == int()

@@ -4,123 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
-            "name": "Run Python",
-            "type": "python",
+            "name": "MYRUN",
+            "type": "debugpy",
             "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${config:python.pythonPath}",
-            "program": "${file}",
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Run Python with contracts",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${file}",
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}/nagini/src"
-            },
-            "envFile": "${workspaceRoot}/.env",
+            "program": "/home/etienne/nagini/test.py",
             "console": "integratedTerminal",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Verify Python with Nagini",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${workspaceRoot}/nagini/env/bin/nagini",
             "args": [
-                "${file}"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
-            "console": "integratedTerminal",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Debug Nagini verifying Python",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${workspaceRoot}/nagini/env/bin/nagini",
-            "args": [
-                "${file}"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
-            "console": "integratedTerminal",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Translate Python to Viper",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${workspaceRoot}/nagini/env/bin/nagini",
-            "args": [
-                "--write-silver-to-file",
-                "${fileDirname}/${fileBasenameNoExtension}.vpr",
-                "${file}"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
-            "console": "integratedTerminal",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
-            ]
-        },
-        {
-            "name": "Verify Viper with Silicon",
-            "type": "python",
-            "request": "launch",
-            "stopOnEntry": false,
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${workspaceRoot}/nagini/env/bin/nagini",
-            "args": [
-                "--write-silver-to-file",
-                "${fileDirname}/${fileBasenameNoExtension}.vpr",
-                "${file}"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
-            "console": "integratedTerminal",
-            "debugOptions": [
-                "WaitOnAbnormalExit",
-                "WaitOnNormalExit",
-                "RedirectOutput"
+                "--skip-verification ",
+                "/home/etienne/nagini/test.py"
             ]
         }
     ]

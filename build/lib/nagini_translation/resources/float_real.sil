@@ -1,0 +1,425 @@
+function float___create__(i: Int): Ref
+    decreases _
+    ensures typeof(result) == float()
+
+function float___unbox__(r: Ref): Perm
+    decreases _
+    requires issubtype(typeof(r), float())
+    requires float___is_nan__(r) == false
+    requires float___is_inf__(r, false) == false
+    requires float___is_inf__(r, true) == false
+    ensures issubtype(typeof(r), int()) ==> result == (int___unbox__(r) / 1)
+
+function __prim__perm___box__(p: Perm): Ref
+    decreases _
+    ensures typeof(result) == float()
+    ensures float___is_nan__(result) == false
+    ensures float___is_inf__(result, false) == false
+    ensures float___is_inf__(result, true) == false
+    ensures float___unbox__(result) == p
+
+function float___box_nan(): Ref
+    decreases _
+    ensures typeof(result) == float()
+    ensures float___is_nan__(result) == true
+    ensures float___is_inf__(result, false) == false
+    ensures float___is_inf__(result, true) == false
+
+function float___box_inf(negative: Bool): Ref
+    decreases _
+    ensures typeof(result) == float()
+    ensures float___is_nan__(result) == false
+    ensures float___is_inf__(result, false) == !negative
+    ensures float___is_inf__(result, true) == negative
+
+function float___is_nan__(r: Ref): Bool
+    decreases _
+    requires issubtype(typeof(r), float())
+    ensures issubtype(typeof(r), int()) ==> result == false
+
+function float___is_inf__(r: Ref, negative: Bool): Bool
+    decreases _
+    requires issubtype(typeof(r), float())
+    ensures issubtype(typeof(r), int()) ==> result == false
+
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures result == float___is_nan__(f)
+
+function float___bool__(self: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures float___is_nan__(self) == false && float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        result == (float___unbox__(self) != 0 / 1)
+    ensures float___is_nan__(self) == true || float___is_inf__(self, false) == true || float___is_inf__(self, true) == true ==>
+        result == true
+
+function float___ge__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == false
+    ensures float___is_inf__(self, false) == true ==> result == true
+    ensures float___is_inf__(self, true) == true ==> result == (float___is_inf__(other, true) == true)
+    ensures float___is_inf__(other, false) == true ==> result == (float___is_inf__(self, false) == true)
+    ensures float___is_inf__(other, true) == true ==> result == true
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == (float___unbox__(self) >= float___unbox__(other))
+
+function float___gt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == false
+    ensures float___is_inf__(self, false) == true ==> result == (float___is_inf__(other, false) == false)
+    ensures float___is_inf__(self, true) == true ==> result == false
+    ensures float___is_inf__(other, false) == true ==> result == false
+    ensures float___is_inf__(other, true) == true ==> result == (float___is_inf__(self, true) == false)
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == (float___unbox__(self) > float___unbox__(other))
+
+function float___le__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == false
+    ensures float___is_inf__(self, false) == true ==> result == (float___is_inf__(other, false) == true)
+    ensures float___is_inf__(self, true) == true ==> result == true
+    ensures float___is_inf__(other, false) == true ==> result == true
+    ensures float___is_inf__(other, true) == true ==> result == (float___is_inf__(self, true) == true)
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == (float___unbox__(self) <= float___unbox__(other))
+
+function float___lt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == false
+    ensures float___is_inf__(self, false) == true ==> result == false
+    ensures float___is_inf__(self, true) == true ==> result == (float___is_inf__(other, true) == false)
+    ensures float___is_inf__(other, false) == true ==> result == (float___is_inf__(self, false) == false)
+    ensures float___is_inf__(other, true) == true ==> result == false
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == (float___unbox__(self) < float___unbox__(other))
+
+function float___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == false
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
+                result == true
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false) ||
+           (float___is_inf__(self, true) == true  && float___is_inf__(other, true) == false) ||
+           (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false) ||
+           (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false) ==>
+               result == false
+    ensures (float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
+            result == (float___unbox__(self) == float___unbox__(other))
+
+function float___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (float___is_nan__(self) == true || float___is_nan__(other) == true) ==>
+        result == float___box_nan()
+    ensures ((float___is_inf__(self, false) == true && float___is_inf__(other, true) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, false) == true)) ==>
+                (result == float___box_nan())
+    ensures ((float___is_inf__(self, false) == true && float___is_inf__(other, true) == false && float___is_nan__(other) == false) ||
+            (float___is_inf__(other, false) == true && float___is_inf__(self, true) == false && float___is_nan__(self) == false)) ==>
+                (result == float___box_inf(false))
+    ensures ((float___is_inf__(self, true) == true && float___is_inf__(other, false) == false && float___is_nan__(other) == false) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, false) == false && float___is_nan__(self) == false)) ==>
+                (result == float___box_inf(true))
+    ensures (float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
+        (result == __prim__perm___box__(float___unbox__(self) + float___unbox__(other)))
+
+function float___radd__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures (float___is_nan__(self) == true || float___is_nan__(other) == true) ==>
+        result == float___box_nan()
+    ensures ((float___is_inf__(self, false) == true && float___is_inf__(other, true) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, false) == true)) ==>
+                result == float___box_nan()
+    ensures ((float___is_inf__(self, false) == true && float___is_inf__(other, true) == false && float___is_nan__(other) == false) ||
+            (float___is_inf__(other, false) == true && float___is_inf__(self, true) == false && float___is_nan__(self) == false)) ==>
+                result == float___box_inf(false)
+    ensures ((float___is_inf__(self, true) == true && float___is_inf__(other, false) == false && float___is_nan__(other) == false) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, false) == false && float___is_nan__(self) == false)) ==>
+                result == float___box_inf(true)
+    ensures (float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
+        result == __prim__perm___box__(float___unbox__(other) + float___unbox__(self))
+
+function float___sub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == float___box_nan()
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false && float___is_nan__(other) == false)  ||
+            (float___is_inf__(self, false) == false && float___is_inf__(self, true) == false && float___is_nan__(self) == false && float___is_inf__(other, true) == true) ==>
+                result == float___box_inf(false)
+    ensures (float___is_inf__(self, true) == true && float___is_inf__(other, true) == false && float___is_nan__(other) == false) ||
+            (float___is_inf__(self, false) == false && float___is_inf__(self, true) == false && float___is_nan__(self) == false && float___is_inf__(other, false) == true) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(self) - float___unbox__(other))
+
+function float___rsub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(other) == true || float___is_nan__(self) == true ==>
+        result == float___box_nan()
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == true) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false && float___is_nan__(self) == false)  ||
+            (float___is_inf__(other, false) == false && float___is_inf__(other, true) == false && float___is_nan__(other) == false && float___is_inf__(self, true) == true) ==>
+                result == float___box_inf(false)
+    ensures (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false && float___is_nan__(self) == false) ||
+            (float___is_inf__(other, false) == false && float___is_inf__(other, true) == false && float___is_nan__(other) == false && float___is_inf__(self, false) == true) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(other) == false && float___is_nan__(self) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(other) - float___unbox__(self))
+
+function float___mul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == float___box_nan()
+    ensures float___is_nan__(self) == false && 
+            float___is_inf__(self, false) == false && 
+            float___is_inf__(self, true) == false &&
+            float___unbox__(self) == 0 / 1 && 
+            (float___is_inf__(other, false) == true || float___is_inf__(other, true) == true) ==>
+                result == float___box_nan()
+    ensures float___is_nan__(other) == false && 
+            float___is_inf__(other, false) == false && 
+            float___is_inf__(other, true) == false &&
+            float___unbox__(other) == 0 / 1 && 
+            (float___is_inf__(self, false) == true || float___is_inf__(self, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___unbox__(self) > 0 / 1 && float___is_inf__(other, false) == true) ||
+            (float___unbox__(self) < 0 / 1 && float___is_inf__(other, true) == true)) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___is_inf__(self, false) == true && float___unbox__(other) > 0 / 1) ||
+            (float___is_inf__(self, true) == true && float___unbox__(other) < 0 / 1)) ==>
+                result == float___box_inf(false)
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, true) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, false) == true) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___unbox__(self) > 0 / 1 && float___is_inf__(other, true) == true) ||
+            (float___unbox__(self) < 0 / 1 && float___is_inf__(other, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___unbox__(other) > 0 / 1 && float___is_inf__(self, true) == true) ||
+            (float___unbox__(other) < 0 / 1 && float___is_inf__(self, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(other) == false && float___is_nan__(self) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(self) * float___unbox__(other))
+
+function float___rmul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == float___box_nan()
+    ensures float___is_nan__(other) == false && 
+            float___is_inf__(other, false) == false && 
+            float___is_inf__(other, true) == false &&
+            float___unbox__(other) == 0 / 1 && 
+            (float___is_inf__(self, false) == true || float___is_inf__(self, true) == true) ==>
+                result == float___box_nan()
+    ensures float___is_nan__(self) == false && 
+            float___is_inf__(self, false) == false && 
+            float___is_inf__(self, true) == false &&
+            float___unbox__(self) == 0 / 1 && 
+            (float___is_inf__(other, false) == true || float___is_inf__(other, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == true) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, true) == true) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___unbox__(other) > 0 / 1 && float___is_inf__(self, false) == true) ||
+            (float___unbox__(other) < 0 / 1 && float___is_inf__(self, true) == true)) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___is_inf__(other, false) == true && float___unbox__(self) > 0 / 1) ||
+            (float___is_inf__(other, true) == true && float___unbox__(self) < 0 / 1)) ==>
+                result == float___box_inf(false)
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, true) == true) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, false) == true) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___unbox__(other) > 0 / 1 && float___is_inf__(self, true) == true) ||
+            (float___unbox__(other) < 0 / 1 && float___is_inf__(self, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___unbox__(self) > 0 / 1 && float___is_inf__(other, true) == true) ||
+            (float___unbox__(self) < 0 / 1 && float___is_inf__(other, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(other) * float___unbox__(self))
+
+function float___truediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(float___is_nan__(other) == false && float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        @error("Divisor may be zero.")(float___unbox__(other) != 0 / 1))
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == float___box_nan()
+    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
+            (float___is_inf__(self, false) == true && float___is_inf__(other, true) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, false) == true) ||
+            (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(other, false) == true || float___is_inf__(other, true) == true) &&
+            float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false ==>
+                result == __prim__perm___box__(0 / 1)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___unbox__(other) > 0 / 1 && float___is_inf__(self, false) == true) ||
+            (float___unbox__(other) < 0 / 1 && float___is_inf__(self, true) == true)) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false &&
+            ((float___unbox__(other) > 0 / 1 && float___is_inf__(self, true) == true) ||
+            (float___unbox__(other) < 0 / 1 && float___is_inf__(self, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(self) == false && float___is_nan__(other) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(self) / float___unbox__(other))
+
+function float___rtruediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(float___is_nan__(self) == false && float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        @error("Divisor may be zero.")(float___unbox__(self) != 0 / 1))
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+        result == float___box_nan()
+    ensures (float___is_inf__(other, false) == true && float___is_inf__(self, false) == true) ||
+            (float___is_inf__(other, false) == true && float___is_inf__(self, true) == true) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, false) == true) ||
+            (float___is_inf__(other, true) == true && float___is_inf__(self, true) == true) ==>
+                result == float___box_nan()
+    ensures (float___is_inf__(self, false) == true || float___is_inf__(self, true) == true) &&
+            float___is_nan__(other) == false &&
+            float___is_inf__(other, false) == false &&
+            float___is_inf__(other, true) == false ==>
+                result == __prim__perm___box__(0 / 1)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___unbox__(self) > 0 / 1 && float___is_inf__(other, false) == true) ||
+            (float___unbox__(self) < 0 / 1 && float___is_inf__(other, true) == true)) ==>
+                result == float___box_inf(false)
+    ensures float___is_nan__(self) == false &&
+            float___is_inf__(self, false) == false &&
+            float___is_inf__(self, true) == false &&
+            ((float___unbox__(self) > 0 / 1 && float___is_inf__(other, true) == true) ||
+            (float___unbox__(self) < 0 / 1 && float___is_inf__(other, false) == true)) ==>
+                result == float___box_inf(true)
+    ensures float___is_nan__(other) == false && float___is_nan__(self) == false &&
+        float___is_inf__(other, false) == false && float___is_inf__(other, true) == false &&
+        float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==>
+        result == __prim__perm___box__(float___unbox__(other) / float___unbox__(self))
+
+function float___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures result == self
+
+function float___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures float___is_nan__(self) == false && float___is_inf__(self, false) == false && float___is_inf__(self, true) == false ==> result == __prim__perm___box__(-float___unbox__(self))
+    ensures float___is_nan__(self) == true ==> result == float___box_nan()
+    ensures float___is_inf__(self, false) == true ==> result == float___box_inf(true)
+    ensures float___is_inf__(self, true) == true ==> result == float___box_inf(false)
+
+function float___int__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires float___is_nan__(self) == false
+    requires float___is_inf__(self, false) == false && float___is_inf__(self, true) == false
+    ensures typeof(result) == int()
+    ensures result == __prim__int___box__(____to_int(float___unbox__(self)))
+
+domain ___real_helper  {
+  function ____to_int(p: Perm): Int interpretation "to_int"
+}

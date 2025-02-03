@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+domain Measure$ {
+
+    function Measure$create(guard: Bool, key: Ref, value: Int): Measure$
+
+    function Measure$guard(m: Measure$): Bool
+
+    function Measure$key(m: Measure$): Ref
+
+    function Measure$value(m: Measure$): Int
+
+    axiom Measure$A0 {
+        (forall g: Bool, k: Ref, v: Int :: {Measure$guard(Measure$create(g, k, v))} Measure$guard(Measure$create(g, k, v)) == g)
+    }
+
+    axiom Measure$A1 {
+        (forall g: Bool, k: Ref, v: Int :: {Measure$key(Measure$create(g, k, v))} Measure$key(Measure$create(g, k, v)) == k)
+    }
+
+    axiom Measure$A2 {
+        (forall g: Bool, k: Ref, v: Int :: {Measure$value(Measure$create(g, k, v))} Measure$value(Measure$create(g, k, v)) == v)
+    }
+}
+
+function Measure$check(map: Seq[Measure$], key: Ref, value: Int): Bool
+    decreases _
+{
+    (forall m: Measure$ :: {m in map} m in map ==>
+     ((Measure$guard(m) && Measure$key(m) == key) ==> Measure$value(m) > value))
+}

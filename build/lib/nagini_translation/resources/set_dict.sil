@@ -1,0 +1,177 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+field set_acc : Set[Ref]
+
+method set___init__() returns (res: Ref)
+    ensures acc(res.set_acc)
+    ensures res.set_acc == Set[Ref]()
+    ensures typeof(res) == set(set_arg(typeof(res), 0))
+{
+    assume false
+}
+
+function set___len__(self: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures result == |self.set_acc|
+
+function set___contains__(self: Ref, item: Ref) : Bool
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures result == (item in self.set_acc)
+
+function set___bool__(self: Ref) : Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires self != null ==> acc(self.set_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.set_acc| != 0)
+
+method set___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+  requires acc(self.set_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.set_acc, 1 / 20)
+  ensures _res.list_acc == set___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
+  ensures issubtype(typeof(_res), Iterator(set_arg(typeof(self), 0)))
+{
+  inhale false
+}
+
+method set_add(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(item), set_arg(typeof(self), 0))
+    ensures acc(self.set_acc)
+    ensures self.set_acc == old(self.set_acc) union Set(item)
+{
+    assume false
+}
+
+method set_remove(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(item), set_arg(typeof(self), 0))
+    requires item in self.set_acc
+    ensures acc(self.set_acc)
+    ensures self.set_acc == old(self.set_acc) setminus Set(item)
+{
+    assume false
+}
+
+method set_clear(self: Ref) returns ()
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    ensures acc(self.set_acc)
+    ensures self.set_acc == Set[Ref]()
+{
+    assume false
+}
+
+function set___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures |result| == |self.set_acc|
+    ensures forall c: Ref :: {c in result} c in self.set_acc <==> c in result
+    ensures (forall i: Int :: {result[i]} (i >= 0 && i < |result|) ==> !((result[i] in result[..i])))
+    ensures forall r: Ref:: {r in result} r in result ==> issubtype(typeof(r), set_arg(typeof(self), 0))
+
+field dict_acc : Map[Ref, Ref]
+
+method dict___init__() returns (res: Ref)
+    ensures acc(res.dict_acc)
+    ensures res.dict_acc == Map[Ref, Ref]()
+    ensures typeof(res) == dict(dict_arg(typeof(res), 0), dict_arg(typeof(res), 1))
+
+
+function dict___contains__(self: Ref, item: Ref) : Bool
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    ensures result == (item in self.dict_acc)
+
+method dict___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+  requires acc(self.dict_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.dict_acc, 1 / 20)
+  ensures _res.list_acc == dict___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
+  ensures issubtype(typeof(_res), Iterator(dict_arg(typeof(self), 0)))
+
+
+function dict___bool__(self: Ref) : Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires self != null ==> acc(self.dict_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.dict_acc| != 0)
+
+method dict_keys(self: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
+    ensures acc(res.set_acc)
+    ensures res.set_acc == domain(self.dict_acc)
+
+
+function dict___getitem__(self: Ref, key: Ref) : Ref
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    requires @error("Key might not be present in dictionary.")dict___contains__(self, key)
+    ensures issubtype(typeof(result), dict_arg(typeof(self), 1))
+    ensures result == self.dict_acc[key]
+
+function dict_get(self: Ref, key: Ref) : Ref
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    ensures result == (dict___contains__(self, key) ? dict___getitem__(self,key) : null)
+
+method dict___setitem__(self: Ref, key: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc)
+    requires issubtype(typeof(item), dict_arg(typeof(self), 1))
+    requires issubtype(typeof(key), dict_arg(typeof(self), 0))
+    ensures acc(self.dict_acc)
+    ensures self.dict_acc == old(self.dict_acc)[key := item]
+
+
+method dict_values(self: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, 1/100)
+    ensures acc(self.dict_acc, 1/100)
+    ensures self.dict_acc == old(self.dict_acc)
+    ensures typeof(_res) == list(dict_arg(typeof(self), 1))
+    ensures acc(_res.list_acc)
+    ensures |_res.list_acc| == |self.dict_acc|
+    ensures forall r: Ref :: { r in _res.list_acc } issubtype(typeof(r), dict_arg(typeof(self), 1)) ==> (r in _res.list_acc == r in range(self.dict_acc))
+
+function dict___len__(self: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    ensures result == |self.dict_acc|
+
+function dict___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    requires acc(self.dict_acc, wildcard)
+    ensures |result| == |self.dict_acc|
+    ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result

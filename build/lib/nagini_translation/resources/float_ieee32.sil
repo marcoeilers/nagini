@@ -1,0 +1,165 @@
+function float___create__(i: Int): Ref
+    decreases _
+    ensures result == __prim__perm___box__(___float32_tofp(toBV32(i)))
+
+function float___unbox__(r: Ref): ___float32
+    decreases _
+    requires issubtype(typeof(r), float())
+    ensures issubtype(typeof(r), int()) ==> result == ___float32_from_real(int___unbox__(r) / 1)
+
+function __prim__perm___box__(p: ___float32): Ref
+    decreases _
+    ensures typeof(result) == float()
+    ensures float___unbox__(result) == p
+
+function float___bool__(self: Ref): Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), float())
+    ensures self == null ==> !result
+    ensures result == (float___unbox__(self) != ___float32_zero())
+
+function float___isNaN(f: Ref): Bool
+    decreases _
+    requires issubtype(typeof(f), float())
+    ensures result == ___float32_isNaN(float___unbox__(f)) 
+
+function float___ge__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures result == (___float32_ge(float___unbox__(self), float___unbox__(other)))
+
+function float___gt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures result == ___float32_gt(float___unbox__(self), float___unbox__(other))
+
+function float___le__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures result == ___float32_ge(float___unbox__(other), float___unbox__(self))
+
+function float___lt__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures result == ___float32_gt(float___unbox__(other), float___unbox__(self))
+
+function float___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures result == ___float32_eq(float___unbox__(self), float___unbox__(other))
+
+function float___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_add(float___unbox__(self), float___unbox__(other)))
+
+function float___radd__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_add(float___unbox__(other), float___unbox__(self)))
+
+function float___sub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_sub(float___unbox__(self), float___unbox__(other)))
+
+function float___rsub__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_sub(float___unbox__(other), float___unbox__(self)))
+
+function float___mul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_mul(float___unbox__(self), float___unbox__(other)))
+
+function float___rmul__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_mul(float___unbox__(other), float___unbox__(self)))
+
+function float___truediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(float___unbox__(other) != ___float32_zero())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_div(float___unbox__(self), float___unbox__(other)))
+
+function float___pos__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == self
+
+function float___neg__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_neg(float___unbox__(self)))
+
+function float___rtruediv__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    requires issubtype(typeof(other), float())
+    requires @error("Divisor may be zero.")(float___unbox__(self) != ___float32_zero())
+    ensures issubtype(typeof(result), float())
+    ensures result == __prim__perm___box__(___float32_div(float___unbox__(other), float___unbox__(self)))
+
+function float___int__(self: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), float())
+    ensures typeof(result) == int()
+    ensures result == __prim__int___box__(___float32_to_int(float___unbox__(self)))
+
+domain ___bv32 interpretation (SMTLIB: "(_ BitVec 32)", Boogie: "bv32") {
+  function toBV32(i: Int): ___bv32 interpretation "(_ int2bv 32)"
+}
+
+domain ___float32 interpretation (Boogie: "float24e8", SMTLIB: "(_ FloatingPoint 8 24)") {
+  function ___float32_tofp(bv: ___bv32): ___float32 interpretation "(_ to_fp 8 24)"
+  function ___float32_from_real(r: Perm): ___float32 interpretation "(_ to_fp 8 24) RNE"
+  function ___float32_eq(___float32, ___float32): Bool interpretation "fp.eq"
+
+  function ___float32_add(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.add RNE"
+  function ___float32_sub(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.sub RNE"
+  function ___float32_mul(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.mul RNE"
+  function ___float32_div(d1: ___float32, f2: ___float32): ___float32 interpretation "fp.div RNE"
+  function ___float32_neg(d1: ___float32): ___float32 interpretation "fp.neg" 
+  function ___float32_gt(___float32, ___float32): Bool interpretation "fp.gt"
+  function ___float32_ge(___float32, ___float32): Bool interpretation "fp.geq"
+
+  function real____to_int(p: Perm): Int interpretation "to_int"
+  function ___float32_to_real(p: ___float32): Perm interpretation "fp.to_real"
+  function ___float32_NaN(): ___float32 interpretation "(_ NaN 8 24)"
+  function ___float32_isNaN(___float32): Bool interpretation "fp.isNaN"
+}
+
+function ___float32_zero(): ___float32
+    decreases _
+{
+    ___float32_tofp(toBV32(0))
+}
+
+function ___float32_to_int(f: ___float32): Int
+    decreases _
+{
+    real____to_int(___float32_to_real(f))
+}

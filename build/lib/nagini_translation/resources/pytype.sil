@@ -1,0 +1,43 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+domain PyType {
+    function extends_(sub: PyType, super: PyType): Bool
+    function typeof(r: Ref): PyType
+    function issubtype(t1: PyType, t2: PyType):Bool
+    function list(t: PyType): PyType
+    function list_arg(t: PyType, i: Int): PyType
+    function set(t: PyType): PyType
+    function set_arg(t: PyType, i: Int): PyType
+    function dict(t: PyType, v: PyType): PyType
+    function dict_arg(t: PyType, i: Int): PyType
+    function tuple(s: Seq[PyType]): PyType
+    function tuple_args(t: PyType): Seq[PyType]
+    function tuple_arg(t: PyType, i: Int): PyType
+    function tuple_basic(): PyType
+    function union_basic(): PyType
+    function Iterator(t: PyType): PyType
+    function Iterator_arg(t: PyType, i: Int): PyType
+    function PSeq(t: PyType): PyType
+    function PSeq_arg(t: PyType, i: Int): PyType
+    function PSet(t: PyType): PyType
+    function PSet_arg(t: PyType, i: Int): PyType
+    function PMultiset(t: PyType): PyType
+    function PMultiset_arg(t: PyType, i: Int): PyType
+    function get_basic(PyType): PyType
+
+    unique function int(): PyType
+    unique function float(): PyType
+    unique function bool(): PyType
+    unique function bytes(): PyType
+    unique function bytearray(): PyType
+    unique function range_0(): PyType
+    unique function slice(): PyType
+    unique function str(): PyType
+    unique function object(): PyType
+    unique function NoneType(): PyType
+}

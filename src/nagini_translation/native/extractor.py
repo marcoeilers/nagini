@@ -16,11 +16,42 @@ class VF_expr:
 class VF_PyObj_t(VF_expr):
     pass
 class VF_PyObj_v(VF_expr):
-    def __init__(self, vf: VF_expr):
-        self.vf = vf
+    pass
+class VF_PyLong_v(VF_PyObj_v):
+    def __init__(self, value:int):
+        self.value = value
+    def __str__(self):
+        return "PyLong_v("+str(self.value)+")"
+class VF_PyFloat_v(VF_PyObj_v):
+    def __init__(self, value:float):
+        self.value = value
+    def __str__(self):
+        return "PyFloat_v("+str(self.value)+")"
+class VF_PyUnicode_v(VF_PyObj_v):
+    def __init__(self, value:str):
+        self.value = value
+    def __str__(self):
+        return "PyUnicode_v(\""+self.value+"\")"
+class VF_PyClass():
+    def __init__(self, name:str, superclass:"VF_PyClass"=None):
+        self.name = name
+        self.superclass = superclass
+    def __init__(self):
+        self.name = "object"
+        self.superclass = None
+    def __str__(self):
+        if(self.superclass is not None):
+            return "PyClass(\""+self.name+"\", "+str(self.superclass)+")"
+        else:
+            return "ObjectType"
+            
+class VF_PyClassInstance_v(VF_PyObj_v):
+    def __init__(self, cls:VF_PyClass):
+        self.cls = cls
+    def __str__(self):
+        return "PyClassInstance_v("+str(self.cls)+")"
 
-#    PyFloat_v(float) |
-#    PyUnicode_v(list<char>) |
+
 #    PyClassInstance_v(PyClass) |
 #    PyType_v(PyObj_Type) |
 #    PyExc_v(PyExc_Raised_Val) |
@@ -30,6 +61,8 @@ class VF_pair(VF_expr):
     def __init__(self, e1:VF_expr, e2:VF_expr):
         self.e1 = e1
         self.e2 = e2
+    def __str__(self):
+        return "pair("+str(self.e1)+", "+str(self.e2)+")"
 class VF_fact:
     pass
 class VF_fact_pred(VF_fact):#a fact built using a predicate
@@ -40,7 +73,7 @@ class VF_fact_eq(VF_fact):#a fact built using an equality
         self.e1 = e1
         self.e2 = e2
 class VF_statement():
-    def __init__(self, f:[VF_fact]):
+    def __init__(self, f:list[VF_fact]):
         self.f = f
     def __str__(self)->string:
         return " &*&\n".join(map(str, self.f))
@@ -65,6 +98,7 @@ class NativeSpecExtractor:
 
 
     def __init__(self, f: PythonMethod, ctx: Context):
+        print("Hello")
         print(self.get_type(f.node.body[0].targets[0], ctx))
         print(self.get_target(f.node.body[0].targets[0], ctx))
         print(f.node.args.args[0])

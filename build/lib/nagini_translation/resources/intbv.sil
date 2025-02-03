@@ -1,0 +1,19 @@
+/*
+ * Copyright (c) 2024 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+// File template: NBITS is to be replaced by the number of bits, INT_MAX_VAL and INT_MIN_VAL by the actual values.
+
+define _INT_MAX (INT_MAX_VAL)
+define _INT_MIN (INT_MIN_VAL)
+
+domain ___intbv interpretation (SMTLIB: "(_ BitVec NBITS)", Boogie: "bvNBITS") {
+  function toBVInt(i: Int): ___intbv interpretation "(_ int2bv NBITS)"
+  function fromBVInt(___intbv): Int interpretation "bv2int"
+  function andBVInt(___intbv, ___intbv): ___intbv interpretation "bvand"
+  function orBVInt(___intbv, ___intbv): ___intbv interpretation "bvor"
+  function xorBVInt(___intbv, ___intbv): ___intbv interpretation "bvxor"
+}

@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+field __container : Ref
+field __iter_index : Int
+field __previous: Seq[Ref]
+
+method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
+  requires acc(self.list_acc, 1 / 40)
+  requires acc(self.__iter_index, write)
+  requires acc(self.__previous, write)
+  // invariants:
+  //requires self.__iter_index <= |self.list_acc|
+  //requires self.__iter_index >= 0
+  //requires self.__previous == self.list_acc[..self.__iter_index - 1]
+  ensures acc(self.list_acc, 1 / 40) && self.list_acc == old(self.list_acc)
+  ensures acc(self.__iter_index, write)
+  ensures self.__iter_index <= |self.list_acc| + 1
+  ensures old(self.__iter_index == |self.list_acc|) == (_err != null)
+  ensures acc(self.__previous, write)
+  ensures _err == null ==> self.__iter_index == old(self.__iter_index) + 1
+  ensures _err == null ==> self.__iter_index > 0
+  ensures _err == null ==> self.__previous == self.list_acc[..self.__iter_index - 1]
+  ensures |self.list_acc| > 0 ==> self.__iter_index > 0
+  ensures _err != null ==> self.__previous == self.list_acc
+  ensures _err != null ==> self.__iter_index == |self.list_acc|
+  ensures |self.list_acc| > 0 ==> _res == self.list_acc[self.__iter_index - 1] && (_res in self.list_acc)
+  ensures |self.list_acc| > 0 ==> issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
+
+  ensures (forall r: Ref :: { (r in self.__previous) }
+    (r in self.__previous) == ((r in old(self.__previous)) ||
+                               ((self.__iter_index > 1 &&  r == self.list_acc[self.__iter_index - 2] && _err == null) || (self.__iter_index > 0 && _err != null &&   r == self.list_acc[self.__iter_index-1]))))
+{
+  // This is a valid implementation with the added preconditions from above (but we don't prove it correct every time).
+  /*
+  if (self.__iter_index < |self.list_acc|) {
+    _err := null
+    self.__iter_index := self.__iter_index + 1
+    self.__previous := self.list_acc[..self.__iter_index - 1]
+    _res := self.list_acc[self.__iter_index - 1]
+  }else{
+    _err := new()
+    assert self.__previous == self.list_acc[..|self.list_acc| - 1]
+    if (|self.list_acc| > 0) {
+      assert self.list_acc == self.__previous ++ Seq(self.list_acc[|self.list_acc| - 1])
+    }
+
+    assert (forall r: Ref :: {r in self.list_acc} (r in self.list_acc) == (r in self.__previous || |self.list_acc| > 0 && r == self.list_acc[|self.list_acc| - 1]))
+    self.__previous := self.list_acc
+    if (|self.list_acc| > 0) {
+      _res := self.list_acc[|self.list_acc| - 1]
+    }
+
+    self.__iter_index := |self.list_acc|
+  }
+  */
+  assume false
+}
+
+method Iterator___del__(self: Ref)
+  requires acc(self.list_acc, 1 / 20)
+  requires acc(self.__container, 1 / 20)
+  ensures acc(self.__container, 1 / 20)
+  ensures (issubtype(typeof(self.__container), list(list_arg(typeof(self.__container), 0)))) ==> acc(self.__container.list_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container), 0), dict_arg(typeof(self.__container), 1)))) ==> acc(self.__container.dict_acc, 1 / 20)
+  ensures (issubtype(typeof(self.__container), set(set_arg(typeof(self.__container), 0)))) ==> acc(self.__container.set_acc, 1 / 20)
+{
+  inhale false
+}

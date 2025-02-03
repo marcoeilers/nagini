@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+function str___len__(self: Ref): Int
+    decreases _
+	ensures result >= 0
+
+function str___val__(self: Ref): Int
+    decreases _
+
+function str___create__(len: Int, value: Int) : Ref
+    decreases _
+	ensures str___len__(result) == len
+	ensures str___val__(result) == value
+	ensures typeof(result) == str()
+
+function str___bool__(self: Ref) : Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), str())
+	ensures self != null ==> result == str___len__(self) != 0
+	ensures self == null ==> !result
+
+function str___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures (str___val__(self) == str___val__(other)) == result
+    ensures result ==> (str___len__(self) == str___len__(other))
+    ensures result == object___eq__(self, other)
+
+function str___add__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures str___len__(result) == str___len__(self) + str___len__(other)
+    ensures typeof(result) == str()
+
+function str_join(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures issubtype(typeof(result), str())
+
+function str___mod__(self: Ref, other: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures issubtype(typeof(result), str())
+
+method str_split(self: Ref) returns (res: Ref)
+    decreases _
+    requires issubtype(typeof(self), str())
+    ensures issubtype(typeof(res), list(str()))
+    ensures acc(res.list_acc)

@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Domain that contains functions for encoding and combining names (represented as
+ * integers). Used for checking definedness of global names.
+ */
+
+domain _Name {
+    function _combine(n1: _Name, n2: _Name): _Name
+    function _single(n: Int): _Name
+
+    function _get_combined_prefix(n: _Name): _Name
+    function _get_combined_name(n: _Name): _Name
+    function _get_value(n: _Name): Int
+
+    function _name_type(n: _Name): Bool
+
+    function _is_single(n: _Name): Bool
+    function _is_combined(n: _Name): Bool
+
+    axiom decompose_single {
+        forall i: Int :: {_single(i)} _get_value(_single(i)) == i
+    }
+
+    axiom compose_single {
+        forall n: _Name :: { _get_value(n) } _is_single(n) ==> n == _single(_get_value(n))
+    }
+
+    axiom type_of_single {
+        forall i: Int :: {_single(i)} _name_type(_single(i))
+    }
+
+    axiom decompose_combined {
+        forall n1: _Name, n2: _Name :: {_combine(n1, n2)}
+            _get_combined_prefix(_combine(n1, n2)) == n1
+            &&
+            _get_combined_name(_combine(n1, n2)) == n2
+    }
+
+    axiom compose_combined {
+        forall n: _Name :: { _get_combined_prefix(n) } { _get_combined_name(n) }
+            _is_combined(n) ==> n == _combine(_get_combined_prefix(n), _get_combined_name(n))
+    }
+
+    axiom type_of_composed {
+        forall n1: _Name, n2: _Name :: { _combine(n1, n2) } !_name_type(_combine(n1, n2))
+    }
+
+    axiom type_is_single {
+        forall n: _Name :: { _name_type(n) } _name_type(n) <==> _is_single(n)
+    }
+
+    axiom type_is_combined {
+        forall n: _Name :: { _name_type(n) } !_name_type(n) <==> _is_combined(n)
+    }
+}

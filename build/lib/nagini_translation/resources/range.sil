@@ -1,0 +1,85 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+function range___create__(start: Int, stop: Int, ctr: Int): Ref
+  decreases _
+  requires stop >= start
+  ensures range___val__(result) == [start..stop)
+  ensures range___start__(result) == start
+  ensures range___stop__(result) == stop
+  ensures typeof(result) == range_0()
+
+
+function range___val__(self: Ref): Seq[Int]
+    decreases _
+
+function range___start__(self: Ref): Int
+    decreases _
+
+function range___stop__(self: Ref): Int
+    decreases _
+
+
+function range___len__(self: Ref): Int
+  decreases _
+  requires issubtype(typeof(self), range_0())
+  ensures result == |range___val__(self)|
+
+
+function range___getitem__(self: Ref, index: Int): Int
+  decreases _
+  requires issubtype(typeof(self), range_0())
+  requires index >= 0 ==> index < range___len__(self)
+  requires index < 0 ==> index >= -range___len__(self)
+  ensures index >= 0 ==> result == range___val__(self)[index]
+  ensures index < 0 ==> result == range___val__(self)[range___len__(self) + index]
+
+
+function range___getitem_slice__(self: Ref, index: Ref): Ref
+  decreases _
+  requires issubtype(typeof(self), range_0())
+  requires issubtype(typeof(index), slice())
+  requires (slice___start__(index, range___len__(self)) >= 0 && slice___start__(index, range___len__(self)) <= range___len__(self))
+  requires (slice___stop__(index, range___len__(self)) >= 0 && slice___stop__(index, range___len__(self)) <= range___len__(self))
+  ensures issubtype(typeof(result), range_0())
+  ensures range___len__(result) == (slice___stop__(index, range___len__(self)) - slice___start__(index, range___len__(self)))
+  ensures range___val__(result) == range___val__(self)[slice___start__(index, range___len__(self))..slice___stop__(index, range___len__(self))]
+
+
+function range___sil_seq__(self: Ref): Seq[Ref]
+  decreases _
+  requires issubtype(typeof(self), range_0())
+  ensures |result| == range___len__(self)
+  ensures (forall i: Int :: { result[i] } i >= 0 && i < |range___val__(self)| ==> result[i] == __prim__int___box__(range___val__(self)[i]))
+  ensures (forall i: Ref :: { (i in result) } (i in result) == (typeof(i) == int() && (int___unbox__(i) in range___val__(self))))
+
+
+function range___eq__(self: Ref, other: Ref): Bool
+  decreases _
+  requires issubtype(typeof(self), range_0())
+  ensures (range___val__(self) == range___val__(other)) == result
+  ensures result ==> (issubtype(typeof(other), range_0()) && range___len__(self) == range___len__(other))
+  ensures result == object___eq__(self, other)
+
+
+function range___contains__(self: Ref, item: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), range_0())
+    requires issubtype(typeof(item), int())
+    ensures result == (item in range___sil_seq__(self))
+
+method range___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), range_0())
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures _res.list_acc == range___sil_seq__(self)
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
+{
+  inhale false
+}

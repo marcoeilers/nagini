@@ -1,0 +1,159 @@
+/*
+ * Copyright (c) 2019 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+field list_acc : Seq[Ref]
+
+domain _list_ce_helper {
+    function seq_ref_length(___s: Seq[Ref]): Int
+    function seq_ref_index(___s: Seq[Ref], i: Int): Ref
+
+    axiom relate_length {
+        forall ___s: Seq[Ref] :: {|___s|} |___s| == seq_ref_length(___s)
+    }
+
+    axiom relate_index {
+        forall ___s: Seq[Ref], ___i: Int :: { ___s[___i] } ___s[___i] == seq_ref_index(___s, ___i)
+    }
+}
+
+method list___init__() returns (res: Ref)
+    ensures acc(res.list_acc)
+    ensures res.list_acc == Seq[Ref]()
+    ensures typeof(res) == list(list_arg(typeof(res), 0))
+    ensures Low(res)
+{
+    assume false
+}
+
+function list___contains__(self: Ref, item: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+    ensures result == (item in self.list_acc)
+
+function list___bool__(self: Ref) : Bool
+    decreases _
+    requires self != null ==> issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires self != null ==> acc(self.list_acc, wildcard)
+    ensures self == null ==> !result
+    ensures self != null ==> result == (|self.list_acc| != 0)
+
+function list___len__(self: Ref) : Int
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, wildcard)
+{
+ |self.list_acc|
+}
+
+function list___getitem__(self: Ref, key: Ref): Ref
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), int())
+    requires acc(self.list_acc, wildcard)
+    requires @error("List index may be out of bounds.")(let ln == (list___len__(self)) in (int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln))
+    requires @error("List index may be out of bounds.")(let ln == (list___len__(self)) in (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
+    ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
+    ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+
+method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(key), slice())
+    requires acc(self.list_acc, 1/1000)
+    ensures acc(self.list_acc, 1/1000)
+    ensures acc(_res.list_acc)
+    ensures typeof(_res) == typeof(self)
+    ensures _res.list_acc == self.list_acc[slice___start__(key, list___len__(self))..slice___stop__(key, list___len__(self))]
+{
+    assume false
+}
+
+method list___setitem__(self: Ref, key: Int, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires @error("List index may be negative.")(key >= 0)
+    requires @error("List index may be out of bounds.")(key < list___len__(self))
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    ensures acc(self.list_acc)
+    ensures self.list_acc == old(self.list_acc)[key := item]
+    ensures (Low(key) && Low(item)) ==> (forall i: Ref :: {list___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self) && Low(old(list___getitem__(self, i)))) ==> Low(list___getitem__(self, i))))
+{
+    assume false
+}
+
+method list_append(self: Ref, item: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    ensures acc(self.list_acc)
+    ensures self.list_acc == old(self.list_acc) ++ Seq(item)
+{
+    assume false
+}
+
+method list_extend(self: Ref, other: Ref) returns ()
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), list(list_arg(typeof(other), 0)))
+    requires issubtype(list_arg(typeof(other), 0), list_arg(typeof(self), 0))
+    requires acc(self.list_acc)
+    requires acc(other.list_acc, 1/100)
+    ensures acc(self.list_acc)
+    ensures acc(other.list_acc, 1/100)
+    ensures self.list_acc == old(self.list_acc) ++ other.list_acc
+
+method list___add__(self: Ref, other: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires issubtype(typeof(other), list(list_arg(typeof(other), 0)))
+    requires issubtype(list_arg(typeof(other), 0), list_arg(typeof(self), 0))
+    requires acc(self.list_acc, 1/100)
+    requires acc(other.list_acc, 1/100)
+    ensures typeof(res) == typeof(self)
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(other.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures res.list_acc == self.list_acc ++ other.list_acc
+
+method list___mul__(self: Ref, factor: Int) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, 1/100)
+    ensures acc(self.list_acc, 1/100)
+    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
+    ensures acc(res.list_acc)
+    ensures |res.list_acc| == (factor > 0 ? factor : 0) * |self.list_acc|
+    ensures factor > 0 ==> (forall i: Int :: {res.list_acc[i]}
+                            i >= 0 && i < |res.list_acc| ==> res.list_acc[i] == self.list_acc[i \ factor])
+
+method list_reverse(self: Ref) returns (res: Ref)
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc, 1/100)
+    ensures issubtype(typeof(res), list(list_arg(typeof(self), 0)))
+    ensures acc(self.list_acc, 1/100)
+    ensures acc(res.list_acc)
+    ensures |res.list_acc| == |self.list_acc|
+    ensures forall i: Int :: {res.list_acc[i]} ((i >= 0 && i < |res.list_acc|) ==> (res.list_acc[i] == self.list_acc[|self.list_acc| - 1 - i]))
+
+method list___iter__(self: Ref) returns (_res: Ref)
+  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+  requires acc(self.list_acc, 1 / 10)
+  ensures _res != self
+  ensures acc(_res.list_acc, 1 / 20)
+  ensures acc(self.list_acc, 1 / 20)
+  ensures _res.list_acc == self.list_acc
+  ensures acc(_res.__container, write) && (_res.__container == self)
+  ensures acc(_res.__iter_index, write) && (_res.__iter_index == 0)
+  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
+  ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
+{
+  inhale false
+}
+
+function list___sil_seq__(self: Ref): Seq[Ref]
+    decreases _
+    requires acc(self.list_acc, wildcard)
+{
+    self.list_acc
+}
