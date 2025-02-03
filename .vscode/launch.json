@@ -4,9 +4,8 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "MYRUN",
+            "name": "translate test.py",
             "type": "debugpy",
             "request": "launch",
             "program": "/home/etienne/nagini/test.py",
@@ -14,6 +13,17 @@
             "args": [
                 "--skip-verification ",
                 "/home/etienne/nagini/test.py"
+            ]
+        },
+        {
+            "name": "translate current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "pip install . ; /home/etienne/nagini/test.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--skip-verification ",
+                "${file}"
             ]
         }
     ]
