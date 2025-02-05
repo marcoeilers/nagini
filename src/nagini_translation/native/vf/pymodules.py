@@ -1,6 +1,7 @@
-import nagini_translation.native.vf.standard as standard
+import nagini_translation.native.vf.standard as vf
 
-class PyObj_v(standard.expr):
+
+class PyObj_v(vf.expr):
     pass
 
 
@@ -31,5 +32,33 @@ class PyClassInstance(PyObj_v):
         return "PyClassInstance_v(\""+self.name+"\", "+str(self.type)+")"
 
 
-class PyObj_t(standard.expr):
+class PyObj_HasVal(vf.pred):
+    def __init__(self, p: vf.ptr, o: PyObj_v):
+        super().__init__("pyobj_hasval")
+        self.ptr = p
+        self.pyobj = o
+    def __str__(self):
+        return self.name + "(" + str(self.ptr) + ", " + str(self.pyobj) + ")"
+
+
+class PyObj_HasAttr(vf.pred):
+    def __init__(self, p1: vf.ptr, attr_name: str, p2: vf.ptr):
+        super().__init__("pyobj_hasattr")
+        self.ptr = p1
+        self.attr_name = attr_name
+        self.attr_val = p2
+    def __str__(self):
+        return self.name + "(" + str(self.ptr) + ", \"" + self.attr_name + "\", " + str(self.attr_val) + ")"
+
+
+class PyObj_HasContent(vf.pred):
+    def __init__(self, p: vf.ptr, o: PyObj_v):
+        super().__init__("pyobj_hascontent")
+        self.ptr = p
+        self.pyobj = o
+    def __str__(self):
+        return self.name + "(" + str(self.ptr) + ", " + str(self.pyobj) + ")"
+
+
+class PyObj_t(vf.expr):
     pass
