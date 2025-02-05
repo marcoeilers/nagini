@@ -1,15 +1,24 @@
+from abc import ABC, abstractmethod
 
-class expr:
+class expr(ABC):
     pass
 
 
-class pred:
+class pred(ABC):
     def __init__(self, name: str):
-        self.args_nr = name
+        self.name = name
 
 
-class ptr(expr):
-    pass
+class val_pattern(expr, ABC):
+    def __init__(self, name: str):
+        self.name = name
+    def __str__(self) -> str:
+        return "?"+self.name
+
+
+class val(expr, ABC):
+    def __init__(self, val: val_pattern):
+        self.value = val
 
 
 class pair(expr):
@@ -18,14 +27,17 @@ class pair(expr):
         self.e2 = e2
 
 
-class fact:
+class fact(ABC):
     pass
 
 
-class fact_pred(fact):  # a fact built using a predicate
+class fact_pred(fact, ABC):  # a fact built using a predicate
     def __init__(self, pred: pred, args: list[expr]):
         self.args = args
         self.pred = pred
+    def __str__(self) -> str:
+        return self.pred.name + "(" + ", ".join(map(str, self.args)) + ")"
+
 
 
 class fact_comparison(fact):  # a fact built using a comparison
@@ -34,12 +46,13 @@ class fact_comparison(fact):  # a fact built using a comparison
         self.e2 = e2
 
 
-class statement():
-    def __init__(self, f: list[fact]):
-        self.f = f
+class fact_conjunction(fact):
+    def __init__(self, f1: fact, f2: fact):
+        self.f1 = f1
+        self.f2 = f2
 
     def __str__(self) -> str:
-        return " &*&\n".join(map(str, self.f))
+        return "(" + str(self.f1) + " &*& " + str(self.f2)+")"
 
 
 class PyObj_v(expr):
