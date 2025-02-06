@@ -1,7 +1,7 @@
 import ast
 import nagini_translation.native.vf.standard as vf
 import nagini_translation.native.vf.pymodules as vfpy
-from build.lib.nagini_translation.lib.program_nodes import PythonVar
+from nagini_translation.lib.program_nodes import PythonVar
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
@@ -22,25 +22,32 @@ class NativeSpecExtractor:
 
     def py_to_vf(self, p: PythonVar):
         if p.type.name == 'int':
-            #if the var name is in the VFcontext, simply recover the corresponding val name
-            #otherwise create val_pattern (which must be initialized at the beginning of the VFcontext's scope)
-                #exception to initializing at the beginning of the VFcontext's scope is if the var is a function argument
-            vf_val=vf.val_pattern(p.name)
+            # if the var name is in the VFcontext, simply recover the corresponding val name
+            # otherwise create val_pattern (which must be initialized at the beginning of the VFcontext's scope)
+            # exception to initializing at the beginning of the VFcontext's scope is if the var is a function argument
+            vf_val = vf.val_pattern(p.name)
             return vfpy.PyLong(vf_val)
         # here list any other immutable native type that could comme in
         else:
             return vfpy.PyClassInstance(vfpy.PyClass(p.type.name))
 
     def setup(self, f: PythonMethod, ctx: Context) -> list[vf.fact]:
-        tuple_entries = 
+        myvfcontext = {}
+        # NOTE: this must be embedded nowhere in the assertion, not even be present in the context (no one can refer to args in py)
+        original_args_ptr = vf.val_pattern("args_ptr")
+        for key, value in f.args.items():
+            myvfcontext[key] = (vf.val_pattern("ptr_"+key), self.py_to_vf(value))
+        tuple_entries = vfpy.PyObj_HasVal(
+            original_args_ptr,
+            vfpy.PyTuple(
+                list(map(lambda a: vfpy.PyObj_HasVal(myvfcontext[a[0]][0], myvfcontext[a[0]][1]),f.args.items()))))
         hasval_sequence = vf.fact_conjunction(list(map(lambda a: vfpy.PyObj_HasVal(
             vf.val_pattern("ptr"+a[0]), self.py_to_vf(a[1])), f.args.items())))
-        print()
+        arg_setup = vf.fact_conjunction([tuple_entries]+[hasval_sequence])
+        print(arg_setup)
         # for key, value in f.args.items():
         #    print(key, value)
 
-        pytuple_entries = ", \n\t".join(list(
-            map(lambda a: "(?arg_"+a[0]+"_ptr"+","+self.pytype__to__PyObj_t(a[1].type)+")", f.args.items())))
         return
 
     def __init__(self, f: PythonMethod, ctx: Context):
