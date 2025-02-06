@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 
 class PyObj_v(vf.expr, ABC):
     pass
+class PyObj_t(vf.expr, ABC):
+    pass
 
 
 class PyLong(PyObj_v):
@@ -13,7 +15,8 @@ class PyLong(PyObj_v):
         return "PyLong_v("+str(self.value)+")"
 
 class PyTuple(PyObj_v):
-    def __init__(self, items: list[]):
+    #TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
+    def __init__(self, items: list[vf.pair]):
         self.items = items
     def __str__(self):
         return "PyTuple_v("+", ".join(map(str, self.items))+")"
