@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import typing
 
 class expr(ABC):
     pass
@@ -21,7 +22,9 @@ class val(expr):
         self.value = val
 
 
-class pair(expr):
+t1 = typing.TypeVar("t1", bound=expr)
+t2 = typing.TypeVar("t2", bound=expr)
+class pair(expr, typing.Generic[t1, t2]):
     def __init__(self, e1: expr, e2: expr):
         self.e1 = e1
         self.e2 = e2
@@ -52,7 +55,7 @@ class fact_conjunction(fact):
     def __init__(self, f:list[fact]):
         self.f=f
     def __str__(self) -> str:
-        return " &*& ".join(map(str, self.f)) 
+        return " &*&\n ".join(map(str, self.f)) 
 
 class PyObj_v(expr):
     def __init__(self, vf: expr):
