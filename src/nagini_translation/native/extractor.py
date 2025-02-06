@@ -13,41 +13,52 @@ from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional
 
 
+class py2vf_context:
+    def __init__(self):
+        self.context = dict()
+        self.parent = None
+
+    def __init__(self, p: "py2vf_context" = None):
+        self.context = dict()
+        self.parent = p
+
+    def __getitem__(self, key: str):
+        if key in self.context:
+            return self.context[key]
+        elif self.parent:
+            return self.parent[key]
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key: str, value: vf.VFVal):
+        self.context[key] = value
+
+
 class NativeSpecExtractor:
-    def pytype__to__PyObj_t(self, p: PythonType):
+    def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         return {
-            'int': 'PyLong_t',
-            'mycoolclass': 'PyClassInstance_v("mycoolclass", ObjectType)'
+            'int': vfpy.PyObj_t("PyLong_t"),
+            # no other parent than ObjectType
+            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass"))
         }[p.name]
 
-    def py_to_vf(self, p: PythonVar):
-        if p.type.name == 'int':
-            # if the var name is in the VFcontext, simply recover the corresponding val name
-            # otherwise create val_pattern (which must be initialized at the beginning of the VFcontext's scope)
-            # exception to initializing at the beginning of the VFcontext's scope is if the var is a function argument
-            vf_val = vf.val_pattern(p.name)
-            return vfpy.PyLong(vf_val)
-        # here list any other immutable native type that could comme in
-        else:
-            return vfpy.PyClassInstance(vfpy.PyClass(p.type.name))
-
-    def setup(self, f: PythonMethod, ctx: Context) -> list[vf.fact]:
-        myvfcontext = {}
-        # NOTE: this must be embedded nowhere in the assertion, not even be present in the context (no one can refer to args in py)
-        original_args_ptr = vf.val_pattern("args_ptr")
+    def setup(self, f: PythonMethod, ctx: Context) -> list[vf.Fact]:
+        py2vf_ctx = py2vf_context()
+        facts = []
+        py2vf_ctx["args"] = vf.VFVal(vf.FromArgs("args"))
+        tuple_args = []
+        facts.append(vfpy.pyobj_hasval(py2vf_ctx["args"], vfpy.PyTuple([])))
         for key, value in f.args.items():
-            myvfcontext[key] = (vf.val_pattern("ptr_"+key), self.py_to_vf(value))
-        tuple_entries = vfpy.PyObj_HasVal(
-            original_args_ptr,
-            vfpy.PyTuple(
-                list(map(lambda a: vfpy.PyObj_HasVal(myvfcontext[a[0]][0], myvfcontext[a[0]][1]),f.args.items()))))
-        hasval_sequence = vf.fact_conjunction(list(map(lambda a: vfpy.PyObj_HasVal(
-            vf.val_pattern("ptr"+a[0]), self.py_to_vf(a[1])), f.args.items())))
-        arg_setup = vf.fact_conjunction([tuple_entries]+[hasval_sequence])
-        print(arg_setup)
-        # for key, value in f.args.items():
-        #    print(key, value)
+            # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
+            py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key))
+            theval = py2vf_ctx[key+"_ptr"]
+            tuple_args.append(
+                vf.Pair(theval.definition, self.pytype__to__PyObj_t(value.type)))
 
+        map(lambda a: vf.Pair(vf.VFVal(vf.Pattern(a[0])),
+                                  self.pytype__to__PyObj_t(a[1].type)), f.args.items())
+        facts[0].obj.items = tuple_args
+        print(vf.FactConjunction(facts))
         return
 
     def __init__(self, f: PythonMethod, ctx: Context):
