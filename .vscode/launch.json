@@ -16,7 +16,7 @@
                 "/home/etienne/nagini/test.py"
             ]
         },
-        {
+        /*{
             "name": "translate current file",
             "type": "debugpy",
             "request": "launch",
@@ -27,6 +27,6 @@
                 "--skip-verification ",
                 "${file}"
             ]
-        }
+        }*/
     ]
 }
