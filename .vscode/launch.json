@@ -9,6 +9,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "/home/etienne/nagini/src/nagini_translation/main.py",
+            "cwd": "/home/etienne/nagini/src/", //"${workspaceFolder}",
             "console": "integratedTerminal",
             "args": [
                 "--skip-verification",
@@ -20,6 +21,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "/home/etienne/nagini/src/nagini_translation/main.py",
+            "cwd": "/home/etienne/nagini/src/", //"${workspaceFolder}",
             "console": "integratedTerminal",
             "args": [
                 "--skip-verification ",
