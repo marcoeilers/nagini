@@ -1,6 +1,7 @@
 import ast
 import nagini_translation.native.vf.standard as vf
-import nagini_translation.native.vf.pymodules as vf
+import nagini_translation.native.vf.pymodules as vfpy
+from build.lib.nagini_translation.lib.program_nodes import PythonVar
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
@@ -19,9 +20,24 @@ class NativeSpecExtractor:
             'mycoolclass': 'PyClassInstance_v("mycoolclass", ObjectType)'
         }[p.name]
 
+    def py_to_vf(self, p: PythonVar):
+        if p.type.name == 'int':
+            #if the var name is in the VFcontext, simply recover the corresponding val name
+            #otherwise create val_pattern (which must be initialized at the beginning of the VFcontext's scope)
+                #exception to initializing at the beginning of the VFcontext's scope is if the var is a function argument
+            vf_val=vf.val_pattern(p.name)
+            return vfpy.PyLong(vf_val)
+        # here list any other immutable native type that could comme in
+        else:
+            return vfpy.PyClassInstance(vfpy.PyClass(p.type.name))
+
     def setup(self, f: PythonMethod, ctx: Context) -> list[vf.fact]:
-        for key, value in f.args.items():
-            print(key, value)
+        tuple_entries = 
+        hasval_sequence = vf.fact_conjunction(list(map(lambda a: vfpy.PyObj_HasVal(
+            vf.val_pattern("ptr"+a[0]), self.py_to_vf(a[1])), f.args.items())))
+        print()
+        # for key, value in f.args.items():
+        #    print(key, value)
 
         pytuple_entries = ", \n\t".join(list(
             map(lambda a: "(?arg_"+a[0]+"_ptr"+","+self.pytype__to__PyObj_t(a[1].type)+")", f.args.items())))
