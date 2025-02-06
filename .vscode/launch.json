@@ -8,10 +8,10 @@
             "name": "translate test.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/etienne/nagini/test.py",
+            "program": "/home/etienne/nagini/src/nagini_translation/main.py",
             "console": "integratedTerminal",
             "args": [
-                "--skip-verification ",
+                "--skip-verification",
                 "/home/etienne/nagini/test.py"
             ]
         },
@@ -19,7 +19,7 @@
             "name": "translate current file",
             "type": "debugpy",
             "request": "launch",
-            "program": "pip install . ; /home/etienne/nagini/test.py",
+            "program": "/home/etienne/nagini/src/nagini_translation/main.py",
             "console": "integratedTerminal",
             "args": [
                 "--skip-verification ",
