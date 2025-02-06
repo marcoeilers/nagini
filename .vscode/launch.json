@@ -8,8 +8,8 @@
             "name": "translate test.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/etienne/nagini/src/nagini_translation/main.py",
-            "cwd": "/home/etienne/nagini/src/", //"${workspaceFolder}",
+            "program": "${workspaceFolder}/src/nagini_translation/main.py",
+            "cwd": "${workspaceFolder}/src/",
             "console": "integratedTerminal",
             "args": [
                 "--skip-verification",
@@ -20,8 +20,8 @@
             "name": "translate current file",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/etienne/nagini/src/nagini_translation/main.py",
-            "cwd": "/home/etienne/nagini/src/", //"${workspaceFolder}",
+            "program": "${workspaceFolder}/src/nagini_translation/main.py",
+            "cwd": "${workspaceFolder}/src/",
             "console": "integratedTerminal",
             "args": [
                 "--skip-verification ",
