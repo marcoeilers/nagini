@@ -15,7 +15,7 @@ class PyObjPtr(vf.VFVal):
 
 
 class PyLong(PyObj_v):
-    def __init__(self, value: int):
+    def __init__(self, value: vf.expr):
         self.value = value
 
     def __str__(self):
@@ -28,16 +28,16 @@ class PyTuple(PyObj_v):
         self.items = items
 
     def __str__(self):
-        return "PyTuple_v("+(", ".join(map(str, self.items)))+")"
+        return "PyTuple_v("+(",\n\t".join(map(str, self.items)))+")"
 
 
 class PyClass():
-    def __init__(self, name: str, parent: "PyClass" = None):
+    def __init__(self, name: str, parent: "PyClass"):
         self.name = name
         self.parent = parent
 
     def __str__(self):
-        return "PyClass_v(\""+self.name+"\", "+(str(self.parent) if self.parent != None else "ObjectType")+")"
+        return "PyClass(\""+self.name+"\", "+(str(self.parent) if self.parent != None else "ObjectType")+")"
 
 
 class PyClass_t(PyObj_t):

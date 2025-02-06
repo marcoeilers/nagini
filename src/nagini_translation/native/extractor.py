@@ -39,29 +39,38 @@ class NativeSpecExtractor:
         return {
             'int': vfpy.PyObj_t("PyLong_t"),
             # no other parent than ObjectType
-            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass"))
+            'mycoolclass': vfpy.PyObj_t("PyClassInstance_v("+str(vfpy.PyClass("mycoolclass", None))+")")
         }[p.name]
 
+    def pyvar__to__PyObj_v(self, p: PythonVar) -> tuple[vfpy.PyObj_v, object]:
+        if p.type.name == "int":
+            thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
+            self.py2vf_ctx[p.name+"_val"] = thevar
+            return (vfpy.PyLong(thevar.definition), thevar)
+        elif p.type.name == "mycoolclass":
+            thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
+            return (vfpy.PyClassInstance(vfpy.PyClass("mycoolclass", None)), None)
+
     def setup(self, f: PythonMethod, ctx: Context) -> list[vf.Fact]:
-        py2vf_ctx = py2vf_context()
-        facts = []
-        py2vf_ctx["args"] = vf.VFVal(vf.FromArgs("args"))
+        self.py2vf_ctx["args"] = vf.VFVal(vf.FromArgs("args"))
         tuple_args = []
-        facts.append(vfpy.pyobj_hasval(py2vf_ctx["args"], vfpy.PyTuple([])))
         for key, value in f.args.items():
             # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
-            py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key))
-            theval = py2vf_ctx[key+"_ptr"]
+            self.py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key+"_ptr"))
             tuple_args.append(
-                vf.Pair(theval.definition, self.pytype__to__PyObj_t(value.type)))
-
-        map(lambda a: vf.Pair(vf.VFVal(vf.Pattern(a[0])),
-                                  self.pytype__to__PyObj_t(a[1].type)), f.args.items())
-        facts[0].obj.items = tuple_args
+                vf.Pair(self.py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
+        facts = [vfpy.pyobj_hasval(
+            self.py2vf_ctx["args"], vfpy.PyTuple(tuple_args))]
+        for key, value in f.args.items():
+            p, v = self.pyvar__to__PyObj_v(value)
+            if (v is not None):
+                self.py2vf_ctx[key+"_val"] = v
+            facts.append(vfpy.pyobj_hasval(self.py2vf_ctx[key+"_ptr"], p))
         print(vf.FactConjunction(facts))
         return
 
     def __init__(self, f: PythonMethod, ctx: Context):
+        self.py2vf_ctx = py2vf_context()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
         self.setup(f, ctx)
