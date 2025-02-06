@@ -9,14 +9,14 @@ class pred(ABC):
         self.name = name
 
 
-class val_pattern(expr, ABC):
+class val_pattern(expr):
     def __init__(self, name: str):
         self.name = name
     def __str__(self) -> str:
         return "?"+self.name
 
 
-class val(expr, ABC):
+class val(expr):
     def __init__(self, val: val_pattern):
         self.value = val
 
@@ -45,15 +45,14 @@ class fact_comparison(fact):  # a fact built using a comparison
         self.e1 = e1
         self.e2 = e2
 
-
+class vflist(expr):
+    def __init__(self, items: list[expr]):
+        self.items = items
 class fact_conjunction(fact):
-    def __init__(self, f1: fact, f2: fact):
-        self.f1 = f1
-        self.f2 = f2
-
+    def __init__(self, f:list[fact]):
+        self.f=f
     def __str__(self) -> str:
-        return "(" + str(self.f1) + " &*& " + str(self.f2)+")"
-
+        return " &*& ".join(map(str, self.f)) 
 
 class PyObj_v(expr):
     def __init__(self, vf: expr):
