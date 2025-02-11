@@ -11,17 +11,6 @@ class pred(ABC):
         self.name = name
 
 
-t1 = typing.TypeVar("t1", bound=expr)
-t2 = typing.TypeVar("t2", bound=expr)
-
-
-class Pair(expr, typing.Generic[t1, t2]):
-    def __init__(self, e1: t1, e2: t2):
-        self.e1 = e1
-        self.e2 = e2
-    def __str__(self) -> str:
-        return "pair("+str(self.e1)+", "+str(self.e2)+")"
-
 
 class Fact(ABC):
     pass
@@ -66,15 +55,10 @@ class PredicateFact(Fact, ABC):  # a fact built using a predicate
         return self.pred.name + "(" + ", ".join(map(str, self.args)) + ")"
 
 
-class BooleanFact(Fact):  # a fact built using a comparison
+class BooleanFact(Fact):  # a fact built using any boolean expression
     def __init__(self, e1: expr, e2: expr, op: str):
         self.e1 = e1
         self.e2 = e2
-
-
-class VFList(expr):
-    def __init__(self, items: list[expr]):
-        self.items = items
 
 
 class FactConjunction(Fact):

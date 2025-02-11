@@ -10,7 +10,6 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
-from nagini_translation.translators.common import CommonTranslator
 from typing import Optional
 
 
@@ -31,17 +30,12 @@ class py2vf_context:
     def __setitem__(self, key: str, value: vf.VFVal):
         self.context[key] = value
 
-class EtienneTranslator(CommonTranslator):
-    def __init__(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context):
-        super().__init__(f, ctx)
-        self.py2vf_ctx = py2vf_ctx
+class Translator():
     def translate_generic(self, node: ast.AST, ctx: Context) -> vf.Fact:
         if isinstance(node, ast.Compare):
             return self.translateCompare(node, ctx)
         if isinstance(node, ast.BoolOp):
             return self.translateBoolOp(node, ctx)
-        if isinstance(node, ast.Expr):
-            return self.translateExpr(node, ctx)
         if isinstance(node, ast.Call):
             pass
             #return self.translateCall(node, ctx)
@@ -51,11 +45,9 @@ class EtienneTranslator(CommonTranslator):
             return self.translateBinOp(node, ctx)
         return vf.Fact()
     def translateCompare(self, node: ast.Compare, ctx: Context) -> vf.Fact:
-        pass
+        if(isinstance(node.ops[0], ast.Gt)):
+            pass
     def translateBoolOp(self, node: ast.BoolOp, ctx: Context) -> vf.Fact:
-        pass
-    def translateExpr(self, node: ast.Expr, ctx: Context) -> vf.expr:
-        #???
         pass
     def translateExprCall(self, node: ast.Call, ctx: Context) -> vf.expr:
         #becomes a fixpoint call
@@ -93,7 +85,7 @@ class NativeSpecExtractor:
             # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
             self.py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key+"_ptr"))
             tuple_args.append(
-                vf.Pair(self.py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
+                (self.py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
         self.py2vf_ctx.setup.append(vfpy.pyobj_hasval(
             self.py2vf_ctx["args"], vfpy.PyTuple(tuple_args)))
         for key, value in f.args.items():
@@ -110,12 +102,13 @@ class NativeSpecExtractor:
         #only keep the preconditions: calls to Require
         Preconds=list(filter(lambda s: isinstance(s.value, ast.Call) and s.value.func.id == "Requires", f.node.body))
         for precond in Preconds:
-            print(precond.value.args[0])
+            print(self.translator.translate_generic(precond.value.args[0], ctx))
         #print(f.node.body.value.func.id)
         return []
 
     def __init__(self, f: PythonMethod, ctx: Context):
         self.py2vf_ctx = py2vf_context()
+        self.translator = Translator()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
         self.setup(f, ctx)

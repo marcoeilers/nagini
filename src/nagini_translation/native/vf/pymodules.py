@@ -24,7 +24,7 @@ class PyLong(PyObj_v):
 
 class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
-    def __init__(self, items: list[vf.Pair[vf.expr, PyObj_t]]):
+    def __init__(self, items: list[tuple[vf.expr, PyObj_t]]):
         self.items = items
 
     def __str__(self):
