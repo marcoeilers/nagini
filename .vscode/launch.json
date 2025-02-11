@@ -16,6 +16,17 @@
                 "/home/etienne/nagini/test.py"
             ]
         },
+        {
+            "name": "verify test.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/nagini_translation/main.py",
+            "cwd": "${workspaceFolder}/src/",
+            "console": "integratedTerminal",
+            "args": [
+                "/home/etienne/nagini/test.py"
+            ]
+        }
         /*{
             "name": "translate current file",
             "type": "debugpy",
