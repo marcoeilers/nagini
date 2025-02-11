@@ -57,7 +57,7 @@ class VFVal(expr):
         return str(self.definition.name)
 
 
-class PredcateFact(Fact, ABC):  # a fact built using a predicate
+class PredicateFact(Fact, ABC):  # a fact built using a predicate
     def __init__(self, pred: pred, args: list[expr]):
         self.args = args
         self.pred = pred
@@ -66,7 +66,7 @@ class PredcateFact(Fact, ABC):  # a fact built using a predicate
         return self.pred.name + "(" + ", ".join(map(str, self.args)) + ")"
 
 
-class ComparisonFact(Fact):  # a fact built using a comparison
+class BooleanFact(Fact):  # a fact built using a comparison
     def __init__(self, e1: expr, e2: expr, op: str):
         self.e1 = e1
         self.e2 = e2
