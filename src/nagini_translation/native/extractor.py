@@ -30,6 +30,7 @@ class py2vf_context:
     def __setitem__(self, key: str, value: vf.VFVal):
         self.context[key] = value
 
+
 class Translator():
     def translate_generic(self, node: ast.AST, ctx: Context) -> vf.Fact:
         if isinstance(node, ast.Compare):
@@ -38,29 +39,48 @@ class Translator():
             return self.translateBoolOp(node, ctx)
         if isinstance(node, ast.Call):
             pass
-            #return self.translateCall(node, ctx)
+            # return self.translateCall(node, ctx)
         if isinstance(node, ast.Name):
             return self.translateName(node, ctx)
         if isinstance(node, ast.BinOp):
             return self.translateBinOp(node, ctx)
         return vf.Fact()
-    def translateCompare(self, node: ast.Compare, ctx: Context) -> vf.Fact:
-        if(isinstance(node.ops[0], ast.Gt)):
-            pass
+
     def translateBoolOp(self, node: ast.BoolOp, ctx: Context) -> vf.Fact:
         pass
-    def translateExprCall(self, node: ast.Call, ctx: Context) -> vf.expr:
-        #becomes a fixpoint call
+
+    def translateExprCall(self, node: ast.Call, ctx: Context) -> ast.expr:
+        # becomes a fixpoint call
         pass
+
     def translateFactCall(self, node: ast.Call, ctx: Context) -> vf.Fact:
-        #becomes a predicate
+        # becomes a predicate
         pass
-    def translateName(self, node: ast.Name, ctx: Context) -> vf.expr:
-        #becomes a variable, use py2vf_ctx to find the occurence
-        ##therefore case-distinguish about the case in which the variable is used: ref or value?
+
+    def translateName(self, node: ast.Name, ctx: Context) -> ast.expr:
+        # becomes a variable, use py2vf_ctx to find the occurence
+        # therefore case-distinguish about the case in which the variable is used: ref or value?
         pass
+
     def translateBinOp(self, node: ast.BinOp, ctx: Context) -> vf.Fact:
         pass
+
+    def is_pure(self, node: ast.AST, ctx: Context) -> bool:
+        # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
+        # predicates are stored in ctx.module.predicates
+        if (isinstance(node, ast.Call)):
+            return not (node.func.id in ctx.module.predicates or node.func.id == "Acc")
+        elif (isinstance(node, ast.UnaryOp)):
+            return self.is_pure(node.operand, ctx)
+        elif (isinstance(node, ast.IfExp)):
+            return self.is_pure(node.body, ctx) and self.is_pure(node.orelse, ctx)
+        elif (isinstance(node, ast.BoolOp)):
+            return all([self.is_pure(x, ctx) for x in node.values])
+        # BinOp, Compare, Constant, Name
+        else:
+            return True
+
+
 class NativeSpecExtractor:
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         return {
@@ -69,50 +89,53 @@ class NativeSpecExtractor:
             'mycoolclass': vfpy.PyObj_t("PyClassInstance_v("+str(vfpy.PyClass("mycoolclass", None))+")")
         }[p.name]
 
-    def pyvar__to__PyObj_v(self, p: PythonVar) -> tuple[vfpy.PyObj_v, object]:
+    def pyvar__to__PyObj_v(self, p: PythonVar, py2vf_ctx: py2vf_context) -> tuple[vfpy.PyObj_v, object]:
         if p.type.name == "int":
             thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
-            self.py2vf_ctx[p.name+"_val"] = thevar
+            py2vf_ctx[p.name+"_val"] = thevar
             return (vfpy.PyLong(thevar.definition), thevar)
         elif p.type.name == "mycoolclass":
             thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
             return (vfpy.PyClassInstance(vfpy.PyClass("mycoolclass", None)), None)
 
-    def setup(self, f: PythonMethod, ctx: Context) -> list[vf.Fact]:
-        self.py2vf_ctx["args"] = vf.VFVal(vf.FromArgs("args"))
+    def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
+        py2vf_ctx["args"] = vf.VFVal(vf.FromArgs("args"))
         tuple_args = []
         for key, value in f.args.items():
             # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
-            self.py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key+"_ptr"))
+            py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key+"_ptr"))
             tuple_args.append(
-                (self.py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
-        self.py2vf_ctx.setup.append(vfpy.pyobj_hasval(
-            self.py2vf_ctx["args"], vfpy.PyTuple(tuple_args)))
+                (py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
+        py2vf_ctx.setup.append(vfpy.pyobj_hasval(
+            py2vf_ctx["args"], vfpy.PyTuple(tuple_args)))
         for key, value in f.args.items():
-            p, v = self.pyvar__to__PyObj_v(value)
+            p, v = self.pyvar__to__PyObj_v(value, py2vf_ctx)
             if (v is not None):
-                self.py2vf_ctx[key+"_val"] = v
-            self.py2vf_ctx.setup.append(vfpy.pyobj_hasval(
-                self.py2vf_ctx[key+"_ptr"], p))
-        print(vf.FactConjunction(self.py2vf_ctx.setup))
-        print(self.py2vf_ctx)
+                py2vf_ctx[key+"_val"] = v
+            py2vf_ctx.setup.append(vfpy.pyobj_hasval(
+                py2vf_ctx[key+"_ptr"], p))
+        print(vf.FactConjunction(py2vf_ctx.setup))
+        print(py2vf_ctx)
         return
-    
-    def precond(self, f: PythonMethod, ctx: Context) -> list[vf.Fact]:
-        #only keep the preconditions: calls to Require
-        Preconds=list(filter(lambda s: isinstance(s.value, ast.Call) and s.value.func.id == "Requires", f.node.body))
-        for precond in Preconds:
-            print(self.translator.translate_generic(precond.value.args[0], ctx))
-        #print(f.node.body.value.func.id)
+
+    def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
+        # only keep the preconditions: calls to Require
+
+        for p, q in f.precondition:
+            # print(self.translator.translate_generic(p.value.args[0], ctx))
+            # print(list(map(str,p.values)))
+            print(self.translator.is_pure(p, ctx))
+            pass
+        # print(f.node.body.value.func.id)
         return []
 
     def __init__(self, f: PythonMethod, ctx: Context):
-        self.py2vf_ctx = py2vf_context()
+        py2vf_ctx = py2vf_context()
         self.translator = Translator()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
-        self.setup(f, ctx)
-        self.precond(f, ctx)
+        self.setup(f, ctx, py2vf_ctx)
+        self.precond(f, ctx, py2vf_ctx)
         pass
 
     def extract(self) -> None:
