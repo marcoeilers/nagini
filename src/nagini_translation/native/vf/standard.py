@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 import typing
-
-
-class expr(ABC):
-    pass
+import ast
 
 
 class pred(ABC):
@@ -30,15 +27,15 @@ class FromArgs(ValDef):
         return self.name
 
 
-class Pattern(expr, ValDef):
+class Pattern(ast.expr, ValDef):
     def __init__(self, name: str):
-        super().__init__(name)
+        ValDef.__init__(self, name)
         self.fact = None
     def __str__(self) -> str:
         return "?"+self.name
 
 
-class VFVal(expr):
+class VFVal(ast.expr):
     def __init__(self, definition: ValDef):
         self.definition = definition
 
@@ -47,7 +44,7 @@ class VFVal(expr):
 
 
 class PredicateFact(Fact, ABC):  # a fact built using a predicate
-    def __init__(self, pred: pred, args: list[expr]):
+    def __init__(self, pred: pred, args: list[ast.expr]):
         self.args = args
         self.pred = pred
 
@@ -55,11 +52,9 @@ class PredicateFact(Fact, ABC):  # a fact built using a predicate
         return self.pred.name + "(" + ", ".join(map(str, self.args)) + ")"
 
 
-class BooleanFact(Fact):  # a fact built using any boolean expression
-    def __init__(self, e1: expr, e2: expr, op: str):
-        self.e1 = e1
-        self.e2 = e2
-
+class BooleanFact(Fact):  # a fact built using any boolean ast.expression
+    def __init__(self, pureBoolean: ast.expr):
+        self.pureBoolean = pureBoolean
 
 class FactConjunction(Fact):
     def __init__(self, f: list[Fact]):
@@ -69,6 +64,6 @@ class FactConjunction(Fact):
         return " &*&\n".join(map(str, self.f))
 
 
-class PyObj_v(expr):
-    def __init__(self, vf: expr):
+class PyObj_v(ast.expr):
+    def __init__(self, vf: ast.expr):
         self.vf = vf

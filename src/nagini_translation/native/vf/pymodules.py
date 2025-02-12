@@ -1,10 +1,11 @@
 import nagini_translation.native.vf.standard as vf
 from abc import ABC, abstractmethod
+import ast
 
 
-class PyObj_v(vf.expr, ABC):
+class PyObj_v(ast.expr, ABC):
     pass
-class PyObj_t(vf.expr):
+class PyObj_t(ast.expr):
     def __init__(self, type:str):
         self.type = type
     def __str__(self):
@@ -15,7 +16,7 @@ class PyObjPtr(vf.VFVal):
 
 
 class PyLong(PyObj_v):
-    def __init__(self, value: vf.expr):
+    def __init__(self, value: ast.expr):
         self.value = value
 
     def __str__(self):
@@ -24,7 +25,7 @@ class PyLong(PyObj_v):
 
 class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
-    def __init__(self, items: list[tuple[vf.expr, PyObj_t]]):
+    def __init__(self, items: list[tuple[ast.expr, PyObj_t]]):
         self.items = items
 
     def __str__(self):
@@ -58,7 +59,7 @@ class PyClassInstance(PyObj_v):
 
 class pyobj_hasval(vf.pred):
     # TODO: refine the type to a pointer instead of any expression
-    def __init__(self, ptr: vf.expr, obj: PyObj_v):
+    def __init__(self, ptr: ast.expr, obj: PyObj_v):
         self.ptr = ptr
         self.obj = obj
 
