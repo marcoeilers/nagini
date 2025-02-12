@@ -33,36 +33,20 @@ class py2vf_context:
 
 class Translator():
     def translate_generic(self, node: ast.AST, ctx: Context) -> vf.Fact:
-        if isinstance(node, ast.Compare):
-            return self.translateCompare(node, ctx)
-        if isinstance(node, ast.BoolOp):
-            return self.translateBoolOp(node, ctx)
-        if isinstance(node, ast.Call):
-            pass
-            # return self.translateCall(node, ctx)
-        if isinstance(node, ast.Name):
-            return self.translateName(node, ctx)
-        if isinstance(node, ast.BinOp):
-            return self.translateBinOp(node, ctx)
-        return vf.Fact()
+        if (isinstance(node, ast.Call)):
+            if (node.func.id in ctx.module.predicates):
+                return vf.PredicateFact(ctx.module.predicates[node.func.id],
+                                        list(map(lambda x: self.translate_generic(x, ctx), node.args)))
+            elif (node.func.id == "Acc"):
+                # for now only handle field access
+                pass
+                # return vf.PredicateFact(
+        if(isinstance(node, ast.Constant)):
+            return node
 
-    def translateBoolOp(self, node: ast.BoolOp, ctx: Context) -> vf.Fact:
-        pass
-
-    def translateExprCall(self, node: ast.Call, ctx: Context) -> ast.expr:
-        # becomes a fixpoint call
-        pass
-
-    def translateFactCall(self, node: ast.Call, ctx: Context) -> vf.Fact:
-        # becomes a predicate
-        pass
-
-    def translateName(self, node: ast.Name, ctx: Context) -> ast.expr:
+    def translateName(self, node: ast.Name, ctx: Context) -> ast.Name:
         # becomes a variable, use py2vf_ctx to find the occurence
         # therefore case-distinguish about the case in which the variable is used: ref or value?
-        pass
-
-    def translateBinOp(self, node: ast.BinOp, ctx: Context) -> vf.Fact:
         pass
 
     def is_pure(self, node: ast.AST, ctx: Context) -> bool:
@@ -105,7 +89,7 @@ class NativeSpecExtractor:
             # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
             py2vf_ctx[key + "_ptr"] = vf.VFVal(vf.Pattern(key+"_ptr"))
             tuple_args.append(
-                (py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type)))
+                vf.Pair((py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type))))
         py2vf_ctx.setup.append(vfpy.pyobj_hasval(
             py2vf_ctx["args"], vfpy.PyTuple(tuple_args)))
         for key, value in f.args.items():
@@ -124,7 +108,8 @@ class NativeSpecExtractor:
         for p, q in f.precondition:
             # print(self.translator.translate_generic(p.value.args[0], ctx))
             # print(list(map(str,p.values)))
-            print(self.translator.is_pure(p, ctx))
+            # print(self.translator.is_pure(p, ctx))
+            print(self.translator.translate_generic(p, ctx))
             pass
         # print(f.node.body.value.func.id)
         return []
