@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import ast
 
 
-class PyObj_v(ast.expr, ABC):
+class PyObjV(ast.expr, ABC):
     pass
 class PyObj_t(ast.expr):
     def __init__(self, type:str):
@@ -13,9 +13,11 @@ class PyObj_t(ast.expr):
 
 class PyObjPtr(vf.VFVal):
     pass
+class PyObjVName(vf.VFVal):
+    pass
 
 
-class PyLong(PyObj_v):
+class PyLong(PyObjV):
     def __init__(self, value: ast.expr):
         self.value = value
 
@@ -23,7 +25,7 @@ class PyLong(PyObj_v):
         return "PyLong_v("+str(self.value)+")"
 
 
-class PyTuple(PyObj_v):
+class PyTuple(PyObjV):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
     def __init__(self, items: list[vf.Pair[ast.expr, PyObj_t]]):
         self.items = items
@@ -49,7 +51,7 @@ class PyClass_t(PyObj_t):
         return "PyClass_t("+str(self.type)+")"
 
 
-class PyClassInstance(PyObj_v):
+class PyClassInstance(PyObjV):
     def __init__(self, type: PyClass):
         self.type = type
 
@@ -59,7 +61,7 @@ class PyClassInstance(PyObj_v):
 
 class pyobj_hasval(vf.VFPredicate):
     # TODO: refine the type to a pointer instead of any expression
-    def __init__(self, ptr: ast.expr, obj: PyObj_v):
+    def __init__(self, ptr: PyObjPtr, obj: PyObjV):
         self.ptr = ptr
         self.obj = obj
 
