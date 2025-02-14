@@ -1,17 +1,17 @@
 from abc import ABC
 from nagini_translation.native.vf.standard.value import Value
 
-class Literal(ABC, Value):
+class Literal(Value, ABC):
     pass
 
 
-class int(Literal):
+class Int(Literal):
     pass
 
-class float(Literal):
+class Float(Literal):
     pass
 
-class ptr(Literal):
+class Ptr(Literal):
     pass
 
 
