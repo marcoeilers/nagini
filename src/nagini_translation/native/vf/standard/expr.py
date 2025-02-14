@@ -1,4 +1,5 @@
 from abc import ABC
 
-class Fact(ABC):
-    pass
+class Expr(ABC):
+    def getType(self):
+        pass
