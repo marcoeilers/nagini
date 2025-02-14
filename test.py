@@ -11,21 +11,31 @@ class mycoolclass:
 def pred(x: mycoolclass, i: int) -> bool:
     return True
 
+@Pure
+def purefunction(x: mycoolclass, i: int) -> int:
+    return 123
+
+def method(x: mycoolclass, i: int) -> int:
+    Requires(Acc(x.arg))
+    x.arg = 123
+    return 1
+
 
 @ContractOnly
 @Native
 def compare(i: int, i2: int, c: mycoolclass) -> int:
-    Requires((i + 2) >= 13)
-    Requires((i+i2 > 0) if ((i + 2) == 13) else True)
-    Requires(c is not None)
-    Requires(pred(c, 2))
-    Requires(Acc(c.arg))
+    #Requires((i + 2) >= 13)
+    #Requires((i+i2 > 0) if ((i + 2) == 13) else True)
+    Requires(i is i2)
+    Requires(pred(c, i))
+    #Requires(Acc(c.arg))
     Ensures(Result() > 13)
 
 
 def test2(i: int, i2: int, c: mycoolclass) -> int:
     Requires(i > 13)
     Requires(i2 > 0)
+    Requires(Acc(pred(c,i)))
     Ensures(Result() > 13)
     a = i
     return a + i2
