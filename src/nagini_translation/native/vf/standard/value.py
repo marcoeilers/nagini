@@ -4,6 +4,8 @@ from typing import TypeVar, Generic
 from abc import ABC
 
 ValueT = TypeVar("ValueT", bound="Value")
+ValueT2 = TypeVar("ValueT2", bound="Value")
+
 class Value(Expr, ABC):
     pass
 class ValueLocation(Generic[ValueT]):
