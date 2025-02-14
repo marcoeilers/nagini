@@ -1,4 +1,4 @@
-from nagini_translation.native.vf.standard.callable import Callable
+from nagini_translation.native.vf.standard.consumer import Consumer
 
-class Pred(Callable):
+class Pred(Consumer):
     pass
