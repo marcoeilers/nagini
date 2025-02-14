@@ -2,12 +2,7 @@ from abc import ABC, abstractmethod
 import typing
 import ast
 from nagini_translation.lib.program_nodes import PythonMethod
-
-
-
-class Fact(ABC):
-    pass
-
+from nagini_translation.native.vf.standard.fact import Fact, FactConjunction, BooleanFact, PredicateFact
 
 class ValDef(ABC):
     def __init__(self, name: str):
@@ -44,25 +39,9 @@ class VFVal(ast.Name):
 
 class VFPredicate(PythonMethod, ABC):
     pass
-class PredicateFact(Fact, ABC):  # a fact built using a predicate
-    def __init__(self, pred: VFPredicate, args: list[ast.expr]):
-        self.args = args
-        self.pred = pred
-
-    def __str__(self) -> str:
-        return self.pred.name + "(" + ", ".join(map(str, self.args)) + ")"
 
 
-class BooleanFact(Fact):  # a fact built using any boolean ast.expression
-    def __init__(self, pureBoolean: ast.expr):
-        self.pureBoolean = pureBoolean
 
-class FactConjunction(Fact):
-    def __init__(self, f: list[Fact]):
-        self.f = f
-
-    def __str__(self) -> str:
-        return " &*&\n".join(map(str, self.f))
 
 
 class PyObj_v(ast.expr):

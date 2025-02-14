@@ -1,5 +1,5 @@
-import nagini_translation.native.vf.standard as vf
-from abc import ABC, abstractmethod
+import nagini_translation.native.vf.standard_old as vf
+from abc import ABC
 import ast
 
 

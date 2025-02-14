@@ -1,5 +1,5 @@
 import ast
-import nagini_translation.native.vf.standard as vf
+import nagini_translation.native.vf.standard_old as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
