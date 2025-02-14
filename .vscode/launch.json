@@ -26,6 +26,16 @@
             "args": [
                 "/home/etienne/nagini/test.py"
             ]
+        },
+        {
+            "name": "test.py for VF standard",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/nagini_translation/native/vf/test.py",
+            "cwd": "${workspaceFolder}/src/",
+            "console": "integratedTerminal",
+            "args": [
+            ]
         }
         /*{
             "name": "translate current file",
