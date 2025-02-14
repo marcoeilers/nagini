@@ -1,5 +1,5 @@
 from abc import ABC
-from nagini_translation.native.vf.standard.pred import Predicate
+from nagini_translation.native.vf.standard.pred import Pred
 from nagini_translation.native.vf.standard.expr import Expr
 
 class Fact(ABC):
@@ -10,7 +10,7 @@ class BooleanFact(Fact):  # a fact built using any boolean ast.expression
     pass
 
 class PredicateFact(Fact, ABC):  # a fact built using a predicate
-    def __init__(self, pred: Predicate, args: list[Expr]):
+    def __init__(self, pred: Pred, args: list[Expr]):
         self.args = args
         self.pred = pred
 
