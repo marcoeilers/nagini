@@ -1,12 +1,12 @@
 import ast
 import nagini_translation.native.vf.standard as vf
 import nagini_translation.native.vf.pymodules as vfpy
-from nagini_translation.lib.program_nodes import PythonVar
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
-    PythonType
+    PythonType,
+    PythonVar
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
@@ -32,21 +32,39 @@ class py2vf_context:
 
 
 class Translator():
-    def translate_generic(self, node: ast.AST, ctx: Context) -> vf.Fact:
+    def is_mutable_arg(self, node: PythonVar) -> bool:
+        switch_dict = {
+            "int": False,
+            "mycoolclass": True
+        }
+        return switch_dict[node.type.name]
+
+    def translate_generic(self, node: ast.AST, ctx: Context, isreference: bool) -> vf.Fact:
         if (isinstance(node, ast.Call)):
             if (node.func.id in ctx.module.predicates):
-                return vf.PredicateFact(ctx.module.predicates[node.func.id],
-                                        list(map(lambda x: self.translate_generic(x, ctx), node.args)))
+                predPythonMethod = ctx.module.predicates[node.func.id]
+                VFpredArgList = list(map(lambda i: self.translate_generic(
+                    node.args[i],
+                    ctx,
+                    # isreference if the argument is mutable
+                    #TODO: this is not sufficient. One immutable argument could be used both in ref and value semantics
+                    self.is_mutable_arg(list(predPythonMethod.args.values())[i])
+                ),
+                    range(len(node.args))))
+                return vf.PredicateFact(predPythonMethod, VFpredArgList)
             elif (node.func.id == "Acc"):
                 # for now only handle field access
                 pass
                 # return vf.PredicateFact(
         if (isinstance(node, ast.Name)):
-            return self.translateName(node, ctx)
+            print("Name: ", str(node.id), isreference)
+            return self.translateName(node, ctx, isreference)
         if (isinstance(node, ast.Constant)):
+            print("Name: ", str(node), isreference)
+            print(str(node), isreference)
             return node
 
-    def translateName(self, node: ast.Name, ctx: Context) -> ast.Name:
+    def translateName(self, node: ast.Name, ctx: Context, isreference: bool) -> ast.Name:
         # becomes a variable, use py2vf_ctx to find the occurence
         # therefore case-distinguish about the case in which the variable is used: ref or value?
         # references to immutable values offer this tradeoff
@@ -113,7 +131,7 @@ class NativeSpecExtractor:
             # print(self.translator.translate_generic(p.value.args[0], ctx))
             # print(list(map(str,p.values)))
             # print(self.translator.is_pure(p, ctx))
-            print(self.translator.translate_generic(p, ctx))
+            print(self.translator.translate_generic(p, ctx, False))
             pass
         # print(f.node.body.value.func.id)
         return []
