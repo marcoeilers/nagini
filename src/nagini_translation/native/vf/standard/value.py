@@ -6,7 +6,7 @@ from abc import ABC
 ValueT = TypeVar("ValueT", bound="Value")
 ValueT2 = TypeVar("ValueT2", bound="Value")
 
-class Value(Expr, ABC):
+class Value(ABC):
     pass
 class ValueLocation(Generic[ValueT]):
     def __init__(self):
