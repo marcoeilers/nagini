@@ -1,12 +1,12 @@
 from nagini_translation.native.vf.standard.pred import Pred
-from nagini_translation.native.vf.standard.value import ValueT, Value
+from nagini_translation.native.vf.standard.value import Value
 from nagini_translation.native.vf.standard.literal import Ptr, Char
 from nagini_translation.native.vf.standard.inductive import List, Pair, Inductive
 from nagini_translation.native.vf.standard.expr import Expr
 from typing import TypeVar, Tuple, Type
 from abc import ABC
 
-
+ValueT = TypeVar("ValueT", bound="Value")
 class PyObj_v(Inductive, ABC):
     pass
 class PyLong(PyObj_v):
@@ -18,12 +18,12 @@ class PyLong(PyObj_v):
 class PyObj_t(Inductive, Type[PyObj_v]):
     #TODO: review this declaration: is really what we want?
     pass
-class PyObj_Ptr(Ptr):
+class PyObjPtr(Ptr):
     pass
-PyObjPtrT = TypeVar('PyObjPtrT', bound=PyObj_Ptr)
+PyObjPtrT = TypeVar('PyObjPtrT', bound=PyObjPtr)
 
-PyObj_HasVal = Pred[Tuple[PyObjPtrT, ValueT]]("pyobj_hasval")
-PyObj_HasAttr = Pred[Tuple[PyObjPtrT, List[Char], PyObjPtrT]]("pyobj_hasattr")
+PyObj_HasVal = Pred[Tuple[PyObjPtrT, ValueT]]("pyobj_hasval", Tuple[PyObjPtr, Value])
+PyObj_HasAttr = Pred[Tuple[PyObjPtrT, List[Char], PyObjPtrT]]("pyobj_hasattr", Tuple[PyObjPtr, List[Char], PyObjPtr])
 
 
 

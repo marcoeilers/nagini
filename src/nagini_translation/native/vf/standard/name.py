@@ -1,16 +1,23 @@
 
 from abc import ABC
-from nagini_translation.native.vf.standard.value import ValueLocation, ValueT
+from nagini_translation.native.vf.standard.value import Value
+from nagini_translation.native.vf.standard.valueloc import ValueLocation
 from nagini_translation.native.vf.standard.expr import Expr
 from typing import Generic
 
+from typing import TypeVar
+ValueT = TypeVar("ValueT", bound="Value")
+ValueT2 = TypeVar("ValueT2", bound="Value")
 
-#DEFINITION: a name is an annotation-internal variable that is used to refer to a value.
+# DEFINITION: a name is an annotation-internal variable that is used to refer to a value.
+
+
 class NameOccurence(Expr, ABC, Generic[ValueT]):
     def __init__(self, location: ValueLocation = None, entity: "NamedValue" = None):
         self.__location = location
         self.__entity = entity
         entity.addLocation(location)
+
 
 class NameDefinition(NameOccurence, Generic[ValueT]):
     def __init__(self):
