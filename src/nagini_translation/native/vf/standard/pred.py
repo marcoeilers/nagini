@@ -5,6 +5,7 @@ _T = TypeVar("T", bound=Tuple[Value, ...])
 
 
 class Pred(Generic[_T]):
-    def __init__(self, pred: Type[_T], args: _T):
-        self.pred = pred
-        self.args = args
+    def __init__(self, name: str):
+        self.__name = name
+    def getName(self) -> str:
+        return self.__name
