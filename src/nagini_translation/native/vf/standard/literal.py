@@ -14,4 +14,6 @@ class Float(Literal):
 class Ptr(Literal):
     pass
 
+class Char(Literal):
+    pass
 
