@@ -6,20 +6,19 @@ from nagini_translation.native.vf.standard.expr import Expr
 from typing import Generic
 
 from typing import TypeVar
-ValueT = TypeVar("ValueT", bound="Value")
-ValueT2 = TypeVar("ValueT2", bound="Value")
+_ValueT = TypeVar("_ValueT", bound="Value")
 
 # DEFINITION: a name is an annotation-internal variable that is used to refer to a value.
 
 
-class NameOccurence(Expr, ABC, Generic[ValueT]):
+class NameOccurence(Expr, ABC, Generic[_ValueT]):
     def __init__(self, location: ValueLocation = None, entity: "NamedValue" = None):
         self.__location = location
         self.__entity = entity
         entity.addLocation(location)
 
 
-class NameDefinition(NameOccurence, Generic[ValueT]):
+class NameDefinition(NameOccurence, Generic[_ValueT]):
     def __init__(self):
         pass
 
@@ -27,7 +26,7 @@ class NameDefinition(NameOccurence, Generic[ValueT]):
         pass
 
 
-class NameUse(NameOccurence, Generic[ValueT]):
+class NameUse(NameOccurence, Generic[_ValueT]):
     def __init__(self):
         pass
 
@@ -35,7 +34,7 @@ class NameUse(NameOccurence, Generic[ValueT]):
         pass
 
 
-class NamedValue(Generic[ValueT]):
+class NamedValue(Generic[_ValueT]):
     def __init__(self,  name: str):
         self.__occurences = []
         self.__def = None
@@ -44,16 +43,16 @@ class NamedValue(Generic[ValueT]):
     def getName(self):
         return self.__name
 
-    def addLocation(self, loc: ValueLocation):
+    def addLocation(self, loc: ValueLocation[_ValueT]):
         # TODO check that the location matches entity type
         self.__occurences.append(loc)
         loc.setContent(self)
 
-    def removeLocation(self, loc: ValueLocation):
+    def removeLocation(self, loc: ValueLocation[_ValueT]):
         self.__occurences.remove(loc)
         loc.content = None
 
-    def setDef(self, defn: ValueLocation):
+    def setDef(self, defn: ValueLocation[_ValueT]):
         # TODO check that the location matches entity type
         self.__def = defn
 
