@@ -1,40 +1,42 @@
-import nagini_translation.native.vf.standard_old as vf
+from nagini_translation.native.vf.standard.pred import Pred
+from nagini_translation.native.vf.standard.value import ValueT, Value
+from nagini_translation.native.vf.standard.literal import Ptr, Char
+from nagini_translation.native.vf.standard.inductive import List, Pair, Inductive
+from nagini_translation.native.vf.standard.expr import Expr
+from typing import TypeVar, Tuple, Type
 from abc import ABC
-import ast
 
 
-class PyObjV(ast.expr, ABC):
+class PyObj_v(Inductive, ABC):
     pass
-class PyObj_t(ast.expr):
-    def __init__(self, type:str):
-        self.type = type
-    def __str__(self):
-        return self.type
-
-class PyObjPtr(vf.VFVal):
-    pass
-class PyObjVName(vf.VFVal):
-    pass
-
-
-class PyLong(PyObjV):
-    def __init__(self, value: ast.expr):
+class PyLong(PyObj_v):
+    def __init__(self, value: int):
         self.value = value
 
     def __str__(self):
         return "PyLong_v("+str(self.value)+")"
+class PyObj_t(Inductive, Type[PyObj_v]):
+    #TODO: review this declaration: is really what we want?
+    pass
+class PyObj_Ptr(Ptr):
+    pass
+PyObjPtrT = TypeVar('PyObjPtrT', bound=PyObj_Ptr)
+
+PyObj_HasVal = Pred[Tuple[PyObjPtrT, ValueT]]("pyobj_hasval")
+PyObj_HasAttr = Pred[Tuple[PyObjPtrT, List[Char], PyObjPtrT]]("pyobj_hasattr")
 
 
-class PyTuple(PyObjV):
+
+class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
-    def __init__(self, items: list[vf.Pair[ast.expr, PyObj_t]]):
+    def __init__(self, items: List[Pair[Expr, PyObj_t]]):
         self.items = items
 
     def __str__(self):
         return "PyTuple_v("+(",\n\t".join(map(str, self.items)))+")"
 
 
-class PyClass():
+class PyClass(Inductive, ABC):
     def __init__(self, name: str, parent: "PyClass"):
         self.name = name
         self.parent = parent
@@ -51,19 +53,9 @@ class PyClass_t(PyObj_t):
         return "PyClass_t("+str(self.type)+")"
 
 
-class PyClassInstance(PyObjV):
+class PyClassInstance(PyObj_v):
     def __init__(self, type: PyClass):
         self.type = type
 
     def __str__(self):
         return "PyClassInstance_v("+str(self.type)+")"
-
-
-class pyobj_hasval(vf.VFPredicate):
-    # TODO: refine the type to a pointer instead of any expression
-    def __init__(self, ptr: PyObjPtr, obj: PyObjV):
-        self.ptr = ptr
-        self.obj = obj
-
-    def __str__(self):
-        return "pyobj_hasval("+str(self.ptr)+", "+str(self.obj)+")"
