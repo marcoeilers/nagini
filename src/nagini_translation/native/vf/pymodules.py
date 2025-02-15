@@ -64,11 +64,11 @@ class PyObj_HasValue(PredicateFact):
         self.valueLoc.setContent(value)
 
     def __str__(self):
-        return "pyobj_hasvalue("+str(self.ptrLoc)+", "+str(self.valueLoc)+")"
+        return "pyobj_hasvalue("+str(self.ptrLoc.getContent())+", "+str(self.valueLoc.getContent())+")"
 
 
 class PyObj_HasAttr(PredicateFact):
-    def __init__(self, obj: Expr[PyObjPtr], attrName: Expr[Char], attrValue: Expr[PyObj_v]):
+    def __init__(self, obj: Expr[PyObjPtr], attrName: Expr[Char], attrValue: Expr[PyObjPtr]):
         self.objLoc = ValueLocation[PyObjPtr]()
         self.objLoc.setContent(obj)
         self.attrNameLoc = ValueLocation[Char]()
@@ -77,7 +77,7 @@ class PyObj_HasAttr(PredicateFact):
         self.attrValueLoc.setContent(attrValue)
 
     def __str__(self):
-        return "pyobj_hasattr("+str(self.objLoc)+", "+str(self.attrNameLoc)+", "+str(self.attrValueLoc)+")"
+        return "pyobj_hasattr("+str(self.objLoc.getContent())+", "+str(self.attrNameLoc.getContent())+", "+str(self.attrValueLoc.getContent())+")"
 
 
 class PyTuple(PyObj_v):
