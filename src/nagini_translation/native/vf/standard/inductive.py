@@ -6,5 +6,5 @@ from nagini_translation.native.vf.standard.expr import Expr
 ExprT = TypeVar("ExprT", bound="Expr")
 
 
-class Inductive(Value, ABC, Generic[ExprT]):
+class Inductive(Value, ABC):
     pass

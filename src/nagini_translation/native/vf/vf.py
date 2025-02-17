@@ -9,13 +9,14 @@ _ValueT = TypeVar("_ValueT", bound="Value")
 
 
 class Pair(Inductive, Generic[_ValueT, _ValueT2]):
-    def __init__(self, first: _ValueT, second: _ValueT2):
+    def __init__(self, first: Expr[_ValueT], second: Expr[_ValueT2]):
+        # one could be a namedefexpr and the other a nameuseexpr
         self.__first = ValueLocation[_ValueT](first)
         self.__second = ValueLocation[_ValueT](second)
 
 class List(Inductive, Generic[_ValueT], ABC):
     @staticmethod
-    def from_list(lst: list[_ValueT]) -> "List"[_ValueT]:
+    def from_list(lst: list[Expr[_ValueT]]) -> "List"[_ValueT]:
         if len(lst) == 0:
             return Nil()
         else:

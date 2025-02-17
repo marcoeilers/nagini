@@ -3,9 +3,12 @@ from nagini_translation.native.vf.standard.value import Value, ValueLocation, Na
 from typing import Generic, TypeVar
 
 _ValueT = TypeVar("ValueT", bound="Value")
+
+
 class Expr(ABC, Generic[_ValueT]):
     # any expression must return a value in the end...
     pass
+
 
 class NameOccurence(Generic[_ValueT], ABC):
     def __init__(self, location: ValueLocation = None, entity: "NamedValue[_ValueT]" = None):
@@ -14,7 +17,7 @@ class NameOccurence(Generic[_ValueT], ABC):
         entity.addLocation(location)
 
 
-class NameDefExpr(NameOccurence[_ValueT]):
+class NameDefExpr(Expr[_ValueT], NameOccurence[_ValueT]):
     def __init__(self):
         pass
 
@@ -23,7 +26,7 @@ class NameDefExpr(NameOccurence[_ValueT]):
 
 
 class DefLessExpr(Expr[_ValueT], ABC):
-    #definitionless expression: only uses names, no definitions
+    # definitionless expression: only uses names, no definitions
     def __init__(self):
         pass
 
@@ -38,6 +41,12 @@ class NameUseExpr(NameOccurence[_ValueT], DefLessExpr[_ValueT]):
     def __str__(self) -> str:
         pass
 
-class ImmediateLiteral(DefLessExpr[_ValueT]):
+
+class ImmLiteral(DefLessExpr[_ValueT]):
+    def __init__(self, value: _ValueT):
+        self.__value = value
+
+
+class ImmInductive(DefLessExpr[_ValueT]):
     def __init__(self, value: _ValueT):
         self.__value = value
