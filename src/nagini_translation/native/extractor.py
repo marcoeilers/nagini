@@ -88,7 +88,7 @@ class NativeSpecExtractor:
             )
         firstpredfact = vfpy.PyObj_HasVal(
             vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx["args"]),
-            vf.ImmInductive(vfpy.PyTuple(tuple_args))
+            vf.ImmInductive(vfpy.PyTuple(vf.List.from_list(tuple_args)))
         )
         print(firstpredfact)
         return

@@ -87,4 +87,4 @@ class PyTuple(PyObj_v):
     def PyObj_t(self) -> PyObj_t:
         return None
     def __str__(self):
-        return "PyTuple_v("+(",\n\t".join(map(str, self.items)))+")"
+        return "PyTuple_v("+str(self.items)+")"
