@@ -8,11 +8,13 @@ _ValueT2 = TypeVar("_ValueT2", bound="Value")
 _ValueT = TypeVar("_ValueT", bound="Value")
 
 
+
 class Pair(Inductive, Generic[_ValueT, _ValueT2]):
     def __init__(self, first: Expr[_ValueT], second: Expr[_ValueT2]):
         # one could be a namedefexpr and the other a nameuseexpr
-        self.__first = ValueLocation[_ValueT](first)
-        self.__second = ValueLocation[_ValueT](second)
+        self.first = first
+        self.second = second
+
 
 class List(Inductive, Generic[_ValueT], ABC):
     @staticmethod
@@ -25,11 +27,11 @@ class List(Inductive, Generic[_ValueT], ABC):
 
 class Cons(List[_ValueT]):
     def __init__(self, head: _ValueT, tail: list[_ValueT]):
-        self.__head = head
-        self.__tail = tail
+        self.head = (head)
+        self.tail = (tail)
 
     def __str__(self) -> str:
-        return "cons(" + str(self.__head) + ", " + str(self.__tail) + ")"
+        return "cons(" + str(self.head) + ", " + str(self.tail) + ")"
 
 
 class Nil(List):
