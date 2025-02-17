@@ -1,20 +1,30 @@
 import nagini_translation.native.vf.vf as vf
 from typing import TypeVar, Tuple, Type
-from abc import ABC
+from abc import ABC, abstractmethod
 
 ValueT = TypeVar("ValueT", bound="vf.Value")
-
+class PyObj_t(vf.Inductive, ABC):
+    def __init__(self, label: str):
+        self.label = label
+    def __str__(self):
+        return self.label
 
 class PyObj_v(vf.Inductive, ABC):
-    pass
+    @abstractmethod
+    def PyObj_t() -> PyObj_t:
+        pass
 
 
 class PyLong(PyObj_v):
+    __PyObj_t = PyObj_t("PyLong_t")
     def __init__(self, value: int):
         self.value = value
 
     def __str__(self):
         return "PyLong_v("+str(self.value)+")"
+    
+    def PyObj_t(self) -> PyObj_t:
+        return PyLong.__PyObj_t
 
 
 class PyClass(vf.Inductive, ABC):
@@ -24,19 +34,9 @@ class PyClass(vf.Inductive, ABC):
 
     def __str__(self):
         return "PyClass(\""+self.name+"\", "+(str(self.parent) if self.parent != None else "ObjectType")+")"
-
-
-class PyClassInstance(PyObj_v):
-    def __init__(self, type: PyClass):
-        self.type = type
-
-    def __str__(self):
-        return "PyClassInstance_v("+str(self.type)+")"
-
-
-class PyObj_t(vf.Inductive, ABC):
-    pass
-
+    
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, PyClass) and self.name == other.name and self.parent == other.parent
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):
@@ -44,7 +44,19 @@ class PyClass_t(PyObj_t):
 
     def __str__(self):
         return "PyClass_t("+str(self.type)+")"
+    
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, PyClass_t) and self.type == other.type
+    
+class PyClassInstance(PyObj_v):
+    def __init__(self, type: PyClass):
+        self.type = type
 
+    def __str__(self):
+        return "PyClassInstance_v("+str(self.type)+")"
+
+    def PyObj_t(self) -> PyObj_t:
+        return PyClass_t(self.type)
 
 class PyObjPtr(vf.Ptr):
     pass
