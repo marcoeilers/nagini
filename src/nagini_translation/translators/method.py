@@ -324,8 +324,16 @@ class MethodTranslator(CommonTranslator):
             body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
-        return self.viper.Function(name, args, type, pres, posts, body,
-                                   pos, self.no_info(ctx))
+
+        # TODO: add possible opt-out of defaulting to opaque function
+        # Default to opaque functions for functions that belong to a class
+        opt_out_condition = True
+        if func.cls and opt_out_condition:
+            return self.viper.Function(name, args, type, pres, posts, body,
+                                    pos, self.viper.AnnotationInfo("opaque", []))
+        else:
+            return self.viper.Function(name, args, type, pres, posts, body,
+                                    pos, self.no_info(ctx))
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,

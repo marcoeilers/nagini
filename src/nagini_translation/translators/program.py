@@ -342,7 +342,7 @@ class ProgramTranslator(CommonTranslator):
             posts.insert(0,
                 self.type_check(
                     result, method.result.type,
-                    self.to_position(result, ctx), ctx
+                    self.to_position(method.result, ctx), ctx
                 )
             )
 
@@ -352,7 +352,7 @@ class ProgramTranslator(CommonTranslator):
                 method, has_subtype, called_name, args, ctx)
             pres = default_checks + pres
 
-            # add decreases class of superclass function to preconditions
+            # add decreases clause of superclass function to preconditions
             superclass_func = method.cls.superclass.get_function(method.name)
             if superclass_func:
                 info = self.no_info(ctx)
@@ -387,7 +387,7 @@ class ProgramTranslator(CommonTranslator):
             # create function viper AST node
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
-                body, self.no_position(ctx), self.no_info(ctx)
+                body, self.no_position(ctx), self.no_info(ctx) # TODO: no_info -> annotation_info
             )
 
         else:

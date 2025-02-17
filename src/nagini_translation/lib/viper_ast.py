@@ -521,6 +521,9 @@ class ViperAST:
     def SimpleInfo(self, comments):
         return self.ast.SimpleInfo(self.to_seq(comments))
 
+    def AnnotationInfo(self, annotation, arguments):
+        return self.ast.AnnotationInfo(self.to_map({annotation: self.to_seq(arguments)}))
+
     def ConsInfo(self, head, tail):
         return self.ast.ConsInfo(head, tail)
 
