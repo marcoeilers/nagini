@@ -14,16 +14,17 @@ class Pair(Inductive, Generic[_ValueT, _ValueT2]):
         # one could be a namedefexpr and the other a nameuseexpr
         self.first = first
         self.second = second
-
+    def __str__(self) -> str:
+        return "pair(" + str(self.first) + ", " + str(self.second) + ")"
 
 class List(Inductive, Generic[_ValueT], ABC):
     @staticmethod
-    def from_list(lst: list[Expr[_ValueT]]) -> "List"[_ValueT]:
+    def from_list(lst: list[Expr[_ValueT]]) -> "List[_ValueT]":
         if len(lst) == 0:
             return Nil()
         else:
             return Cons(lst[0], List.from_list(lst[1:]))
-
+    pass
 
 class Cons(List[_ValueT]):
     def __init__(self, head: _ValueT, tail: list[_ValueT]):

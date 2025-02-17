@@ -14,7 +14,6 @@ class PyObj_v(vf.Inductive, ABC):
     def PyObj_t() -> PyObj_t:
         pass
 
-
 class PyLong(PyObj_v):
     __PyObj_t = PyObj_t("PyLong_t")
     def __init__(self, value: int):
@@ -64,27 +63,28 @@ class PyObjPtr(vf.Ptr):
 
 class PyObj_HasVal(vf.PredicateFact):
     def __init__(self, ptr: vf.Expr[PyObjPtr], value: vf.Expr[PyObj_v]):
-        self.ptrLoc = (ptr)
-        self.valueLoc = (value)
+        self.ptr = (ptr)
+        self.value = (value)
 
     def __str__(self):
-        return "pyobj_hasvalue("+str(self.ptrLoc.getContent())+", "+str(self.valueLoc.getContent())+")"
+        return "pyobj_hasvalue("+str(self.ptr)+", "+str(self.value)+")"
 
 
 class PyObj_HasAttr(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: vf.Expr[vf.Char], attrValue: vf.Expr[PyObjPtr]):
-        self.objLoc = (obj)
-        self.attrNameLoc = (attrName)
-        self.attrValueLoc = (attrValue)
+        self.obj = (obj)
+        self.attrName= (attrName)
+        self.attrValue = (attrValue)
 
     def __str__(self):
-        return "pyobj_hasattr("+str(self.objLoc.getContent())+", "+str(self.attrNameLoc.getContent())+", "+str(self.attrValueLoc.getContent())+")"
+        return "pyobj_hasattr("+str(self.obj)+", "+str(self.attrName)+", "+str(self.attrValue)+")"
 
 
 class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
     def __init__(self, items: vf.List[vf.Pair[PyObjPtr, PyObj_t]]):
         self.items = items
-
+    def PyObj_t(self) -> PyObj_t:
+        return None
     def __str__(self):
         return "PyTuple_v("+(",\n\t".join(map(str, self.items)))+")"

@@ -1,5 +1,5 @@
 import ast
-import nagini_translation.native.vf.standard_old as vf
+import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
@@ -27,7 +27,7 @@ class py2vf_context:
         else:
             return None
 
-    def __setitem__(self, key: str, value: vf.VFVal):
+    def __setitem__(self, key: str, value: vf.Value):
         self.context[key] = value
 
 
@@ -40,36 +40,7 @@ class Translator():
         return switch_dict[node.type.name]
 
     def translate_generic(self, node: ast.AST, ctx: Context, isreference: bool) -> vf.Fact:
-        if (isinstance(node, ast.Call)):
-            if (node.func.id in ctx.module.predicates):
-                predPythonMethod = ctx.module.predicates[node.func.id]
-                VFpredArgList = list(map(lambda i: self.translate_generic(
-                    node.args[i],
-                    ctx,
-                    # isreference if the argument is mutable
-                    #TODO: this is not sufficient. One immutable argument could be used both in ref and value semantics
-                    self.is_mutable_arg(list(predPythonMethod.args.values())[i])
-                ),
-                    range(len(node.args))))
-                return vf.PredicateFact(predPythonMethod, VFpredArgList)
-            elif (node.func.id == "Acc"):
-                # for now only handle field access
-                pass
-                # return vf.PredicateFact(
-        if (isinstance(node, ast.Name)):
-            print("Name: ", str(node.id), isreference)
-            return self.translateName(node, ctx, isreference)
-        if (isinstance(node, ast.Constant)):
-            print("Name: ", str(node), isreference)
-            print(str(node), isreference)
-            return node
-
-    def translateName(self, node: ast.Name, ctx: Context, isreference: bool) -> ast.Name:
-        # becomes a variable, use py2vf_ctx to find the occurence
-        # therefore case-distinguish about the case in which the variable is used: ref or value?
-        # references to immutable values offer this tradeoff
-        # but references to mutable values are simpler to handle, they are just references
-        pass
+        raise NotImplementedError()
 
     def is_pure(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
@@ -92,36 +63,34 @@ class NativeSpecExtractor:
         return {
             'int': vfpy.PyObj_t("PyLong_t"),
             # no other parent than ObjectType
-            'mycoolclass': vfpy.PyObj_t("PyClassInstance_v("+str(vfpy.PyClass("mycoolclass", None))+")")
+            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass", None))
         }[p.name]
 
-    def pyvar__to__PyObjV(self, p: PythonVar, py2vf_ctx: py2vf_context) -> tuple[vfpy.PyObjV, object]:
-        if p.type.name == "int":
-            thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
-            py2vf_ctx[p.name+"_val"] = thevar
-            return (vfpy.PyLong(thevar.definition), thevar)
-        elif p.type.name == "mycoolclass":
-            thevar = vf.VFVal(vf.Pattern(p.name+"_val"))
-            return (vfpy.PyClassInstance(vfpy.PyClass("mycoolclass", None)), None)
-
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
-        py2vf_ctx["args"] = vfpy.PyObjPtr(vf.FromArgs("args"))
+        args_val = vf.NamedValue("args")
+        py2vf_ctx["args"] = args_val 
         tuple_args = []
         for key, value in f.args.items():
-            # vfpy.pyobj_hasval(py2vf_context["ptr_" + key],)
-            py2vf_ctx[key + "_ptr"] = vfpy.PyObjPtr(vf.Pattern(key+"_ptr"))
+            # now manually translate the arguments from PY to VF
+
+            py2vf_ctx[key +
+                      "_ptr"] = vf.NamedValue(key + "_ptr")
+            cur_arg_def = vf.NameDefExpr[vfpy.PyObjPtr](
+                py2vf_ctx[key + "_ptr"])
+            py2vf_ctx[key + "_ptr"].setDef(cur_arg_def)
             tuple_args.append(
-                vf.Pair((py2vf_ctx[key+"_ptr"].definition, self.pytype__to__PyObj_t(value.type))))
-        py2vf_ctx.setup.append(vfpy.pyobj_hasval(
-            py2vf_ctx["args"], vfpy.PyTuple(tuple_args)))
-        for key, value in f.args.items():
-            p, v = self.pyvar__to__PyObjV(value, py2vf_ctx)
-            if (v is not None):
-                py2vf_ctx[key+"_val"] = v
-            py2vf_ctx.setup.append(vfpy.pyobj_hasval(
-                py2vf_ctx[key+"_ptr"], p))
-        print(vf.FactConjunction(py2vf_ctx.setup))
-        print(py2vf_ctx)
+                vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_v](
+                    cur_arg_def,
+                    vf.ImmInductive[vfpy.PyObj_t](
+                        self.pytype__to__PyObj_t(value.type))
+
+                )
+            )
+        firstpredfact = vfpy.PyObj_HasVal(
+            vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx["args"]),
+            vf.ImmInductive(vfpy.PyTuple(tuple_args))
+        )
+        print(firstpredfact)
         return
 
     def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
@@ -142,7 +111,7 @@ class NativeSpecExtractor:
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
         self.setup(f, ctx, py2vf_ctx)
-        self.precond(f, ctx, py2vf_ctx)
+        # self.precond(f, ctx, py2vf_ctx)
         pass
 
     def extract(self) -> None:
