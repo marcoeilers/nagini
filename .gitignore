@@ -16,3 +16,4 @@ docs/build
 *.pyc
 viper_out
 build
+venv
