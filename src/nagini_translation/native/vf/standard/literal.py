@@ -3,12 +3,16 @@ from nagini_translation.native.vf.standard.value import Value
 
 
 class Literal(Value, ABC):
-    pass
-
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return str(self.value)
 
 class Int(Literal):
     pass
 
+class Bool(Literal):
+    pass
 
 class Float(Literal):
     pass

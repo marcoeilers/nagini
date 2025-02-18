@@ -10,7 +10,7 @@ from nagini_translation.lib.program_nodes import (
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
-from typing import Optional
+from typing import Optional, Type
 
 
 class py2vf_context:
@@ -25,6 +25,7 @@ class py2vf_context:
         elif self.parent:
             return self.parent[key]
         else:
+            # raise KeyError(key)
             return None
 
     def __setitem__(self, key: str, value: vf.Value):
@@ -32,15 +33,76 @@ class py2vf_context:
 
 
 class Translator():
+    def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+        if (self.is_pure(node, ctx)):
+            return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
+    #def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    #    if (self.is_pure(node, ctx)):
+    #        return self.translate_pure(node, ctx, py2vf_ctx)
+    def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        pass
+    def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        switch_dict = {
+            # "ast.Call": self.translate_Call,
+            # "ast.UnaryOp": self.translate_UnaryOp,
+            "IfExp": self.translate_IfExp,
+            # "ast.BoolOp": self.translate_BoolOp,
+            # "ast.BinOp": self.translate_BinOp,
+            "Compare": self.translate_Compare,
+            "Constant": self.translate_Constant,
+            "Name": self.translate_Name
+        }
+        return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
+
+    def translate_Constant(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        return vf.ImmLiteral[vf.Int](vf.Int(node.value))
+
+    def translate_Name(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        if isreference:
+            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.id + "_ptr"])
+        else:
+            # TODO: refine the type here
+            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "_val"])
+
+    def translate_Compare(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        dict = {
+            "Eq": vf.Eq,
+            "NotEq": vf.NotEq,
+            "Lt": vf.Lt,
+            "LtE": vf.LtE,
+            "Gt": vf.Gt,
+            "GtE": vf.GtE,
+        }
+        operator = dict[type(node.ops[0]).__name__]
+        return vf.BinOp[vf.Bool](
+            self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
+            self.translate_generic_expr(node.comparators[0], ctx, py2vf_ctx, False),
+            operator)
+
+    def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> vf.Expr:
+        pass
+    # HELPER FUNCTIONS
+
+    def pytype__to__PyObj_v(self, p: PythonType) -> Type[vfpy.PyObj_v]:
+        return {
+            'int': vfpy.PyLong,
+            # no other parent than ObjectType
+            'mycoolclass': vfpy.PyClassInstance
+        }[p.name]
+
+    def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
+        return {
+            'int': vfpy.PyLong(0).PyObj_t(),
+            # no other parent than ObjectType
+            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass", None))
+        }[p.name]
+
     def is_mutable_arg(self, node: PythonVar) -> bool:
         switch_dict = {
             "int": False,
             "mycoolclass": True
         }
         return switch_dict[node.type.name]
-
-    def translate_generic(self, node: ast.AST, ctx: Context, isreference: bool) -> vf.Fact:
-        raise NotImplementedError()
 
     def is_pure(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
@@ -59,59 +121,54 @@ class Translator():
 
 
 class NativeSpecExtractor:
-    def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
-        return {
-            'int': vfpy.PyObj_t("PyLong_t"),
-            # no other parent than ObjectType
-            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass", None))
-        }[p.name]
-
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
-        args_val = vf.NamedValue("args")
-        py2vf_ctx["args"] = args_val 
+        py2vf_ctx["args"] = vf.NamedValue("args")
         tuple_args = []
+        arg_predicates = []
         for key, value in f.args.items():
             # now manually translate the arguments from PY to VF
 
             py2vf_ctx[key +
-                      "_ptr"] = vf.NamedValue(key + "_ptr")
+                      "_ptr"] = vf.NamedValue[vfpy.PyObjPtr](key + "_ptr")
             cur_arg_def = vf.NameDefExpr[vfpy.PyObjPtr](
                 py2vf_ctx[key + "_ptr"])
+            #translate argument to pointers
             py2vf_ctx[key + "_ptr"].setDef(cur_arg_def)
             tuple_args.append(
-                vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_v](
+                vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     cur_arg_def,
                     vf.ImmInductive[vfpy.PyObj_t](
-                        self.pytype__to__PyObj_t(value.type))
-
-                )
-            )
+                        self.translator.pytype__to__PyObj_t(value.type))
+                ))
+            #translate pointers to values
+            py2vf_ctx[key + "_val"] = vf.NamedValue[vfpy.PyObj_v](key + "_val")
+            pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "_val"])))
+            arg_predicates.append(
+                vfpy.PyObj_HasVal(
+                    vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + "_ptr"]),
+                    pyobj_content
+                ))
         firstpredfact = vfpy.PyObj_HasVal(
             vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx["args"]),
             vf.ImmInductive(vfpy.PyTuple(vf.List.from_list(tuple_args)))
         )
-        print(firstpredfact)
-        return
+        return [firstpredfact]+arg_predicates
 
     def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
-        # only keep the preconditions: calls to Require
-
+        precondfacts = []
         for p, q in f.precondition:
-            # print(self.translator.translate_generic(p.value.args[0], ctx))
+            # print(self.translator.translate_generic_expr(p.value.args[0], ctx))
             # print(list(map(str,p.values)))
             # print(self.translator.is_pure(p, ctx))
-            print(self.translator.translate_generic(p, ctx, False))
-            pass
-        # print(f.node.body.value.func.id)
-        return []
+            precondfacts.append(self.translator.translate(p, ctx, py2vf_ctx))
+        return precondfacts
 
     def __init__(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
         self.translator = Translator()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
-        self.setup(f, ctx, py2vf_ctx)
-        # self.precond(f, ctx, py2vf_ctx)
+        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx)+self.precond(f, ctx, py2vf_ctx)))
         pass
 
     def extract(self) -> None:

@@ -11,7 +11,7 @@ class PyObj_t(vf.Inductive, ABC):
 
 class PyObj_v(vf.Inductive, ABC):
     @abstractmethod
-    def PyObj_t() -> PyObj_t:
+    def PyObj_t(self) -> PyObj_t:
         pass
 
 class PyLong(PyObj_v):
