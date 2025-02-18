@@ -57,8 +57,13 @@ class Translator():
             "Name": self.translate_Name
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
+
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        raise NotImplementedError("IfExp not implemented")
+        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
+                            self.translate_generic_expr(
+                                node.body, ctx, py2vf_ctx, False),
+                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, False))
+
     def translate_BinOp(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         dict = {
             "Add": vf.Add,
@@ -81,8 +86,8 @@ class Translator():
             operator)
 
     def translate_Constant(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        #TODO: handle immediate values of other types here
-        dict={
+        # TODO: handle immediate values of other types here
+        dict = {
             "int": vf.Int,
             "float": vf.Float,
             "bool": vf.Bool

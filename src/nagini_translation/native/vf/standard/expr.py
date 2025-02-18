@@ -3,7 +3,7 @@ from nagini_translation.native.vf.standard.value import Value
 from nagini_translation.native.vf.standard.literal import Int, Bool
 from nagini_translation.native.vf.standard.inductive import Inductive
 from typing import Generic, TypeVar
-
+_BoolT = TypeVar("ValueT", bound="Bool")
 _ValueT = TypeVar("ValueT", bound="Value")
 _ValueT2 = TypeVar("ValueT2", bound="Value")
 _ValueT3 = TypeVar("ValueT3", bound="Value")
@@ -114,3 +114,12 @@ class BinOp(Expr[_ValueT]):
     def __str__(self):
         return "("+str(self.left)+" "+str(self.op)+" "+str(self.right)+")"
 
+class TernaryOp(DefLessExpr[_ValueT], ABC):
+    def __init__(self, cond: Expr[Bool], left: Expr[_ValueT], right: Expr[_ValueT]):
+        self.cond = cond
+        self.left = left
+        self.right = right
+        
+
+    def __str__(self):
+        return "("+str(self.cond)+" ? "+str(self.left)+" : "+str(self.right)+")"
