@@ -14,7 +14,7 @@ class BooleanFact(Fact):  # a fact built using any boolean ast.expression
         self.e = e
 
     def __str__(self) -> str:
-        return "("+str(self.e)+")"
+        return str(self.e)
 
 
 _T = TypeVar("T", bound=Tuple[Value, ...])

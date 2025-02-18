@@ -36,26 +36,58 @@ class Translator():
     def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (self.is_pure(node, ctx)):
             return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
-    #def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        else:
+            return self.translate_generic_fact(node, ctx, py2vf_ctx)
+    # def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
     #    if (self.is_pure(node, ctx)):
     #        return self.translate_pure(node, ctx, py2vf_ctx)
+
     def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         pass
+
     def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         switch_dict = {
             # "ast.Call": self.translate_Call,
             # "ast.UnaryOp": self.translate_UnaryOp,
-            "IfExp": self.translate_IfExp,
+            "IfExp": self.translate_IfExp_expr,
             # "ast.BoolOp": self.translate_BoolOp,
-            # "ast.BinOp": self.translate_BinOp,
+            "BinOp": self.translate_BinOp,
             "Compare": self.translate_Compare,
             "Constant": self.translate_Constant,
             "Name": self.translate_Name
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
+    def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        raise NotImplementedError("IfExp not implemented")
+    def translate_BinOp(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        dict = {
+            "Add": vf.Add,
+            "Sub": vf.Sub,
+            "Mult": vf.Mul,
+            "Div": vf.Div,
+            "Mod": vf.Mod,
+            # TODO"Pow": vf.Pow,
+            "LShift": vf.LShift,
+            "RShift": vf.RShift,
+            "BitOr": vf.BitOr,
+            "BitXor": vf.BitXor,
+            "BitAnd": vf.BitAnd,
+            "FloorDiv": vf.Div
+        }
+        operator = dict[type(node.op).__name__]
+        return vf.BinOp[vf.Int](
+            self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
+            self.translate_generic_expr(node.right, ctx, py2vf_ctx, False),
+            operator)
 
     def translate_Constant(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        return vf.ImmLiteral[vf.Int](vf.Int(node.value))
+        #TODO: handle immediate values of other types here
+        dict={
+            "int": vf.Int,
+            "float": vf.Float,
+            "bool": vf.Bool
+        }
+        return dict[type(node.value).__name__](node.value)
 
     def translate_Name(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         if isreference:
@@ -72,11 +104,13 @@ class Translator():
             "LtE": vf.LtE,
             "Gt": vf.Gt,
             "GtE": vf.GtE,
+            # TODO "Is": vf.Is,
         }
         operator = dict[type(node.ops[0]).__name__]
         return vf.BinOp[vf.Bool](
             self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
-            self.translate_generic_expr(node.comparators[0], ctx, py2vf_ctx, False),
+            self.translate_generic_expr(
+                node.comparators[0], ctx, py2vf_ctx, False),
             operator)
 
     def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> vf.Expr:
@@ -132,7 +166,7 @@ class NativeSpecExtractor:
                       "_ptr"] = vf.NamedValue[vfpy.PyObjPtr](key + "_ptr")
             cur_arg_def = vf.NameDefExpr[vfpy.PyObjPtr](
                 py2vf_ctx[key + "_ptr"])
-            #translate argument to pointers
+            # translate argument to pointers
             py2vf_ctx[key + "_ptr"].setDef(cur_arg_def)
             tuple_args.append(
                 vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
@@ -140,9 +174,10 @@ class NativeSpecExtractor:
                     vf.ImmInductive[vfpy.PyObj_t](
                         self.translator.pytype__to__PyObj_t(value.type))
                 ))
-            #translate pointers to values
+            # translate pointers to values
             py2vf_ctx[key + "_val"] = vf.NamedValue[vfpy.PyObj_v](key + "_val")
-            pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "_val"])))
+            pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(
+                value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "_val"])))
             arg_predicates.append(
                 vfpy.PyObj_HasVal(
                     vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + "_ptr"]),
@@ -168,7 +203,8 @@ class NativeSpecExtractor:
         self.translator = Translator()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
-        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx)+self.precond(f, ctx, py2vf_ctx)))
+        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
+              self.precond(f, ctx, py2vf_ctx)))
         pass
 
     def extract(self) -> None:

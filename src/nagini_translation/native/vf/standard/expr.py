@@ -85,14 +85,16 @@ class BinaryOperator(ABC, Generic[_ValueT, _ValueT2]):
     def __str__(self):
         return self.symbol
 
-
 Add = BinaryOperator[Int, Int]("+")
 Sub = BinaryOperator[Int, Int]("-")
 Mul = BinaryOperator[Int, Int]("*")
 Div = BinaryOperator[Int, Int]("/")
 Mod = BinaryOperator[Int, Int]("%")
-BitwiseAnd = BinaryOperator[Int, Int]("&")
-BitwiseOr = BinaryOperator[Int, Int]("|")
+BitAnd = BinaryOperator[Int, Int]("&")
+BitOr = BinaryOperator[Int, Int]("|")
+BitXor = BinaryOperator[Int, Int]("^")
+LShift = BinaryOperator[Int, Int]("<<")
+RShift = BinaryOperator[Int, Int](">>")
 Lt = BinaryOperator[Int, Bool]("<")
 LtE = BinaryOperator[Int, Bool]("<=")
 Gt = BinaryOperator[Int, Bool](">")
@@ -111,3 +113,4 @@ class BinOp(Expr[_ValueT]):
 
     def __str__(self):
         return "("+str(self.left)+" "+str(self.op)+" "+str(self.right)+")"
+

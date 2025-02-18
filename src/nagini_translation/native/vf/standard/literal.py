@@ -12,15 +12,9 @@ class Int(Literal):
     pass
 
 class Bool(Literal):
-    pass
-
+    def __str__(self):
+        return "true" if self.value else "false"
 class Float(Literal):
     pass
-
-
-class Ptr(Literal):
-    pass
-
-
 class Char(Literal):
     pass
