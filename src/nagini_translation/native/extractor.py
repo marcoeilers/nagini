@@ -103,19 +103,19 @@ class Translator():
 
     def translate_Compare(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         dict = {
-            "Eq": vf.Eq,
-            "NotEq": vf.NotEq,
-            "Lt": vf.Lt,
-            "LtE": vf.LtE,
-            "Gt": vf.Gt,
-            "GtE": vf.GtE,
-            # TODO "Is": vf.Is,
+            "Eq": (vf.Eq, False),
+            "NotEq": (vf.NotEq, False),
+            "Lt": (vf.Lt, False),
+            "LtE": (vf.LtE, False),
+            "Gt": (vf.Gt, False),
+            "GtE": (vf.GtE, False),
+            "Is": (vf.Eq, True),
         }
-        operator = dict[type(node.ops[0]).__name__]
+        operator, asref = dict[type(node.ops[0]).__name__]
         return vf.BinOp[vf.Bool](
-            self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
+            self.translate_generic_expr(node.left, ctx, py2vf_ctx, asref),
             self.translate_generic_expr(
-                node.comparators[0], ctx, py2vf_ctx, False),
+                node.comparators[0], ctx, py2vf_ctx, asref),
             operator)
 
     def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> vf.Expr:
