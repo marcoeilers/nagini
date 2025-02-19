@@ -11,6 +11,7 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
+from functools import reduce
 
 
 class py2vf_context:
@@ -38,9 +39,6 @@ class Translator():
             return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
         else:
             return self.translate_generic_fact(node, ctx, py2vf_ctx)
-    # def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-    #    if (self.is_pure(node, ctx)):
-    #        return self.translate_pure(node, ctx, py2vf_ctx)
 
     def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         pass
@@ -50,13 +48,25 @@ class Translator():
             # "ast.Call": self.translate_Call,
             # "ast.UnaryOp": self.translate_UnaryOp,
             "IfExp": self.translate_IfExp_expr,
-            # "ast.BoolOp": self.translate_BoolOp,
+            "BoolOp": self.translate_BoolOp_expr,
             "BinOp": self.translate_BinOp,
             "Compare": self.translate_Compare,
             "Constant": self.translate_Constant,
             "Name": self.translate_Name
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
+
+    def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        dict = {
+            "And": vf.BoolAnd,
+            "Or": vf.BoolOr
+        }
+        operator = dict[type(node.op).__name__]
+        return reduce(
+            lambda x, y: vf.BinOp[vf.Bool](
+                x, self.translate_generic_expr(y, ctx, py2vf_ctx, False), operator),
+            node.values[1:],
+            self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, False))
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
@@ -117,10 +127,6 @@ class Translator():
             self.translate_generic_expr(
                 node.comparators[0], ctx, py2vf_ctx, asref),
             operator)
-
-    def translate_IfExp(self, node: ast.IfExp, ctx: Context) -> vf.Expr:
-        pass
-    # HELPER FUNCTIONS
 
     def pytype__to__PyObj_v(self, p: PythonType) -> Type[vfpy.PyObj_v]:
         return {

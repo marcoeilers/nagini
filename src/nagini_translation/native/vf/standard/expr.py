@@ -101,6 +101,8 @@ Gt = BinaryOperator[Int, Bool](">")
 GtE = BinaryOperator[Int, Bool](">=")
 Eq = BinaryOperator[Int, Bool]("==")
 NotEq = BinaryOperator[Int, Bool]("!=")
+BoolAnd = BinaryOperator[Bool, Bool]("&&")
+BoolOr = BinaryOperator[Bool, Bool]("||")
 
 
 class BinOp(Expr[_ValueT]):
