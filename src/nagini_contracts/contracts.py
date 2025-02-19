@@ -434,6 +434,13 @@ def Pure(func: T) -> T:
     return func
 
 
+def Opaque(func: T) -> T:
+    """
+    Decorator to mark opaque functions. It's a no-op.
+    """
+    return func
+
+
 def Predicate(func: T) -> T:
     """
     Decorator to mark predicate functions. It's a no-op.
@@ -561,6 +568,7 @@ __all__ = [
         'Unfold',
         'Unfolding',
         'Pure',
+        'Opaque',
         'Predicate',
         'Inline',
         'Ghost',

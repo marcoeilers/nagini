@@ -41,7 +41,8 @@ from nagini_translation.lib.util import (
     get_body_indices,
     get_parent_of_type,
     get_surrounding_try_blocks,
-    InvalidProgramException
+    InvalidProgramException,
+    UnsupportedException
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -279,6 +280,9 @@ class MethodTranslator(CommonTranslator):
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
         """
+        if not func.cls and func.opaque:
+            raise UnsupportedException(func.node, 'Opaque functions not belonging to a class are currently not supported')
+
         old_function = ctx.current_function
         ctx.current_function = func
         self.bind_type_vars(func, ctx)
@@ -325,15 +329,13 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = old_function
         name = func.sil_name
 
-        # TODO: add possible opt-out of defaulting to opaque function
-        # Default to opaque functions for functions that belong to a class
-        opt_out_condition = True
-        if func.cls and opt_out_condition:
-            return self.viper.Function(name, args, type, pres, posts, body,
-                                    pos, self.viper.AnnotationInfo("opaque", []))
+        # Create Function node and add opaque property if it exists
+        if func.opaque:
+            annotation = self.viper.AnnotationInfo("opaque", [])
         else:
-            return self.viper.Function(name, args, type, pres, posts, body,
-                                    pos, self.no_info(ctx))
+            annotation = self.no_info(ctx)
+        return self.viper.Function(name, args, type, pres, posts, body,
+                                   pos, annotation)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
@@ -540,6 +542,8 @@ class MethodTranslator(CommonTranslator):
         Translates an impure Python function (may or not belong to a class) to
         a Viper method
         """
+        if method.opaque:
+            raise UnsupportedException(method.node, 'Opaque methods are currently not supported')
         old_function = ctx.current_function
         ctx.current_function = method
         args = self._translate_params(method, ctx)

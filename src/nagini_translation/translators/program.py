@@ -385,9 +385,13 @@ class ProgramTranslator(CommonTranslator):
                 raise InvalidProgramException(method.node, 'invalid.override')
 
             # create function viper AST node
+            if method.cls and method.opaque and method.overrides.opaque:
+                annotation = self.viper.AnnotationInfo("opaque", [])
+            else:
+                annotation = self.no_info(ctx)
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
-                body, self.no_position(ctx), self.no_info(ctx) # TODO: no_info -> annotation_info
+                body, self.no_position(ctx), annotation
             )
 
         else:
@@ -1442,7 +1446,14 @@ class ProgramTranslator(CommonTranslator):
                              (cls.superclass and
                               cls.superclass.python_class.has_classmethod)) and
                             func.overrides):
-                        functions.append(self.create_override_check(func, ctx))
+                        if func.cls and func.opaque and func.overrides.opaque:
+                            functions.append(self.create_override_check(func, ctx))
+                        else:
+                            msg: str = "To override a (pure) function, it and the overriding function must be opaque;"
+                            msg += " try the @Opaque decorator in addition to @Pure"
+                            raise InvalidProgramException(func.node, 'invalid.override', msg)
+
+
                 for method_name in cls.methods:
                     method = cls.methods[method_name]
                     threading_ids_constants.append(
