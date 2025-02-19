@@ -39,7 +39,6 @@ class NamedValue(Generic[_ValueT]):
         return self.__name
 
     def setDef(self, defn: NameDefExpr):
-        # TODO check that the location matches entity type
         self.__def = defn
 
     def getDef(self) -> NameDefExpr:

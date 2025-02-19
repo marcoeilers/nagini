@@ -40,8 +40,31 @@ class Translator():
         else:
             return self.translate_generic_fact(node, ctx, py2vf_ctx)
 
-    def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+        # if(self.is_pure(node, ctx)):
+        #    return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
+        switch_dict = {
+            "Call": self.translate_Call_fact,
+            "IfExp": self.translate_IfExp_fact,
+            "BoolOp": self.translate_BoolOp_fact,
+        }
+        return switch_dict[type(node).__name__](node, ctx, py2vf_ctx)
+
+    def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         pass
+
+    def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+        #the condition must be pure
+        #but either branches could be pure or a fact (just one needs be a fact)
+        return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx),
+                              self.translate(node.body, ctx, py2vf_ctx),
+                              self.translate(node.orelse, ctx, py2vf_ctx))
+
+    def translate_BoolOp_fact(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+        if (type(node).__name__ == "And"):
+            return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
+        else:
+            raise NotImplementedError
 
     def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         switch_dict = {
@@ -49,10 +72,10 @@ class Translator():
             # "ast.UnaryOp": self.translate_UnaryOp,
             "IfExp": self.translate_IfExp_expr,
             "BoolOp": self.translate_BoolOp_expr,
-            "BinOp": self.translate_BinOp,
-            "Compare": self.translate_Compare,
-            "Constant": self.translate_Constant,
-            "Name": self.translate_Name
+            "BinOp": self.translate_BinOp_expr,
+            "Compare": self.translate_Compare_expr,
+            "Constant": self.translate_Constant_expr,
+            "Name": self.translate_Name_expr
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
 
@@ -71,10 +94,10 @@ class Translator():
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
                             self.translate_generic_expr(
-                                node.body, ctx, py2vf_ctx, False),
-                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, False))
+                                node.body, ctx, py2vf_ctx, isreference),
+                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, isreference))
 
-    def translate_BinOp(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         dict = {
             "Add": vf.Add,
             "Sub": vf.Sub,
@@ -95,7 +118,7 @@ class Translator():
             self.translate_generic_expr(node.right, ctx, py2vf_ctx, False),
             operator)
 
-    def translate_Constant(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         # TODO: handle immediate values of other types here
         dict = {
             "int": vf.Int,
@@ -104,14 +127,14 @@ class Translator():
         }
         return dict[type(node.value).__name__](node.value)
 
-    def translate_Name(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         if isreference:
             return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.id + "_ptr"])
         else:
             # TODO: refine the type here
             return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "_val"])
 
-    def translate_Compare(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         dict = {
             "Eq": (vf.Eq, False),
             "NotEq": (vf.NotEq, False),
@@ -203,9 +226,6 @@ class NativeSpecExtractor:
     def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
         precondfacts = []
         for p, q in f.precondition:
-            # print(self.translator.translate_generic_expr(p.value.args[0], ctx))
-            # print(list(map(str,p.values)))
-            # print(self.translator.is_pure(p, ctx))
             precondfacts.append(self.translator.translate(p, ctx, py2vf_ctx))
         return precondfacts
 

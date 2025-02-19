@@ -5,6 +5,7 @@ from nagini_translation.native.vf.standard.value import Value
 from nagini_translation.native.vf.standard.literal import Bool
 _BoolT = TypeVar("ValueT", bound="Bool")
 
+
 class Fact(ABC):
     pass
 
@@ -17,10 +18,9 @@ class BooleanFact(Fact):  # a fact built using any boolean ast.expression
         return str(self.e)
 
 
-_T = TypeVar("T", bound=Tuple[Value, ...])
-
-
-class PredicateFact(Fact, ABC):  # a fact built using a predicate
+class PredicateFact(Fact, ABC):
+    # a fact built using a predicate
+    # (user must create subclasses to instantiate)
     pass
 
 
@@ -30,3 +30,13 @@ class FactConjunction(Fact):
 
     def __str__(self) -> str:
         return " &*&\n".join(map(str, self.f))
+
+
+class TernaryFact(Fact):
+    def __init__(self, cond: Expr[_BoolT], then: Fact, orelse: Fact):
+        self.cond = cond
+        self.then = then
+        self.orelse = orelse
+
+    def __str__(self) -> str:
+        return f"{self.cond} ? {self.then} : {self.orelse}"
