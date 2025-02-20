@@ -280,9 +280,6 @@ class MethodTranslator(CommonTranslator):
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
         """
-        if not func.cls and func.opaque:
-            raise UnsupportedException(func.node, 'Opaque functions not belonging to a class are currently not supported')
-
         old_function = ctx.current_function
         ctx.current_function = func
         self.bind_type_vars(func, ctx)
@@ -331,6 +328,8 @@ class MethodTranslator(CommonTranslator):
 
         # Create Function node and add opaque property if it exists
         if func.opaque:
+            if not func.cls:
+                raise UnsupportedException(func.node, 'Opaque functions not belonging to a class are currently not supported')
             annotation = self.viper.AnnotationInfo("opaque", [])
         else:
             annotation = self.no_info(ctx)

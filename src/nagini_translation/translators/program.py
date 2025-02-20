@@ -1460,7 +1460,6 @@ class ProgramTranslator(CommonTranslator):
                             msg += " try the @Opaque decorator in addition to @Pure"
                             raise InvalidProgramException(func.node, 'invalid.override', msg)
 
-
                 for method_name in cls.methods:
                     method = cls.methods[method_name]
                     threading_ids_constants.append(
