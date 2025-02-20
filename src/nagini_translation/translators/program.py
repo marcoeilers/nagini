@@ -334,19 +334,14 @@ class ProgramTranslator(CommonTranslator):
 
         called_name = method.sil_name
 
+        ctx.position.pop()
+
         if method.pure:
             t = self.translate_type(method.result.type, ctx)
-            result = self.viper.Result(
-                t, self.to_position(method.node, ctx), self.no_info(ctx)
-            )
+            result = self.viper.Result(t, self.no_position(ctx), self.no_info(ctx))
             posts.insert(0,
-                self.type_check(
-                    result, method.result.type,
-                    self.to_position(method.result, ctx), ctx
-                )
+                self.type_check(result, method.result.type, self.no_position(ctx), ctx)
             )
-
-            ctx.position.pop()
 
             method_type, default_checks, body = self._create_override_check_body_pure(
                 method, has_subtype, called_name, args, ctx)
