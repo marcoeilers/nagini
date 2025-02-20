@@ -63,21 +63,14 @@ class PyObjPtr(vf.Ptr):
 
 class PyObj_HasVal(vf.PredicateFact):
     def __init__(self, ptr: vf.Expr[PyObjPtr], value: vf.Expr[PyObj_v]):
-        self.ptr = (ptr)
-        self.value = (value)
-
-    def __str__(self):
-        return "pyobj_hasvalue("+str(self.ptr)+", "+str(self.value)+")"
+        super().__init__("pyobj_hasvalue", ptr, value)
+#    def __str__(self):
+#        return "pyobj_hasvalue("+str(self.ptr)+", "+str(self.value)+")"
 
 
 class PyObj_HasAttr(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: vf.Expr[vf.Char], attrValue: vf.Expr[PyObjPtr]):
-        self.obj = (obj)
-        self.attrName= (attrName)
-        self.attrValue = (attrValue)
-
-    def __str__(self):
-        return "pyobj_hasattr("+str(self.obj)+", "+str(self.attrName)+", "+str(self.attrValue)+")"
+        super().__init__("pyobj_hasattr", obj, attrName, attrValue)
 
 
 class PyTuple(PyObj_v):

@@ -116,7 +116,7 @@ class BinOp(Expr[_ValueT]):
         return "("+str(self.left)+" "+str(self.op)+" "+str(self.right)+")"
 
 class TernaryOp(DefLessExpr[_ValueT], ABC):
-    def __init__(self, cond: Expr[Bool], left: Expr[_ValueT], right: Expr[_ValueT]):
+    def __init__(self, cond: Expr[_BoolT], left: Expr[_ValueT], right: Expr[_ValueT]):
         self.cond = cond
         self.left = left
         self.right = right

@@ -11,7 +11,7 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
-from functools import reduce
+from functools import reduce, partial
 
 
 class py2vf_context:
@@ -34,6 +34,9 @@ class py2vf_context:
 
 
 class Translator():
+    def __init__(self):
+        self.predicates = dict()
+
     def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (self.is_pure(node, ctx)):
             return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
@@ -51,20 +54,23 @@ class Translator():
         return switch_dict[type(node).__name__](node, ctx, py2vf_ctx)
 
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
-        pass
+        if (node.func.id == "Acc"):
+            raise NotImplementedError("Acc is not implemented")
+        else:
+            funcid = node.func.id
+            # TODO: check if each of these variables is to be used as ref or as val
+            return self.predicates[funcid](map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx), node.args))
 
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
-        #the condition must be pure
-        #but either branches could be pure or a fact (just one needs be a fact)
+        # the condition must be pure
+        # but either branches could be pure or a fact (just one needs be a fact)
         return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx),
                               self.translate(node.body, ctx, py2vf_ctx),
                               self.translate(node.orelse, ctx, py2vf_ctx))
 
     def translate_BoolOp_fact(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
-        if (type(node).__name__ == "And"):
-            return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
-        else:
-            raise NotImplementedError
+        assert (type(node.op).__name__ == "And")
+        return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
 
     def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         switch_dict = {
@@ -92,6 +98,7 @@ class Translator():
             self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, False))
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        # TODO: create a new py2vf_context for the branches
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
                             self.translate_generic_expr(
                                 node.body, ctx, py2vf_ctx, isreference),
@@ -189,6 +196,19 @@ class Translator():
 
 
 class NativeSpecExtractor:
+    def env(self, m: PythonModule, ctx: Context) -> str:
+        # res = ""
+        # for key, value in m.classes.items():
+        #    res += "fixpoint PyClass"
+        # setup predicates in the translator
+        # TODO: precise whether such or such argument is to be translated as ptr or val
+        def make_init(key):
+            return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
+        for key, value in m.predicates.items():
+            self.translator.predicates[key] = type(
+                key, (vf.NaginiPredicateFact,), {"__init__": make_init(key)})
+        pass
+
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
         py2vf_ctx["args"] = vf.NamedValue("args")
         tuple_args = []
@@ -234,6 +254,7 @@ class NativeSpecExtractor:
         self.translator = Translator()
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
+        print(self.env(ctx.module, ctx))
         print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
               self.precond(f, ctx, py2vf_ctx)))
         pass
