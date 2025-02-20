@@ -1446,7 +1446,14 @@ class ProgramTranslator(CommonTranslator):
                              (cls.superclass and
                               cls.superclass.python_class.has_classmethod)) and
                             func.overrides):
-                        if func.cls and func.opaque and func.overrides.opaque:
+                        # check if the overriding function and
+                        # all overridden functions are opaque
+                        all_opaque: bool = func.opaque
+                        next: PythonMethod = func
+                        while(all_opaque and not (next is None)):
+                            all_opaque = all_opaque and next.opaque
+                            next = next.overrides
+                        if all_opaque:
                             functions.append(self.create_override_check(func, ctx))
                         else:
                             msg: str = "To override a (pure) function, it and the overriding function must be opaque;"
