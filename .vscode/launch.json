@@ -127,19 +127,45 @@
             "name": "Manual BST Testing",
             "type": "python",
             "request": "launch",
-            "pythonPath": "${workspaceRoot}/nagini/env/bin/python3",
-            "program": "${workspaceRoot}/nagini/src/nagini_translation/main.py",
+            "pythonPath": "${workspaceRoot}/venv/bin/python3",
+            "program": "${workspaceRoot}/src/nagini_translation/main.py",
             "args": [
                 "--write-viper-to-file",
-                "${cwd}/manual_testing/out/${fileBasenameNoExtension}.vpr",
+                "${workspaceRoot}/manual_testing/out/${fileBasenameNoExtension}.vpr",
                 "--counterexample",
                 "--verbose",
                 "${file}"
             ],
-            "cwd": "${workspaceRoot}",
-            "env": {},
-            "envFile": "${workspaceRoot}/.env",
             "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Python: BST Testing 2.0",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/src/nagini_translation/main.py",
+            "args": [
+                "--write-viper-to-file",
+                "manual_testing/out/${fileBasenameNoExtension}.vpr",
+                "--counterexample",
+                "--verbose",
+                "${file}",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+        {
+            "name": "Pytest Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "venv/bin/pytest",
+            "args": [
+                "-v",
+                "${cwd}/src/nagini_translation/tests.py",
+                "--silicon"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
         }
     ]
 }
