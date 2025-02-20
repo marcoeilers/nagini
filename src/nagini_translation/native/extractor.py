@@ -11,7 +11,7 @@ from nagini_translation.lib.program_nodes import (
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
-from functools import reduce, partial
+from functools import reduce
 
 
 class py2vf_context:
