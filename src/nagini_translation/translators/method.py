@@ -41,8 +41,7 @@ from nagini_translation.lib.util import (
     get_body_indices,
     get_parent_of_type,
     get_surrounding_try_blocks,
-    InvalidProgramException,
-    UnsupportedException
+    InvalidProgramException
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
@@ -329,7 +328,10 @@ class MethodTranslator(CommonTranslator):
         # Create Function node and add opaque property if it exists
         if func.opaque:
             if not func.cls:
-                raise UnsupportedException(func.node, 'Opaque functions not belonging to a class are currently not supported')
+                raise InvalidProgramException(
+                    func.node, 'invalid.opaque.function',
+                    'Opaque functions not belonging to a class are currently not supported'
+                )
             annotation = self.viper.AnnotationInfo("opaque", [])
         else:
             annotation = self.no_info(ctx)
@@ -542,7 +544,10 @@ class MethodTranslator(CommonTranslator):
         a Viper method
         """
         if method.opaque:
-            raise UnsupportedException(method.node, 'Opaque methods are currently not supported')
+            raise InvalidProgramException(
+                method.node, 'invalid.opaque.method',
+                'Opaque methods are currently not supported')
+
         old_function = ctx.current_function
         ctx.current_function = method
         args = self._translate_params(method, ctx)
