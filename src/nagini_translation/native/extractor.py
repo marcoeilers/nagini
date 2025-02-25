@@ -6,12 +6,13 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonType,
-    PythonVar
+    PythonVar 
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
 from functools import reduce
+from fractions import Fraction
 
 
 class py2vf_context:
@@ -55,11 +56,33 @@ class Translator():
 
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
-            raise NotImplementedError("Acc is not implemented")
+            frac = 1
+            if len(node.args) == 2:
+                assert (isinstance(node.args[1], ast.BinOp))
+                assert (isinstance(node.args[1].left, ast.Constant))
+                assert (isinstance(node.args[1].right, ast.Constant))
+                frac = Fraction(node.args[1].left.value,
+                                node.args[1].right.value)
+            if isinstance(node.args[0], ast.Attribute):
+                py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
+                    node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr")
+                return vf.FactConjunction([
+                    vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, True),
+                                          node.args[0].attr,
+                                          vf.NameDefExpr(
+                                              py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"])),
+                    vfpy.PyObj_HasVal(py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"],
+                                    # TODO: find a way to recursively go through the type of the attribute to assign all value translations
+                                    vf.ImmInductive(vfpy.PyObj_t("ZUUUUUT"))
+                                    )
+                ])
+            else:
+                pass
+            # raise NotImplementedError("Acc is not implemented")
         else:
             funcid = node.func.id
             # TODO: check if each of these variables is to be used as ref or as val
-            return self.predicates[funcid](map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx), node.args))
+            return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx), node.args))
 
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         # the condition must be pure
@@ -81,7 +104,8 @@ class Translator():
             "BinOp": self.translate_BinOp_expr,
             "Compare": self.translate_Compare_expr,
             "Constant": self.translate_Constant_expr,
-            "Name": self.translate_Name_expr
+            "Name": self.translate_Name_expr,
+            "Attribute": self.translate_Attribute_expr
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
 
@@ -96,6 +120,12 @@ class Translator():
                 x, self.translate_generic_expr(y, ctx, py2vf_ctx, False), operator),
             node.values[1:],
             self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, False))
+
+    def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        if isreference:
+            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.value.id + "." + node.attr + "__ptr"])
+        else:
+            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.value.id + "." + node.attr + "__val"])
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
@@ -136,10 +166,10 @@ class Translator():
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         if isreference:
-            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.id + "_ptr"])
+            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.id + "__ptr"])
         else:
             # TODO: refine the type here
-            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "_val"])
+            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "__val"])
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         dict = {
@@ -217,11 +247,11 @@ class NativeSpecExtractor:
             # now manually translate the arguments from PY to VF
 
             py2vf_ctx[key +
-                      "_ptr"] = vf.NamedValue[vfpy.PyObjPtr](key + "_ptr")
+                      "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](key + "__ptr")
             cur_arg_def = vf.NameDefExpr[vfpy.PyObjPtr](
-                py2vf_ctx[key + "_ptr"])
+                py2vf_ctx[key + "__ptr"])
             # translate argument to pointers
-            py2vf_ctx[key + "_ptr"].setDef(cur_arg_def)
+            py2vf_ctx[key + "__ptr"].setDef(cur_arg_def)
             tuple_args.append(
                 vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     cur_arg_def,
@@ -229,12 +259,12 @@ class NativeSpecExtractor:
                         self.translator.pytype__to__PyObj_t(value.type))
                 ))
             # translate pointers to values
-            py2vf_ctx[key + "_val"] = vf.NamedValue[vfpy.PyObj_v](key + "_val")
+            py2vf_ctx[key + "__val"] = vf.NamedValue[vfpy.PyObj_v](key + "__val")
             pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(
-                value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "_val"])))
+                value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "__val"])))
             arg_predicates.append(
                 vfpy.PyObj_HasVal(
-                    vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + "_ptr"]),
+                    vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + "__ptr"]),
                     pyobj_content
                 ))
         firstpredfact = vfpy.PyObj_HasVal(
@@ -252,6 +282,10 @@ class NativeSpecExtractor:
     def __init__(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
         self.translator = Translator()
+        somearg=list(f.args.items())[0][1].type
+        print(somearg)
+        print(self.get_type(f.precondition[0][0].values[1].comparators[0], ctx).type_args)
+        #CONCLUSION: get_type can be used to retrieve the type of an expression in a precond, WOohoo!
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
         print(self.env(ctx.module, ctx))
