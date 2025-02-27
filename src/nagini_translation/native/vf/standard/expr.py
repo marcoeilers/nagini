@@ -11,7 +11,11 @@ _ValueT3 = TypeVar("ValueT3", bound="Value")
 
 class Expr(ABC, Generic[_ValueT]):
     # any expression must return a value in the end...
-    pass
+    def __init__(self, value: _ValueT):
+        self.__value = value
+
+    def __str__(self) -> str:
+        return str(self.__value)
 
 
 class NameOccurence(ABC):
@@ -50,11 +54,7 @@ class NamedValue(Generic[_ValueT]):
 
 class DefLessExpr(Expr[_ValueT], ABC):
     # definitionless expression: only uses names, no definitions
-    def __init__(self, value: _ValueT):
-        self.__value = value
-
-    def __str__(self) -> str:
-        return str(self.__value)
+    pass
 
 
 class NameUseExpr(NameOccurence, DefLessExpr[_ValueT]):
@@ -72,7 +72,7 @@ class ImmLiteral(DefLessExpr[_ValueT]):
 _InductiveT = TypeVar("InductiveT", bound="Inductive")
 
 
-class ImmInductive(DefLessExpr[_InductiveT]):
+class ImmInductive(Expr[_InductiveT]):
     def __str__(self):
         return super().__str__()
 
@@ -83,6 +83,7 @@ class BinaryOperator(ABC, Generic[_ValueT, _ValueT2]):
 
     def __str__(self):
         return self.symbol
+
 
 Add = BinaryOperator[Int, Int]("+")
 Sub = BinaryOperator[Int, Int]("-")
@@ -115,12 +116,12 @@ class BinOp(Expr[_ValueT]):
     def __str__(self):
         return "("+str(self.left)+" "+str(self.op)+" "+str(self.right)+")"
 
+
 class TernaryOp(DefLessExpr[_ValueT], ABC):
     def __init__(self, cond: Expr[_BoolT], left: Expr[_ValueT], right: Expr[_ValueT]):
         self.cond = cond
         self.left = left
         self.right = right
-        
 
     def __str__(self):
         return "("+str(self.cond)+" ? "+str(self.left)+" : "+str(self.right)+")"

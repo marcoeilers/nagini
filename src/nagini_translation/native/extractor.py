@@ -6,7 +6,7 @@ from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
     PythonType,
-    PythonVar 
+    PythonVar
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
@@ -64,17 +64,17 @@ class Translator():
                 frac = Fraction(node.args[1].left.value,
                                 node.args[1].right.value)
             if isinstance(node.args[0], ast.Attribute):
-                py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
-                    node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr")
+                attrVFName = node.args[0].value.id + "_DOT_"+node.args[0].attr
+                py2vf_ctx[attrVFName + "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
+                    attrVFName + "__ptr")
                 return vf.FactConjunction([
                     vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, True),
                                           node.args[0].attr,
                                           vf.NameDefExpr(
-                                              py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"])),
-                    vfpy.PyObj_HasVal(py2vf_ctx[node.args[0].value.id + "_DOT_"+node.args[0].attr + "__ptr"],
-                                    # TODO: find a way to recursively go through the type of the attribute to assign all value translations
-                                    vf.ImmInductive(vfpy.PyObj_t("ZUUUUUT"))
-                                    )
+                                              py2vf_ctx[attrVFName + "__ptr"])),
+                    self.create_hasval_fact(attrVFName, self.get_type(
+                        node.args[0], ctx), ctx, py2vf_ctx)
+                    # ,vfpy.PyObj_HasVal(py2vf_ctx[attrVFName + "__ptr"],vf.ImmInductive(vfpy.PyObj_t("ZUUUUUT")))
                 ])
             else:
                 pass
@@ -95,6 +95,9 @@ class Translator():
         assert (type(node.op).__name__ == "And")
         return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
 
+    def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        return "{immediate tuple string}"
+
     def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
         switch_dict = {
             # "ast.Call": self.translate_Call,
@@ -105,7 +108,8 @@ class Translator():
             "Compare": self.translate_Compare_expr,
             "Constant": self.translate_Constant_expr,
             "Name": self.translate_Name_expr,
-            "Attribute": self.translate_Attribute_expr
+            "Attribute": self.translate_Attribute_expr,
+            "Tuple": self.translate_Tuple_expr
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
 
@@ -150,6 +154,7 @@ class Translator():
             "FloorDiv": vf.Div
         }
         operator = dict[type(node.op).__name__]
+        # TODO: handle mutable-case of these binops (like list+list)
         return vf.BinOp[vf.Int](
             self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
             self.translate_generic_expr(node.right, ctx, py2vf_ctx, False),
@@ -172,6 +177,8 @@ class Translator():
             return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "__val"])
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+        operandtype = self.get_type(node.left, ctx).name
+        # TODO: any other type fitting in there?
         dict = {
             "Eq": (vf.Eq, False),
             "NotEq": (vf.NotEq, False),
@@ -182,24 +189,64 @@ class Translator():
             "Is": (vf.Eq, True),
         }
         operator, asref = dict[type(node.ops[0]).__name__]
-        return vf.BinOp[vf.Bool](
-            self.translate_generic_expr(node.left, ctx, py2vf_ctx, asref),
-            self.translate_generic_expr(
-                node.comparators[0], ctx, py2vf_ctx, asref),
-            operator)
-
+        if (operandtype in ["int", "float", "bool", "string"]):
+            return vf.BinOp[vf.Bool](
+                self.translate_generic_expr(node.left, ctx, py2vf_ctx, asref),
+                self.translate_generic_expr(
+                    node.comparators[0], ctx, py2vf_ctx, asref),
+                operator)
+        elif operandtype == "tuple":
+            # TODO: handle tuple comparison? eq, neq, lex>, lex<, lex>=, lex<=. For lex, shorter is considered smaller
+            compname = type(node.ops[0]).__name__
+            opd_left_types = self.get_type(node.left, ctx).type_args
+            opd_right_types = self.get_type(node.comparators[0], ctx).type_args
+            if (compname == "Eq"):
+                if (opd_left_types != opd_right_types):
+                    return vf.Bool(False)
+                else:
+                    return
+                    return vf.FactConjunction(map(lambda x, y: self.translate_Compare_expr(ast.Compare(
+                        left=x, ops=[node.ops[0]], comparators=[y]), ctx, py2vf_ctx, asref), zip(node.left.elts, node.comparators[0].elts)))
     def pytype__to__PyObj_v(self, p: PythonType) -> Type[vfpy.PyObj_v]:
         return {
             'int': vfpy.PyLong,
-            # no other parent than ObjectType
-            'mycoolclass': vfpy.PyClassInstance
+            'tuple': vfpy.PyTuple,
+            # TODO: this is just for testing, remove this and implement cleanly later
+            'mycoolclass': vfpy.PyClassInstance,
+            'mytupledclass': vfpy.PyClassInstance
         }[p.name]
 
+    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+        if (t.name == "int"):
+            py2vf_ctx[pyobjname+"__val"] = vf.NamedValue(pyobjname+"__val")
+            pyobjval = vf.ImmInductive(vfpy.PyLong(vf.NameUseExpr(
+                py2vf_ctx[pyobjname+"__val"])))
+        elif (t.name == "tuple"):
+            tupleEls = []
+            for i in range(len(t.type_args)):
+                tupleElName = pyobjname+"_AT"+str(i)
+                py2vf_ctx[tupleElName+"__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
+                    tupleElName+"__ptr")
+                tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
+                    vf.NameDefExpr[vfpy.PyObjPtr](
+                        py2vf_ctx[tupleElName+"__ptr"]),
+                    vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
+            pyobjval = vf.ImmInductive(
+                vfpy.PyTuple(vf.List.from_list(tupleEls)))
+        else:
+            raise NotImplementedError("Type not implemented")
+            return
+
+        return vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+"__ptr"], pyobjval)
+
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
+        if (p.name == 'tuple'):
+            return vfpy.PyTuple_t(vf.List.from_list(map(lambda x: vf.ImmInductive(self.pytype__to__PyObj_t(x)), p.type_args))),
         return {
             'int': vfpy.PyLong(0).PyObj_t(),
-            # no other parent than ObjectType
-            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass", None))
+            # TODO: this is just for testing, remove this and implement cleanly later
+            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass", None)),
+            'mytupledclass': vfpy.PyClass_t(vfpy.PyClass("mytupledclass", None))
         }[p.name]
 
     def is_mutable_arg(self, node: PythonVar) -> bool:
@@ -223,6 +270,23 @@ class Translator():
         else:
             # BinOp, Compare, Constant, Name
             return True
+
+    def get_type(self, node: ast.AST, ctx: Context) -> Optional[PythonType]:
+        """
+        Returns the type of the expression represented by node as a PythonType,
+        or None if the type is void.
+        """
+        container = ctx.actual_function if ctx.actual_function else ctx.module
+        containers = [ctx]
+        if ctx.current_class:
+            containers.append(ctx.current_class)
+        if isinstance(container, PythonMethod):
+            containers.append(container)
+            containers.extend(container.module.get_included_modules())
+        else:
+            # Assume module
+            containers.extend(container.get_included_modules())
+        return do_get_type(node, containers, container)
 
 
 class NativeSpecExtractor:
@@ -259,7 +323,8 @@ class NativeSpecExtractor:
                         self.translator.pytype__to__PyObj_t(value.type))
                 ))
             # translate pointers to values
-            py2vf_ctx[key + "__val"] = vf.NamedValue[vfpy.PyObj_v](key + "__val")
+            py2vf_ctx[key +
+                      "__val"] = vf.NamedValue[vfpy.PyObj_v](key + "__val")
             pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(
                 value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "__val"])))
             arg_predicates.append(
@@ -282,10 +347,14 @@ class NativeSpecExtractor:
     def __init__(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
         self.translator = Translator()
-        somearg=list(f.args.items())[0][1].type
-        print(somearg)
-        print(self.get_type(f.precondition[0][0].values[1].comparators[0], ctx).type_args)
-        #CONCLUSION: get_type can be used to retrieve the type of an expression in a precond, WOohoo!
+        somearg = list(f.args.items())[0][1].type
+        #print(somearg)
+        #tupletype = self.get_type(
+        #    f.precondition[0][0].values[1].comparators[0], ctx)
+        #print(tupletype)
+        #print(self.get_type(
+        #    f.precondition[0][0].values[1].comparators[0], ctx).type_args)
+        # CONCLUSION: get_type can be used to retrieve the type of an expression in a precond, WOohoo!
         # self.get_type(f.node.body[0].targets[0], ctx)
         # self.get_target(f.node.body[0].targets[0], ctx)
         print(self.env(ctx.module, ctx))

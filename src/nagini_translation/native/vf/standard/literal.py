@@ -5,6 +5,8 @@ from nagini_translation.native.vf.standard.value import Value
 class Literal(Value, ABC):
     def __init__(self, value):
         self.value = value
+    def __eq__(self, other):
+        return other.value == self.value
     def __str__(self):
         return str(self.value)
 

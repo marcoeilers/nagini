@@ -3,25 +3,31 @@ from typing import TypeVar, Tuple, Type
 from abc import ABC, abstractmethod
 
 ValueT = TypeVar("ValueT", bound="vf.Value")
+
+
 class PyObj_t(vf.Inductive, ABC):
     def __init__(self, label: str):
         self.label = label
+
     def __str__(self):
         return self.label
+
 
 class PyObj_v(vf.Inductive, ABC):
     @abstractmethod
     def PyObj_t(self) -> PyObj_t:
         pass
 
+
 class PyLong(PyObj_v):
     __PyObj_t = PyObj_t("PyLong_t")
+
     def __init__(self, value: int):
         self.value = value
 
     def __str__(self):
         return "PyLong_v("+str(self.value)+")"
-    
+
     def PyObj_t(self) -> PyObj_t:
         return PyLong.__PyObj_t
 
@@ -33,9 +39,10 @@ class PyClass(vf.Inductive, ABC):
 
     def __str__(self):
         return "PyClass(\""+self.name+"\", "+(str(self.parent) if self.parent != None else "ObjectType")+")"
-    
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, PyClass) and self.name == other.name and self.parent == other.parent
+
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):
@@ -43,10 +50,11 @@ class PyClass_t(PyObj_t):
 
     def __str__(self):
         return "PyClass_t("+str(self.type)+")"
-    
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, PyClass_t) and self.type == other.type
-    
+
+
 class PyClassInstance(PyObj_v):
     def __init__(self, type: PyClass):
         self.type = type
@@ -56,6 +64,7 @@ class PyClassInstance(PyObj_v):
 
     def PyObj_t(self) -> PyObj_t:
         return PyClass_t(self.type)
+
 
 class PyObjPtr(vf.Ptr):
     pass
@@ -77,7 +86,17 @@ class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr
     def __init__(self, items: vf.List[vf.Pair[PyObjPtr, PyObj_t]]):
         self.items = items
+
     def PyObj_t(self) -> PyObj_t:
         return None
+
     def __str__(self):
         return "PyTuple_v("+str(self.items)+")"
+
+
+class PyTuple_t(PyObj_t):
+    def __init__(self, items: vf.List[PyObj_t]):
+        self.items = items
+
+    def __str__(self):
+        return "PyTuple_t("+str(self.items)+")"
