@@ -275,6 +275,70 @@ class ProgramTranslator(CommonTranslator):
         self.info = None
         return result
 
+    def create_merge_function(self, func: PythonMethod,
+                              ctx: Context) -> 'silver.ast.Callable':
+        assert func.pure and func.opaque
+
+        pos = self.viper.to_position(func.node, ctx.position, py_node=func)
+        ctx.position.append(('override', pos))
+        self.info = self.viper.SimpleInfo(['merge.function'])
+
+        # find superclass function
+        super_func: PythonMethod = func
+        while(super_func.overrides):
+            super_func = super_func.overrides
+
+        mname = ctx.module.get_fresh_name(super_func.sil_name + '_merged')
+        self.viper.used_names_sets[super_func.sil_name].add(mname)
+
+        old_function = ctx.current_function
+        ctx.current_function = super_func
+
+        super_func.sil_name = mname
+        super_func.name = mname
+        super_func.contract_only = True
+
+        # set alias for e.g. self_0 -> self
+        self_alias = func.args[next(iter(func.args))].sil_name
+        if self_alias != 'self':
+            ctx.set_alias(self_alias, 'self')
+
+        # null check for self
+        self_var = super_func.args[next(iter(super_func.args))].ref()
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        merge_pres = [not_null]
+        merge_post = []
+
+        # loop through all overridden superclass functions and encode
+        # the pre-/postconditions as implications depending on the type e.g.:
+        # requires issubtype(self, X) ==> <Precondition of X>
+        # requires issubtype(self, Y) ==> <Precondition of Y>
+        next_func: PythonMethod = func
+        while(next_func):
+            pos = self.to_position(next_func.node, ctx)
+            info = self.no_info(ctx)
+            self_var = next_func.args[next(iter(next_func.args))].ref()
+
+            for pre in map(lambda x: x[0], next_func.precondition):
+                _, obj = self.translate_expr(pre, ctx, self.viper.Bool)
+                check = self.type_check(self_var, next_func.cls, pos, ctx, inhale_exhale=False)
+                to_add_pre = self.viper.Implies(check, obj, pos, info)
+                merge_pres.append(to_add_pre)
+
+            for post in map(lambda x: x[0], next_func.postcondition):
+                _, obj = self.translate_expr(post, ctx, self.viper.Bool)
+                check = self.type_check(self_var, next_func.cls, pos, ctx, inhale_exhale=False)
+                to_add_post = self.viper.Implies(check, obj, pos, info)
+                merge_post.append(to_add_post)
+            
+            next_func = next_func.overrides
+
+        super_func.opaque = False
+        return self.translate_function(super_func, ctx, (merge_pres, merge_post))
+
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
         """
@@ -1450,6 +1514,7 @@ class ProgramTranslator(CommonTranslator):
                             next = next.overrides
                         if all_opaque:
                             functions.append(self.create_override_check(func, ctx))
+                            functions.append(self.create_merge_function(func, ctx))
                         else:
                             msg: str = "To override a (pure) function, it and the overriding function must be opaque;"
                             msg += " try the @Opaque decorator in addition to @Pure"
