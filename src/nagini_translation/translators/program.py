@@ -39,6 +39,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonNode,
     PythonVar,
+    ProgramNodeFactory
 )
 from nagini_translation.lib.typedefs import (
     Domain,
@@ -275,33 +276,49 @@ class ProgramTranslator(CommonTranslator):
         self.info = None
         return result
 
-    def create_merge_function(self, func: PythonMethod,
+    def create_merge_function(self, f: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
-        assert func.pure and func.opaque
+        assert f.pure and f.opaque
 
-        pos = self.viper.to_position(func.node, ctx.position, py_node=func)
+        pos = self.viper.to_position(f.node, ctx.position, py_node=f)
         ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['merge.function'])
 
+        # make a deepcopy of f (not possible with deepcopy)
+        node_factory = ProgramNodeFactory()
+        super_func: PythonMethod = node_factory.create_python_method(
+            f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
+            node_factory, f.interface, f.interface_dict, f.method_type, f.opaque
+        )
+        for k,v in super_func.__dict__.items():
+            if not v and f.__getattribute__(k):
+                super_func.__setattr__(k, f.__getattribute__(k))
+
         # find superclass function
-        super_func: PythonMethod = func
         while(super_func.overrides):
             super_func = super_func.overrides
-
-        mname = ctx.module.get_fresh_name(super_func.sil_name + '_merged')
-        self.viper.used_names_sets[super_func.sil_name].add(mname)
 
         old_function = ctx.current_function
         ctx.current_function = super_func
 
-        super_func.sil_name = mname
-        super_func.name = mname
+        if super_func.sil_name.endswith("_merged"):
+            fname = super_func.sil_name
+        else:
+            fname = super_func.sil_name + "_merged"
+
+        if not self.viper.used_names_sets.get(fname):
+            fname = ctx.module.get_fresh_name(fname)
+            self.viper.used_names_sets[fname] = set()
+            self.viper.used_names_sets[fname].add(fname)
+
+        super_func.sil_name = fname
+        super_func.name = fname
         super_func.contract_only = True
 
         # set alias for e.g. self_0 -> self
-        self_alias = func.args[next(iter(func.args))].sil_name
-        if self_alias != 'self':
-            ctx.set_alias(self_alias, 'self')
+        # self_alias = func.args[next(iter(func.args))].sil_name
+        # if self_alias != 'self':
+        #     ctx.set_alias(self_alias, 'self')
 
         # null check for self
         self_var = super_func.args[next(iter(super_func.args))].ref()
@@ -312,11 +329,12 @@ class ProgramTranslator(CommonTranslator):
         merge_pres = [not_null]
         merge_post = []
 
+        # TODO: FIX
         # loop through all overridden superclass functions and encode
         # the pre-/postconditions as implications depending on the type e.g.:
         # requires issubtype(self, X) ==> <Precondition of X>
         # requires issubtype(self, Y) ==> <Precondition of Y>
-        next_func: PythonMethod = func
+        next_func: PythonMethod = super_func
         while(next_func):
             pos = self.to_position(next_func.node, ctx)
             info = self.no_info(ctx)
@@ -336,7 +354,9 @@ class ProgramTranslator(CommonTranslator):
             
             next_func = next_func.overrides
 
-        super_func.opaque = False
+        ctx.current_function = old_function
+        # TODO: fix me
+        # super_func.opaque = False
         return self.translate_function(super_func, ctx, (merge_pres, merge_post))
 
     def create_override_check(self, method: PythonMethod,
@@ -444,13 +464,9 @@ class ProgramTranslator(CommonTranslator):
                 raise InvalidProgramException(method.node, 'invalid.override')
 
             # create function viper AST node
-            if method.cls and method.opaque and method.overrides.opaque:
-                annotation = self.viper.AnnotationInfo("opaque", [])
-            else:
-                annotation = self.no_info(ctx)
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
-                body, self.no_position(ctx), annotation
+                body, self.no_position(ctx), self.no_info(ctx)
             )
 
         else:
@@ -1499,6 +1515,7 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
+                    functions.append(self.create_merge_function(func, ctx))
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
@@ -1514,7 +1531,6 @@ class ProgramTranslator(CommonTranslator):
                             next = next.overrides
                         if all_opaque:
                             functions.append(self.create_override_check(func, ctx))
-                            functions.append(self.create_merge_function(func, ctx))
                         else:
                             msg: str = "To override a (pure) function, it and the overriding function must be opaque;"
                             msg += " try the @Opaque decorator in addition to @Pure"
