@@ -122,12 +122,12 @@ class Translator:
         else:
             funcid = node.func.id
             # TODO: check if each of these variables is to be used as ref or as val
-            return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx), node.args))
+            return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx, ValAccess()), node.args))
 
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         # the condition must be pure
         # but either branches could be pure or a fact (just one needs be a fact)
-        return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx),
+        return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValueAccess()),
                               self.translate(node.body, ctx, py2vf_ctx),
                               self.translate(node.orelse, ctx, py2vf_ctx))
 
@@ -169,16 +169,16 @@ class Translator:
         operator = dict[type(node.op).__name__]
         return reduce(
             lambda x, y: vf.BinOp[vf.Bool](
-                x, self.translate_generic_expr(y, ctx, py2vf_ctx, False), operator),
+                x, self.translate_generic_expr(y, ctx, py2vf_ctx, ValAccess()), operator),
             node.values[1:],
-            self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, False))
+            self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, ValAccess()))
 
     def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         return self.translate_generic_expr(node.value, ctx, py2vf_ctx, AttrAccess(node.attr, v))
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
-        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
+        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
                             self.translate_generic_expr(
                                 node.body, ctx, py2vf_ctx, v),
                             self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, v))
@@ -201,8 +201,8 @@ class Translator:
         operator = dict[type(node.op).__name__]
         # TODO: handle mutable-case of these binops (like list+list)
         return vf.BinOp[vf.Int](
-            self.translate_generic_expr(node.left, ctx, py2vf_ctx, False),
-            self.translate_generic_expr(node.right, ctx, py2vf_ctx, False),
+            self.translate_generic_expr(node.left, ctx, py2vf_ctx, ValAccess()),
+            self.translate_generic_expr(node.right, ctx, py2vf_ctx, ValAccess()),
             operator)
 
     def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
