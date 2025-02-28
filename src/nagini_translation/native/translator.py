@@ -8,15 +8,77 @@ import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
+from abc import ABC
 import ast
 
-class Translator():
+
+class ValueAccess(ABC):
+    pass
+
+
+class LeafValueAccess(ValueAccess, ABC):
+    pass
+
+
+class PtrAccess(ValueAccess):
+    def __str__(self):
+        return "__ptr"
+
+    def __repr__(self):
+        return ":ptr"
+
+
+class ValAccess(ValueAccess):
+    def __str__(self):
+        return "__val"
+
+    def __repr__(self):
+        return ":val"
+
+
+class SubscriptAccess(ValueAccess):
+    def __init__(self, index: int, value: ValueAccess):
+        self.index = index
+        self.value = value
+
+    def __str__(self):
+        if (isinstance(self.value, LeafValueAccess)):
+            return str(self.value)+"_AT"+str(self.index)
+        else:
+            return "_AT"+str(self.index)+str(self.value)
+
+    def __repr__(self):
+        if (isinstance(self.value, LeafValueAccess)):
+            return repr(self.value)+"["+str(self.index)+"]"
+        else:
+            return "["+str(self.index)+"]"+repr(self.value)
+
+
+class AttrAccess(ValueAccess):
+    def __init__(self, attr: str, value: ValueAccess):
+        self.attr = attr
+        self.value = value
+
+    def __str__(self):
+        if (isinstance(self.value, LeafValueAccess)):
+            return str(self.value)+"_DOT_"+str(self.attr)
+        else:
+            return "_DOT_"+str(self.attr)+str(self.value)
+
+    def __repr__(self):
+        if (isinstance(self.value, LeafValueAccess)):
+            return repr(self.value)+"."+str(self.attr)
+        else:
+            return "."+str(self.attr)+repr(self.value)
+
+
+class Translator:
     def __init__(self):
         self.predicates = dict()
 
     def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (self.is_pure(node, ctx)):
-            return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
+            return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx, ValAccess()))
         else:
             return self.translate_generic_fact(node, ctx, py2vf_ctx)
 
@@ -41,15 +103,17 @@ class Translator():
                                 node.args[1].right.value)
             if isinstance(node.args[0], ast.Attribute):
                 attrVFName = node.args[0].value.id + "_DOT_"+node.args[0].attr
-                py2vf_ctx[attrVFName + "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
-                    attrVFName + "__ptr")
+                py2vf_ctx[node.args[0].value.id + repr(AttrAccess(node.args[0].attr, PtrAccess()))] = vf.NamedValue[vfpy.PyObjPtr](
+                    node.args[0].value.id +
+                    str(AttrAccess(node.args[0].attr, PtrAccess())))
                 return vf.FactConjunction([
-                    vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, True),
+                    vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, ValAccess()),
                                           node.args[0].attr,
                                           vf.NameDefExpr(
-                                              py2vf_ctx[attrVFName + "__ptr"])),
-                    self.create_hasval_fact(attrVFName, self.get_type(
-                        node.args[0], ctx), ctx, py2vf_ctx)
+                                              py2vf_ctx[node.args[0].value.id +
+                                                        repr(AttrAccess(node.args[0].attr, PtrAccess()))])),
+                    self.create_hasval_fact(node.args[0].value.id, self.get_type(
+                        node.args[0], ctx), ctx, py2vf_ctx, lambda x: AttrAccess(node.args[0].attr, x)),
                     # ,vfpy.PyObj_HasVal(py2vf_ctx[attrVFName + "__ptr"],vf.ImmInductive(vfpy.PyObj_t("ZUUUUUT")))
                 ])
             else:
@@ -71,10 +135,7 @@ class Translator():
         assert (type(node.op).__name__ == "And")
         return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
 
-    def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        return "{immediate tuple string}"
-
-    def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         switch_dict = {
             # "ast.Call": self.translate_Call,
             # "ast.UnaryOp": self.translate_UnaryOp,
@@ -85,11 +146,22 @@ class Translator():
             "Constant": self.translate_Constant_expr,
             "Name": self.translate_Name_expr,
             "Attribute": self.translate_Attribute_expr,
-            "Tuple": self.translate_Tuple_expr
+            "Tuple": self.translate_Tuple_expr,
+            "Subscript": self.translate_Subscript_expr
         }
-        return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, isreference)
+        return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, v)
 
-    def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+        if (type(v) == SubscriptAccess):
+            # TODO: handle the case where the index is not a constant
+            return self.translate_generic_expr(node.elts[v.index], ctx, py2vf_ctx, v.value)
+        else:
+            raise NotImplementedError("Tuple expression not implemented")
+
+    def translate_Subscript_expr(self, node: ast.Subscript, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+        return self.translate_generic_expr(node.value, ctx, py2vf_ctx, SubscriptAccess(node.slice.value, v))
+
+    def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {
             "And": vf.BoolAnd,
             "Or": vf.BoolOr
@@ -101,20 +173,17 @@ class Translator():
             node.values[1:],
             self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, False))
 
-    def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        if isreference:
-            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.value.id + "." + node.attr + "__ptr"])
-        else:
-            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.value.id + "." + node.attr + "__val"])
+    def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+        return self.translate_generic_expr(node.value, ctx, py2vf_ctx, AttrAccess(node.attr, v))
 
-    def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, False),
                             self.translate_generic_expr(
-                                node.body, ctx, py2vf_ctx, isreference),
-                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, isreference))
+                                node.body, ctx, py2vf_ctx, v),
+                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, v))
 
-    def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         dict = {
             "Add": vf.Add,
             "Sub": vf.Sub,
@@ -136,7 +205,7 @@ class Translator():
             self.translate_generic_expr(node.right, ctx, py2vf_ctx, False),
             operator)
 
-    def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         # TODO: handle immediate values of other types here
         dict = {
             "int": vf.Int,
@@ -145,31 +214,31 @@ class Translator():
         }
         return dict[type(node.value).__name__](node.value)
 
-    def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
-        if isreference:
-            return vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[node.id + "__ptr"])
-        else:
-            # TODO: refine the type here
-            return vf.NameUseExpr[vfpy.PyObj_v](py2vf_ctx[node.id + "__val"])
+    def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
+        name = node.id + repr(v)
+        return vf.NameUseExpr(py2vf_ctx[name])
 
-    def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context, isreference: bool = False) -> vf.Expr:
+    def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         operandtype = self.get_type(node.left, ctx).name
         # TODO: any other type fitting in there?
+        ptracc = PtrAccess()
+        valacc = ValAccess()
         dict = {
-            "Eq": (vf.Eq, False),
-            "NotEq": (vf.NotEq, False),
-            "Lt": (vf.Lt, False),
-            "LtE": (vf.LtE, False),
-            "Gt": (vf.Gt, False),
-            "GtE": (vf.GtE, False),
-            "Is": (vf.Eq, True),
+            "Eq": (vf.Eq, valacc),
+            "NotEq": (vf.NotEq, valacc),
+            "Lt": (vf.Lt, valacc),
+            "LtE": (vf.LtE, valacc),
+            "Gt": (vf.Gt, valacc),
+            "GtE": (vf.GtE, valacc),
+            "Is": (vf.Eq, ptracc),
         }
-        operator, asref = dict[type(node.ops[0]).__name__]
+        operator, acctype = dict[type(node.ops[0]).__name__]
         if (operandtype in ["int", "float", "bool", "string"]):
             return vf.BinOp[vf.Bool](
-                self.translate_generic_expr(node.left, ctx, py2vf_ctx, asref),
                 self.translate_generic_expr(
-                    node.comparators[0], ctx, py2vf_ctx, asref),
+                    node.left, ctx, py2vf_ctx, acctype),
+                self.translate_generic_expr(
+                    node.comparators[0], ctx, py2vf_ctx, acctype),
                 operator)
         elif operandtype == "tuple":
             # TODO: handle tuple comparison? eq, neq, lex>, lex<, lex>=, lex<=. For lex, shorter is considered smaller
@@ -180,9 +249,14 @@ class Translator():
                 if (opd_left_types != opd_right_types):
                     return vf.Bool(False)
                 else:
-                    return
-                    return vf.FactConjunction(map(lambda x, y: self.translate_Compare_expr(ast.Compare(
-                        left=x, ops=[node.ops[0]], comparators=[y]), ctx, py2vf_ctx, asref), zip(node.left.elts, node.comparators[0].elts)))
+                    return self.translate_generic_expr(ast.BoolOp(ast.And(), [
+                        ast.Compare(left=ast.Subscript(value=node.left, slice=ast.Constant(value=i), ctx=ast.Load()),
+                                    ops=[ast.Eq()],
+                                    comparators=[ast.Subscript(
+                                        value=node.comparators[0], slice=ast.Constant(value=i), ctx=ast.Load())],
+                                    ) for i in range(len(opd_left_types))
+                    ]), ctx, py2vf_ctx, v)
+
     def pytype__to__PyObj_v(self, p: PythonType) -> Type[vfpy.PyObj_v]:
         return {
             'int': vfpy.PyLong,
@@ -192,28 +266,30 @@ class Translator():
             'mytupledclass': vfpy.PyClassInstance
         }[p.name]
 
-    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
+    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x) -> vf.Fact:
         if (t.name == "int"):
-            py2vf_ctx[pyobjname+"__val"] = vf.NamedValue(pyobjname+"__val")
-            pyobjval = vf.ImmInductive(vfpy.PyLong(vf.NameUseExpr(
-                py2vf_ctx[pyobjname+"__val"])))
+            access = path(ValAccess())
+            py2vf_ctx[pyobjname+repr(access)
+                      ] = vf.NamedValue(pyobjname+str(access))
+            pyobjval = vf.ImmInductive(vfpy.PyLong(
+                vf.NameDefExpr(py2vf_ctx[pyobjname+repr(access)])))
+            return vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(path(PtrAccess()))], pyobjval)
         elif (t.name == "tuple"):
             tupleEls = []
             for i in range(len(t.type_args)):
-                tupleElName = pyobjname+"_AT"+str(i)
-                py2vf_ctx[tupleElName+"__ptr"] = vf.NamedValue[vfpy.PyObjPtr](
-                    tupleElName+"__ptr")
+                el_acc_type = path(SubscriptAccess(i, PtrAccess()))
+                py2vf_ctx[pyobjname+repr(el_acc_type)] = vf.NamedValue[vfpy.PyObjPtr](
+                    pyobjname+str(el_acc_type))
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     vf.NameDefExpr[vfpy.PyObjPtr](
-                        py2vf_ctx[tupleElName+"__ptr"]),
+                        py2vf_ctx[pyobjname+repr(el_acc_type)]),
                     vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
-            pyobjval = vf.ImmInductive(
-                vfpy.PyTuple(vf.List.from_list(tupleEls)))
+            pyobjval = vf.ImmInductive(vfpy.PyTuple(vf.List.from_list(tupleEls)))
+            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(PtrAccess())], pyobjval)]+[
+                self.create_hasval_fact(pyobjname, t.type_args[i], ctx, py2vf_ctx, lambda x: path(SubscriptAccess(i, x))) for i in range(len(t.type_args))
+            ])
         else:
             raise NotImplementedError("Type not implemented")
-            return
-
-        return vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+"__ptr"], pyobjval)
 
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         if (p.name == 'tuple'):

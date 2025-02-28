@@ -2,7 +2,7 @@ import ast
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.native.py2vf_ctx import py2vf_context
-from nagini_translation.native.translator import Translator
+from nagini_translation.native.translator import *
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
@@ -38,11 +38,11 @@ class NativeSpecExtractor:
             # now manually translate the arguments from PY to VF
 
             py2vf_ctx[key +
-                      "__ptr"] = vf.NamedValue[vfpy.PyObjPtr](key + "__ptr")
+                      repr(PtrAccess())] = vf.NamedValue[vfpy.PyObjPtr](key + str(PtrAccess()))
             cur_arg_def = vf.NameDefExpr[vfpy.PyObjPtr](
-                py2vf_ctx[key + "__ptr"])
+                py2vf_ctx[key + repr(PtrAccess())])
             # translate argument to pointers
-            py2vf_ctx[key + "__ptr"].setDef(cur_arg_def)
+            py2vf_ctx[key +repr(PtrAccess())].setDef(cur_arg_def)
             tuple_args.append(
                 vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     cur_arg_def,
@@ -51,12 +51,12 @@ class NativeSpecExtractor:
                 ))
             # translate pointers to values
             py2vf_ctx[key +
-                      "__val"] = vf.NamedValue[vfpy.PyObj_v](key + "__val")
+                      repr(ValAccess())] = vf.NamedValue[vfpy.PyObj_v](key + str(ValAccess()))
             pyobj_content = vf.ImmInductive(self.translator.pytype__to__PyObj_v(
-                value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + "__val"])))
+                value.type)(vf.NameDefExpr[vfpy.PyObj_v](py2vf_ctx[key + repr(ValAccess())])))
             arg_predicates.append(
                 vfpy.PyObj_HasVal(
-                    vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + "__ptr"]),
+                    vf.NameUseExpr[vfpy.PyObjPtr](py2vf_ctx[key + repr(PtrAccess())]),
                     pyobj_content
                 ))
         firstpredfact = vfpy.PyObj_HasVal(
