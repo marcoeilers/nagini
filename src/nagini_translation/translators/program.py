@@ -7,7 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 from collections import OrderedDict
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Optional
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
@@ -276,45 +276,89 @@ class ProgramTranslator(CommonTranslator):
         self.info = None
         return result
 
-    def create_merge_function(self, f: PythonMethod,
-                              ctx: Context) -> 'silver.ast.Callable':
-        assert f.pure and f.opaque
+    def translate_merge_function(self, f: PythonMethod, ctx: Context) -> Optional['silver.ast.Callable']:
+        """
+        Creates a Viper function that contains all pre-/postconditions of the given function
+        and of all the overriding function in subclasses called the merge function.
+        """
+
+        # TODO: remove postcondition of superclass function
+        # e.g. ensures int___ge__(result, __prim__int___box__(0))
+
+        # TODO: solve aliasing problem
 
         pos = self.viper.to_position(f.node, ctx.position, py_node=f)
         ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['merge.function'])
 
+        # gather all overrides plus the function itself
+        overrides: set[PythonMethod] = set()
+        worklist: set[PythonMethod] = set()
+        worklist.add(f)
+        while(worklist):
+            cur = worklist.pop()
+            overrides.add(cur)
+            for override in map(
+                lambda sb: sb.functions.get(cur.func_constant),
+                cur.cls.direct_subclasses
+            ):
+                worklist.add(override)
+
+        # no need for a merge function since no overrides
+        if len(overrides) == 1:
+            return None
+
         # make a deepcopy of f (not possible with deepcopy)
         node_factory = ProgramNodeFactory()
-        super_func: PythonMethod = node_factory.create_python_method(
+        merge_func: PythonMethod = node_factory.create_python_method(
             f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
             node_factory, f.interface, f.interface_dict, f.method_type, f.opaque
         )
-        for k,v in super_func.__dict__.items():
+        for k,v in merge_func.__dict__.items():
             if not v and f.__getattribute__(k):
-                super_func.__setattr__(k, f.__getattribute__(k))
-
-        # find superclass function
-        while(super_func.overrides):
-            super_func = super_func.overrides
+                merge_func.__setattr__(k, f.__getattribute__(k))
 
         old_function = ctx.current_function
-        ctx.current_function = super_func
+        ctx.current_function = merge_func
 
-        if super_func.sil_name.endswith("_merged"):
-            fname = super_func.sil_name
-        else:
-            fname = super_func.sil_name + "_merged"
+        # null check for self
+        self_var = merge_func.args[next(iter(merge_func.args))].ref()
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
+                                    self.no_info(ctx))
 
-        if not self.viper.used_names_sets.get(fname):
-            fname = ctx.module.get_fresh_name(fname)
-            self.viper.used_names_sets[fname] = set()
-            self.viper.used_names_sets[fname].add(fname)
+        merge_pres = [not_null]
+        merge_post = []
 
-        super_func.sil_name = fname
-        super_func.name = fname
-        super_func.contract_only = True
+        fname = f.sil_name + "_merged"
+        merge_func.sil_name = fname
+        merge_func.name = fname
+        merge_func.contract_only = True
+        merge_func.opaque = False
 
+        for cur in overrides:
+            pos = self.to_position(cur.node, ctx)
+            info = self.no_info(ctx)
+            self_var = cur.args[next(iter(cur.args))].ref()
+
+            for pre in map(lambda x: x[0], cur.precondition):
+                _, obj = self.translate_expr(pre, ctx, self.viper.Bool)
+                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                to_add_pre = self.viper.Implies(check, obj, pos, info)
+                merge_pres.append(to_add_pre)
+
+            for post in map(lambda x: x[0], cur.postcondition):
+                _, obj = self.translate_expr(post, ctx, self.viper.Bool)
+                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                to_add_post = self.viper.Implies(check, obj, pos, info)
+                merge_post.append(to_add_post)
+
+            # add to context for the translation of function calls
+            ctx.merge_functions[cur] = merge_func
+
+        ctx.current_function = old_function
+        return self.translate_function(merge_func, ctx, (merge_pres, merge_post))
+        
         # set alias for e.g. self_0 -> self
         # self_alias = func.args[next(iter(func.args))].sil_name
         # if self_alias != 'self':
@@ -1515,7 +1559,9 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
-                    functions.append(self.create_merge_function(func, ctx))
+                    merge_func = self.translate_merge_function(func, ctx)
+                    if merge_func:
+                        functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
@@ -1526,7 +1572,7 @@ class ProgramTranslator(CommonTranslator):
                         # all overridden functions are opaque
                         all_opaque: bool = func.opaque
                         next: PythonMethod = func
-                        while(all_opaque and not (next is None)):
+                        while(all_opaque and next):
                             all_opaque = all_opaque and next.opaque
                             next = next.overrides
                         if all_opaque:

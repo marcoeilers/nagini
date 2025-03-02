@@ -632,26 +632,14 @@ class CallTranslator(CommonTranslator):
 
         type = self.translate_type(target.type, ctx)
 
-        # generate merge function name
-        # mname = ctx.module.get_fresh_name(super_func.sil_name + '_merged')
-        # self.viper.used_names_sets[mname].add(mname)
-
-        if super_func.sil_name.endswith("_merged"):
-            fname = super_func.sil_name
-        else:
-            fname = super_func.sil_name + "_merged"
-        if not fname in self.viper.used_names_sets.get(fname):
-            msg: str = f"Merge function for {target.sil_name} not found."
-            InvalidProgramException(target.node, "override.merge_function", msg)
-
-        # if target function overrides or is overridden by a direct subclass
-        is_overridden = len(list(map(
-            lambda sb: sb.functions.get(target.func_constant),
-            target.cls.direct_subclasses
-        ))) > 0
-        if target.overrides or is_overridden:
-            call = self.viper.FuncApp(fname, args, position,
+        merge_func = ctx.merge_functions.get(target)
+        if merge_func:
+            call = self.viper.FuncApp(merge_func.sil_name, args, position,
                                       self.no_info(ctx), type, formal_args)
+        else:
+            call = self.viper.FuncApp(target.sil_name, args, position,
+                                      self.no_info(ctx), type, formal_args)
+
         if target.module is not target.module.global_module:
             # Mark the current function as depending on the called function. If we're in
             # a global context, wrap the result into a check that the called function and its
