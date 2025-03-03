@@ -48,4 +48,4 @@ class TernaryFact(Fact):
         self.orelse = orelse
 
     def __str__(self) -> str:
-        return f"{self.cond} ? {self.then} : {self.orelse}"
+        return f"{self.cond} ? (\n{self.then}) : (\n{self.orelse})"
