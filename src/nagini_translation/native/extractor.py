@@ -7,9 +7,7 @@ from nagini_translation.lib.context import Context
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonModule,
-    PythonType,
-    PythonVar
-)
+    PythonType)
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type, Tuple
@@ -17,19 +15,14 @@ from typing import Optional, Type, Tuple
 
 class NativeSpecExtractor:
     def env(self, m: PythonModule, ctx: Context) -> str:
-        # res = ""
-        # for key, value in m.classes.items():
-        #    res += "fixpoint PyClass"
-        # setup predicates in the translator
         res = "fixpoint PyClass PyClass_ObjectType(){\n\treturn ObjectType;\n}\n"
         for key, value in m.classes.items():
             self.translator.classes[key] = vfpy.PyClass(key)
             res += "fixpoint PyClass PyClass_"+key + \
                 "(){\n\treturn PyClass(\""+key+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
                 ");\n}\n"
-            # self.translator.classes[key] =
+        # TODO: finish translating fixpoint functions and predicates
         # TODO: precise whether such or such argument is to be translated as ptr or val
-
         def make_init(key):
             return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
         for key, value in m.predicates.items():
@@ -38,6 +31,7 @@ class NativeSpecExtractor:
         return res
 
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
+        #TODO: note that the setup must be simply reused as is for the postcond (just ensure name defs are removed)
         py2vf_ctx["args"+repr(PtrAccess())] = vf.NamedValue("args")
         return [self.translator.create_hasval_fact("args",
                                                   self.get_type(ast.Tuple(list(map(
