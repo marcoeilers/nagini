@@ -162,9 +162,8 @@ class AbstractTranslator(metaclass=ABCMeta):
                               ctx: Context) -> 'silver.ast.Method':
         return self.config.method_translator.translate_main_method(modules, ctx)
 
-    def translate_function(self, func: PythonMethod,
-                           ctx: Context, translated_contract: Tuple[List, List] = ()) -> 'silver.ast.Function':
-        return self.config.method_translator.translate_function(func, ctx, translated_contract)
+    def translate_function(self, func: PythonMethod, ctx: Context) -> 'silver.ast.Function':
+        return self.config.method_translator.translate_function(func, ctx)
 
     def translate_predicate_family(self, root: PythonMethod,
             preds: List[PythonMethod], ctx: Context) -> Tuple[List['ast.silver.Predicate'], List['ast.silver.Method']]:

@@ -397,31 +397,11 @@ class ProgramTranslator(CommonTranslator):
             # add to context for the translation of function calls
             ctx.merge_functions[cur] = merge_func
 
-        self.bind_type_vars(merge_func, ctx)
-        pos = self.to_position(merge_func.node, ctx)
-
-        with ctx.additional_aliases(ctx.var_aliases):
-            if not merge_func.type:
-                raise InvalidProgramException(merge_func.node, 'function.type.none')
-            type = self.translate_type(merge_func.type, ctx)
-            
-            args = self.config.method_translator._translate_params(merge_func, ctx)
-            if merge_func.declared_exceptions:
-                raise InvalidProgramException(merge_func.node,
-                                            'function.throws.exception')
-
-            decreases_pres = self.config.method_translator._translate_decreases(merge_func, ctx)
-            pres = pres + decreases_pres
-
-            # Create typeof preconditions
-            pres = self.config.method_translator._create_typeof_pres(merge_func, False, ctx) + pres
-        
-        ctx.var_aliases = {}
         ctx.current_function = old_function
         ctx.module = old_module
         ctx.current_class = old_cls
-        return self.viper.Function(merge_func.sil_name, args,
-                                   type, pres, posts, None, pos, self.no_info(ctx))
+        ctx.var_aliases = {}
+        return self.config.method_translator.translate_merge_function(merge_func, ctx, pres, posts)
 
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
@@ -1579,7 +1559,7 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
-                    merge_func = self.translate_merge_function(func, ctx)
+                    merge_func = self.create_merge_function(func, ctx)
                     if merge_func:
                         functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))

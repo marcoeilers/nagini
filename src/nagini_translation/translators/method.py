@@ -272,7 +272,36 @@ class MethodTranslator(CommonTranslator):
         if func.kw_arg:
             args.append(func.kw_arg.decl)
         return args
+    
+    def translate_merge_function(self, merge_func: PythonMethod, ctx: Context,
+                                 pres, posts) -> 'silver.ast.Function':
+        """
+        Translates a pure merge function Python function to a Viper function.
+        """
+        old_function = ctx.current_function
+        ctx.current_function = merge_func
+        self.bind_type_vars(merge_func, ctx)
+        pos = self.to_position(merge_func.node, ctx)
 
+        if not merge_func.type:
+            raise InvalidProgramException(merge_func.node, 'function.type.none')
+        type = self.translate_type(merge_func.type, ctx)
+        
+        args = self._translate_params(merge_func, ctx)
+        if merge_func.declared_exceptions:
+            raise InvalidProgramException(merge_func.node,
+                                          'function.throws.exception')
+
+        decreases_pres = self._translate_decreases(merge_func, ctx)
+        pres = pres + decreases_pres
+
+        # Create typeof preconditions
+        pres = self._create_typeof_pres(merge_func, False, ctx) + pres
+
+        ctx.current_function = old_function
+        return self.viper.Function(merge_func.sil_name, args,
+                                   type, pres, posts, None, pos, self.no_info(ctx))
+        
     def translate_function(self, func: PythonMethod,
                            ctx: Context) -> 'silver.ast.Function':
         """
