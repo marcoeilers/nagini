@@ -97,13 +97,14 @@ class Translator:
         if (node.func.id == "Acc"):
             frac = 1
             if len(node.args) == 2:
+                #TODO: check if these assertions are at least somehow useful?
                 assert (isinstance(node.args[1], ast.BinOp))
                 assert (isinstance(node.args[1].left, ast.Constant))
                 assert (isinstance(node.args[1].right, ast.Constant))
                 frac = Fraction(node.args[1].left.value,
                                 node.args[1].right.value)
+                #TODO: finish translating this
             if isinstance(node.args[0], ast.Attribute):
-                attrVFName = node.args[0].value.id + "_DOT_"+node.args[0].attr
                 py2vf_ctx[node.args[0].value.id + repr(AttrAccess(node.args[0].attr, PtrAccess()))] = vf.NamedValue[vfpy.PyObjPtr](
                     node.args[0].value.id +
                     str(AttrAccess(node.args[0].attr, PtrAccess())))
@@ -115,11 +116,9 @@ class Translator:
                                                         repr(AttrAccess(node.args[0].attr, PtrAccess()))])),
                     self.create_hasval_fact(node.args[0].value.id, self.get_type(
                         node.args[0], ctx), ctx, py2vf_ctx, lambda x: AttrAccess(node.args[0].attr, x)),
-                    # ,vfpy.PyObj_HasVal(py2vf_ctx[attrVFName + "__ptr"],vf.ImmInductive(vfpy.PyObj_t("ZUUUUUT")))
                 ])
             else:
-                pass
-            # raise NotImplementedError("Acc is not implemented")
+                raise NotImplementedError("Acc is not implemented for this content"+ str(node.args[0]))
         else:
             funcid = node.func.id
             # TODO: check if each of these variables is to be used as ref or as val
@@ -307,16 +306,7 @@ class Translator:
         return {
             'int': vfpy.PyLong(0).PyObj_t(),
             # TODO: this is just for testing, remove this and implement cleanly later
-            'mycoolclass': vfpy.PyClass_t(vfpy.PyClass("mycoolclass")),
-            'mytupledclass': vfpy.PyClass_t(vfpy.PyClass("mytupledclass"))
-        }.get(p.name, lambda x: self.classes[p.name])
-
-    def is_mutable_arg(self, node: PythonVar) -> bool:
-        switch_dict = {
-            "int": False,
-            "mycoolclass": True
-        }
-        return switch_dict[node.type.name]
+        }.get(p.name, vfpy.PyClass_t(self.classes.get(p.name, "FAILED PYTYPE TRANSLATION")))
 
     def is_pure(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
