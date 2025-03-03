@@ -377,16 +377,16 @@ class ProgramTranslator(CommonTranslator):
 
                 for post, aliases in cur.postcondition:
                     # result type check
-                    if cur.type.name not in PRIMITIVES:
-                        res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
-                        res_type = self.translate_type(cur.type, ctx)
-                        result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
-                        check = self.type_check(result, cur.type, res_type_pos, ctx)
+                    res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
+                    res_type = self.translate_type(cur.type, ctx)
+                    result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+                    check = self.type_check(result, cur.type, res_type_pos, ctx)
 
-                        first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-                        implication = self.viper.Implies(first_check, check, pos, info)
-                        posts = [implication] + posts
+                    first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                    implication = self.viper.Implies(first_check, check, pos, info)
+                    posts = [implication] + posts
 
+                    # postcondition check
                     stmt, obj = self.translate_expr(post, ctx, self.viper.Bool)
                     check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                     to_add_post = self.viper.Implies(check, obj, pos, info)
