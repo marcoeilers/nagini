@@ -8,6 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 from collections import OrderedDict
 from typing import List, Set, Tuple, Optional
+import copy
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
@@ -276,17 +277,11 @@ class ProgramTranslator(CommonTranslator):
         self.info = None
         return result
 
-    def translate_merge_function(self, f: PythonMethod, ctx: Context) -> Optional['silver.ast.Callable']:
+    def create_merge_function(self, f: PythonMethod, ctx: Context) -> Optional['silver.ast.Callable']:
         """
         Creates a Viper function that contains all pre-/postconditions of the given function
         and of all the overriding function in subclasses called the merge function.
         """
-
-        # TODO: remove postcondition of superclass function
-        # e.g. ensures int___ge__(result, __prim__int___box__(0))
-
-        # TODO: solve aliasing problem
-
         pos = self.viper.to_position(f.node, ctx.position, py_node=f)
         ctx.position.append(('override', pos))
         self.info = self.viper.SimpleInfo(['merge.function'])
@@ -302,7 +297,8 @@ class ProgramTranslator(CommonTranslator):
                 lambda sb: sb.functions.get(cur.func_constant),
                 cur.cls.direct_subclasses
             ):
-                worklist.add(override)
+                if override:
+                    worklist.add(override)
 
         # no need for a merge function since no overrides
         if len(overrides) == 1:
@@ -319,6 +315,9 @@ class ProgramTranslator(CommonTranslator):
                 merge_func.__setattr__(k, f.__getattribute__(k))
 
         old_function = ctx.current_function
+        old_module = ctx.module
+        old_cls = ctx.current_class
+
         ctx.current_function = merge_func
 
         # null check for self
@@ -327,8 +326,8 @@ class ProgramTranslator(CommonTranslator):
         not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
                                     self.no_info(ctx))
 
-        merge_pres = [not_null]
-        merge_post = []
+        pres = [not_null]
+        posts = []
 
         fname = f.sil_name + "_merged"
         merge_func.sil_name = fname
@@ -336,72 +335,93 @@ class ProgramTranslator(CommonTranslator):
         merge_func.contract_only = True
         merge_func.opaque = False
 
+        # aliases = {}
+
+        # loop through all overriding functions and encode
+        # the pre-/postconditions as implications depending on the type e.g.:
+        # requires issubtype(self, X) ==> <Precondition of X>
+        # requires issubtype(self, Y) ==> <Precondition of Y>
         for cur in overrides:
+
+            ctx.current_function = cur
+            ctx.module = cur.module
+            ctx.current_class = cur.cls
+
+            if cur.overrides:
+                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                    root_var = merge_func.args[merge_name]
+                    if merge_name == next(iter(f.args.keys())):
+                        root_var = copy.copy(root_var)
+                        root_var.type = cur.cls
+                    ctx.set_alias(cur_name, root_var)
+
             pos = self.to_position(cur.node, ctx)
             info = self.no_info(ctx)
-            self_var = cur.args[next(iter(cur.args))].ref()
 
-            for pre in map(lambda x: x[0], cur.precondition):
-                _, obj = self.translate_expr(pre, ctx, self.viper.Bool)
-                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-                to_add_pre = self.viper.Implies(check, obj, pos, info)
-                merge_pres.append(to_add_pre)
+            with ctx.additional_aliases(ctx.var_aliases):
+                self_var = cur.args[next(iter(cur.args))].ref()
 
-            for post in map(lambda x: x[0], cur.postcondition):
-                _, obj = self.translate_expr(post, ctx, self.viper.Bool)
-                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-                to_add_post = self.viper.Implies(check, obj, pos, info)
-                merge_post.append(to_add_post)
+                # find self in aliases
+                if ctx.var_aliases:
+                    self_var = ctx.var_aliases.get(
+                        merge_func.args[next(iter(merge_func.args))].name
+                    ).ref()
+
+                for pre, aliases in cur.precondition:
+                    stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
+                    check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                    to_add_pre = self.viper.Implies(check, obj, pos, info)
+                    if stmt:
+                        raise InvalidProgramException(to_add_pre, 'purity.violated')
+                    pres.append(to_add_pre)
+
+                for post, aliases in cur.postcondition:
+                    # result type check
+                    if cur.type.name not in PRIMITIVES:
+                        res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
+                        res_type = self.translate_type(cur.type, ctx)
+                        result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+                        check = self.type_check(result, cur.type, res_type_pos, ctx)
+
+                        first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                        implication = self.viper.Implies(first_check, check, pos, info)
+                        posts = [implication] + posts
+
+                    stmt, obj = self.translate_expr(post, ctx, self.viper.Bool)
+                    check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                    to_add_post = self.viper.Implies(check, obj, pos, info)
+                    if stmt:
+                        raise InvalidProgramException(to_add_post, 'purity.violated')
+                    posts.append(to_add_post)
 
             # add to context for the translation of function calls
             ctx.merge_functions[cur] = merge_func
 
-        ctx.current_function = old_function
-        return self.translate_function(merge_func, ctx, (merge_pres, merge_post))
-        
-        # set alias for e.g. self_0 -> self
-        # self_alias = func.args[next(iter(func.args))].sil_name
-        # if self_alias != 'self':
-        #     ctx.set_alias(self_alias, 'self')
+        self.bind_type_vars(merge_func, ctx)
+        pos = self.to_position(merge_func.node, ctx)
 
-        # null check for self
-        self_var = super_func.args[next(iter(super_func.args))].ref()
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-        merge_pres = [not_null]
-        merge_post = []
-
-        # TODO: FIX
-        # loop through all overridden superclass functions and encode
-        # the pre-/postconditions as implications depending on the type e.g.:
-        # requires issubtype(self, X) ==> <Precondition of X>
-        # requires issubtype(self, Y) ==> <Precondition of Y>
-        next_func: PythonMethod = super_func
-        while(next_func):
-            pos = self.to_position(next_func.node, ctx)
-            info = self.no_info(ctx)
-            self_var = next_func.args[next(iter(next_func.args))].ref()
-
-            for pre in map(lambda x: x[0], next_func.precondition):
-                _, obj = self.translate_expr(pre, ctx, self.viper.Bool)
-                check = self.type_check(self_var, next_func.cls, pos, ctx, inhale_exhale=False)
-                to_add_pre = self.viper.Implies(check, obj, pos, info)
-                merge_pres.append(to_add_pre)
-
-            for post in map(lambda x: x[0], next_func.postcondition):
-                _, obj = self.translate_expr(post, ctx, self.viper.Bool)
-                check = self.type_check(self_var, next_func.cls, pos, ctx, inhale_exhale=False)
-                to_add_post = self.viper.Implies(check, obj, pos, info)
-                merge_post.append(to_add_post)
+        with ctx.additional_aliases(ctx.var_aliases):
+            if not merge_func.type:
+                raise InvalidProgramException(merge_func.node, 'function.type.none')
+            type = self.translate_type(merge_func.type, ctx)
             
-            next_func = next_func.overrides
+            args = self.config.method_translator._translate_params(merge_func, ctx)
+            if merge_func.declared_exceptions:
+                raise InvalidProgramException(merge_func.node,
+                                            'function.throws.exception')
 
+            decreases_pres = self.config.method_translator._translate_decreases(merge_func, ctx)
+            pres = pres + decreases_pres
+
+            # Create typeof preconditions
+            pres = self.config.method_translator._create_typeof_pres(merge_func, False, ctx) + pres
+        
+        ctx.var_aliases = {}
         ctx.current_function = old_function
-        # TODO: fix me
-        # super_func.opaque = False
-        return self.translate_function(super_func, ctx, (merge_pres, merge_post))
+        ctx.module = old_module
+        ctx.current_class = old_cls
+        return self.viper.Function(merge_func.sil_name, args,
+                                   type, pres, posts, None, pos, self.no_info(ctx))
 
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':

@@ -274,7 +274,7 @@ class MethodTranslator(CommonTranslator):
         return args
 
     def translate_function(self, func: PythonMethod,
-                           ctx: Context, translated_contract: Tuple[List, List] = ()) -> 'silver.ast.Function':
+                           ctx: Context) -> 'silver.ast.Function':
         """
         Translates a pure Python function (may or not belong to a class) to a
         Viper function
@@ -290,17 +290,12 @@ class MethodTranslator(CommonTranslator):
         if func.declared_exceptions:
             raise InvalidProgramException(func.node,
                                           'function.throws.exception')
-        if translated_contract:
-            pres, posts = translated_contract
-        else:
-            # Create preconditions
-            pres = self._translate_pres(func, ctx)
-            posts = []
-
+        # Create preconditions
+        pres = self._translate_pres(func, ctx)
         decreases_pres = self._translate_decreases(func, ctx)
         pres = pres + decreases_pres
-
         # Create postconditions
+        posts = []
         for post, aliases in func.postcondition:
             with ctx.additional_aliases(aliases):
                 stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
