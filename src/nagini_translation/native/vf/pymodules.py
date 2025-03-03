@@ -33,16 +33,10 @@ class PyLong(PyObj_v):
 
 
 class PyClass(vf.Inductive, ABC):
-    def __init__(self, name: str, parent: "PyClass"):
+    def __init__(self, name: str):
         self.name = name
-        self.parent = parent
-
     def __str__(self):
-        return "PyClass(\""+self.name+"\", "+(str(self.parent) if self.parent != None else "ObjectType")+")"
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, PyClass) and self.name == other.name and self.parent == other.parent
-
+        return "PyClass_"+self.name+""
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):
