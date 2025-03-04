@@ -1106,7 +1106,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         super_func: PythonMethod = self
         while(super_func.overrides):
             super_func = super_func.overrides
-        self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
+        if super_func.sil_name:
+            self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
+        elif super_func.name:
+            self.merge_func_name = self.get_fresh_name(super_func.name + '_merged')
 
     @property
     def nargs(self) -> int:
