@@ -140,7 +140,7 @@
             "justMyCode": false
         },
         {
-            "name": "Python: BST Testing 2.0",
+            "name": "Python: Nagini Testing 2.0",
             "type": "python",
             "request": "launch",
             "program": "${cwd}/src/nagini_translation/main.py",
@@ -162,7 +162,9 @@
             "args": [
                 "-v",
                 "${cwd}/src/nagini_translation/tests.py",
-                "--silicon"
+                "--silicon",
+                "-k",
+                "${fileBasename}"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
