@@ -4,15 +4,14 @@
 from nagini_contracts.contracts import *
 
 
-class SuperA:
+class Super:
     @Pure
     def foo(self, a: int) -> int:
         return a
 
 
-# only pure and OPAQUE functions can be overridden
-class SubA(SuperA):
+class Sub(Super):
     @Pure
     #:: ExpectedOutput(invalid.program:invalid.override)
-    def foo(self, a: int) -> int:
-        return a + 5
+    def foo(self, c: int) -> int:
+        return c
