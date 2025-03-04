@@ -329,7 +329,7 @@ class ProgramTranslator(CommonTranslator):
         pres = [not_null]
         posts = []
 
-        fname = f.sil_name + "_merged"
+        fname = merge_func.merge_func_name
         merge_func.sil_name = fname
         merge_func.name = fname
         merge_func.contract_only = True

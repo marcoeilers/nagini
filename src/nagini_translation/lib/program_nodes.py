@@ -1041,6 +1041,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.definition_deps = set()
         self.call_deps = set()
         self.decreases_clauses = []
+        self.merge_func_name: Optional[str] = None
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1100,6 +1101,12 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                                             translator)
         for try_block in self.try_blocks:
             try_block.process(translator)
+
+        # generate merge function name
+        super_func: PythonMethod = self
+        while(super_func.overrides):
+            super_func = super_func.overrides
+        self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
 
     @property
     def nargs(self) -> int:
