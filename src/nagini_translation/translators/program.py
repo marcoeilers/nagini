@@ -294,7 +294,7 @@ class ProgramTranslator(CommonTranslator):
             cur = worklist.pop()
             overrides.add(cur)
             for override in map(
-                lambda sb: sb.functions.get(cur.func_constant),
+                lambda sb: sb.functions.get(cur.name),
                 cur.cls.direct_subclasses
             ):
                 if override:
@@ -302,6 +302,7 @@ class ProgramTranslator(CommonTranslator):
 
         # no need for a merge function since no overrides
         if len(overrides) == 1:
+            ctx.position.pop()
             return None
 
         # make a deepcopy of f (not possible with deepcopy)
@@ -335,8 +336,6 @@ class ProgramTranslator(CommonTranslator):
         merge_func.contract_only = True
         merge_func.opaque = False
 
-        # aliases = {}
-
         # loop through all overriding functions and encode
         # the pre-/postconditions as implications depending on the type e.g.:
         # requires issubtype(self, X) ==> <Precondition of X>
@@ -367,7 +366,7 @@ class ProgramTranslator(CommonTranslator):
                         merge_func.args[next(iter(merge_func.args))].name
                     ).ref()
 
-                for pre, aliases in cur.precondition:
+                for pre, _ in cur.precondition:
                     stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
                     check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                     to_add_pre = self.viper.Implies(check, obj, pos, info)
@@ -375,16 +374,17 @@ class ProgramTranslator(CommonTranslator):
                         raise InvalidProgramException(to_add_pre, 'purity.violated')
                     pres.append(to_add_pre)
 
-                for post, aliases in cur.postcondition:
+                for post, _ in cur.postcondition:
                     # result type check
-                    res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
-                    res_type = self.translate_type(cur.type, ctx)
-                    result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
-                    check = self.type_check(result, cur.type, res_type_pos, ctx)
+                    if cur.type.name not in PRIMITIVES:
+                        res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
+                        res_type = self.translate_type(cur.type, ctx)
+                        result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+                        check = self.type_check(result, cur.type, res_type_pos, ctx)
 
-                    first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-                    implication = self.viper.Implies(first_check, check, pos, info)
-                    posts = [implication] + posts
+                        first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                        implication = self.viper.Implies(first_check, check, pos, info)
+                        posts = [implication] + posts
 
                     # postcondition check
                     stmt, obj = self.translate_expr(post, ctx, self.viper.Bool)
@@ -401,6 +401,7 @@ class ProgramTranslator(CommonTranslator):
         ctx.module = old_module
         ctx.current_class = old_cls
         ctx.var_aliases = {}
+        ctx.position.pop()
         return self.config.method_translator.translate_merge_function(merge_func, ctx, pres, posts)
 
     def create_override_check(self, method: PythonMethod,
