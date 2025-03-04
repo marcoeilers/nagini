@@ -376,9 +376,25 @@ class ProgramTranslator(CommonTranslator):
                     ).ref()
 
                 for pre, _ in cur.precondition:
+
+                    # check that it has exactly the type and is not a subclass
+                    type_checks = set()
+                    for subclass in cur.cls.direct_subclasses:
+                        type_checks.add(self.viper.Not(self.type_check(
+                            self_var, subclass, pos, ctx, inhale_exhale=False
+                        ), pos, info))
+
                     stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
                     check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-                    to_add_pre = self.viper.Implies(check, obj, pos, info)
+
+                    if type_checks:
+                        full_type_check = self.viper.And(check, type_checks.pop(), pos, info)
+                        while(type_checks):
+                            full_type_check = self.viper.And(full_type_check, type_checks.pop(), pos, info)
+                    else:
+                        full_type_check = check
+
+                    to_add_pre = self.viper.Implies(full_type_check, obj, pos, info)
                     if stmt:
                         raise InvalidProgramException(to_add_pre, 'purity.violated')
                     pres.append(to_add_pre)
