@@ -287,12 +287,12 @@ class ProgramTranslator(CommonTranslator):
         self.info = self.viper.SimpleInfo(['merge.function'])
 
         # gather all overrides plus the function itself
-        overrides: set[PythonMethod] = set()
+        overrides: list[PythonMethod] = []
         worklist: set[PythonMethod] = set()
         worklist.add(f)
         while(worklist):
             cur = worklist.pop()
-            overrides.add(cur)
+            overrides.insert(0, cur)  # insert at the front to have a topo ordering
             for override in map(
                 lambda sb: sb.functions.get(cur.name),
                 cur.cls.direct_subclasses
@@ -301,7 +301,9 @@ class ProgramTranslator(CommonTranslator):
                     worklist.add(override)
 
         # no need for a merge function since no overrides
-        if len(overrides) == 1:
+        # or we already created a merge function in a super class (i.e. overridden)
+        # function if it overrides
+        if len(overrides) == 1 or f.overrides:
             ctx.position.pop()
             ctx.var_aliases = {}
             return None
@@ -337,6 +339,11 @@ class ProgramTranslator(CommonTranslator):
         merge_func.contract_only = True
         merge_func.opaque = False
         old_aliases = copy.deepcopy(ctx.var_aliases)
+
+        # assert topological for methods
+        for func in overrides:
+            if func.overrides:
+                assert overrides.index(func) < overrides.index(func.overrides)
 
         # loop through all overriding functions and encode
         # the pre-/postconditions as implications depending on the type e.g.:
