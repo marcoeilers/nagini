@@ -303,6 +303,7 @@ class ProgramTranslator(CommonTranslator):
         # no need for a merge function since no overrides
         if len(overrides) == 1:
             ctx.position.pop()
+            ctx.var_aliases = {}
             return None
 
         # make a deepcopy of f (not possible with deepcopy)
@@ -335,6 +336,7 @@ class ProgramTranslator(CommonTranslator):
         merge_func.name = fname
         merge_func.contract_only = True
         merge_func.opaque = False
+        old_aliases = copy.deepcopy(ctx.var_aliases)
 
         # loop through all overriding functions and encode
         # the pre-/postconditions as implications depending on the type e.g.:
@@ -397,10 +399,14 @@ class ProgramTranslator(CommonTranslator):
             # add to context for the translation of function calls
             ctx.merge_functions[cur] = merge_func
 
+        while(ctx.var_aliases):
+            for alias in list(ctx.var_aliases.keys()):
+                ctx.remove_alias(alias)
+        ctx.var_aliases = old_aliases
+
         ctx.current_function = old_function
         ctx.module = old_module
         ctx.current_class = old_cls
-        ctx.var_aliases = {}
         ctx.position.pop()
         return self.config.method_translator.translate_merge_function(merge_func, ctx, pres, posts)
 
