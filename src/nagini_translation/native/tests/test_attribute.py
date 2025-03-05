@@ -9,7 +9,7 @@ class ClassA:
 
 @ContractOnly
 @Native
-def simple_access(i: int, i2: int, c: ClassA, d: ClassA) -> int:
+def ternary_val(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     """
     pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), cons(pair(?i2__ptr, PyLong_t), cons(pair(?c__ptr, PyClass_t(PyClass_ClassA)), cons(pair(?d__ptr, PyClass_t(PyClass_ClassA)), nil)))))) &*&
     pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
@@ -24,3 +24,18 @@ def simple_access(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     """
     Requires(Acc(c.attrA1) and Acc(d.attrA1) and (
         c.attrA1 if (i == i2) else d.attrA1) == 0)
+
+@ContractOnly
+@Native
+def double_access(i: int, i2: int, c: ClassA) -> int:
+    """
+    pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), cons(pair(?i2__ptr, PyLong_t), cons(pair(?c__ptr, PyClass_t(PyClass_ClassA)), nil))))) &*&
+    pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
+    pyobj_hasvalue(i2__ptr, PyLong_v(?i2__val)) &*&
+    pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_ClassA)) &*&
+    pyobj_hasattr(c__ptr, attrA1, ?c_DOT_attrA1__ptr) &*&
+    pyobj_hasvalue(c_DOT_attrA1__ptr, PyLong_v(?c_DOT_attrA1__val)) &*&
+    pyobj_hasattr(c__ptr, attrA1, c_DOT_attrA1__ptr) &*&
+    pyobj_hasvalue(c_DOT_attrA1__ptr, PyLong_v(c_DOT_attrA1__val))
+    """
+    Requires(Acc(c.attrA1) and Acc(c.attrA1))
