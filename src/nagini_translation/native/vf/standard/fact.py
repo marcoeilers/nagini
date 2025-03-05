@@ -35,7 +35,12 @@ class NaginiPredicateFact(PredicateFact):
 
 class FactConjunction(Fact):
     def __init__(self, f: list[Fact]):
-        self.f = f
+        self.f = []
+        for fact in f:
+            if isinstance(fact, FactConjunction):
+                self.f.extend(fact.f)
+            else:
+                self.f.append(fact)
 
     def __str__(self) -> str:
         return " &*&\n".join(map(str, self.f))
