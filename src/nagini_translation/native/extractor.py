@@ -23,6 +23,7 @@ class NativeSpecExtractor:
                 ");\n}\n"
         # TODO: finish translating fixpoint functions and predicates
         # TODO: precise whether such or such argument is to be translated as ptr or val
+
         def make_init(key):
             return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
         for key, value in m.predicates.items():
@@ -31,15 +32,14 @@ class NativeSpecExtractor:
         return res
 
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
-        #TODO: note that the setup must be simply reused as is for the postcond (just ensure name defs are removed)
+        # TODO: note that the setup must be simply reused as is for the postcond (just ensure name defs are removed)
         py2vf_ctx["args"+repr(PtrAccess())] = vf.NamedValue("args")
         return [self.translator.create_hasval_fact("args",
-                                                  self.get_type(ast.Tuple(list(map(
-                                                      lambda x: ast.Name(
-                                                          x[0], ast.Load(), lineno=0, col_offset=0),
-                                                      f.args.items()))), ctx),
-                                                  ctx, py2vf_ctx, names=list(map(lambda x: x[0], f.args.items())))]
-
+                                                   self.get_type(ast.Tuple(list(map(
+                                                       lambda x: ast.Name(
+                                                           x[0], ast.Load(), lineno=0, col_offset=0),
+                                                       f.args.items()))), ctx),
+                                                   ctx, py2vf_ctx, names=list(map(lambda x: x[0], f.args.items())))]
 
     def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
         precondfacts = []
@@ -50,8 +50,8 @@ class NativeSpecExtractor:
     def __init__(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
         self.translator = Translator()
-
-        print(self.env(ctx.module, ctx))
+        theenv = self.env(ctx.module, ctx)
+        # print(self.env(ctx.module, ctx))
         print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
               self.precond(f, ctx, py2vf_ctx)))
         pass

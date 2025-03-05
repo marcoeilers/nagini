@@ -28,10 +28,10 @@
             ]
         },
         {
-            "name": "test.py for VF standard",
+            "name": "run unit tests for native",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/nagini_translation/native/vf/test.py",
+            "program": "${workspaceFolder}/src/nagini_translation/native/runtests.py",
             "cwd": "${workspaceFolder}/src/",
             "console": "integratedTerminal",
             "args": [
