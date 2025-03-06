@@ -312,7 +312,7 @@ class ProgramTranslator(CommonTranslator):
         node_factory = ProgramNodeFactory()
         merge_func: PythonMethod = node_factory.create_python_method(
             f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
-            node_factory, f.interface, f.interface_dict, f.method_type, f.opaque
+            node_factory, f.interface, f.interface_dict, f.method_type
         )
         for k,v in merge_func.__dict__.items():
             if not v and f.__getattribute__(k):
@@ -1598,19 +1598,7 @@ class ProgramTranslator(CommonTranslator):
                              (cls.superclass and
                               cls.superclass.python_class.has_classmethod)) and
                             func.overrides):
-                        # check if the overriding function and
-                        # all overridden functions are opaque
-                        all_opaque: bool = func.opaque
-                        next: PythonMethod = func
-                        while(all_opaque and next):
-                            all_opaque = all_opaque and next.opaque
-                            next = next.overrides
-                        if all_opaque:
-                            functions.append(self.create_override_check(func, ctx))
-                        else:
-                            msg: str = "To override a (pure) function, it and the overriding function must be opaque;"
-                            msg += " try the @Opaque decorator in addition to @Pure"
-                            raise InvalidProgramException(func.node, 'invalid.override', msg)
+                        functions.append(self.create_override_check(func, ctx))
 
                 for method_name in cls.methods:
                     method = cls.methods[method_name]

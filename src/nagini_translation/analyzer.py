@@ -653,19 +653,17 @@ class Analyzer(ast.NodeVisitor):
             if not self.is_static_method(node):
                 func.cls = self.current_class
             func.pure = self.is_pure(node)
-            func.opaque = self.is_opaque(node)
             func.node = node
             func.superscope = scope_container
         else:
             pure = is_property_getter or self.is_pure(node)
-            opaque = self.is_opaque(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
                 contract_only = self.contract_only or self.is_contract_only(node)
             func = self.node_factory.create_python_method(
                 name, node, self.current_class, scope_container, pure,
-                contract_only, self.node_factory, opaque=opaque)
+                contract_only, self.node_factory)
             if is_property_setter:
                 container[name].setter = func
             else:
@@ -1536,9 +1534,6 @@ class Analyzer(ast.NodeVisitor):
 
     def is_pure(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Pure')
-
-    def is_opaque(self, func: ast.FunctionDef) -> bool:
-        return self.has_decorator(func, 'Opaque')
 
     def is_predicate(self, func: ast.FunctionDef) -> bool:
         return self.has_decorator(func, 'Predicate')

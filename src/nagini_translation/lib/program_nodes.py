@@ -985,8 +985,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
-                 method_type: MethodType = MethodType.normal,
-                 opaque: bool = False):
+                 method_type: MethodType = MethodType.normal):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -995,7 +994,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         implementation, just its contract
         :param interface: True iff the method implementation is provided in
         native Silver.
-        :param opaque: True iff ir's opaque
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
@@ -1019,7 +1017,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
-        self.opaque = opaque
+        self.opaque = False
         self.predicate = False
         self.inline = False
         self.all_low = False
@@ -1102,14 +1100,20 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         for try_block in self.try_blocks:
             try_block.process(translator)
 
-        # generate merge function name
-        super_func: PythonMethod = self
-        while(super_func.overrides):
-            super_func = super_func.overrides
-        if super_func.sil_name:
-            self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
-        elif super_func.name:
-            self.merge_func_name = self.get_fresh_name(super_func.name + '_merged')
+        # generate merge function name and
+        # set self and all overrides to opaque if it is overridden
+        if self.pure:
+            super_func: PythonMethod = self
+            while(super_func.overrides):
+                super_func.opaque = True
+                super_func = super_func.overrides
+                if (super_func):
+                    super_func.opaque = True
+
+            if super_func.sil_name:
+                self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
+            elif super_func.name:
+                self.merge_func_name = self.get_fresh_name(super_func.name + '_merged')
 
     @property
     def nargs(self) -> int:
@@ -1865,11 +1869,10 @@ class ProgramNodeFactory:
             container_factory: 'ProgramNodeFactory',
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
-            method_type: MethodType = MethodType.normal,
-            opaque: bool = False) -> PythonMethod:
+            method_type: MethodType = MethodType.normal) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
-                            method_type, opaque)
+                            method_type)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
