@@ -114,8 +114,11 @@ class Translator:
                                           vf.NameDefExpr(
                                               py2vf_ctx[node.args[0].value.id +
                                                         repr(AttrAccess(node.args[0].attr, PtrAccess()))])),
-                    self.create_hasval_fact(node.args[0].value.id, self.get_type(
-                        node.args[0], ctx), ctx, py2vf_ctx, lambda x: AttrAccess(node.args[0].attr, x)),
+                    self.create_hasval_fact(node.args[0].value.id, 
+                                            self.get_type(node.args[0], ctx), 
+                                            ctx, 
+                                            py2vf_ctx, 
+                                            lambda x: AttrAccess(node.args[0].attr, x)),
                 ])
             else:
                 raise NotImplementedError("Acc is not implemented for this content"+ str(node.args[0]))
@@ -286,7 +289,7 @@ class Translator:
                     vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
             pyobjval = vf.ImmInductive(
                 vfpy.PyTuple(vf.List.from_list(tupleEls)))
-            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(PtrAccess())], pyobjval)]+[
+            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(path(PtrAccess()))], pyobjval)]+[
                 self.create_hasval_fact(
                     names[i] if i < len(names) else pyobjname,
                     t.type_args[i],
