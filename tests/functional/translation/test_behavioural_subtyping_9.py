@@ -11,7 +11,6 @@ class Super:
 
 
 class Sub(Super):
-
-    @Pure       #:: ExpectedOutput(invalid.program:invalid.override)
+    @Pure
     def some_function(self, a: int) -> int:
         return a

@@ -5,6 +5,7 @@ from nagini_contracts.contracts import *
 
 
 class Super:
+    #:: ExpectedOutput(invalid.program:invalid.opaque.method)
     def some_function(self, a: int) -> int:
         Requires(a >= 0)
         Ensures(Result() > 17)
@@ -12,8 +13,7 @@ class Super:
 
 
 class Sub(Super):
-
-    @Pure       #:: ExpectedOutput(invalid.program:invalid.override)
+    @Pure
     def some_function(self, a: int) -> int:
         Requires(True)
         Ensures(Result() > 17)
