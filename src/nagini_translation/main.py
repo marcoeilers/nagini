@@ -195,21 +195,26 @@ def extract_native_contracts(modules: List['PythonModule']) -> None:
     for m in modules:
         for f in m.methods.values():
             if f.native:
-                extract_native_contract(m, None, f)
+                extract_native_contract(m, None, f, modules)
         for c in m.classes.values():
             if not isinstance(c, PythonClass):
                 continue
             for f in c.methods.values():
                 if f.native:
-                    extract_native_contract(m, c, f)
+                    extract_native_contract(m, c, f, modules)
 
-def extract_native_contract(m: 'PythonModule', c: 'PythonClass', f: 'PythonMethod') -> None:
+
+extractor = None
+
+def extract_native_contract(m: 'PythonModule', c: 'PythonClass', f: 'PythonMethod', all_modules: List['PythonModule']) -> None:
+    global extractor
+    if extractor is None:
+        extractor = NativeSpecExtractor(all_modules)
     ctx = Context()
     ctx.module = m
     ctx.current_function = f
     ctx.current_class = c
-    extractor = NativeSpecExtractor(f, ctx)
-    extractor.extract()
+    extractor.extract(f, ctx)
 
 def collect_modules(analyzer: Analyzer, path: str) -> None:
     """

@@ -10,7 +10,7 @@ from nagini_translation.lib.program_nodes import (
     PythonType)
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
-from typing import Optional, Type, Tuple
+from typing import Optional, Type, Tuple, List
 
 
 class NativeSpecExtractor:
@@ -47,7 +47,7 @@ class NativeSpecExtractor:
             precondfacts.append(self.translator.translate(p, ctx, py2vf_ctx))
         return precondfacts
 
-    def __init__(self, f: PythonMethod, ctx: Context):
+    def extract(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
         self.translator = Translator()
         theenv = self.env(ctx.module, ctx)
@@ -56,7 +56,9 @@ class NativeSpecExtractor:
               self.precond(f, ctx, py2vf_ctx)))
         pass
 
-    def extract(self) -> None:
+    def __init__(self, all_modules: List[PythonModule]) -> None:
+        self.all_modules = all_modules
+        # generate global stuff, e.g. iterate over all classes from all modules.
         pass
 
     def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
