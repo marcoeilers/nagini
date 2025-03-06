@@ -302,7 +302,7 @@ class Translator:
 
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         if (p.name == 'tuple'):
-            return vfpy.PyTuple_t(vf.List.from_list(list(map(lambda x: vf.ImmInductive(self.pytype__to__PyObj_t(x)), p.type_args)))),
+            return vfpy.PyTuple_t(vf.List.from_list(list(map(lambda x: vf.ImmInductive(self.pytype__to__PyObj_t(x)), p.type_args))))
         return {
             'int': vfpy.PyLong(0).PyObj_t(),
             # TODO: this is just for testing, remove this and implement cleanly later
