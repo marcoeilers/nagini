@@ -97,13 +97,13 @@ class Translator:
         if (node.func.id == "Acc"):
             frac = 1
             if len(node.args) == 2:
-                #TODO: check if these assertions are at least somehow useful?
+                # TODO: check if these assertions are at least somehow useful?
                 assert (isinstance(node.args[1], ast.BinOp))
                 assert (isinstance(node.args[1].left, ast.Constant))
                 assert (isinstance(node.args[1].right, ast.Constant))
                 frac = Fraction(node.args[1].left.value,
                                 node.args[1].right.value)
-                #TODO: finish translating this
+                # TODO: finish translating this
             if isinstance(node.args[0], ast.Attribute):
                 py2vf_ctx[node.args[0].value.id + repr(AttrAccess(node.args[0].attr, PtrAccess()))] = vf.NamedValue[vfpy.PyObjPtr](
                     node.args[0].value.id +
@@ -114,14 +114,15 @@ class Translator:
                                           vf.NameDefExpr(
                                               py2vf_ctx[node.args[0].value.id +
                                                         repr(AttrAccess(node.args[0].attr, PtrAccess()))])),
-                    self.create_hasval_fact(node.args[0].value.id, 
-                                            self.get_type(node.args[0], ctx), 
-                                            ctx, 
-                                            py2vf_ctx, 
+                    self.create_hasval_fact(node.args[0].value.id,
+                                            self.get_type(node.args[0], ctx),
+                                            ctx,
+                                            py2vf_ctx,
                                             lambda x: AttrAccess(node.args[0].attr, x)),
                 ])
             else:
-                raise NotImplementedError("Acc is not implemented for this content"+ str(node.args[0]))
+                raise NotImplementedError(
+                    "Acc is not implemented for this content" + str(node.args[0]))
         else:
             funcid = node.func.id
             # TODO: check if each of these variables is to be used as ref or as val
@@ -239,6 +240,8 @@ class Translator:
             "Is": (vf.Eq, ptracc),
         }
         operator, acctype = dict[type(node.ops[0]).__name__]
+        if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx).name):
+            return vf.ImmLiteral(vf.Bool(False))
         if (operandtype in ["int", "float", "bool", "string"]):
             return vf.BinOp[vf.Bool](
                 self.translate_generic_expr(
@@ -271,7 +274,7 @@ class Translator:
             cntnt = {
                 "int": vfpy.PyLong
 
-            }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.name]))
+            }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(cntnt(
                 vf.NameDefExpr(py2vf_ctx[pyobjname+repr(access)])))
             return vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(path(PtrAccess()))], pyobjval)
@@ -309,7 +312,7 @@ class Translator:
         return {
             'int': vfpy.PyLong(0).PyObj_t(),
             # TODO: this is just for testing, remove this and implement cleanly later
-        }.get(p.name, vfpy.PyClass_t(self.classes.get(p.name, "FAILED PYTYPE TRANSLATION")))
+        }.get(p.name, vfpy.PyClass_t(self.classes.get(p.module.sil_name+p.name, "FAILED PYTYPE TRANSLATION")))
 
     def is_pure(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)

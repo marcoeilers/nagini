@@ -1,7 +1,6 @@
 from nagini_contracts.contracts import *
 from typing import List, Tuple
-
-
+import nagini_translation.t1 as t1
 class mycoolclass:
     def __init__(self, arg: int) -> None:
         self.arg = arg
@@ -49,7 +48,7 @@ def compare(i: int, i2: int, c: mycoolclass, d: mycoolclass) -> int:
 @ContractOnly
 @Native
 #TODO: this passes the translation and fails the verification
-def compare3(c: mytupledclass) -> int:
+def compare3(c: t1.mytupledclass) -> int:
     Requires(Acc(c.arg) and c.arg == (3,(21,12)))
     Ensures(Result() > 13)
 #    

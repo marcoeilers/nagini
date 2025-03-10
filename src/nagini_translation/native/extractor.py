@@ -14,13 +14,15 @@ from typing import Optional, Type, Tuple, List
 
 
 class NativeSpecExtractor:
-    def env(self, m: PythonModule, ctx: Context) -> str:
+    def env(self, modules: List[PythonModule]) -> str:
         res = "fixpoint PyClass PyClass_ObjectType(){\n\treturn ObjectType;\n}\n"
-        for key, value in m.classes.items():
-            self.translator.classes[key] = vfpy.PyClass(key)
-            res += "fixpoint PyClass PyClass_"+key + \
-                "(){\n\treturn PyClass(\""+key+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
-                ");\n}\n"
+        for m in modules[1:]:
+            for key, value in m.classes.items():
+                vfname=m.sil_name+key
+                self.translator.classes[vfname] = vfpy.PyClass(vfname)
+                res += "fixpoint PyClass PyClass_"+vfname + \
+                    "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
+                    ");\n}\n"
         # TODO: finish translating fixpoint functions and predicates
         # TODO: precise whether such or such argument is to be translated as ptr or val
 
@@ -49,15 +51,16 @@ class NativeSpecExtractor:
 
     def extract(self, f: PythonMethod, ctx: Context):
         py2vf_ctx = py2vf_context()
-        self.translator = Translator()
-        theenv = self.env(ctx.module, ctx)
         # print(self.env(ctx.module, ctx))
         print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
               self.precond(f, ctx, py2vf_ctx)))
         pass
 
     def __init__(self, all_modules: List[PythonModule]) -> None:
+        self.translator = Translator()
         self.all_modules = all_modules
+        theenv = self.env(self.all_modules)
+        print(theenv)
         # generate global stuff, e.g. iterate over all classes from all modules.
         pass
 
