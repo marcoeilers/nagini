@@ -23,6 +23,7 @@ class NativeSpecExtractor:
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
                     ");\n}\n"
+        res += "/*--END OF ENV--*/"
         # TODO: finish translating fixpoint functions and predicates
         # TODO: precise whether such or such argument is to be translated as ptr or val
 
@@ -54,6 +55,7 @@ class NativeSpecExtractor:
         # print(self.env(ctx.module, ctx))
         print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
               self.precond(f, ctx, py2vf_ctx)))
+        print("/*----*/")
         pass
 
     def __init__(self, all_modules: List[PythonModule]) -> None:
