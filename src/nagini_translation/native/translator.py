@@ -240,7 +240,7 @@ class Translator:
             "Is": (vf.Eq, ptracc),
         }
         operator, acctype = dict[type(node.ops[0]).__name__]
-        if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx).name):
+        if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
             return vf.ImmLiteral(vf.Bool(False))
         if (operandtype in ["int", "float", "bool", "string"]):
             return vf.BinOp[vf.Bool](
