@@ -1,6 +1,13 @@
+"""
+fixpoint PyClass PyClass_ObjectType(){
+    return ObjectType;
+}
+fixpoint PyClass PyClass_module_0ClassA(){
+    return PyClass("module_0ClassA", PyClass_ObjectType);
+}
+"""
 from nagini_contracts.contracts import *
 from typing import List, Tuple
-
 
 class ClassA:
     def __init__(self, arg: int, arg2: Tuple[int, int]) -> None:
