@@ -1,3 +1,4 @@
+from fractions import Fraction
 import nagini_translation.native.vf.vf as vf
 from typing import TypeVar, Tuple, Type
 from abc import ABC, abstractmethod
@@ -37,6 +38,9 @@ class PyClass(vf.Inductive, ABC):
         self.name = name
     def __str__(self):
         return "PyClass_"+self.name+""
+class PyClass_List(PyClass):
+    def __init__(self):
+        super().__init__("List")
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):
@@ -72,8 +76,8 @@ class PyObj_HasVal(vf.PredicateFact):
 
 
 class PyObj_HasAttr(vf.PredicateFact):
-    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: vf.Expr[vf.Char], attrValue: vf.Expr[PyObjPtr]):
-        super().__init__("pyobj_hasattr", obj, attrName, attrValue)
+    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: vf.Expr[vf.Char], attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
+        super().__init__("pyobj_hasattr", obj, attrName, attrValue, frac=frac)
 
 
 class PyTuple(PyObj_v):

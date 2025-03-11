@@ -37,7 +37,7 @@ class ValAccess(ValueAccess):
 
 
 class SubscriptAccess(ValueAccess):
-    def __init__(self, index: int, value: ValueAccess):
+    def __init__(self, index: ast.Expr, value: ValueAccess):
         self.index = index
         self.value = value
 
@@ -113,7 +113,8 @@ class Translator:
                                           node.args[0].attr,
                                           vf.NameDefExpr(
                                               py2vf_ctx[node.args[0].value.id +
-                                                        repr(AttrAccess(node.args[0].attr, PtrAccess()))])),
+                                                        repr(AttrAccess(node.args[0].attr, PtrAccess()))]),
+                                          frac=frac),
                     self.create_hasval_fact(node.args[0].value.id,
                                             self.get_type(node.args[0], ctx),
                                             ctx,
@@ -123,6 +124,8 @@ class Translator:
             else:
                 raise NotImplementedError(
                     "Acc is not implemented for this content" + str(node.args[0]))
+        elif (node.func.id == "list_pred"):
+            raise NotImplementedError("list_pred is not implemented")
         else:
             funcid = node.func.id
             # TODO: check if each of these variables is to be used as ref or as val
@@ -283,8 +286,8 @@ class Translator:
             py2vf_ctx[pyobjname+repr(access)
                       ] = vf.NamedValue(pyobjname+str(access))
             cntnt = {
-                "int": vfpy.PyLong
-
+                "int": vfpy.PyLong,
+                "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(cntnt(
                 vf.NameDefExpr(py2vf_ctx[pyobjname+repr(access)])))
@@ -329,7 +332,7 @@ class Translator:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
         if (isinstance(node, ast.Call)):
             # predicates are stored in ctx.module.predicates
-            return not (node.func.id in ctx.module.predicates or node.func.id == "Acc")
+            return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred"])
         elif (isinstance(node, ast.UnaryOp)):
             return self.is_pure(node.operand, ctx)
         elif (isinstance(node, ast.IfExp)):
