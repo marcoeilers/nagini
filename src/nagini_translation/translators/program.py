@@ -292,7 +292,7 @@ class ProgramTranslator(CommonTranslator):
         worklist.add(f)
         while(worklist):
             cur = worklist.pop()
-            overrides.insert(0, cur)  # insert at the front to have a topo ordering
+            overrides.append(cur)  # insert at the back to have a topo ordering
             for override in map(
                 lambda sb: sb.functions.get(cur.name),
                 cur.cls.direct_subclasses
@@ -416,7 +416,8 @@ class ProgramTranslator(CommonTranslator):
             ctx.merge_functions[cur] = merge_func
 
         # append the one large conditional expression
-        pres.append(last_check)
+        if last_check:
+            pres.append(last_check)
 
         while(ctx.var_aliases):
             for alias in list(ctx.var_aliases.keys()):
