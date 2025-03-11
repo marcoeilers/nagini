@@ -1102,6 +1102,10 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         for try_block in self.try_blocks:
             try_block.process(translator)
 
+        # impure methods cannot use the opaque field
+        if not self.pure:
+            self.opaque = False
+
         if self.pure:
             # if function not part of a class, set to transparent
             if not self.cls:
