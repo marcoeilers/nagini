@@ -24,6 +24,7 @@ class RingBuffer:
                Implies(len(self.data) > 0, self.datalen <= len(self.data) and self.first < len(self.data))
 
     @Pure
+    @Transparent
     def contents(self) -> PSeq[int]:
         Requires(Rd(self.valid()))
         return Unfolding(Rd(self.valid()),
@@ -32,6 +33,7 @@ class RingBuffer:
                          else self.data.drop(self.first) + self.data.take(self.first + self.datalen - len(self.data)))
 
     @Pure
+    @Transparent
     def capacity(self) -> int:
         Requires(Rd(self.valid()))
         return Unfolding(Rd(self.valid()), len(self.data))
@@ -60,6 +62,7 @@ class RingBuffer:
         Fold(self.valid())
 
     @Pure
+    @Transparent
     def head(self) -> int:
         Requires(Rd(self.valid()))
         Requires(len(self.contents()) != 0)

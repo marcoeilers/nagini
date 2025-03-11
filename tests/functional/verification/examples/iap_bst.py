@@ -25,31 +25,37 @@ class TreeNode:
                 Acc(self.parent) and self.parent is parent)
 
     @Pure
+    @Transparent
     def hasLeftChild(self) -> Optional['TreeNode']:
         Requires(Acc(self.leftChild))
         return self.leftChild
 
     @Pure
+    @Transparent
     def hasRightChild(self) -> Optional['TreeNode']:
         Requires(Acc(self.rightChild))
         return self.rightChild
 
     @Pure
+    @Transparent
     def isRoot(self) -> bool:
         Requires(tree(self))
         return Unfolding(tree(self), not self.parent)
 
     @Pure
+    @Transparent
     def isLeaf(self) -> bool:
         Requires(tree(self))
         return Unfolding(tree(self), not (self.rightChild or self.leftChild))
 
     @Pure
+    @Transparent
     def hasAnyChildren(self) -> Optional['TreeNode']:
         Requires(tree(self))
         return Unfolding(tree(self), self.rightChild or self.leftChild)
 
     @Pure
+    @Transparent
     def hasBothChildren(self) -> Optional['TreeNode']:
         Requires(tree(self))
         return Unfolding(tree(self), self.rightChild and self.leftChild)

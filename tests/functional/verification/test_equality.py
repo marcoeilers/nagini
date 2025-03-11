@@ -18,6 +18,7 @@ class Thing:
         self.value = new_val
 
     @Pure
+    @Transparent
     def __eq__(self, other: object) -> bool:
         Requires(Acc(self.value, 1/10))
         Requires(Acc(other.value, 1/10) if isinstance(other, Thing) else True)

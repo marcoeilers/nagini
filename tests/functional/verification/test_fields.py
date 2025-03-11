@@ -29,12 +29,14 @@ class SuperClass:
         self.typed_field = SuperClass()
 
     @Pure
+    @Transparent
     def get_private(self) -> int:
         Requires(self != None)
         Requires(Acc(self.__private_field))
         return self.__private_field
 
     @Pure
+    @Transparent
     def get_public(self) -> int:
         Requires(self != None)
         Requires(Acc(self.super_field))
@@ -75,12 +77,14 @@ class SubClass(SuperClass):
         self.__private_field = i
 
     @Pure
+    @Transparent
     def get_private_sub(self) -> int:
         Requires(self != None)
         Requires(Acc(self.__private_field))
         return self.__private_field
 
     @Pure
+    @Transparent
     def get_public_sub(self) -> int:
         Requires(self != None)
         Requires(Acc(self.super_field))

@@ -312,7 +312,7 @@ class ProgramTranslator(CommonTranslator):
         node_factory = ProgramNodeFactory()
         merge_func: PythonMethod = node_factory.create_python_method(
             f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
-            node_factory, f.interface, f.interface_dict, f.method_type
+            node_factory, f.interface, f.interface_dict, f.method_type, opaque=False
         )
         for k,v in merge_func.__dict__.items():
             if not v and f.__getattribute__(k):

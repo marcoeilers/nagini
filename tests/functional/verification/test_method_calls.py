@@ -11,6 +11,7 @@ class Class1:
         self.c2 = Class2(self)
 
     @Pure
+    @Transparent
     def get_c2(self) -> 'Class2':
         Requires(Acc(self.c2))  # type: ignore
         return self.c2
@@ -35,6 +36,7 @@ class Class2:
         self.c1 = c1
 
     @Pure
+    @Transparent
     def get_c1(self) -> Class1:
         Requires(Acc(self.c1))  # type: ignore
         return self.c1

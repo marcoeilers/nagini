@@ -16,26 +16,31 @@ class Container:
         return Acc(self.v2)
 
     @Pure
+    @Transparent
     def needs_pred_full(self) -> int:
         Requires(self.P())
         return Unfolding(self.P(), self.v2)
 
     @Pure
+    @Transparent
     def needs_pred(self) -> int:
         Requires(Rd(self.P()))
         return Unfolding(Rd(self.P()), self.v2)
 
-    @Pure       #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+    @Pure
+    @Transparent       #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
     def needs_pred_fails(self) -> int:
         Requires(Rd(self.P()))
         return Unfolding(self.P(), self.v2)
 
     @Pure
+    @Transparent
     def needs_field_full(self) -> int:
         Requires(Acc(self.v))
         return self.v
 
     @Pure
+    @Transparent
     def needs_field(self) -> int:
         Requires(Rd(self.v))
         return self.v

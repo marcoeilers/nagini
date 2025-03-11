@@ -24,6 +24,7 @@ class Cell:
         self.dock = Dock(1)  # type: Dock
 
     @Pure
+    @Transparent
     def docker(self) -> Dock:
         Requires(Rd(self.dock))
         return self.dock
