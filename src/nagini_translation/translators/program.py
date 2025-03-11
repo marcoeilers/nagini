@@ -343,12 +343,18 @@ class ProgramTranslator(CommonTranslator):
         # assert topological for methods
         for func in overrides:
             if func.overrides:
-                assert overrides.index(func) < overrides.index(func.overrides)
+                assert overrides.index(func) > overrides.index(func.overrides)
 
         # loop through all overriding functions and encode
-        # the pre-/postconditions as implications depending on the type e.g.:
-        # requires issubtype(self, X) ==> <Precondition of X>
-        # requires issubtype(self, Y) ==> <Precondition of Y>
+        # the preconditions as one large conditional expression of the form:
+        # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
+        #          issubtype(typeof(self), X) ? <Pre of X> :
+        #          issubtype(typeof(self), SubX) ? <Pre of SubX> : true
+        # 
+        # postconditions as implications depending on the type e.g.:
+        # ensures issubtype(self, X) ==> <Post of X>
+        # ensures issubtype(self, Y) ==> <Post of Y>
+        last_check = None
         for cur in overrides:
 
             ctx.current_function = cur
@@ -376,28 +382,15 @@ class ProgramTranslator(CommonTranslator):
                     ).ref()
 
                 for pre, _ in cur.precondition:
-
-                    # check that it has exactly the type and is not a subclass
-                    type_checks = set()
-                    for subclass in cur.cls.direct_subclasses:
-                        type_checks.add(self.viper.Not(self.type_check(
-                            self_var, subclass, pos, ctx, inhale_exhale=False
-                        ), pos, info))
-
                     stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
                     check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-
-                    if type_checks:
-                        full_type_check = self.viper.And(check, type_checks.pop(), pos, info)
-                        while(type_checks):
-                            full_type_check = self.viper.And(full_type_check, type_checks.pop(), pos, info)
+                    if last_check is None:
+                        last_check = self.viper.CondExp(check, obj, self.viper.TrueLit(pos, info), pos, info)
                     else:
-                        full_type_check = check
-
-                    to_add_pre = self.viper.Implies(full_type_check, obj, pos, info)
+                        last_check = self.viper.CondExp(check, obj, last_check, pos, info)
                     if stmt:
-                        raise InvalidProgramException(to_add_pre, 'purity.violated')
-                    pres.append(to_add_pre)
+                        raise InvalidProgramException(merge_func.node, 'purity.violated')
+                
 
                 for post, _ in cur.postcondition:
                     # result type check
@@ -421,6 +414,9 @@ class ProgramTranslator(CommonTranslator):
 
             # add to context for the translation of function calls
             ctx.merge_functions[cur] = merge_func
+
+        # append the one large conditional expression
+        pres.append(last_check)
 
         while(ctx.var_aliases):
             for alias in list(ctx.var_aliases.keys()):
