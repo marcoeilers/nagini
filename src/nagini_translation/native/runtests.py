@@ -36,12 +36,16 @@ for filename in os.listdir('nagini_translation/native/tests'):
         result = subprocess.run('python3 nagini_translation/main.py --skip-verification ' +
                                 filepath, cwd="./", shell=True, capture_output=True, text=True)
         print("  ENV" + (20 - len("ENV")) * " ", end="")
-        separated=result.stdout.split("/*--END OF ENV--*/\n")
-        handle_diff(ast.get_docstring(tree), separated[0])
-        if (len(separated) > 1):
-            fun = separated[1] or None
-            for i, f in enumerate(functions):
-                print("  "+f.name + (20 - len(f.name)) * " ", end="")
-                handle_diff(ast.get_docstring(f), fun.split("\n/*----*/\n")[i])
+        if (result.stderr==""):
+            separated=result.stdout.split("/*--END OF ENV--*/\n")
+            handle_diff(ast.get_docstring(tree), separated[0])
+            if (len(separated) > 1):
+                fun = separated[1] or None
+                for i, f in enumerate(functions):
+                    print("  "+f.name + (20 - len(f.name)) * " ", end="")
+                    handle_diff(ast.get_docstring(f), fun.split("\n/*----*/\n")[i])
+        else:
+            print(Fore.RED+"FAILED"+Style.RESET_ALL)
+            print(result.stderr)
 file.close()
 print("All tests completed.")
