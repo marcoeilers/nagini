@@ -36,7 +36,7 @@ class ValAccess(ValueAccess):
         return ":val"
 
 
-class SubscriptAccess(ValueAccess):
+class TupleSubscriptAccess(ValueAccess):
     def __init__(self, index: ast.Expr, value: ValueAccess):
         self.index = index
         self.value = value
@@ -160,14 +160,14 @@ class Translator:
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, v)
 
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
-        if (type(v) == SubscriptAccess):
+        if (type(v) == TupleSubscriptAccess):
             # TODO: handle the case where the index is not a constant
             return self.translate_generic_expr(node.elts[v.index], ctx, py2vf_ctx, v.value)
         else:
             raise NotImplementedError("Tuple expression not implemented")
 
     def translate_Subscript_expr(self, node: ast.Subscript, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
-        return self.translate_generic_expr(node.value, ctx, py2vf_ctx, SubscriptAccess(node.slice.value, v))
+        return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {
@@ -295,7 +295,7 @@ class Translator:
         elif (t.name == "tuple"):
             tupleEls = []
             tupleElNames = [(names[i], PtrAccess()) if i < len(names)
-                            else (pyobjname, path(SubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
+                            else (pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
                 el_ptr_name, el_acc_type = tupleElNames[i]
                 py2vf_ctx[el_ptr_name+repr(el_acc_type)] = vf.NamedValue[vfpy.PyObjPtr](
@@ -313,7 +313,7 @@ class Translator:
                     ctx,
                     py2vf_ctx,
                     (lambda x: x) if i < len(names) else
-                    (lambda x: path(SubscriptAccess(i, x)))
+                    (lambda x: path(TupleSubscriptAccess(i, x)))
                 ) for i in range(len(t.type_args))
             ])
         else:
