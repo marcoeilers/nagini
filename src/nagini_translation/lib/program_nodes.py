@@ -985,7 +985,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                  node_factory: 'ProgramNodeFactory',
                  interface: bool = False,
                  interface_dict: Dict[str, Any] = None,
-                 method_type: MethodType = MethodType.normal):
+                 method_type: MethodType = MethodType.normal,
+                 opaque: bool = True):
         """
         :param cls: Class this method belongs to, if any.
         :param superscope: The scope (class or module) this method belongs to
@@ -994,6 +995,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         implementation, just its contract
         :param interface: True iff the method implementation is provided in
         native Silver.
+        :param pure: True iff ir's opaque
         """
         PythonNode.__init__(self, name, node)
         PythonScope.__init__(self, None, superscope)
@@ -1017,7 +1019,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.error_var = None  # infer
         self.declared_exceptions = OrderedDict()  # direct
         self.pure = pure
-        self.opaque = False
+        self.opaque = opaque
         self.predicate = False
         self.inline = False
         self.all_low = False
@@ -1100,9 +1102,20 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         for try_block in self.try_blocks:
             try_block.process(translator)
 
-        # generate merge function name and
-        # set self and all overrides to opaque if it is overridden
         if self.pure:
+            # if function not part of a class, set to transparent
+            if not self.cls:
+                self.opaque = False
+
+            # check that if function is transparent, it is not
+            # overridden in a subclass
+            if self.overrides and not (self.opaque and self.overrides.opaque):
+                    msg: str = "A tranparent function cannot be overridden. "
+                    msg += "Remove the @Transparent decorator for the function to be opaque."
+                    raise InvalidProgramException(self.node, "invalid.override.opaque", msg)
+
+            # generate merge function name and
+            # set self and all overrides to opaque if it is overridden
             super_func: PythonMethod = self
             while(super_func.overrides):
                 super_func.opaque = True
@@ -1869,10 +1882,11 @@ class ProgramNodeFactory:
             container_factory: 'ProgramNodeFactory',
             interface: bool = False,
             interface_dict: Dict[str, Any] = None,
-            method_type: MethodType = MethodType.normal) -> PythonMethod:
+            method_type: MethodType = MethodType.normal,
+            opaque: bool = True) -> PythonMethod:
         return PythonMethod(name, node, cls, superscope, pure, contract_only,
                             container_factory, interface, interface_dict,
-                            method_type)
+                            method_type, opaque=opaque)
 
     def create_python_io_operation(self, name: str, node: ast.AST,
                                    superscope: PythonScope,
