@@ -14,6 +14,7 @@ class Cell:
         return Acc(self.cnts)
 
     @Pure
+    @Transparent
     def get_contents(self) -> object:
         Requires(self.val())
         return Unfolding(self.val(), self.cnts)
@@ -38,6 +39,7 @@ class ReCell(Cell):
         return Acc(self.bak)
 
     @Pure
+    @Transparent
     def get_last(self) -> object:
         Requires(self.val())
         return Unfolding(self.val(), self.bak)

@@ -7,7 +7,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 from collections import OrderedDict
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Optional
+import copy
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
@@ -39,6 +40,7 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonNode,
     PythonVar,
+    ProgramNodeFactory
 )
 from nagini_translation.lib.typedefs import (
     Domain,
@@ -275,6 +277,159 @@ class ProgramTranslator(CommonTranslator):
         self.info = None
         return result
 
+    def create_merge_function(self, f: PythonMethod, ctx: Context) -> Optional['silver.ast.Callable']:
+        """
+        Creates a Viper function that contains all pre-/postconditions of the given function
+        and of all the overriding function in subclasses called the merge function.
+        """
+        pos = self.viper.to_position(f.node, ctx.position, py_node=f)
+        ctx.position.append(('override', pos))
+        self.info = self.viper.SimpleInfo(['merge.function'])
+
+        # gather all overrides plus the function itself
+        overrides: list[PythonMethod] = []
+        worklist: set[PythonMethod] = set()
+        worklist.add(f)
+        while(worklist):
+            cur = worklist.pop()
+            overrides.append(cur)  # insert at the back to have a topo ordering
+            for override in map(
+                lambda sb: sb.functions.get(cur.name),
+                cur.cls.direct_subclasses
+            ):
+                if override:
+                    worklist.add(override)
+
+        # no need for a merge function since no overrides
+        # or we already created a merge function in a super class (i.e. overridden)
+        # function if it overrides
+        if len(overrides) == 1 or f.overrides:
+            ctx.position.pop()
+            ctx.var_aliases = {}
+            return None
+
+        # make a deepcopy of f (not possible with deepcopy)
+        node_factory = ProgramNodeFactory()
+        merge_func: PythonMethod = node_factory.create_python_method(
+            f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
+            node_factory, f.interface, f.interface_dict, f.method_type, opaque=False
+        )
+        for k,v in merge_func.__dict__.items():
+            if not v and f.__getattribute__(k):
+                merge_func.__setattr__(k, f.__getattribute__(k))
+
+        old_function = ctx.current_function
+        old_module = ctx.module
+        old_cls = ctx.current_class
+
+        ctx.current_function = merge_func
+
+        # null check for self
+        self_var = merge_func.args[next(iter(merge_func.args))].ref()
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        pres = [not_null]
+        posts = []
+
+        fname = merge_func.merge_func_name
+        merge_func.sil_name = fname
+        merge_func.name = fname
+        merge_func.contract_only = True
+        merge_func.opaque = False
+        old_aliases = copy.deepcopy(ctx.var_aliases)
+
+        # assert topological for methods
+        for func in overrides:
+            if func.overrides:
+                assert overrides.index(func) > overrides.index(func.overrides)
+
+        # loop through all overriding functions and encode
+        # the preconditions as one large conditional expression of the form:
+        # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
+        #          issubtype(typeof(self), X) ? <Pre of X> :
+        #          issubtype(typeof(self), SubX) ? <Pre of SubX> : true
+        # 
+        # postconditions as implications depending on the type e.g.:
+        # ensures issubtype(self, X) ==> <Post of X>
+        # ensures issubtype(self, Y) ==> <Post of Y>
+        last_check = None
+        for cur in overrides:
+
+            ctx.current_function = cur
+            ctx.module = cur.module
+            ctx.current_class = cur.cls
+
+            if cur.overrides:
+                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                    root_var = merge_func.args[merge_name]
+                    if merge_name == next(iter(f.args.keys())):
+                        root_var = copy.copy(root_var)
+                        root_var.type = cur.cls
+                    ctx.set_alias(cur_name, root_var)
+
+            pos = self.to_position(cur.node, ctx)
+            info = self.no_info(ctx)
+
+            with ctx.additional_aliases(ctx.var_aliases):
+                self_var = cur.args[next(iter(cur.args))].ref()
+
+                # find self in aliases
+                if ctx.var_aliases:
+                    self_var = ctx.var_aliases.get(
+                        merge_func.args[next(iter(merge_func.args))].name
+                    ).ref()
+
+                for pre, _ in cur.precondition:
+                    stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
+                    check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                    if last_check is None:
+                        last_check = self.viper.CondExp(check, obj, self.viper.TrueLit(pos, info), pos, info)
+                    else:
+                        last_check = self.viper.CondExp(check, obj, last_check, pos, info)
+                    if stmt:
+                        raise InvalidProgramException(merge_func.node, 'purity.violated')
+                
+
+                for post, _ in cur.postcondition:
+                    # result type check
+                    if cur.type.name not in PRIMITIVES:
+                        res_type_pos = self.to_position(cur.node, ctx, '"return type is correct"')
+                        res_type = self.translate_type(cur.type, ctx)
+                        result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+                        check = self.type_check(result, cur.type, res_type_pos, ctx)
+
+                        first_check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                        implication = self.viper.Implies(first_check, check, pos, info)
+                        posts = [implication] + posts
+
+                    # postcondition check
+                    stmt, obj = self.translate_expr(post, ctx, self.viper.Bool)
+                    check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                    to_add_post = self.viper.Implies(check, obj, pos, info)
+                    if stmt:
+                        raise InvalidProgramException(to_add_post, 'purity.violated')
+                    posts.append(to_add_post)
+
+            # add to context for the translation of function calls
+            ctx.merge_functions[cur] = merge_func
+
+        # append the one large conditional expression
+        if last_check:
+            pres.append(last_check)
+
+        while(ctx.var_aliases):
+            for alias in list(ctx.var_aliases.keys()):
+                ctx.remove_alias(alias)
+        ctx.var_aliases = old_aliases
+
+        ctx.current_function = old_function
+        ctx.module = old_module
+        ctx.current_class = old_cls
+        ctx.position.pop()
+        return self.config.method_translator.translate_merge_function(merge_func, ctx, pres, posts)
+
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
         """
@@ -282,7 +437,6 @@ class ProgramTranslator(CommonTranslator):
         function which calls the overriding function, to check behavioural
         subtyping.
         """
-        assert not method.pure
         old_function = ctx.current_function
         ctx.current_function = method.overrides
         pos = self.viper.to_position(method.node, ctx.position, py_node=method)
@@ -334,17 +488,111 @@ class ProgramTranslator(CommonTranslator):
                          for f in fields])
 
         called_name = method.sil_name
+
         ctx.position.pop()
-        results, targets, body = self._create_override_check_body_impure(
-            method, has_subtype, called_name, args, ctx)
-        result = self.create_method_node(
-            ctx, mname, params, results, pres, posts, [], body,
-            self.no_position(ctx), self.no_info(ctx),
-            method=method.overrides, overriding_check=True)
+
+        if method.pure:
+            t = self.translate_type(method.result.type, ctx)
+            result = self.viper.Result(t, self.no_position(ctx), self.no_info(ctx))
+            posts.insert(0,
+                self.type_check(result, method.result.type, self.no_position(ctx), ctx)
+            )
+
+            method_type, default_checks, body = self._create_override_check_body_pure(
+                method, has_subtype, called_name, args, ctx)
+            pres = default_checks + pres
+
+            # add decreases clause of superclass function to preconditions
+            superclass_func = method.cls.superclass.get_function(method.name)
+            if superclass_func:
+                info = self.no_info(ctx)
+                for args, aliases in superclass_func.decreases_clauses:
+                    with ctx.additional_aliases(aliases):
+                        condition = None
+                        pos = self.to_position(args[0], ctx)
+                        if len(args) > 1:
+                            cond_stmt, condition = self.translate_expr(args[1], ctx, self.viper.Bool)
+                            if cond_stmt:
+                                raise InvalidProgramException(args[1], 'purity.violated')
+                        measure_node = args[0]
+                        if isinstance(measure_node, ast.NameConstant) and measure_node.value is None:
+                            decreases_clause = self.viper.DecreasesWildcard(condition, pos, info)
+                        else:
+                            measure = None
+                            if isinstance(measure_node, ast.Call):
+                                target = self.get_target(measure_node, ctx)
+                                if isinstance(target, PythonMethod) and target.predicate:
+                                    measure_stmt, measure_args, _ = self.translate_args(target, measure_node.args,
+                                                                                        measure_node.keywords, measure_node, ctx)
+                                    measure = self.viper.PredicateInstance(measure_args, target.sil_name, pos, info)
+                            if measure is None:
+                                measure_stmt, measure = self.translate_expr(measure_node, ctx, target_type=self.viper.Int)
+                            decreases_clause = self.viper.DecreasesTuple([measure], condition, pos, info)
+                            if measure_stmt:
+                                raise InvalidProgramException(measure_node, 'purity.violated')
+                    pres.insert(0, decreases_clause)
+            else:
+                raise InvalidProgramException(method.node, 'invalid.override')
+
+            # create function viper AST node
+            result = self.viper.Function(
+                mname, params, method_type, pres, posts,
+                body, self.no_position(ctx), self.no_info(ctx)
+            )
+
+        else:
+            results, targets, body = self._create_override_check_body_impure(
+                method, has_subtype, called_name, args, ctx)
+            result = self.create_method_node(
+                ctx, mname, params, results, pres, posts, [], body,
+                self.no_position(ctx), self.no_info(ctx),
+                method=method.overrides, overriding_check=True)
 
         ctx.current_function = old_function
         self.info = None
         return result
+
+    def _create_override_check_body_pure(self, method: PythonMethod,
+            has_subtype: Expr, calledname: str,
+            args: List[Expr], ctx: Context) -> Tuple['silver.ast.Callable', List[Expr], Expr]:
+        
+        if method.type:
+            method_type = self.translate_type(method.type, ctx)
+        else:
+            raise InvalidProgramException(method.node, 'invalid.override')
+
+        # Check that arg names match and default args are equal
+        default_checks = []
+        for (name1, arg1), (name2, arg2) in zip(method.args.items(),
+                                                method.overrides.args.items()):
+            error_string = ('"default value matches overridden method '
+                            'for argument {0}"').format(name1)
+            assert_pos = self.to_position(arg1.node, ctx, error_string)
+            if name1 != name2:
+                raise InvalidProgramException(arg1.node, 'invalid.override')
+            if arg1.default or arg2.default:
+                if not (arg1.default and arg2.default):
+                    raise InvalidProgramException(arg1.node, 'invalid.override')
+                val1 = arg1.default_expr
+                val2 = arg2.default_expr
+                eq = self.viper.EqCmp(val1, val2, assert_pos,
+                                      self.no_info(ctx))
+                assertion = self.viper.Assert(eq, assert_pos,
+                                              self.no_info(ctx))
+                default_checks.append(assertion)
+        ctx.position.append(('overridden method',
+                             self.viper.to_position(method.overrides.node,
+                                                    ctx.position, py_node=method)))
+
+        func_app = self.viper.FuncApp(
+            calledname, args, self.to_position(method.node, ctx),
+            self.no_info(ctx), method_type
+        )
+        ctx.position.pop()
+
+        if has_subtype:
+            default_checks.append(has_subtype)
+        return method_type, default_checks, func_app
 
     def _create_override_check_body_impure(self, method: PythonMethod,
             has_subtype: Expr, calledname: str,
@@ -1338,15 +1586,17 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
+                    merge_func = self.create_merge_function(func, ctx)
+                    if merge_func:
+                        functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
                     func_constants.append(self.translate_function_constant(func, ctx))
-                    if func.overrides and not ((func_name in ('__str__', '__bool__') and
-                                                func.overrides.cls.name == 'object') or
-                                               (func_name in ('__getitem__',) and func.overrides.cls.name == 'dict')):
-                        # We allow overriding certain methods, since the basic versions
-                        # in object are already minimal.
-                        raise InvalidProgramException(func.node,
-                                                      'invalid.override')
+                    if ((func_name != '__init__' or
+                             (cls.superclass and
+                              cls.superclass.python_class.has_classmethod)) and
+                            func.overrides):
+                        functions.append(self.create_override_check(func, ctx))
+
                 for method_name in cls.methods:
                     method = cls.methods[method_name]
                     threading_ids_constants.append(

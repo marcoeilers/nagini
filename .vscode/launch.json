@@ -122,6 +122,52 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ]
+        },
+        {
+            "name": "Manual BST Testing",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "${workspaceRoot}/venv/bin/python3",
+            "program": "${workspaceRoot}/src/nagini_translation/main.py",
+            "args": [
+                "--write-viper-to-file",
+                "${workspaceRoot}/manual_testing/out/${fileBasenameNoExtension}.vpr",
+                "--counterexample",
+                "--verbose",
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Nagini Testing 2.0",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/src/nagini_translation/main.py",
+            "args": [
+                "--write-viper-to-file",
+                "manual_testing/out/${fileBasenameNoExtension}.vpr",
+                "--counterexample",
+                "--verbose",
+                "${file}",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+        {
+            "name": "Pytest Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "venv/bin/pytest",
+            "args": [
+                "-v",
+                "${cwd}/src/nagini_translation/tests.py",
+                "--silicon",
+                "-k",
+                "${fileBasename}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
         }
     ]
 }

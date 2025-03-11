@@ -15,3 +15,6 @@ docs/build
 .idea
 *.pyc
 viper_out
+build
+venv
+manual_testing

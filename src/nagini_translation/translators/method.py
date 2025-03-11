@@ -272,7 +272,36 @@ class MethodTranslator(CommonTranslator):
         if func.kw_arg:
             args.append(func.kw_arg.decl)
         return args
+    
+    def translate_merge_function(self, merge_func: PythonMethod, ctx: Context,
+                                 pres, posts) -> 'silver.ast.Function':
+        """
+        Translates a pure merge function Python function to a Viper function.
+        """
+        old_function = ctx.current_function
+        ctx.current_function = merge_func
+        self.bind_type_vars(merge_func, ctx)
+        pos = self.to_position(merge_func.node, ctx)
 
+        if not merge_func.type:
+            raise InvalidProgramException(merge_func.node, 'function.type.none')
+        type = self.translate_type(merge_func.type, ctx)
+        
+        args = self._translate_params(merge_func, ctx)
+        if merge_func.declared_exceptions:
+            raise InvalidProgramException(merge_func.node,
+                                          'function.throws.exception')
+
+        decreases_pres = self._translate_decreases(merge_func, ctx)
+        pres = pres + decreases_pres
+
+        # Create typeof preconditions
+        pres = self._create_typeof_pres(merge_func, False, ctx) + pres
+
+        ctx.current_function = old_function
+        return self.viper.Function(merge_func.sil_name, args,
+                                   type, pres, posts, None, pos, self.no_info(ctx))
+        
     def translate_function(self, func: PythonMethod,
                            ctx: Context) -> 'silver.ast.Function':
         """
@@ -324,8 +353,19 @@ class MethodTranslator(CommonTranslator):
             body = self.translate_exprs(actual_body, func, ctx)
         ctx.current_function = old_function
         name = func.sil_name
+
+        # Create Function node and add opaque property if it exists
+        if func.opaque:
+            if not func.cls:
+                raise InvalidProgramException(
+                    func.node, 'invalid.opaque.function',
+                    'Opaque functions not belonging to a class are currently not supported'
+                )
+            annotation = self.viper.AnnotationInfo("opaque", [])
+        else:
+            annotation = self.no_info(ctx)
         return self.viper.Function(name, args, type, pres, posts, body,
-                                   pos, self.no_info(ctx))
+                                   pos, annotation)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
@@ -346,8 +386,9 @@ class MethodTranslator(CommonTranslator):
         type_pres = self._create_typeof_pres(method, is_constructor, ctx)
         pres = type_pres + pres
 
-        result_post = self._create_result_type_post(method, error_var_ref, ctx)
-        posts = result_post + posts
+        if not method.pure:
+            result_post = self._create_result_type_post(method, error_var_ref, ctx)
+            posts = result_post + posts
         return pres, posts
 
     def _create_result_type_post(self, method: PythonMethod, error_var_ref,
@@ -531,6 +572,11 @@ class MethodTranslator(CommonTranslator):
         Translates an impure Python function (may or not belong to a class) to
         a Viper method
         """
+        if method.opaque:
+            raise InvalidProgramException(
+                method.node, 'invalid.opaque.method',
+                'Opaque methods are currently not supported')
+
         old_function = ctx.current_function
         ctx.current_function = method
         args = self._translate_params(method, ctx)

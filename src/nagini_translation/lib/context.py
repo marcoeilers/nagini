@@ -28,6 +28,7 @@ class Context:
         self.current_function = None
         self.current_class = None
         self.current_contract_exception = None
+        self.merge_functions = {}
         self.var_aliases = {}
         self.old_aliases = {}
         self.label_aliases = {}

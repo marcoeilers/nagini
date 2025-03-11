@@ -14,6 +14,7 @@ class Whatever:
         return named_default2[0]
 
     @Pure
+    @Transparent
     def something_func(self, normal: int, named1: bool, named2: object,
                        named_default: int = 13,
                        named_default2: Tuple[int, bool]=(2, True)) -> int:
