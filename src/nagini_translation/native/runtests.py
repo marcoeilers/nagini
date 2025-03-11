@@ -16,10 +16,10 @@ def handle_diff(sol, res):
         if (res1 == sol1):
             print(""+(Fore.GREEN+"PASSED")+Style.RESET_ALL)
         else:
-            print((Fore.RED+"FAILED")+Style.RESET_ALL)
+            print((Fore.RED+"FAILED")+Style.RESET_ALL, end="")
             differences = list(difflib.ndiff(res.splitlines(), sol.splitlines()))
             print("\n\t" + "\n\t".join(filter(lambda x: x.startswith("+") or x.startswith("-") or x.startswith("?"), differences)))
-
+            print()
 
 for filename in os.listdir('nagini_translation/native/tests'):
     if filename.startswith("test_"):

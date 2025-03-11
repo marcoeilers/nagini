@@ -46,3 +46,22 @@ def double_access(i: int, i2: int, c: ClassA) -> int:
     pyobj_hasvalue(c_DOT_attrA1__ptr, PyLong_v(c_DOT_attrA1__val))
     """
     Requires(Acc(c.attrA1) and Acc(c.attrA1))
+    
+@ContractOnly
+@Native
+def delayed_ternary_acc(i: int, i2: int, c: ClassA, d: ClassA) -> int:
+    """
+    pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), cons(pair(?i2__ptr, PyLong_t), cons(pair(?c__ptr, PyClass_t(PyClass_module_0ClassA)), cons(pair(?d__ptr, PyClass_t(PyClass_module_0ClassA)), nil)))))) &*&
+    pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
+    pyobj_hasvalue(i2__ptr, PyLong_v(?i2__val)) &*&
+    pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    (i__val == i2__val) ? (
+    pyobj_hasattr(c__ptr, attrA1, ?c_DOT_attrA1__ptr) &*&
+    pyobj_hasvalue(c_DOT_attrA1__ptr, PyLong_v(?c_DOT_attrA1__val))) : (
+    pyobj_hasattr(d__ptr, attrA1, ?d_DOT_attrA1__ptr) &*&
+    pyobj_hasvalue(d_DOT_attrA1__ptr, PyLong_v(?d_DOT_attrA1__val))) &*&
+    ((i__val == i2__val) ? (c_DOT_attrA1__val == 0) : (d_DOT_attrA1__val == 0))
+    """
+    Requires((Acc(c.attrA1)) if i == i2 else (Acc(d.attrA1)))
+    Requires((c.attrA1 == 0) if i == i2 else (d.attrA1 == 0))
