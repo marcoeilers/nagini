@@ -15,7 +15,7 @@ class Extractor:
         scala_store = ce.store()
         store = OrderedDict()
         for entry in ScalaIterableWrapper(scala_store):
-            store[entry._1()] = entry._2()
+            store[entry._1()] = entry._2()._1()
         scala_model = ce.model()
         model = OrderedDict()
         for entry in ScalaIterableWrapper(scala_model.entries()):
