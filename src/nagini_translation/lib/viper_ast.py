@@ -162,7 +162,7 @@ class ViperAST:
                                         info, self.NoTrafos)
 
     def PredicateAccessPredicate(self, loc, perm, position, info):
-        return self.ast.PredicateAccessPredicate(loc, perm, position, info, self.NoTrafos)
+        return self.ast.PredicateAccessPredicate(loc, self.scala.Some(perm), position, info, self.NoTrafos)
 
     def Fold(self, predicate, position, info):
         return self.ast.Fold(predicate, position, info, self.NoTrafos)
@@ -256,7 +256,7 @@ class ViperAST:
         return self.ast.FieldAccess(receiver, field, position, info, self.NoTrafos)
 
     def FieldAccessPredicate(self, fieldacc, perm, position, info):
-        return self.ast.FieldAccessPredicate(fieldacc, perm, position, info, self.NoTrafos)
+        return self.ast.FieldAccessPredicate(fieldacc, self.scala.Some(perm), position, info, self.NoTrafos)
 
     def Old(self, expr, position, info):
         return self.ast.Old(expr, position, info, self.NoTrafos)
