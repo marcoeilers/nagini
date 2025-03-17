@@ -521,13 +521,13 @@
             "type": "str"
         },
         "__create__": {
-            "args": ["__prim__int", "__prim__int"],
+            "args": ["__prim__int", "__prim__Seq"],
             "type": "str",
             "requires": ["__len__", "__val__"]
         },
         "__val__": {
             "args": ["str"],
-            "type": "int"
+            "type": "__prim__Seq"
         },
         "join": {
             "args": ["str", "list"],
