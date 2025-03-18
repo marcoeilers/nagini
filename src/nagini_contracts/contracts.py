@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    overload,
     Sized,
     Tuple,
     Type,
@@ -44,8 +45,12 @@ U4 = TypeVar('U4')
 def Requires(expr: bool) -> bool:
     pass
 
-
+@overload
 def Ensures(expr: bool) -> bool:
+    pass
+
+@overload
+def Ensures(t: Type[T], expr: Callable[[T], bool]) -> bool:
     pass
 
 
