@@ -389,8 +389,12 @@ class ExpressionTranslator(CommonTranslator):
         length = len(s)
         length_arg = self.viper.IntLit(length, self.no_position(ctx),
                                        self.no_info(ctx))
-        val_arg = self.viper.IntLit(self._get_string_value(s),
-                                    self.no_position(ctx), self.no_info(ctx))
+        elements = [self.viper.IntLit(ord(c), self.no_position(ctx), self.no_info(ctx)) for c in s]
+
+        if elements:
+            val_arg = self.viper.ExplicitSeq(elements, self.no_position(ctx), self.no_info(ctx))
+        else:
+            val_arg = self.viper.EmptySeq(self.viper.Int, self.no_position(ctx), self.no_info(ctx))
         args = [length_arg, val_arg]
         arg_types = [None, None]
         str_type = ctx.module.global_module.classes[STRING_TYPE]

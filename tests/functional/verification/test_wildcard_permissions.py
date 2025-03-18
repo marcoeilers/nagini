@@ -15,11 +15,25 @@ class Container:
     def P(self) -> bool:
         return Acc(self.v2)
 
+    @Predicate
+    def P2(self) -> bool:
+        return Acc(self.v2)
+
     @Pure
     @Transparent
     def needs_pred_full(self) -> int:
         Requires(self.P())
         return Unfolding(self.P(), self.v2)
+
+    @Pure
+    def needs_other_pred_full(self) -> int:
+        Requires(self.P2())
+        return Unfolding(self.P2(), 5)
+
+    @Pure   #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+    def needs_other_pred_fail(self) -> int:
+        Requires(self.P2())
+        return Unfolding(self.P(), 5)
 
     @Pure
     @Transparent
@@ -28,7 +42,7 @@ class Container:
         return Unfolding(Rd(self.P()), self.v2)
 
     @Pure
-    @Transparent       #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+    @Transparent
     def needs_pred_fails(self) -> int:
         Requires(Rd(self.P()))
         return Unfolding(self.P(), self.v2)
@@ -97,8 +111,9 @@ def fixed_client(c: Container) -> None:
     Ensures(Acc(c.v, 1/10000))
     a = c.needs_pred()
     d = c.needs_field()
-    #:: ExpectedOutput(application.precondition:insufficient.permission)
     f = c.needs_pred_full()
+    #:: ExpectedOutput(application.precondition:insufficient.permission)
+    f = c.needs_other_pred_full()
 
 
 def none_client_1(c: Container) -> None:

@@ -889,9 +889,13 @@ class CallTranslator(CommonTranslator):
             length = len(key)
             length_arg = self.viper.IntLit(length, self.no_position(ctx),
                                            self.no_info(ctx))
-            val_arg = self.viper.IntLit(self._get_string_value(key),
-                                        self.no_position(ctx),
-                                        self.no_info(ctx))
+            elements = [self.viper.IntLit(ord(c), self.no_position(ctx), self.no_info(ctx)) for c in key]
+
+            if elements:
+                val_arg = self.viper.ExplicitSeq(elements, self.no_position(ctx), self.no_info(ctx))
+            else:
+                val_arg = self.viper.EmptySeq(self.viper.Int, self.no_position(ctx), self.no_info(ctx))
+
             str_create_args = [length_arg, val_arg]
             str_create_arg_types = [None, None]
             func_name = '__create__'
