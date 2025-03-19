@@ -51,10 +51,15 @@ class NativeSpecExtractor:
         return precondfacts
 
     def extract(self, f: PythonMethod, ctx: Context):
-        py2vf_ctx = py2vf_context()
+        py2vf_ctx_setup = py2vf_context(prefix="SETUP_")
+        setupfacts=self.setup(f, ctx, py2vf_ctx_setup)
         # print(self.env(ctx.module, ctx))
-        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx) +
-              self.precond(f, ctx, py2vf_ctx)))
+        print("requires ", end="")
+        print(vf.FactConjunction(setupfacts +
+              self.precond(f, ctx, py2vf_context(parent=py2vf_ctx_setup, prefix=""))))
+        print()
+        print("ensures ", end="")
+        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx_setup)))
         print("/*----*/")
         pass
 

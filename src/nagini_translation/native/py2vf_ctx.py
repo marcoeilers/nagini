@@ -64,9 +64,9 @@ class AttrAccess(ValueAccess):
 
 
 class py2vf_context:
-    def __init__(self, p: "py2vf_context" = None, prefix: str = ""):
+    def __init__(self, parent: "py2vf_context" = None, prefix: str = ""):
         self.context = dict()
-        self.parent = p
+        self.parent = parent
         self.setup = []
         if (prefix is None):
             self._prefix = ""
@@ -76,13 +76,13 @@ class py2vf_context:
     def getprefix(self):
         return self._prefix
 
-    def getExpr(self, key: str, ValueAccess: ValueAccess, useonly: bool = False, useprefix: bool = True):
+    def getExpr(self, key: str, ValueAccess: ValueAccess, useonly: bool = False):
         loc = key + repr(ValueAccess)
         theval = self[loc]
         if theval != None or useonly:
             return vf.NameUseExpr(theval)
         else:
-            self[loc] = vf.NamedValue((self._prefix if useprefix else "" )+key+str(ValueAccess))
+            self[loc] = vf.NamedValue(self._prefix+key+str(ValueAccess))
             return vf.NameDefExpr(self[loc])
 
     def __getitem__(self, key: str):

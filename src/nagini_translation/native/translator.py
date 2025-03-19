@@ -219,11 +219,11 @@ class Translator:
                 "int": vfpy.PyLong,
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
-            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname if len(names)==0 else names[0], access, useprefix=len(names)==0)))
+            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname, access)))
             return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)
         elif (t.name == "tuple"):
             tupleEls = []
-            tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess(), useprefix=False) if i < len(names)
+            tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess()) if i < len(names)
                             else py2vf_ctx.getExpr(pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
