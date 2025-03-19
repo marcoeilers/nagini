@@ -18,7 +18,7 @@ class NativeSpecExtractor:
         res = "fixpoint PyClass PyClass_ObjectType(){\n\treturn ObjectType;\n}\n"
         for m in modules[1:]:
             for key, value in m.classes.items():
-                vfname=m.sil_name+key
+                vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
@@ -51,15 +51,22 @@ class NativeSpecExtractor:
         return precondfacts
 
     def extract(self, f: PythonMethod, ctx: Context):
-        py2vf_ctx_setup = py2vf_context(prefix="SETUP_")
-        setupfacts=self.setup(f, ctx, py2vf_ctx_setup)
+        py2vf_ctx_setup = py2vf_context(prefix="")
+        setupfacts = self.setup(f, ctx, py2vf_ctx_setup)
         # print(self.env(ctx.module, ctx))
         print("requires ", end="")
-        print(vf.FactConjunction(setupfacts +
-              self.precond(f, ctx, py2vf_context(parent=py2vf_ctx_setup, prefix=""))))
+        print(vf.FactConjunction(
+            setupfacts +
+            map(lambda p: self.translator.translate(p[0], ctx, py2vf_ctx_setup),
+                f.preconditions)
+        ))
         print()
         print("ensures ", end="")
-        print(vf.FactConjunction(self.setup(f, ctx, py2vf_ctx_setup)))
+        print(vf.FactConjunction(
+            self.setup(f, ctx, py2vf_ctx_setup) +
+            map(lambda p: self.translator.translate(p[0], ctx, py2vf_ctx_setup),
+                f.postconditions)
+        ))
         print("/*----*/")
         pass
 
