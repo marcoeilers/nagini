@@ -1081,6 +1081,34 @@ function list___eq__(self: Ref, other: Ref): Bool
                                 issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -list___len__(self)
                                  ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
 
+function set___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    // permissions
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+             acc(other.set_acc) && forall r: Ref :: { r in (self.set_acc union other.set_acc) }
+             r in (self.set_acc union other.set_acc) && !stateless(r) ==> state(r)
+
+    ensures object___eq__(self, other)
+    ensures result <==>
+            (issubtype(typeof(other), set(set_arg(typeof(other), 0))) &&
+              set___len__(self) == set___len__(other) &&
+              (forall r: Ref :: { r in self.set_acc, r in other.set_acc }
+                                r in self.set_acc <==> r in other.set_acc))
+
+function set___len__(self: Ref): Int
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures result == |self.set_acc|
+
+function set___contains__(self: Ref, item: Ref) : Bool
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc, wildcard)
+    ensures result == (item in self.set_acc)
+
 function list___getitem__(self: Ref, key: Int): Ref
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
