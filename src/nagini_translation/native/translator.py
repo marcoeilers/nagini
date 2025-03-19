@@ -69,8 +69,8 @@ class Translator:
         # but either branches could be pure or a fact (just one needs be a fact)
         return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValueAccess()),
                               self.translate(
-                                  node.body, ctx, py2vf_context(py2vf_ctx)),
-                              self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx)))
+                                  node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())),
+                              self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())))
 
     def translate_BoolOp_fact(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         assert (type(node.op).__name__ == "And")
@@ -119,9 +119,9 @@ class Translator:
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
-        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_context(py2vf_ctx), ValAccess()),
+        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix()), ValAccess()),
                             self.translate_generic_expr(
-                                node.body, ctx, py2vf_context(py2vf_ctx), v),
+                                node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix()), v),
                             self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, v))
 
     def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
@@ -158,7 +158,7 @@ class Translator:
         return dict[type(node.value).__name__](node.value)
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        return py2vf_ctx.getExpr(node.id, v)
+        return py2vf_ctx.getExpr(node.id, v, True)
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         operandtype = self.get_type(node.left, ctx).name
@@ -219,16 +219,15 @@ class Translator:
                 "int": vfpy.PyLong,
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
-            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname, access)))
+            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname if len(names)==0 else names[0], access, useprefix=len(names)==0)))
             return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)
         elif (t.name == "tuple"):
             tupleEls = []
-            tupleElNames = [(names[i], PtrAccess()) if i < len(names)
-                            else (pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
+            tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess(), useprefix=False) if i < len(names)
+                            else py2vf_ctx.getExpr(pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
-                el_ptr_name, el_acc_type = tupleElNames[i]
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
-                    py2vf_ctx.getExpr(el_ptr_name, el_acc_type),
+                    tupleElNames[i],
                     vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
             pyobjval = vf.ImmInductive(
                 vfpy.PyTuple(vf.List.from_list(tupleEls)))
@@ -239,7 +238,8 @@ class Translator:
                     ctx,
                     py2vf_ctx,
                     (lambda x: x) if i < len(names) else
-                    (lambda x: path(TupleSubscriptAccess(i, x)))
+                    (lambda x: path(TupleSubscriptAccess(i, x))),
+                    names=[names[i]] if i < len(names) else []
                 ) for i in range(len(t.type_args))
             ])
         else:
