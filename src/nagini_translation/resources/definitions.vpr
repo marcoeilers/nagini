@@ -1177,30 +1177,35 @@ function tuple___eq__(self: Ref, other: Ref): Bool
              r in (tuple___sil_seq__(self) ++ tuple___sil_seq__(other)) && !stateless(r) ==> state(r)
 
     ensures object___eq__(self, other)
-    ensures result <==>
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall i: Int :: { tuple___getitem__(self, i) }
                                { tuple___getitem__(other, i)}
                                i >= 0 && i < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i))))
-    ensures result <==>
+                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i)))))
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall i: Int :: { tuple___getitem__(self, i) }
                                { tuple___getitem__(other, i)}
                                i <= -1 && i >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i))))
-    ensures result <==>
+                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i)))))
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
                                { tuple___getitem__(other, int___unbox__(i))}
                                issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i)))))
-    ensures result <==>
+                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
                                { tuple___getitem__(other, int___unbox__(i))}
                                issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i)))))
+                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
+
 // useful tuple funcs
 function tuple___len__(self: Ref): Int
     decreases _
