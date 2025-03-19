@@ -2,75 +2,13 @@
 from functools import reduce
 from fractions import Fraction
 from nagini_translation.lib.context import Context
-from nagini_translation.native.py2vf_ctx import py2vf_context
+from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
-from abc import ABC
 import ast
-
-
-class ValueAccess(ABC):
-    pass
-
-
-class LeafValueAccess(ValueAccess, ABC):
-    pass
-
-
-class PtrAccess(ValueAccess):
-    def __str__(self):
-        return "__ptr"
-
-    def __repr__(self):
-        return ":ptr"
-
-
-class ValAccess(ValueAccess):
-    def __str__(self):
-        return "__val"
-
-    def __repr__(self):
-        return ":val"
-
-
-class TupleSubscriptAccess(ValueAccess):
-    def __init__(self, index: ast.Expr, value: ValueAccess):
-        self.index = index
-        self.value = value
-
-    def __str__(self):
-        if (isinstance(self.value, LeafValueAccess)):
-            return str(self.value)+"_AT"+str(self.index)
-        else:
-            return "_AT"+str(self.index)+str(self.value)
-
-    def __repr__(self):
-        if (isinstance(self.value, LeafValueAccess)):
-            return repr(self.value)+"["+str(self.index)+"]"
-        else:
-            return "["+str(self.index)+"]"+repr(self.value)
-
-
-class AttrAccess(ValueAccess):
-    def __init__(self, attr: str, value: ValueAccess):
-        self.attr = attr
-        self.value = value
-
-    def __str__(self):
-        if (isinstance(self.value, LeafValueAccess)):
-            return str(self.value)+"_DOT_"+str(self.attr)
-        else:
-            return "_DOT_"+str(self.attr)+str(self.value)
-
-    def __repr__(self):
-        if (isinstance(self.value, LeafValueAccess)):
-            return repr(self.value)+"."+str(self.attr)
-        else:
-            return "."+str(self.attr)+repr(self.value)
-
 
 class Translator:
     def __init__(self):
@@ -105,15 +43,10 @@ class Translator:
                                 node.args[1].right.value)
                 # TODO: finish translating this
             if isinstance(node.args[0], ast.Attribute):
-                py2vf_ctx[node.args[0].value.id + repr(AttrAccess(node.args[0].attr, PtrAccess()))] = vf.NamedValue[vfpy.PyObjPtr](
-                    node.args[0].value.id +
-                    str(AttrAccess(node.args[0].attr, PtrAccess())))
                 return vf.FactConjunction([
                     vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, PtrAccess()),
                                           node.args[0].attr,
-                                          vf.NameDefExpr(
-                                              py2vf_ctx[node.args[0].value.id +
-                                                        repr(AttrAccess(node.args[0].attr, PtrAccess()))]),
+                                          py2vf_ctx.getExpr(node.args[0].value.id, AttrAccess(node.args[0].attr, PtrAccess())),
                                           frac=frac),
                     self.create_hasval_fact(node.args[0].value.id,
                                             self.get_type(node.args[0], ctx),
@@ -225,8 +158,7 @@ class Translator:
         return dict[type(node.value).__name__](node.value)
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        name = node.id + repr(v)
-        return vf.NameUseExpr(py2vf_ctx[name])
+        return py2vf_ctx.getExpr(node.id, v)
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         operandtype = self.get_type(node.left, ctx).name
@@ -283,30 +215,24 @@ class Translator:
     def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[]) -> vf.Fact:
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
-            py2vf_ctx[pyobjname+repr(access)
-                      ] = vf.NamedValue(pyobjname+str(access))
             cntnt = {
                 "int": vfpy.PyLong,
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
-            pyobjval = vf.ImmInductive(cntnt(
-                vf.NameDefExpr(py2vf_ctx[pyobjname+repr(access)])))
-            return vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(path(PtrAccess()))], pyobjval)
+            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname, access)))
+            return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)
         elif (t.name == "tuple"):
             tupleEls = []
             tupleElNames = [(names[i], PtrAccess()) if i < len(names)
                             else (pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
                 el_ptr_name, el_acc_type = tupleElNames[i]
-                py2vf_ctx[el_ptr_name+repr(el_acc_type)] = vf.NamedValue[vfpy.PyObjPtr](
-                    el_ptr_name+str(el_acc_type))
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
-                    vf.NameDefExpr[vfpy.PyObjPtr](
-                        py2vf_ctx[el_ptr_name+repr(el_acc_type)]),
+                    py2vf_ctx.getExpr(el_ptr_name, el_acc_type),
                     vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
             pyobjval = vf.ImmInductive(
                 vfpy.PyTuple(vf.List.from_list(tupleEls)))
-            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx[pyobjname+repr(path(PtrAccess()))], pyobjval)]+[
+            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)]+[
                 self.create_hasval_fact(
                     names[i] if i < len(names) else pyobjname,
                     t.type_args[i],
