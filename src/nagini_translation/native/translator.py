@@ -202,13 +202,14 @@ class Translator:
                 if (opd_left_types != opd_right_types):
                     return vf.Bool(False)
                 else:
-                    return self.translate_generic_expr(ast.BoolOp(ast.And(), [
+                    res = ast.BoolOp(ast.And(), [
                         ast.Compare(left=ast.Subscript(value=node.left, slice=ast.Constant(value=i), ctx=ast.Load()),
                                     ops=[ast.Eq()],
                                     comparators=[ast.Subscript(
                                         value=node.comparators[0], slice=ast.Constant(value=i), ctx=ast.Load())],
                                     ) for i in range(len(opd_left_types))
-                    ]), ctx, py2vf_ctx, v)
+                    ])
+                    return self.translate_generic_expr(res, ctx, py2vf_ctx, v)
             elif (compname == "NotEq"):
                 if (opd_left_types != opd_right_types):
                     return vf.Bool(True)
@@ -220,6 +221,10 @@ class Translator:
                                         value=node.comparators[0], slice=ast.Constant(value=i), ctx=ast.Load())],
                                     ) for i in range(len(opd_left_types))
                     ]), ctx, py2vf_ctx, v)
+            else:
+                raise NotImplementedError("Tuple comparison "+compname+" not implemented")
+        else:
+            raise NotImplementedError("Comparison for type "+operandtype+" not implemented")
 
     def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
         if (t.name not in ["tuple"]):
