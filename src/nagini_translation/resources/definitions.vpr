@@ -1025,8 +1025,9 @@ function str___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), str())
     ensures issubtype(typeof(other), str()) ==>
-            result == (str___val__(self) == str___val__(other)) &&
-            result ==> (str___len__(self) == str___len__(other))
+            (result <==>
+              (str___len__(self) == str___len__(other)) && 
+              (str___val__(self) == str___val__(other)))
     ensures result == object___eq__(self, other)
 
 // TODO: stateless in python
@@ -1052,27 +1053,27 @@ function list___eq__(self: Ref, other: Ref): Bool
 
     ensures object___eq__(self, other)
     // FYI: error due to stateless function
-    ensures result <==>
-            (issubtype(typeof(other), list(list_arg(typeof(other), 0))) &&
+    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+            (result <==>
               list___len__(self) == list___len__(other) &&
               (forall i: Int :: { list___getitem__(self, i), list___getitem__(other, i) }
                                 i >= 0 && i < list___len__(self) ==>
                                 object___eq__(list___getitem__(self, i), list___getitem__(other, i))))
-    ensures result <==>
-            (issubtype(typeof(other), list(list_arg(typeof(other), 0))) &&
+    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+            (result <==>
               list___len__(self) == list___len__(other) &&
               (forall i: Int :: { list___getitem__(self, i), list___getitem__(other, i) }
                                 i <= -1 && i >= -list___len__(self) ==>
                                 object___eq__(list___getitem__(self, i), list___getitem__(other, i))))
-    ensures result <==>
-            (issubtype(typeof(other), list(list_arg(typeof(other), 0))) &&
+    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+            (result <==>
               list___len__(self) == list___len__(other) &&
               (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
                                 { list___getitem__(other, int___unbox__(i))}
                                 issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self)
                                  ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
-    ensures result <==>
-            (issubtype(typeof(other), list(list_arg(typeof(other), 0))) &&
+    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+            (result <==>
               list___len__(self) == list___len__(other) &&
               (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
                                 { list___getitem__(other, int___unbox__(i))}
