@@ -1051,8 +1051,7 @@ function list___eq__(self: Ref, other: Ref): Bool
              acc(other.list_acc) && forall r: Ref :: { r in (self.list_acc ++ other.list_acc) }
              r in (self.list_acc ++ other.list_acc) && !stateless(r) ==> state(r)
 
-    ensures object___eq__(self, other)
-    // FYI: error due to stateless function
+    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
               list___len__(self) == list___len__(other) &&
@@ -1089,7 +1088,7 @@ function set___eq__(self: Ref, other: Ref): Bool
              acc(other.set_acc) && forall r: Ref :: { r in (self.set_acc union other.set_acc) }
              r in (self.set_acc union other.set_acc) && !stateless(r) ==> state(r)
 
-    ensures object___eq__(self, other)
+    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
             (result <==>
               set___len__(self) == set___len__(other) &&
@@ -1126,8 +1125,7 @@ function dict___eq__(self: Ref, other: Ref): Bool
                                   !stateless(r) ==> state(r))
              )
 
-    ensures object___eq__(self, other)
-    
+    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other),dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
             (result <==>
               dict___len__(self) == dict___len__(other) &&
@@ -1177,7 +1175,7 @@ function tuple___eq__(self: Ref, other: Ref): Bool
              forall r: Ref :: { r in (tuple___sil_seq__(self) ++ tuple___sil_seq__(other)) }
              r in (tuple___sil_seq__(self) ++ tuple___sil_seq__(other)) && !stateless(r) ==> state(r)
 
-    ensures object___eq__(self, other)
+    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
