@@ -89,7 +89,7 @@ def delayed_ternary_acc(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     pyobj_hasvalue(c_DOT_attrA1__ptr, PyLong_v(?c_DOT_attrA1__val))) : (
     pyobj_hasattr(d__ptr, attrA1, ?d_DOT_attrA1__ptr) &*&
     pyobj_hasvalue(d_DOT_attrA1__ptr, PyLong_v(?d_DOT_attrA1__val))) &*&
-    ((i__val == i2__val) ? (None == 0) : (None == 0));
+    ((i__val == i2__val) ? (d_DOT_attrA1__val == 0) : (c_DOT_attrA1__val == 0));
 
     ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), cons(pair(i2__ptr, PyLong_t), cons(pair(c__ptr, PyClass_t(PyClass_module_0ClassA)), cons(pair(d__ptr, PyClass_t(PyClass_module_0ClassA)), nil)))))) &*&
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
