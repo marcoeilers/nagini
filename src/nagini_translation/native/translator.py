@@ -91,10 +91,16 @@ class Translator:
             "Name": self.translate_Name_expr,
             "Attribute": self.translate_Attribute_expr,
             "Tuple": self.translate_Tuple_expr,
-            "Subscript": self.translate_Subscript_expr
+            "Subscript": self.translate_Subscript_expr,
+            "Call": self.translate_Call_expr
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, v)
-
+    def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+        if (node.func.id == "Old"):
+            return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
+        else:
+            funcid = node.func.id
+            raise NotImplementedError("Call to function "+funcid+" not implemented")
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):
             # TODO: handle the case where the index is not a constant
@@ -242,7 +248,6 @@ class Translator:
                     py2vf_ctx,
                     (lambda x: x) if i < len(names) else
                     (lambda x: path(TupleSubscriptAccess(i, x))),
-                    names=[names[i]] if i < len(names) else []
                 ) for i in range(len(t.type_args))
             ])
         else:
