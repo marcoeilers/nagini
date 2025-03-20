@@ -76,8 +76,8 @@ class PyObj_HasVal(vf.PredicateFact):
 
 
 class PyObj_HasAttr(vf.PredicateFact):
-    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: vf.Expr[vf.Char], attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
-        super().__init__("pyobj_hasattr", obj, attrName, attrValue, frac=frac)
+    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
+        super().__init__("pyobj_hasattr", obj, "\""+attrName+"\"", attrValue, frac=frac)
 
 
 class PyTuple(PyObj_v):

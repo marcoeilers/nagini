@@ -16,7 +16,7 @@ def compare3(c: t1.mytupledclass) -> int:
       """
       requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
       pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass)) &*&
-      pyobj_hasattr(c__ptr, arg, ?c_DOT_arg__ptr) &*&
+      pyobj_hasattr(c__ptr, "arg", ?c_DOT_arg__ptr) &*&
       pyobj_hasvalue(c_DOT_arg__ptr, PyLong_v(?c_DOT_arg__val)) &*&
       false;
 
