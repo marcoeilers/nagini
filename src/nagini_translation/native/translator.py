@@ -52,7 +52,7 @@ class Translator:
                                             self.get_type(node.args[0], ctx),
                                             ctx,
                                             py2vf_ctx,
-                                            lambda x: AttrAccess(node.args[0].attr, x)),
+                                            lambda x: AttrAccess(node.args[0].attr, x), frac=frac),
                 ])
             else:
                 raise NotImplementedError(
@@ -215,7 +215,7 @@ class Translator:
                                     ) for i in range(len(opd_left_types))
                     ]), ctx, py2vf_ctx, v)
 
-    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[]) -> vf.Fact:
+    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
             cntnt = {
@@ -223,7 +223,7 @@ class Translator:
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname, access)))
-            return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)
+            return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval, frac=frac)
         elif (t.name == "tuple"):
             tupleEls = []
             tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess()) if i < len(names)
