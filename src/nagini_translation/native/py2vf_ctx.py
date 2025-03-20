@@ -64,14 +64,17 @@ class AttrAccess(ValueAccess):
 
 
 class py2vf_context:
-    def __init__(self, parent: "py2vf_context" = None, prefix: str = ""):
+    def __init__(self, parent: "py2vf_context" = None, old: "py2vf_context" = None, prefix: str = ""):
         self.context = dict()
         self.parent = parent
-        self.setup = []
         if (prefix is None):
             self._prefix = ""
         else:
             self._prefix = prefix
+        if old is None:
+            self.old = self
+        else:
+            self.old = old
 
     def getprefix(self):
         return self._prefix

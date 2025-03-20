@@ -59,8 +59,11 @@ class Translator:
                     "Acc is not implemented for this content" + str(node.args[0]))
         elif (node.func.id == "list_pred"):
             raise NotImplementedError("list_pred is not implemented")
+        elif (node.func.id == "Old"):
+            return self.translate(node.args[0], ctx, py2vf_ctx.old)
         else:
             funcid = node.func.id
+            #raise NotImplementedError("Call to function not implemented")
             # TODO: check if each of these variables is to be used as ref or as val
             return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx, ValAccess()), node.args))
 

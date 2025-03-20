@@ -54,19 +54,22 @@ class NativeSpecExtractor:
         py2vf_ctx_setup = py2vf_context(prefix="")
         setupfacts = self.setup(f, ctx, py2vf_ctx_setup)
         # print(self.env(ctx.module, ctx))
+        py2vf_ctx_precond = py2vf_context(parent=py2vf_ctx_setup, prefix="")
         print("requires ", end="")
         print(vf.FactConjunction(
             setupfacts +
-            map(lambda p: self.translator.translate(p[0], ctx, py2vf_ctx_setup),
-                f.preconditions)
-        ))
+            [self.translator.translate(p[0], ctx, py2vf_ctx_precond)
+             for p in f.precondition]
+        ), end=";\n")
         print()
         print("ensures ", end="")
+        py2vf_ctx_postcond = py2vf_context(
+            parent=py2vf_ctx_setup, prefix="NEW_", old=py2vf_ctx_precond)
         print(vf.FactConjunction(
             self.setup(f, ctx, py2vf_ctx_setup) +
-            map(lambda p: self.translator.translate(p[0], ctx, py2vf_ctx_setup),
-                f.postconditions)
-        ))
+            [self.translator.translate(p[0], ctx, py2vf_ctx_postcond)
+             for p in f.postcondition]
+        ), end=";\n")
         print("/*----*/")
         pass
 
