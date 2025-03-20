@@ -79,13 +79,27 @@ class py2vf_context:
     def getprefix(self):
         return self._prefix
 
-    def getExpr(self, key: str, ValueAccess: ValueAccess, useonly: bool = False):
-        loc = key + repr(ValueAccess)
+    def __getloc(self, key: ast.Expr, ValueAccess: ValueAccess):
+        if (isinstance(key, ast.Name)):
+            loc = key.id + repr(ValueAccess)
+            return (loc, key.id)
+        elif (isinstance(key, ast.Call) and key.func.id == "Result" and key.args == []):
+            loc = "Result()"+repr(ValueAccess)
+            return (loc, "result")
+        else:
+            raise NotImplementedError("Unsupported expression key")
+
+    def setExpr(self, key: ast.Expr, ValueAccess: ValueAccess, value: vf.Value):
+        loc, key = self.__getloc(key, ValueAccess)
+        self[loc] = value
+
+    def getExpr(self, key: ast.Expr, ValueAccess: ValueAccess, useonly: bool = False):
+        loc, keystr = self.__getloc(key, ValueAccess)
         theval = self[loc]
         if theval != None or useonly:
             return vf.NameUseExpr(theval)
         else:
-            self[loc] = vf.NamedValue(self._prefix+key+str(ValueAccess))
+            self[loc] = vf.NamedValue(self._prefix+keystr+str(ValueAccess))
             return vf.NameDefExpr(self[loc])
 
     def __getitem__(self, key: str):

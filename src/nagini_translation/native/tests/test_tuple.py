@@ -20,7 +20,8 @@ def simpletuple_eq(t: Tuple[int, int]) -> int:
     ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(t__ptr, PyTuple_t(cons(PyLong_t, cons(PyLong_t, nil)))), nil))) &*&
     pyobj_hasvalue(t__ptr, PyTuple_v(cons(pair(t_AT0__ptr, PyLong_t), cons(pair(t_AT1__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(t_AT0__ptr, PyLong_v(t_AT0__val)) &*&
-    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val));
+    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(t == (1, 2))
     #Ensures(Result() == 3)
@@ -38,7 +39,8 @@ def simpletuple_neq1(t: Tuple[int, int]) -> int:
     ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(t__ptr, PyTuple_t(cons(PyLong_t, cons(PyLong_t, nil)))), nil))) &*&
     pyobj_hasvalue(t__ptr, PyTuple_v(cons(pair(t_AT0__ptr, PyLong_t), cons(pair(t_AT1__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(t_AT0__ptr, PyLong_v(t_AT0__val)) &*&
-    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val));
+    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(t != (1, 2))
     #Ensures(Result() == 3)
@@ -56,7 +58,8 @@ def simpletuple_neq2(t: Tuple[int, int]) -> int:
     ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(t__ptr, PyTuple_t(cons(PyLong_t, cons(PyLong_t, nil)))), nil))) &*&
     pyobj_hasvalue(t__ptr, PyTuple_v(cons(pair(t_AT0__ptr, PyLong_t), cons(pair(t_AT1__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(t_AT0__ptr, PyLong_v(t_AT0__val)) &*&
-    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val));
+    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(t != (1, 2, 3))
     #Ensures(Result() == 3)
@@ -78,7 +81,8 @@ def doubletuple_eq1(t: Tuple[Tuple[int, int], int]) -> int:
     pyobj_hasvalue(t_AT0__ptr, PyTuple_v(cons(pair(t_AT0_AT0__ptr, PyLong_t), cons(pair(t_AT0_AT1__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(t_AT0_AT0__ptr, PyLong_v(t_AT0_AT0__val)) &*&
     pyobj_hasvalue(t_AT0_AT1__ptr, PyLong_v(t_AT0_AT1__val)) &*&
-    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val));
+    pyobj_hasvalue(t_AT1__ptr, PyLong_v(t_AT1__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(t == ((1, 2), 3))
     #Ensures(Result() == 3)

@@ -37,12 +37,14 @@ class NativeSpecExtractor:
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
         # TODO: note that the setup must be simply reused as is for the postcond (just ensure name defs are removed)
         py2vf_ctx["args"+repr(PtrAccess())] = vf.NamedValue("args")
-        return [self.translator.create_hasval_fact("args",
+        return [self.translator.create_hasval_fact(ast.Name(
+                                                           "args", ast.Load(), lineno=0, col_offset=0),
                                                    self.get_type(ast.Tuple(list(map(
                                                        lambda x: ast.Name(
                                                            x[0], ast.Load(), lineno=0, col_offset=0),
                                                        f.args.items()))), ctx),
-                                                   ctx, py2vf_ctx, names=list(map(lambda x: x[0], f.args.items())))]
+                                                   ctx, py2vf_ctx, names=list(map(lambda x: ast.Name(
+                                                       x[0], ast.Load(), lineno=0, col_offset=0), f.args.items())))]
 
     def precond(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
         precondfacts = []
@@ -53,7 +55,6 @@ class NativeSpecExtractor:
     def extract(self, f: PythonMethod, ctx: Context):
         py2vf_ctx_setup = py2vf_context(prefix="")
         setupfacts = self.setup(f, ctx, py2vf_ctx_setup)
-        # print(self.env(ctx.module, ctx))
         py2vf_ctx_precond = py2vf_context(parent=py2vf_ctx_setup, prefix="")
         print("requires ", end="")
         print(vf.FactConjunction(
@@ -65,10 +66,13 @@ class NativeSpecExtractor:
         print("ensures ", end="")
         py2vf_ctx_postcond = py2vf_context(
             parent=py2vf_ctx_setup, prefix="NEW_", old=py2vf_ctx_precond)
+        resultcall = ast.Call(ast.Name("Result", ast.Load()), [], [])
+        py2vf_ctx_setup.setExpr(
+            resultcall, PtrAccess(), vf.NamedValue("result"))
         print(vf.FactConjunction(
             self.setup(f, ctx, py2vf_ctx_setup) +
-            [self.translator.translate(p[0], ctx, py2vf_ctx_postcond)
-             for p in f.postcondition]
+            [self.translator.create_hasval_fact(resultcall, f.result.type, ctx, py2vf_ctx_setup)]
+            +[self.translator.translate(p[0], ctx, py2vf_ctx_postcond) for p in f.postcondition]
         ), end=";\n")
         print("/*----*/")
         pass

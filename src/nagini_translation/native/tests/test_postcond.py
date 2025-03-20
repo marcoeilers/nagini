@@ -56,3 +56,25 @@ def method2(x: classA) -> int:
     Requires(Acc(x.attr1))
     Ensures(Acc(x.attr1))
     Ensures(x.attr1 == Old(x.attr1))
+
+@ContractOnly
+@Native
+def method(x: classA) -> classA:
+    """
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?x__ptr, PyClass_t(PyClass_module_0classA)), nil))) &*&
+    pyobj_hasvalue(x__ptr, PyClassInstance_v(PyClass_module_0classA)) &*&
+    pyobj_hasattr(x__ptr, attr2, ?x_DOT_attr2__ptr) &*&
+    pyobj_hasvalue(x_DOT_attr2__ptr, PyLong_v(?x_DOT_attr2__val));
+
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(x__ptr, PyClass_t(PyClass_module_0classA)), nil))) &*&
+    pyobj_hasvalue(x__ptr, PyClassInstance_v(PyClass_module_0classA)) &*&
+    pyobj_hasvalue(result, PyClassInstance_v(PyClass_module_0classA)) &*&
+    pyobj_hasattr(x__ptr, attr2, ?NEW_x_DOT_attr2__ptr) &*&
+    pyobj_hasvalue(NEW_x_DOT_attr2__ptr, PyLong_v(?NEW_x_DOT_attr2__val)) &*&
+    (NEW_x_DOT_attr2__val == x_DOT_attr2__val) &*&
+    pyobj_hasattr(result, attr2, ?NEW_result_DOT_attr2__ptr) &*&
+    pyobj_hasvalue(NEW_result_DOT_attr2__ptr, PyLong_v(?NEW_result_DOT_attr2__val));
+    """
+    Requires(Acc(x.attr2))
+    Ensures(Acc(x.attr2) and x.attr2 == Old(x.attr2))
+    Ensures(Acc(Result().attr2))

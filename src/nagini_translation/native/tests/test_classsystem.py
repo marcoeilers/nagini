@@ -67,6 +67,7 @@ def test(a: ClassA, b: ClassB, c: ClassC, d: ClassD, b2: ClassB2, c2: ClassC2) -
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassC)) &*&
     pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassD)) &*&
     pyobj_hasvalue(b2__ptr, PyClassInstance_v(PyClass_module_0ClassB2)) &*&
-    pyobj_hasvalue(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2));
+    pyobj_hasvalue(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     pass

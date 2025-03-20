@@ -35,6 +35,7 @@ def ternary_val(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     pyobj_hasvalue(i2__ptr, PyLong_v(i2__val)) &*&
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
     pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     pyobj_hasattr(c__ptr, attrA1, ?NEW_c_DOT_attrA1__ptr) &*&
     pyobj_hasvalue(NEW_c_DOT_attrA1__ptr, PyLong_v(?NEW_c_DOT_attrA1__val)) &*&
     pyobj_hasattr(d__ptr, attrA1, ?NEW_d_DOT_attrA1__ptr) &*&
@@ -65,6 +66,7 @@ def double_access(i: int, i2: int, c: ClassA) -> int:
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
     pyobj_hasvalue(i2__ptr, PyLong_v(i2__val)) &*&
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     pyobj_hasattr(c__ptr, attrA1, ?NEW_c_DOT_attrA1__ptr) &*&
     pyobj_hasvalue(NEW_c_DOT_attrA1__ptr, PyLong_v(?NEW_c_DOT_attrA1__val)) &*&
     pyobj_hasattr(c__ptr, attrA1, NEW_c_DOT_attrA1__ptr) &*&
@@ -95,7 +97,8 @@ def delayed_ternary_acc(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
     pyobj_hasvalue(i2__ptr, PyLong_v(i2__val)) &*&
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
-    pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA));
+    pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires((Acc(c.attrA1)) if i == i2 else (Acc(d.attrA1)))
     Requires((c.attrA1 == 0) if i == i2 else (d.attrA1 == 0))
@@ -120,7 +123,8 @@ def fractional(i: int, i2: int, c: ClassA, d: ClassA) -> int:
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
     pyobj_hasvalue(i2__ptr, PyLong_v(i2__val)) &*&
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
-    pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA));
+    pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(Acc(c.attrA1, 1/2) and Acc(d.attrA1, 1/18) and (
         c.attrA1 if (i == i2) else d.attrA1) == 0)
@@ -142,6 +146,7 @@ def double_fractional(i: int, i2: int, c: ClassA) -> int:
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
     pyobj_hasvalue(i2__ptr, PyLong_v(i2__val)) &*&
     pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassA)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     [1/2]pyobj_hasattr(c__ptr, attrA1, ?NEW_c_DOT_attrA1__ptr) &*&
     [1/2]pyobj_hasvalue(NEW_c_DOT_attrA1__ptr, PyLong_v(?NEW_c_DOT_attrA1__val)) &*&
     [1/2]pyobj_hasattr(c__ptr, attrA1, NEW_c_DOT_attrA1__ptr) &*&

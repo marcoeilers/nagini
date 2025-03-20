@@ -21,6 +21,7 @@ def compare3(c: t1.mytupledclass) -> int:
       false;
 
       ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
-      pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass));
+      pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass)) &*&
+      pyobj_hasvalue(result, PyLong_v(?result__val));
       """
       Requires(Acc(c.arg) and c.arg == (3,(21,12)))

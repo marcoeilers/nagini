@@ -10,6 +10,7 @@ from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
 import ast
 
+
 class Translator:
     def __init__(self):
         self.predicates = dict()
@@ -46,13 +47,14 @@ class Translator:
                 return vf.FactConjunction([
                     vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, PtrAccess()),
                                           node.args[0].attr,
-                                          py2vf_ctx.getExpr(node.args[0].value.id, AttrAccess(node.args[0].attr, PtrAccess())),
+                                          py2vf_ctx.getExpr(node.args[0].value, AttrAccess(
+                                              node.args[0].attr, PtrAccess())),
                                           frac=frac),
-                    self.create_hasval_fact(node.args[0].value.id,
+                    self.create_hasval_fact(node.args[0].value,
                                             self.get_type(node.args[0], ctx),
                                             ctx,
                                             py2vf_ctx,
-                                            lambda x: AttrAccess(node.args[0].attr, x), frac=frac),
+                                            lambda x: AttrAccess(node.args[0].attr, x), frac=frac)
                 ])
             else:
                 raise NotImplementedError(
@@ -63,7 +65,7 @@ class Translator:
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
         else:
             funcid = node.func.id
-            #raise NotImplementedError("Call to function not implemented")
+            # raise NotImplementedError("Call to function not implemented")
             # TODO: check if each of these variables is to be used as ref or as val
             return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx, ValAccess()), node.args))
 
@@ -95,12 +97,17 @@ class Translator:
             "Call": self.translate_Call_expr
         }
         return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, v)
+
     def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (node.func.id == "Old"):
             return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
+        if (node.func.id == "Result"):
+            return py2vf_ctx.getExpr(node, v)
         else:
             funcid = node.func.id
-            raise NotImplementedError("Call to function "+funcid+" not implemented")
+            raise NotImplementedError(
+                "Call to function "+funcid+" not implemented")
+
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):
             # TODO: handle the case where the index is not a constant
@@ -167,7 +174,7 @@ class Translator:
         return dict[type(node.value).__name__](node.value)
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        return py2vf_ctx.getExpr(node.id, v, True)
+        return py2vf_ctx.getExpr(node, v, True)
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         operandtype = self.get_type(node.left, ctx).name
@@ -222,32 +229,38 @@ class Translator:
                                     ) for i in range(len(opd_left_types))
                     ]), ctx, py2vf_ctx, v)
             else:
-                raise NotImplementedError("Tuple comparison "+compname+" not implemented")
+                raise NotImplementedError(
+                    "Tuple comparison "+compname+" not implemented")
         else:
-            raise NotImplementedError("Comparison for type "+operandtype+" not implemented")
+            raise NotImplementedError(
+                "Comparison for type "+operandtype+" not implemented")
 
-    def create_hasval_fact(self, pyobjname: str, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
+    def create_hasval_fact(self, target: ast.expr, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
             cntnt = {
                 "int": vfpy.PyLong,
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
-            pyobjval = vf.ImmInductive(cntnt(py2vf_ctx.getExpr(pyobjname, access)))
-            return vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval, frac=frac)
+            pyobjval = vf.ImmInductive(
+                cntnt(py2vf_ctx.getExpr(target, access)))
+            return vfpy.PyObj_HasVal(
+                py2vf_ctx.getExpr(target, path(PtrAccess())), 
+                pyobjval, 
+                frac=frac)
         elif (t.name == "tuple"):
             tupleEls = []
             tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess()) if i < len(names)
-                            else py2vf_ctx.getExpr(pyobjname, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
+                            else py2vf_ctx.getExpr(target, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     tupleElNames[i],
                     vf.ImmInductive(self.pytype__to__PyObj_t(t.type_args[i]))))
             pyobjval = vf.ImmInductive(
                 vfpy.PyTuple(vf.List.from_list(tupleEls)))
-            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx.getExpr(pyobjname,path(PtrAccess())), pyobjval)]+[
+            return vf.FactConjunction([vfpy.PyObj_HasVal(py2vf_ctx.getExpr(target, path(PtrAccess())), pyobjval)]+[
                 self.create_hasval_fact(
-                    names[i] if i < len(names) else pyobjname,
+                    names[i] if i < len(names) else target,
                     t.type_args[i],
                     ctx,
                     py2vf_ctx,
@@ -256,7 +269,7 @@ class Translator:
                 ) for i in range(len(t.type_args))
             ])
         else:
-            print("NADA"+t.name)
+            print("NADA "+t.name)
             # raise NotImplementedError("Type not implemented")
 
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
