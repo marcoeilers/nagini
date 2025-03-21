@@ -30,6 +30,8 @@ from nagini_translation.lib.constants import (
     RESULT_NAME,
     STRING_TYPE,
     VIPER_KEYWORDS,
+    BUILTIN___EQ___FUNCTIONS,
+    OBJ___EQ__MERGED
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
 from nagini_translation.lib.typedefs import Expr, Stmt
@@ -1074,6 +1076,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             for requirement in self.requires:
                 requires.add(requirement)
             translator.set_required_names(self.sil_name, requires)
+            if self.sil_name in BUILTIN___EQ___FUNCTIONS:
+                self.merge_func_name = OBJ___EQ__MERGED
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1127,10 +1131,12 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 if (super_func):
                     super_func.opaque = True
 
-            if super_func.sil_name:
+            if super_func.merge_func_name == OBJ___EQ__MERGED:
+                self.merge_func_name = super_func.merge_func_name
+            elif super_func.sil_name:
                 self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
             elif super_func.name:
-                self.merge_func_name = self.get_fresh_name(super_func.name + '_merged')
+                self.merge_func_name = self.get_fresh_name(super_func.name + '_merged') 
 
     @property
     def nargs(self) -> int:

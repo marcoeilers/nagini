@@ -30,6 +30,7 @@ from nagini_translation.lib.constants import (
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
+    OBJ___EQ__MERGED,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -40,7 +41,8 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonNode,
     PythonVar,
-    ProgramNodeFactory
+    ProgramNodeFactory,
+    toposort_classes
 )
 from nagini_translation.lib.typedefs import (
     Domain,
@@ -429,6 +431,145 @@ class ProgramTranslator(CommonTranslator):
         ctx.current_class = old_cls
         ctx.position.pop()
         return self.config.method_translator.translate_merge_function(merge_func, ctx, pres, posts)
+
+    def is_object_eq(self, f: PythonMethod) -> bool:
+        return f.sil_name == 'object___eq__'
+
+    
+    def create_object_equality_merge_function(self, sil_progs: Program,
+                                              functions, eq_funcs: set[PythonMethod], ctx: Context) -> Optional['silver.ast.Callable']:
+        """
+        Creates a Viper function that contains all pre-/postconditions for object.__eq__
+        and of all the overriding function in subclasses called the merge function.
+        """
+        # no other function overrides object___eq__
+        if len(eq_funcs) == 1:
+            ctx.var_aliases = {}
+            return None
+
+        # order overrides in reverse topo order in respect to the class hierarchy 
+        cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
+        overrides_sorted = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
+        
+        eq: PythonMethod = overrides_sorted[-1]
+
+        pos = self.viper.to_position(eq.node, ctx.position, py_node=eq)
+        ctx.position.append(('override', pos))
+        self.info = self.viper.SimpleInfo(['merge.function.object___eq__'])
+
+        # make a deepcopy of f (not possible with deepcopy)
+        node_factory = ProgramNodeFactory()
+        merge_func: PythonMethod = node_factory.create_python_method(
+            eq.name, eq.node, eq.cls, eq.superscope, eq.pure, eq.contract_only,
+            node_factory, eq.interface, eq.interface_dict, eq.method_type, opaque=False
+        )
+        for k,v in merge_func.__dict__.items():
+            if not v and eq.__getattribute__(k):
+                merge_func.__setattr__(k, eq.__getattribute__(k))
+
+        old_function = ctx.current_function
+        old_module = ctx.module
+        old_cls = ctx.current_class
+
+        ctx.current_function = merge_func
+
+        # null check for self
+        self_var = merge_func.args[next(iter(merge_func.args))].ref()
+        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
+        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
+                                    self.no_info(ctx))
+
+        merge_pres = [not_null]
+        merge_posts = []
+
+        fname = OBJ___EQ__MERGED
+        merge_func.sil_name = fname
+        merge_func.name = fname
+        merge_func.contract_only = True
+        merge_func.opaque = False
+        old_aliases = copy.deepcopy(ctx.var_aliases)
+
+        # loop through all overriding functions and encode
+        # the preconditions as one large conditional expression of the form:
+        # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
+        #          issubtype(typeof(self), X) ? <Pre of X> :
+        #          issubtype(typeof(self), SubX) ? <Pre of SubX> : true
+        # 
+        # postconditions as implications depending on the type e.g.:
+        # ensures issubtype(self, X) ==> <Post of X>
+        # ensures issubtype(self, Y) ==> <Post of Y>
+        overrides_sorted.reverse()
+
+        last_check = None
+        for cur in overrides_sorted:
+
+            ctx.current_function = cur
+            ctx.module = cur.module
+            ctx.current_class = cur.cls
+
+            # find pre- and postconditions from sil_progs
+            if cur.interface:
+                res = sil_progs.findFunction(cur.sil_name)
+                pres = []
+                posts = []
+                for pre in self.viper.to_list(res.pres()):
+                    pres.insert(0, pre)
+                for post in self.viper.to_list(res.posts()):
+                    posts.insert(0, post)
+            else:
+                pres = list(map(lambda f: f[0], cur.precondition))
+                posts = list(map(lambda f: f[0], cur.precondition))
+        
+            if cur.overrides:
+                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                    root_var = merge_func.args[merge_name]
+                    if merge_name == next(iter(eq.args.keys())):
+                        root_var = copy.copy(root_var)
+                        root_var.type = cur.cls
+                    ctx.set_alias(cur_name, root_var)
+
+            pos = self.to_position(cur.node, ctx)
+            info = self.no_info(ctx)
+
+            with ctx.additional_aliases(ctx.var_aliases):
+                self_var = cur.args[next(iter(cur.args))].ref()
+
+                self_var = merge_func.args.get('arg_0').ref()
+                other_var = merge_func.args.get('arg_1').ref()
+                and_pres = self.viper.TrueLit(pos, info)
+                for pre in pres:
+                    # translate first if not already translated (i.e. custom __eq__ precondition)
+                    if not cur.interface:
+                        stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
+                        if stmt:
+                            raise InvalidProgramException(cur.node, 'purity.violated')
+
+
+                    and_pres = self.viper.And(and_pres, pre, pos, info)
+
+                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                if last_check is None:
+                    last_check = self.viper.CondExp(check, and_pres, self.viper.TrueLit(pos, info), pos, info)
+                else:
+                    last_check = self.viper.CondExp(check, and_pres, last_check, pos, info)
+            # add to context for the translation of function calls
+            ctx.merge_functions[cur] = merge_func
+
+        # append the one large conditional expression
+        if last_check:
+            merge_pres.append(last_check)
+
+        while(ctx.var_aliases):
+            for alias in list(ctx.var_aliases.keys()):
+                ctx.remove_alias(alias)
+        ctx.var_aliases = old_aliases
+
+        ctx.current_function = old_function
+        ctx.module = old_module
+        ctx.current_class = old_cls
+        ctx.position.pop()
+        return self.config.method_translator.translate_merge_function(merge_func, ctx, merge_pres, merge_posts)
+        
 
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
@@ -1498,6 +1639,9 @@ class ProgramTranslator(CommonTranslator):
 
         all_names = []
 
+        # used when creating merge function for object.__eq__
+        eq_funcs = set()
+
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
         for module in modules:
@@ -1583,6 +1727,12 @@ class ProgramTranslator(CommonTranslator):
                     type_axioms.extend(axioms)
                 for func_name in cls.functions:
                     func = cls.functions[func_name]
+
+                    # add all __eq__ functions to eq_funcs
+                    # to later create the merge func for object.__eq__
+                    if func.merge_func_name == OBJ___EQ__MERGED:
+                        eq_funcs.add(func)
+
                     if func.interface:
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
@@ -1705,6 +1855,10 @@ class ProgramTranslator(CommonTranslator):
                 if superclass is not None:
                     all_used_names.append(superclass.sil_name)
             i += 1
+
+        eq_merge = self.create_object_equality_merge_function(sil_progs, functions, eq_funcs, ctx)
+        if eq_merge:
+            functions.append(eq_merge)
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.

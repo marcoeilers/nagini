@@ -422,3 +422,17 @@ RIGHT_OPERATOR_FUNCTIONS = {
     ast.BitOr: '__ror__',
     ast.BitXor: '__rxor__',
 }
+
+BUILTIN___EQ___FUNCTIONS = [
+    'int___eq__',
+    'bool___eq__',
+    'str___eq__',
+    'float___eq__',
+    'list___eq__',
+    'tuple___eq__',
+    'set___eq__',
+    'dict___eq__',
+    'object___eq__',
+]
+
+OBJ___EQ__MERGED = 'object___eq___merged'
