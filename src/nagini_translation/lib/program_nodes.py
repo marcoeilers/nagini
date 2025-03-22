@@ -1131,12 +1131,21 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 if (super_func):
                     super_func.opaque = True
 
+            # if self is a custom __eq__ function, 
+            # i.e., directly or indirectly overrides object___eq__
             if super_func.merge_func_name == OBJ___EQ__MERGED:
                 self.merge_func_name = super_func.merge_func_name
+                if not [a for a, _ in self.args.items()] == [a for a, _ in super_func.args.items()]:
+                    msg = "Any override of __eq__ must have only have the following two parameters: self, other"
+                    raise InvalidProgramException(self.node, "invalid.parameter.name", msg)
+            # find a new name for a merge_function
             elif super_func.sil_name:
                 self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
             elif super_func.name:
                 self.merge_func_name = self.get_fresh_name(super_func.name + '_merged') 
+            # should not happen
+            else:
+                raise InvalidProgramException(self.node, "invalid.merge.function")
 
     @property
     def nargs(self) -> int:
