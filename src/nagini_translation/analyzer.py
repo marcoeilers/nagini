@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
     MYPY_SUPERCLASSES,
     OBJECT_TYPE,
     TUPLE_TYPE,
+    BUILTIN___EQ___FUNCTIONS,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -322,7 +323,20 @@ class Analyzer(ast.NodeVisitor):
             method.interface_name = if_method['display_name']
         ctr = 0
         for arg_type in if_method['args']:
-            name = 'arg_' + str(ctr)
+            
+            # rename arg_0, arg_1 to self, other if it's an __eq__ function
+            if pure and cls and cls.name:
+                sil_name = f"{cls.name}_{method_name}"
+                if sil_name in BUILTIN___EQ___FUNCTIONS and ctr in [0, 1]:
+                    if ctr == 0:
+                        name = 'self'
+                    elif ctr == 1:
+                        name = 'other'
+                else:
+                    name = 'arg_' + str(ctr)
+            else:
+                name = 'arg_' + str(ctr)
+
             arg = node_factory.create_python_var(
                 name, None, self.find_or_create_class(arg_type,
                                                       self.module.global_module))
