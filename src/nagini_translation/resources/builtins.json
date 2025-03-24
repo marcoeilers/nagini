@@ -8,7 +8,8 @@
         },
         "__eq__": {
             "args": ["object", "object"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["stateless"]
         },
         "__str__": {
             "args": ["object"],
@@ -17,6 +18,13 @@
         "__cast__": {
             "args": ["type", "object"],
             "type": "object"
+        }
+    },
+    "predicates": {
+        "state": {
+            "args": ["object"],
+            "type": "bool",
+            "requires": ["list_state", "set_state", "dict_state", "tuple_state"]
         }
     }
 },
@@ -683,7 +691,7 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__", "object___eq__"]
+            "requires": ["__len__", "__getitem__", "object___eq__", "stateless"]
         },
         "__sil_seq__": {
             "args": ["tuple"],

@@ -149,19 +149,14 @@ function bool___unbox__(box: Ref): Bool
 function int___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), int())
-    requires issubtype(typeof(other), int()) || issubtype(typeof(other), float())
-    ensures issubtype(typeof(other), int()) ==> result == int___unbox__(self) == int___unbox__(other)
-    ensures issubtype(typeof(other), int()) ==> result == object___eq__(self, other)
-    ensures issubtype(typeof(other), float()) ==> result == float___eq__(self, other)
-
+    ensures issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
+    ensures result == object___eq__(self, other)
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), bool())
-    requires issubtype(typeof(other), bool())
-    ensures result == bool___unbox__(self) == bool___unbox__(other)
+    ensures issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
     ensures result == object___eq__(self, other)
-
 
 function int___ge__(self: Ref, other: Ref): Bool
     decreases _
@@ -288,25 +283,35 @@ function int___int__(self: Ref): Ref
     requires issubtype(typeof(self), int())
     ensures result == self
 
-domain __ObjectEquality {
-    function object___eq__(Ref, Ref): Bool
+function object___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    // permissions
+    // TODO: add
+    // requires !stateless(self) ==> state(self)
+    // requires !stateless(other) ==> state(other)
 
-    axiom {
-        forall o1: Ref, o2: Ref, o3: Ref ::
-            { object___eq__(o1, o2), object___eq__(o2, o3) }
-            { object___eq__(o1, o2), object___eq__(o1, o3) }
-            { object___eq__(o2, o3), object___eq__(o1, o3) }
-            object___eq__(o1, o2) && object___eq__(o2, o3) ==> object___eq__(o1, o3)
-    }
+    // null
+    ensures self == null ==> result == (other == null ? true : false)
+    // reflexivity
+    ensures !issubtype(typeof(self), float()) ==> self == other ==> result
+    // TODO: force symmetry in overrides
+    // symmetry
+    ensures result == object___eq__(other, self)
+    // transitivity
+    ensures (
+        forall a: Ref ::
+        { object___eq__(self, a) }
+        object___eq__(self, a) && object___eq__(a, other) ==> result
+    )
 
-    axiom {
-        forall o1: Ref, o2: Ref :: { object___eq__(o1, o2) }
-            (object___eq__(o1, o2) == object___eq__(o2, o1)) &&
-            (o1 == o2 ==> object___eq__(o1, o2)) &&
-            (((o1 == null) != (o2 == null)) ==> !object___eq__(o1, o2))
-    }
+function stateless(o: Ref): Bool
+    decreases _
+    ensures result <==>
+            issubtype(typeof(o), bool()) || issubtype(typeof(o), int()) ||
+            issubtype(typeof(o), str()) || issubtype(typeof(o), float())
 
-}
+// TODO: state in python
+predicate state(r: Ref)
 
 function Place___eq__(self: Ref, other: Ref): Bool
     decreases _

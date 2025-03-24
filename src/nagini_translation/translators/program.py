@@ -31,6 +31,8 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     OBJ___EQ__MERGED,
+    STATE_PRED,
+    STATE_PREDS,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -436,21 +438,17 @@ class ProgramTranslator(CommonTranslator):
         return f.sil_name == 'object___eq__'
 
     
-    def create_object_equality_merge_function(self, sil_progs: Program,
-                                              functions, eq_funcs: set[PythonMethod], ctx: Context) -> Optional['silver.ast.Callable']:
+    def create_object_equality_merge_function(self, sil_progs: Program, functions,
+                                              overrides: list[PythonMethod], ctx: Context) -> Optional['silver.ast.Callable']:
         """
         Creates a Viper function that contains all pre-/postconditions for object.__eq__
         and of all the overriding function in subclasses called the merge function.
         """
         # no other function overrides object___eq__
-        if len(eq_funcs) == 1:
+        if len(overrides) == 1:
             return None
-
-        # order overrides in reverse topo order in respect to the class hierarchy 
-        cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
-        overrides_sorted = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
         
-        eq: PythonMethod = overrides_sorted[-1]
+        eq: PythonMethod = overrides[-1]
 
         pos = self.viper.to_position(eq.node, ctx.position, py_node=eq)
         ctx.position.append(('override', pos))
@@ -487,7 +485,7 @@ class ProgramTranslator(CommonTranslator):
         merge_func.contract_only = True
         merge_func.opaque = False
 
-        # loop through all overriding functions and encode
+        # loop through all overriding __eq__ functions and encode
         # the preconditions as one large conditional expression of the form:
         # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
         #          issubtype(typeof(self), X) ? <Pre of X> :
@@ -496,10 +494,10 @@ class ProgramTranslator(CommonTranslator):
         # postconditions as implications depending on the type e.g.:
         # ensures issubtype(self, X) ==> <Post of X>
         # ensures issubtype(self, Y) ==> <Post of Y>
-        overrides_sorted.reverse()
+        overrides.reverse()
 
         last_check = None
-        for cur in overrides_sorted:
+        for cur in overrides:
 
             ctx.current_function = cur
             ctx.module = cur.module
@@ -508,15 +506,11 @@ class ProgramTranslator(CommonTranslator):
             # find pre- and postconditions from sil_progs
             if cur.interface:
                 res = sil_progs.findFunction(cur.sil_name)
-                pres = []
-                posts = []
-                for pre in self.viper.to_list(res.pres()):
-                    pres.insert(0, pre)
-                for post in self.viper.to_list(res.posts()):
-                    posts.insert(0, post)
+                pres = self.viper.to_list(res.pres())
+                posts = self.viper.to_list(res.posts())
             else:
                 pres = list(map(lambda f: f[0], cur.precondition))
-                posts = list(map(lambda f: f[0], cur.precondition))
+                posts = list(map(lambda f: f[0], cur.postcondition))
 
             pos = self.to_position(cur.node, ctx)
             info = self.no_info(ctx)
@@ -570,7 +564,6 @@ class ProgramTranslator(CommonTranslator):
         ctx.current_class = old_cls
         ctx.position.pop()
         return self.config.method_translator.translate_merge_function(merge_func, ctx, merge_pres, merge_posts)
-        
 
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
@@ -1826,7 +1819,7 @@ class ProgramTranslator(CommonTranslator):
 
         for root in predicate_families:
             self.track_dependencies(selected_names, selected, root, ctx)
-            preds, pred_self_framing_checks = self.translate_predicate_family(root, predicate_families[root], ctx)
+            preds, pred_self_framing_checks = self.translate_predicate_family(root, predicate_families[root], sil_progs, ctx)
             predicates.extend(preds)
             methods.extend(pred_self_framing_checks)
 
@@ -1857,7 +1850,13 @@ class ProgramTranslator(CommonTranslator):
                     all_used_names.append(superclass.sil_name)
             i += 1
 
-        eq_merge = self.create_object_equality_merge_function(sil_progs, functions, eq_funcs, ctx)
+
+        # order overrides in reverse topo order in respect to the class hierarchy 
+        cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
+        overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
+
+
+        eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
         if eq_merge:
             functions.append(eq_merge)
 

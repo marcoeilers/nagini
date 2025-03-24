@@ -27,6 +27,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     TUPLE_TYPE,
     BUILTIN___EQ___FUNCTIONS,
+    STATE_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -323,11 +324,11 @@ class Analyzer(ast.NodeVisitor):
             method.interface_name = if_method['display_name']
         ctr = 0
         for arg_type in if_method['args']:
-            
+
             # rename arg_0, arg_1 to self, other if it's an __eq__ function
             if pure and cls and cls.name:
                 sil_name = f"{cls.name}_{method_name}"
-                if sil_name in BUILTIN___EQ___FUNCTIONS and ctr in [0, 1]:
+                if sil_name in BUILTIN___EQ___FUNCTIONS + [STATE_PRED] and ctr in [0, 1]:
                     if ctr == 0:
                         name = 'self'
                     elif ctr == 1:

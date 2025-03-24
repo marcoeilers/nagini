@@ -536,28 +536,6 @@ domain ____pow_helper  {
   }
 }
 
-// domain __ObjectEquality  {
-//   
-//   function object___eq__(Ref, Ref): Bool 
-//   
-//   axiom {
-//     (forall o1: Ref, o2: Ref, o3: Ref ::
-//       { object___eq__(o1, o2), object___eq__(o2, o3) }
-//       { object___eq__(o1, o2), object___eq__(o1, o3) }
-//       { object___eq__(o2, o3), object___eq__(o1, o3) }
-//       object___eq__(o1, o2) && object___eq__(o2, o3) ==>
-//       object___eq__(o1, o3))
-//   }
-//   
-//   axiom {
-//     (forall o1: Ref, o2: Ref ::
-//       { object___eq__(o1, o2) }
-//       object___eq__(o1, o2) == object___eq__(o2, o1) &&
-//       ((o1 == o2 ==> object___eq__(o1, o2)) &&
-//       ((o1 == null) != (o2 == null) ==> !object___eq__(o1, o2))))
-//   }
-// }
-
 domain __SumHelper[T$]  {
   
   function __sum(s: Seq[Int]): Int 
@@ -837,11 +815,6 @@ field X_i: Ref
 
 field SubX_j: Ref
 
-function object___eq___merged(arg_0_0: Ref, arg_1: Ref): Bool
-  requires issubtype(typeof(arg_0_0), object())
-  requires issubtype(typeof(arg_1), object())
-  requires arg_0_0 != null
-
 
 @opaque()
 function X___eq__(self: Ref, other: Ref): Ref
@@ -971,12 +944,16 @@ function float___bool__(self: Ref): Bool
 
 /////////////////////// EQUALITY CONTRACTS ///////////////////////
 
+predicate object___eq___state(self: Ref) {
+  true
+}
+
 function object___eq__(self: Ref, other: Ref): Bool
     decreases _
     // permissions
     // TODO: add
-    // requires !stateless(self) ==> state(self)
-    // requires !stateless(other) ==> state(other)
+    requires !stateless(self) ==> state(self)
+    requires !stateless(other) ==> state(other)
 
     // null
     ensures self == null ==> result == (other == null ? true : false)
@@ -984,13 +961,19 @@ function object___eq__(self: Ref, other: Ref): Bool
     ensures isnotsubtype(typeof(self), float()) ==> self == other ==> result
     // TODO: force symmetry in overrides
     // symmetry
-    ensures object___eq__(other, self)
+    ensures result == object___eq__(other, self)
     // transitivity
     ensures (
         forall a: Ref ::
         { object___eq__(self, a) }
         object___eq__(self, a) && object___eq__(a, other) ==> result
     )
+    // TODO: andere kombinationen sinnvoll oder nötig?
+    // ensures (
+    //     forall a: Ref ::
+    //     { object___eq__(self, a) }
+    //     result && object___eq__(self, a) ==> object___eq__(a, other)??? does this hold
+    // )
 
 // BOOL Equality
 function bool___eq__(self: Ref, other: Ref): Bool
@@ -1007,7 +990,6 @@ function int___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
 
 // FLOAT Equality
-// Rationals not supported?
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
@@ -1031,71 +1013,112 @@ function str___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
 
 // TODO: stateless in python
-function stateless(o: Ref): Bool
+function stateless(x: Ref): Bool
     decreases _
-    ensures result <==>
-            issubtype(typeof(o), bool()) || issubtype(typeof(o), int()) ||
-            issubtype(typeof(o), str()) || issubtype(typeof(o), float())
+    ensures result <==> (
+      issubtype(typeof(x), bool()) || issubtype(typeof(x), int()) ||
+      issubtype(typeof(x), str()) || issubtype(typeof(x), float()) ||
+      (issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
+        (forall y: Ref :: { y in tuple___sil_seq__(x) }
+        (y in tuple___sil_seq__(x)) && stateless(y))
+      )
+    )
 
 // TODO: state in python
-predicate state(r: Ref)
+predicate state(r: Ref) 
 
-// TODO: triggers for precondition good?
+
+predicate list_state(self: Ref) {
+    issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==> (acc(self.list_acc) && 
+      (forall x: Ref :: { x in self.list_acc } (x in self.list_acc) && !stateless(x) ==> state(x))
+    )
+}
+
+// TODO: the predicate above has only self -> 
+// if we use list_state(self) and list_state(other), we get state(self) twice if self is other
+// but should not be a problem anymore with viper
+// should be predicate
+function list___eq__state(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    requires acc(self.list_acc)
+    requires issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+             acc(other.list_acc) &&
+             (forall x: Ref :: { x in self.list_acc } { x in other.list_acc }
+                               (x in self.list_acc || x in other.list_acc) && !stateless(x) ==> state(x)
+             )
+
 function list___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     // Permissions
     // acquire permissions for all references in both lists (self and other)
-    requires acc(self.list_acc)
-    requires issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-             acc(other.list_acc) && forall r: Ref :: { r in (self.list_acc ++ other.list_acc) }
-             r in (self.list_acc ++ other.list_acc) && !stateless(r) ==> state(r)
+    
+    requires state(self)
+    requires !stateless(other) ==> state(other)
 
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
               list___len__(self) == list___len__(other) &&
-              (forall i: Int :: { list___getitem__(self, i), list___getitem__(other, i) }
-                                i >= 0 && i < list___len__(self) ==>
-                                object___eq__(list___getitem__(self, i), list___getitem__(other, i))))
+              (forall n: Int :: { list___getitem__(self, n) }
+                                { list___getitem__(other, n) }
+                                n >= 0 && n < list___len__(self) ==>
+                                object___eq__(list___getitem__(self, n), list___getitem__(other, n))))
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
               list___len__(self) == list___len__(other) &&
-              (forall i: Int :: { list___getitem__(self, i), list___getitem__(other, i) }
-                                i <= -1 && i >= -list___len__(self) ==>
-                                object___eq__(list___getitem__(self, i), list___getitem__(other, i))))
-    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-            (result <==>
-              list___len__(self) == list___len__(other) &&
-              (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
-                                { list___getitem__(other, int___unbox__(i))}
-                                issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self)
-                                 ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
-    ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-            (result <==>
-              list___len__(self) == list___len__(other) &&
-              (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
-                                { list___getitem__(other, int___unbox__(i))}
-                                issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -list___len__(self)
-                                 ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
+              (forall n: Int :: { list___getitem__(self, n) }
+                                { list___getitem__(other, n) }
+                                n <= -1 && n >= -list___len__(self) ==>
+                                object___eq__(list___getitem__(self, n), list___getitem__(other, n))))
+    // ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+    //         (result <==>
+    //           list___len__(self) == list___len__(other) &&
+    //           (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
+    //                             { list___getitem__(other, int___unbox__(i))}
+    //                             issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < list___len__(self)
+    //                              ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
+    // ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+    //         (result <==>
+    //           list___len__(self) == list___len__(other) &&
+    //           (forall i: Ref :: { list___getitem__(self, int___unbox__(i)) }
+    //                             { list___getitem__(other, int___unbox__(i))}
+    //                             issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -list___len__(self)
+    //                              ==> object___eq__(list___getitem__(self, int___unbox__(i)), list___getitem__(other, int___unbox__(i)))))
+
+predicate set_state(self: Ref) {
+    issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==> (acc(self.set_acc) &&
+      (forall x: Ref :: {x in self.set_acc } (x in self.set_acc) && !stateless(x) ==> state(x))
+    )
+}
+
+// should be predicate
+function set___eq__state(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
+    requires acc(self.set_acc)
+    requires issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+             acc(other.set_acc) && forall x: Ref :: {x in self.set_acc } { x in other.set_acc }
+             (x in self.set_acc || x in other.set_acc) && !stateless(x) ==> state(x)
+
 
 function set___eq__(self: Ref, other: Ref): Bool
     decreases _
     // permissions
     requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
-    requires acc(self.set_acc)
-    requires issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
-             acc(other.set_acc) && forall r: Ref :: { r in (self.set_acc union other.set_acc) }
-             r in (self.set_acc union other.set_acc) && !stateless(r) ==> state(r)
+
+    requires state(self)
+    requires !stateless(other) ==> state(other)
 
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
             (result <==>
               set___len__(self) == set___len__(other) &&
-              (forall s: Ref :: exists o: Ref :: set___contains__(self, s) && set___contains__(other, o) &&
-              object___eq__(s, o)) &&
-              (forall o: Ref :: exists s: Ref :: set___contains__(other, o) && set___contains__(self, s) &&
-              object___eq__(s, o))
+              (forall x: Ref :: { set___contains__(self, x) } exists y: Ref :: { set___contains__(other, y) } { object___eq__(x, y) }
+              set___contains__(self, x) && set___contains__(other, y) && object___eq__(x, y)) &&
+              (forall y: Ref :: { set___contains__(other, y) } exists x: Ref :: { set___contains__(self, x) } { object___eq__(x, y) }
+              set___contains__(other, y) && set___contains__(self, x) && object___eq__(x, y))
             )
 
 function set___len__(self: Ref): Int
@@ -1110,30 +1133,46 @@ function set___contains__(self: Ref, item: Ref) : Bool
     requires acc(self.set_acc, wildcard)
     ensures result == (item in self.set_acc)
 
-function dict___eq__(self: Ref, other: Ref): Bool
+predicate dict_state(self: Ref) {
+    issubtype(typeof(self),dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1))) ==> (acc(self.dict_acc) &&
+      (forall x: Ref :: { x in self.dict_acc } { x in range(self.dict_acc) }
+                        (x in self.dict_acc || x in range(self.dict_acc)) && !stateless(x) ==> state(x))
+    )
+}
+
+// should be predicate
+function dict___eq__state(self: Ref, other: Ref): Bool
     decreases _
-    // permissions
     requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
     requires acc(self.dict_acc)
     requires issubtype(typeof(other),dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
              (
                 acc(other.dict_acc) &&
-                (forall r: Ref :: { r in ((dict___sil_seq__(self) ++ dict___sil_seq__(other)) ++ 
-                                  set_to_seq(domain(self.dict_acc) union domain(other.dict_acc)))  }
-                                  r in ((dict___sil_seq__(self) ++ dict___sil_seq__(other)) ++ 
-                                  set_to_seq(domain(self.dict_acc) union domain(other.dict_acc))) &&
-                                  !stateless(r) ==> state(r))
+                (forall x: Ref :: { x in self.dict_acc } { x in other.dict_acc } { x in range(self.dict_acc) } { x in range(other.dict_acc) }
+
+                                  (x in self.dict_acc || x in other.dict_acc || x in range(self.dict_acc) || x in range(other.dict_acc)) &&
+                                  !stateless(x) ==> state(x))
              )
+
+function dict___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    // permissions
+    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
+    
+    requires state(self)
+    requires !stateless(other) ==> state(other)
 
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other),dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
             (result <==>
-              dict___len__(self) == dict___len__(other) &&
-              (forall k: Ref :: exists l: Ref :: k in domain(self.dict_acc) && l in domain(other.dict_acc) && object___eq__(k, l) && 
-              object___eq__(dict___getitem__(self, k), dict___getitem__(other, l))) &&
-              (forall l: Ref :: exists k: Ref :: l in domain(other.dict_acc) && l in domain(self.dict_acc) && object___eq__(k, l) && 
-              object___eq__(dict___getitem__(self, k), dict___getitem__(other, l)))
-            )
+              (dict___len__(self) == dict___len__(other) &&
+
+              (forall x: Ref :: { x in self.dict_acc } exists y: Ref :: { y in other.dict_acc } { object___eq__(x, y) }
+              { dict___getitem__(self, x)} { dict___getitem__(other, y) }
+
+              x in self.dict_acc && y in other.dict_acc && object___eq__(x, y) && 
+              object___eq__(dict___getitem__(self, x), dict___getitem__(other, y)))
+            ))
 
 function dict___len__(self: Ref): Int
     decreases _
@@ -1155,55 +1194,58 @@ function dict___contains__(self: Ref, item: Ref) : Bool
     requires acc(self.dict_acc, wildcard)
     ensures result == (item in self.dict_acc)
 
-function set_to_seq(self: Set[Ref]): Seq[Ref]
-    decreases _
-    ensures |result| == |self|
-    ensures forall r: Ref :: {r in result} r in self <==> r in result
+predicate tuple_state(self: Ref) {
+    issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> (
+      forall x: Ref :: { x in tuple___sil_seq__(self) }
+      (x in tuple___sil_seq__(self)) && !stateless(x) ==> state(x)
+    )
+}
 
-function dict___sil_seq__(self: Ref): Seq[Ref]
+// should be predicate
+function tuple___eq__state(self: Ref, other: Ref): Bool
     decreases _
-    requires issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)))
-    requires acc(self.dict_acc, wildcard)
-    ensures |result| == |self.dict_acc|
-    ensures forall c: Ref :: {c in result} c in self.dict_acc <==> c in result
+    requires issubtype(typeof(self), tuple(tuple_args(typeof(self))))
+    requires issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+             forall x: Ref :: { x in tuple___sil_seq__(self) } { x in tuple___sil_seq__(other) }
+             (x in tuple___sil_seq__(self) || x in tuple___sil_seq__(other)) && !stateless(x) ==> state(x)
 
 function tuple___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), tuple(tuple_args(typeof(self))))
     // Permissions
-    requires issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-             forall r: Ref :: { r in (tuple___sil_seq__(self) ++ tuple___sil_seq__(other)) }
-             r in (tuple___sil_seq__(self) ++ tuple___sil_seq__(other)) && !stateless(r) ==> state(r)
+    // self could be stateless if e.g. self = (1, 2)
+    requires !stateless(self) ==> state(self)
+    requires !stateless(other) ==> state(other)
 
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Int :: { tuple___getitem__(self, i) }
-                               { tuple___getitem__(other, i)}
-                               i >= 0 && i < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i)))))
+             (forall x: Int :: { tuple___getitem__(self, x) }
+                               { tuple___getitem__(other, x)}
+                               x >= 0 && x < tuple___len__(self)
+                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Int :: { tuple___getitem__(self, i) }
-                               { tuple___getitem__(other, i)}
-                               i <= -1 && i >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i)))))
-    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-            (result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
-                               { tuple___getitem__(other, int___unbox__(i))}
-                               issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
-    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-            (result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
-                               { tuple___getitem__(other, int___unbox__(i))}
-                               issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
+             (forall x: Int :: { tuple___getitem__(self, x) }
+                               { tuple___getitem__(other, x)}
+                               x <= -1 && x >= -tuple___len__(self)
+                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
+    // ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+    //         (result <==>
+    //         (tuple___len__(self) == tuple___len__(other) &&
+    //          (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
+    //                            { tuple___getitem__(other, int___unbox__(i))}
+    //                            issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < tuple___len__(self)
+    //                             ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
+    // ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+    //         (result <==>
+    //         (tuple___len__(self) == tuple___len__(other) &&
+    //          (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
+    //                            { tuple___getitem__(other, int___unbox__(i))}
+    //                            issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -tuple___len__(self)
+    //                             ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i))))))
 
 // useful tuple funcs
 function tuple___len__(self: Ref): Int

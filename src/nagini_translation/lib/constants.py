@@ -77,6 +77,16 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 
 SINGLE_NAME = '_single'
 
+STATE_PRED = 'state'
+
+STATE_PREDS = [
+    'list_state',
+    'set_state',
+    'tuple_state',
+    'dict_state',
+    'state',
+]
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -130,14 +140,15 @@ INTERNAL_NAMES = [
     't',
     'g',
     'x',
+    'y',
     'n',
     'n1',
     'n2',
     'Low',
     'key',
     'guard',
-    'value'
-]
+    'value',
+] + [STATE_PRED] + STATE_PREDS
 
 VIPER_KEYWORDS = [
     'result',
@@ -436,3 +447,6 @@ BUILTIN___EQ___FUNCTIONS = [
 ]
 
 OBJ___EQ__MERGED = 'object___eq___merged'
+ILLEGAL_FUNC_NAMES = [
+    'stateless',
+]

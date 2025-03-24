@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 import copy
 
-from nagini_translation.lib.constants import BOOL_TYPE
+from nagini_translation.lib.constants import BOOL_TYPE, STATE_PREDS
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.util import InvalidProgramException
@@ -16,6 +16,7 @@ from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
 from toposort import toposort_flatten
 from typing import List, Tuple
+from nagini_translation.lib.typedefs import Program
 
 
 class PredicateTranslator(CommonTranslator):
@@ -63,6 +64,7 @@ class PredicateTranslator(CommonTranslator):
 
     def translate_predicate_family(self, root: PythonMethod,
                                    preds: List[PythonMethod],
+                                   sil_progs: Program,
                                    ctx: Context) -> Tuple[List['ast.silver.Predicate'], List['ast.silver.Method']]:
         """
         Translates the methods in preds, whose root (which they all override)
@@ -106,37 +108,51 @@ class PredicateTranslator(CommonTranslator):
             ctx.current_function = instance
             ctx.module = instance.module
             self.bind_type_vars(instance, ctx)
-            # Replace variables in instance by variables in root, since we use the
-            # parameter names from root.
-            for root_name, current_name in zip(root.args.keys(),
-                                               instance.args.keys()):
-                root_var = root.args[root_name]
-                # For the receiver parameter, we need it to have the same sil_name as
-                # that of the root, but the type of the current instance when translating
-                # it, otherwise some fields/functions/predicates may not be found.
-                if root_name == next(iter(root.args.keys())):
-                    root_var = copy.copy(root_var)
-                    root_var.type = instance.cls
-                ctx.set_alias(current_name, root_var)
-            actual_body_start = 0
-            while (actual_body_start < len(instance.node.body) and
-                       isinstance(instance.node.body[actual_body_start], ast.Expr) and
-                    isinstance(instance.node.body[actual_body_start].value, ast.Str)):
-                actual_body_start += 1
-            if len(instance.node.body[actual_body_start:]) != 1:
-                raise InvalidProgramException(instance.node,
-                                              'invalid.predicate')
-            content = instance.node.body[actual_body_start]
-            if isinstance(content, ast.Return):
-                content = content.value
+            
+            if instance.sil_name == 'object_state':
+                content = ast.parse("True", mode='eval')
+                content.lineno = 0
+                content.end_lineno = 0
+                content.col_offset = 0
+                content.end_col_offset = 0
+                pos = self.to_position(content, ctx)
+                current = self.viper.TrueLit(pos, self.no_info(ctx))
+            else:
 
-            stmt, current = self.translate_expr(
-                    content,
-                    ctx, impure=True,
-                    target_type=self.viper.Bool)
-            if stmt:
-                raise InvalidProgramException(instance.node,
-                                              'invalid.predicate')
+                if root.sil_name != 'object_state':
+                    # Replace variables in instance by variables in root, since we use the
+                    # parameter names from root.
+                    for root_name, current_name in zip(root.args.keys(),
+                                                    instance.args.keys()):
+                        root_var = root.args[root_name]
+                        # For the receiver parameter, we need it to have the same sil_name as
+                        # that of the root, but the type of the current instance when translating
+                        # it, otherwise some fields/functions/predicates may not be found.
+                        if root_name == next(iter(root.args.keys())):
+                            root_var = copy.copy(root_var)
+                            root_var.type = instance.cls
+                        ctx.set_alias(current_name, root_var)
+
+                actual_body_start = 0
+            
+                while (actual_body_start < len(instance.node.body) and
+                        isinstance(instance.node.body[actual_body_start], ast.Expr) and
+                        isinstance(instance.node.body[actual_body_start].value, ast.Str)):
+                    actual_body_start += 1
+                if len(instance.node.body[actual_body_start:]) != 1:
+                    raise InvalidProgramException(instance.node,
+                                                'invalid.predicate')
+                content = instance.node.body[actual_body_start]
+                if isinstance(content, ast.Return):
+                    content = content.value
+
+                stmt, current = self.translate_expr(
+                        content,
+                        ctx, impure=True,
+                        target_type=self.viper.Bool)
+                if stmt:
+                    raise InvalidProgramException(instance.node,
+                                                'invalid.predicate')
             instance_pos = self.to_position(instance.node, ctx)
             has_type = self.type_factory.type_check(self_var_ref, instance.cls, instance_pos, ctx)
             implication = self.viper.Implies(has_type, current, instance_pos, no_info)
@@ -176,9 +192,18 @@ class PredicateTranslator(CommonTranslator):
             body = self.viper.And(body, self.viper.Implies(unknown_type_condition, rest_pred_acc_pred,
                                                            root_pos_with_rule, no_info),
                                   root_pos_with_rule, no_info)
-        ctx.var_aliases = {}
         if not root.contract_only:
             body = self.viper.And(arg_types, body, root_pos, no_info)
+
+        if root.sil_name == 'object_state':
+            for fname in STATE_PREDS:
+
+                res = sil_progs.findPredicate(fname)
+                pred_body_opt = res.body()
+                if pred_body_opt != self.viper.none:
+                    body = self.viper.And(body, pred_body_opt.get(), root_pos, no_info)
+
+        ctx.var_aliases = {}
         family_pred = self.viper.Predicate(name, args, body, root_pos, no_info)
         all_preds.append(family_pred)
         return all_preds, self_framing_check_methods
