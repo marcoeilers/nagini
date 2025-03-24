@@ -71,6 +71,7 @@ class NativeSpecExtractor:
             resultcall, PtrAccess(), vf.NamedValue("result"))
         print(vf.FactConjunction(
             self.setup(f, ctx, py2vf_ctx_setup) +
+            #TODO: this does not handle "None" return type yet
             [self.translator.create_hasval_fact(resultcall, f.result.type, ctx, py2vf_ctx_setup)]
             +[self.translator.translate(p[0], ctx, py2vf_ctx_postcond) for p in f.postcondition]
         ), end=";\n")
