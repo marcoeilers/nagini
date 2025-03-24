@@ -79,6 +79,13 @@ class PyObj_HasAttr(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
         super().__init__("pyobj_hasattr", obj, "\""+attrName+"\"", attrValue, frac=frac)
 
+class PyObj_MayCreate(vf.PredicateFact):
+    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, frac=Fraction(1)):
+       super().__init__("pyobj_maycreateattr", obj, "\""+attrName+"\"", frac=frac)
+
+class PyObj_MaySet(vf.PredicateFact):
+    def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Option[PyObjPtr], frac=Fraction(1)):
+        super().__init__("pyobj_maysetattr", obj, "\""+attrName+"\"", attrValue, frac=frac)
 
 class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr

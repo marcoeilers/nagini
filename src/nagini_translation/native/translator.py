@@ -61,6 +61,18 @@ class Translator:
                     "Acc is not implemented for this content" + str(node.args[0]))
         elif (node.func.id == "list_pred"):
             raise NotImplementedError("list_pred is not implemented")
+        elif (node.func.id == "MaySet"):
+            return vfpy.PyObj_MaySet(
+                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, PtrAccess()), 
+                node.args[1].value, 
+                vf.Wildcard[vfpy.PyObjPtr](), 
+                frac=Fraction(1)
+            )            
+        elif (node.func.id == "MayCreate"):
+            return vfpy.PyObj_MayCreate(
+                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, PtrAccess()), 
+                node.args[1].value, 
+                frac=Fraction(1))
         elif (node.func.id == "Old"):
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
         else:
@@ -284,7 +296,7 @@ class Translator:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
         if (isinstance(node, ast.Call)):
             # predicates are stored in ctx.module.predicates
-            return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred"])
+            return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred", "MaySet", "MayCreate"])
         elif (isinstance(node, ast.UnaryOp)):
             return self.is_pure(node.operand, ctx)
         elif (isinstance(node, ast.IfExp)):

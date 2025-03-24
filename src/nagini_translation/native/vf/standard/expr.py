@@ -18,6 +18,13 @@ class Expr(ABC, Generic[_ValueT]):
         return str(self.__value)
 
 
+class Wildcard(Expr[_ValueT]):
+    def __init__(self):
+        pass
+    def __str__(self) -> str:
+        return "_"
+
+
 class NameOccurence(ABC):
     def __init__(self, entity: "NamedValue"):
         self.__entity = entity
@@ -41,7 +48,8 @@ class NamedValue(Generic[_ValueT]):
 
     def getName(self):
         return self.__name
-    #TODO: remove this? it is used nowhere yet
+    # TODO: remove this? it is used nowhere yet
+
     def setDef(self, defn: NameDefExpr):
         self.__def = defn
 
@@ -84,7 +92,8 @@ class BinaryOperator(ABC, Generic[_ValueT, _ValueT2]):
     def __str__(self):
         return self.symbol
 
-#TODO: either remove type arguments or allow for more general types 
+
+# TODO: either remove type arguments or allow for more general types
 # e.g. comparisons Eq. Neq, etc...
 Add = BinaryOperator[Int, Int]("+")
 Sub = BinaryOperator[Int, Int]("-")
