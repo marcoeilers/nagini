@@ -65,22 +65,21 @@ def test1() -> int:
     Requires(True)
     Ensures(True)
 
+
 @Native
 @ContractOnly
-def test2(a: A, b: int, c: float) -> int:
+def test2(a: A, b: int) -> int:
     """
-    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), cons(pair(?c__ptr, PyLong_t), nil))))) &*&
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
     pyobj_hasvalue(b__ptr, PyLong_v(?b__val)) &*&
-    pyobj_hasvalue(c__ptr, PyLong_v(?c__val)) &*&
-    PRED_pred2(a__ptr, a__val, c__ptr, c__val);
-    
-    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), cons(pair(c__ptr, PyLong_t), nil))))) &*&
+    PRED_pred2(a__ptr, a__val, b__ptr, b__val);
+
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), nil)))) &*&
     pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
     pyobj_hasvalue(b__ptr, PyLong_v(b__val)) &*&
-    pyobj_hasvalue(c__ptr, PyLong_v(c__val)) &*&
     pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
-    PRED_pred3(a__ptr, a__val, b__ptr, b__val, c__ptr, c__val);
+    PRED_pred3(a__ptr, a__val, b__ptr, b__val, result, result__val);
     """
-    Requires(pred2(a, c))
-    Ensures(pred3(a, b, c))
+    Requires(pred2(a, b))
+    Ensures(pred3(a, b, Result()))
