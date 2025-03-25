@@ -17,13 +17,13 @@ class Translator:
         self.classes = dict()
 
     def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
-        if (self.is_pure(node, ctx)):
+        if (self.is_predless(node, ctx)):
             return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx, ValAccess()))
         else:
             return self.translate_generic_fact(node, ctx, py2vf_ctx)
 
     def translate_generic_fact(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
-        # if(self.is_pure(node, ctx)):
+        # if(self.is_predless(node, ctx)):
         #    return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
         switch_dict = {
             "Call": self.translate_Call_fact,
@@ -292,17 +292,17 @@ class Translator:
             # TODO: this is just for testing, remove this and implement cleanly later
         }.get(p.name, vfpy.PyClass_t(self.classes.get(p.module.sil_name+p.name, "FAILED PYTYPE TRANSLATION")))
 
-    def is_pure(self, node: ast.AST, ctx: Context) -> bool:
+    def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
         if (isinstance(node, ast.Call)):
             # predicates are stored in ctx.module.predicates
             return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred", "MaySet", "MayCreate"])
         elif (isinstance(node, ast.UnaryOp)):
-            return self.is_pure(node.operand, ctx)
+            return self.is_predless(node.operand, ctx)
         elif (isinstance(node, ast.IfExp)):
-            return self.is_pure(node.body, ctx) and self.is_pure(node.orelse, ctx)
+            return self.is_predless(node.body, ctx) and self.is_predless(node.orelse, ctx)
         elif (isinstance(node, ast.BoolOp)):
-            return all([self.is_pure(x, ctx) for x in node.values])
+            return all([self.is_predless(x, ctx) for x in node.values])
         else:
             # BinOp, Compare, Constant, Name
             return True
