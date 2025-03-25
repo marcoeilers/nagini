@@ -33,6 +33,7 @@ from nagini_translation.lib.constants import (
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
     STATE_PREDS,
+    STATELESS_FUNC,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -471,7 +472,9 @@ class ProgramTranslator(CommonTranslator):
         ctx.current_function = merge_func
 
         # null check for self
-        self_var = merge_func.args[next(iter(merge_func.args))].ref()
+        iter_args = iter(merge_func.args)
+        self_var = merge_func.args[next(iter_args)].ref()
+        other_var = merge_func.args[next(iter_args)].ref()
         null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
         not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
                                     self.no_info(ctx))
@@ -484,6 +487,19 @@ class ProgramTranslator(CommonTranslator):
         merge_func.name = fname
         merge_func.contract_only = True
         merge_func.opaque = False
+
+        # add stateless and state preconditions for self and other
+        for var in [self_var, other_var]:
+            not_stateless_check = self.viper.Not(self.viper.FuncApp(
+                STATELESS_FUNC, [var], pos, self.info, self.viper.Bool
+            ), pos, self.info)
+
+            pred_acc = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, self.info)
+            state_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, self.viper.FullPerm(pos, self.info), pos, self.info)
+
+
+            state_implication = self.viper.Implies(not_stateless_check, state_acc_pred, pos, self.info)
+            merge_pres.append(state_implication)
 
         # loop through all overriding __eq__ functions and encode
         # the preconditions as one large conditional expression of the form:
