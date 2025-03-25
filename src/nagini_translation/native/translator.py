@@ -27,11 +27,11 @@ class Translator:
         # if(self.is_predless(node, ctx)):
         #    return vf.BooleanFact(self.translate_generic_expr(node, ctx, py2vf_ctx))
         switch_dict = {
-            "Call": self.translate_Call_fact,
-            "IfExp": self.translate_IfExp_fact,
-            "BoolOp": self.translate_BoolOp_fact,
+            ast.Call: self.translate_Call_fact,
+            ast.IfExp: self.translate_IfExp_fact,
+            ast.BoolOp: self.translate_BoolOp_fact,
         }
-        return switch_dict[type(node).__name__](node, ctx, py2vf_ctx)
+        return switch_dict[type(node)](node, ctx, py2vf_ctx)
 
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
@@ -104,18 +104,18 @@ class Translator:
         switch_dict = {
             # "ast.Call": self.translate_Call,
             # "ast.UnaryOp": self.translate_UnaryOp,
-            "IfExp": self.translate_IfExp_expr,
-            "BoolOp": self.translate_BoolOp_expr,
-            "BinOp": self.translate_BinOp_expr,
-            "Compare": self.translate_Compare_expr,
-            "Constant": self.translate_Constant_expr,
-            "Name": self.translate_Name_expr,
-            "Attribute": self.translate_Attribute_expr,
-            "Tuple": self.translate_Tuple_expr,
-            "Subscript": self.translate_Subscript_expr,
-            "Call": self.translate_Call_expr
+            ast.IfExp: self.translate_IfExp_expr,
+            ast.BoolOp: self.translate_BoolOp_expr,
+            ast.BinOp: self.translate_BinOp_expr,
+            ast.Compare: self.translate_Compare_expr,
+            ast.Constant: self.translate_Constant_expr,
+            ast.Name: self.translate_Name_expr,
+            ast.Attribute: self.translate_Attribute_expr,
+            ast.Tuple: self.translate_Tuple_expr,
+            ast.Subscript: self.translate_Subscript_expr,
+            ast.Call: self.translate_Call_expr,
         }
-        return switch_dict[type(node).__name__](node, ctx,  py2vf_ctx, v)
+        return switch_dict[type(node)](node, ctx,  py2vf_ctx, v)
 
     def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (node.func.id == "Old"):
@@ -139,10 +139,10 @@ class Translator:
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {
-            "And": vf.BoolAnd,
-            "Or": vf.BoolOr
+            ast.And: vf.BoolAnd,
+            ast.Or: vf.BoolOr
         }
-        operator = dict[type(node.op).__name__]
+        operator = dict[type(node.op)]
         return reduce(
             lambda x, y: vf.BinOp[vf.Bool](
                 x, self.translate_generic_expr(y, ctx, py2vf_ctx, ValAccess()), operator),
@@ -161,20 +161,20 @@ class Translator:
 
     def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         dict = {
-            "Add": vf.Add,
-            "Sub": vf.Sub,
-            "Mult": vf.Mul,
-            "Div": vf.Div,
-            "Mod": vf.Mod,
+            ast.Add: vf.Add,
+            ast.Sub: vf.Sub,
+            ast.Mult: vf.Mul,
+            ast.Div: vf.Div,
+            ast.Mod: vf.Mod,
             # TODO"Pow": vf.Pow,
-            "LShift": vf.LShift,
-            "RShift": vf.RShift,
-            "BitOr": vf.BitOr,
-            "BitXor": vf.BitXor,
-            "BitAnd": vf.BitAnd,
-            "FloorDiv": vf.Div
+            ast.LShift: vf.LShift,
+            ast.RShift: vf.RShift,
+            ast.BitOr: vf.BitOr,
+            ast.BitXor: vf.BitXor,
+            ast.BitAnd: vf.BitAnd,
+            ast.FloorDiv: vf.Div
         }
-        operator = dict[type(node.op).__name__]
+        operator = dict[type(node.op)]
         # TODO: handle mutable-case of these binops (like list+list)
         return vf.BinOp[vf.Int](
             self.translate_generic_expr(
@@ -201,15 +201,15 @@ class Translator:
         ptracc = PtrAccess()
         valacc = ValAccess()
         dict = {
-            "Eq": (vf.Eq, valacc),
-            "NotEq": (vf.NotEq, valacc),
-            "Lt": (vf.Lt, valacc),
-            "LtE": (vf.LtE, valacc),
-            "Gt": (vf.Gt, valacc),
-            "GtE": (vf.GtE, valacc),
-            "Is": (vf.Eq, ptracc),
+            ast.Eq: (vf.Eq, valacc),
+            ast.NotEq: (vf.NotEq, valacc),
+            ast.Lt: (vf.Lt, valacc),
+            ast.LtE: (vf.LtE, valacc),
+            ast.Gt: (vf.Gt, valacc),
+            ast.GtE: (vf.GtE, valacc),
+            ast.Is: (vf.Eq, ptracc),
         }
-        operator, acctype = dict[type(node.ops[0]).__name__]
+        operator, acctype = dict[type(node.ops[0])]
         if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
             return vf.ImmLiteral(vf.Bool(False))
         if (operandtype in ["int", "float", "bool", "string"]):
