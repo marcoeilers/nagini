@@ -77,7 +77,7 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 
 SINGLE_NAME = '_single'
 
-STATE_PRED = 'state'
+EQUALITY_STATE_PRED = 'state'
 
 STATE_PREDS = [
     'list_state',
@@ -148,7 +148,7 @@ INTERNAL_NAMES = [
     'key',
     'guard',
     'value',
-] + [STATE_PRED] + STATE_PREDS
+] + [EQUALITY_STATE_PRED] + STATE_PREDS
 
 VIPER_KEYWORDS = [
     'result',

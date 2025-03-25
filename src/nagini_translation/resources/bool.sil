@@ -306,12 +306,8 @@ function object___eq__(self: Ref, other: Ref): Bool
 
 function stateless(o: Ref): Bool
     decreases _
-    ensures result <==>
-            issubtype(typeof(o), bool()) || issubtype(typeof(o), int()) ||
-            issubtype(typeof(o), str()) || issubtype(typeof(o), float())
-
-// TODO: state in python
-predicate state(r: Ref)
+// dummy state function
+predicate state(self: Ref)
 
 function Place___eq__(self: Ref, other: Ref): Bool
     decreases _

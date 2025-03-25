@@ -31,7 +31,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     OBJ___EQ__MERGED,
-    STATE_PRED,
+    EQUALITY_STATE_PRED,
     STATE_PREDS,
 )
 from nagini_translation.lib.jvmaccess import getobject
@@ -952,7 +952,11 @@ class ProgramTranslator(CommonTranslator):
             function
             for function in self.viper.to_list(sil_progs.functions())
             if function.name() in used_names]
-        predicates += self.viper.to_list(sil_progs.predicates())
+ 
+        predicates += [
+            pred for pred in self.viper.to_list(sil_progs.predicates())
+            if pred.name() != EQUALITY_STATE_PRED
+        ]
 
         return domains, predicates, functions, methods
 
