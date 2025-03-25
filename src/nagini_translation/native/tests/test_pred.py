@@ -1,3 +1,21 @@
+"""
+fixpoint PyClass PyClass_ObjectType(){
+        return ObjectType;
+}
+fixpoint PyClass PyClass_module_0A(){
+        return PyClass("module_0A", PyClass_ObjectType);
+}
+predicate PRED_pred1() = true;
+predicate PRED_pred2(x__ptr, x__val, f__ptr, f__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
+pyobj_hasvalue(x_DOT_a__ptr, PyLong_v(?x_DOT_a__val)) &*&
+pyobj_maycreateattr(x__ptr, "b") &*&
+pyobj_maysetattr(x__ptr, "c", _) &*&
+(x_DOT_a__val == 14);
+predicate PRED_pred3(x__ptr, x__val, y__ptr, y__val, z__ptr, z__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
+pyobj_hasvalue(x_DOT_a__ptr, PyLong_v(?x_DOT_a__val)) &*&
+(x_DOT_a__val == 14) &*&
+pred1();
+"""
 from nagini_contracts.contracts import *
 
 
@@ -36,5 +54,13 @@ def pred3(x: A, y: int, z: float) -> bool:
 @Native
 @ContractOnly
 def somemethod() -> int:
+    """
+    requires pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+    true;
+
+    ensures pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
+    true;
+    """
     Requires(True)
     Ensures(True)
