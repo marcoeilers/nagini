@@ -8,6 +8,7 @@ import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
+from itertools import chain
 import ast
 
 
@@ -63,15 +64,17 @@ class Translator:
             raise NotImplementedError("list_pred is not implemented")
         elif (node.func.id == "MaySet"):
             return vfpy.PyObj_MaySet(
-                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, PtrAccess()), 
-                node.args[1].value, 
-                vf.Wildcard[vfpy.PyObjPtr](), 
+                self.translate_generic_expr(
+                    node.args[0], ctx, py2vf_ctx, PtrAccess()),
+                node.args[1].value,
+                vf.Wildcard[vfpy.PyObjPtr](),
                 frac=Fraction(1)
-            )            
+            )
         elif (node.func.id == "MayCreate"):
             return vfpy.PyObj_MayCreate(
-                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, PtrAccess()), 
-                node.args[1].value, 
+                self.translate_generic_expr(
+                    node.args[0], ctx, py2vf_ctx, PtrAccess()),
+                node.args[1].value,
                 frac=Fraction(1))
         elif (node.func.id == "Old"):
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
@@ -79,7 +82,10 @@ class Translator:
             funcid = node.func.id
             # raise NotImplementedError("Call to function not implemented")
             # TODO: check if each of these variables is to be used as ref or as val
-            return self.predicates[funcid](*map(lambda x: self.translate_generic_expr(x, ctx, py2vf_ctx, ValAccess()), node.args))
+            def f(x, y): return self.translate_generic_expr(
+                x, ctx, py2vf_ctx, y)
+
+            return self.predicates[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
 
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         # the condition must be pure
@@ -257,8 +263,8 @@ class Translator:
             pyobjval = vf.ImmInductive(
                 cntnt(py2vf_ctx.getExpr(target, access)))
             return vfpy.PyObj_HasVal(
-                py2vf_ctx.getExpr(target, path(PtrAccess())), 
-                pyobjval, 
+                py2vf_ctx.getExpr(target, path(PtrAccess())),
+                pyobjval,
                 frac=frac)
         elif (t.name == "tuple"):
             tupleEls = []

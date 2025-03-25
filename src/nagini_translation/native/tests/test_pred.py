@@ -14,7 +14,7 @@ pyobj_maysetattr(x__ptr, "c", _) &*&
 predicate PRED_pred3(x__ptr, x__val, y__ptr, y__val, z__ptr, z__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
 pyobj_hasvalue(x_DOT_a__ptr, PyLong_v(?x_DOT_a__val)) &*&
 (x_DOT_a__val == 14) &*&
-pred1();
+PRED_pred1();
 """
 from nagini_contracts.contracts import *
 
@@ -53,7 +53,7 @@ def pred3(x: A, y: int, z: float) -> bool:
 
 @Native
 @ContractOnly
-def somemethod() -> int:
+def test1() -> int:
     """
     requires pyobj_hasvalue(args, PyTuple_v(nil)) &*&
     true;
@@ -64,3 +64,23 @@ def somemethod() -> int:
     """
     Requires(True)
     Ensures(True)
+
+@Native
+@ContractOnly
+def test2(a: A, b: int, c: float) -> int:
+    """
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), cons(pair(?c__ptr, PyLong_t), nil))))) &*&
+    pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
+    pyobj_hasvalue(b__ptr, PyLong_v(?b__val)) &*&
+    pyobj_hasvalue(c__ptr, PyLong_v(?c__val)) &*&
+    PRED_pred2(a__ptr, a__val, c__ptr, c__val);
+    
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), cons(pair(c__ptr, PyLong_t), nil))))) &*&
+    pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
+    pyobj_hasvalue(b__ptr, PyLong_v(b__val)) &*&
+    pyobj_hasvalue(c__ptr, PyLong_v(c__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
+    PRED_pred3(a__ptr, a__val, b__ptr, b__val, c__ptr, c__val);
+    """
+    Requires(pred2(a, c))
+    Ensures(pred3(a, b, c))

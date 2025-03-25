@@ -30,23 +30,22 @@ class NativeSpecExtractor:
 
         def make_init(key):
             return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
-        for key, value in m.predicates.items():
-            self.translator.predicates[key] = type(
-                key, (vf.NaginiPredicateFact,), {"__init__": make_init(key)})
+
         for m in modules:
-            for p in m.predicates.values():
+            for k, p in m.predicates.items():
                 ctx = Context()
                 ctx.module = m
                 ctx.current_function = p
                 py2vf_ctx = py2vf_context()
-                def somefun(x, y): return py2vf_ctx.getExpr(
+                def f(x, y): return py2vf_ctx.getExpr(
                     ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
                 #create a named value for each argument
+                self.translator.predicates[k] = type(k, (vf.NaginiPredicateFact,), {"__init__": make_init("PRED_"+k)})
                 for y in p.args.items():
-                    somefun(y[0], PtrAccess())
-                    somefun(y[0], ValAccess())
+                    f(y[0], PtrAccess())
+                    f(y[0], ValAccess())
                 predargs = map(str, list(chain.from_iterable(
-                    [(somefun(y[0], PtrAccess()), somefun(y[0], ValAccess())) for y in p.args.items()])))
+                    [(f(y[0], PtrAccess()), f(y[0], ValAccess())) for y in p.args.items()])))
                 res += "predicate PRED_"+p.name+"("+', '.join(predargs)+") = "+str(self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
                 pass
                 # res += self.translator.translate(p, Context(m), py2vf_context())
