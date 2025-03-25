@@ -76,6 +76,7 @@ class Translator:
                     node.args[0], ctx, py2vf_ctx, PtrAccess()),
                 node.args[1].value,
                 frac=Fraction(1))
+        #TODO: remove this?
         elif (node.func.id == "Old"):
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
         else:
