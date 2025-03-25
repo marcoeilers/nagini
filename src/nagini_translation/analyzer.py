@@ -673,7 +673,11 @@ class Analyzer(ast.NodeVisitor):
             func.superscope = scope_container
         else:
             pure = is_property_getter or self.is_pure(node)
-            opaque = not self.is_transparent(node)
+            # properties are transparent
+            if is_property_getter:
+                opaque = False
+            else:
+                opaque = not self.is_transparent(node)
             if pure:
                 contract_only = self.is_declared_contract_only(node)
             else:
