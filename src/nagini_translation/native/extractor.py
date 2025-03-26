@@ -12,13 +12,29 @@ from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type, Tuple, List
 from itertools import chain
-
+from nagini_translation.native.exprify import Exprifier
 
 class NativeSpecExtractor:
     def env(self, modules: List[PythonModule]) -> str:
         # Class System Translation
+        ctx = Context()
         res = "fixpoint PyClass PyClass_ObjectType(){\n\treturn ObjectType;\n}\n"
         for m in modules[1:]:
+            ctx.module = m
+            for k, f in m.functions.items():
+                #TODO. raise an error if the function has a non predfree precondition
+                py2vf_ctx = py2vf_context()
+                def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+                #create a named value for each argument
+                for y in f.args.items():
+                    ptrandval(y[0], PtrAccess())
+                    ptrandval(y[0], ValAccess())
+                predargs = map(str, list(chain.from_iterable(
+                    [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
+                ctx.current_function = f
+                exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
+                print(ast.unparse(exprifiedfunction))
+                print(self.translator.translate(exprifiedfunction, ctx, py2vf_ctx))
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
@@ -32,23 +48,19 @@ class NativeSpecExtractor:
             return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
 
         for m in modules:
+            ctx.module = m
             for k, p in m.predicates.items():
-                ctx = Context()
-                ctx.module = m
                 ctx.current_function = p
                 py2vf_ctx = py2vf_context()
-                def f(x, y): return py2vf_ctx.getExpr(
-                    ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                #create a named value for each argument
                 self.translator.predicates[k] = type(k, (vf.NaginiPredicateFact,), {"__init__": make_init("PRED_"+k)})
+                def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+                #create a named value for each argument
                 for y in p.args.items():
-                    f(y[0], PtrAccess())
-                    f(y[0], ValAccess())
+                    ptrandval(y[0], PtrAccess())
+                    ptrandval(y[0], ValAccess())
                 predargs = map(str, list(chain.from_iterable(
-                    [(f(y[0], PtrAccess()), f(y[0], ValAccess())) for y in p.args.items()])))
+                    [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in p.args.items()])))
                 res += "predicate PRED_"+p.name+"("+', '.join(predargs)+") = "+str(self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
-                pass
-                # res += self.translator.translate(p, Context(m), py2vf_context())
         # TODO: finish translating fixpoint functions
 
         return res + "/*--END OF ENV--*/\n"
