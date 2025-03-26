@@ -33,8 +33,12 @@ class NativeSpecExtractor:
                     [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
                 ctx.current_function = f
                 exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
-                print(ast.unparse(exprifiedfunction))
-                print(self.translator.translate(exprifiedfunction, ctx, py2vf_ctx))
+                #TODO: how to handle the case in which the function returns a value-only thing (like an addition)
+                #print(ast.unparse(exprifiedfunction))
+                #print("fixpoint "+"SOMETYPE"+"PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return ", end="")
+                #print(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()), end=";\n")
+                #print("}")
+                
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
