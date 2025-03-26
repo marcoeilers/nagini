@@ -126,33 +126,36 @@ function tuple___contains__(self: Ref, item: Ref): Bool
     decreases _
     ensures result == item in tuple___val__(self)
 
+predicate tuple_state(self: Ref) {
+    issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> (
+      forall x: Ref :: { x in tuple___sil_seq__(self) }
+      (x in tuple___sil_seq__(self)) && !stateless(x) ==> state(x)
+    )
+}
+
 function tuple___eq__(self: Ref, other: Ref): Bool
     decreases _
-    ensures result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Int :: { tuple___getitem__(self, i) }
-                               { tuple___getitem__(other, i)}
-                               i >= 0 && i < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i))))
-    ensures result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Int :: { tuple___getitem__(self, i) }
-                               { tuple___getitem__(other, i)}
-                               i <= -1 && i >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, i), tuple___getitem__(other, i))))
-    ensures result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
-                               { tuple___getitem__(other, int___unbox__(i))}
-                               issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i)))))
-    ensures result <==>
-            (tuple___len__(self) == tuple___len__(other) &&
-             (forall i: Ref :: { tuple___getitem__(self, int___unbox__(i)) }
-                               { tuple___getitem__(other, int___unbox__(i))}
-                               issubtype(typeof(i), int()) && int___unbox__(i) <= -1 && int___unbox__(i) >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, int___unbox__(i)), tuple___getitem__(other, int___unbox__(i)))))
+    requires issubtype(typeof(self), tuple(tuple_args(typeof(self))))
+    // Permissions
+    // self could be stateless if e.g. self = (1, 2)
+    requires !stateless(self) ==> state(self)
+    requires !stateless(other) ==> state(other)
 
+    ensures result == object___eq__(self, other)
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
+            (tuple___len__(self) == tuple___len__(other) &&
+             (forall x: Int :: { tuple___getitem__(self, x) }
+                               { tuple___getitem__(other, x)}
+                               x >= 0 && x < tuple___len__(self)
+                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
+    ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+            (result <==>
+            (tuple___len__(self) == tuple___len__(other) &&
+             (forall x: Int :: { tuple___getitem__(self, x) }
+                               { tuple___getitem__(other, x)}
+                               x <= -1 && x >= -tuple___len__(self)
+                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
 
 domain tuple_types {
     function tuple_var(arg0: PyType): PyType

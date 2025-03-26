@@ -286,9 +286,8 @@ function int___int__(self: Ref): Ref
 function object___eq__(self: Ref, other: Ref): Bool
     decreases _
     // permissions
-    // TODO: add
-    // requires !stateless(self) ==> state(self)
-    // requires !stateless(other) ==> state(other)
+    requires !stateless(self) ==> state(self)
+    requires !stateless(other) ==> state(other)
 
     // null
     ensures self == null ==> result == (other == null ? true : false)
@@ -299,13 +298,22 @@ function object___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(other, self)
     // transitivity
     ensures (
-        forall a: Ref ::
-        { object___eq__(self, a) }
-        object___eq__(self, a) && object___eq__(a, other) ==> result
+        forall x: Ref ::
+        { object___eq__(self, x) }
+        object___eq__(self, x) && object___eq__(x, other) ==> result
     )
 
-function stateless(o: Ref): Bool
+function stateless(x: Ref): Bool
     decreases _
+    ensures result <==> (
+      issubtype(typeof(x), bool()) || issubtype(typeof(x), int()) ||
+      issubtype(typeof(x), str()) || issubtype(typeof(x), float()) ||
+      (issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
+        (forall y: Ref :: { y in tuple___val__(x) }
+        (y in tuple___val__(x)) && stateless(y))
+      )
+    )
+
 // dummy state function
 predicate state(self: Ref)
 
