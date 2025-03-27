@@ -24,7 +24,7 @@ class NativeSpecExtractor:
             for k, f in m.functions.items():
                 ctx.current_function = f
                 if(any([self.translator.is_predless(p[0], ctx)==False for p in f.precondition])):
-                    res+= "\n//WARNING: Function "+f.name+" has a predicate in its precondition. => Not translated\n\n"
+                    res+= "\n//WARNING: Pure function "+f.name+" has a predicate in its precondition. => Not translated\n\n"
                 else:
                     py2vf_ctx = py2vf_context()
                     def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
@@ -36,10 +36,10 @@ class NativeSpecExtractor:
                         [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
                     exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
                     #TODO: how to handle the case in which the function returns a value-only thing (like an addition)
-                    #print(ast.unparse(exprifiedfunction))
-                    #print("fixpoint "+"SOMETYPE"+"PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return ", end="")
-                    #print(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()), end=";\n")
-                    #print("}")
+                    #(ast.unparse(exprifiedfunction))
+                    res+="fixpoint "+"SOMETYPE"+" PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return "
+                    res+=str(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()))
+                    res+=";\n}\n\n"
                     
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
