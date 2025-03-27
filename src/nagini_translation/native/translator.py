@@ -37,19 +37,19 @@ class Translator:
         if (node.func.id == "Acc"):
             frac = 1
             if len(node.args) == 2:
-                # TODO: check if these assertions are at least somehow useful?
-                assert (isinstance(node.args[1], ast.BinOp))
-                assert (isinstance(node.args[1].left, ast.Constant))
-                assert (isinstance(node.args[1].right, ast.Constant))
-                frac = Fraction(node.args[1].left.value,
+                if (isinstance(node.args[1], ast.BinOp)) and (isinstance(node.args[1].left, ast.Constant)) and (isinstance(node.args[1].right, ast.Constant)):
+                    frac = Fraction(node.args[1].left.value,
                                 node.args[1].right.value)
-                # TODO: finish translating this
+                else: 
+                    raise NotImplementedError("Acc with non-constant fraction not implemented")
             if isinstance(node.args[0], ast.Attribute):
                 return vf.FactConjunction([
                     vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, PtrAccess()),
                                           node.args[0].attr,
-                                          py2vf_ctx.getExpr(node.args[0].value, AttrAccess(
-                                              node.args[0].attr, PtrAccess())),
+                                          py2vf_ctx.getExpr(
+                                              node.args[0].value, 
+                                              AttrAccess(node.args[0].attr, PtrAccess())
+                                          ),
                                           frac=frac),
                     self.create_hasval_fact(node.args[0].value,
                                             self.get_type(node.args[0], ctx),
@@ -76,7 +76,7 @@ class Translator:
                     node.args[0], ctx, py2vf_ctx, PtrAccess()),
                 node.args[1].value,
                 frac=Fraction(1))
-        #TODO: remove this?
+        # TODO: remove this?
         elif (node.func.id == "Old"):
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
         else:
@@ -129,7 +129,7 @@ class Translator:
 
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):
-            # TODO: handle the case where the index is not a constant
+            # handle the case where the index is not a constant? a priori, not implemented yet in Nagini, so no
             return self.translate_generic_expr(node.elts[v.index], ctx, py2vf_ctx, v.value)
         else:
             raise NotImplementedError("Tuple expression not implemented")
@@ -175,7 +175,6 @@ class Translator:
             ast.FloorDiv: vf.Div
         }
         operator = dict[type(node.op)]
-        # TODO: handle mutable-case of these binops (like list+list)
         return vf.BinOp[vf.Int](
             self.translate_generic_expr(
                 node.left, ctx, py2vf_ctx, ValAccess()),
@@ -220,7 +219,6 @@ class Translator:
                     node.comparators[0], ctx, py2vf_ctx, acctype),
                 operator)
         elif operandtype == "tuple":
-            # TODO: handle tuple comparison? eq, neq, lex>, lex<, lex>=, lex<=. For lex, shorter is considered smaller
             compname = type(node.ops[0]).__name__
             opd_left_types = self.get_type(node.left, ctx).type_args
             opd_right_types = self.get_type(node.comparators[0], ctx).type_args
