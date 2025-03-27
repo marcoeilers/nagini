@@ -183,11 +183,12 @@ class Translator:
             operator)
 
     def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        # TODO: handle immediate values of other types here
         dict = {
             "int": vf.Int,
             "float": vf.Float,
             "bool": vf.Bool
+            #TODO: add string
+            #TODO: use class names instead of strings
         }
         return dict[type(node.value).__name__](node.value)
 
