@@ -70,7 +70,6 @@ class NativeSpecExtractor:
         return res + "/*--END OF ENV--*/\n"
 
     def setup(self, f: PythonMethod, ctx: Context, py2vf_ctx: py2vf_context) -> list[vf.Fact]:
-        # TODO: note that the setup must be simply reused as is for the postcond (just ensure name defs are removed)
         py2vf_ctx["args"+repr(PtrAccess())] = vf.NamedValue("args")
         return [self.translator.create_hasval_fact(ast.Name(
             "args", ast.Load(), lineno=0, col_offset=0),
