@@ -125,10 +125,10 @@ class Translator:
             return py2vf_ctx.getExpr(node, v)
         else:
             funcid = node.func.id
-            if(self.translator.functions.get(funcid)!=None):
+            if(self.functions.get(funcid)!=None):
                 def f(x, y): return self.translate_generic_expr(
                     x, ctx, py2vf_ctx, y)
-                return self.translator.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+                return self.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
             else:
                 raise NotImplementedError("Call to function "+funcid+" not implemented: the function was not translated")
 

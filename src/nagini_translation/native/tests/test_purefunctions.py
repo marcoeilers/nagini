@@ -1,16 +1,15 @@
 """
     fixpoint PyClass PyClass_ObjectType(){
-            return ObjectType;
-    }
+        return ObjectType;
+}
 
-    //WARNING: Pure function purefunction has a predicate in its precondition. => Not translated
+//WARNING: Pure function purefunction has a predicate in its precondition. => Not translated
 
-    fixpoint SOMETYPEPURE_purefunction1(i__ptr, i__val){
-            return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
-    }
+fixpoint int PURE_purefunction1(i__ptr, i__val){
+         return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
+}
 
-    predicate PRED_mypredicate(i__ptr, i__val) = (i__val > 0);
-    /*--END OF ENV--*/
+predicate PRED_mypredicate(i__ptr, i__val) = (i__val > 0);
 """
 from nagini_contracts.contracts import *
 
@@ -53,6 +52,13 @@ def purefunction1(i: int) -> int:
 @Native
 def mytest(i: int) -> int:
     """
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
+    pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
+    (PURE_purefunction1(i__ptr, i__val) > 0);
+
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
+    pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val));
     """
     Requires(purefunction(i) > 0)
     Requires(purefunction1(i) > 0)
