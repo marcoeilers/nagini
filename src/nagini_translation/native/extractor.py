@@ -14,59 +14,81 @@ from typing import Optional, Type, Tuple, List
 from itertools import chain
 from nagini_translation.native.exprify import Exprifier
 
+
 class NativeSpecExtractor:
     def env(self, modules: List[PythonModule]) -> str:
         # Class System Translation
         ctx = Context()
         res = "fixpoint PyClass PyClass_ObjectType(){\n\treturn ObjectType;\n}\n"
         for m in modules[1:]:
-            ctx.module = m
-            for k, f in m.functions.items():
-                ctx.current_function = f
-                if(any([self.translator.is_predless(p[0], ctx)==False for p in f.precondition])):
-                    res+= "\n//WARNING: Pure function "+f.name+" has a predicate in its precondition. => Not translated\n\n"
-                else:
-                    py2vf_ctx = py2vf_context()
-                    def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                    #create a named value for each argument
-                    for y in f.args.items():
-                        ptrandval(y[0], PtrAccess())
-                        ptrandval(y[0], ValAccess())
-                    predargs = map(str, list(chain.from_iterable(
-                        [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
-                    exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
-                    #TODO: how to handle the case in which the function returns a value-only thing (like an addition)
-                    #(ast.unparse(exprifiedfunction))
-                    res+="fixpoint "+"SOMETYPE"+" PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return "
-                    res+=str(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()))
-                    res+=";\n}\n\n"
-                    
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
                     ");\n}\n"
+                    
+        def make_init_nagpureFPcall(key):
+            return lambda self, *args: vfpy.NaginiPredicateFact.__init__(self, key, *args)
+        for m in modules[1:]:
+            ctx.module = m
+            for k, f in m.functions.items():
+                ctx.current_function = f
+                if (any([self.translator.is_predless(p[0], ctx) == False for p in f.precondition])):
+                    res += "\n//WARNING: Pure function "+f.name + \
+                        " has a predicate in its precondition. => Not translated\n\n"
+                else:
+                    py2vf_ctx = py2vf_context()
+                    def ptrandval(x, y): return py2vf_ctx.getExpr(
+                        ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+                    # create a named value for each argument
+                    for y in f.args.items():
+                        ptrandval(y[0], PtrAccess())
+                        ptrandval(y[0], ValAccess())
+                    predargs = map(str, list(chain.from_iterable(
+                        [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
+                    exprifiedfunction = Exprifier().exprifyBody(
+                        f.node.body, ast.Constant(value=None))
+                    purefunctiontypes = [
+                        "int", "float", "bool"
+                    ]
+                    if (f.result.type.name in purefunctiontypes):
+                        # TODO the function info here
+                        self.translator.functions[f.name] = type(k, (vfpy.NaginiPureFPCall,), {
+                                                                 "__init__": make_init_nagpureFPcall("PURE_"+k)})
+                        res += "fixpoint "+f.result.type.name+" PURE_" + \
+                            f.name+"("+', '.join(predargs)+"){\n\t return "
+                        res += str(self.translator.translate_generic_expr(
+                            exprifiedfunction, ctx, py2vf_ctx, PtrAccess()))
+                        res += ";\n}\n\n"
+                    else:
+                        self.translator.functions[f.name] = None
+                        res += "//WARNING: Function "+f.name+" has a non-C-native return type" + \
+                            f.result.type.name+". => Not translated\n\n"
+
         # TODO: precise whether such or such argument is to be translated as ptr or val
         # Predicate Translation
 
-        def make_init(key):
-            return lambda self, *args: vf.NaginiPredicateFact.__init__(self, key, *args)
+        def make_init_nagpredfact(key):
+            return lambda self, *args: vfpy.NaginiPredicateFact.__init__(self, key, *args)
 
         for m in modules:
             ctx.module = m
             for k, p in m.predicates.items():
                 ctx.current_function = p
                 py2vf_ctx = py2vf_context()
-                self.translator.predicates[k] = type(k, (vf.NaginiPredicateFact,), {"__init__": make_init("PRED_"+k)})
-                def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                #create a named value for each argument
+                self.translator.predicates[k] = type(k, (vfpy.NaginiPredicateFact,), {
+                                                     "__init__": make_init_nagpredfact("PRED_"+k)})
+                def ptrandval(x, y): return py2vf_ctx.getExpr(
+                    ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+                # create a named value for each argument
                 for y in p.args.items():
                     ptrandval(y[0], PtrAccess())
                     ptrandval(y[0], ValAccess())
                 predargs = map(str, list(chain.from_iterable(
                     [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in p.args.items()])))
-                res += "predicate PRED_"+p.name+"("+', '.join(predargs)+") = "+str(self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
+                res += "predicate PRED_"+p.name+"("+', '.join(predargs)+") = "+str(
+                    self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
         # TODO: finish translating fixpoint functions
 
         return res + "/*--END OF ENV--*/\n"

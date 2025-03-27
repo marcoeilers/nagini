@@ -30,9 +30,6 @@ class PredicateFact(Fact, ABC):
         fracstr = "["+str(self.frac.numerator)+"/"+str(self.frac.denominator)+"]" if self.frac != Fraction(1) else ""
         return f"{fracstr}{self.name}({', '.join(map(str, self.args))})"
 
-class NaginiPredicateFact(PredicateFact):
-    pass
-
 class FactConjunction(Fact):
     def __init__(self, f: list[Fact]):
         self.f = []

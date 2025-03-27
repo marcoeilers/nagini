@@ -15,6 +15,7 @@ import ast
 class Translator:
     def __init__(self):
         self.predicates = dict()
+        self.functions = dict()
         self.classes = dict()
 
     def translate(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
@@ -124,8 +125,12 @@ class Translator:
             return py2vf_ctx.getExpr(node, v)
         else:
             funcid = node.func.id
-            raise NotImplementedError(
-                "Call to function "+funcid+" not implemented")
+            if(self.translator.functions.get(funcid)!=None):
+                def f(x, y): return self.translate_generic_expr(
+                    x, ctx, py2vf_ctx, y)
+                return self.translator.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+            else:
+                raise NotImplementedError("Call to function "+funcid+" not implemented: the function was not translated")
 
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):

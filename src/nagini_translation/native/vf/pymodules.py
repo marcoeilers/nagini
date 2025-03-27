@@ -105,3 +105,9 @@ class PyTuple_t(PyObj_t):
 
     def __str__(self):
         return "PyTuple_t("+str(self.items)+")"
+
+class NaginiPredicateFact(vf.PredicateFact):
+    pass
+
+class NaginiPureFPCall(vf.FPCall):
+    pass
