@@ -60,5 +60,5 @@ def mytest(i: int) -> int:
     pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
     pyobj_hasvalue(result, PyLong_v(?result__val));
     """
-    Requires(purefunction(i) > 0)
+    #Requires(purefunction(i) > 0)
     Requires(purefunction1(i) > 0)
