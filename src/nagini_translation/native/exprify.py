@@ -10,9 +10,14 @@ class Exprifier:
         thedict = {
             ast.If: self.exprifyIf,
             ast.Assign: self.exprifyAssign,
-            ast.Return: self.exprifyReturn
+            ast.Return: self.exprifyReturn,
+            ast.Expr: self.exprifyExpr
         }
         return thedict[type(node)](node, expr)
+
+    def exprifyExpr(self, node: ast.Expr, expr: ast.expr) -> ast.expr:
+        #Expressions may occur as part of preconditions, but they do not affect the final result
+        return expr
 
     def exprifyBody(self, body: List[ast.stmt], expr: ast.expr) -> ast.expr:
         for s in reversed(body):
@@ -24,7 +29,6 @@ class Exprifier:
             test=node.test,
             body=self.exprifyBody(node.body, expr),
             orelse=self.exprifyBody(node.orelse, expr))
-            
 
     def exprifyAssign(self, node: ast.Assign, expr: ast.expr) -> ast.expr:
         for t in node.targets:

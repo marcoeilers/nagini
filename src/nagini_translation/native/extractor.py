@@ -22,23 +22,25 @@ class NativeSpecExtractor:
         for m in modules[1:]:
             ctx.module = m
             for k, f in m.functions.items():
-                #TODO. raise an error if the function has a non predfree precondition
-                py2vf_ctx = py2vf_context()
-                def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                #create a named value for each argument
-                for y in f.args.items():
-                    ptrandval(y[0], PtrAccess())
-                    ptrandval(y[0], ValAccess())
-                predargs = map(str, list(chain.from_iterable(
-                    [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
                 ctx.current_function = f
-                exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
-                #TODO: how to handle the case in which the function returns a value-only thing (like an addition)
-                #print(ast.unparse(exprifiedfunction))
-                #print("fixpoint "+"SOMETYPE"+"PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return ", end="")
-                #print(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()), end=";\n")
-                #print("}")
-                
+                if(any([self.translator.is_predless(p[0], ctx)==False for p in f.precondition])):
+                    res+= "\n//WARNING: Function "+f.name+" has a predicate in its precondition. => Not translated\n\n"
+                else:
+                    py2vf_ctx = py2vf_context()
+                    def ptrandval(x, y): return py2vf_ctx.getExpr(ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+                    #create a named value for each argument
+                    for y in f.args.items():
+                        ptrandval(y[0], PtrAccess())
+                        ptrandval(y[0], ValAccess())
+                    predargs = map(str, list(chain.from_iterable(
+                        [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
+                    exprifiedfunction=Exprifier().exprifyBody(f.node.body, ast.Constant(value=None))
+                    #TODO: how to handle the case in which the function returns a value-only thing (like an addition)
+                    #print(ast.unparse(exprifiedfunction))
+                    #print("fixpoint "+"SOMETYPE"+"PURE_"+f.name+"("+', '.join(predargs)+"){\n\t return ", end="")
+                    #print(self.translator.translate_generic_expr(exprifiedfunction, ctx, py2vf_ctx, PtrAccess()), end=";\n")
+                    #print("}")
+                    
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
