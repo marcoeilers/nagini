@@ -128,8 +128,8 @@ function tuple___contains__(self: Ref, item: Ref): Bool
 
 predicate tuple_state(self: Ref) {
     issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> (
-      forall x: Ref :: { x in tuple___sil_seq__(self) }
-      (x in tuple___sil_seq__(self)) && !stateless(x) ==> state(x)
+      forall x: Ref :: { x in tuple___val__(self) }
+      (x in tuple___val__(self)) && !stateless(x) ==> state(x)
     )
 }
 

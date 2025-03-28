@@ -317,6 +317,13 @@ function stateless(x: Ref): Bool
 // dummy state function
 predicate state(self: Ref)
 
+predicate not_collection_type(self: Ref) {
+    typeof(self) != list(list_arg(typeof(self), 0)) &&
+    typeof(self) != tuple(tuple_args(typeof(self))) &&
+    typeof(self) != dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)) &&
+    typeof(self) != set(set_arg(typeof(self), 0))
+}
+
 function Place___eq__(self: Ref, other: Ref): Bool
     decreases _
     ensures result == (self == other)
