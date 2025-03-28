@@ -28,6 +28,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     STATELESS_FUNC,
+    EQUALITY_STATE_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -150,6 +151,13 @@ class ContractTranslator(CommonTranslator):
             return self.translate_may_start(node, args, perm, ctx)
         elif name == 'ThreadPost':
             return self.translate_thread_post(node, args, perm, ctx)
+        elif name == 'state_pred':
+            if len(node.args) != 1:
+                raise InvalidProgramException(node, 'invalid.contract.call')
+            stmt, var = self.translate_expr(node.args[0], ctx, target_type=self.viper.Ref)
+            if stmt:
+                raise InvalidProgramException(node, 'purity.violated')
+            return self.translate_state_pred(node, [var], perm, ctx)
         else:
             raise UnsupportedException(node)
 
@@ -162,6 +170,15 @@ class ContractTranslator(CommonTranslator):
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
         pred = self.viper.FieldAccessPredicate(field_acc, perm, pos, info)
         return pred
+
+    def translate_state_pred(self, node: ast.Call, args: List[Expr], perm: Expr,
+                             ctx: Context) -> Expr:
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        pred_access = self.viper.PredicateAccess(args, EQUALITY_STATE_PRED, pos, info)
+        access_pred = self.viper.PredicateAccessPredicate(pred_access, perm, pos,
+                                                          info)
+        return access_pred
 
     def translate_may_start(self, node: ast.Call, args: List[Expr], perm: Expr,
                             ctx: Context) -> Expr:

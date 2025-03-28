@@ -535,6 +535,14 @@ def Stateless(self: object) -> bool:
     """
     pass
 
+
+def state_pred(self: object) -> bool:
+    """
+    Special, predefined predicate that represents the permissions belonging
+    to an object. To be used like a normal predicate.
+    """
+    pass
+
 __all__ = [
         'Requires',
         'Ensures',
@@ -593,4 +601,5 @@ __all__ = [
         'MayCreate',
         'isNaN',
         'Stateless',
+        'state_pred',
         ]
