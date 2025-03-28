@@ -1145,12 +1145,17 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                     super_func.opaque = True
 
             # if self is a custom __eq__ function, 
-            # i.e., directly or indirectly overrides object___eq__
+            # i.e., (in)directly overrides object___eq__
             if super_func.merge_func_name == OBJ___EQ__MERGED:
                 self.merge_func_name = super_func.merge_func_name
                 if not [a for a, _ in self.args.items()] == [a for a, _ in super_func.args.items()]:
-                    msg = "Any override of __eq__ must have only have the following two parameters: self, other"
+                    msg = "Any override of __eq__ must have only have the following two parameters: self, other."
                     raise InvalidProgramException(self.node, "invalid.parameter.name", msg)
+                if self.cls and (not self.cls.predicates is None) and (not self.cls.predicates.get(EQUALITY_STATE_PRED)):
+                    msg = f"Any override of __eq__ must define a predicate called '{EQUALITY_STATE_PRED}' "
+                    msg += "used for permissions. It must be defined for each subclass that overrides '__eq__'."
+                    raise InvalidProgramException(self.node, f"predicate.{EQUALITY_STATE_PRED}.not_found", msg)
+                    
             # find a new name for a merge_function
             elif super_func.sil_name:
                 self.merge_func_name = self.get_fresh_name(super_func.sil_name + '_merged')
