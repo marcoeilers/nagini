@@ -24,7 +24,7 @@
         "state": {
             "args": ["object"],
             "type": "bool",
-            "requires": ["list_state", "set_state", "dict_state", "tuple_state"]
+            "requires": ["list_state", "set_state", "dict_state", "tuple_state", "not_collection_type"]
         }
     }
 },

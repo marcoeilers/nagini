@@ -153,7 +153,7 @@ INTERNAL_NAMES = [
     'key',
     'guard',
     'value',
-] + [EQUALITY_STATE_PRED] + STATE_PREDS
+] + STATE_PREDS
 
 VIPER_KEYWORDS = [
     'result',
