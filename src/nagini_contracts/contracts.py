@@ -31,7 +31,7 @@ CONTRACT_FUNCS = ['Assume', 'Assert', 'Old', 'Result', 'ResultT', 'Implies', 'Fo
                   'Acc', 'Rd', 'Wildcard', 'Fold', 'Unfold', 'Unfolding', 'Previous',
                   'RaisedException', 'PSeq', 'PSet', 'ToSeq', 'ToMS', 'MaySet', 'MayCreate',
                   'getMethod', 'getArg', 'getOld', 'arg', 'Joinable', 'MayStart', 'Let',
-                  'PMultiset', 'LowExit', 'Refute', 'isNaN']
+                  'PMultiset', 'LowExit', 'Refute', 'isNaN', 'Stateless', 'State']
 
 T = TypeVar('T')
 V = TypeVar('V')
@@ -528,6 +528,13 @@ def dict_pred(d: object) -> bool:
 def isNaN(f: float) -> bool:
     pass
 
+
+def Stateless(self: object) -> bool:
+    """
+    A Function returning true iff self is stateless, i.e., a primitive or a tuple of primitives.
+    """
+    pass
+
 __all__ = [
         'Requires',
         'Ensures',
@@ -584,5 +591,6 @@ __all__ = [
         'ToMS',
         'MaySet',
         'MayCreate',
-        'isNaN'
+        'isNaN',
+        'Stateless',
         ]

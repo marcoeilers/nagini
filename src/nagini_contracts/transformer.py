@@ -20,7 +20,8 @@ contract_keywords = frozenset(["Requires", "Ensures", "Exsures",
                                "Acc",
                                "Fold", "Unfold", "Unfolding",
                                "Pure", "Predicate",
-                               "Ghost",])
+                               "Ghost",
+                               "Stateless",])
 
 
 class GhostCollector(ast.NodeVisitor):

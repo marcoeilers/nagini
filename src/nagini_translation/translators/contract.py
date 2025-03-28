@@ -27,6 +27,7 @@ from nagini_translation.lib.constants import (
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
+    STATELESS_FUNC,
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -998,6 +999,18 @@ class ContractTranslator(CommonTranslator):
         call = self.get_function_call(float_class, '__isNaN', [expr], [None], node, ctx, self.to_position(node, ctx))
         return stmt, call
 
+    def translate_stateless(self, node: ast.Call, ctx: Context,
+                            impure=False) -> StmtsAndExpr:
+        """
+        Translates a call to the Stateless() contract function.
+        """
+        if len(node.args) != 1:
+            raise InvalidProgramException(node, 'invalid.contract.call')
+        stmt, var = self.translate_expr(node.args[0], ctx, target_type=self.viper.Ref)
+        if stmt:
+            raise InvalidProgramException(node, 'purity.violated')
+        return ([], self.viper.FuncApp(STATELESS_FUNC, [var], self.to_position(node, ctx), self.no_info(ctx), self.viper.Bool))
+
     def translate_contractfunc_call(self, node: ast.Call, ctx: Context,
                                     impure=False, statement=False) -> StmtsAndExpr:
         """
@@ -1006,6 +1019,8 @@ class ContractTranslator(CommonTranslator):
         func_name = get_func_name(node)
         if func_name in ('Result', 'ResultT'):
             return self.translate_result(node, ctx)
+        elif func_name == 'Stateless':
+            return self.translate_stateless(node, ctx)
         elif func_name == 'RaisedException':
             return self.translate_raised_exception(node, ctx)
         elif func_name in ('Acc', 'Rd', 'Wildcard'):
