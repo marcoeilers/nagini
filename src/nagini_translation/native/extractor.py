@@ -1,6 +1,7 @@
 import ast
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
+import nagini_translation.native.vf.nag as vfnag
 from nagini_translation.native.py2vf_ctx import py2vf_context
 from nagini_translation.native.translator import *
 from nagini_translation.lib.context import Context
@@ -27,9 +28,9 @@ class NativeSpecExtractor:
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
                     ");\n}\n"
-                    
+
         def make_init_nagpureFPcall(key):
-            return lambda self, *args: vfpy.NaginiPredicateFact.__init__(self, key, *args)
+            return lambda self, *args: vfnag.NaginiPredicateFact.__init__(self, key, *args)
         for m in modules[1:]:
             ctx.module = m
             for k, f in m.functions.items():
@@ -54,7 +55,7 @@ class NativeSpecExtractor:
                     ]
                     if (f.result.type.name in purefunctiontypes):
                         # TODO the function info here
-                        self.translator.functions[f.name] = type(k, (vfpy.NaginiPureFPCall,), {
+                        self.translator.functions[f.name] = type(k, (vfnag.NaginiPureFPCall,), {
                                                                  "__init__": make_init_nagpureFPcall("PURE_"+k)})
                         res += "fixpoint "+f.result.type.name+" PURE_" + \
                             f.name+"("+', '.join(predargs)+"){\n\t return "
@@ -70,7 +71,7 @@ class NativeSpecExtractor:
         # Predicate Translation
 
         def make_init_nagpredfact(key):
-            return lambda self, *args: vfpy.NaginiPredicateFact.__init__(self, key, *args)
+            return lambda self, *args: vfnag.NaginiPredicateFact.__init__(self, key, *args)
 
         for m in modules:
             ctx.module = m
