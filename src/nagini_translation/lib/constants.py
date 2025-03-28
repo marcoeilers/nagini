@@ -133,6 +133,9 @@ INTERNAL_NAMES = [
     COMBINED_NAME_ACCESSOR,
     COMBINED_PREFIX_ACCESSOR,
     SINGLE_NAME,
+    EQUALITY_STATE_PRED,
+    PRED_NOT_COLLECTION_TYPE,
+    STATELESS_FUNC,
     '_is_single',
     '_is_combined',
     'm',     # the following are used in various
