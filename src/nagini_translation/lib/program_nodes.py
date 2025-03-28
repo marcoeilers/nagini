@@ -1131,9 +1131,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             # check that if function is transparent, it is not
             # overridden in a subclass
             if self.overrides and not (self.opaque and self.overrides.opaque):
-                    msg: str = "A tranparent function cannot be overridden. "
-                    msg += "Remove the @Transparent decorator for the function to be opaque."
-                    raise InvalidProgramException(self.node, "invalid.override.opaque", msg)
+                msg: str = "A property or a function using the @Transparent decorator cannot be overridden."
+                raise InvalidProgramException(self.node, "invalid.override.opaque", msg)
 
             # generate merge function name and
             # set self and all overrides to opaque if it is overridden

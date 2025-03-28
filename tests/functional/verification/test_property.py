@@ -21,7 +21,8 @@ class A:
         Ensures(self.v == vhalvs // 2)
         self.v = vhalvs // 2
 
-    @property       #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
+    @property
+    #:: ExpectedOutput(function.not.wellformed:insufficient.permission)
     def vtt_2(self) -> int:
         return self.v
 
