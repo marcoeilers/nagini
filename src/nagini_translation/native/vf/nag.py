@@ -53,6 +53,6 @@ class ListForallCond_Gte(ListForallCond):
     def __str__(self):
         return "gte("+str(self.a)+")"
     
-class ForallPredFact(vf.PredPredicateFactCall):
+class ForallPredFact(vf.PredicateFact):
     def __init__(self, pairlist: vf.NameDefExpr, predname: vf.NameUseExpr, cond, wrapperpair: vf.NameUseExpr, frac=Fraction(1)):
         super().__init__("forall_predfact", pairlist, predname, cond, wrapperpair, vf.Nil, frac=frac)
