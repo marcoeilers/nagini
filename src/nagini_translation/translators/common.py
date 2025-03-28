@@ -29,6 +29,7 @@ from nagini_translation.lib.constants import (
     SET_TYPE,
     SINGLE_NAME,
     UNION_TYPE,
+    OBJ___EQ__MERGED,
 )
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
@@ -713,13 +714,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                   self.no_info(ctx), ctx)
         else:
             if func_name == '__eq__':
-                func_cls = receiver.get_function(func_name).cls
-                if func_cls.name == OBJECT_TYPE:
-                    assert len(args) == 2
-                    arg1 = self.to_ref(args[0], ctx)
-                    arg2 = self.to_ref(args[1], ctx)
-                    return self.viper.DomainFuncApp('object___eq__', [arg1, arg2], self.viper.Bool, position,
-                                                    self.no_info(ctx), '__ObjectEquality')
+                assert len(args) == 2
+                arg1 = self.to_ref(args[0], ctx)
+                arg2 = self.to_ref(args[1], ctx)
+                return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                        self.no_info(ctx), self.viper.Bool)
+
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:
                     import logging
