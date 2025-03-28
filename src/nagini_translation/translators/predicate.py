@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import ast
 import copy
 
-from nagini_translation.lib.constants import BOOL_TYPE, STATE_PREDS
+from nagini_translation.lib.constants import BOOL_TYPE, STATE_PREDS, EQUALITY_STATE_PRED, PRED_NOT_COLLECTION_TYPE
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import PythonMethod
 from nagini_translation.lib.util import InvalidProgramException
@@ -109,7 +109,7 @@ class PredicateTranslator(CommonTranslator):
             ctx.module = instance.module
             self.bind_type_vars(instance, ctx)
             
-            if instance.sil_name == 'object_state':
+            if instance.sil_name == EQUALITY_STATE_PRED:
                 content = ast.parse("True", mode='eval')
                 content.lineno = 0
                 content.end_lineno = 0
@@ -119,7 +119,8 @@ class PredicateTranslator(CommonTranslator):
                 current = self.viper.TrueLit(pos, self.no_info(ctx))
             else:
 
-                if root.sil_name != 'object_state':
+                # only do aliasing if its not the __eq__ state predicate
+                if root.sil_name != EQUALITY_STATE_PRED:
                     # Replace variables in instance by variables in root, since we use the
                     # parameter names from root.
                     for root_name, current_name in zip(root.args.keys(),
@@ -189,15 +190,22 @@ class PredicateTranslator(CommonTranslator):
             rest_pred_acc_pred = self.viper.PredicateAccessPredicate(rest_pred_acc,
                                                                      self.viper.FullPerm(root_pos_with_rule, no_info),
                                                                      root_pos_with_rule, no_info)
+
+            if root.sil_name == EQUALITY_STATE_PRED:
+                res = sil_progs.findPredicate(PRED_NOT_COLLECTION_TYPE)
+                pred_body_opt = res.body()
+                if pred_body_opt != self.viper.none:
+                    unknown_type_condition = self.viper.And(unknown_type_condition, pred_body_opt.get(), root_pos, no_info)
+
             body = self.viper.And(body, self.viper.Implies(unknown_type_condition, rest_pred_acc_pred,
                                                            root_pos_with_rule, no_info),
                                   root_pos_with_rule, no_info)
+
         if not root.contract_only:
             body = self.viper.And(arg_types, body, root_pos, no_info)
 
-        if root.sil_name == 'object_state':
+        if root.sil_name == EQUALITY_STATE_PRED:
             for fname in STATE_PREDS:
-
                 res = sil_progs.findPredicate(fname)
                 pred_body_opt = res.body()
                 if pred_body_opt != self.viper.none:

@@ -78,14 +78,16 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 SINGLE_NAME = '_single'
 
 EQUALITY_STATE_PRED = 'state'
+STATELESS_FUNC = 'stateless'
 
 STATE_PREDS = [
     'list_state',
     'set_state',
     'tuple_state',
     'dict_state',
-    'state',
 ]
+
+PRED_NOT_COLLECTION_TYPE = 'not_collection_type'
 
 INTERNAL_NAMES = [
     'FuncTriple',
