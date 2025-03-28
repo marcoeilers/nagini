@@ -1058,12 +1058,25 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         same for local variables. Also sets the method type and
         checks if this method overrides one from a superclass,
         """
-        self.sil_name = sil_name
+        if sil_name in ILLEGAL_FUNC_NAMES:
+            self.sil_name = self.superscope.get_fresh_name(sil_name)
+        elif self.cls and self.cls.name == OBJECT_TYPE and self.name == 'state':
+            self.sil_name = EQUALITY_STATE_PRED
+        else:
+            self.sil_name = sil_name
         self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
-        for name, arg in self.args.items():
-            arg.process(self.get_fresh_name(name), translator)
+
+        # no fresh name for args of the __eq__ state predicate
+        if self.cls and self.cls.name == OBJECT_TYPE and self.name == 'state':
+            for name, arg in self.args.items():
+                arg.process(name, translator)
+
+        else:
+            for name, arg in self.args.items():
+                arg.process(self.get_fresh_name(name), translator)
+
         if self.var_arg:
             self.var_arg.process(self.get_fresh_name(self.var_arg.name),
                                  translator)

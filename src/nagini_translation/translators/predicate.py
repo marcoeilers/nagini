@@ -118,21 +118,18 @@ class PredicateTranslator(CommonTranslator):
                 pos = self.to_position(content, ctx)
                 current = self.viper.TrueLit(pos, self.no_info(ctx))
             else:
-
-                # only do aliasing if its not the __eq__ state predicate
-                if root.sil_name != EQUALITY_STATE_PRED:
-                    # Replace variables in instance by variables in root, since we use the
-                    # parameter names from root.
-                    for root_name, current_name in zip(root.args.keys(),
-                                                    instance.args.keys()):
-                        root_var = root.args[root_name]
-                        # For the receiver parameter, we need it to have the same sil_name as
-                        # that of the root, but the type of the current instance when translating
-                        # it, otherwise some fields/functions/predicates may not be found.
-                        if root_name == next(iter(root.args.keys())):
-                            root_var = copy.copy(root_var)
-                            root_var.type = instance.cls
-                        ctx.set_alias(current_name, root_var)
+                # Replace variables in instance by variables in root, since we use the
+                # parameter names from root.
+                for root_name, current_name in zip(root.args.keys(),
+                                                instance.args.keys()):
+                    root_var = root.args[root_name]
+                    # For the receiver parameter, we need it to have the same sil_name as
+                    # that of the root, but the type of the current instance when translating
+                    # it, otherwise some fields/functions/predicates may not be found.
+                    if root_name == next(iter(root.args.keys())):
+                        root_var = copy.copy(root_var)
+                        root_var.type = instance.cls
+                    ctx.set_alias(current_name, root_var)
 
                 actual_body_start = 0
             
