@@ -447,6 +447,7 @@ class ProgramTranslator(CommonTranslator):
         """
         # no other function overrides object___eq__
         if len(overrides) == 1:
+            ctx.var_aliases = {}
             return None
         
         eq: PythonMethod = overrides[-1]
@@ -487,8 +488,11 @@ class ProgramTranslator(CommonTranslator):
         merge_func.name = fname
         merge_func.contract_only = True
         merge_func.opaque = False
+        old_aliases = copy.deepcopy(ctx.var_aliases)
 
         # add stateless and state preconditions for self and other
+
+        general_state_impl = self.viper.TrueLit(pos, self.info)
         for var in [self_var, other_var]:
             not_stateless_check = self.viper.Not(self.viper.FuncApp(
                 STATELESS_FUNC, [var], pos, self.info, self.viper.Bool
@@ -499,7 +503,7 @@ class ProgramTranslator(CommonTranslator):
 
 
             state_implication = self.viper.Implies(not_stateless_check, state_acc_pred, pos, self.info)
-            merge_pres.append(state_implication)
+            general_state_impl = self.viper.And(general_state_impl, state_implication, pos, self.info)
 
         # loop through all overriding __eq__ functions and encode
         # the preconditions as one large conditional expression of the form:
@@ -519,6 +523,14 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = cur.module
             ctx.current_class = cur.cls
 
+            if cur.overrides:
+                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                    root_var = merge_func.args[merge_name]
+                    if merge_name == next(iter(merge_func.args.keys())):
+                        root_var = copy.copy(root_var)
+                        root_var.type = cur.cls
+                    ctx.set_alias(cur_name, root_var)
+
             # find pre- and postconditions from sil_progs
             if cur.interface:
                 res = sil_progs.findFunction(cur.sil_name)
@@ -531,42 +543,48 @@ class ProgramTranslator(CommonTranslator):
             pos = self.to_position(cur.node, ctx)
             info = self.no_info(ctx)
 
-            self_var = merge_func.args.get('self').ref()
-            other_var = merge_func.args.get('other').ref()
+            with ctx.additional_aliases(ctx.var_aliases):
+                self_var = cur.args[next(iter(cur.args))].ref()
 
-            and_pres = self.viper.TrueLit(pos, info)
-            for pre in pres:
-                # translate first if not already translated (i.e. custom __eq__ precondition)
-                
-                if not cur.interface:
-                    stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
-                    if stmt:
-                        raise InvalidProgramException(cur.node, 'purity.violated')
+                # find self in aliases
+                if ctx.var_aliases:
+                    self_var = ctx.var_aliases.get(
+                        merge_func.args[next(iter(merge_func.args))].name
+                    ).ref()
+
+                and_pres = self.viper.TrueLit(pos, info)
+                for pre in pres:
+                    # translate first if not already translated (i.e. custom __eq__ precondition)
+                    
+                    if not cur.interface:
+                        stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
+                        if stmt:
+                            raise InvalidProgramException(cur.node, 'purity.violated')
 
 
-                and_pres = self.viper.And(and_pres, pre, pos, info)
+                    and_pres = self.viper.And(and_pres, pre, pos, info)
 
-            check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-            if last_check is None:
-                last_check = self.viper.CondExp(check, and_pres, self.viper.TrueLit(pos, info), pos, info)
-            else:
-                last_check = self.viper.CondExp(check, and_pres, last_check, pos, info)
-                
-            and_posts = self.viper.TrueLit(pos, info)
-            for post in posts:
-                # translate first if not already translated (i.e. custom __eq__ precondition)
-                if not cur.interface:
-                    stmt, post = self.translate_expr(post, ctx, self.viper.Bool)
-                    if stmt:
-                        raise InvalidProgramException(cur.node, 'purity.violated')
+                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                if last_check is None:
+                    last_check = self.viper.CondExp(check, and_pres, general_state_impl, pos, info)
+                else:
+                    last_check = self.viper.CondExp(check, and_pres, last_check, pos, info)
+                    
+                and_posts = self.viper.TrueLit(pos, info)
+                for post in posts:
+                    # translate first if not already translated (i.e. custom __eq__ precondition)
+                    if not cur.interface:
+                        stmt, post = self.translate_expr(post, ctx, self.viper.Bool)
+                        if stmt:
+                            raise InvalidProgramException(cur.node, 'purity.violated')
 
-                # And all postconditions
-                and_posts = self.viper.And(and_posts, post, pos, info)
+                    # And all postconditions
+                    and_posts = self.viper.And(and_posts, post, pos, info)
 
-            # add implication: issubtype(...) ==> And(posts)
-            check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
-            implication = self.viper.Implies(check, and_posts, pos, info)
-            merge_posts.append(implication)
+                # add implication: issubtype(...) ==> And(posts)
+                check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+                implication = self.viper.Implies(check, and_posts, pos, info)
+                merge_posts.append(implication)
 
             # add to context for the translation of function calls
             ctx.merge_functions[cur] = merge_func
@@ -574,6 +592,11 @@ class ProgramTranslator(CommonTranslator):
         # append the one large conditional expression
         if last_check:
             merge_pres.append(last_check)
+
+        while(ctx.var_aliases):
+            for alias in list(ctx.var_aliases.keys()):
+                ctx.remove_alias(alias)
+        ctx.var_aliases = old_aliases
 
         ctx.current_function = old_function
         ctx.module = old_module
@@ -969,6 +992,7 @@ class ProgramTranslator(CommonTranslator):
             for function in self.viper.to_list(sil_progs.functions())
             if function.name() in used_names]
  
+        # remove dummy state __eq__ predicate
         predicates += [
             pred for pred in self.viper.to_list(sil_progs.predicates())
             if pred.name() != EQUALITY_STATE_PRED
