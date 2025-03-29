@@ -144,6 +144,8 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     else:
         translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
+    if not analyzer.enable_obligations:
+        config.obligation_config.disable_all = True
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
         sil_programs = load_sil_files(jvm, bv_size, sif, float_encoding)
