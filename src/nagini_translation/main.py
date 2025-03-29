@@ -144,7 +144,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     else:
         translator = Translator(jvm, path, types, viper_ast)
     analyzer.process(translator)
-    if not analyzer.enable_obligations:
+    if not analyzer.enable_obligations and config.obligation_config.disable_all is None:
         config.obligation_config.disable_all = True
     if 'sil_programs' not in globals() or reload_resources:
         global sil_programs
@@ -320,6 +320,11 @@ def main() -> None:
         help='do not verify liveness properties (obligations)'
     )
     parser.add_argument(
+        '--force-obligations',
+        action='store_true',
+        help='force use of the obligations encoding used to verify liveness properties'
+    )
+    parser.add_argument(
         '--server',
         action='store_true',
         help='start Nagini server'
@@ -358,7 +363,11 @@ def main() -> None:
     config.mypy_path = args.mypy_path
     config.set_verifier(args.verifier)
     if args.ignore_obligations:
+        if args.force_obligations:
+            parser.error('incompatible arguments: --ignore-obligations and --force-obligations')
         config.obligation_config.disable_all = True
+    elif args.force_obligations:
+        config.obligation_config.disable_all = False
 
     if not config.classpath:
         parser.error('missing argument: --viper-jar-path')
