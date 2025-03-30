@@ -1434,7 +1434,7 @@ class Analyzer(ast.NodeVisitor):
             elif node.func.id == 'cast':
                 return self.find_or_create_target_class(node.args[0])
             elif node.func.id == 'super':
-                return self.current_class.superclass  ## TODO: constructor call
+                return self.current_class.superclass
             else:
                 f = self.module.get_func_or_method(node.func.id)
                 if f is not None:
