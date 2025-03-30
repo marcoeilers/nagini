@@ -282,7 +282,8 @@ def pytest_generate_tests(metafunc: 'pytest.python.Metafunc'):
             float_encoding = new_float_encoding
             arp = 'arp' in file
             base = file.partition('verification')[0] + 'verification'
-            params.extend([(file, base, verifier, sif, reload_resources, arp, ignore_obligations,
+            params.extend([(file, base, verifier, sif, reload_resources, arp,
+                            ignore_obligations or (None if verifier == 'silicon' else False),
                             _pytest_config.store_viper, float_encoding) for verifier
                            in _pytest_config.verifiers])
         metafunc.parametrize('path,base,verifier,sif,reload_resources,arp,ignore_obligations,print,float_encoding', params)
