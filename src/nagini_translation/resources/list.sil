@@ -173,7 +173,6 @@ function list___eq__(self: Ref, other: Ref): Bool
     requires state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
                 (unfolding acc(state(self)) in (

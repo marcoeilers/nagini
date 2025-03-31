@@ -150,13 +150,11 @@ function int___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), int())
     ensures issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
-    ensures result == object___eq__(self, other)
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), bool())
     ensures issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
-    ensures result == object___eq__(self, other)
 
 function int___ge__(self: Ref, other: Ref): Bool
     decreases _
@@ -304,7 +302,7 @@ function stateless(x: Ref): Bool
       issubtype(typeof(x), str()) || issubtype(typeof(x), float()) ||
       (issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
         (forall y: Ref :: { y in tuple___val__(x) }
-        (y in tuple___val__(x)) && stateless(y))
+        (y in tuple___val__(x)) ==> stateless(y))
       )
     )
 

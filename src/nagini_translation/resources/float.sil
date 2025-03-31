@@ -47,7 +47,6 @@ function float___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), float())
     // result == false if self or other are NaN
     ensures issubtype(typeof(other), float()) ==> float___isNaN(self) || float___isNaN(other) ==> result == false
-    ensures result == object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _

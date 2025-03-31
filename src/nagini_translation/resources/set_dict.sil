@@ -102,7 +102,6 @@ function set___eq__(self: Ref, other: Ref): Bool
     requires state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
             (result <==>
               (unfolding acc(state(self)) in (
@@ -222,7 +221,6 @@ function dict___eq__(self: Ref, other: Ref): Bool
     requires state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other),dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
             (result <==>
               (unfolding acc(state(self)) in (

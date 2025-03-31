@@ -141,7 +141,6 @@ function tuple___eq__(self: Ref, other: Ref): Bool
     requires !stateless(self) ==> state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
               (!stateless(self) ==> unfolding acc(state(self)) in (

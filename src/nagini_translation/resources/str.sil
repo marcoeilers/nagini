@@ -31,7 +31,6 @@ function str___eq__(self: Ref, other: Ref): Bool
             (result <==>
               (str___len__(self) == str___len__(other)) && 
               (str___val__(self) == str___val__(other)))
-    ensures result == object___eq__(self, other)
 
 function str___add__(self: Ref, other: Ref): Ref
     decreases _
