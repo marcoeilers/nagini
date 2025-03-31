@@ -17,7 +17,7 @@ class ListForallCond_True(ListForallCond):
         return "True"
 
 class ListForallCond_InRange(ListForallCond):
-    def __init__(self, a: int, b: int, c: int):
+    def __init__(self, a: vf.Expr[vf.Int], b: vf.Expr[vf.Int], c: vf.Expr[vf.Int]):
         self.a = a
         self.b = b
         self.c = c
@@ -26,28 +26,28 @@ class ListForallCond_InRange(ListForallCond):
         return "inrange("+str(self.a)+", "+str(self.b)+", "+str(self.c)+")"
     
 class ListForallCond_Lt(ListForallCond):
-    def __init__(self, a: int):
+    def __init__(self, a: vf.Expr[vf.Int]):
         self.a = a
 
     def __str__(self):
         return "lt("+str(self.a)+")"
     
 class ListForallCond_Gt(ListForallCond):
-    def __init__(self, a: int):
+    def __init__(self, a: vf.Expr[vf.Int]):
         self.a = a
 
     def __str__(self):
         return "gt("+str(self.a)+")"
     
 class ListForallCond_Lte(ListForallCond):
-    def __init__(self, a: int):
+    def __init__(self, a: vf.Expr[vf.Int]):
         self.a = a
 
     def __str__(self):
         return "lte("+str(self.a)+")"
 
 class ListForallCond_Gte(ListForallCond):
-    def __init__(self, a: int):
+    def __init__(self, a: vf.Expr[vf.Int]):
         self.a = a
 
     def __str__(self):
