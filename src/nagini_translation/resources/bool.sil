@@ -296,12 +296,6 @@ function object___eq__(self: Ref, other: Ref): Bool
     // TODO: force symmetry in overrides
     // symmetry
     ensures result == object___eq__(other, self)
-    // transitivity
-    ensures (
-        forall x: Ref ::
-        { object___eq__(self, x) }
-        object___eq__(self, x) && object___eq__(x, other) ==> result
-    )
 
 function stateless(x: Ref): Bool
     decreases _
