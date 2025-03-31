@@ -136,7 +136,7 @@ class TernaryOp(DefLessExpr[_ValueT], ABC):
     def __str__(self):
         return "("+str(self.cond)+" ? "+str(self.left)+" : "+str(self.right)+")"
 
-class FPCall(DefLessExpr[_ValueT], ABC):
+class FPCall(DefLessExpr[_ValueT]):
     def __init__(self, name: str, *args: list[Expr[_ValueT]]):
         self.name = name
         self.args = args

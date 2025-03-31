@@ -181,15 +181,16 @@ class Translator:
                                 )),
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     "map(fst, " +
-                                            str(
-                                                py2vf_ctx.getExpr(
-                                                    acc_content.value.value, ptr2val_access)
-                                            )
-                                            + ")",
-                                    py2vf_ctx.getExpr(acc_content.value.value, attr_ptrlist),
+                                    str(
+                                        py2vf_ctx.getExpr(
+                                            acc_content.value.value, ptr2val_access)
+                                    )
+                                    + ")",
+                                    py2vf_ctx.getExpr(
+                                        acc_content.value.value, attr_ptrlist),
                                     vf.Eq
                                 )),
-                                # 
+                                #
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
                                             str(
@@ -262,6 +263,8 @@ class Translator:
             return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
         if (node.func.id == "Result"):
             return py2vf_ctx.getExpr(node, v)
+        if (node.func.id == "len"):
+            return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
         else:
             funcid = node.func.id
             if (self.functions.get(funcid) != None):
