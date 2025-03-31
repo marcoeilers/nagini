@@ -107,9 +107,19 @@ function set___eq__(self: Ref, other: Ref): Bool
             (result <==>
               set___len__(self) == set___len__(other) &&
               (forall x: Ref :: { set___contains__(self, x) } exists y: Ref :: { set___contains__(other, y) } { object___eq__(x, y) }
-              set___contains__(self, x) && set___contains__(other, y) && object___eq__(x, y)) &&
+              (unfolding acc(state(self)) in (
+                (!stateless(other) ==> unfolding acc(state(other)) in
+                    set___contains__(self, x) && set___contains__(other, y) && 
+                    object___eq__(x, y)
+                )
+              ))) &&
               (forall y: Ref :: { set___contains__(other, y) } exists x: Ref :: { set___contains__(self, x) } { object___eq__(x, y) }
-              set___contains__(other, y) && set___contains__(self, x) && object___eq__(x, y))
+              (unfolding acc(state(self)) in (
+                (!stateless(other) ==> unfolding acc(state(other)) in
+                    set___contains__(other, y) && set___contains__(self, x) && 
+                    object___eq__(x, y)
+                )
+              )))
             )
 
 
@@ -224,6 +234,10 @@ function dict___eq__(self: Ref, other: Ref): Bool
               (forall x: Ref :: { x in self.dict_acc } exists y: Ref :: { y in other.dict_acc } { object___eq__(x, y) }
               { dict___getitem__(self, x)} { dict___getitem__(other, y) }
 
-              x in self.dict_acc && y in other.dict_acc && object___eq__(x, y) && 
-              object___eq__(dict___getitem__(self, x), dict___getitem__(other, y)))
-            ))
+              (unfolding acc(state(self)) in (
+                  (!stateless(other) ==> unfolding acc(state(other)) in
+                    x in self.dict_acc && y in other.dict_acc && object___eq__(x, y) && 
+                    object___eq__(dict___getitem__(self, x), dict___getitem__(other, y))
+                  )
+              ))))
+            )

@@ -147,15 +147,25 @@ function tuple___eq__(self: Ref, other: Ref): Bool
             (tuple___len__(self) == tuple___len__(other) &&
              (forall x: Int :: { tuple___getitem__(self, x) }
                                { tuple___getitem__(other, x)}
-                               x >= 0 && x < tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
+                               (!stateless(self) ==> unfolding acc(state(self)) in (
+                                   (!stateless(other) ==> unfolding acc(state(other)) in
+                                      x >= 0 && x < tuple___len__(self) ==>
+                                      object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
+                                   )
+                                 )
+                               ))))
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
             (tuple___len__(self) == tuple___len__(other) &&
              (forall x: Int :: { tuple___getitem__(self, x) }
                                { tuple___getitem__(other, x)}
-                               x <= -1 && x >= -tuple___len__(self)
-                                ==> object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x)))))
+                               (!stateless(self) ==> unfolding acc(state(self)) in (
+                                   (!stateless(other) ==> unfolding acc(state(other)) in
+                                      x <= -1 && x >= -tuple___len__(self) ==>
+                                      object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
+                                   )
+                                 )
+                               ))))
 
 domain tuple_types {
     function tuple_var(arg0: PyType): PyType
