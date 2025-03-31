@@ -1,69 +1,59 @@
 from nagini_contracts.contracts import *
 from typing import List, Tuple
-import nagini_translation.t1 as t1
-class mycoolclass:
+
+
+class classA:
     def __init__(self, arg: int) -> None:
-        self.arg = arg
-
-class mycoolerclass(mycoolclass):
-    def __init__(self, arg: int) -> None:
-        self.arg = arg
-        
-class mytupledclass():
-    def __init__(self, arg: int) -> None:
-        self.arg = (arg,(1,1))
-
-@Predicate
-def pred(x: mycoolclass, i: int) -> bool:
-    return True
-
-@Predicate
-def pred2(i: int) -> bool:
-    return True
-
-@Pure
-def purefunction(x: mycoolclass, i: int) -> int:
-    return 123
-
-def method(x: mycoolclass, i: int) -> int:
-    Requires(Acc(x.arg))
-    x.arg = 123
-    return 1
-
-
-#@ContractOnly
-#@Native
-def compare(i: int, i2: int, c: mycoolclass, d: mycoolclass) -> int:
-    Requires(Acc(c.arg) and Acc(d.arg) and (c.arg if (i==i2) else d.arg)==0 )
-    Requires(i >= 13 and i != 13  and i == 0)
-    Requires((i + 2) >= 13)
-    Requires((i+i2 > 0) if ((i + 2) == 13) else True)
-    Requires(i is i2)
-    Requires((Acc(c.arg)) if i == i2 else (Acc(d.arg)))
-    Requires((c.arg == 0) if i == i2 else (d.arg == 0))
-    Requires(pred(c, i))
-    Requires(pred(c, i) if i > 4 else pred2(14 if i2 == 0 else 3))
-    Ensures(Result() > 13)
+        self.attr = arg
 
 @ContractOnly
 @Native
-#TODO: this passes the translation and fails the verification
-def compare3(c: t1.mytupledclass) -> int:
-    Requires(Acc(c.arg) and c.arg == (3,(21,12)))
-    Ensures(Result() > 13)
-#    
-#
-#def test2(i: int, i2: int, c: mycoolclass) -> int:
-#    Requires(i > 13)
-#    Requires(i2 > 0)
-#    Requires(Acc(pred(c,i)))
-#    Ensures(Result() > 13)
-#    
-#
-def test(i: int, i2: int, c: mycoolclass) -> int:
-    Requires(i > 13 and i > i2+3 and pred(c, i))
-    Requires((pred(c, i) if i > 4 else i2 == 0))
-    Requires(i2 > 0 and ((Acc(c.arg) and c.arg > 0) if i2 > 0 else True))
-    Ensures(Result() > 13)
-    return 14
-    
+def test_listpred(l: List[int]) -> int:
+    """
+    """
+    Requires(list_pred(l))
+    Ensures(list_pred(l))
+
+@ContractOnly
+@Native
+def test_forallAcc1(l: List[classA]) -> int:
+    """
+    """
+    Requires(list_pred(l) and Forall(int,
+                                     lambda i: Implies(i >= 0 and i < len(l), Acc(l[i].attr))))
+    Ensures(list_pred(l))
+
+@ContractOnly
+@Native
+def test_forallAcc2(l: List[classA], j: int) -> int:
+    """
+    """
+    Requires(list_pred(l) and Forall(int,
+                                     lambda i: Implies(i >= 0 and i < len(l), Acc(l[i].attr))) and l[j].attr > 0)
+    Ensures(list_pred(l))
+
+@ContractOnly
+#@Native
+def test_forallAcc3(l: List[classA]) -> int:
+    """
+    """
+    Requires(list_pred(l) and Forall(l, lambda el: Acc(el.attr)))
+    Ensures(list_pred(l))
+
+@ContractOnly
+#@Native
+def test_forallAcc4(l: List[classA], j: int) -> int:
+    """
+    """
+    Requires(list_pred(l) and Forall(
+        l, lambda el: Acc(el.attr)) and l[j].attr > 0)
+    Ensures(list_pred(l))
+
+@ContractOnly
+#@Native
+def test_forallAcc5(l: List[classA],) -> int:
+    """
+    """
+    Requires(list_pred(l) and Forall(l, lambda el: Acc(el.attr)) and
+             Forall(int, lambda i: Implies(i >= 0 and i < len(l), Acc(l[i].attr))))
+    Ensures(list_pred(l))

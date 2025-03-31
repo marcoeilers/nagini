@@ -2,10 +2,11 @@
 from functools import reduce
 from fractions import Fraction
 from nagini_translation.lib.context import Context
-from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess
+from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess, CtntAccess, ListSubscriptAccess
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
+
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Optional, Type
 from itertools import chain
@@ -34,24 +35,39 @@ class Translator:
         }
         return switch_dict[type(node)](node, ctx, py2vf_ctx)
 
+    def getWrapperStr(self, t: type) -> str:
+        if (t.name == "int"):
+            return "PyLong_wrap"
+        elif (t.name == "float"):
+            return "PyFloat_wrap"
+        elif (t.name == "bool"):
+            return "PyBool_wrap"
+        else:
+            return "PyClassInstance_wrap"
+
+    def get_equivalence_fact(a: vf.Expr, b: vf.Expr) -> vf.Fact:
+        pass
+
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
             frac = 1
             if len(node.args) == 2:
                 if (isinstance(node.args[1], ast.BinOp)) and (isinstance(node.args[1].left, ast.Constant)) and (isinstance(node.args[1].right, ast.Constant)):
                     frac = Fraction(node.args[1].left.value,
-                                node.args[1].right.value)
-                else: 
-                    raise NotImplementedError("Acc with non-constant fraction not implemented")
+                                    node.args[1].right.value)
+                else:
+                    raise NotImplementedError(
+                        "Acc with non-constant fraction not implemented")
             if isinstance(node.args[0], ast.Attribute):
                 return vf.FactConjunction([
                     vfpy.PyObj_HasAttr(self.translate_generic_expr(node.args[0].value, ctx, py2vf_ctx, PtrAccess()),
                                           node.args[0].attr,
                                           py2vf_ctx.getExpr(
-                                              node.args[0].value, 
-                                              AttrAccess(node.args[0].attr, PtrAccess())
-                                          ),
-                                          frac=frac),
+                                              node.args[0].value,
+                                              AttrAccess(
+                                                  node.args[0].attr, PtrAccess())
+                    ),
+                        frac=frac),
                     self.create_hasval_fact(node.args[0].value,
                                             self.get_type(node.args[0], ctx),
                                             ctx,
@@ -62,7 +78,31 @@ class Translator:
                 raise NotImplementedError(
                     "Acc is not implemented for this content" + str(node.args[0]))
         elif (node.func.id == "list_pred"):
-            raise NotImplementedError("list_pred is not implemented")
+            return vf.FactConjunction([vfpy.PyObj_HasContent(
+                self.translate_generic_expr(
+                    node.args[0], ctx, py2vf_ctx, PtrAccess()),
+                py2vf_ctx.getExpr(node.args[0], CtntAccess(PtrAccess())),
+                frac=Fraction(1)
+            ),
+                vfpy.ForallPredFact(
+                py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
+                vf.NameUseExpr("pyobj_hasval"),
+                vfpy.ListForallCond_True(),
+                self.getWrapperStr(self.get_type(node.args[0], ctx).type_args[0])),
+                vf.BooleanFact(vf.BinOp[vf.Bool](
+                    "map(fst, " +
+                    str(py2vf_ctx.getExpr(node.args[0], CtntAccess("")))+")",
+                    py2vf_ctx.getExpr(node.args[0], CtntAccess(PtrAccess())),
+                    vf.Eq
+                )),
+                vf.BooleanFact(vf.BinOp[vf.Bool](
+                    vf.Some("map(snd, " +
+                            str(py2vf_ctx.getExpr(node.args[0], CtntAccess("")))+")"),
+                    vf.Some(py2vf_ctx.getExpr(
+                        node.args[0], CtntAccess(ValAccess()))),
+                    vf.Eq
+                ))
+            ])
         elif (node.func.id == "MaySet"):
             return vfpy.PyObj_MaySet(
                 self.translate_generic_expr(
@@ -77,6 +117,105 @@ class Translator:
                     node.args[0], ctx, py2vf_ctx, PtrAccess()),
                 node.args[1].value,
                 frac=Fraction(1))
+        elif (node.func.id == "Forall"):
+            # this handles the cases exactly equal to Forall(int, lambda i: P(i) )
+            if (isinstance(node.args[1], ast.Lambda) and
+               isinstance(node.args[1].body, ast.Call) and
+               isinstance(node.args[1].body.func, ast.Name)):
+                # this handles the case exactly equal to P(i) = Implies(i >= 0 and i < len(l), PRED(i))
+                if (node.args[1].body.func.id == "Implies" and
+                   isinstance(node.args[0], ast.Name) and
+                   node.args[0].id == "int"):
+                    # this handles the case exactly equal to PRED(i) = Acc(l[i].attr)
+                    if (node.args[1].body.args[1].func.id == "Acc"):
+                        acc_content = node.args[1].body.args[1].args[0]
+                        if (isinstance(acc_content, ast.Attribute)
+                            and isinstance(acc_content.value, ast.Subscript)
+                                and isinstance(acc_content.value.value, ast.Name)):
+                            ptr2ptr_access = AttrAccess(
+                                acc_content.attr, CtntAccess("_attrptr2ptr"))
+                            attr_ptrlist = AttrAccess(
+                                acc_content.attr, CtntAccess(PtrAccess()))
+                            attr_vallist = AttrAccess(
+                                acc_content.attr, CtntAccess(ValAccess()))
+                            ptr2val_access = AttrAccess(
+                                acc_content.attr, CtntAccess(""))
+                            return vf.FactConjunction([
+                                # first fact: hasattr
+                                vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
+                                                    vf.NameUseExpr(
+                                                        "pyobj_hasattr"),
+                                                    vfpy.ListForallCond_True(),
+                                                    self.getWrapperStr(
+                                    self.get_type(acc_content, ctx)),
+                                    frac=Fraction(1)
+                                ),
+                                # set equivalences: fst is the ptr list from list_pred
+                                vf.BooleanFact(vf.BinOp[vf.Bool](
+                                    "map(fst, " + str(py2vf_ctx.getExpr(
+                                        acc_content.value.value, ptr2ptr_access)) + ")",
+                                    py2vf_ctx.getExpr(
+                                        acc_content.value.value, CtntAccess(PtrAccess())),
+                                    # AttrAccess(acc_content.attr, CtntAccess(""))),
+                                    vf.Eq
+                                )),
+                                vfpy.ForallPredFact(
+                                    py2vf_ctx.getExpr(
+                                        acc_content.value.value, ptr2val_access),
+                                    vf.NameUseExpr("pyobj_hasval"),
+                                    vfpy.ListForallCond_True(),
+                                    self.getWrapperStr(self.get_type(
+                                        acc_content.value.value, ctx).type_args[0]),
+                                    frac=Fraction(1)),
+
+                                vf.BooleanFact(vf.BinOp[vf.Bool](
+                                    vf.Some("map(snd, " +
+                                            str(
+                                                py2vf_ctx.getExpr(
+                                                    acc_content.value.value, ptr2ptr_access)
+                                            )
+                                            + ")"),
+                                    vf.Some(py2vf_ctx.getExpr(
+                                        acc_content.value.value, attr_ptrlist)),
+                                    vf.Eq
+                                )),
+                                vf.BooleanFact(vf.BinOp[vf.Bool](
+                                    "map(fst, " +
+                                            str(
+                                                py2vf_ctx.getExpr(
+                                                    acc_content.value.value, ptr2val_access)
+                                            )
+                                            + ")",
+                                    py2vf_ctx.getExpr(acc_content.value.value, attr_ptrlist),
+                                    vf.Eq
+                                )),
+                                # 
+                                vf.BooleanFact(vf.BinOp[vf.Bool](
+                                    vf.Some("map(snd, " +
+                                            str(
+                                                py2vf_ctx.getExpr(
+                                                    acc_content.value.value, ptr2val_access)
+                                            )
+                                            + ")"),
+                                    vf.Some(py2vf_ctx.getExpr(
+                                        acc_content.value.value, attr_vallist)),
+                                    vf.Eq
+                                )),
+
+                            ])
+                    else:
+                        raise NotImplementedError(
+                            "Forall is not implemented for this content")
+                elif (self.get_type(node.args[0], ctx).name == "list" and
+                      isinstance(node.args[0], ast.Name)):
+                    # translate into an indexed forall
+                    raise "Cannot translate non-indexed forall yet"
+                else:
+                    raise NotImplementedError(
+                        "Forall is not implemented for this content")
+            else:
+                raise NotImplementedError(
+                    "Forall is not implemented for this content")
         # TODO: remove this?
         elif (node.func.id == "Old"):
             return self.translate(node.args[0], ctx, py2vf_ctx.old)
@@ -125,12 +264,13 @@ class Translator:
             return py2vf_ctx.getExpr(node, v)
         else:
             funcid = node.func.id
-            if(self.functions.get(funcid)!=None):
+            if (self.functions.get(funcid) != None):
                 def f(x, y): return self.translate_generic_expr(
                     x, ctx, py2vf_ctx, y)
                 return self.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
             else:
-                raise NotImplementedError("Call to function "+funcid+" not implemented: the function was not translated")
+                raise NotImplementedError(
+                    "Call to function "+funcid+" not implemented: the function was not translated")
 
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):
@@ -140,7 +280,10 @@ class Translator:
             raise NotImplementedError("Tuple expression not implemented")
 
     def translate_Subscript_expr(self, node: ast.Subscript, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
-        return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
+        if (self.get_type(node.value, ctx).name == "tuple"):
+            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
+        else:
+            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, ListSubscriptAccess(node.slice, v))
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {
@@ -192,8 +335,8 @@ class Translator:
             "int": vf.Int,
             "float": vf.Float,
             "bool": vf.Bool
-            #TODO: add string
-            #TODO: use class names instead of strings
+            # TODO: add string
+            # TODO: use class names instead of strings
         }
         return dict[type(node.value).__name__](node.value)
 
@@ -261,12 +404,13 @@ class Translator:
     def create_hasval_fact(self, target: ast.expr, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
-            cntnt = {
+            pyobj_method = {
                 "int": vfpy.PyLong,
+                # "bool": vfpy.PyBool,
                 "list": lambda x: vfpy.PyClass_List(),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(
-                cntnt(py2vf_ctx.getExpr(target, access)))
+                pyobj_method(py2vf_ctx.getExpr(target, access)))
             return vfpy.PyObj_HasVal(
                 py2vf_ctx.getExpr(target, path(PtrAccess())),
                 pyobjval,
@@ -307,6 +451,10 @@ class Translator:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
         if (isinstance(node, ast.Call)):
             # predicates are stored in ctx.module.predicates
+            if (node.func.id == "Implies"):
+                return self.is_predless(node.args[1], ctx)
+            if (node.func.id == "Forall"):
+                return self.is_predless(node.args[1].body, ctx)
             return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred", "MaySet", "MayCreate"])
         elif (isinstance(node, ast.UnaryOp)):
             return self.is_predless(node.operand, ctx)

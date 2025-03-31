@@ -1,5 +1,6 @@
 from fractions import Fraction
 import nagini_translation.native.vf.vf as vf
+from nagini_translation.native.vf.nag import *
 from typing import TypeVar, Tuple, Type
 from abc import ABC, abstractmethod
 
@@ -36,11 +37,15 @@ class PyLong(PyObj_v):
 class PyClass(vf.Inductive, ABC):
     def __init__(self, name: str):
         self.name = name
+
     def __str__(self):
         return "PyClass_"+self.name+""
+
+
 class PyClass_List(PyClass):
     def __init__(self):
         super().__init__("List")
+
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):
@@ -75,17 +80,25 @@ class PyObj_HasVal(vf.PredicateFact):
 #        return "pyobj_hasvalue("+str(self.ptr)+", "+str(self.value)+")"
 
 
+class PyObj_HasContent(vf.PredicateFact):
+    def __init__(self, ptr: vf.Expr[PyObjPtr], value: vf.Expr[vf.List[PyObj_v]], frac=Fraction(1)):
+        super().__init__("pyobj_hascontent", ptr, value, frac=frac)
+
+
 class PyObj_HasAttr(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Expr[PyObjPtr], frac=Fraction(1)):
         super().__init__("pyobj_hasattr", obj, "\""+attrName+"\"", attrValue, frac=frac)
 
+
 class PyObj_MayCreate(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, frac=Fraction(1)):
-       super().__init__("pyobj_maycreateattr", obj, "\""+attrName+"\"", frac=frac)
+        super().__init__("pyobj_maycreateattr", obj, "\""+attrName+"\"", frac=frac)
+
 
 class PyObj_MaySet(vf.PredicateFact):
     def __init__(self, obj: vf.Expr[PyObjPtr], attrName: str, attrValue: vf.Option[PyObjPtr], frac=Fraction(1)):
         super().__init__("pyobj_maysetattr", obj, "\""+attrName+"\"", attrValue, frac=frac)
+
 
 class PyTuple(PyObj_v):
     # TODO: a pointer is represented as a an expression here, but could it be refined as a val? decude whe we'll define the class ptr

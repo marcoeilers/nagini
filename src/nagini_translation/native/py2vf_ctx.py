@@ -7,6 +7,7 @@ class ValueAccess(ABC):
     pass
 
 
+# TODO. one day, recall to use this
 class LeafValueAccess(ValueAccess, ABC):
     pass
 
@@ -17,6 +18,17 @@ class PtrAccess(ValueAccess):
 
     def __repr__(self):
         return ":ptr"
+
+
+class CtntAccess(ValueAccess):
+    def __init__(self, value: ValueAccess):
+        self.value = value
+
+    def __str__(self):
+        return "__content"+str(self.value)
+
+    def __repr__(self):
+        return "[]"+repr(self.value)
 
 
 class ValAccess(ValueAccess):
@@ -40,7 +52,24 @@ class TupleSubscriptAccess(ValueAccess):
 
     def __repr__(self):
         if (isinstance(self.value, LeafValueAccess)):
-            return repr(self.value)+"["+str(self.index)+"]"
+            return repr(self.value)+"["+repr(self.index)+"]"
+        else:
+            return "["+str(self.index)+"]"+repr(self.value)
+
+
+class ListSubscriptAccess(ValueAccess):
+    def __init__(self, index: ast.Expr, value: ValueAccess):
+        self.index = index
+        self.value = value
+
+    def __str__(self):
+        return " LISTINDEX "
+        raise NotImplementedError(
+            "ListSubscriptAccess.__str__ not implemented")
+
+    def __repr__(self):
+        if (isinstance(self.value, LeafValueAccess)):
+            return repr(self.value)+"["+repr(self.index)+"]"
         else:
             return "["+str(self.index)+"]"+repr(self.value)
 
@@ -58,7 +87,7 @@ class AttrAccess(ValueAccess):
 
     def __repr__(self):
         if (isinstance(self.value, LeafValueAccess)):
-            return repr(self.value)+"."+str(self.attr)
+            return repr(self.value)+"."+repr(self.attr)
         else:
             return "."+str(self.attr)+repr(self.value)
 
