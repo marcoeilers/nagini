@@ -101,6 +101,11 @@
         "__sil_seq__": {
             "args": ["list"],
             "type": "__prim__Seq"
+        },
+        "__eq__": {
+            "args": ["list", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless"]
         }
     },
     "type_vars": 1,
@@ -152,6 +157,11 @@
         "__sil_seq__": {
             "args": ["set"],
             "type": "__prim__Seq"
+        },
+        "__eq__": {
+            "args": ["set", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__contains__", "object___eq__", "stateless"]
         }
     },
     "type_vars": 1,
@@ -215,6 +225,11 @@
         "__sil_seq__": {
             "args": ["dict"],
             "type": "__prim__Seq"
+        },
+        "__eq__": {
+            "args": ["dict", "object"],
+            "type": "__prim__bool",
+            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless"]
         }
     },
     "type_vars": 2,
