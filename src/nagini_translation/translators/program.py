@@ -490,21 +490,6 @@ class ProgramTranslator(CommonTranslator):
         merge_func.opaque = False
         old_aliases = copy.deepcopy(ctx.var_aliases)
 
-        # add stateless and state preconditions for self and other
-
-        general_state_impl = self.viper.TrueLit(pos, self.info)
-        for var in [self_var, other_var]:
-            not_stateless_check = self.viper.Not(self.viper.FuncApp(
-                STATELESS_FUNC, [var], pos, self.info, self.viper.Bool
-            ), pos, self.info)
-
-            pred_acc = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, self.info)
-            state_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, self.viper.FullPerm(pos, self.info), pos, self.info)
-
-
-            state_implication = self.viper.Implies(not_stateless_check, state_acc_pred, pos, self.info)
-            general_state_impl = self.viper.And(general_state_impl, state_implication, pos, self.info)
-
         # loop through all overriding __eq__ functions and encode
         # the preconditions as one large conditional expression of the form:
         # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
@@ -566,7 +551,7 @@ class ProgramTranslator(CommonTranslator):
 
                 check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                 if last_check is None:
-                    last_check = self.viper.CondExp(check, and_pres, general_state_impl, pos, info)
+                    last_check = self.viper.CondExp(check, and_pres, self.viper.TrueLit(pos, self.info), pos, info)
                 else:
                     last_check = self.viper.CondExp(check, and_pres, last_check, pos, info)
                     
