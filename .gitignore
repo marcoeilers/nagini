@@ -17,4 +17,10 @@ docs/build
 viper_out
 build
 venv
-manual_testing
+manual_testing/*
+!manual_testing/out/
+manual_testing/out/*
+!manual_testing/out/eq_example_predicate_familiy.vpr
+
+
+
