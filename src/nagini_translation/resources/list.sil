@@ -176,28 +176,28 @@ function list___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
-              list___len__(self) == list___len__(other) &&
-              (unfolding acc(state(self)) in (
-                  (!stateless(other) ==> unfolding acc(state(other)) in
-                      (forall n: Ref :: { list___getitem__(self, n) } { list___getitem__(other, n) }
-                        issubtype(typeof(n), int()) &&
-                        int___unbox__(n) >= 0 && int___unbox__(n) < list___len__(self) ==>
-                        object___eq__(list___getitem__(self, n), list___getitem__(other, n))
-                      )
-                  )
-              ))
+                (unfolding acc(state(self)) in (
+                    (!stateless(other) ==> unfolding acc(state(other)) in
+                            list___len__(self) == list___len__(other) &&
+                            (forall n: Ref :: { list___getitem__(self, n) } { list___getitem__(other, n) }
+                              issubtype(typeof(n), int()) &&
+                              int___unbox__(n) >= 0 && int___unbox__(n) < list___len__(self) ==>
+                              object___eq__(list___getitem__(self, n), list___getitem__(other, n))
+                            )
+                    )
+                ))
             )
                                     
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
-              list___len__(self) == list___len__(other) &&
-              (unfolding acc(state(self)) in (
-                  (!stateless(other) ==> unfolding acc(state(other)) in
-                      (forall n: Ref :: { list___getitem__(self, n) } { list___getitem__(other, n) }
-                        issubtype(typeof(n), int()) &&
-                        int___unbox__(n) <= -1 && int___unbox__(n) >= -list___len__(self) ==>
-                        object___eq__(list___getitem__(self, n), list___getitem__(other, n))
+                (unfolding acc(state(self)) in (
+                      (!stateless(other) ==> unfolding acc(state(other)) in
+                            list___len__(self) == list___len__(other) &&
+                            (forall n: Ref :: { list___getitem__(self, n) } { list___getitem__(other, n) }
+                                issubtype(typeof(n), int()) &&
+                                int___unbox__(n) <= -1 && int___unbox__(n) >= -list___len__(self) ==>
+                                object___eq__(list___getitem__(self, n), list___getitem__(other, n))
+                            )
                       )
-                  )
-              ))
+                ))
             )

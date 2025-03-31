@@ -144,9 +144,9 @@ function tuple___eq__(self: Ref, other: Ref): Bool
     ensures result == object___eq__(self, other)
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
-              tuple___len__(self) == tuple___len__(other) &&
               (!stateless(self) ==> unfolding acc(state(self)) in (
                 (!stateless(other) ==> unfolding acc(state(other)) in
+                    tuple___len__(self) == tuple___len__(other) &&
                     (forall x: Int :: { tuple___getitem__(self, x) } { tuple___getitem__(other, x)}
                         x >= 0 && x < tuple___len__(self) ==>
                         object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
@@ -156,9 +156,9 @@ function tuple___eq__(self: Ref, other: Ref): Bool
             )
     ensures issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
             (result <==>
-              tuple___len__(self) == tuple___len__(other) &&
               (!stateless(self) ==> unfolding acc(state(self)) in (
                 (!stateless(other) ==> unfolding acc(state(other)) in
+                  tuple___len__(self) == tuple___len__(other) &&
                   (forall x: Int :: { tuple___getitem__(self, x) } { tuple___getitem__(other, x)}
                       x <= -1 && x >= -tuple___len__(self) ==>
                       object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
