@@ -31,7 +31,10 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     VIPER_KEYWORDS,
     BUILTIN___EQ___FUNCTIONS,
-    OBJ___EQ__MERGED
+    OBJ___EQ__MERGED,
+    ILLEGAL_FUNC_NAMES,
+    EQUALITY_STATE_PRED,
+    OBJECT_TYPE,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
 from nagini_translation.lib.typedefs import Expr, Stmt
@@ -1060,7 +1063,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         """
         if sil_name in ILLEGAL_FUNC_NAMES:
             self.sil_name = self.superscope.get_fresh_name(sil_name)
-        elif self.cls and self.cls.name == OBJECT_TYPE and self.name == 'state':
+        elif self.cls and self.cls.name == OBJECT_TYPE and self.name == EQUALITY_STATE_PRED:
             self.sil_name = EQUALITY_STATE_PRED
         else:
             self.sil_name = sil_name
@@ -1069,7 +1072,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             self.func_constant = self.superscope.get_fresh_name(self.name)
 
         # no fresh name for args of the __eq__ state predicate
-        if self.cls and self.cls.name == OBJECT_TYPE and self.name == 'state':
+        if self.cls and self.cls.name == OBJECT_TYPE and self.name == EQUALITY_STATE_PRED:
             for name, arg in self.args.items():
                 arg.process(name, translator)
 

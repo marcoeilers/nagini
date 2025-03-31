@@ -315,7 +315,9 @@ function stateless(x: Ref): Bool
     )
 
 // dummy state function
-predicate state(self: Ref)
+predicate state(self: Ref) {
+    true
+}
 
 predicate not_collection_type(self: Ref) {
     typeof(self) != list(list_arg(typeof(self), 0)) &&
