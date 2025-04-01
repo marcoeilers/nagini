@@ -74,35 +74,47 @@ class Translator:
                                             py2vf_ctx,
                                             lambda x: AttrAccess(node.args[0].attr, x), frac=frac)
                 ])
+            elif isinstance(node.args[0], ast.Call):
+                if (node.args[0].func.id == "list_pred"):
+                    node = node.args[0]
+                    return vf.FactConjunction([vfpy.PyObj_HasContent(
+                        self.translate_generic_expr(
+                            node.args[0], ctx, py2vf_ctx, PtrAccess()),
+                        py2vf_ctx.getExpr(
+                            node.args[0], CtntAccess(PtrAccess())),
+                        frac=frac
+                    ),
+                        vfpy.ForallPredFact(
+                        py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
+                        vf.NameUseExpr("pyobj_hasval"),
+                        vfpy.ListForallCond_True(),
+                        self.getWrapperStr(self.get_type(
+                            node.args[0], ctx).type_args[0]),
+                        frac=frac),
+                        vf.BooleanFact(vf.BinOp[vf.Bool](
+                            "map(fst, " +
+                            str(py2vf_ctx.getExpr(
+                                node.args[0], CtntAccess("")))+")",
+                            py2vf_ctx.getExpr(
+                                node.args[0], CtntAccess(PtrAccess())),
+                            vf.Eq
+                        )),
+                        vf.BooleanFact(vf.BinOp[vf.Bool](
+                            vf.Some("map(snd, " +
+                                    str(py2vf_ctx.getExpr(node.args[0], CtntAccess("")))+")"),
+                            vf.Some(py2vf_ctx.getExpr(
+                                node.args[0], CtntAccess(ValAccess()))),
+                            vf.Eq
+                        ))
+                    ])
+                else:
+                    raise NotImplementedError(
+                        "Acc is not implemented for this content" + str(node.args[0]))
             else:
                 raise NotImplementedError(
                     "Acc is not implemented for this content" + str(node.args[0]))
         elif (node.func.id == "list_pred"):
-            return vf.FactConjunction([vfpy.PyObj_HasContent(
-                self.translate_generic_expr(
-                    node.args[0], ctx, py2vf_ctx, PtrAccess()),
-                py2vf_ctx.getExpr(node.args[0], CtntAccess(PtrAccess())),
-                frac=Fraction(1)
-            ),
-                vfpy.ForallPredFact(
-                py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
-                vf.NameUseExpr("pyobj_hasval"),
-                vfpy.ListForallCond_True(),
-                self.getWrapperStr(self.get_type(node.args[0], ctx).type_args[0])),
-                vf.BooleanFact(vf.BinOp[vf.Bool](
-                    "map(fst, " +
-                    str(py2vf_ctx.getExpr(node.args[0], CtntAccess("")))+")",
-                    py2vf_ctx.getExpr(node.args[0], CtntAccess(PtrAccess())),
-                    vf.Eq
-                )),
-                vf.BooleanFact(vf.BinOp[vf.Bool](
-                    vf.Some("map(snd, " +
-                            str(py2vf_ctx.getExpr(node.args[0], CtntAccess("")))+")"),
-                    vf.Some(py2vf_ctx.getExpr(
-                        node.args[0], CtntAccess(ValAccess()))),
-                    vf.Eq
-                ))
-            ])
+            return self.translate_generic_fact(ast.Call(func=ast.Name(id="Acc", ctx=ast.Load()), args=[node]), ctx, py2vf_ctx)
         elif (node.func.id == "MaySet"):
             return vfpy.PyObj_MaySet(
                 self.translate_generic_expr(
@@ -136,7 +148,8 @@ class Translator:
                     if (node.args[1].body.args[1].func.id == "Acc"):
                         acc_call = node.args[1].body.args[1]
                         acc_content = acc_call.args[0]
-                        acc_frac = Fraction(acc_call.args[1].left.value, acc_call.args[1].right.value) if len(node.args[1].body.args[1].args) == 2 else Fraction(1)
+                        acc_frac = Fraction(acc_call.args[1].left.value, acc_call.args[1].right.value) if len(
+                            node.args[1].body.args[1].args) == 2 else Fraction(1)
                         if (isinstance(acc_content, ast.Attribute)
                             and isinstance(acc_content.value, ast.Subscript)
                                 and isinstance(acc_content.value.value, ast.Name)):

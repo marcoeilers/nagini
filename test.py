@@ -13,6 +13,14 @@ def test_listpred(l: List[int]) -> int:
     """
     Requires(list_pred(l))
     Ensures(list_pred(l))
+    
+@ContractOnly
+@Native
+def test_listpred2(l: List[int]) -> int:
+    """
+    """
+    Requires(Acc(list_pred(l), 1/3))
+    Ensures(Acc(list_pred(l), 1/3))
 
 @ContractOnly
 @Native
