@@ -114,7 +114,9 @@ class Translator:
                 raise NotImplementedError(
                     "Acc is not implemented for this content" + str(node.args[0]))
         elif (node.func.id == "list_pred"):
-            return self.translate_generic_fact(ast.Call(func=ast.Name(id="Acc", ctx=ast.Load()), args=[node]), ctx, py2vf_ctx)
+            rewritten = ast.Call(func=ast.Name(
+                id="Acc", ctx=ast.Load()), args=[node], keywords=[])
+            return self.translate_generic_fact(rewritten, ctx, py2vf_ctx)
         elif (node.func.id == "MaySet"):
             return vfpy.PyObj_MaySet(
                 self.translate_generic_expr(
