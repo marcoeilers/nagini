@@ -132,14 +132,14 @@ class Translator:
                         if (isinstance(acc_content, ast.Attribute)
                             and isinstance(acc_content.value, ast.Subscript)
                                 and isinstance(acc_content.value.value, ast.Name)):
-                            ptr2ptr_access = AttrAccess(
-                                acc_content.attr, CtntAccess("_attrptr2ptr"))
-                            attr_ptrlist = AttrAccess(
-                                acc_content.attr, CtntAccess(PtrAccess()))
-                            attr_vallist = AttrAccess(
-                                acc_content.attr, CtntAccess(ValAccess()))
-                            ptr2val_access = AttrAccess(
-                                acc_content.attr, CtntAccess(""))
+                            ptr2ptr_access = CtntAccess(AttrAccess(
+                                acc_content.attr, "_attrptr2ptr"))
+                            attr_ptrlist = CtntAccess(AttrAccess(
+                                acc_content.attr, PtrAccess()))
+                            attr_vallist = CtntAccess(AttrAccess(
+                                acc_content.attr, ValAccess()))
+                            ptr2val_access = CtntAccess(AttrAccess(
+                                acc_content.attr, ""))
                             return vf.FactConjunction([
                                 # first fact: hasattr
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
@@ -289,8 +289,6 @@ class Translator:
             idxExpr=self.translate_generic_expr(node.slice, ctx, py2vf_ctx, ValAccess())
             list_ctnt_ = self.translate_generic_expr(node.value, ctx, py2vf_ctx, CtntAccess(v))
             return vf.FPCall("nth", idxExpr, list_ctnt_)
-            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, 
-                                               CtntAccess(ListSubscriptAccess(node.slice, v)))
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {

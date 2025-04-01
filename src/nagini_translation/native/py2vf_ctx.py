@@ -28,7 +28,7 @@ class CtntAccess(ValueAccess):
         return "__content"+str(self.value)
 
     def __repr__(self):
-        return "[]"+repr(self.value) if self.value != "" else ""
+        return "[]"+repr(self.value) if isinstance(self.value, ValueAccess) else str(self.value)
 
 
 class ValAccess(ValueAccess):
