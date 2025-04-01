@@ -47,7 +47,58 @@ class Translator:
 
     def get_equivalence_fact(a: vf.Expr, b: vf.Expr) -> vf.Fact:
         pass
-
+    def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
+        class TransformName(ast.NodeTransformer):
+                        def visit_Name(self, vnode):
+                            if vnode.id == node.args[1].args.args[0].arg:
+                                return ast.Subscript(
+                                    value=node.args[0],
+                                    slice=ast.Name(id="_i", ctx=ast.Load()),
+                                    ctx=ast.Load()
+                                )
+                            else:
+                                return vnode
+        rewrittenbody = TransformName().visit(node.args[1].body)
+        rewritten = ast.Call(
+            func=ast.Name(id="Forall", ctx=ast.Load()),
+            args=[
+                ast.Name(id="int",
+                         ctx=ast.Load(),
+                         lineno=node.lineno,
+                         ),
+                ast.Lambda(
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        kwonlyargs=[],
+                        defaults=[],
+                        args=[ast.arg(arg="_i", annotation=None)]),
+                    body=ast.Call(
+                        func=ast.Name(
+                            id="Implies", ctx=ast.Load()),
+                        args=[
+                            ast.BoolOp(op=ast.And(),
+                                       values=[
+                                ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()),
+                                            ops=[ast.GtE()],
+                                            comparators=[
+                                    ast.Constant(value=0)]
+                                ),
+                                ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()), ops=[ast.LtE()], comparators=[
+                                    ast.Call(func=ast.Name(id="len", ctx=ast.Load()), args=[node.args[0]], keywords=[])])
+                            ]
+                            ),
+                            rewrittenbody
+                        ],
+                        keywords=[],
+                    )
+                )
+            ],
+            keywords=[],
+        )
+        return rewritten
+        # print(ast.unparse(rewrittenbody))
+        # print(ast.unparse(rewritten))
+        
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
             frac = 1
@@ -235,58 +286,9 @@ class Translator:
                             "Forall is not implemented for this content")
                 elif (self.get_type(node.args[0], ctx).name == "list" and
                       isinstance(node.args[0], ast.Name)):
-                    class TransformName(ast.NodeTransformer):
-                        def visit_Name(self, vnode):
-                            if vnode.id == node.args[1].args.args[0].arg:
-                                return ast.Subscript(
-                                    value=node.args[0],
-                                    slice=ast.Name(id="_i", ctx=ast.Load()),
-                                    ctx=ast.Load()
-                                )
-                            else:
-                                return vnode
-                    rewrittenbody = TransformName().visit(node.args[1].body)
-                    rewritten = ast.Call(
-                        func=ast.Name(id="Forall", ctx=ast.Load()),
-                        args=[
-                            ast.Name(id="int",
-                                     ctx=ast.Load(),
-                                     lineno=node.lineno,
-                                     ),
-                            ast.Lambda(
-                                args=ast.arguments(
-                                    posonlyargs=[],
-                                    kwonlyargs=[],
-                                    defaults=[],
-                                    args=[ast.arg(arg="_i", annotation=None)]),
-                                body=ast.Call(
-                                    func=ast.Name(
-                                        id="Implies", ctx=ast.Load()),
-                                    args=[
-                                        ast.BoolOp(op=ast.And(),
-                                                   values=[
-                                            ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()),
-                                                        ops=[ast.GtE()],
-                                                        comparators=[
-                                                ast.Constant(value=0)]
-                                            ),
-                                            ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()), ops=[ast.LtE()], comparators=[
-                                                ast.Call(func=ast.Name(id="len", ctx=ast.Load()), args=[node.args[0]], keywords=[])])
-                                        ]
-                                        ),
-                                        rewrittenbody
-                                    ],
-                                    keywords=[],
-                                )
-                            )
-                        ],
-                        keywords=[],
-                    )
-                    # print(ast.unparse(rewrittenbody))
-                    # print(ast.unparse(rewritten))
+                    rewritten = self.indexify_forall(node, ctx, py2vf_ctx)                    
                     return self.translate(rewritten, ctx, py2vf_ctx)
                     # translate into an indexed forall
-                    raise "Cannot translate non-indexed forall yet"
                 else:
                     raise NotImplementedError(
                         "Forall is not implemented for this content")
