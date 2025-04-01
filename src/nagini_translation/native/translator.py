@@ -45,8 +45,6 @@ class Translator:
         else:
             return "PyClassInstance_wrap"
 
-    def get_equivalence_fact(a: vf.Expr, b: vf.Expr) -> vf.Fact:
-        pass
     def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
         class TransformName(ast.NodeTransformer):
                         def visit_Name(self, vnode):
