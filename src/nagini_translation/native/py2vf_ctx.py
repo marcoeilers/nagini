@@ -28,7 +28,7 @@ class CtntAccess(ValueAccess):
         return "__content"+str(self.value)
 
     def __repr__(self):
-        return "[]"+repr(self.value)
+        return "[]"+repr(self.value) if self.value != "" else ""
 
 
 class ValAccess(ValueAccess):
@@ -49,23 +49,6 @@ class TupleSubscriptAccess(ValueAccess):
             return str(self.value)+"_AT"+str(self.index)
         else:
             return "_AT"+str(self.index)+str(self.value)
-
-    def __repr__(self):
-        if (isinstance(self.value, LeafValueAccess)):
-            return repr(self.value)+"["+repr(self.index)+"]"
-        else:
-            return "["+str(self.index)+"]"+repr(self.value)
-
-
-class ListSubscriptAccess(ValueAccess):
-    def __init__(self, index: ast.Expr, value: ValueAccess):
-        self.index = index
-        self.value = value
-
-    def __str__(self):
-        return " LISTINDEX "
-        raise NotImplementedError(
-            "ListSubscriptAccess.__str__ not implemented")
 
     def __repr__(self):
         if (isinstance(self.value, LeafValueAccess)):

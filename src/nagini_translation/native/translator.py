@@ -2,7 +2,7 @@
 from functools import reduce
 from fractions import Fraction
 from nagini_translation.lib.context import Context
-from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess, CtntAccess, ListSubscriptAccess
+from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess, CtntAccess
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
@@ -232,7 +232,7 @@ class Translator:
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         # the condition must be pure
         # but either branches could be pure or a fact (just one needs be a fact)
-        return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValueAccess()),
+        return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
                               self.translate(
                                   node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())),
                               self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())))
@@ -286,7 +286,11 @@ class Translator:
         if (self.get_type(node.value, ctx).name == "tuple"):
             return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
         else:
-            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, ListSubscriptAccess(node.slice, v))
+            idxExpr=self.translate_generic_expr(node.slice, ctx, py2vf_ctx, ValAccess())
+            list_ctnt_ = self.translate_generic_expr(node.value, ctx, py2vf_ctx, CtntAccess(v))
+            return vf.FPCall("nth", idxExpr, list_ctnt_)
+            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, 
+                                               CtntAccess(ListSubscriptAccess(node.slice, v)))
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         dict = {
