@@ -41,7 +41,7 @@ def test_forallAcc2(l: List[classA], j: int) -> int:
     Ensures(list_pred(l))
 
 @ContractOnly
-#@Native
+@Native
 def test_forallAcc3(l: List[classA]) -> int:
     """
     """

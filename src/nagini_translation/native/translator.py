@@ -146,12 +146,16 @@ class Translator:
                 if (node.args[1].body.func.id == "Implies" and
                    isinstance(node.args[0], ast.Name) and
                    node.args[0].id == "int"):
+                    #TODO: ensure that we properly translate the condition
+                    #TODO: clean all this by declaring local variables
                     # this handles the case exactly equal to PRED(i) = Acc(l[i].attr)
                     if (node.args[1].body.args[1].func.id == "Acc"):
                         acc_call = node.args[1].body.args[1]
                         acc_content = acc_call.args[0]
-                        acc_frac = Fraction(acc_call.args[1].left.value, acc_call.args[1].right.value) if len(
-                            node.args[1].body.args[1].args) == 2 else Fraction(1)
+                        acc_frac = Fraction(1)
+                        if len(node.args[1].body.args[1].args) == 2:
+                            acc_frac = Fraction(
+                                acc_call.args[1].left.value, acc_call.args[1].right.value)
                         if (isinstance(acc_content, ast.Attribute)
                             and isinstance(acc_content.value, ast.Subscript)
                                 and isinstance(acc_content.value.value, ast.Name)):
@@ -231,6 +235,56 @@ class Translator:
                             "Forall is not implemented for this content")
                 elif (self.get_type(node.args[0], ctx).name == "list" and
                       isinstance(node.args[0], ast.Name)):
+                    class TransformName(ast.NodeTransformer):
+                        def visit_Name(self, vnode):
+                            if vnode.id == node.args[1].args.args[0].arg:
+                                return ast.Subscript(
+                                    value=node.args[0],
+                                    slice=ast.Name(id="_i", ctx=ast.Load()),
+                                    ctx=ast.Load()
+                                )
+                            else:
+                                return vnode
+                    rewrittenbody = TransformName().visit(node.args[1].body)
+                    rewritten = ast.Call(
+                        func=ast.Name(id="Forall", ctx=ast.Load()),
+                        args=[
+                            ast.Name(id="int",
+                                     ctx=ast.Load(),
+                                     lineno=node.lineno,
+                                     ),
+                            ast.Lambda(
+                                args=ast.arguments(
+                                    posonlyargs=[],
+                                    kwonlyargs=[],
+                                    defaults=[],
+                                    args=[ast.arg(arg="_i", annotation=None)]),
+                                body=ast.Call(
+                                    func=ast.Name(
+                                        id="Implies", ctx=ast.Load()),
+                                    args=[
+                                        ast.BoolOp(op=ast.And(),
+                                                   values=[
+                                            ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()),
+                                                        ops=[ast.GtE()],
+                                                        comparators=[
+                                                ast.Constant(value=0)]
+                                            ),
+                                            ast.Compare(left=ast.Name(id="_i", ctx=ast.Load()), ops=[ast.LtE()], comparators=[
+                                                ast.Call(func=ast.Name(id="len", ctx=ast.Load()), args=[node.args[0]], keywords=[])])
+                                        ]
+                                        ),
+                                        rewrittenbody
+                                    ],
+                                    keywords=[],
+                                )
+                            )
+                        ],
+                        keywords=[],
+                    )
+                    # print(ast.unparse(rewrittenbody))
+                    # print(ast.unparse(rewritten))
+                    return self.translate(rewritten, ctx, py2vf_ctx)
                     # translate into an indexed forall
                     raise "Cannot translate non-indexed forall yet"
                 else:
