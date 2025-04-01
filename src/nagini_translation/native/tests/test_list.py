@@ -55,3 +55,12 @@ def test_listpred2(l: List[int]) -> int:
     """
     Requires(Acc(list_pred(l), 1/3))
     Ensures(Acc(list_pred(l), 1/3))
+
+@ContractOnly
+@Native
+def test_length(l: List[classA]) -> int:
+    """
+    """
+    Requires(Acc(list_pred(l), 1/3) and 
+             len(l) > 200)
+    Ensures(Acc(list_pred(l), 1/3) and Old(len(l))+1 == len(l))
