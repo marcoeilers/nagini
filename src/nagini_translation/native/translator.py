@@ -117,6 +117,12 @@ class Translator:
                     node.args[0], ctx, py2vf_ctx, PtrAccess()),
                 node.args[1].value,
                 frac=Fraction(1))
+        elif (node.func.id == "Implies"):
+            return vf.FactConjunction([
+                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx),
+                self.translate_generic_fact(node.args[1], ctx, py2vf_ctx)
+            ])
+
         elif (node.func.id == "Forall"):
             # this handles the cases exactly equal to Forall(int, lambda i: P(i) )
             if (isinstance(node.args[1], ast.Lambda) and
@@ -128,7 +134,9 @@ class Translator:
                    node.args[0].id == "int"):
                     # this handles the case exactly equal to PRED(i) = Acc(l[i].attr)
                     if (node.args[1].body.args[1].func.id == "Acc"):
-                        acc_content = node.args[1].body.args[1].args[0]
+                        acc_call = node.args[1].body.args[1]
+                        acc_content = acc_call.args[0]
+                        acc_frac = Fraction(acc_call.args[1].left.value, acc_call.args[1].right.value) if len(node.args[1].body.args[1].args) == 2 else Fraction(1)
                         if (isinstance(acc_content, ast.Attribute)
                             and isinstance(acc_content.value, ast.Subscript)
                                 and isinstance(acc_content.value.value, ast.Name)):
@@ -148,7 +156,7 @@ class Translator:
                                                     vfpy.ListForallCond_True(),
                                                     self.getWrapperStr(
                                     self.get_type(acc_content, ctx)),
-                                    frac=Fraction(1)
+                                    frac=acc_frac
                                 ),
                                 # set equivalences: fst is the ptr list from list_pred
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
@@ -166,8 +174,7 @@ class Translator:
                                     vfpy.ListForallCond_True(),
                                     self.getWrapperStr(self.get_type(
                                         acc_content.value.value, ctx).type_args[0]),
-                                    frac=Fraction(1)),
-
+                                    frac=acc_frac),
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
                                             str(
@@ -261,9 +268,16 @@ class Translator:
     def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (node.func.id == "Old"):
             return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
-        if (node.func.id == "Result"):
+        elif (node.func.id == "Result"):
             return py2vf_ctx.getExpr(node, v)
-        if (node.func.id == "len"):
+        elif (node.func.id == "Implies"):
+            return vf.TernaryOp(
+                self.translate_generic_expr(node.args[0], ctx, py2vf_context(
+                    py2vf_ctx, prefix=py2vf_ctx.getprefix()), ValAccess()),
+                self.translate_generic_expr(node.args[1], ctx, py2vf_context(
+                    py2vf_ctx, prefix=py2vf_ctx.getprefix()), v),
+                vf.Bool(True))
+        elif (node.func.id == "len"):
             return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
         else:
             funcid = node.func.id
@@ -286,8 +300,10 @@ class Translator:
         if (self.get_type(node.value, ctx).name == "tuple"):
             return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
         else:
-            idxExpr=self.translate_generic_expr(node.slice, ctx, py2vf_ctx, ValAccess())
-            list_ctnt_ = self.translate_generic_expr(node.value, ctx, py2vf_ctx, CtntAccess(v))
+            idxExpr = self.translate_generic_expr(
+                node.slice, ctx, py2vf_ctx, ValAccess())
+            list_ctnt_ = self.translate_generic_expr(
+                node.value, ctx, py2vf_ctx, CtntAccess(v))
             return vf.FPCall("nth", idxExpr, list_ctnt_)
 
     def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
