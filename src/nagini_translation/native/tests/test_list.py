@@ -60,6 +60,22 @@ def test_listpred2(l: List[int]) -> int:
 @Native
 def test_length(l: List[classA]) -> int:
     """
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    [1/3]pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
+    [1/3]forall_predfact(?l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&
+    (map(fst, l__content) == l__content__ptr) &*&
+    (some(map(snd, l__content)) == some(?l__content__val)) &*&
+    (length(l__content__val) > 200);
+
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
+    [1/3]pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
+    [1/3]forall_predfact(?NEW_l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&
+    (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
+    (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val)) &*&
+    ((length(l__content__val) + 1) == length(NEW_l__content__val));
     """
     Requires(Acc(list_pred(l), 1/3) and 
              len(l) > 200)
