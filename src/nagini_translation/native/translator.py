@@ -136,7 +136,7 @@ class Translator:
                         vfpy.ForallPredFact(
                         py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
                         vf.NameUseExpr("pyobj_hasval"),
-                        vfpy.ListForallCond_True(),
+                        vf.ImmInductive(vfpy.ListForallCond_True()),
                         self.getWrapperStr(self.get_type(
                             node.args[0], ctx).type_args[0]),
                         frac=frac),
@@ -221,7 +221,7 @@ class Translator:
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
                                                     vf.NameUseExpr(
                                                         "pyobj_hasattr"),
-                                                    vfpy.ListForallCond_True(),
+                                                    vf.ImmInductive(vfpy.ListForallCond_True()),
                                                     self.getWrapperStr(
                                     self.get_type(acc_content, ctx)),
                                     frac=acc_frac
@@ -239,7 +239,7 @@ class Translator:
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, ptr2val_access),
                                     vf.NameUseExpr("pyobj_hasval"),
-                                    vfpy.ListForallCond_True(),
+                                    vf.ImmInductive(vfpy.ListForallCond_True()),
                                     self.getWrapperStr(self.get_type(
                                         acc_content.value.value, ctx).type_args[0]),
                                     frac=acc_frac),
