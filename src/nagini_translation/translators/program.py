@@ -1892,8 +1892,6 @@ class ProgramTranslator(CommonTranslator):
 
 
         eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
-        if eq_merge:
-            functions.append(eq_merge)
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.

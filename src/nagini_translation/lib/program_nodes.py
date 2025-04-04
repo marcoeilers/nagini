@@ -35,6 +35,7 @@ from nagini_translation.lib.constants import (
     ILLEGAL_FUNC_NAMES,
     EQUALITY_STATE_PRED,
     OBJECT_TYPE,
+    OBJECT_EQ,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
 from nagini_translation.lib.typedefs import Expr, Stmt
@@ -1072,7 +1073,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             self.func_constant = self.superscope.get_fresh_name(self.name)
 
         # no fresh name for args of the __eq__ state predicate
-        if self.cls and self.cls.name == OBJECT_TYPE and self.name == EQUALITY_STATE_PRED:
+        if self.cls and ((self.cls.name == OBJECT_TYPE and self.name == EQUALITY_STATE_PRED) or (
+            sil_name == OBJECT_EQ
+        )):
             for name, arg in self.args.items():
                 arg.process(name, translator)
 
