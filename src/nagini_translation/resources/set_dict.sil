@@ -102,20 +102,23 @@ function set___eq__(self: Ref, other: Ref): Bool
     requires state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
-            (result <==>
-              (unfolding acc(state(self)) in (
-                (!stateless(other) ==> unfolding acc(state(other)) in
-                    set___len__(self) == set___len__(other) &&
-                    (forall x: Ref :: { set___contains__(self, x) } exists y: Ref :: { set___contains__(other, y) } { object___eq__(x, y) }
-                            set___contains__(self, x) && set___contains__(other, y) && object___eq__(x, y)
-                    ) &&
-                    (forall y: Ref :: { set___contains__(other, y) } exists x: Ref :: { set___contains__(self, x) } { object___eq__(x, y) }
-                          set___contains__(other, y) && set___contains__(self, x) && object___eq__(x, y)
-                    )
-                )
-              ))
+    ensures (issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+      result ==
+      (unfolding acc(state(self)) in
+        (!stateless(other) ==>
+        (unfolding acc(state(other)) in
+          set___len__(self) == set___len__(other) &&
+          ((forall x: Ref ::
+            { set___contains__(self, x) }
+            (exists y: Ref :: { set___contains__(other, y) }
+              x != null && y != null &&
+              set___contains__(self, x) &&
+              (set___contains__(other, y) ==>
+              object___eq___merged(x, y))
             )
+          ))
+        ))
+      ))
 
 
 field dict_acc : Map[Ref, Ref]
@@ -221,17 +224,21 @@ function dict___eq__(self: Ref, other: Ref): Bool
     requires state(self)
     requires !stateless(other) ==> state(other)
 
-    ensures issubtype(typeof(other),dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
-            (result <==>
-              (unfolding acc(state(self)) in (
-                    (!stateless(other) ==> unfolding acc(state(other)) in
-                        (dict___len__(self) == dict___len__(other) &&
-                        (forall x: Ref :: { x in self.dict_acc } exists y: Ref :: { y in other.dict_acc } { object___eq__(x, y) }
-                        { dict___getitem__(self, x)} { dict___getitem__(other, y) }
-                            x in self.dict_acc && y in other.dict_acc && object___eq__(x, y) && 
-                            object___eq__(dict___getitem__(self, x), dict___getitem__(other, y))
-                        )
-                        )
-                    )
-              ))
+    ensures (issubtype(typeof(other), dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
+        result ==
+        (unfolding acc(state(self)) in (
+          !stateless(other) ==>
+          (unfolding acc(state(other)) in (
+            dict___len__(self) == dict___len__(other) &&
+            (forall x: Ref ::
+              { dict___contains__(self, x) } { dict___getitem__(self, x) }
+              (exists y: Ref :: { dict___contains__(other, y) } { dict___getitem__(other, y) }
+                x != null && y != null &&
+                dict___contains__(self, x) && dict___contains__(other, y) ==>
+                (object___eq___merged(x, y) &&
+                (dict___getitem__(self, x) != null && dict___getitem__(other, y) != null ==>
+                object___eq___merged(dict___getitem__(self, x), dict___getitem__(other, y))))
+              )
             )
+          ))
+        )))

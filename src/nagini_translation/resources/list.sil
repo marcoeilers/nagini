@@ -60,6 +60,20 @@ function list___getitem__(self: Ref, key: Ref): Ref
     ensures result == (int___unbox__(key) >= 0 ? self.list_acc[int___unbox__(key)] : self.list_acc[list___len__(self) + int___unbox__(key)])
     ensures issubtype(typeof(result), list_arg(typeof(self), 0))
 
+function list___getitem___index(self: Ref, key: Int): Ref
+  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+  requires acc(self.list_acc, wildcard)
+  requires @error("List index may be out of bounds.")
+    ((let ln == (list___len__(self)) in key < 0 ==> key >= -ln))
+  requires @error("List index may be out of bounds.")
+    ((let ln == (list___len__(self)) in key >= 0 ==> key < ln))
+  ensures result ==
+    (key >= 0 ?
+      self.list_acc[key] :
+      self.list_acc[list___len__(self) + key])
+  ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+  decreases _
+
 method list___getitem_slice__(self: Ref, key: Ref) returns (_res: Ref)
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     requires issubtype(typeof(key), slice())
@@ -174,18 +188,19 @@ function list___eq__(self: Ref, other: Ref): Bool
     requires !stateless(other) ==> state(other)
 
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-            (result <==>
-                (unfolding acc(state(self)) in (
-                    (!stateless(other) ==> unfolding acc(state(other)) in
-                            list___len__(self) == list___len__(other) &&
-                            (forall n: Ref :: { list___getitem__(self, n) } { list___getitem__(other, n) }
-                              issubtype(typeof(n), int()) &&
-                              int___unbox__(n) >= 0 && int___unbox__(n) < list___len__(self) ==>
-                              object___eq__(list___getitem__(self, n), list___getitem__(other, n))
-                            )
-                    )
-                ))
+        result == 
+        (unfolding acc(state(self)) in (
+          (!stateless(other) ==> (unfolding acc(state(other)) in (
+            list___len__(self) == list___len__(other) &&
+            (forall x: Int ::
+              { list___getitem___index(self, x) }
+              { list___getitem___index(other, x) }
+              (x >= 0 && x < list___len__(self)) || (x >= -list___len__(self) && x <= -1) ==>
+              (list___getitem___index(self, x) != null && list___getitem___index(other, x) != null ==>
+              object___eq___merged(list___getitem___index(self, x), list___getitem___index(other, x)))
             )
+          )))
+        ))
                                     
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
             (result <==>
