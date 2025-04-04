@@ -32,8 +32,7 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
-    STATE_PREDS,
-    STATELESS_FUNC,
+    BUILTIN___EQ___FUNCTIONS,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -472,15 +471,7 @@ class ProgramTranslator(CommonTranslator):
 
         ctx.current_function = merge_func
 
-        # null check for self
-        iter_args = iter(merge_func.args)
-        self_var = merge_func.args[next(iter_args)].ref()
-        other_var = merge_func.args[next(iter_args)].ref()
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-        merge_pres = [not_null]
+        merge_pres = []
         merge_posts = []
 
         fname = OBJ___EQ__MERGED
@@ -508,13 +499,12 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = cur.module
             ctx.current_class = cur.cls
 
-            if cur.overrides:
-                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
-                    root_var = merge_func.args[merge_name]
-                    if merge_name == next(iter(merge_func.args.keys())):
-                        root_var = copy.copy(root_var)
-                        root_var.type = cur.cls
-                    ctx.set_alias(cur_name, root_var)
+            for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                root_var = merge_func.args[merge_name]
+                if merge_name == next(iter(merge_func.args.keys())):
+                    root_var = copy.copy(root_var)
+                    root_var.type = cur.cls
+                ctx.set_alias(cur_name, root_var)
 
             # find pre- and postconditions from sil_progs
             if cur.interface:
@@ -587,7 +577,22 @@ class ProgramTranslator(CommonTranslator):
         ctx.module = old_module
         ctx.current_class = old_cls
         ctx.position.pop()
-        return self.config.method_translator.translate_merge_function(merge_func, ctx, merge_pres, merge_posts)
+        
+        # extend the dummy merge equality function
+        viper_merge_func = sil_progs.findFunction(OBJ___EQ__MERGED)
+        viper_merge_func_pres = self.viper.to_list(viper_merge_func.pres())
+        merge_pres.extend(viper_merge_func_pres)
+
+        args = self.config.method_translator._translate_params(merge_func, ctx)
+        if merge_func.declared_exceptions:
+            raise InvalidProgramException(merge_func.node,
+                                          'function.throws.exception')
+
+        return self.viper.Function(merge_func.sil_name, args, self.viper.Bool,
+                                   merge_pres, merge_posts, None, pos, self.no_info(ctx))
+
+
+
 
     def create_override_check(self, method: PythonMethod,
                               ctx: Context) -> 'silver.ast.Callable':
@@ -972,10 +977,11 @@ class ProgramTranslator(CommonTranslator):
             domain for domain in self.viper.to_list(sil_progs.domains())
             if domain.name() not in excluded_domains]
 
+        # remove dummy __eq__ merge function
         functions += [
             function
             for function in self.viper.to_list(sil_progs.functions())
-            if function.name() in used_names]
+            if function.name() in used_names and function.name() != OBJ___EQ__MERGED]
  
         # remove dummy state __eq__ predicate
         predicates += [
@@ -1916,6 +1922,10 @@ class ProgramTranslator(CommonTranslator):
         predicates += s_predicates
         functions += s_functions
         methods += s_methods
+
+        # add the new merge function
+        if eq_merge:
+            functions.append(eq_merge)
 
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),
