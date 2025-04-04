@@ -281,6 +281,9 @@ function int___int__(self: Ref): Ref
     requires issubtype(typeof(self), int())
     ensures result == self
 
+function object___eq___merged(self: Ref, other: Ref): Bool
+    decreases _
+
 function object___eq__(self: Ref, other: Ref): Bool
     decreases _
     // permissions
