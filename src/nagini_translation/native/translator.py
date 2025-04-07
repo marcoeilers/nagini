@@ -47,15 +47,15 @@ class Translator:
 
     def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
         class TransformName(ast.NodeTransformer):
-                        def visit_Name(self, vnode):
-                            if vnode.id == node.args[1].args.args[0].arg:
-                                return ast.Subscript(
-                                    value=node.args[0],
-                                    slice=ast.Name(id="_i", ctx=ast.Load()),
-                                    ctx=ast.Load()
-                                )
-                            else:
-                                return vnode
+            def visit_Name(self, vnode):
+                if vnode.id == node.args[1].args.args[0].arg:
+                    return ast.Subscript(
+                        value=node.args[0],
+                        slice=ast.Name(id="_i", ctx=ast.Load()),
+                        ctx=ast.Load()
+                    )
+                else:
+                    return vnode
         rewrittenbody = TransformName().visit(node.args[1].body)
         rewritten = ast.Call(
             func=ast.Name(id="Forall", ctx=ast.Load()),
@@ -96,7 +96,7 @@ class Translator:
         return rewritten
         # print(ast.unparse(rewrittenbody))
         # print(ast.unparse(rewritten))
-        
+
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
             frac = 1
@@ -195,8 +195,8 @@ class Translator:
                 if (node.args[1].body.func.id == "Implies" and
                    isinstance(node.args[0], ast.Name) and
                    node.args[0].id == "int"):
-                    #TODO: ensure that we properly translate the condition
-                    #TODO: clean all this by declaring local variables
+                    # TODO: ensure that we properly translate the condition
+                    # TODO: clean all this by declaring local variables
                     # this handles the case exactly equal to PRED(i) = Acc(l[i].attr)
                     if (node.args[1].body.args[1].func.id == "Acc"):
                         acc_call = node.args[1].body.args[1]
@@ -221,7 +221,8 @@ class Translator:
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
                                                     vf.NameUseExpr(
                                                         "pyobj_hasattr"),
-                                                    vf.ImmInductive(vfpy.ListForallCond_True()),
+                                                    vf.ImmInductive(
+                                                        vfpy.ListForallCond_True()),
                                                     self.getWrapperStr(
                                     self.get_type(acc_content, ctx)),
                                     frac=acc_frac
@@ -239,7 +240,8 @@ class Translator:
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, ptr2val_access),
                                     vf.NameUseExpr("pyobj_hasval"),
-                                    vf.ImmInductive(vfpy.ListForallCond_True()),
+                                    vf.ImmInductive(
+                                        vfpy.ListForallCond_True()),
                                     self.getWrapperStr(self.get_type(
                                         acc_content.value.value, ctx).type_args[0]),
                                     frac=acc_frac),
@@ -266,6 +268,7 @@ class Translator:
                                     vf.Eq
                                 )),
                                 #
+                                "MISSING: something stating which attr is",
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
                                             str(
@@ -284,7 +287,7 @@ class Translator:
                             "Forall is not implemented for this content")
                 elif (self.get_type(node.args[0], ctx).name == "list" and
                       isinstance(node.args[0], ast.Name)):
-                    rewritten = self.indexify_forall(node, ctx, py2vf_ctx)                    
+                    rewritten = self.indexify_forall(node, ctx, py2vf_ctx)
                     return self.translate(rewritten, ctx, py2vf_ctx)
                     # translate into an indexed forall
                 else:
@@ -446,6 +449,7 @@ class Translator:
             ast.Gt: (vf.Gt, valacc),
             ast.GtE: (vf.GtE, valacc),
             ast.Is: (vf.Eq, ptracc),
+            ast.IsNot: (vf.NotEq, ptracc),
         }
         operator, acctype = dict[type(node.ops[0])]
         if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
