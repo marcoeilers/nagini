@@ -32,7 +32,8 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
-    BUILTIN___EQ___FUNCTIONS,
+    OBJECT_EQ,
+    STATELESS_FUNC,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -628,6 +629,52 @@ class ProgramTranslator(CommonTranslator):
         self.viper.used_names_sets[method.sil_name].add(mname)
         pres, posts = self.extract_contract(method.overrides, '_err',
                                             False, ctx)
+        # add state preconditions
+        if method.overrides.sil_name == OBJECT_EQ:
+            perm = self.viper.FullPerm(self.no_position(ctx), self.no_info(ctx))
+            if len(method.node.args.args) != 2:
+                raise InvalidProgramException(method.node, 'invalid.num.args.call')
+
+            old_aliases = copy.deepcopy(ctx.var_aliases)
+
+            # aliasing
+            for obj_eq, cur_name in zip(method.overrides.args.keys(), method.args.keys()):
+                root_var = method.overrides.args[obj_eq]
+                if obj_eq == cur_name:
+                    root_var = copy.copy(root_var)
+                    root_var.type = method.cls
+                ctx.set_alias(cur_name, root_var)
+
+            with ctx.additional_aliases(ctx.var_aliases):
+                iterator = iter(method.args)
+                super_iter = iter(method.overrides.args)
+                if ctx.var_aliases:
+                    self_var = ctx.var_aliases.get(
+                        method.overrides.args[next(super_iter)].name
+                    ).ref()
+                    other_var = ctx.var_aliases.get(
+                        method.overrides.args[next(super_iter)].name
+                    ).ref()
+                else:
+                    self_var = method.args[next(iterator)].ref()
+                    other_var = method.args[next(iterator)].ref()
+
+                for var in [self_var, other_var]:
+                    acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], perm, method.node, ctx)
+                    # add !stateless(other) ==> acc(state(other))
+                    if var == other_var:
+                        not_stateless = self.viper.Not(
+                            self.viper.FuncApp(
+                                STATELESS_FUNC, [other_var], self.to_position(method.node, ctx),
+                                self.no_info(ctx), self.viper.Bool), pos, self.info
+                        )
+
+                        acc_precond = self.viper.Implies(
+                            not_stateless, acc_precond, pos, self.info
+                        )
+                    pres.append(acc_precond)
+            ctx.var_aliases = old_aliases
+
         self_arg = None
         has_subtype = None
         if method.cls and method.method_type == MethodType.normal:

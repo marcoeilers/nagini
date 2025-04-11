@@ -89,6 +89,26 @@ STATE_PREDS = [
 
 PRED_NOT_COLLECTION_TYPE = 'not_collection_type'
 
+OBJECT_EQ = 'object___eq__'
+
+BUILTIN___EQ___FUNCTIONS = [
+    'int___eq__',
+    'bool___eq__',
+    'str___eq__',
+    'float___eq__',
+    'list___eq__',
+    'tuple___eq__',
+    'set___eq__',
+    'dict___eq__',
+    OBJECT_EQ,
+]
+
+ILLEGAL_FUNC_NAMES = [
+    STATELESS_FUNC
+]
+
+OBJ___EQ__MERGED = 'object___eq___merged'
+
 INTERNAL_NAMES = [
     'FuncTriple',
     'ft_get1',
@@ -438,20 +458,3 @@ RIGHT_OPERATOR_FUNCTIONS = {
     ast.BitOr: '__ror__',
     ast.BitXor: '__rxor__',
 }
-
-BUILTIN___EQ___FUNCTIONS = [
-    'int___eq__',
-    'bool___eq__',
-    'str___eq__',
-    'float___eq__',
-    'list___eq__',
-    'tuple___eq__',
-    'set___eq__',
-    'dict___eq__',
-    'object___eq__',
-]
-
-OBJ___EQ__MERGED = 'object___eq___merged'
-ILLEGAL_FUNC_NAMES = [
-    'stateless',
-]
