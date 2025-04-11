@@ -329,13 +329,7 @@ class ProgramTranslator(CommonTranslator):
 
         ctx.current_function = merge_func
 
-        # null check for self
-        self_var = merge_func.args[next(iter(merge_func.args))].ref()
-        null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
-        not_null = self.viper.NeCmp(self_var, null, self.no_position(ctx),
-                                    self.no_info(ctx))
-
-        pres = [not_null]
+        pres = []
         posts = []
 
         fname = merge_func.merge_func_name

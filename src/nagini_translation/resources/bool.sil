@@ -283,7 +283,6 @@ function int___int__(self: Ref): Ref
 
 function object___eq___merged(self: Ref, other: Ref): Bool
     decreases _
-    requires self != null
 
 function object___eq__(self: Ref, other: Ref): Bool
     decreases _
