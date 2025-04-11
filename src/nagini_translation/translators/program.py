@@ -389,6 +389,14 @@ class ProgramTranslator(CommonTranslator):
                 for pre, _ in cur.precondition:
                     stmt, obj = self.translate_expr(pre, ctx, self.viper.Bool)
                     check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
+
+                    # do not add decreases
+                    if type(obj) in (
+                        self.jvm.viper.silver.plugin.standard.termination.DecreasesTuple,
+                        self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard
+                    ):
+                        continue
+
                     if last_check is None:
                         last_check = self.viper.CondExp(check, obj, self.viper.TrueLit(pos, info), pos, info)
                     else:
@@ -537,6 +545,12 @@ class ProgramTranslator(CommonTranslator):
                         if stmt:
                             raise InvalidProgramException(cur.node, 'purity.violated')
 
+                    # do not add decreases
+                    if type(pre) in (
+                        self.jvm.viper.silver.plugin.standard.termination.DecreasesTuple,
+                        self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard
+                    ):
+                        continue
 
                     and_pres = self.viper.And(and_pres, pre, pos, info)
 
