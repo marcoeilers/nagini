@@ -174,7 +174,7 @@ function list___sil_seq__(self: Ref): Seq[Ref]
 
 predicate list_state(self: Ref) {
     issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==> (acc(self.list_acc) && 
-      (forall x: Ref :: { x in self.list_acc } (x in self.list_acc) && !stateless(x) ==> state(x))
+      (forall x: Ref :: { x in self.list_acc } (x in self.list_acc) && !stateless(x) ==> acc(state(x)))
     )
 }
 
@@ -184,8 +184,8 @@ function list___eq__(self: Ref, other: Ref): Bool
     // Permissions
     // acquire permissions for all references in both lists (self and other)
     
-    requires state(self)
-    requires !stateless(other) ==> state(other)
+    requires acc(state(self))
+    requires !stateless(other) ==> acc(state(other))
 
     ensures issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
         result == 
@@ -196,8 +196,7 @@ function list___eq__(self: Ref, other: Ref): Bool
               { list___getitem___index(self, x) }
               { list___getitem___index(other, x) }
               (x >= 0 && x < list___len__(self)) || (x >= -list___len__(self) && x <= -1) ==>
-              (list___getitem___index(self, x) != null && list___getitem___index(other, x) != null ==>
-              object___eq___merged(list___getitem___index(self, x), list___getitem___index(other, x)))
+              object___eq___merged(list___getitem___index(self, x), list___getitem___index(other, x))
             )
           )))
         ))

@@ -129,7 +129,7 @@ function tuple___contains__(self: Ref, item: Ref): Bool
 predicate tuple_state(self: Ref) {
     issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==> (
       forall x: Ref :: { x in tuple___val__(self) }
-      (x in tuple___val__(self)) && !stateless(x) ==> state(x)
+      (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x))
     )
 }
 
@@ -138,8 +138,8 @@ function tuple___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), tuple(tuple_args(typeof(self))))
     // Permissions
     // self could be stateless if e.g. self = (1, 2)
-    requires !stateless(self) ==> state(self)
-    requires !stateless(other) ==> state(other)
+    requires !stateless(self) ==> acc(state(self))
+    requires !stateless(other) ==> acc(state(other))
 
     ensures (issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
       result ==
@@ -150,8 +150,7 @@ function tuple___eq__(self: Ref, other: Ref): Bool
               { tuple___getitem__(self, x) }
               { tuple___getitem__(other, x) }
               (x >= 0 && x < tuple___len__(self)) || (x >= -tuple___len__(self) && x <= -1) ==>
-              (tuple___getitem__(self, x) != null && tuple___getitem__(other, x) != null ==>
-              object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other, x)))
+              object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other, x))
             )
           )))
         )))
