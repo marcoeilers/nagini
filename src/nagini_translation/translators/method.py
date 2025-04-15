@@ -341,8 +341,11 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
+        # TODO: use implementation if type is exactly the given type to avoid call to object___eq__(other, self)
+        # Encode postconditions for custom __eq__ overrides
         if func.name == '__eq__':
             posts.append(self.translate_reflexivity_post(func, ctx))
+            posts.append(self.translate_symmetry_post(func, ctx))
             posts.append(self.translate_modular_post(func, ctx))
 
         statements = func.node.body
@@ -381,35 +384,48 @@ class MethodTranslator(CommonTranslator):
         res = self.viper.Result(self.viper.Bool, pos, info)
         return self.viper.Implies(comp, res, pos, info)
 
+    def translate_symmetry_post(self, func: PythonMethod, ctx: Context) -> Expr:
+        pos = self.to_position(func.node, ctx)
+        info = self.no_info(ctx)
+        iterator = iter(func.args)
+        self_var = func.args[next(iterator)].ref()
+        other_var = func.args[next(iterator)].ref()
+        domain_name = 'PyType'
+        pytype = self.viper.DomainType(domain_name, {}, [])
+
+        rhs = self.viper.TrueLit(pos, info)
+        for c in func.mentioned_classes:
+            c_vpr = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
+            typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
+            lhs_impl = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
+            eq_func = c.functions.get('__eq__')
+            if not eq_func:
+                raise InvalidProgramException(func.node, 'invalid.function.__eq__', 'The function __eq__ does not exist.')
+            
+            rhs_impl = self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)
+            implies = self.viper.Implies(lhs_impl, rhs_impl, pos, info)
+            rhs = self.viper.And(rhs, implies, pos, info)
+
+        res = self.viper.Result(self.viper.Bool, pos, info)
+        return self.viper.Implies(res, rhs, pos, info)
+
     def translate_modular_post(self, func: PythonMethod, ctx: Context) -> Expr:
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
         iterator = iter(func.args)
         self_var = func.args[next(iterator)].ref()
         other_var = func.args[next(iterator)].ref()
-        comp = self.viper.EqCmp(self_var, other_var, pos, info)
-        res = self.viper.Result(self.viper.Bool, pos, info)
         domain_name = 'PyType'
         pytype = self.viper.DomainType(domain_name, {}, [])
-        M_l = []
+
+        rhs = self.viper.EqCmp(self_var, other_var, pos, info)
         for c in func.mentioned_classes:
-            app = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
-            M_l.append(app)
-        variables = []
-        M = self.viper.ExplicitSeq(M_l, pos, info)
-        var_decl = self.viper.LocalVarDecl('x', pytype, pos, info)
-        variables.append(var_decl)
-        x = self.viper.LocalVar('x', pytype, pos, info)
-        x_in_M = self.viper.SeqContains(x, M, pos, info)
-        typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
-        body_exists = self.viper.And(
-            x_in_M,
-            self.viper.DomainFuncApp('issubtype', [typeof_other, x], self.viper.Bool, pos, info, domain_name),
-            pos, info
-        )
-        rhs = self.viper.Or(
-            self.viper.Exists(variables, [], body_exists, pos, info), comp, pos, info
-        )
+            c_vpr = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
+            typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
+            subtype_check = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
+            rhs = self.viper.Or(rhs, subtype_check, pos, info)
+
+        res = self.viper.Result(self.viper.Bool, pos, info)
         return self.viper.Implies(res, rhs, pos, info)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
