@@ -131,6 +131,7 @@ class PythonStatementContainer:
         self.postcondition = []
         self.try_blocks = []  # direct
         self.loop_invariants = {}   # type: Dict[Union[ast.While, ast.For], List[ast.AST]]
+        self.mentioned_classes_str = set()
 
 
 class PythonModule(PythonScope, ContainerInterface, PythonStatementContainer):
@@ -1048,6 +1049,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.call_deps = set()
         self.decreases_clauses = []
         self.merge_func_name: Optional[str] = None
+        self.mentioned_classes = set()
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1169,6 +1171,18 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             # should not happen
             else:
                 raise InvalidProgramException(self.node, "invalid.merge.function")
+
+            # find all mentioned classes for custom __eq__ functions
+            if self.merge_func_name == OBJ___EQ__MERGED and super_func.sil_name == OBJECT_EQ:
+                visited = set()
+                stack = list([subclass for subclass in super_func.cls.direct_subclasses])
+                while(stack):
+                    subclass = stack.pop()
+                    if subclass not in visited and not subclass.interface:
+                        visited.add(subclass)
+                        if subclass.name in self.mentioned_classes_str:
+                            self.mentioned_classes.add(subclass)
+                        stack.extend(subclass.direct_subclasses)
 
     @property
     def nargs(self) -> int:

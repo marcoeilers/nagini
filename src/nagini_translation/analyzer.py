@@ -990,6 +990,24 @@ class Analyzer(ast.NodeVisitor):
             postconditions = list(map(lambda tuple: tuple[0], self.stmt_container.postcondition))
             if contains_stmt(preconditions, node) or contains_stmt(postconditions, node):
                 raise InvalidProgramException(node, 'invalid.contract.position')
+
+        # find all mentioned classes
+        if isinstance(node.func, ast.Name):
+            if node.func.id == 'isinstance':
+                assert len(node.args) == 2
+                if hasattr(node.args[1], "elts"): 
+                    for i in map(lambda i: i.id, node.args[1].elts):
+                        self.stmt_container.mentioned_classes_str.add(i)
+                else:
+                    self.stmt_container.mentioned_classes_str.add(node.args[1].id)
+            elif node.func.id == 'type' and isinstance(node._parent, ast.Compare):
+                mentioned = node._parent.comparators[0]
+                if hasattr(mentioned, "elts"):
+                    for i in map(lambda i: i.id, mentioned.elts):
+                        self.stmt_container.mentioned_classes_str.add(i)
+                else:
+                    self.stmt_container.mentioned_classes_str.add(mentioned.id)
+
         self.visit_default(node)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
