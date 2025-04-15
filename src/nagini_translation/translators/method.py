@@ -381,8 +381,12 @@ class MethodTranslator(CommonTranslator):
         self_var = func.args[next(iterator)].ref()
         other_var = func.args[next(iterator)].ref()
         comp = self.viper.EqCmp(self_var, other_var, pos, info)
-        res = self.viper.Result(self.viper.Bool, pos, info)
-        return self.viper.Implies(comp, res, pos, info)
+        res_box = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.viper.Result(self.viper.Ref, pos, info)],
+                pos, info, self.viper.Bool
+        )
+        return self.viper.Implies(comp, res_box, pos, info)
 
     def translate_symmetry_post(self, func: PythonMethod, ctx: Context) -> Expr:
         pos = self.to_position(func.node, ctx)
@@ -402,12 +406,20 @@ class MethodTranslator(CommonTranslator):
             if not eq_func:
                 raise InvalidProgramException(func.node, 'invalid.function.__eq__', 'The function __eq__ does not exist.')
             
-            rhs_impl = self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)
+            rhs_impl = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
+                pos, info, self.viper.Ref
+            )
             implies = self.viper.Implies(lhs_impl, rhs_impl, pos, info)
             rhs = self.viper.And(rhs, implies, pos, info)
 
-        res = self.viper.Result(self.viper.Bool, pos, info)
-        return self.viper.Implies(res, rhs, pos, info)
+        res_box = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.viper.Result(self.viper.Ref, pos, info)],
+                pos, info, self.viper.Bool
+        )
+        return self.viper.Implies(res_box, rhs, pos, info)
 
     def translate_modular_post(self, func: PythonMethod, ctx: Context) -> Expr:
         pos = self.to_position(func.node, ctx)
@@ -425,8 +437,12 @@ class MethodTranslator(CommonTranslator):
             subtype_check = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
             rhs = self.viper.Or(rhs, subtype_check, pos, info)
 
-        res = self.viper.Result(self.viper.Bool, pos, info)
-        return self.viper.Implies(res, rhs, pos, info)
+        res_box = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.viper.Result(self.viper.Ref, pos, info)],
+                pos, info, self.viper.Bool
+        )
+        return self.viper.Implies(res_box, rhs, pos, info)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
