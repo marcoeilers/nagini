@@ -66,6 +66,10 @@ class Context:
         self.allow_statements = False
         self.float_encoding = None
 
+        # used for resul type mismatch of custom __eq__ functions (return Ref)
+        # and the merge function (returns Bool)
+        self.in_merge___eq__ = False
+
     def get_fresh_int(self) -> int:
         """
         Returns a fresh integer value, to be used as a globally used counter

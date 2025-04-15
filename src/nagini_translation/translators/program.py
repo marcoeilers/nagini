@@ -558,7 +558,10 @@ class ProgramTranslator(CommonTranslator):
                 for post in posts:
                     # translate first if not already translated (i.e. custom __eq__ precondition)
                     if not cur.interface:
+                        # make sure type of result is Bool and not Ref
+                        ctx.in_merge___eq__ = True  
                         stmt, post = self.translate_expr(post, ctx, self.viper.Bool)
+                        ctx.in_merge___eq__ = False
                         if stmt:
                             raise InvalidProgramException(cur.node, 'purity.violated')
 
