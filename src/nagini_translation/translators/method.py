@@ -341,6 +341,10 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
+        if func.name == '__eq__':
+            posts.append(self.translate_reflexivity_post(func, ctx))
+            posts.append(self.translate_modular_post(func, ctx))
+
         statements = func.node.body
         start, end = get_body_indices(statements)
         # Translate body
@@ -366,6 +370,47 @@ class MethodTranslator(CommonTranslator):
             annotation = self.no_info(ctx)
         return self.viper.Function(name, args, type, pres, posts, body,
                                    pos, annotation)
+    
+    def translate_reflexivity_post(self, func: PythonMethod, ctx: Context) -> Expr:
+        pos = self.to_position(func.node, ctx)
+        info = self.no_info(ctx)
+        iterator = iter(func.args)
+        self_var = func.args[next(iterator)].ref()
+        other_var = func.args[next(iterator)].ref()
+        comp = self.viper.EqCmp(self_var, other_var, pos, info)
+        res = self.viper.Result(self.viper.Bool, pos, info)
+        return self.viper.Implies(comp, res, pos, info)
+
+    def translate_modular_post(self, func: PythonMethod, ctx: Context) -> Expr:
+        pos = self.to_position(func.node, ctx)
+        info = self.no_info(ctx)
+        iterator = iter(func.args)
+        self_var = func.args[next(iterator)].ref()
+        other_var = func.args[next(iterator)].ref()
+        comp = self.viper.EqCmp(self_var, other_var, pos, info)
+        res = self.viper.Result(self.viper.Bool, pos, info)
+        domain_name = 'PyType'
+        pytype = self.viper.DomainType(domain_name, {}, [])
+        M_l = []
+        for c in func.mentioned_classes:
+            app = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
+            M_l.append(app)
+        variables = []
+        M = self.viper.ExplicitSeq(M_l, pos, info)
+        var_decl = self.viper.LocalVarDecl('x', pytype, pos, info)
+        variables.append(var_decl)
+        x = self.viper.LocalVar('x', pytype, pos, info)
+        x_in_M = self.viper.SeqContains(x, M, pos, info)
+        typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
+        body_exists = self.viper.And(
+            x_in_M,
+            self.viper.DomainFuncApp('issubtype', [typeof_other, x], self.viper.Bool, pos, info, domain_name),
+            pos, info
+        )
+        rhs = self.viper.Or(
+            self.viper.Exists(variables, [], body_exists, pos, info), comp, pos, info
+        )
+        return self.viper.Implies(res, rhs, pos, info)
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
