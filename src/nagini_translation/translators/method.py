@@ -403,14 +403,19 @@ class MethodTranslator(CommonTranslator):
             typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
             lhs_impl = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
             eq_func = c.functions.get('__eq__')
-            if not eq_func:
-                raise InvalidProgramException(func.node, 'invalid.function.__eq__', 'The function __eq__ does not exist.')
             
-            rhs_impl = self.viper.FuncApp(
-                'bool___unbox__',
-                [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
-                pos, info, self.viper.Ref
-            )
+            # encode symmetric __eq__ call
+            if eq_func:
+                rhs_impl = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
+                    pos, info, self.viper.Ref
+                )
+            
+            # c.__eq__ doesn't exist -> referential equality
+            else:
+                rhs_impl = self.viper.EqCmp(other_var, self_var, pos, info)
+            
             implies = self.viper.Implies(lhs_impl, rhs_impl, pos, info)
             rhs = self.viper.And(rhs, implies, pos, info)
 

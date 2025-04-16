@@ -347,6 +347,15 @@ FLOAT_TYPE = 'float'
 
 BOOL_TYPE = 'bool'
 
+OBJECT_TYPE = 'object'
+
+BUILTIN_TYPES = {
+    LIST_TYPE, RANGE_TYPE, TUPLE_TYPE, UNION_TYPE, DICT_TYPE, SET_TYPE, STRING_TYPE,
+    BYTES_TYPE, INT_TYPE, FLOAT_TYPE, BOOL_TYPE, OBJECT_TYPE, 
+    'type', 'None', 'Any', 'Callable', 'Iterable', 'Optional',
+    'List', 'Dict', 'Set', 'Tuple', 'Literal', 'Self', 'ClassVar', 'Final',
+}
+
 PRIMITIVE_PREFIX = '__prim__'
 
 PRIMITIVE_INT_TYPE = PRIMITIVE_PREFIX + INT_TYPE
@@ -361,8 +370,6 @@ PRIMITIVE_SET_TYPE = PRIMITIVE_PREFIX + 'Set'
 
 PRIMITIVE_MSET_TYPE = PRIMITIVE_PREFIX + 'Multiset'
 
-
-OBJECT_TYPE = 'object'
 
 CALLABLE_TYPE = 'Callable'
 

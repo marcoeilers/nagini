@@ -27,6 +27,11 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     TUPLE_TYPE,
     BUILTIN___EQ___FUNCTIONS,
+    BUILTIN_TYPES,
+    BUILTIN_PREDICATES,
+    BUILTINS,
+    EQUALITY_STATE_PRED,
+    STATELESS_FUNC,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -993,22 +998,43 @@ class Analyzer(ast.NodeVisitor):
 
         # find all mentioned classes
         if isinstance(node.func, ast.Name):
-            if node.func.id == 'isinstance':
-                assert len(node.args) == 2
-                if hasattr(node.args[1], "elts"): 
-                    for i in map(lambda i: i.id, node.args[1].elts):
-                        self.stmt_container.mentioned_classes_str.add(i)
-                else:
-                    self.stmt_container.mentioned_classes_str.add(node.args[1].id)
-            elif node.func.id == 'type' and isinstance(node._parent, ast.Compare):
-                mentioned = node._parent.comparators[0]
-                if hasattr(mentioned, "elts"):
-                    for i in map(lambda i: i.id, mentioned.elts):
-                        self.stmt_container.mentioned_classes_str.add(i)
-                else:
-                    self.stmt_container.mentioned_classes_str.add(mentioned.id)
+            if node.func.id in ['isinstance', 'issubclass'] and len(node.args) >= 2:
+                self.extract_mentioned_classes(node.args[1])
+            else:
+                self.extract_mentioned_classes(node.func)
+        elif isinstance(node.func, ast.Attribute):
+            self.extract_mentioned_classes(node.func)
 
         self.visit_default(node)
+
+    def visit_Compare(self, node: ast.Compare) -> None:
+        if isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name):
+            if node.left.func.id == "type":
+                for comp in node.comparators:
+                    self.extract_mentioned_classes(comp)
+
+        self.visit_default(node)
+
+    def extract_mentioned_classes(self, node: ast.AST) -> None:
+        if isinstance(node, ast.Name):
+            if not (node.id in BUILTIN_TYPES or node.id in CONTRACT_FUNCS 
+                    or node.id in CONTRACT_WRAPPER_FUNCS or node.id in ['self', 'other']
+                    or node.id in BUILTINS or node.id in BUILTIN_PREDICATES
+                    or node.id in [STATELESS_FUNC, EQUALITY_STATE_PRED]):
+                self.stmt_container.mentioned_classes_str.add(node.id)
+        # for module.class (treated as attribute)
+        elif isinstance(node, ast.Attribute):
+            if not (node.attr in BUILTIN_TYPES or node.attr in CONTRACT_FUNCS 
+                    or node.attr in CONTRACT_WRAPPER_FUNCS or node.attr in ['self', 'other']
+                    or node.attr in BUILTINS or node.attr in BUILTIN_PREDICATES
+                    or node.attr in [STATELESS_FUNC, EQUALITY_STATE_PRED]):
+                self.stmt_container.mentioned_classes_str.add(node.attr)
+        elif isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            for elt in node.elts:
+                self.extract_mentioned_classes(elt)
+        elif isinstance(node, ast.Subscript):
+            self.extract_mentioned_classes(node.value)
+            self.extract_mentioned_classes(node.slice)
 
     def _get_parent_of_type(self, node: ast.AST, typ: type) -> ast.AST:
         """
