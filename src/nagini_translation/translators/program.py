@@ -535,7 +535,10 @@ class ProgramTranslator(CommonTranslator):
                     # translate first if not already translated (i.e. custom __eq__ precondition)
                     
                     if not cur.interface:
-                        stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
+                        if isinstance(pre.func, ast.Attribute) and pre.func.attr == EQUALITY_STATE_PRED:
+                            stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
+                        else:
+                            stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
                         if stmt:
                             raise InvalidProgramException(cur.node, 'purity.violated')
 
