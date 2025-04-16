@@ -1830,6 +1830,13 @@ class ProgramTranslator(CommonTranslator):
                     if merge_func:
                         functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
+                    pos = self.to_position(func.node, ctx)
+                    info = self.no_info(ctx)
+                    trans_check = self.config.method_translator.encode_transitivity_check(
+                        func, ctx, pos, info
+                    )
+                    methods.append(trans_check)
+
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
                              (cls.superclass and
