@@ -404,3 +404,27 @@ domain __SumHelper[T$] {
         forall __ss1: Seq[Int], __ss2: Seq[Int] :: { __sum(__ss1), __sum(__ss2) } __toMS(__ss1) == __toMS(__ss2) ==> __sum(__ss1) == __sum(__ss2)
     }
 }
+
+domain __Transitivity_Eq {
+    function eq(self: Ref, other: Ref): Bool
+
+    axiom {
+        forall o1: Ref :: { eq(o1, o1) }
+        eq(o1, o1)
+    }
+
+    axiom {
+        forall o1: Ref, o2: Ref, o3: Ref ::
+            { eq(o1, o2), eq(o2, o3) }
+            { eq(o1, o2), eq(o1, o3) }
+            { eq(o2, o3), eq(o1, o3) }
+            eq(o1, o2) && eq(o2, o3) ==> eq(o1, o3)
+    }
+
+    axiom {
+        forall o1: Ref, o2: Ref :: { eq(o1, o2) }
+            (eq(o1, o2) == eq(o2, o1)) &&
+            (o1 == o2 ==> eq(o1, o2)) &&
+            (((o1 == null) != (o2 == null)) ==> !eq(o1, o2))
+    }
+}

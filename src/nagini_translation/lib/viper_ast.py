@@ -279,6 +279,9 @@ class ViperAST:
             return self.Seqn([], position, info)
         return self.ast.Assert(expr, position, info, self.NoTrafos)
 
+    def Assume(self, expr, position, info):
+        return self.ast.Assume(expr, position, info, self.NoTrafos)
+
     def Refute(self, expr, position, info):
         return self.jvm.viper.silver.plugin.standard.refute.Refute(expr, position, info, self.NoTrafos)
 

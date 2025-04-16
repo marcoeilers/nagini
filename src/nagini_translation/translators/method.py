@@ -18,6 +18,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVES,
     STRING_TYPE,
+    EQUALITY_STATE_PRED,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -28,6 +29,8 @@ from nagini_translation.lib.program_nodes import (
     PythonModule,
     PythonTryBlock,
     PythonVar,
+    PythonClass,
+    toposort_classes,
 )
 from nagini_translation.lib.typedefs import (
     DomainFuncApp,
@@ -35,6 +38,9 @@ from nagini_translation.lib.typedefs import (
     Position,
     Stmt,
     VarDecl,
+    Method,
+    Function,
+    Var,
 )
 from nagini_translation.lib.util import (
     flatten,
@@ -45,7 +51,7 @@ from nagini_translation.lib.util import (
 )
 from nagini_translation.translators.abstract import Context
 from nagini_translation.translators.common import CommonTranslator
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 class MethodTranslator(CommonTranslator):
@@ -344,9 +350,10 @@ class MethodTranslator(CommonTranslator):
         # TODO: use implementation if type is exactly the given type to avoid call to object___eq__(other, self)
         # Encode postconditions for custom __eq__ overrides
         if func.name == '__eq__':
-            posts.append(self.translate_reflexivity_post(func, ctx))
-            posts.append(self.translate_symmetry_post(func, ctx))
-            posts.append(self.translate_modular_post(func, ctx))
+            info = self.no_info(ctx)
+            posts.append(self.encode_reflexivity_post(func, ctx, pos, info))
+            posts.append(self.encode_symmetry_post(func, ctx, pos, info))
+            posts.append(self.encode_modular_post(func, ctx, pos, info))
 
         statements = func.node.body
         start, end = get_body_indices(statements)
@@ -373,14 +380,39 @@ class MethodTranslator(CommonTranslator):
             annotation = self.no_info(ctx)
         return self.viper.Function(name, args, type, pres, posts, body,
                                    pos, annotation)
-    
-    def translate_reflexivity_post(self, func: PythonMethod, ctx: Context) -> Expr:
-        pos = self.to_position(func.node, ctx)
-        info = self.no_info(ctx)
+
+    def get_self_other_as_var_and_decls(self, func: PythonMethod):
         iterator = iter(func.args)
         self_var = func.args[next(iterator)].ref()
         other_var = func.args[next(iterator)].ref()
-        comp = self.viper.EqCmp(self_var, other_var, pos, info)
+
+        iterator = iter(func.args)
+        self_decl = func.args[next(iterator)].decl
+        other_decl = func.args[next(iterator)].decl
+        return self_var, other_var, self_decl, other_decl
+
+    def get_subtype_check_for_custom_class(self, var: Var, cls: PythonClass, pos, info) -> DomainFuncApp:
+        domain_name = 'PyType'
+        pytype = self.viper.DomainType(domain_name, {}, [])
+        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], pytype, pos, info, domain_name)
+        typeof_var = self.viper.DomainFuncApp('typeof', [var], pytype, pos, info, domain_name)
+        return self.viper.DomainFuncApp('issubtype', [typeof_var, vpr_class], self.viper.Bool, pos, info, domain_name)
+    
+    def get_eq_domain_app(self, self_var: Var, other_var: Var, pos, info):
+        domain_name = 'PyType'
+        pytype = self.viper.DomainType(domain_name, {}, [])
+        return self.viper.DomainFuncApp(
+            'eq', [self_var, other_var], pytype, pos, info,
+            '__Transitivity_Eq'
+        )
+    
+    def encode_reflexivity_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
+        self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
+        
+        if ctx.use_domain_func_eq:
+            comp = self.get_eq_domain_app(self_var, other_var, pos, info)
+        else:
+            comp = self.viper.EqCmp(self_var, other_var, pos, info)
         res_box = self.viper.FuncApp(
                 'bool___unbox__',
                 [self.viper.Result(self.viper.Ref, pos, info)],
@@ -388,33 +420,28 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(comp, res_box, pos, info)
 
-    def translate_symmetry_post(self, func: PythonMethod, ctx: Context) -> Expr:
-        pos = self.to_position(func.node, ctx)
-        info = self.no_info(ctx)
-        iterator = iter(func.args)
-        self_var = func.args[next(iterator)].ref()
-        other_var = func.args[next(iterator)].ref()
-        domain_name = 'PyType'
-        pytype = self.viper.DomainType(domain_name, {}, [])
+    def encode_symmetry_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
+        self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
 
         rhs = self.viper.TrueLit(pos, info)
         for c in func.mentioned_classes:
-            c_vpr = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
-            typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
-            lhs_impl = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
-            eq_func = c.functions.get('__eq__')
+            lhs_impl = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
             
-            # encode symmetric __eq__ call
-            if eq_func:
-                rhs_impl = self.viper.FuncApp(
-                    'bool___unbox__',
-                    [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
-                    pos, info, self.viper.Ref
-                )
-            
-            # c.__eq__ doesn't exist -> referential equality
+            if ctx.use_domain_func_eq:
+                rhs_impl = self.get_eq_domain_app(other_var, self_var, pos, info)
             else:
-                rhs_impl = self.viper.EqCmp(other_var, self_var, pos, info)
+                eq_func = c.functions.get('__eq__')
+
+                # encode symmetric __eq__ call
+                if eq_func:
+                    rhs_impl = self.viper.FuncApp(
+                        'bool___unbox__',
+                        [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
+                        pos, info, self.viper.Ref
+                    )
+                # c.__eq__ doesn't exist -> referential equality
+                else:
+                    rhs_impl = self.viper.EqCmp(other_var, self_var, pos, info)
             
             implies = self.viper.Implies(lhs_impl, rhs_impl, pos, info)
             rhs = self.viper.And(rhs, implies, pos, info)
@@ -426,28 +453,94 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(res_box, rhs, pos, info)
 
-    def translate_modular_post(self, func: PythonMethod, ctx: Context) -> Expr:
-        pos = self.to_position(func.node, ctx)
-        info = self.no_info(ctx)
-        iterator = iter(func.args)
-        self_var = func.args[next(iterator)].ref()
-        other_var = func.args[next(iterator)].ref()
-        domain_name = 'PyType'
-        pytype = self.viper.DomainType(domain_name, {}, [])
-
+    def encode_modular_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
+        self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
         rhs = self.viper.EqCmp(self_var, other_var, pos, info)
         for c in func.mentioned_classes:
-            c_vpr = self.viper.DomainFuncApp(c.sil_name, [], pytype, pos, info, domain_name)
-            typeof_other = self.viper.DomainFuncApp('typeof', [other_var], pytype, pos, info, domain_name)
-            subtype_check = self.viper.DomainFuncApp('issubtype', [typeof_other, c_vpr], self.viper.Bool, pos, info, domain_name)
+            subtype_check = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
             rhs = self.viper.Or(rhs, subtype_check, pos, info)
-
         res_box = self.viper.FuncApp(
                 'bool___unbox__',
                 [self.viper.Result(self.viper.Ref, pos, info)],
                 pos, info, self.viper.Bool
         )
         return self.viper.Implies(res_box, rhs, pos, info)
+
+    def encode_transitivity_check(self, func: PythonMethod, ctx: Context, pos, info) -> (Method, Optional[Function]):
+        print(func.sil_name)
+        self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
+
+        domain_name = 'PyType'
+        pytype = self.viper.DomainType(domain_name, {}, [])
+
+        x = self.viper.LocalVar('x', self.viper.Ref, pos, info)
+        x_decl = self.viper.LocalVarDecl('x', self.viper.Ref, pos, info)
+
+        res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
+        res = self.viper.LocalVar('_res', self.viper.Bool, pos, info)
+
+        # Body
+        assume_x = self.viper.TrueLit(pos, info)
+        assume_other = self.viper.TrueLit(pos, info)
+        for c in func.mentioned_classes:
+            subtype_check_x = self.get_subtype_check_for_custom_class(x, c, pos, info)
+            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            assume_x = self.viper.Or(assume_x, subtype_check_x, pos, info)
+            assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
+
+        assume_x = self.viper.Assume(assume_x, pos, info)
+        assume_other = self.viper.Assume(assume_other, pos, info)
+        body = [assume_x, assume_other]
+
+        for var in [self_var, x, other_var]:
+            state_acc = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
+            body.append(self.viper.Inhale(state_acc, pos, info))
+
+        self_eq_x = self.viper.FuncApp(func.sil_name, [self_var, x], pos, info, self.viper.Ref)
+        self_eq_other = self.viper.FuncApp(func.sil_name, [self_var, other_var], pos, info, self.viper.Ref)
+        body.append(self.viper.Assume(self_eq_x, pos, info))
+        body.append(self.viper.Assume(self_eq_other, pos, info))
+
+        # TODO:
+        for c in toposort_classes(set(func.mentioned_classes)):
+            check = self.get_subtype_check_for_custom_class(x, c, pos, info)
+            # self.viper.LocalVarAssign(res, )
+            
+            # Use the domain function eq instead of the __eq__ merge function
+            # for the transitivity assumption.
+            ctx.use_domain_func_eq = True
+
+            old_func = ctx.current_function
+            ctx.current_function = func
+
+            and_posts = self.viper.TrueLit(pos, info)
+            for post, aliases in func.postcondition:
+                with ctx.additional_aliases(aliases):
+                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                if stmt:
+                    raise InvalidProgramException(post, 'purity.violated')
+                and_posts = self.viper.And(and_posts, expr, pos, info)
+            if func.type.name not in PRIMITIVES:
+                res_type_pos = self.to_position(func.node, ctx,
+                                                '"return type is correct"')
+                res_type = self.translate_type(func.type, ctx)
+                result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
+                check = self.type_check(result, func.type, res_type_pos, ctx)
+                and_posts = self.viper.And(and_posts, check, pos, info)
+
+            ctx.use_domain_func_eq = False
+            ctx.current_function = old_func
+            
+            body.append(self.viper.Assume(and_posts, pos, info))
+
+        block = self.translate_block(body, pos, info)
+        transitivity_check = self.viper.Method(
+            f"{func.sil_name}_check_transitivity",
+            [self_decl, x_decl, other_decl], [res_decl],
+            [], [], [], block, pos, info
+        )
+        return transitivity_check
+        
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,

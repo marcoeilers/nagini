@@ -715,10 +715,20 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             if func_name == '__eq__':
                 assert len(args) == 2
-                arg1 = self.to_ref(args[0], ctx)
-                arg2 = self.to_ref(args[1], ctx)
-                return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
-                                        self.no_info(ctx), self.viper.Bool)
+
+                # redirect call to __eq__ function to domain function eq
+                if ctx.use_domain_func_eq:
+                    domain_name = 'PyType'
+                    pytype = self.viper.DomainType(domain_name, {}, [])
+                    return self.viper.DomainFuncApp(
+                        'eq', [args[0], args[1]], pytype, position, self.no_info(ctx),
+                        '__Transitivity_Eq'
+                    )
+                else:
+                    arg1 = self.to_ref(args[0], ctx)
+                    arg2 = self.to_ref(args[1], ctx)
+                    return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                              self.no_info(ctx), self.viper.Bool)
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:

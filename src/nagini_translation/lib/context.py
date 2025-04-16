@@ -69,6 +69,7 @@ class Context:
         # used for resul type mismatch of custom __eq__ functions (return Ref)
         # and the merge function (returns Bool)
         self.in_merge___eq__ = False
+        self.use_domain_func_eq = False
 
     def get_fresh_int(self) -> int:
         """
