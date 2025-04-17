@@ -31,6 +31,7 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     PythonClass,
     toposort_classes,
+    chain_if_stmts,
 )
 from nagini_translation.lib.typedefs import (
     DomainFuncApp,
@@ -493,51 +494,97 @@ class MethodTranslator(CommonTranslator):
         body = [assume_x, assume_other]
 
         for var in [self_var, x, other_var]:
-            state_acc = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
-            body.append(self.viper.Inhale(state_acc, pos, info))
+            state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
+            body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
         self_eq_x = self.viper.FuncApp(func.sil_name, [self_var, x], pos, info, self.viper.Ref)
         self_eq_other = self.viper.FuncApp(func.sil_name, [self_var, other_var], pos, info, self.viper.Ref)
-        body.append(self.viper.Assume(self_eq_x, pos, info))
-        body.append(self.viper.Assume(self_eq_other, pos, info))
+        unboxed_self_eq_x = self.viper.FuncApp('bool___unbox__', [self_eq_x], pos,
+                                               info, self.viper.Bool)
+        unboxed_self_eq_other = self.viper.FuncApp('bool___unbox__', [self_eq_other],
+                                                   pos, info, self.viper.Bool)
+        
+        body.append(self.viper.Assume(unboxed_self_eq_x, pos, info))
+        body.append(self.viper.Assume(unboxed_self_eq_other, pos, info))
 
         # TODO:
+        guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
-            check = self.get_subtype_check_for_custom_class(x, c, pos, info)
-            # self.viper.LocalVarAssign(res, )
+            cond = self.get_subtype_check_for_custom_class(x, c, pos, info)
             
             # Use the domain function eq instead of the __eq__ merge function
             # for the transitivity assumption.
             ctx.use_domain_func_eq = True
 
-            old_func = ctx.current_function
-            ctx.current_function = func
-
             and_posts = self.viper.TrueLit(pos, info)
-            for post, aliases in func.postcondition:
-                with ctx.additional_aliases(aliases):
-                    stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
-                if stmt:
-                    raise InvalidProgramException(post, 'purity.violated')
-                and_posts = self.viper.And(and_posts, expr, pos, info)
-            if func.type.name not in PRIMITIVES:
-                res_type_pos = self.to_position(func.node, ctx,
-                                                '"return type is correct"')
-                res_type = self.translate_type(func.type, ctx)
-                result = self.viper.Result(res_type, res_type_pos, self.no_info(ctx))
-                check = self.type_check(result, func.type, res_type_pos, ctx)
-                and_posts = self.viper.And(and_posts, check, pos, info)
+            cur_eq_func = c.functions.get('__eq__')
+
+            stmts = []
+            # TODO: if __eq__ is not overridden
+            if not cur_eq_func:
+                pass                
+
+            else:
+                old_func = ctx.current_function
+                ctx.current_function = cur_eq_func
+                old_class = ctx.current_class
+                ctx.current_class = cur_eq_func.cls
+
+                # inline call to func.__eq__ using where the calls to the merge function are 
+                # redirected to the eq domain function
+                and_pres = self.viper.TrueLit(pos, info)
+                for pre, aliases in cur_eq_func.precondition:
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool)
+                    if stmt:
+                        raise InvalidProgramException(pre, 'purity.violated')
+                    and_pres = self.viper.And(and_pres, expr, pos, info)
+                
+                y_decl = self.viper.LocalVarDecl('y', self.viper.Bool, pos, info)
+                y = self.viper.LocalVar('y', self.viper.Bool, pos, info)
+                y_assn = self.viper.LocalVarAssign(y, and_pres, pos, info)
+
+                stmts.append(y_assn)
+                stmts.append(self.viper.Assert(y, pos, info))
+
+                # stmts.append(self.viper.Assert(and_pres, pos, info))
+
+                for post, aliases in cur_eq_func.postcondition:
+                    # TODO: fix aliasing
+                    # self_pyvar, other_pyvar = self.get_self_other_pythonvar(func)
+                    # cur_self_pyvar, cur_other_pyvar = self.get_self_other_pythonvar(cur_eq_func)
+                    # aliases[cur_self_pyvar.name] = self_pyvar
+                    # aliases[cur_other_pyvar.name] = other_pyvar
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                    if stmt:
+                        raise InvalidProgramException(post, 'purity.violated')
+                    and_posts = self.viper.And(and_posts, expr, pos, info)
+
+                impl_assert = self.viper.Assert(
+                    self.viper.Implies(y, and_posts, pos, info),
+                    pos, info
+                )
+                stmts.append(impl_assert)
+
+                ctx.current_function = old_func
+                ctx.current_class = old_class
+
+            guarded_blocks.append(
+                (cond, self.translate_block(stmts, pos, info))
+            )
 
             ctx.use_domain_func_eq = False
-            ctx.current_function = old_func
-            
-            body.append(self.viper.Assume(and_posts, pos, info))
 
+        if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
+        body.append(if_stmt)
         block = self.translate_block(body, pos, info)
+
         transitivity_check = self.viper.Method(
             f"{func.sil_name}_check_transitivity",
             [self_decl, x_decl, other_decl], [res_decl],
-            [], [], [], block, pos, info
+            [], [], [y_decl], block, pos, info
         )
         return transitivity_check
         

@@ -102,6 +102,30 @@ class ContractTranslator(CommonTranslator):
                 raise InvalidProgramException(node, 'invalid.result')
             return [], ctx.result_var.ref(node, ctx)
         else:
+            # result is from a function for which transitivity is being checked
+            if ctx.use_domain_func_eq:
+                cur_eq_func = ctx.current_class.functions.get('__eq__')
+                if cur_eq_func:
+                    domain_name = 'PyType'
+                    pytype = self.viper.DomainType(domain_name, {}, [])
+                    args_ref = list(map(lambda v: v.ref(), cur_eq_func.args.values()))
+                    return ([], 
+                        self.viper.FuncApp(
+                            '__prim__bool___box__',
+                            [
+                                self.viper.DomainFuncApp(
+                                    'eq', args_ref, pytype, self.to_position(node, ctx),
+                                    self.no_info(ctx), '__Transitivity_Eq'
+                                )
+                            ],
+                            self.to_position(node, ctx), self.no_info(ctx), self.viper.Ref
+                        )
+                    )
+                # TODO: fix, what to do here?
+                # can we just return true?
+                else:
+                    pass
+
             if ctx.in_merge___eq__:
                 t = self.viper.Bool
             else:
