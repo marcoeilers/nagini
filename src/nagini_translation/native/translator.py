@@ -501,7 +501,7 @@ class Translator:
             pyobj_method = {
                 "int": vfpy.PyLong,
                 # "bool": vfpy.PyBool,
-                "list": lambda x: vfpy.PyClass_List(),
+                "list": lambda x: vfpy.PyList(self.pytype__to__PyObj_t(t.type_args[0])),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(
                 pyobj_method(py2vf_ctx.getExpr(target, access)))
@@ -536,10 +536,21 @@ class Translator:
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         if (p.name == 'tuple'):
             return vfpy.PyTuple_t(vf.List.from_list(list(map(lambda x: vf.ImmInductive(self.pytype__to__PyObj_t(x)), p.type_args))))
-        return {
-            'int': vfpy.PyLong(0).PyObj_t(),
-            # TODO: this is just for testing, remove this and implement cleanly later
-        }.get(p.name, vfpy.PyClass_t(self.classes.get(p.module.sil_name+p.name, "FAILED PYTYPE TRANSLATION")))
+        if(p.name == 'int'):
+            return "PyLong_t"
+        elif(p.name == 'float'):
+            return "PyFloat_t"
+        elif (p.name == 'bool'):
+            return "PyBool_t"
+        elif (p.name == 'string'):
+            return "PyUnicode_t"
+        elif (p.name=="list"):
+            return "PyList_t("+",".join([str(self.pytype__to__PyObj_t(x)) for x in p.type_args])+")"
+        else:
+            if self.classes.get(p.module.sil_name+p.name) == None:
+                raise NotImplementedError("Type "+p.name+" not implemented")
+            else:
+                return vfpy.PyClass_t(self.classes[p.module.sil_name+p.name])
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)

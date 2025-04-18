@@ -16,15 +16,15 @@ class classA:
 @Native
 def test_listpred(l: List[int]) -> int:
     """
-    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyLong_t)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyLong_t)) &*&
     pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
     forall_predfact(?l__content, pyobj_hasval, True, PyLong_wrap, nil) &*&
     (map(fst, l__content) == l__content__ptr) &*&
     (some(map(snd, l__content)) == some(?l__content__val));
 
-    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyLong_t)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyLong_t)) &*&
     pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
     forall_predfact(?NEW_l__content, pyobj_hasval, True, PyLong_wrap, nil) &*&
@@ -38,15 +38,15 @@ def test_listpred(l: List[int]) -> int:
 @Native
 def test_listpred2(l: List[int]) -> int:
     """
-    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyLong_t)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyLong_t)) &*&
     [1/3]pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
     [1/3]forall_predfact(?l__content, pyobj_hasval, True, PyLong_wrap, nil) &*&
     (map(fst, l__content) == l__content__ptr) &*&
     (some(map(snd, l__content)) == some(?l__content__val));
 
-    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyLong_t)), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyLong_t)) &*&
     pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     [1/3]pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
     [1/3]forall_predfact(?NEW_l__content, pyobj_hasval, True, PyLong_wrap, nil) &*&
@@ -60,16 +60,16 @@ def test_listpred2(l: List[int]) -> int:
 @Native
 def test_length(l: List[classA]) -> int:
     """
-    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0classA))), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA))) &*&
     [1/3]pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
     [1/3]forall_predfact(?l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&
     (map(fst, l__content) == l__content__ptr) &*&
     (some(map(snd, l__content)) == some(?l__content__val)) &*&
     (length(l__content__val) > 200);
 
-    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyClass_t(FAILED PYTYPE TRANSLATION)), nil))) &*&
-    pyobj_hasvalue(l__ptr, PyClass_List) &*&
+    ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0classA))), nil))) &*&
+    pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA))) &*&
     pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
     [1/3]pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
     [1/3]forall_predfact(?NEW_l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&

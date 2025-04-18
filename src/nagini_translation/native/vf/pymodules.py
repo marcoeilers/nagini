@@ -20,7 +20,17 @@ class PyObj_v(vf.Inductive, ABC):
     def PyObj_t(self) -> PyObj_t:
         pass
 
+class PyList(PyObj_v):
 
+    def __init__(self, t: PyObj_t):
+        __PyObj_t = PyObj_t("PyList_t($)")
+        self.t = t
+
+    def __str__(self):
+        return "PyList_v("+str(self.t)+")"
+    def PyObj_t(self) -> PyObj_t:
+        return self.__PyObj_t.replace("$", str(self.t))
+    
 class PyLong(PyObj_v):
     __PyObj_t = PyObj_t("PyLong_t")
 
@@ -41,10 +51,6 @@ class PyClass(vf.Inductive, ABC):
     def __str__(self):
         return "PyClass_"+self.name+""
 
-
-class PyClass_List(PyClass):
-    def __init__(self):
-        super().__init__("List")
 
 
 class PyClass_t(PyObj_t):
