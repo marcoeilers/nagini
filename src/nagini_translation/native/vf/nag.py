@@ -63,6 +63,33 @@ class ListForallCond_Gte(ListForallCond):
     def __str__(self):
         return "gte("+str(self.a)+")"
 
+#class ListForallCond_Fixp(ListForallCond):
+#    def __init__(self, f: vf.Fixpoint):
+#        self.f = f
+#
+#    def __str__(self):
+#        return "fixp("+str(self.f)+")"
+class ListForallCond_Neg(ListForallCond):
+    def __init__(self, c: ListForallCond):
+        self.c = c
+
+    def __str__(self):
+        return "neg("+str(self.c)+")"
+class ListForallCond_And(ListForallCond):
+    def __init__(self, c1: ListForallCond, c2: ListForallCond):
+        self.c1 = c1
+        self.c2 = c2
+
+    def __str__(self):
+        return "and("+str(self.c1)+", "+str(self.c2)+")"
+class ListForallCond_Or(ListForallCond):
+    def __init__(self, c1: ListForallCond, c2: ListForallCond):
+        self.c1 = c1
+        self.c2 = c2
+
+    def __str__(self):
+        return "or("+str(self.c1)+", "+str(self.c2)+")"
+
 
 class ForallPredFact(vf.PredicateFact):
     def __init__(self, pairlist: vf.NameDefExpr, predname: vf.NameUseExpr, cond: ListForallCond, frac=Fraction(1)):
