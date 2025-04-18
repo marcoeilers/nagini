@@ -34,16 +34,28 @@ class Translator:
             ast.BoolOp: self.translate_BoolOp_fact,
         }
         return switch_dict[type(node)](node, ctx, py2vf_ctx)
-
-    def getWrapperStr(self, t: type) -> str:
-        if (t.name == "int"):
-            return "PyLong_wrap"
-        elif (t.name == "float"):
-            return "PyFloat_wrap"
+    def gethasvalpredname(self, t: type) -> str:
+        if (t.name == "int"):        
+            return "pyobj_hasPyLong"
         elif (t.name == "bool"):
-            return "PyBool_wrap"
+            return "pyobj_hasPyBoolval"
+        elif (t.name == "float"):
+            return "pyobj_hasPyFloatval"
+        elif (t.name == "string"):
+            return "pyobj_hasPyUnicodeval"
+        elif (t.name == "list"):
+            return "pyobj_hasPyListval"
+        elif (t.name == "tuple"):
+            return "pyobj_hasPyTupleval"
+        elif (t.name == "none"):
+            return "pyobj_hasPyNoneval"
+        elif (t.name == "dict"):
+            return "pyobj_hasPyTypeval"
         else:
-            return "PyClassInstance_wrap"
+            if(self.classes.get(t.module.sil_name+t.name) == None):
+                raise NotImplementedError("Type "+t.name+" not implemented")
+            else:
+                return "pyobj_hasPyClassInstanceval(PyClass_"+t.module.sil_name+t.name+")"
 
     def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
         class TransformName(ast.NodeTransformer):
@@ -134,12 +146,10 @@ class Translator:
                         frac=frac
                     ),
                         vfpy.ForallPredFact(
-                        py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
-                        vf.NameUseExpr("pyobj_hasval"),
-                        vf.ImmInductive(vfpy.ListForallCond_True()),
-                        self.getWrapperStr(self.get_type(
-                            node.args[0], ctx).type_args[0]),
-                        frac=frac),
+                            py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
+                            vf.NameUseExpr(self.gethasvalpredname(self.get_type(node.args[0], ctx).type_args[0])),
+                            vf.ImmInductive(vfpy.ListForallCond_True()),
+                            frac=frac),
                         vf.BooleanFact(vf.BinOp[vf.Bool](
                             "map(fst, " +
                             str(py2vf_ctx.getExpr(
@@ -219,12 +229,9 @@ class Translator:
                             return vf.FactConjunction([
                                 # first fact: hasattr
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
-                                                    vf.NameUseExpr(
-                                                        "pyobj_hasattr"),
-                                                    vf.ImmInductive(
-                                                        vfpy.ListForallCond_True()),
-                                                    self.getWrapperStr(
-                                    self.get_type(acc_content, ctx)),
+                                                    vf.NameUseExpr("attr_binary_pred(hasAttr(\""+str(acc_content.attr)+"\"))"),
+                                                    #vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),
+                                                    vf.ImmInductive(vfpy.ListForallCond_True()),
                                     frac=acc_frac
                                 ),
                                 # set equivalences: fst is the ptr list from list_pred
@@ -239,11 +246,9 @@ class Translator:
                                 vfpy.ForallPredFact(
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, ptr2val_access),
-                                    vf.NameUseExpr("pyobj_hasval"),
+                                    vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),#self.get_type(acc_content.value.value, ctx).type_args[0]
                                     vf.ImmInductive(
                                         vfpy.ListForallCond_True()),
-                                    self.getWrapperStr(self.get_type(
-                                        acc_content.value.value, ctx).type_args[0]),
                                     frac=acc_frac),
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
@@ -268,7 +273,7 @@ class Translator:
                                     vf.Eq
                                 )),
                                 #
-                                "MISSING: something stating which attr is",
+                                #"MISSING: something stating which attr is",
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
                                             str(
@@ -496,6 +501,7 @@ class Translator:
                 "Comparison for type "+operandtype+" not implemented")
 
     def create_hasval_fact(self, target: ast.expr, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
+        #maybe one day simply this using gethasvalpred?
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
             pyobj_method = {
