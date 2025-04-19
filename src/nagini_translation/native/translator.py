@@ -34,28 +34,31 @@ class Translator:
             ast.BoolOp: self.translate_BoolOp_fact,
         }
         return switch_dict[type(node)](node, ctx, py2vf_ctx)
+
     def gethasvalpredname(self, t: type) -> str:
-        if (t.name == "int"):        
+        if (t.name == "int"):
             return "pyobj_hasPyLong"
         elif (t.name == "bool"):
             return "pyobj_hasPyBoolval"
         elif (t.name == "float"):
             return "pyobj_hasPyFloatval"
         elif (t.name == "string"):
-            return "pyobj_hasPyUnicodeval"
+            return "pyobj_hasPyUnicodeval()"
         elif (t.name == "list"):
-            return "pyobj_hasPyListval"
+            return "pyobj_hasPyListval()"
         elif (t.name == "tuple"):
-            return "pyobj_hasPyTupleval"
+            return "pyobj_hasPyTupleval()"
         elif (t.name == "none"):
             return "pyobj_hasPyNoneval"
         elif (t.name == "dict"):
-            return "pyobj_hasPyTypeval"
+            raise NotImplementedError("Dict not implemented")
+            # return "pyobj_hasPyTypeval"
         else:
-            if(self.classes.get(t.module.sil_name+t.name) == None):
+            if (self.classes.get(t.module.sil_name+t.name) == None):
                 raise NotImplementedError("Type "+t.name+" not implemented")
             else:
-                return "pyobj_hasPyClassInstanceval(PyClass_"+t.module.sil_name+t.name+","+")"
+                return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyObj_t(t))+")"
+
     def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
         class TransformName(ast.NodeTransformer):
             def visit_Name(self, vnode):
@@ -107,38 +110,43 @@ class Translator:
         return rewritten
         # print(ast.unparse(rewrittenbody))
         # print(ast.unparse(rewritten))
+
     def translate_forall_condition(self, node: ast.Expr, name: ast.Name, ctx: Context, py2vf_ctx: py2vf_context) -> vfpy.ListForallCond:
-        if(isinstance(node, ast.Compare)):
+        if (isinstance(node, ast.Compare)):
             the_cmp = {ast.GtE: vfpy.ListForallCond_Gte,
-                ast.LtE: vfpy.ListForallCond_Lte,
-                ast.Gt: vfpy.ListForallCond_Gt,
-                ast.Lt: vfpy.ListForallCond_Lt,
-            }[type(node.ops[0])]
+                       ast.LtE: vfpy.ListForallCond_Lte,
+                       ast.Gt: vfpy.ListForallCond_Gt,
+                       ast.Lt: vfpy.ListForallCond_Lt,
+                       }[type(node.ops[0])]
             # ensure that only two elements are compared
             if (len(node.comparators) != 1):
-                raise NotImplementedError("Forall condition comparing more than 2 elements not implemented")
-            if(isinstance(node.left, ast.Name) and node.left.id == name):
+                raise NotImplementedError(
+                    "Forall condition comparing more than 2 elements not implemented")
+            if (isinstance(node.left, ast.Name) and node.left.id == name):
                 return the_cmp(
                     self.translate_generic_expr(node.comparators[0], ctx, py2vf_ctx, ValAccess()))
-            elif(isinstance(node.comparators[0], ast.Name) and  node.comparators[0].id == name):
+            elif (isinstance(node.comparators[0], ast.Name) and node.comparators[0].id == name):
                 return the_cmp(
                     self.translate_generic_expr(node.left, ctx, py2vf_ctx, ValAccess()))
             else:
-                raise NotImplementedError("Forall condition comparing "+str(node.left)+" and "+str(node.comparators[0])+" not implemented")
-        if(isinstance(node, ast.BoolOp)):
+                raise NotImplementedError("Forall condition comparing "+str(
+                    node.left)+" and "+str(node.comparators[0])+" not implemented")
+        if (isinstance(node, ast.BoolOp)):
             if (isinstance(node.op, ast.And)):
                 return vfpy.ListForallCond_And(
-                    self.translate_forall_condition(node.values[0], name, ctx, py2vf_ctx),
+                    self.translate_forall_condition(
+                        node.values[0], name, ctx, py2vf_ctx),
                     self.translate_forall_condition(node.values[1], name, ctx, py2vf_ctx))
             elif (isinstance(node.op, ast.Or)):
                 return vfpy.ListForallCond_Or(
-                    self.translate_forall_condition(node.values[0], name, ctx, py2vf_ctx),
+                    self.translate_forall_condition(
+                        node.values[0], name, ctx, py2vf_ctx),
                     self.translate_forall_condition(node.values[1], name, ctx, py2vf_ctx))
-        if(isinstance(node, ast.UnaryOp)):
+        if (isinstance(node, ast.UnaryOp)):
             if (isinstance(node.op, ast.Not)):
                 return vfpy.ListForallCond_Neg(
                     self.translate_forall_condition(node.operand, name, ctx, py2vf_ctx))
-            
+
     def translate_Call_fact(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         if (node.func.id == "Acc"):
             frac = 1
@@ -177,7 +185,8 @@ class Translator:
                     ),
                         vfpy.ForallPredFact(
                             py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
-                            vf.NameUseExpr(self.gethasvalpredname(self.get_type(node.args[0], ctx).type_args[0])),
+                            vf.NameUseExpr(self.gethasvalpredname(
+                                self.get_type(node.args[0], ctx).type_args[0])),
                             vf.ImmInductive(vfpy.ListForallCond_True()),
                             frac=frac),
                         vf.BooleanFact(vf.BinOp[vf.Bool](
@@ -237,7 +246,8 @@ class Translator:
                    isinstance(node.args[0], ast.Name) and
                    node.args[0].id == "int"):
                     implies = thelambda.body
-                    forallpred_inductive_condition = self.translate_forall_condition(implies.args[0], thelambda.args.args[0].arg, ctx, py2vf_ctx)
+                    forallpred_inductive_condition = self.translate_forall_condition(
+                        implies.args[0], thelambda.args.args[0].arg, ctx, py2vf_ctx)
                     # TODO: ensure that we properly translate the condition
                     # TODO: clean all this by declaring local variables
                     # this handles the case exactly equal to PRED(i) = Acc(l[i].attr)
@@ -252,19 +262,25 @@ class Translator:
                             and isinstance(acc_content.value, ast.Subscript)
                             and isinstance(acc_content.value.value, ast.Name)
                             and isinstance(acc_content.value.slice, ast.Name)
-                            and acc_content.value.slice.id == thelambda.args.args[0].arg):
-                            ptr2ptr_access = CtntAccess(AttrAccess(acc_content.attr, "_attrptr2ptr"))
-                            attr_ptrlist = CtntAccess(AttrAccess(acc_content.attr, PtrAccess()))
-                            attr_vallist = CtntAccess(AttrAccess(acc_content.attr, ValAccess()))
-                            ptr2val_access = CtntAccess(AttrAccess(acc_content.attr, ""))
+                                and acc_content.value.slice.id == thelambda.args.args[0].arg):
+                            ptr2ptr_access = CtntAccess(
+                                AttrAccess(acc_content.attr, "_attrptr2ptr"))
+                            attr_ptrlist = CtntAccess(
+                                AttrAccess(acc_content.attr, PtrAccess()))
+                            attr_vallist = CtntAccess(
+                                AttrAccess(acc_content.attr, ValAccess()))
+                            ptr2val_access = CtntAccess(
+                                AttrAccess(acc_content.attr, ""))
                             return vf.FactConjunction([
                                 # first fact: hasattr
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
-                                                    vf.NameUseExpr("attr_binary_pred(hasAttr(\""+str(acc_content.attr)+"\"))"),
-                                                    #vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),
-                                                    forallpred_inductive_condition,#vf.ImmInductive(vfpy.ListForallCond_True()),
-                                    frac=acc_frac
-                                ),
+                                                    vf.NameUseExpr(
+                                                        "attr_binary_pred(hasAttr(\""+str(acc_content.attr)+"\"))"),
+                                                    # vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),
+                                                    # vf.ImmInductive(vfpy.ListForallCond_True()),
+                                                    forallpred_inductive_condition,
+                                                    frac=acc_frac
+                                                    ),
                                 # set equivalences: fst is the ptr list from list_pred
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     "map(fst, " + str(py2vf_ctx.getExpr(
@@ -277,7 +293,9 @@ class Translator:
                                 vfpy.ForallPredFact(
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, ptr2val_access),
-                                    vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),#self.get_type(acc_content.value.value, ctx).type_args[0]
+                                    # self.get_type(acc_content.value.value, ctx).type_args[0]
+                                    vf.NameUseExpr(self.gethasvalpredname(self.get_type(
+                                        acc_content.value.value, ctx).type_args[0])),
                                     vf.ImmInductive(
                                         vfpy.ListForallCond_True()),
                                     frac=acc_frac),
@@ -293,13 +311,14 @@ class Translator:
                                     vf.Eq
                                 )),
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
-                                    "map(fst, " + str(py2vf_ctx.getExpr(acc_content.value.value, ptr2val_access)) + ")",
+                                    "map(fst, " + str(py2vf_ctx.getExpr(
+                                        acc_content.value.value, ptr2val_access)) + ")",
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, attr_ptrlist),
                                     vf.Eq
                                 )),
                                 #
-                                #"MISSING: something stating which attr is",
+                                # "MISSING: something stating which attr is",
                                 vf.BooleanFact(vf.BinOp[vf.Bool](
                                     vf.Some("map(snd, " +
                                             str(
@@ -527,8 +546,8 @@ class Translator:
                 "Comparison for type "+operandtype+" not implemented")
 
     def create_hasval_fact(self, target: ast.expr, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
-        #maybe one day simply this using gethasvalpred?
-        if(t == type(None)):
+        # maybe one day simply this using gethasvalpred?
+        if (t == type(None)):
             return vfpy.PyObj_HasVal(
                 py2vf_ctx.getExpr(target, path(PtrAccess())),
                 vf.ImmInductive(vfpy.PyNone()),
@@ -575,20 +594,21 @@ class Translator:
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         if (p.name == 'tuple'):
             return vfpy.PyTuple_t(vf.List.from_list(list(map(lambda x: vf.ImmInductive(self.pytype__to__PyObj_t(x)), p.type_args))))
-        if(p.name == 'int'):
+        if (p.name == 'int'):
             return "PyLong_t"
-        elif(p.name == 'float'):
+        elif (p.name == 'float'):
             return "PyFloat_t"
         elif (p.name == 'bool'):
             return "PyBool_t"
         elif (p.name == 'string'):
             return "PyUnicode_t"
-        elif (p.name=="list"):
+        elif (p.name == "list"):
             return "PyList_t("+",".join([str(self.pytype__to__PyObj_t(x)) for x in p.type_args])+")"
         else:
             if self.classes.get(p.module.sil_name+p.name) == None:
                 raise NotImplementedError("Type "+p.name+" not implemented")
             else:
+                # TODO: add support for generic classes
                 return vfpy.PyClass_t(self.classes[p.module.sil_name+p.name])
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
