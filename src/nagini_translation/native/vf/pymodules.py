@@ -43,7 +43,29 @@ class PyLong(PyObj_v):
     def PyObj_t(self) -> PyObj_t:
         return PyLong.__PyObj_t
 
+class PyFloat(PyObj_v):
+    __PyObj_t = PyObj_t("PyFloat_t")
 
+    def __init__(self, value: float):
+        self.value = value
+
+    def __str__(self):
+        return "PyFloat_v("+str(self.value)+")"
+
+    def PyObj_t(self) -> PyObj_t:
+        return PyFloat.__PyObj_t
+    
+class PyBool(PyObj_v):
+    __PyObj_t = PyObj_t("PyBool_t")
+
+    def __init__(self, value: bool):
+        self.value = value
+
+    def __str__(self):
+        return "PyBool_v("+str(self.value)+")"
+
+    def PyObj_t(self) -> PyObj_t:
+        return PyBool.__PyObj_t
 class PyClass(vf.Inductive, ABC):
     def __init__(self, name: str):
         self.name = name
@@ -51,7 +73,29 @@ class PyClass(vf.Inductive, ABC):
     def __str__(self):
         return "PyClass_"+self.name+""
 
+class PyUnicode(PyObj_v):
+    __PyObj_t = PyObj_t("PyUnicode_t")
 
+    def __init__(self, value: str):
+        self.value = value
+
+    def __str__(self):
+        return "PyUnicode_v("+str(self.value)+")"
+
+    def PyObj_t(self) -> PyObj_t:
+        return PyUnicode.__PyObj_t
+
+class PyNone(PyObj_v):
+    __PyObj_t = PyObj_t("PyNone_t")
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "PyNone_v"
+
+    def PyObj_t(self) -> PyObj_t:
+        return PyNone.__PyObj_t
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):

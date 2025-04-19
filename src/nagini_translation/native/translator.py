@@ -528,11 +528,18 @@ class Translator:
 
     def create_hasval_fact(self, target: ast.expr, t: PythonType, ctx: Context, py2vf_ctx: py2vf_context, path=lambda x: x, names=[], frac=Fraction(1)) -> vf.Fact:
         #maybe one day simply this using gethasvalpred?
+        if(t == type(None)):
+            return vfpy.PyObj_HasVal(
+                py2vf_ctx.getExpr(target, path(PtrAccess())),
+                vf.ImmInductive(vfpy.PyNone()),
+                frac=frac)
         if (t.name not in ["tuple"]):
             access = path(ValAccess())
             pyobj_method = {
                 "int": vfpy.PyLong,
-                # "bool": vfpy.PyBool,
+                "float": vfpy.PyFloat,
+                "bool": vfpy.PyBool,
+                "string": vfpy.PyUnicode,
                 "list": lambda x: vfpy.PyList(self.pytype__to__PyObj_t(t.type_args[0])),
             }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
             pyobjval = vf.ImmInductive(
