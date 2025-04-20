@@ -83,13 +83,13 @@ class py2vf_context:
             self._prefix = ""
         else:
             self._prefix = prefix
-        if old is None:
-            self.old = self
-        else:
-            self.old = old
+        self.old = old
 
     def getprefix(self):
         return self._prefix
+    
+    def setprefix(self, prefix: str):
+        self._prefix = prefix
 
     def __getloc(self, key: ast.Expr, ValueAccess: ValueAccess):
         if (isinstance(key, ast.Name)):

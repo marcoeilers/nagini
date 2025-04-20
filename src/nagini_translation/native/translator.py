@@ -362,9 +362,8 @@ class Translator:
         # the condition must be pure
         # but either branches could be pure or a fact (just one needs be a fact)
         return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
-                              self.translate(
-                                  node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())),
-                              self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix())))
+                              self.translate(node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
+                              self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)))
 
     def translate_BoolOp_fact(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         assert (type(node.op).__name__ == "And")
@@ -392,24 +391,35 @@ class Translator:
             return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
         elif (node.func.id == "Result"):
             return py2vf_ctx.getExpr(node, v)
+        elif (node.func.id == "Forall"):
+            thelambda = node.args[1]
+            if (isinstance(thelambda, ast.Lambda) and
+               isinstance(thelambda.body, ast.Call) and
+               isinstance(thelambda.body.func, ast.Name)):
+                    forallcontext=py2vf_context(py2vf_ctx)
+                    forallcontext.getExpr(ast.Name(thelambda.args.args[0].arg), ValAccess())
+                    return "forall_(int "+thelambda.args.args[0].arg+"; "+str(self.translate_generic_expr(thelambda.body, ctx,forallcontext, ValAccess()))
         elif (node.func.id == "Implies"):
             return vf.TernaryOp(
-                self.translate_generic_expr(node.args[0], ctx, py2vf_context(
-                    py2vf_ctx, prefix=py2vf_ctx.getprefix()), ValAccess()),
+                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, ValAccess()),
                 self.translate_generic_expr(node.args[1], ctx, py2vf_context(
-                    py2vf_ctx, prefix=py2vf_ctx.getprefix()), v),
+                    py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
                 vf.Bool(True))
         elif (node.func.id == "len"):
             return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
         else:
-            funcid = node.func.id
-            if (self.functions.get(funcid) != None):
-                def f(x, y): return self.translate_generic_expr(
-                    x, ctx, py2vf_ctx, y)
-                return self.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+            if(isinstance(v, ValAccess)):
+                funcid = node.func.id
+                if (self.functions.get(funcid) != None):
+                    def f(x, y): return self.translate_generic_expr(
+                        x, ctx, py2vf_ctx, y)
+                    return self.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+                else:
+                    raise NotImplementedError(
+                        "Call to function "+funcid+" not implemented: the function was not translated")
             else:
                 raise NotImplementedError(
-                    "Call to function "+funcid+" not implemented: the function was not translated")
+                    "Pure functions cannot be translated in this context: "+str(node.func.id)+" in "+repr(v)+".\n Only value-semantics is supported")
 
     def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (type(v) == TupleSubscriptAccess):
@@ -445,10 +455,9 @@ class Translator:
 
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
-        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix()), ValAccess()),
-                            self.translate_generic_expr(
-                                node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix()), v),
-                            self.translate_generic_expr(node.orelse, ctx, py2vf_ctx, v))
+        return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
+                            self.translate_generic_expr(node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
+                            self.translate_generic_expr(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v))
 
     def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
         dict = {
@@ -487,7 +496,6 @@ class Translator:
         return py2vf_ctx.getExpr(node, v, True)
 
     def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        operandtype = self.get_type(node.left, ctx).name
         # TODO: any other type fitting in there?
         ptracc = PtrAccess()
         valacc = ValAccess()
@@ -504,6 +512,7 @@ class Translator:
         operator, acctype = dict[type(node.ops[0])]
         if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
             return vf.ImmLiteral(vf.Bool(False))
+        operandtype = self.get_type(node.left, ctx).name
         if (operandtype in ["int", "float", "bool", "string"]):
             return vf.BinOp[vf.Bool](
                 self.translate_generic_expr(
@@ -617,7 +626,7 @@ class Translator:
             # predicates are stored in ctx.module.predicates
             if (node.func.id == "Implies"):
                 return self.is_predless(node.args[1], ctx)
-            if (node.func.id == "Forall"):
+            if (node.func.id in ["Forall", "Forall2", "Forall3", "Forall4", "Forall5"]):
                 return self.is_predless(node.args[1].body, ctx)
             return not (node.func.id in ctx.module.predicates or node.func.id in ["Acc", "list_pred", "MaySet", "MayCreate"])
         elif (isinstance(node, ast.UnaryOp)):
