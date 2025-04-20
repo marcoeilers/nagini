@@ -3,7 +3,6 @@ fixpoint PyClass PyClass_ObjectType(){
         return ObjectType;
 }
 """
-from types import NoneType
 from nagini_contracts.contracts import *
 
 def return_float() -> float:
