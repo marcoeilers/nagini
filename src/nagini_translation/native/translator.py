@@ -348,7 +348,8 @@ class Translator:
                     "Forall is not implemented for this content")
         # TODO: remove this?
         elif (node.func.id == "Old"):
-            return self.translate(node.args[0], ctx, py2vf_ctx.old)
+            old_interm=py2vf_context(py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
+            return self.translate(node.args[0], ctx, old_interm)
         else:
             funcid = node.func.id
             # raise NotImplementedError("Call to function not implemented")
@@ -388,7 +389,8 @@ class Translator:
 
     def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
         if (node.func.id == "Old"):
-            return self.translate_generic_expr(node.args[0], ctx, py2vf_ctx.old, v)
+            old_interm=py2vf_context(py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
+            return self.translate_generic_expr(node.args[0], ctx, old_interm, v)
         elif (node.func.id == "Result"):
             return py2vf_ctx.getExpr(node, v)
         elif (node.func.id == "Forall"):
