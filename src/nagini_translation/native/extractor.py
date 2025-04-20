@@ -118,15 +118,16 @@ class NativeSpecExtractor:
         print()
         print("ensures ", end="")
         py2vf_ctx_postcond = py2vf_context(
-            parent=py2vf_ctx_setup, prefix="NEW_", old=py2vf_ctx_precond)
+            parent=py2vf_ctx_setup, prefix="", old=py2vf_ctx_precond)
         resultcall = ast.Call(ast.Name("Result", ast.Load()), [], [])
-        py2vf_ctx_setup.setExpr(
+        py2vf_ctx_postcond.setExpr(
             resultcall, PtrAccess(), vf.NamedValue("result"))
+        result_hasvalfact=self.translator.create_hasval_fact(resultcall, f.result.type if f.result!=None else type(None), ctx, py2vf_ctx_postcond)
+        py2vf_ctx_postcond.setprefix("NEW_")
         print(vf.FactConjunction(
             self.setup(f, ctx, py2vf_ctx_setup) +
             # TODO: this does not handle "None" return type yet
-            [self.translator.create_hasval_fact(
-                resultcall, f.result.type if f.result!=None else type(None), ctx, py2vf_ctx_setup)]
+            [result_hasvalfact]
             + [self.translator.translate(p[0], ctx, py2vf_ctx_postcond)
                for p in f.postcondition]
         ), end=";\n")
