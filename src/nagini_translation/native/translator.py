@@ -2,7 +2,7 @@
 from functools import reduce
 from fractions import Fraction
 from nagini_translation.lib.context import Context
-from nagini_translation.native.py2vf_ctx import py2vf_context, ValueAccess, PtrAccess, ValAccess, TupleSubscriptAccess, AttrAccess, CtntAccess
+from nagini_translation.native.py2vf_ctx import py2vf_context, AccessType, PtrAccess, ValAccess, TupleSbscAccess, AttrAccess, CtntAccess
 from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
@@ -370,7 +370,7 @@ class Translator:
         assert (type(node.op).__name__ == "And")
         return vf.FactConjunction(map(lambda x: self.translate(x, ctx, py2vf_ctx), node.values))
 
-    def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_generic_expr(self, node: ast.AST, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         switch_dict = {
             # "ast.Call": self.translate_Call,
             # "ast.UnaryOp": self.translate_UnaryOp,
@@ -387,7 +387,7 @@ class Translator:
         }
         return switch_dict[type(node)](node, ctx,  py2vf_ctx, v)
 
-    def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         if (node.func.id == "Old"):
             old_interm=py2vf_context(py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
             return self.translate_generic_expr(node.args[0], ctx, old_interm, v)
@@ -400,6 +400,11 @@ class Translator:
                isinstance(thelambda.body.func, ast.Name)):
                     forallcontext=py2vf_context(py2vf_ctx)
                     forallcontext.getExpr(ast.Name(thelambda.args.args[0].arg), ValAccess())
+                    ctx = Context()
+                    ctx.module = m
+                    self.get_type(ast.Name(id=thelambda.args.args[0].arg, ctx=ast.Load(), lineno=thelambda.lineno, col_offset=thelambda.col_offset), ctx)
+                    ctx.current_function = f
+                    ctx.current_class = c
                     return "forall_(int "+thelambda.args.args[0].arg+"; "+str(self.translate_generic_expr(thelambda.body, ctx,forallcontext, ValAccess()))
         elif (node.func.id == "Implies"):
             return vf.TernaryOp(
@@ -423,16 +428,16 @@ class Translator:
                 raise NotImplementedError(
                     "Pure functions cannot be translated in this context: "+str(node.func.id)+" in "+repr(v)+".\n Only value-semantics is supported")
 
-    def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
-        if (type(v) == TupleSubscriptAccess):
+    def translate_Tuple_expr(self, node: ast.Tuple, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
+        if (type(v) == TupleSbscAccess):
             # handle the case where the index is not a constant? a priori, not implemented yet in Nagini, so no
             return self.translate_generic_expr(node.elts[v.index], ctx, py2vf_ctx, v.value)
         else:
             raise NotImplementedError("Tuple expression not implemented")
 
-    def translate_Subscript_expr(self, node: ast.Subscript, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_Subscript_expr(self, node: ast.Subscript, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         if (self.get_type(node.value, ctx).name == "tuple"):
-            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSubscriptAccess(node.slice.value, v))
+            return self.translate_generic_expr(node.value, ctx, py2vf_ctx, TupleSbscAccess(node.slice.value, v))
         else:
             idxExpr = self.translate_generic_expr(
                 node.slice, ctx, py2vf_ctx, ValAccess())
@@ -440,7 +445,7 @@ class Translator:
                 node.value, ctx, py2vf_ctx, CtntAccess(v))
             return vf.FPCall("nth", idxExpr, list_ctnt_)
 
-    def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_BoolOp_expr(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         dict = {
             ast.And: vf.BoolAnd,
             ast.Or: vf.BoolOr
@@ -452,16 +457,16 @@ class Translator:
             node.values[1:],
             self.translate_generic_expr(node.values[0], ctx, py2vf_ctx, ValAccess()))
 
-    def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_Attribute_expr(self, node: ast.Attribute, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         return self.translate_generic_expr(node.value, ctx, py2vf_ctx, AttrAccess(node.attr, v))
 
-    def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: ValueAccess) -> vf.Expr:
+    def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
                             self.translate_generic_expr(node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
                             self.translate_generic_expr(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v))
 
-    def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
+    def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         dict = {
             ast.Add: vf.Add,
             ast.Sub: vf.Sub,
@@ -484,20 +489,24 @@ class Translator:
                 node.right, ctx, py2vf_ctx, ValAccess()),
             operator)
 
-    def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
-        dict = {
-            "int": vf.Int,
-            "float": vf.Float,
-            "bool": vf.Bool
-            # TODO: add string
-            # TODO: use class names instead of strings
-        }
-        return dict[type(node.value).__name__](node.value)
+    def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
+        if(isinstance(v, ValAccess)):
+            dict = {
+                "int": vf.Int,
+                "float": vf.Float,
+                "bool": vf.Bool
+                # TODO: add string
+                # TODO: use class names instead of strings
+            }
+            return vf.ImmLiteral(dict[type(node.value).__name__](node.value))
+        else :
+            raise NotImplementedError(
+                "Constant expression cannot be translated in this context: "+str(node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
 
-    def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
+    def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         return py2vf_ctx.getExpr(node, v, True)
 
-    def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: ValueAccess) -> vf.Expr:
+    def translate_Compare_expr(self, node: ast.Compare, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         # TODO: any other type fitting in there?
         ptracc = PtrAccess()
         valacc = ValAccess()
@@ -581,7 +590,7 @@ class Translator:
         elif (t.name == "tuple"):
             tupleEls = []
             tupleElNames = [py2vf_ctx.getExpr(names[i], PtrAccess()) if i < len(names)
-                            else py2vf_ctx.getExpr(target, path(TupleSubscriptAccess(i, PtrAccess())))for i in range(len(t.type_args))]
+                            else py2vf_ctx.getExpr(target, path(TupleSbscAccess(i, PtrAccess())))for i in range(len(t.type_args))]
             for i in range(len(t.type_args)):
                 tupleEls.append(vf.Pair[vfpy.PyObjPtr, vfpy.PyObj_t](
                     tupleElNames[i],
@@ -595,7 +604,7 @@ class Translator:
                     ctx,
                     py2vf_ctx,
                     (lambda x: x) if i < len(names) else
-                    (lambda x: path(TupleSubscriptAccess(i, x))),
+                    (lambda x: path(TupleSbscAccess(i, x))),
                 ) for i in range(len(t.type_args))
             ])
         else:
