@@ -14,7 +14,8 @@
             "args": [
                 "--skip-verification",
                 "/home/etienne/nagini/test.py"
-            ]
+            ],
+            "justMyCode": false
         },
         {
             "name": "verify test.py",
