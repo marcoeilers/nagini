@@ -67,7 +67,7 @@ class NativeSpecExtractor:
                         res += "fixpoint "+f.result.type.name+" PURE_" + \
                             f.name+"("+', '.join(predargs)+"){\n\t return "
                         res += str(self.translator.translate_generic_expr(
-                            exprifiedfunction, ctx, py2vf_ctx, PtrAccess()))
+                            exprifiedfunction, ctx, py2vf_ctx, ValAccess()))
                         res += ";\n}\n\n"
                     else:
                         self.translator.functions[f.name] = None

@@ -489,8 +489,7 @@ class Translator:
             }
             return vf.ImmLiteral(dict[type(node.value).__name__](node.value))
         else:
-            raise NotImplementedError(
-                "Constant expression cannot be translated in this context: "+str(node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
+           raise NotImplementedError("Constant expression cannot be translated in this context: "+str(node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         return py2vf_ctx.getExpr(node, v, True)
@@ -510,8 +509,8 @@ class Translator:
             ast.IsNot: (vf.NotEq, ptracc),
         }
         operator, acctype = dict[type(node.ops[0])]
-        if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
-            return vf.ImmLiteral(vf.Bool(False))
+        #if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
+        #    return vf.ImmLiteral(vf.Bool(False))
         operandtype = self.get_type(node.left, ctx).name
         if (operandtype in ["int", "float", "bool", "string"]):
             return vf.BinOp[vf.Bool](
@@ -569,7 +568,7 @@ class Translator:
                 "bool": vfpy.PyBool,
                 "string": vfpy.PyUnicode,
                 "list": lambda x: vfpy.PyList(self.pytype__to__PyObj_t(t.type_args[0])),
-            }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name](map(self.pytype__to__PyObj_t, t.type_args))))
+            }.get(t.name, lambda x: vfpy.PyClassInstance(self.pytype__to__PyClass(t)))
             pyobjval = vf.ImmInductive(
                 pyobj_method(py2vf_ctx.getExpr(target, access)))
             return vfpy.PyObj_HasVal(
@@ -604,7 +603,7 @@ class Translator:
         if self.classes.get(p.module.sil_name+p.name) == None:
             raise NotImplementedError("Type "+p.name+" not implemented")
         else:
-            return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args))
+            return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args if hasattr(p,'type_args') else []))
 
     def pytype__to__PyObj_v(self, p: PythonType) -> Callable[[PythonType], vfpy.PyObj_v]:
         if (p == type(None)):
