@@ -206,10 +206,11 @@ class Translator:
                 node.args[1].value,
                 frac=Fraction(1))
         elif (node.func.id == "Implies"):
-            return vf.FactConjunction([
-                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx),
-                self.translate_generic_fact(node.args[1], ctx, py2vf_ctx)
-            ])
+            return vf.TernaryFact(
+                self.translate_generic_expr(
+                    node.args[0], ctx, py2vf_ctx, ValAccess()),
+                self.translate(node.args[1], ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
+                vf.BooleanFact(vf.ImmLiteral(vf.Bool(True))))
 
         elif (node.func.id == "Forall"):
             # this handles the cases exactly equal to Forall(int, lambda i: P(i) )
