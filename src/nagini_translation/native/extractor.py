@@ -26,7 +26,13 @@ class NativeSpecExtractor:
                 vfname = m.sil_name+key
                 self.translator.classes[vfname] = vfpy.PyClass(vfname)
                 res += "fixpoint PyClass PyClass_"+vfname + \
-                    "(){\n\treturn PyClass(\""+vfname+"\", PyClass_"+("ObjectType" if (value.superclass.name == "object") else value.superclass.name) +\
+                    "("+", ".join([("PyObj_Type "+x) for x in value.type_vars.keys()])+"){\n\treturn PyClass(\""+\
+                        vfname+"\", "+\
+                        "PyClass_"+("ObjectType, nil" 
+                            if (value.superclass.name == "object") 
+                            else ((vfname+"("+", ".join([(x) for x in value.superclass.cls.type_vars.keys()])+")")+", "+\
+                                    str(vf.List.from_list([x for x in value.type_vars.keys() if x not in value.superclass.cls.type_vars.keys()])))
+                            ) +\
                     ");\n}\n"
 
         def make_init_nagpureFPcall(key):
