@@ -39,8 +39,7 @@ class Someclass(Generic[T, V, W], Super[T, V]):
 @Native
 def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         """
-        requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+        requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
         pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
         pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
         forall_predfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
@@ -53,8 +52,7 @@ def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         (map(fst, l__content_DOT_t) == l__content_DOT_t__ptr) &*&
         (some(map(snd, l__content_DOT_t)) == some(?l__content_DOT_t__val));
          
-        ensures PyExc(none, none) &*&   
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+        ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
         pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0MyException(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
