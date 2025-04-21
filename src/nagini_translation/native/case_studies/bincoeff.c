@@ -1,5 +1,9 @@
 /// inspired by GMPy_MPZ_Function_Bincoef
+#ifdef COMPILING FOR PYTHON
 #include <Python.h>
+#else
+#include "mpz_include.c"
+#endif
 #include <gmp.h>
 static PyObject *
 GMPy_MPZ_Function_Bincoef(PyObject *self, PyObject *const *args)
@@ -20,6 +24,8 @@ GMPy_MPZ_Function_Bincoef(PyObject *self, PyObject *const *args)
     }
     mpz_bin_uiui(x, n, k);
     long res = mpz_get_ui(x);
+    //todo check for overflow
+    //if overflow, return NULL; and raise exception? no... unsupported...
     mpz_clear(x); // Clear the variable
     return PyLong_FromUnsignedLong(res);
 }
