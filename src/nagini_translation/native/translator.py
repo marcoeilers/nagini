@@ -396,6 +396,10 @@ class Translator:
                 vf.Bool(True))
         elif (node.func.id == "len"):
             return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
+        elif (node.func.id == "IsInstance"):
+            return vf.FPCall("isinstance", 
+                             self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, ValAccess()), 
+                             self.translate_generic_expr(node.args[1], ctx, py2vf_ctx, ValAccess()))
         else:
             if (isinstance(v, ValAccess)):
                 funcid = node.func.id
@@ -637,22 +641,22 @@ class Translator:
 
     def pytype__to__hasvalpredname(self, t: type) -> str:
         if (t.name == "int"):
-            return "pyobj_hasPyLong"
+            return "pyobj_hasPyLongval"
         elif (t.name == "bool"):
             return "pyobj_hasPyBoolval"
         elif (t.name == "float"):
             return "pyobj_hasPyFloatval"
         elif (t.name == "string"):
-            return "pyobj_hasPyUnicodeval()"
-        elif (t.name == "list"):
-            return "pyobj_hasPyListval()"
+            return "pyobj_hasPyUnicodeval"
         elif (t.name == "tuple"):
             return "pyobj_hasPyTupleval()"
         elif (t.name == "none"):
             return "pyobj_hasPyNoneval"
         # TODO: support pytype here
+        elif (t.name == "list"):
+            return "pyobj_hasPyListval("+str(self.pytype__to__PyObj_t(t.type_args[0]))+")"
         else:
-            return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyClass(t))+")"
+            return "pyobj_hasPyClassInstanceval("+",".join([str(self.pytype__to__hasvalpredname(x)) for x in t.type_args])+")"
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
