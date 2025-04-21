@@ -1,7 +1,7 @@
 from fractions import Fraction
 import nagini_translation.native.vf.vf as vf
 from nagini_translation.native.vf.nag import *
-from typing import TypeVar, Tuple, Type
+from typing import TypeVar, Tuple, Type, List
 from abc import ABC, abstractmethod
 
 ValueT = TypeVar("ValueT", bound="vf.Value")
@@ -20,6 +20,7 @@ class PyObj_v(vf.Inductive, ABC):
     def PyObj_t(self) -> PyObj_t:
         pass
 
+
 class PyList(PyObj_v):
 
     def __init__(self, t: PyObj_t):
@@ -28,9 +29,11 @@ class PyList(PyObj_v):
 
     def __str__(self):
         return "PyList_v("+str(self.t)+")"
+
     def PyObj_t(self) -> PyObj_t:
         return self.__PyObj_t.replace("$", str(self.t))
-    
+
+
 class PyLong(PyObj_v):
     __PyObj_t = PyObj_t("PyLong_t")
 
@@ -43,6 +46,7 @@ class PyLong(PyObj_v):
     def PyObj_t(self) -> PyObj_t:
         return PyLong.__PyObj_t
 
+
 class PyFloat(PyObj_v):
     __PyObj_t = PyObj_t("PyFloat_t")
 
@@ -54,7 +58,8 @@ class PyFloat(PyObj_v):
 
     def PyObj_t(self) -> PyObj_t:
         return PyFloat.__PyObj_t
-    
+
+
 class PyBool(PyObj_v):
     __PyObj_t = PyObj_t("PyBool_t")
 
@@ -66,12 +71,16 @@ class PyBool(PyObj_v):
 
     def PyObj_t(self) -> PyObj_t:
         return PyBool.__PyObj_t
+
+
 class PyClass(vf.Inductive, ABC):
-    def __init__(self, name: str):
+    def __init__(self, name: str, type_vars: List[PyObj_t]):
         self.name = name
+        self.type_vars = type_vars
 
     def __str__(self):
-        return "PyClass_"+self.name+""
+        return "PyClass_"+self.name+"("+", ".join(map(str, self.type_vars))+")"
+
 
 class PyUnicode(PyObj_v):
     __PyObj_t = PyObj_t("PyUnicode_t")
@@ -85,6 +94,7 @@ class PyUnicode(PyObj_v):
     def PyObj_t(self) -> PyObj_t:
         return PyUnicode.__PyObj_t
 
+
 class PyNone(PyObj_v):
     __PyObj_t = PyObj_t("PyNone_t")
 
@@ -96,6 +106,7 @@ class PyNone(PyObj_v):
 
     def PyObj_t(self) -> PyObj_t:
         return PyNone.__PyObj_t
+
 
 class PyClass_t(PyObj_t):
     def __init__(self, type: PyClass):

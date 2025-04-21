@@ -24,7 +24,7 @@ class NativeSpecExtractor:
         for m in modules[1:]:
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
-                self.translator.classes[vfname] = vfpy.PyClass(vfname)
+                self.translator.classes[vfname] = lambda x: vfpy.PyClass(vfname, x)
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "("+", ".join([("PyObj_Type "+x) for x in value.type_vars.keys()])+"){\n\treturn PyClass(\""+\
                         vfname+"\", "+\

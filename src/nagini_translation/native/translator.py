@@ -8,7 +8,7 @@ import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
 
 from nagini_translation.lib.resolver import get_type as do_get_type
-from typing import Optional, Type
+from typing import Callable, Optional, Type
 from itertools import chain
 import ast
 
@@ -34,30 +34,6 @@ class Translator:
             ast.BoolOp: self.translate_BoolOp_fact,
         }
         return switch_dict[type(node)](node, ctx, py2vf_ctx)
-
-    def gethasvalpredname(self, t: type) -> str:
-        if (t.name == "int"):
-            return "pyobj_hasPyLong"
-        elif (t.name == "bool"):
-            return "pyobj_hasPyBoolval"
-        elif (t.name == "float"):
-            return "pyobj_hasPyFloatval"
-        elif (t.name == "string"):
-            return "pyobj_hasPyUnicodeval()"
-        elif (t.name == "list"):
-            return "pyobj_hasPyListval()"
-        elif (t.name == "tuple"):
-            return "pyobj_hasPyTupleval()"
-        elif (t.name == "none"):
-            return "pyobj_hasPyNoneval"
-        elif (t.name == "dict"):
-            raise NotImplementedError("Dict not implemented")
-            # return "pyobj_hasPyTypeval"
-        else:
-            if (self.classes.get(t.module.sil_name+t.name) == None):
-                raise NotImplementedError("Type "+t.name+" not implemented")
-            else:
-                return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyObj_t(t))+")"
 
     def indexify_forall(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context) -> ast.Call:
         class TransformName(ast.NodeTransformer):
@@ -185,7 +161,7 @@ class Translator:
                     ),
                         vfpy.ForallPredFact(
                             py2vf_ctx.getExpr(node.args[0], CtntAccess("")),
-                            vf.NameUseExpr(self.gethasvalpredname(
+                            vf.NameUseExpr(self.pytype__to__hasvalpredname(
                                 self.get_type(node.args[0], ctx).type_args[0])),
                             vf.ImmInductive(vfpy.ListForallCond_True()),
                             frac=frac),
@@ -276,7 +252,7 @@ class Translator:
                                 vfpy.ForallPredFact(py2vf_ctx.getExpr(acc_content.value.value, ptr2ptr_access),
                                                     vf.NameUseExpr(
                                                         "attr_binary_pred(hasAttr(\""+str(acc_content.attr)+"\"))"),
-                                                    # vf.NameUseExpr(self.gethasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),
+                                                    # vf.NameUseExpr(self.pytype__to__hasvalpredname(self.get_type(acc_content.value.value, ctx).type_args[0])),
                                                     # vf.ImmInductive(vfpy.ListForallCond_True()),
                                                     forallpred_inductive_condition,
                                                     frac=acc_frac
@@ -294,7 +270,7 @@ class Translator:
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, ptr2val_access),
                                     # self.get_type(acc_content.value.value, ctx).type_args[0]
-                                    vf.NameUseExpr(self.gethasvalpredname(self.get_type(
+                                    vf.NameUseExpr(self.pytype__to__hasvalpredname(self.get_type(
                                         acc_content.value.value, ctx).type_args[0])),
                                     vf.ImmInductive(
                                         vfpy.ListForallCond_True()),
@@ -348,7 +324,8 @@ class Translator:
                     "Forall is not implemented for this content")
         # TODO: remove this?
         elif (node.func.id == "Old"):
-            old_interm=py2vf_context(py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
+            old_interm = py2vf_context(
+                py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
             return self.translate(node.args[0], ctx, old_interm)
         else:
             funcid = node.func.id
@@ -363,7 +340,8 @@ class Translator:
         # the condition must be pure
         # but either branches could be pure or a fact (just one needs be a fact)
         return vf.TernaryFact(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
-                              self.translate(node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
+                              self.translate(node.body, ctx, py2vf_context(
+                                  py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
                               self.translate(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)))
 
     def translate_BoolOp_fact(self, node: ast.BoolOp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
@@ -389,7 +367,8 @@ class Translator:
 
     def translate_Call_expr(self, node: ast.Call, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         if (node.func.id == "Old"):
-            old_interm=py2vf_context(py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
+            old_interm = py2vf_context(
+                py2vf_ctx.old, old=py2vf_ctx.old, prefix=py2vf_ctx.getprefix())
             return self.translate_generic_expr(node.args[0], ctx, old_interm, v)
         elif (node.func.id == "Result"):
             return py2vf_ctx.getExpr(node, v)
@@ -398,24 +377,27 @@ class Translator:
             if (isinstance(thelambda, ast.Lambda) and
                isinstance(thelambda.body, ast.Call) and
                isinstance(thelambda.body.func, ast.Name)):
-                    forallcontext=py2vf_context(py2vf_ctx)
-                    forallcontext.getExpr(ast.Name(thelambda.args.args[0].arg), ValAccess())
-                    ctx = Context()
-                    ctx.module = m
-                    self.get_type(ast.Name(id=thelambda.args.args[0].arg, ctx=ast.Load(), lineno=thelambda.lineno, col_offset=thelambda.col_offset), ctx)
-                    ctx.current_function = f
-                    ctx.current_class = c
-                    return "forall_(int "+thelambda.args.args[0].arg+"; "+str(self.translate_generic_expr(thelambda.body, ctx,forallcontext, ValAccess()))
+                forallcontext = py2vf_context(py2vf_ctx)
+                forallcontext.getExpr(
+                    ast.Name(thelambda.args.args[0].arg), ValAccess())
+                ctx = Context()
+                ctx.module = m
+                self.get_type(ast.Name(id=thelambda.args.args[0].arg, ctx=ast.Load(
+                ), lineno=thelambda.lineno, col_offset=thelambda.col_offset), ctx)
+                ctx.current_function = f
+                ctx.current_class = c
+                return "forall_(int "+thelambda.args.args[0].arg+"; "+str(self.translate_generic_expr(thelambda.body, ctx, forallcontext, ValAccess()))
         elif (node.func.id == "Implies"):
             return vf.TernaryOp(
-                self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, ValAccess()),
+                self.translate_generic_expr(
+                    node.args[0], ctx, py2vf_ctx, ValAccess()),
                 self.translate_generic_expr(node.args[1], ctx, py2vf_context(
                     py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
                 vf.Bool(True))
         elif (node.func.id == "len"):
             return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
         else:
-            if(isinstance(v, ValAccess)):
+            if (isinstance(v, ValAccess)):
                 funcid = node.func.id
                 if (self.functions.get(funcid) != None):
                     def f(x, y): return self.translate_generic_expr(
@@ -463,7 +445,8 @@ class Translator:
     def translate_IfExp_expr(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context, v: AccessType) -> vf.Expr:
         # TODO: create a new py2vf_context for the branches
         return vf.TernaryOp(self.translate_generic_expr(node.test, ctx, py2vf_ctx, ValAccess()),
-                            self.translate_generic_expr(node.body, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
+                            self.translate_generic_expr(node.body, ctx, py2vf_context(
+                                py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v),
                             self.translate_generic_expr(node.orelse, ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old), v))
 
     def translate_BinOp_expr(self, node: ast.BinOp, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
@@ -490,7 +473,7 @@ class Translator:
             operator)
 
     def translate_Constant_expr(self, node: ast.Constant, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
-        if(isinstance(v, ValAccess)):
+        if (isinstance(v, ValAccess)):
             dict = {
                 "int": vf.Int,
                 "float": vf.Float,
@@ -499,7 +482,7 @@ class Translator:
                 # TODO: use class names instead of strings
             }
             return vf.ImmLiteral(dict[type(node.value).__name__](node.value))
-        else :
+        else:
             raise NotImplementedError(
                 "Constant expression cannot be translated in this context: "+str(node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
 
@@ -580,7 +563,7 @@ class Translator:
                 "bool": vfpy.PyBool,
                 "string": vfpy.PyUnicode,
                 "list": lambda x: vfpy.PyList(self.pytype__to__PyObj_t(t.type_args[0])),
-            }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name]))
+            }.get(t.name, lambda x: vfpy.PyClassInstance(self.classes[t.module.sil_name+t.name](map(self.pytype__to__PyObj_t, t.type_args))))
             pyobjval = vf.ImmInductive(
                 pyobj_method(py2vf_ctx.getExpr(target, access)))
             return vfpy.PyObj_HasVal(
@@ -610,6 +593,30 @@ class Translator:
         else:
             print("NADA "+t.name)
             # raise NotImplementedError("Type not implemented")
+    def pytype__to__PyClass(self, p: PythonType) -> vfpy.PyClass:
+        if self.classes.get(p.module.sil_name+p.name) == None:
+            raise NotImplementedError("Type "+p.name+" not implemented")
+        else:
+            return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args))
+        
+    def pytype__to__PyObj_v(self, p: PythonType) -> Callable[[PythonType], vfpy.PyObj_v]:
+        if (p == type(None)):
+            return lambda x: vfpy.PyNone()
+        else:
+            if (p.name == 'tuple'):
+                return vfpy.PyTuple
+            if (p.name == 'int'):
+                return vfpy.PyLong
+            elif (p.name == 'float'):
+                return vfpy.PyFloat
+            elif (p.name == 'bool'):
+                return vfpy.PyBool
+            elif (p.name == 'string'):
+                return vfpy.PyUnicode
+            elif (p.name == "list"):
+                return lambda x: vfpy.PyList(self.pytype__to__PyObj_t(p.type_args[0])(x))
+            else:
+                return lambda x: vfpy.PyClassInstance(self.pytype__to__PyClass(p))
 
     def pytype__to__PyObj_t(self, p: PythonType) -> vfpy.PyObj_t:
         if (p.name == 'tuple'):
@@ -625,11 +632,26 @@ class Translator:
         elif (p.name == "list"):
             return "PyList_t("+",".join([str(self.pytype__to__PyObj_t(x)) for x in p.type_args])+")"
         else:
-            if self.classes.get(p.module.sil_name+p.name) == None:
-                raise NotImplementedError("Type "+p.name+" not implemented")
-            else:
-                # TODO: add support for generic classes
-                return vfpy.PyClass_t(self.classes[p.module.sil_name+p.name])
+            return vfpy.PyClass_t(self.pytype__to__PyClass(p))
+    
+    def pytype__to__hasvalpredname(self, t: type) -> str:
+        if (t.name == "int"):
+            return "pyobj_hasPyLong"
+        elif (t.name == "bool"):
+            return "pyobj_hasPyBoolval"
+        elif (t.name == "float"):
+            return "pyobj_hasPyFloatval"
+        elif (t.name == "string"):
+            return "pyobj_hasPyUnicodeval()"
+        elif (t.name == "list"):
+            return "pyobj_hasPyListval()"
+        elif (t.name == "tuple"):
+            return "pyobj_hasPyTupleval()"
+        elif (t.name == "none"):
+            return "pyobj_hasPyNoneval"
+        #TODO: support pytype here
+        else:
+            return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyClass(t))+")"
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
