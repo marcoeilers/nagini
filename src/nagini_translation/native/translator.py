@@ -381,6 +381,7 @@ class Translator:
                 forallcontext = py2vf_context(py2vf_ctx)
                 forallcontext.getExpr(
                     ast.Name(thelambda.args.args[0].arg), ValAccess())
+                #TODO: this is not functional and must still be bugfixed
                 ctx = Context()
                 ctx.module = m
                 self.get_type(ast.Name(id=thelambda.args.args[0].arg, ctx=ast.Load(
