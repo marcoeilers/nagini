@@ -593,12 +593,13 @@ class Translator:
         else:
             print("NADA "+t.name)
             # raise NotImplementedError("Type not implemented")
+
     def pytype__to__PyClass(self, p: PythonType) -> vfpy.PyClass:
         if self.classes.get(p.module.sil_name+p.name) == None:
             raise NotImplementedError("Type "+p.name+" not implemented")
         else:
             return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args))
-        
+
     def pytype__to__PyObj_v(self, p: PythonType) -> Callable[[PythonType], vfpy.PyObj_v]:
         if (p == type(None)):
             return lambda x: vfpy.PyNone()
@@ -633,7 +634,7 @@ class Translator:
             return "PyList_t("+",".join([str(self.pytype__to__PyObj_t(x)) for x in p.type_args])+")"
         else:
             return vfpy.PyClass_t(self.pytype__to__PyClass(p))
-    
+
     def pytype__to__hasvalpredname(self, t: type) -> str:
         if (t.name == "int"):
             return "pyobj_hasPyLong"
@@ -649,7 +650,7 @@ class Translator:
             return "pyobj_hasPyTupleval()"
         elif (t.name == "none"):
             return "pyobj_hasPyNoneval"
-        #TODO: support pytype here
+        # TODO: support pytype here
         else:
             return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyClass(t))+")"
 

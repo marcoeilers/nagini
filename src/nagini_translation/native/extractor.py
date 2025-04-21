@@ -28,9 +28,10 @@ class NativeSpecExtractor:
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "("+", ".join([("PyObj_Type "+x) for x in value.type_vars.keys()])+"){\n\treturn PyClass(\""+\
                         vfname+"\", "+\
-                        "PyClass_"+("ObjectType, nil" 
-                            if (value.superclass.name == "object") 
-                            else ((vfname+"("+", ".join([(x) for x in value.superclass.cls.type_vars.keys()])+")")+", "+\
+                        (
+                            "PyClass_ObjectType, nil" if (value.superclass.name == "object") else
+                            "Exception, nil" if(value.superclass.name == "Exception") else 
+                            "PyClass_"+((vfname+"("+", ".join([(x) for x in value.superclass.cls.type_vars.keys()])+")")+", "+\
                                     str(vf.List.from_list([x for x in value.type_vars.keys() if x not in value.superclass.cls.type_vars.keys()])))
                             ) +\
                     ");\n}\n"
@@ -115,14 +116,14 @@ class NativeSpecExtractor:
         py2vf_ctx_setup = py2vf_context(prefix="")
         setupfacts = self.setup(f, ctx, py2vf_ctx_setup)
         py2vf_ctx_precond = py2vf_context(parent=py2vf_ctx_setup, prefix="")
-        print("requires ", end="")
+        print("requires PyExc(none, none) &*&")
         print(vf.FactConjunction(
             setupfacts +
             [self.translator.translate(p[0], ctx, py2vf_ctx_precond)
              for p in f.precondition]
         ), end=";\n")
         print()
-        print("ensures ", end="")
+        print("ensures PyExc(none, none) &*&")
         py2vf_ctx_postcond = py2vf_context(
             parent=py2vf_ctx_setup, prefix="", old=py2vf_ctx_precond)
         resultcall = ast.Call(ast.Name("Result", ast.Load()), [], [])
