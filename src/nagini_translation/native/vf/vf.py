@@ -25,7 +25,6 @@ class List(Inductive, Generic[_ValueT], ABC):
             return Nil()
         else:
             return Cons(lst[0], List.from_list(lst[1:]))
-    pass
 
 
 class Cons(List[_ValueT]):
