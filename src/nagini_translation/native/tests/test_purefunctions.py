@@ -52,11 +52,13 @@ def purefunction1(i: int) -> int:
 @Native
 def mytest(i: int) -> int:
         """
-        requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
+        requires PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
         pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
         (PURE_purefunction1(i__ptr, i__val) > 0);
 
-        ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
+        ensures PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
         pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val));
         """

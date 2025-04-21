@@ -14,13 +14,15 @@ from nagini_contracts.contracts import *
 #TODO: this passes the translation and fails the verification
 def compare3(c: t1.mytupledclass) -> int:
           """
-          requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
+          requires PyExc(none, none) &*&
+          pyobj_hasvalue(args, PyTuple_v(cons(pair(?c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
           pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass)) &*&
           pyobj_hasattr(c__ptr, "arg", ?c_DOT_arg__ptr) &*&
           pyobj_hasvalue(c_DOT_arg__ptr, PyLong_v(?c_DOT_arg__val)) &*&
           false;
 
-          ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
+          ensures PyExc(none, none) &*&
+          pyobj_hasvalue(args, PyTuple_v(cons(pair(c__ptr, PyClass_t(PyClass_module_1mytupledclass)), nil))) &*&
           pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_1mytupledclass)) &*&
           pyobj_hasvalue(result, PyLong_v(?result__val));
           """

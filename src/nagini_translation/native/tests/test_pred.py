@@ -55,10 +55,12 @@ def pred3(x: A, y: int, z: float) -> bool:
 @ContractOnly
 def test1() -> int:
         """
-        requires pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+        requires PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
         true;
 
-        ensures pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+        ensures PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
         true;
         """
@@ -70,12 +72,14 @@ def test1() -> int:
 @ContractOnly
 def test2(a: A, b: int) -> int:
         """
-        requires pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), nil)))) &*&
+        requires PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), nil)))) &*&
         pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
         pyobj_hasvalue(b__ptr, PyLong_v(?b__val)) &*&
         PRED_pred2(a__ptr, a__val, b__ptr, b__val);
 
-        ensures pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), nil)))) &*&
+        ensures PyExc(none, none) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), nil)))) &*&
         pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
         pyobj_hasvalue(b__ptr, PyLong_v(b__val)) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
