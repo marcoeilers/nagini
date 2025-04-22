@@ -3,7 +3,7 @@ fixpoint PyClass PyClass_ObjectType(){
                 return ObjectType;
 }
 fixpoint PyClass PyClass_module_0A(){
-                return PyClass("module_0A", PyClass_ObjectType);
+                return PyClass("module_0A", PyClass_ObjectType, nil);
 }
 predicate PRED_pred1() = true;
 predicate PRED_pred2(x__ptr, x__val, f__ptr, f__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
@@ -73,14 +73,14 @@ def test1() -> int:
 def test2(a: A, b: int) -> int:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(?b__ptr, PyLong_t), nil)))) &*&
-        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0A())), cons(pair(?b__ptr, PyLong_t), nil)))) &*&
+        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A())) &*&
         pyobj_hasvalue(b__ptr, PyLong_v(?b__val)) &*&
         PRED_pred2(a__ptr, a__val, b__ptr, b__val);
 
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A)), cons(pair(b__ptr, PyLong_t), nil)))) &*&
-        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A)) &*&
+        pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0A())), cons(pair(b__ptr, PyLong_t), nil)))) &*&
+        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0A())) &*&
         pyobj_hasvalue(b__ptr, PyLong_v(b__val)) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
         PRED_pred3(a__ptr, a__val, b__ptr, b__val, result, result__val);

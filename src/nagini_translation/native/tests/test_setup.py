@@ -4,7 +4,8 @@ fixpoint PyClass PyClass_ObjectType(){
 }
 """
 from nagini_contracts.contracts import *
-
+@ContractOnly
+@Native
 def test_setup1(i:int, f:float, b:bool) -> int:
         """ 
         requires PyExc(none, none) &*&
@@ -20,6 +21,5 @@ def test_setup1(i:int, f:float, b:bool) -> int:
         pyobj_hasvalue(b__ptr, PyBool_v(b__val)) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val));
         """
-        Requires(True)
-        Ensures(True)
+        pass
         
