@@ -143,7 +143,7 @@ class PyObj_HasVal(vf.PredicateFact):
 
 class PyObj_HasContent(vf.PredicateFact):
     def __init__(self, ptr: vf.Expr[PyObjPtr], value: vf.Expr[vf.List[PyObj_v]], frac=Fraction(1)):
-        super().__init__("pyobj_hascontent", ptr, value, frac=frac)
+        super().__init__("pyobj_hascontent", ptr, "List("+str(value)+")", frac=frac)
 
 
 class PyObj_HasAttr(vf.PredicateFact):
