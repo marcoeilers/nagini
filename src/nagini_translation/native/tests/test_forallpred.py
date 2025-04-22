@@ -3,7 +3,7 @@ fixpoint PyClass PyClass_ObjectType(){
                 return ObjectType;
 }
 fixpoint PyClass PyClass_module_0classA(){
-                return PyClass("module_0classA", PyClass_ObjectType);
+                return PyClass("module_0classA", PyClass_ObjectType, nil);
 }
 """
 from nagini_contracts.contracts import *
