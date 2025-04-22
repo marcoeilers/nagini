@@ -6,7 +6,7 @@ def fibo(n:int) -> int:
 
 @ContractOnly
 @Native
-def fibo_array(n: int) -> List[int]:
+def fibo_array(n: int, l: List[int]) -> None:
     Requires(n >= 0)
     Ensures(list_pred(Result()) and
-            Forall(int, lambda i: Implies(i >= 0 and i < len(Result()), Result()[i] == fibo(i))))
+            Forall(int, lambda i: Implies(i >= 0 and i < len(l), l[i] == fibo(i))))
