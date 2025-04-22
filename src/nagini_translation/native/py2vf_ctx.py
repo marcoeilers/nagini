@@ -108,8 +108,13 @@ class py2vf_context:
     def getExpr(self, key: ast.Expr, AccessType: AccessType, useonly: bool = False):
         loc, keystr = self.__getloc(key, AccessType)
         theval = self[loc]
-        if theval != None or useonly:
-            return vf.NameUseExpr(theval)
+        if useonly:
+            if theval != None:
+                return vf.NameUseExpr(theval)
+            else:
+                #TODO: once finished, remove the return none
+                return None
+                raise NotImplementedError("Expression cannot be translated into a symbol")
         else:
             self[loc] = vf.NamedValue(self._prefix+keystr+str(AccessType))
             return vf.NameDefExpr(self[loc])
