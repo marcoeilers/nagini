@@ -18,25 +18,38 @@ from nagini_translation.native.exprify import Exprifier
 
 class NativeSpecExtractor:
     def signature(self, py2vf_ctx: py2vf_context, ctx: Context, p: ast.AST) -> Tuple[Type, Type]:
-        def ptrandval(x, y): return py2vf_ctx.getExpr(
+        def f(x, y): 
+            py2vf_ctx.setExpr(
+            ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+            return py2vf_ctx.getExpr(
             ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
         # create a named value for each argument
-        for y in p.args.items():
-            ptrandval(y[0], PtrAccess())
-            ptrandval(y[0], ValAccess())
-        def retrieve_argtype(x:str):
-            types = {
-                "int": "int",
-                "float": "float",
-                "bool": "bool",
-                "str": "list<char>",
-            }
-            t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
-            return types.get(t.name, "PyClass")
-        funargs = list(chain.from_iterable(
-            [(("PyObject* "+str(ptrandval(y[0], PtrAccess()))), 
-              retrieve_argtype(y[0])+" "+str(ptrandval(y[0], ValAccess()))) for y in p.args.items()]))
-        return funargs
+        
+        def translate_argtype(x:str, a: AccessType):
+            if isinstance(a, PtrAccess):
+                return "PyObject*"
+            if isinstance(a, ValAccess):
+                types = {
+                    "int": "int",
+                    "float": "float",
+                    "bool": "bool",
+                    "str": "list<char>",
+                }
+                t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
+                return types.get(t.name, "PyClass")
+        funargs = []
+        arg_accesses = []
+        for(k, v) in p.args.items():
+            translated_arg_access = []
+            if k.startswith("VALUEONLY_") == False:
+                translated_arg_access.append(PtrAccess())
+            translated_arg_access.append(ValAccess())
+            arg_ast_name = ast.Name(k, ast.Load(), lineno=0, col_offset=0)
+            for y in translated_arg_access:
+                py2vf_ctx.getExpr(arg_ast_name, y)
+                funargs.append((translate_argtype(k, y) + " "+ str(py2vf_ctx.getExpr(arg_ast_name, y))))
+            arg_accesses.append(translated_arg_access)
+        return funargs, arg_accesses
     def env(self, modules: List[PythonModule]) -> str:
         # Class System Translation
         ctx = Context()
@@ -68,7 +81,7 @@ class NativeSpecExtractor:
                         " has a predicate in its precondition. => Not translated\n\n"
                 else:
                     py2vf_ctx = py2vf_context()
-                    predargs = self.signature(py2vf_ctx, ctx, f)
+                    predargs = self.signature(py2vf_ctx, ctx, f)[0]
                     exprifiedfunction = Exprifier().exprifyBody(
                         f.node.body, ast.Constant(value=None))
                     purefunctiontypes = [
@@ -116,7 +129,7 @@ class NativeSpecExtractor:
                     }
                     t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
                     return types.get(t.name, "PyClass")
-                funargs = self.signature(py2vf_ctx, ctx, p)
+                funargs = self.signature(py2vf_ctx, ctx, p)[0]
                 res += "predicate PRED_"+p.name+"("+', '.join(funargs)+") = "+str(
                     self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
         # TODO: finish translating fixpoint functions
