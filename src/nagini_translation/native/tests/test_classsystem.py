@@ -54,22 +54,22 @@ class ClassC2(ClassB2):
 def test(a: ClassA, b: ClassB, c: ClassC, d: ClassD, b2: ClassB2, c2: ClassC2) -> int:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0ClassA())), cons(pair(?b__ptr, PyClass_t(PyClass_module_0ClassB())), cons(pair(?c__ptr, PyClass_t(PyClass_module_0ClassC())), cons(pair(?d__ptr, PyClass_t(PyClass_module_0ClassD())), cons(pair(?b2__ptr, PyClass_t(PyClass_module_0ClassB2())), cons(pair(?c2__ptr, PyClass_t(PyClass_module_0ClassC2())), nil)))))))) &*&
-        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0ClassA())) &*&
-        pyobj_hasvalue(b__ptr, PyClassInstance_v(PyClass_module_0ClassB())) &*&
-        pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassC())) &*&
-        pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassD())) &*&
-        pyobj_hasvalue(b2__ptr, PyClassInstance_v(PyClass_module_0ClassB2())) &*&
-        pyobj_hasvalue(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2()));
+        pyobj_hasval(args, PyTuple_v(cons(pair(?a__ptr, PyClass_t(PyClass_module_0ClassA())), cons(pair(?b__ptr, PyClass_t(PyClass_module_0ClassB())), cons(pair(?c__ptr, PyClass_t(PyClass_module_0ClassC())), cons(pair(?d__ptr, PyClass_t(PyClass_module_0ClassD())), cons(pair(?b2__ptr, PyClass_t(PyClass_module_0ClassB2())), cons(pair(?c2__ptr, PyClass_t(PyClass_module_0ClassC2())), nil)))))))) &*&
+        pyobj_hasval(a__ptr, PyClassInstance_v(PyClass_module_0ClassA())) &*&
+        pyobj_hasval(b__ptr, PyClassInstance_v(PyClass_module_0ClassB())) &*&
+        pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_0ClassC())) &*&
+        pyobj_hasval(d__ptr, PyClassInstance_v(PyClass_module_0ClassD())) &*&
+        pyobj_hasval(b2__ptr, PyClassInstance_v(PyClass_module_0ClassB2())) &*&
+        pyobj_hasval(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2()));
         
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0ClassA())), cons(pair(b__ptr, PyClass_t(PyClass_module_0ClassB())), cons(pair(c__ptr, PyClass_t(PyClass_module_0ClassC())), cons(pair(d__ptr, PyClass_t(PyClass_module_0ClassD())), cons(pair(b2__ptr, PyClass_t(PyClass_module_0ClassB2())), cons(pair(c2__ptr, PyClass_t(PyClass_module_0ClassC2())), nil)))))))) &*&
-        pyobj_hasvalue(a__ptr, PyClassInstance_v(PyClass_module_0ClassA())) &*&
-        pyobj_hasvalue(b__ptr, PyClassInstance_v(PyClass_module_0ClassB())) &*&
-        pyobj_hasvalue(c__ptr, PyClassInstance_v(PyClass_module_0ClassC())) &*&
-        pyobj_hasvalue(d__ptr, PyClassInstance_v(PyClass_module_0ClassD())) &*&
-        pyobj_hasvalue(b2__ptr, PyClassInstance_v(PyClass_module_0ClassB2())) &*&
-        pyobj_hasvalue(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2())) &*&
-        pyobj_hasvalue(result, PyLong_v(?result__val));
+        pyobj_hasval(args, PyTuple_v(cons(pair(a__ptr, PyClass_t(PyClass_module_0ClassA())), cons(pair(b__ptr, PyClass_t(PyClass_module_0ClassB())), cons(pair(c__ptr, PyClass_t(PyClass_module_0ClassC())), cons(pair(d__ptr, PyClass_t(PyClass_module_0ClassD())), cons(pair(b2__ptr, PyClass_t(PyClass_module_0ClassB2())), cons(pair(c2__ptr, PyClass_t(PyClass_module_0ClassC2())), nil)))))))) &*&
+        pyobj_hasval(a__ptr, PyClassInstance_v(PyClass_module_0ClassA())) &*&
+        pyobj_hasval(b__ptr, PyClassInstance_v(PyClass_module_0ClassB())) &*&
+        pyobj_hasval(c__ptr, PyClassInstance_v(PyClass_module_0ClassC())) &*&
+        pyobj_hasval(d__ptr, PyClassInstance_v(PyClass_module_0ClassD())) &*&
+        pyobj_hasval(b2__ptr, PyClassInstance_v(PyClass_module_0ClassB2())) &*&
+        pyobj_hasval(c2__ptr, PyClassInstance_v(PyClass_module_0ClassC2())) &*&
+        pyobj_hasval(result, PyLong_v(?result__val));
         """
         pass

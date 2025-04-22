@@ -53,14 +53,14 @@ def purefunction1(i: int) -> int:
 def mytest(i: int) -> int:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
-        pyobj_hasvalue(i__ptr, PyLong_v(?i__val)) &*&
+        pyobj_hasval(args, PyTuple_v(cons(pair(?i__ptr, PyLong_t), nil))) &*&
+        pyobj_hasval(i__ptr, PyLong_v(?i__val)) &*&
         (PURE_purefunction1(i__ptr, i__val) > 0);
 
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
-        pyobj_hasvalue(i__ptr, PyLong_v(i__val)) &*&
-        pyobj_hasvalue(result, PyLong_v(?result__val));
+        pyobj_hasval(args, PyTuple_v(cons(pair(i__ptr, PyLong_t), nil))) &*&
+        pyobj_hasval(i__ptr, PyLong_v(i__val)) &*&
+        pyobj_hasval(result, PyLong_v(?result__val));
         """
         #Requires(purefunction(i) > 0)
         Requires(purefunction1(i) > 0)

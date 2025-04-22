@@ -8,11 +8,11 @@ from nagini_contracts.contracts import *
 def return_float() -> float:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
         true;
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
-        pyobj_hasvalue(result, PyFloat_v(?result__val)) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(result, PyFloat_v(?result__val)) &*&
         true;
         """
         Requires(True)
@@ -23,11 +23,11 @@ def return_float() -> float:
 def return_bool() -> bool:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
         true;
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
-        pyobj_hasvalue(result, PyBool_v(?result__val)) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(result, PyBool_v(?result__val)) &*&
         true;
         """
         Requires(True)
@@ -38,11 +38,11 @@ def return_bool() -> bool:
 def return_none() -> None:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
         true;
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(nil)) &*&
-        pyobj_hasvalue(result, PyNone_v) &*&
+        pyobj_hasval(args, PyTuple_v(nil)) &*&
+        pyobj_hasval(result, PyNone_v) &*&
         true;
         """
         Requires(True)

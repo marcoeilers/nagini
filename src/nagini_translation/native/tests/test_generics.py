@@ -37,8 +37,8 @@ class Someclass(Generic[T, V, W], Super[T, V]):
 def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         """
         requires PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
-        pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
+        pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+        pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
         pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
         forall_predfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
@@ -51,9 +51,9 @@ def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         (some(map(snd, l__content_DOT_t)) == some(?l__content_DOT_t__val));
          
         ensures PyExc(none, none) &*&
-        pyobj_hasvalue(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
-        pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
-        pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
+        pyobj_hasval(args, PyTuple_v(cons(pair(l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
+        pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
+        pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
         forall_predfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
