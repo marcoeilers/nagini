@@ -19,6 +19,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVES,
     STRING_TYPE,
     EQUALITY_STATE_PRED,
+    OBJECT_EQ,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -56,6 +57,11 @@ from typing import List, Tuple, Optional
 
 
 class MethodTranslator(CommonTranslator):
+
+    def __init__(self, config, jvm, source_file, type_info, viper_ast):
+        super().__init__(config, jvm, source_file, type_info, viper_ast)
+        self.pytype_domain = 'PyType'
+        self.pytype = self.viper.DomainType(self.pytype_domain, {}, [])
 
     def get_parameter_typeof(self, param: PythonVar,
                              ctx: Context) -> 'silver.ast.DomainFuncApp':
@@ -353,7 +359,6 @@ class MethodTranslator(CommonTranslator):
         if func.name == '__eq__':
             info = self.no_info(ctx)
             posts.append(self.encode_reflexivity_post(func, ctx, pos, info))
-            posts.append(self.encode_symmetry_post(func, ctx, pos, info))
             posts.append(self.encode_modular_post(func, ctx, pos, info))
 
         statements = func.node.body
@@ -392,18 +397,25 @@ class MethodTranslator(CommonTranslator):
         other_decl = func.args[next(iterator)].decl
         return self_var, other_var, self_decl, other_decl
 
+    def get_self_other_pythonvar(self, func: PythonMethod):
+        iterator = iter(func.args)
+        self_var = func.args[next(iterator)]
+        other_var = func.args[next(iterator)]
+        return self_var, other_var
+
+    def get_typeof_check_for_custom_class(self, var: Var, cls: PythonClass, pos, info) -> DomainFuncApp:
+        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], self.pytype, pos, info, self.pytype_domain)
+        typeof_var = self.viper.DomainFuncApp('typeof', [var], self.pytype, pos, info, self.pytype_domain)
+        return self.viper.EqCmp(typeof_var, vpr_class, pos, info)
+
     def get_subtype_check_for_custom_class(self, var: Var, cls: PythonClass, pos, info) -> DomainFuncApp:
-        domain_name = 'PyType'
-        pytype = self.viper.DomainType(domain_name, {}, [])
-        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], pytype, pos, info, domain_name)
-        typeof_var = self.viper.DomainFuncApp('typeof', [var], pytype, pos, info, domain_name)
-        return self.viper.DomainFuncApp('issubtype', [typeof_var, vpr_class], self.viper.Bool, pos, info, domain_name)
+        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], self.pytype, pos, info, self.pytype_domain)
+        typeof_var = self.viper.DomainFuncApp('typeof', [var], self.pytype, pos, info, self.pytype_domain)
+        return self.viper.DomainFuncApp('issubtype', [typeof_var, vpr_class], self.viper.Bool, pos, info, self.pytype_domain)
     
     def get_eq_domain_app(self, self_var: Var, other_var: Var, pos, info):
-        domain_name = 'PyType'
-        pytype = self.viper.DomainType(domain_name, {}, [])
         return self.viper.DomainFuncApp(
-            'eq', [self_var, other_var], pytype, pos, info,
+            'eq', [self_var, other_var], self.pytype, pos, info,
             '__Transitivity_Eq'
         )
     
@@ -421,38 +433,67 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(comp, res_box, pos, info)
 
-    def encode_symmetry_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
-        self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
+    def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
+        self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
+        res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
+        body = []
 
-        rhs = self.viper.TrueLit(pos, info)
-        for c in func.mentioned_classes:
-            lhs_impl = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
-            
-            if ctx.use_domain_func_eq:
-                rhs_impl = self.get_eq_domain_app(other_var, self_var, pos, info)
-            else:
-                eq_func = c.functions.get('__eq__')
+        # inhale state predicate access for self and other
+        for var in [self_var, other_var]:
+            state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
+            body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
-                # encode symmetric __eq__ call
-                if eq_func:
-                    rhs_impl = self.viper.FuncApp(
-                        'bool___unbox__',
-                        [self.viper.FuncApp(eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)],
-                        pos, info, self.viper.Ref
-                    )
-                # c.__eq__ doesn't exist -> referential equality
-                else:
-                    rhs_impl = self.viper.EqCmp(other_var, self_var, pos, info)
-            
-            implies = self.viper.Implies(lhs_impl, rhs_impl, pos, info)
-            rhs = self.viper.And(rhs, implies, pos, info)
-
-        res_box = self.viper.FuncApp(
-                'bool___unbox__',
-                [self.viper.Result(self.viper.Ref, pos, info)],
-                pos, info, self.viper.Bool
+        left_eq = self.viper.FuncApp(
+            func.sil_name, [self_var, other_var], pos, info, self.viper.Ref
         )
-        return self.viper.Implies(res_box, rhs, pos, info)
+        left_eq_unboxed = self.viper.FuncApp(
+            'bool___unbox__', [left_eq], pos, info, self.viper.Bool
+        )
+        assume_left = self.viper.Assume(left_eq_unboxed, pos, info)
+        body.append(assume_left)
+
+        guarded_blocks = []
+        for c in toposort_classes(set(func.mentioned_classes)):
+            cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c, pos, info)
+            cond_subtype = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            other_eq_func = c.functions.get('__eq__')
+
+            # find superclass with 
+            if not other_eq_func:
+                superclass = c.superclass
+                super_func = superclass.functions.get('__eq__')
+                while(not super_func):
+                    superclass = superclass.superclass
+                    super_func = superclass.functions.get('__eq__')
+                other_eq_func = super_func
+
+            # encode symmetric __eq__ call
+            # if we know the exact type, we can use the implementation
+            annotation = self.viper.AnnotationInfo("reveal", [])
+            symm_call_exact_type = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, annotation, self.viper.Bool)
+            symm_call_subtype = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)
+            rhs_exact = self.viper.FuncApp('bool___unbox__', [symm_call_exact_type], pos, info, self.viper.Bool)
+            rhs_subtype = self.viper.FuncApp('bool___unbox__', [symm_call_subtype], pos, info, self.viper.Bool)
+            assert_right_exact = self.viper.Assert(rhs_exact, pos, info)
+            assert_right_subtype = self.viper.Assert(rhs_subtype, pos, info)
+            guarded_blocks.append((cond_exact_type, assert_right_exact))
+            guarded_blocks.append((cond_subtype, assert_right_subtype))
+
+        # encode else branch as elseif(true) -> call object___eq__(other, self)
+        symm_object_eq = self.viper.FuncApp(OBJECT_EQ, [other_var, self_var], pos, info, self.viper.Bool),
+        assert_obj_eq = self.viper.Assert(symm_object_eq, pos, info)
+        guarded_blocks.append((self.viper.TrueLit(pos, info), assert_obj_eq))
+
+        if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
+        body.append(if_stmt)
+        block = self.translate_block(body, pos, info)
+
+        return self.viper.Method(
+            f"{func.sil_name}_check_symmetry",
+            [self_decl, other_decl], [res_decl],
+            [], [], [], block, pos, info
+        )
 
     def encode_modular_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
         self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)

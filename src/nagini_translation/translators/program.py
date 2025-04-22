@@ -1832,9 +1832,13 @@ class ProgramTranslator(CommonTranslator):
                     functions.append(self.translate_function(func, ctx))
                     pos = self.to_position(func.node, ctx)
                     info = self.no_info(ctx)
+                    symm_check  = self.config.method_translator.encode_symmetry_check(
+                        func, ctx, pos, info
+                    )  
                     trans_check = self.config.method_translator.encode_transitivity_check(
                         func, ctx, pos, info
                     )
+                    methods.append(symm_check)
                     methods.append(trans_check)
 
                     func_constants.append(self.translate_function_constant(func, ctx))
