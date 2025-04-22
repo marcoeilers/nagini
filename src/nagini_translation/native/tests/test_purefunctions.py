@@ -5,11 +5,11 @@
 
 //WARNING: Pure function purefunction has a predicate in its precondition. => Not translated
 
-fixpoint int PURE_purefunction1(i__ptr, i__val){
+fixpoint int PURE_purefunction1(PyObject* i__ptr, int i__vall){
                  return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
 }
 
-predicate PRED_mypredicate(i__ptr, i__val) = (i__val > 0);
+predicate PRED_mypredicate(PyObject* i__ptr, int i__val) = (i__val > 0);
 """
 from nagini_contracts.contracts import *
 

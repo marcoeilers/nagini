@@ -17,8 +17,26 @@ from nagini_translation.native.exprify import Exprifier
 
 
 class NativeSpecExtractor:
-    def signature(py2vf_ctx: py2vf_context, ctx: Context, node: ast.AST) -> Tuple[Type, Type]:
-        pass
+    def signature(self, py2vf_ctx: py2vf_context, ctx: Context, p: ast.AST) -> Tuple[Type, Type]:
+        def ptrandval(x, y): return py2vf_ctx.getExpr(
+            ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
+        # create a named value for each argument
+        for y in p.args.items():
+            ptrandval(y[0], PtrAccess())
+            ptrandval(y[0], ValAccess())
+        def retrieve_argtype(x:str):
+            types = {
+                "int": "int",
+                "float": "float",
+                "bool": "bool",
+                "str": "list<char>",
+            }
+            t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
+            return types.get(t.name, "PyClass")
+        funargs = list(chain.from_iterable(
+            [(("PyObject* "+str(ptrandval(y[0], PtrAccess()))), 
+              retrieve_argtype(y[0])+" "+str(ptrandval(y[0], ValAccess()))) for y in p.args.items()]))
+        return funargs
     def env(self, modules: List[PythonModule]) -> str:
         # Class System Translation
         ctx = Context()
@@ -50,14 +68,7 @@ class NativeSpecExtractor:
                         " has a predicate in its precondition. => Not translated\n\n"
                 else:
                     py2vf_ctx = py2vf_context()
-                    def ptrandval(x, y): return py2vf_ctx.getExpr(
-                        ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                    # create a named value for each argument
-                    for y in f.args.items():
-                        ptrandval(y[0], PtrAccess())
-                        ptrandval(y[0], ValAccess())
-                    predargs = map(str, list(chain.from_iterable(
-                        [(ptrandval(y[0], PtrAccess()), ptrandval(y[0], ValAccess())) for y in f.args.items()])))
+                    predargs = self.signature(py2vf_ctx, ctx, f)
                     exprifiedfunction = Exprifier().exprifyBody(
                         f.node.body, ast.Constant(value=None))
                     purefunctiontypes = [
@@ -105,10 +116,8 @@ class NativeSpecExtractor:
                     }
                     t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
                     return types.get(t.name, "PyClass")
-                predargs = list(chain.from_iterable(
-                    [(("PyObject* "+str(ptrandval(y[0], PtrAccess()))), 
-                      retrieve_argtype(y[0])+" "+str(ptrandval(y[0], ValAccess()))) for y in p.args.items()]))
-                res += "predicate PRED_"+p.name+"("+', '.join(predargs)+") = "+str(
+                funargs = self.signature(py2vf_ctx, ctx, p)
+                res += "predicate PRED_"+p.name+"("+', '.join(funargs)+") = "+str(
                     self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
         # TODO: finish translating fixpoint functions
 
