@@ -15,8 +15,8 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     PythonVarBase,
 )
-from nagini_translation.lib.typedefs import Expr
-from typing import Dict, List
+from nagini_translation.lib.typedefs import Expr, Var
+from typing import Dict, List, Optional
 
 
 class Context:
@@ -70,6 +70,7 @@ class Context:
         # and the merge function (returns Bool)
         self.in_merge___eq__ = False
         self.use_domain_func_eq = False
+        self.transitivity_result_var = Optional[Var]
 
     def get_fresh_int(self) -> int:
         """

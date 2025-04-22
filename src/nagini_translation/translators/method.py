@@ -433,6 +433,14 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(comp, res_box, pos, info)
 
+    def get_inherited_function(self, c: PythonClass):
+        superclass = c.superclass
+        super_func = superclass.functions.get('__eq__')
+        while(not super_func):
+            superclass = superclass.superclass
+            super_func = superclass.functions.get('__eq__')
+        return super_func
+
     def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
         res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
@@ -459,14 +467,8 @@ class MethodTranslator(CommonTranslator):
             cond_subtype = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
             other_eq_func = c.functions.get('__eq__')
 
-            # find superclass with 
             if not other_eq_func:
-                superclass = c.superclass
-                super_func = superclass.functions.get('__eq__')
-                while(not super_func):
-                    superclass = superclass.superclass
-                    super_func = superclass.functions.get('__eq__')
-                other_eq_func = super_func
+                other_eq_func = self.get_inherited_function(c)
 
             # encode symmetric __eq__ call
             # if we know the exact type, we can use the implementation
@@ -481,7 +483,7 @@ class MethodTranslator(CommonTranslator):
             guarded_blocks.append((cond_subtype, assert_right_subtype))
 
         # encode else branch as elseif(true) -> call object___eq__(other, self)
-        symm_object_eq = self.viper.FuncApp(OBJECT_EQ, [other_var, self_var], pos, info, self.viper.Bool),
+        symm_object_eq = self.viper.FuncApp(OBJECT_EQ, [other_var, self_var], pos, info, self.viper.Bool)
         assert_obj_eq = self.viper.Assert(symm_object_eq, pos, info)
         guarded_blocks.append((self.viper.TrueLit(pos, info), assert_obj_eq))
 
@@ -508,20 +510,16 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(res_box, rhs, pos, info)
 
-    def encode_transitivity_check(self, func: PythonMethod, ctx: Context, pos, info) -> (Method, Optional[Function]):
-        print(func.sil_name)
+    def encode_transitivity_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
-
-        domain_name = 'PyType'
-        pytype = self.viper.DomainType(domain_name, {}, [])
-
         x = self.viper.LocalVar('x', self.viper.Ref, pos, info)
         x_decl = self.viper.LocalVarDecl('x', self.viper.Ref, pos, info)
+        _res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
+        _res = self.viper.LocalVar('_res', self.viper.Bool, pos, info)
 
-        res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
-        res = self.viper.LocalVar('_res', self.viper.Bool, pos, info)
+        locals = []
 
-        # Body
+        # assume x and other have type of one of the mentioned classes
         assume_x = self.viper.TrueLit(pos, info)
         assume_other = self.viper.TrueLit(pos, info)
         for c in func.mentioned_classes:
@@ -539,75 +537,85 @@ class MethodTranslator(CommonTranslator):
             acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
-        self_eq_x = self.viper.FuncApp(func.sil_name, [self_var, x], pos, info, self.viper.Ref)
-        self_eq_other = self.viper.FuncApp(func.sil_name, [self_var, other_var], pos, info, self.viper.Ref)
-        unboxed_self_eq_x = self.viper.FuncApp('bool___unbox__', [self_eq_x], pos,
-                                               info, self.viper.Bool)
-        unboxed_self_eq_other = self.viper.FuncApp('bool___unbox__', [self_eq_other],
-                                                   pos, info, self.viper.Bool)
-        
-        body.append(self.viper.Assume(unboxed_self_eq_x, pos, info))
-        body.append(self.viper.Assume(unboxed_self_eq_other, pos, info))
+        # inline body of func.___eq___ and assume the body
+        ctx.use_domain_func_eq = True
 
-        # TODO:
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        statements = func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body = None
+        else:
+            inlined_body = self.translate_exprs(actual_body, func, ctx)
+
+        ctx.current_function = old_func
+
+        body.append(self.viper.Assume(inlined_body, pos, info))
+        ctx.use_domain_func_eq = False
+
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
             cond = self.get_subtype_check_for_custom_class(x, c, pos, info)
+            cur_eq_func = c.functions.get('__eq__')
+            stmts = []
+            cur_self_var, cur_other_var, cur_self_var_decl, cur_other_var_decl = self.get_self_other_as_var_and_decls(cur_eq_func)
+            if not (self_var.name() == cur_self_var.name()):
+                locals.append(cur_self_var_decl)
+            if not (other_var.name() == cur_other_var.name()):
+                locals.append(cur_other_var_decl)
             
             # Use the domain function eq instead of the __eq__ merge function
             # for the transitivity assumption.
             ctx.use_domain_func_eq = True
 
-            and_posts = self.viper.TrueLit(pos, info)
-            cur_eq_func = c.functions.get('__eq__')
-
-            stmts = []
-            # TODO: if __eq__ is not overridden
             if not cur_eq_func:
-                pass                
-
+                cur_eq_func = self.get_inherited_function(c)
             else:
                 old_func = ctx.current_function
                 ctx.current_function = cur_eq_func
                 old_class = ctx.current_class
                 ctx.current_class = cur_eq_func.cls
 
+                # first fix aliasing
+                alias_assgn_self = self.viper.LocalVarAssign(cur_self_var, x, pos, info)
+                alias_assgn_other = self.viper.LocalVarAssign(cur_other_var, other_var, pos, info)
+                stmts.extend([alias_assgn_self, alias_assgn_other])
+
                 # inline call to func.__eq__ using where the calls to the merge function are 
                 # redirected to the eq domain function
                 and_pres = self.viper.TrueLit(pos, info)
                 for pre, aliases in cur_eq_func.precondition:
                     with ctx.additional_aliases(aliases):
-                        stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool)
+                        stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
                     if stmt:
                         raise InvalidProgramException(pre, 'purity.violated')
                     and_pres = self.viper.And(and_pres, expr, pos, info)
-                
-                y_decl = self.viper.LocalVarDecl('y', self.viper.Bool, pos, info)
-                y = self.viper.LocalVar('y', self.viper.Bool, pos, info)
-                y_assn = self.viper.LocalVarAssign(y, and_pres, pos, info)
+                stmts.append(self.viper.Assert(and_pres, pos, info))
 
-                stmts.append(y_assn)
-                stmts.append(self.viper.Assert(y, pos, info))
+                # we substitute result in the postconditions with res
+                result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Bool, pos, info)
+                locals.append(result_decl_in_posts)
+                rt = self.translate_type(func.type, ctx)
+                result_in_posts = self.viper.LocalVar('res', rt, pos, info)
+                ctx.transitivity_result_var = result_in_posts
 
-                # stmts.append(self.viper.Assert(and_pres, pos, info))
-
+                and_posts = self.viper.TrueLit(pos, info)
                 for post, aliases in cur_eq_func.postcondition:
-                    # TODO: fix aliasing
-                    # self_pyvar, other_pyvar = self.get_self_other_pythonvar(func)
-                    # cur_self_pyvar, cur_other_pyvar = self.get_self_other_pythonvar(cur_eq_func)
-                    # aliases[cur_self_pyvar.name] = self_pyvar
-                    # aliases[cur_other_pyvar.name] = other_pyvar
                     with ctx.additional_aliases(aliases):
                         stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
                     if stmt:
                         raise InvalidProgramException(post, 'purity.violated')
                     and_posts = self.viper.And(and_posts, expr, pos, info)
 
-                impl_assert = self.viper.Assert(
-                    self.viper.Implies(y, and_posts, pos, info),
-                    pos, info
-                )
-                stmts.append(impl_assert)
+                stmts.append(self.viper.Assume(and_posts, pos, info))
+                
+                # check if transitivity holds by asserting res
+                stmts.append(self.viper.Assert(result_in_posts, pos, info))
 
                 ctx.current_function = old_func
                 ctx.current_class = old_class
@@ -622,13 +630,11 @@ class MethodTranslator(CommonTranslator):
         body.append(if_stmt)
         block = self.translate_block(body, pos, info)
 
-        transitivity_check = self.viper.Method(
+        return self.viper.Method(
             f"{func.sil_name}_check_transitivity",
-            [self_decl, x_decl, other_decl], [res_decl],
-            [], [], [y_decl], block, pos, info
+            [self_decl, x_decl, other_decl], [_res_decl],
+            [], [], locals, block, pos, info
         )
-        return transitivity_check
-        
 
     def extract_contract(self, method: PythonMethod, errorvarname: str,
                          is_constructor: bool,
