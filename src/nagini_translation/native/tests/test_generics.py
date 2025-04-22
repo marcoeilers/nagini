@@ -6,7 +6,7 @@ fixpoint PyClass PyClass_module_0Super(PyObj_Type T, PyObj_Type V){
         return PyClass("module_0Super", PyClass_ObjectType, nil);
 }
 fixpoint PyClass PyClass_module_0Someclass(PyObj_Type T, PyObj_Type V, PyObj_Type W){
-        return PyClass("module_0Someclass", PyClass_module_0Someclass(T, V), cons(W, nil));
+        return PyClass("module_0Someclass", PyClass_module_0Super(T, V), cons(W, nil));
 }
 """
 from nagini_contracts.contracts import *

@@ -24,15 +24,16 @@ class NativeSpecExtractor:
         for m in modules[1:]:
             for key, value in m.classes.items():
                 vfname = m.sil_name+key
-                self.translator.classes[vfname] = lambda x: vfpy.PyClass(vfname, x)
+                self.translator.classes[vfname] = lambda x, classname=vfname: vfpy.PyClass(classname, x)
+                super_typevars = value.superclass.cls.type_vars.keys() if hasattr(value.superclass, "cls") else []
                 res += "fixpoint PyClass PyClass_"+vfname + \
                     "("+", ".join([("PyObj_Type "+x) for x in value.type_vars.keys()])+"){\n\treturn PyClass(\""+\
                         vfname+"\", "+\
                         (
                             "PyClass_ObjectType, nil" if (value.superclass.name == "object") else
                             "Exception, nil" if(value.superclass.name == "Exception") else 
-                            "PyClass_"+((vfname+"("+", ".join([(x) for x in value.superclass.cls.type_vars.keys()])+")")+", "+\
-                                    str(vf.List.from_list([x for x in value.type_vars.keys() if x not in value.superclass.cls.type_vars.keys()])))
+                            "PyClass_"+((value.superclass.module.sil_name+value.superclass.name+"("+", ".join([x for x in super_typevars])+")")+", "+\
+                                    str(vf.List.from_list([x for x in value.type_vars.keys() if x not in super_typevars])))
                             ) +\
                     ");\n}\n"
 
