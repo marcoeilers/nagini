@@ -93,4 +93,4 @@ class ListForallCond_Or(ListForallCond):
 
 class ForallPredFact(vf.PredicateFact):
     def __init__(self, pairlist: vf.NameDefExpr, predname: vf.NameUseExpr, cond: ListForallCond, frac=Fraction(1)):
-        super().__init__("forall_predfact", pairlist, predname, cond, vf.Nil(), frac=frac)
+        super().__init__("list_forallpredfact", pairlist, predname, cond, vf.Nil(), frac=frac)
