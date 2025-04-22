@@ -68,7 +68,7 @@ def test_length(l: List[classA]) -> int:
         pyobj_hasvalue(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0classA()))), nil))) &*&
         pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         [1/3]pyobj_hascontent(l__ptr, ?l__content__ptr) &*&
-        [1/3]forall_predfact(?l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&
+        [1/3]forall_predfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
         (length(l__content__val) > 200);
@@ -78,7 +78,7 @@ def test_length(l: List[classA]) -> int:
         pyobj_hasvalue(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasvalue(result, PyLong_v(?result__val)) &*&
         [1/3]pyobj_hascontent(l__ptr, ?NEW_l__content__ptr) &*&
-        [1/3]forall_predfact(?NEW_l__content, pyobj_hasval, True, PyClassInstance_wrap, nil) &*&
+        [1/3]forall_predfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val)) &*&
         ((length(l__content__val) + 1) == length(NEW_l__content__val));
