@@ -3,13 +3,12 @@ from functools import reduce
 from fractions import Fraction
 from nagini_translation.lib.context import Context
 from nagini_translation.native.py2vf_ctx import py2vf_context, AccessType, PtrAccess, ValAccess, TupleSbscAccess, AttrAccess, CtntAccess
-from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar
+from nagini_translation.lib.program_nodes import PythonMethod, PythonType, PythonVar, PythonModule, PythonClass
 import nagini_translation.native.vf.vf as vf
 import nagini_translation.native.vf.pymodules as vfpy
-
+from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.resolver import get_type as do_get_type
 from typing import Callable, Optional, Type
-from itertools import chain
 import ast
 
 
@@ -209,7 +208,8 @@ class Translator:
             return vf.TernaryFact(
                 self.translate_generic_expr(
                     node.args[0], ctx, py2vf_ctx, ValAccess()),
-                self.translate(node.args[1], ctx, py2vf_context(py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
+                self.translate(node.args[1], ctx, py2vf_context(
+                    py2vf_ctx, prefix=py2vf_ctx.getprefix(), old=py2vf_ctx.old)),
                 vf.BooleanFact(vf.ImmLiteral(vf.Bool(True))))
 
         elif (node.func.id == "Forall"):
@@ -335,7 +335,7 @@ class Translator:
             def f(x, y): return self.translate_generic_expr(
                 x, ctx, py2vf_ctx, y)
             if (funcid in self.predicates):
-                
+
                 translated_arg_list = []
                 for enum, arg in enumerate(node.args):
                     for accesstype in self.predicates[funcid][1][enum]:
@@ -387,16 +387,14 @@ class Translator:
                isinstance(thelambda.body, ast.Call) and
                isinstance(thelambda.body.func, ast.Name)):
                 forallcontext = py2vf_context(py2vf_ctx)
-                forallcontext.getExpr(
-                    ast.Name(thelambda.args.args[0].arg), ValAccess())
-                #TODO: this is not functional and must still be bugfixed
-                ctx = Context()
-                ctx.module = m
-                self.get_type(ast.Name(id=thelambda.args.args[0].arg, ctx=ast.Load(
-                ), lineno=thelambda.lineno, col_offset=thelambda.col_offset), ctx)
-                ctx.current_function = f
-                ctx.current_class = c
-                return "forall_(int "+thelambda.args.args[0].arg+"; "+str(self.translate_generic_expr(thelambda.body, ctx, forallcontext, ValAccess()))
+                lambda_arg_astName = ast.Name(thelambda.args.args[0].arg)
+                forallcontext.getExpr(lambda_arg_astName, ValAccess())
+                # TODO: this is not functional and must still be bugfixed
+                #lambdactx = copy.deepcopy(ctx)
+                
+                lambdavar = PythonVar(thelambda.args.args[0].arg, self.get_target(thelambda.args.args[0], ctx), PythonClass(node.args[0].id, None, None))
+                ctx.set_alias(thelambda.args.args[0].arg, lambdavar)
+                return "forall_(int "+str(forallcontext.getExpr(lambda_arg_astName, ValAccess()))+"; "+str(self.translate_generic_expr(thelambda.body, ctx, forallcontext, ValAccess()))+")"
         elif (node.func.id == "Implies"):
             return vf.TernaryOp(
                 self.translate_generic_expr(
@@ -407,17 +405,19 @@ class Translator:
         elif (node.func.id == "len"):
             return vf.FPCall("length", self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, CtntAccess(v)))
         elif (node.func.id == "IsInstance"):
-            return vf.FPCall("isinstance", 
-                             self.translate_generic_expr(node.args[0], ctx, py2vf_ctx, ValAccess()), 
+            return vf.FPCall("isinstance",
+                             self.translate_generic_expr(
+                                 node.args[0], ctx, py2vf_ctx, ValAccess()),
                              self.translate_generic_expr(node.args[1], ctx, py2vf_ctx, ValAccess()))
         else:
             if (isinstance(v, ValAccess)):
                 funcid = node.func.id
                 if (self.functions[funcid] != None):
-                    translated_arg_list=[]
+                    translated_arg_list = []
                     for enum, arg in enumerate(node.args):
                         for accesstype in self.functions[funcid][1][enum]:
-                            translated_arg_list.append(self.translate_generic_expr(arg, ctx, py2vf_ctx, accesstype))
+                            translated_arg_list.append(
+                                self.translate_generic_expr(arg, ctx, py2vf_ctx, accesstype))
                     return self.functions[funcid][0](*translated_arg_list)
                 else:
                     raise NotImplementedError(
@@ -493,13 +493,15 @@ class Translator:
             dict = {
                 "int": vf.Int,
                 "float": vf.Float,
-                "bool": vf.Bool
-                # TODO: add string
+                "bool": vf.Bool,
+                "string": vf.String
+                
                 # TODO: use class names instead of strings
             }
             return vf.ImmLiteral(dict[type(node.value).__name__](node.value))
         else:
-           raise NotImplementedError("Constant expression cannot be translated in this context: "+str(node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
+            raise NotImplementedError("Constant expression cannot be translated in this context: "+str(
+                node.value)+" in "+repr(v)+".\n Only value-semantics is supported")
 
     def translate_Name_expr(self, node: ast.Name, ctx: Context, py2vf_ctx: py2vf_context,  v: AccessType) -> vf.Expr:
         return py2vf_ctx.getExpr(node, v, True)
@@ -519,7 +521,7 @@ class Translator:
             ast.IsNot: (vf.NotEq, ptracc),
         }
         operator, acctype = dict[type(node.ops[0])]
-        #TODO. review and fix this line
+        # TODO. review and fix this line
         if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
             return vf.ImmLiteral(vf.Bool(False))
         operandtype = self.get_type(node.left, ctx).name
@@ -614,7 +616,7 @@ class Translator:
         if self.classes.get(p.module.sil_name+p.name) == None:
             raise NotImplementedError("Type "+p.name+" not implemented")
         else:
-            return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args if hasattr(p,'type_args') else []))
+            return self.classes[p.module.sil_name+p.name](map(self.pytype__to__PyObj_t, p.type_args if hasattr(p, 'type_args') else []))
 
     def pytype__to__PyObj_v(self, p: PythonType) -> Callable[[PythonType], vfpy.PyObj_v]:
         if (p == type(None)):
@@ -705,3 +707,18 @@ class Translator:
             # Assume module
             containers.extend(container.get_included_modules())
         return do_get_type(node, containers, container)
+
+    def get_target(self, node: ast.AST, ctx: Context) -> PythonModule:
+        container = ctx.actual_function if ctx.actual_function else ctx.module
+        containers = [ctx]
+
+        if ctx.current_class:
+            containers.append(ctx.current_class)
+        if isinstance(container, PythonMethod):
+            containers.append(container)
+            containers.extend(container.module.get_included_modules())
+        else:
+            # Assume module
+            containers.extend(container.get_included_modules(()))
+        result = do_get_target(node, containers, container)
+        return result

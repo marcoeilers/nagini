@@ -26,6 +26,13 @@ class List(Inductive, Generic[_ValueT], ABC):
         else:
             return Cons(lst[0], List.from_list(lst[1:]))
 
+CharT = TypeVar("CharT", bound="Char")
+class String(Inductive, Generic[CharT]):
+    def __init__(self, value: str):
+        self.value = value
+
+    def __str__(self) -> str:
+        return "\"" + str(self.value) + "\""
 
 class Cons(List[_ValueT]):
     def __init__(self, head: _ValueT, tail: list[_ValueT]):
