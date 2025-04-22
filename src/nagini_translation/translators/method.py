@@ -519,6 +519,9 @@ class MethodTranslator(CommonTranslator):
 
         locals = []
 
+        result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Ref, pos, info)
+        locals.append(result_decl_in_posts)
+
         # assume x and other have type of one of the mentioned classes
         assume_x = self.viper.TrueLit(pos, info)
         assume_other = self.viper.TrueLit(pos, info)
@@ -537,21 +540,28 @@ class MethodTranslator(CommonTranslator):
             acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
-        # inline body of func.___eq___ and assume the body
         ctx.use_domain_func_eq = True
 
         old_func = ctx.current_function
         ctx.current_function = func
 
+        # Inline body of func.___eq___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
         statements = func.node.body
         start, end = get_body_indices(statements)
         actual_body = statements[start:end]
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
                  isinstance(actual_body[0].value, ast.Ellipsis))):
+            
+            # TODO: fix this -> cannot be None
             inlined_body = None
         else:
-            inlined_body = self.translate_exprs(actual_body, func, ctx)
+            inlined_body = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.translate_exprs(actual_body, func, ctx)],
+                pos, info, self.viper.Bool 
+            )
 
         ctx.current_function = old_func
 
@@ -598,10 +608,7 @@ class MethodTranslator(CommonTranslator):
                 stmts.append(self.viper.Assert(and_pres, pos, info))
 
                 # we substitute result in the postconditions with res
-                result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Bool, pos, info)
-                locals.append(result_decl_in_posts)
-                rt = self.translate_type(func.type, ctx)
-                result_in_posts = self.viper.LocalVar('res', rt, pos, info)
+                result_in_posts = self.viper.LocalVar('res', self.viper.Ref, pos, info)
                 ctx.transitivity_result_var = result_in_posts
 
                 and_posts = self.viper.TrueLit(pos, info)
@@ -615,7 +622,12 @@ class MethodTranslator(CommonTranslator):
                 stmts.append(self.viper.Assume(and_posts, pos, info))
                 
                 # check if transitivity holds by asserting res
-                stmts.append(self.viper.Assert(result_in_posts, pos, info))
+                result_in_posts_unboxed = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [result_in_posts],
+                    pos, info, self.viper.Bool 
+                )
+                stmts.append(self.viper.Assert(result_in_posts_unboxed, pos, info))
 
                 ctx.current_function = old_func
                 ctx.current_class = old_class
