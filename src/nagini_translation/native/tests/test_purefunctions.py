@@ -5,7 +5,7 @@
 
 //WARNING: Pure function purefunction has a predicate in its precondition. => Not translated
 
-fixpoint int PURE_purefunction1(PyObject* i__ptr, int i__vall){
+fixpoint int PURE_purefunction1(PyObject* i__ptr, int i__val){
                  return ((i__val > 0) ? (18 + 1) : ((i__val < 0) ? 0 : (18 * 2)));
 }
 
