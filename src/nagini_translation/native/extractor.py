@@ -22,11 +22,6 @@ class NativeSpecExtractor:
         Returns the signature of the function as a tuple of strings (to use directly in the VFPY translation) 
         and a list of AccessType (to use to properly translate all arguments in tanslator.py).
         """
-        def f(x, y): 
-            py2vf_ctx.setExpr(
-            ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-            return py2vf_ctx.getExpr(
-            ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
         # create a named value for each argument
         
         def translate_argtype(x:str, a: AccessType):
@@ -85,7 +80,7 @@ class NativeSpecExtractor:
                         " has a predicate in its precondition. => Not translated\n\n"
                 else:
                     py2vf_ctx = py2vf_context()
-                    fun_args_str, fun_arcs_AccessTypeList = self.signature(py2vf_ctx, ctx, f)
+                    fun_args_str, fun_args_AccessTypeList = self.signature(py2vf_ctx, ctx, f)
                     
                     exprifiedfunction = Exprifier().exprifyBody(
                         f.node.body, ast.Constant(value=None))
@@ -95,7 +90,7 @@ class NativeSpecExtractor:
                     if (f.result.type.name in purefunctiontypes):
                         # TODO the function info here
                         fixpointcall=type(k, (vfnag.NaginiPureFPCall,), {"__init__": make_init_nagpureFPcall("PURE_"+k)})
-                        self.translator.functions[f.name] = fixpointcall, fun_arcs_AccessTypeList
+                        self.translator.functions[f.name] = fixpointcall, fun_args_AccessTypeList
                         res += "fixpoint "+f.result.type.name+" PURE_" + \
                             f.name+"("+', '.join(fun_args_str)+"){\n\t return "
                         res += str(self.translator.translate_generic_expr(
@@ -117,25 +112,10 @@ class NativeSpecExtractor:
             for k, p in m.predicates.items():
                 ctx.current_function = p
                 py2vf_ctx = py2vf_context()
+                pred_args_str, pred_args_AccessTypeList = self.signature(py2vf_ctx, ctx, p)
                 self.translator.predicates[k] = type(k, (vfpy.NaginiPredicateFact,), {
-                                                     "__init__": make_init_nagpredfact("PRED_"+k)})
-                def ptrandval(x, y): return py2vf_ctx.getExpr(
-                    ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
-                # create a named value for each argument
-                for y in p.args.items():
-                    ptrandval(y[0], PtrAccess())
-                    ptrandval(y[0], ValAccess())
-                def retrieve_argtype(x:str):
-                    types = {
-                        "int": "int",
-                        "float": "float",
-                        "bool": "bool",
-                        "str": "list<char>",
-                    }
-                    t=self.get_type(ast.Name(x, ast.Load(), lineno=0, col_offset=0), ctx)
-                    return types.get(t.name, "PyClass")
-                funargs = self.signature(py2vf_ctx, ctx, p)[0]
-                res += "predicate PRED_"+p.name+"("+', '.join(funargs)+") = "+str(
+                                                     "__init__": make_init_nagpredfact("PRED_"+k)}), pred_args_AccessTypeList
+                res += "predicate PRED_"+p.name+"("+', '.join(pred_args_str)+") = "+str(
                     self.translator.translate(p.node.body[0].value, ctx, py2vf_ctx))+";\n"
         # TODO: finish translating fixpoint functions
 

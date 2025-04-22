@@ -334,8 +334,16 @@ class Translator:
             # TODO: check if each of these variables is to be used as ref or as val
             def f(x, y): return self.translate_generic_expr(
                 x, ctx, py2vf_ctx, y)
-
-            return self.predicates[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+            if (funcid in self.predicates):
+                
+                translated_arg_list = []
+                for enum, arg in enumerate(node.args):
+                    for accesstype in self.predicates[funcid][1][enum]:
+                        translated_arg_list.append(f(arg, accesstype))
+                return self.predicates[funcid][0](*translated_arg_list)
+            else:
+                raise NotImplementedError(
+                    "Call to predicate "+funcid+" not translated: the predicate was not translated or does not exist")
 
     def translate_IfExp_fact(self, node: ast.IfExp, ctx: Context, py2vf_ctx: py2vf_context) -> vf.Fact:
         # the condition must be pure
