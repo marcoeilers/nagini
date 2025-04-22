@@ -389,9 +389,6 @@ class Translator:
                 forallcontext = py2vf_context(py2vf_ctx)
                 lambda_arg_astName = ast.Name(thelambda.args.args[0].arg)
                 forallcontext.getExpr(lambda_arg_astName, ValAccess())
-                # TODO: this is not functional and must still be bugfixed
-                #lambdactx = copy.deepcopy(ctx)
-                
                 lambdavar = PythonVar(thelambda.args.args[0].arg, self.get_target(thelambda.args.args[0], ctx), PythonClass(node.args[0].id, None, None))
                 ctx.set_alias(thelambda.args.args[0].arg, lambdavar)
                 return "forall_(int "+str(forallcontext.getExpr(lambda_arg_astName, ValAccess()))+"; "+str(self.translate_generic_expr(thelambda.body, ctx, forallcontext, ValAccess()))+")"
