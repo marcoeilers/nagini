@@ -1158,10 +1158,6 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 if not [a for a, _ in self.args.items()] == [a for a, _ in super_func.args.items()]:
                     msg = "Any override of __eq__ must have only have the following two parameters: self, other."
                     raise InvalidProgramException(self.node, "invalid.parameter.name", msg)
-                if self.cls and (not self.cls.predicates is None) and (not self.cls.predicates.get(EQUALITY_STATE_PRED)):
-                    msg = f"Any override of __eq__ must define a predicate called '{EQUALITY_STATE_PRED}' "
-                    msg += "used for permissions. It must be defined for each subclass that overrides '__eq__'."
-                    raise InvalidProgramException(self.node, f"predicate.{EQUALITY_STATE_PRED}.not_found", msg)
                     
             # find a new name for a merge_function
             elif super_func.sil_name:
