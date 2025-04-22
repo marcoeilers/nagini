@@ -6,12 +6,12 @@ fixpoint PyClass PyClass_module_0A(){
                 return PyClass("module_0A", PyClass_ObjectType, nil);
 }
 predicate PRED_pred1() = true;
-predicate PRED_pred2(x__ptr, x__val, f__ptr, f__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
+predicate PRED_pred2(PyObject * x__ptr, PyClass x__val, PyObject * f__ptr, float f__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
 pyobj_hasvalue(x_DOT_a__ptr, PyLong_v(?x_DOT_a__val)) &*&
 pyobj_maycreateattr(x__ptr, "b") &*&
 pyobj_maysetattr(x__ptr, "c", _) &*&
 (x_DOT_a__val == 14);
-predicate PRED_pred3(x__ptr, x__val, y__ptr, y__val, z__ptr, z__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
+predicate PRED_pred3(PyObject * x__ptr, PyClass x__val, PyObject * y__ptr, int y__val, PyObject *  z__ptr, float z__val) = pyobj_hasattr(x__ptr, "a", ?x_DOT_a__ptr) &*&
 pyobj_hasvalue(x_DOT_a__ptr, PyLong_v(?x_DOT_a__val)) &*&
 (x_DOT_a__val == 14) &*&
 PRED_pred1();
