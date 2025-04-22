@@ -18,6 +18,10 @@ from nagini_translation.native.exprify import Exprifier
 
 class NativeSpecExtractor:
     def signature(self, py2vf_ctx: py2vf_context, ctx: Context, p: ast.AST) -> Tuple[Type, Type]:
+        """
+        Returns the signature of the function as a tuple of strings (to use directly in the VFPY translation) 
+        and a list of AccessType (to use to properly translate all arguments in tanslator.py).
+        """
         def f(x, y): 
             py2vf_ctx.setExpr(
             ast.Name(x, ast.Load(), lineno=0, col_offset=0), y)
@@ -81,7 +85,8 @@ class NativeSpecExtractor:
                         " has a predicate in its precondition. => Not translated\n\n"
                 else:
                     py2vf_ctx = py2vf_context()
-                    predargs = self.signature(py2vf_ctx, ctx, f)[0]
+                    fun_args_str, fun_arcs_AccessTypeList = self.signature(py2vf_ctx, ctx, f)
+                    
                     exprifiedfunction = Exprifier().exprifyBody(
                         f.node.body, ast.Constant(value=None))
                     purefunctiontypes = [
@@ -89,10 +94,10 @@ class NativeSpecExtractor:
                     ]
                     if (f.result.type.name in purefunctiontypes):
                         # TODO the function info here
-                        self.translator.functions[f.name] = type(k, (vfnag.NaginiPureFPCall,), {
-                                                                 "__init__": make_init_nagpureFPcall("PURE_"+k)})
+                        fixpointcall=type(k, (vfnag.NaginiPureFPCall,), {"__init__": make_init_nagpureFPcall("PURE_"+k)})
+                        self.translator.functions[f.name] = fixpointcall, fun_arcs_AccessTypeList
                         res += "fixpoint "+f.result.type.name+" PURE_" + \
-                            f.name+"("+', '.join(predargs)+"){\n\t return "
+                            f.name+"("+', '.join(fun_args_str)+"){\n\t return "
                         res += str(self.translator.translate_generic_expr(
                             exprifiedfunction, ctx, py2vf_ctx, ValAccess()))
                         res += ";\n}\n\n"

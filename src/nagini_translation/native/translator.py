@@ -405,10 +405,12 @@ class Translator:
         else:
             if (isinstance(v, ValAccess)):
                 funcid = node.func.id
-                if (self.functions.get(funcid) != None):
-                    def f(x, y): return self.translate_generic_expr(
-                        x, ctx, py2vf_ctx, y)
-                    return self.functions[funcid](*list(chain.from_iterable([(f(y, PtrAccess()), f(y, ValAccess())) for y in node.args])))
+                if (self.functions[funcid] != None):
+                    translated_arg_list=[]
+                    for enum, arg in enumerate(node.args):
+                        for accesstype in self.functions[funcid][1][enum]:
+                            translated_arg_list.append(self.translate_generic_expr(arg, ctx, py2vf_ctx, accesstype))
+                    return self.functions[funcid][0](*translated_arg_list)
                 else:
                     raise NotImplementedError(
                         "Call to function "+funcid+" not implemented: the function was not translated")
