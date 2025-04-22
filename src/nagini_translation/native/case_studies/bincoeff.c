@@ -1,10 +1,10 @@
 /// inspired by GMPy_MPZ_Function_Bincoef
 #ifdef COMPILING FOR PYTHON
 #include <Python.h>
+#include <gmp.h>
 #else
 #include "mpz_include.c"
 #endif
-#include <gmp.h>
 static PyObject *
 GMPy_MPZ_Function_Bincoef(PyObject *self, PyObject *const *args)
 {
