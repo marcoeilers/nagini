@@ -657,7 +657,7 @@ class Translator:
         elif (t.name == "list"):
             return "pyobj_hasPyListval("+str(self.pytype__to__PyObj_t(t.type_args[0]))+")"
         else:
-            return "pyobj_hasPyClassInstanceval("+",".join([str(self.pytype__to__hasvalpredname(x)) for x in (t.type_args if hasattr(t, "type_args") else [])])+")"
+            return "pyobj_hasPyClassInstanceval("+str(self.pytype__to__PyClass(t))+")"
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
