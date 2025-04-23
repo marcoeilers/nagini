@@ -25,5 +25,5 @@ fixpoint unsigned int bincoeff(unsigned int n, unsigned int k) {
 }
 @*/
 void mpz_bin_uiui(mpz_t res, unsigned int n, unsigned int k);
-/*@requires is_mpz(res,_) &*& n >= 0 &*& k >= 0;@*/
+/*@requires is_mpz(res,_) &*& n >= 0 &*& k >= 0 &*& k<=n;@*/
 /*@ensures is_mpz(res, ?res_val) &*& res_val == bincoeff(n, k);@*/
