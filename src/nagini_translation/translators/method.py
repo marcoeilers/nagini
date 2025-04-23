@@ -449,6 +449,14 @@ class MethodTranslator(CommonTranslator):
         initial_subtype_check = self.get_subtype_check_for_custom_class(self_var, func.cls, pos, info)
         body.append(self.viper.Assume(initial_subtype_check, pos, info))
 
+        assume_other = self.viper.TrueLit(pos, info)
+        for c in func.mentioned_classes:
+            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
+
+        assume_other = self.viper.Assume(assume_other, pos, info)
+        body.append(assume_other)
+
         # inhale state predicate access for self and other
         for var in [self_var, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
