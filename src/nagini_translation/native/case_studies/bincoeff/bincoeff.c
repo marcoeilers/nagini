@@ -7,12 +7,6 @@
 #include "../vfpy/PythonAPI/vfpy.c"
 #endif
 /*@
-    lemma_auto void PURE_bincoeff__2__bin_mpz(int n, int k);
-    requires true;
-    ensures PURE_bincoeff(n, k) == bin_mpz(n, k);
-@*/
-
-/*@
 fixpoint PyClass PyClass_ObjectType(){
     return ObjectType;
 }
@@ -51,16 +45,8 @@ result__val == PURE_bincoeff(n__val, k__val);
 
     PyGILState_STATE gstate = PyGILState_Ensure();
     n = PyLong_AsUnsignedLong(PyTuple_GetItem(args, 0));
-    /*if (PyErr_Occurred())
-    {
-        return NULL;
-    }*/
     PyObject *obj_k = PyTuple_GetItem(args, 1);
     k = PyLong_AsUnsignedLong(obj_k);
-    /*if (PyErr_Occurred())
-    {
-        return NULL;
-    }*/
     mpz_bin_uiui(x, n, k);
     unsigned long res = mpz_get_ui(x);
     mpz_clear(x); // Clear the variable*/
