@@ -52,6 +52,9 @@ result__val == PURE_bincoeff(n__val, k__val);
     unsigned long res = mpz_get_ui(x);
     mpz_clear(x); 
     PyObject *r = PyLong_FromUnsignedLong(res);
+    //uncomment one of these assertions to ensure that an error can be thrown by this method
+    ///@assert r != NULL;
+    ///@ assert PyExc(none, none);
     while (r == NULL) 
 /*@
     invariant PyExc(?e_ptr, ?t_ptr) &*&
@@ -59,12 +62,12 @@ result__val == PURE_bincoeff(n__val, k__val);
     pyobj_hasval(n__ptr, PyLong_v(n__val)) &*&
     pyobj_hasval(k__ptr, PyLong_v(k__val)) &*& 
     (r == NULL)?
-        (e_ptr == some(_) &*& t_ptr == some(_)):
-        (pyobj_hasval(r, PyLong_v(res)) &*& e_ptr == none &*& t_ptr == none);
+        e_ptr==some(_) &*& t_ptr==some(_):
+        pyobj_hasval(r, PyLong_v(res));
 @*/
     {
-        PyObject *r = PyLong_FromUnsignedLong(res);
-        PyErr_Clear();
+        r = PyLong_FromUnsignedLong(res);
     }
+    PyErr_Clear();
     return r;
 }
