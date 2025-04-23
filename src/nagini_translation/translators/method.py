@@ -403,13 +403,13 @@ class MethodTranslator(CommonTranslator):
         other_var = func.args[next(iterator)]
         return self_var, other_var
 
-    def get_typeof_check_for_custom_class(self, var: Var, cls: PythonClass, pos, info) -> DomainFuncApp:
-        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], self.pytype, pos, info, self.pytype_domain)
+    def get_typeof_check_for_custom_class(self, var: Var, cls_name: str, pos, info) -> DomainFuncApp:
+        vpr_class = self.viper.DomainFuncApp(cls_name, [], self.pytype, pos, info, self.pytype_domain)
         typeof_var = self.viper.DomainFuncApp('typeof', [var], self.pytype, pos, info, self.pytype_domain)
         return self.viper.EqCmp(typeof_var, vpr_class, pos, info)
 
-    def get_subtype_check_for_custom_class(self, var: Var, cls: PythonClass, pos, info) -> DomainFuncApp:
-        vpr_class = self.viper.DomainFuncApp(cls.sil_name, [], self.pytype, pos, info, self.pytype_domain)
+    def get_subtype_check_for_custom_class(self, var: Var, cls_name: str, pos, info) -> DomainFuncApp:
+        vpr_class = self.viper.DomainFuncApp(cls_name, [], self.pytype, pos, info, self.pytype_domain)
         typeof_var = self.viper.DomainFuncApp('typeof', [var], self.pytype, pos, info, self.pytype_domain)
         return self.viper.DomainFuncApp('issubtype', [typeof_var, vpr_class], self.viper.Bool, pos, info, self.pytype_domain)
     
@@ -446,12 +446,12 @@ class MethodTranslator(CommonTranslator):
         res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
         body = []
 
-        initial_subtype_check = self.get_subtype_check_for_custom_class(self_var, func.cls, pos, info)
+        initial_subtype_check = self.get_subtype_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
         body.append(self.viper.Assume(initial_subtype_check, pos, info))
 
         assume_other = self.viper.TrueLit(pos, info)
         for c in func.mentioned_classes:
-            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
 
         assume_other = self.viper.Assume(assume_other, pos, info)
@@ -474,8 +474,8 @@ class MethodTranslator(CommonTranslator):
 
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
-            cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c, pos, info)
-            cond_subtype = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c.sil_name, pos, info)
+            cond_subtype = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             other_eq_func = c.functions.get('__eq__')
 
             if not other_eq_func:
@@ -512,7 +512,7 @@ class MethodTranslator(CommonTranslator):
         self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
         rhs = self.viper.EqCmp(self_var, other_var, pos, info)
         for c in func.mentioned_classes:
-            subtype_check = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            subtype_check = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             rhs = self.viper.Or(rhs, subtype_check, pos, info)
         res_box = self.viper.FuncApp(
                 'bool___unbox__',
@@ -523,28 +523,40 @@ class MethodTranslator(CommonTranslator):
 
     def encode_transitivity_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
-        x = self.viper.LocalVar('x', self.viper.Ref, pos, info)
-        x_decl = self.viper.LocalVarDecl('x', self.viper.Ref, pos, info)
         _res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
         _res = self.viper.LocalVar('_res', self.viper.Bool, pos, info)
 
         locals = []
+        body = []
+
+        assert len(func.args) == 2
+        other_pyvar = func.args[list(func.args.keys())[1]]
+
+        x_py = func.create_variable('x', func.cls, self.translator, local=False)
+        x = x_py.ref()
+        x_decl = x_py.decl
+
+        result_in_posts = self.viper.LocalVar('res', self.viper.Ref, pos, info)
 
         result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Ref, pos, info)
         locals.append(result_decl_in_posts)
+
+        # assume typeof(res) <: bool
+        result_in_posts_subtype_check = self.get_subtype_check_for_custom_class(result_in_posts, 'bool', pos, info)
+        body.append(self.viper.Assume(result_in_posts_subtype_check, pos, info))
 
         # assume x and other have type of one of the mentioned classes
         assume_x = self.viper.TrueLit(pos, info)
         assume_other = self.viper.TrueLit(pos, info)
         for c in func.mentioned_classes:
-            subtype_check_x = self.get_subtype_check_for_custom_class(x, c, pos, info)
-            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c, pos, info)
+            subtype_check_x = self.get_subtype_check_for_custom_class(x, c.sil_name, pos, info)
+            subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             assume_x = self.viper.Or(assume_x, subtype_check_x, pos, info)
             assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
 
         assume_x = self.viper.Assume(assume_x, pos, info)
         assume_other = self.viper.Assume(assume_other, pos, info)
-        body = [assume_x, assume_other]
+        body.extend([assume_x, assume_other])
 
         for var in [self_var, x, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
@@ -581,14 +593,9 @@ class MethodTranslator(CommonTranslator):
 
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
-            cond = self.get_subtype_check_for_custom_class(x, c, pos, info)
+            cond = self.get_subtype_check_for_custom_class(x, c.sil_name, pos, info)
             cur_eq_func = c.functions.get('__eq__')
             stmts = []
-            cur_self_var, cur_other_var, cur_self_var_decl, cur_other_var_decl = self.get_self_other_as_var_and_decls(cur_eq_func)
-            if not (self_var.name() == cur_self_var.name()):
-                locals.append(cur_self_var_decl)
-            if not (other_var.name() == cur_other_var.name()):
-                locals.append(cur_other_var_decl)
             
             # Use the domain function eq instead of the __eq__ merge function
             # for the transitivity assumption.
@@ -602,15 +609,16 @@ class MethodTranslator(CommonTranslator):
                 old_class = ctx.current_class
                 ctx.current_class = cur_eq_func.cls
 
-                # first fix aliasing
-                alias_assgn_self = self.viper.LocalVarAssign(cur_self_var, x, pos, info)
-                alias_assgn_other = self.viper.LocalVarAssign(cur_other_var, other_var, pos, info)
-                stmts.extend([alias_assgn_self, alias_assgn_other])
-
-                # inline call to func.__eq__ using where the calls to the merge function are 
-                # redirected to the eq domain function
                 and_pres = self.viper.TrueLit(pos, info)
-                for pre, aliases in cur_eq_func.precondition:
+
+                iterator = iter(cur_eq_func.args)
+                cur_self_pyvar = cur_eq_func.args[next(iterator)]
+                cur_other_pyvar = cur_eq_func.args[next(iterator)]
+                aliases = {}
+                aliases[cur_self_pyvar.name] = x_py
+                aliases[cur_other_pyvar.name] = other_pyvar
+
+                for pre, _ in cur_eq_func.precondition:
                     with ctx.additional_aliases(aliases):
                         stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
                     if stmt:
@@ -619,11 +627,10 @@ class MethodTranslator(CommonTranslator):
                 stmts.append(self.viper.Assert(and_pres, pos, info))
 
                 # we substitute result in the postconditions with res
-                result_in_posts = self.viper.LocalVar('res', self.viper.Ref, pos, info)
                 ctx.transitivity_result_var = result_in_posts
 
                 and_posts = self.viper.TrueLit(pos, info)
-                for post, aliases in cur_eq_func.postcondition:
+                for post, _ in cur_eq_func.postcondition:
                     with ctx.additional_aliases(aliases):
                         stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
                     if stmt:
