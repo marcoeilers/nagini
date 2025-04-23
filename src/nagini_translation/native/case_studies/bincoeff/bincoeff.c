@@ -1,4 +1,3 @@
-/// inspired by GMPy_MPZ_Function_Bincoef
 #ifdef COMPILING FOR PYTHON
 #include <Python.h>
 #include <gmp.h>
