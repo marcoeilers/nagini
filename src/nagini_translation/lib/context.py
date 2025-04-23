@@ -9,14 +9,14 @@ from contextlib import contextmanager
 from nagini_translation.lib.constants import ERROR_NAME, RESULT_NAME
 from nagini_translation.lib.io_context import IOOpenContext
 from nagini_translation.lib.obligation_context import ObligationContext
+from nagini_translation.lib.typedefs import Expr, Var
+from typing import Dict, List, Optional
 from nagini_translation.lib.program_nodes import (
     PythonMethod,
     PythonType,
     PythonVar,
     PythonVarBase,
 )
-from nagini_translation.lib.typedefs import Expr, Var
-from typing import Dict, List, Optional
 
 
 class Context:
@@ -66,9 +66,11 @@ class Context:
         self.allow_statements = False
         self.float_encoding = None
 
-        # used for resul type mismatch of custom __eq__ functions (return Ref)
-        # and the merge function (returns Bool)
+        # Used for result type mismatch of custom __eq__ functions (return Ref)
+        # and merge functions (return Bool)
         self.in_merge___eq__ = False
+
+        # Used to translate the transitivity check for custom __eq__ functions
         self.use_domain_func_eq = False
         self.transitivity_result_var = Optional[Var]
 

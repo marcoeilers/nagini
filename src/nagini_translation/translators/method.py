@@ -446,6 +446,9 @@ class MethodTranslator(CommonTranslator):
         res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
         body = []
 
+        initial_subtype_check = self.get_subtype_check_for_custom_class(self_var, func.cls, pos, info)
+        body.append(self.viper.Assume(initial_subtype_check, pos, info))
+
         # inhale state predicate access for self and other
         for var in [self_var, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)

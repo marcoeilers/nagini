@@ -716,13 +716,18 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             if func_name == '__eq__':
                 assert len(args) == 2
 
-                # redirect call to __eq__ function to domain function eq
+                # Redirect call to __eq__ function to domain function eq.
+                # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
                 if ctx.use_domain_func_eq:
                     domain_name = 'PyType'
                     pytype = self.viper.DomainType(domain_name, {}, [])
                     return self.viper.DomainFuncApp(
-                        'eq', [args[0], args[1]], pytype, position, self.no_info(ctx),
-                        '__Transitivity_Eq'
+                        '__prim__bool___box__',
+                        [self.viper.DomainFuncApp(
+                            'eq', [args[0], args[1]], pytype, position, self.no_info(ctx),
+                            '__Transitivity_Eq'
+                        )],
+                        pytype, position, self.no_info(ctx), 'PyType'
                     )
                 else:
                     arg1 = self.to_ref(args[0], ctx)
