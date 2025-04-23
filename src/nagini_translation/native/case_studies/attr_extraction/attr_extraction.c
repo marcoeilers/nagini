@@ -53,9 +53,9 @@ pyobj_hasval(NEW_n_DOT_y__ptr, PyLong_v(?NEW_n_DOT_y__val)) &*&
         (e_ptr==some(_) &*& t_ptr==some(_)):
         (pyobj_hasval(n_DOT_y__ptr, PyLong_v(n_DOT_y__val))&*& n_DOT_y__ptr == n_DOT_y);
 @*/
-    {
+    
         n_DOT_y = PyObject_GetAttrString(n, attr_name);
-    }
+    
     PyErr_Clear();
     int r = PyObject_SetAttrString(n, attr_name, i);
     while(r == -1)
@@ -70,9 +70,8 @@ pyobj_hasval(NEW_n_DOT_y__ptr, PyLong_v(?NEW_n_DOT_y__val)) &*&
         (new_n_DOT_y__ptr == n_DOT_y__ptr):
         (new_n_DOT_y__ptr == i &*& e_ptr_2 == none &*& t_ptr_2 == none);
 @*/
-    {
         PyErr_Clear();
-    }
+    
     return n_DOT_y;
 }
 
