@@ -42,6 +42,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     TUPLE_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
@@ -87,15 +88,46 @@ class CallTranslator(CommonTranslator):
                               ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 2
         target = self.get_target(node.args[1], ctx)
-        assert isinstance(target, (PythonType, PythonVar))
+        type_arg_type = self.get_type(node.args[1], ctx)
         stmt, obj = self.translate_expr(node.args[0], ctx)
         pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        type_stmt = []
         if isinstance(target, PythonType):
             check = self.type_check(obj, target, pos, ctx, inhale_exhale=False)
-        else:
+        elif False and isinstance(target, PythonVar):
             check = self.type_factory.dynamic_type_check(obj, target.ref(), pos,
                                                          ctx)
-        return stmt, check
+        elif type_arg_type.name == TYPE_TYPE:
+            type_stmt, type_obj = self.translate_expr(node.args[1], ctx)
+            check = self.subtype_check(obj, type_obj, pos, ctx)
+        elif type_arg_type.name == TUPLE_TYPE:
+            if isinstance(node.args[1], ast.Tuple):
+                options = []
+                for e in node.args[1].elts:
+                    el_target = self.get_target(e, ctx)
+                    if isinstance(el_target, PythonType):
+                        options.append(self.type_check(obj, el_target, pos, ctx, inhale_exhale=False))
+                    else:
+                        el_stmt, el_obj = self.translate_expr(e, ctx)
+                        type_stmt.extend(el_stmt)
+                        options.append(self.subtype_check(obj, el_obj, pos, ctx))
+                check = self._disjoin(options, pos, info)
+            else:
+                type_stmt, type_obj = self.translate_expr(node.args[1], ctx)
+                if type_arg_type.exact_length:
+                    options = []
+                    for index, ta in enumerate(type_arg_type.type_args):
+                        el_obj = self.get_function_call(type_arg_type, '__getitem__',
+                                        [type_obj, self.viper.IntLit(index, pos, info)], [None, None],
+                                        node, ctx)
+                        options.append(self.subtype_check(obj, el_obj, pos, ctx))
+                    check = self._disjoin(options, pos, info)
+                else:
+                    raise UnsupportedException(node, "isinstance with unknown-length tuple argument is currently not supported")
+        else:
+            print("++")
+        return stmt + type_stmt, check
 
     def _translate_type_func(self, node: ast.Call,
                              ctx: Context) -> StmtsAndExpr:

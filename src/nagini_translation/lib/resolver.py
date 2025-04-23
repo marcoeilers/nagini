@@ -26,6 +26,7 @@ from nagini_translation.lib.constants import (
     SET_TYPE,
     STRING_TYPE,
     TUPLE_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.program_nodes import (
     ContainerInterface,
@@ -258,7 +259,7 @@ def _do_get_type(node: ast.AST, containers: List[ContainerInterface],
                 else:
                     error = 'generic.constructor.without.type'
                     raise InvalidProgramException(node, error)
-            return target
+            return module.global_module.classes[TYPE_TYPE]
     if isinstance(node, (ast.Attribute, ast.Name)):
         if isinstance(node, ast.Attribute):
             lhs = _do_get_type(node.value, containers, container)

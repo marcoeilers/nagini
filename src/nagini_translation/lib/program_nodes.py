@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019 ETH Zurich
+Copyright (c) 2025 ETH Zurich
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -24,6 +24,7 @@ from nagini_translation.lib.constants import (
     PRIMITIVE_PREFIX,
     PRIMITIVE_SEQ_TYPE,
     PRIMITIVE_SET_TYPE,
+    PRIMITIVE_TYPE_TYPE,
     PRIMITIVES,
     PSEQ_TYPE,
     PSET_TYPE,
@@ -716,10 +717,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             boxed_name = self.name[len(PRIMITIVE_PREFIX):]
             if boxed_name == 'Set':
                 boxed_name = PSET_TYPE
-            if boxed_name == 'Multiset':
+            elif boxed_name == 'Multiset':
                 boxed_name = PMSET_TYPE
-            if boxed_name == 'Seq':
+            elif boxed_name == 'Seq':
                 boxed_name = PSEQ_TYPE
+            elif self.name == PRIMITIVE_TYPE_TYPE:
+                boxed_name = 'type'
             return self.module.classes[boxed_name]
         return self
 
