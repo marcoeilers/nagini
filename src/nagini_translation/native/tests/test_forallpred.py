@@ -22,12 +22,12 @@ def test_forallAcc1(l: List[classA]) -> int:
         pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0classA()))), nil))) &*&
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpredfact(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lt(length(l__content__val))), nil) &*&
+        list_forallpred(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lt(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_attr_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpredfact(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (some(map(snd, l__content_DOT_attr_attrptr2ptr)) == some(?l__content_DOT_attr__ptr)) &*&
         (map(fst, l__content_DOT_attr) == l__content_DOT_attr__ptr) &*&
         (some(map(snd, l__content_DOT_attr)) == some(?l__content_DOT_attr__val));
@@ -37,7 +37,7 @@ def test_forallAcc1(l: List[classA]) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """
@@ -54,12 +54,12 @@ def test_forallAcc2(l: List[classA], j: int) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasval(j__ptr, PyLong_v(?j__val)) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        [1/2]list_forallpredfact(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lt(length(l__content__val))), nil) &*&
+        [1/2]list_forallpred(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lt(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_attr_attrptr2ptr) == l__content__ptr) &*&
-        [1/2]list_forallpredfact(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        [1/2]list_forallpred(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (some(map(snd, l__content_DOT_attr_attrptr2ptr)) == some(?l__content_DOT_attr__ptr)) &*&
         (map(fst, l__content_DOT_attr) == l__content_DOT_attr__ptr) &*&
         (some(map(snd, l__content_DOT_attr)) == some(?l__content_DOT_attr__val)) &*&
@@ -71,7 +71,7 @@ def test_forallAcc2(l: List[classA], j: int) -> int:
         pyobj_hasval(j__ptr, PyLong_v(j__val)) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """
@@ -87,12 +87,12 @@ def test_forallAcc3(l: List[classA]) -> int:
         pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0classA()))), nil))) &*&
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpredfact(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
+        list_forallpred(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_attr_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpredfact(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (some(map(snd, l__content_DOT_attr_attrptr2ptr)) == some(?l__content_DOT_attr__ptr)) &*&
         (map(fst, l__content_DOT_attr) == l__content_DOT_attr__ptr) &*&
         (some(map(snd, l__content_DOT_attr)) == some(?l__content_DOT_attr__val));
@@ -102,7 +102,7 @@ def test_forallAcc3(l: List[classA]) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """
@@ -118,12 +118,12 @@ def test_forallAcc4(l: List[classA], j: int) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasval(j__ptr, PyLong_v(?j__val)) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpredfact(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
+        list_forallpred(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_attr_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpredfact(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (some(map(snd, l__content_DOT_attr_attrptr2ptr)) == some(?l__content_DOT_attr__ptr)) &*&
         (map(fst, l__content_DOT_attr) == l__content_DOT_attr__ptr) &*&
         (some(map(snd, l__content_DOT_attr)) == some(?l__content_DOT_attr__val)) &*&
@@ -135,7 +135,7 @@ def test_forallAcc4(l: List[classA], j: int) -> int:
         pyobj_hasval(j__ptr, PyLong_v(j__val)) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """
@@ -151,12 +151,12 @@ def test_forallAcc5(l: List[classA],) -> int:
         pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0classA()))), nil))) &*&
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpredfact(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
+        list_forallpred(?l__content_DOT_attr_attrptr2ptr, attr_binary_pred(hasAttr("attr")), and(gte(0), lte(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_attr_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpredfact(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?l__content_DOT_attr, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (some(map(snd, l__content_DOT_attr_attrptr2ptr)) == some(?l__content_DOT_attr__ptr)) &*&
         (map(fst, l__content_DOT_attr) == l__content_DOT_attr__ptr) &*&
         (some(map(snd, l__content_DOT_attr)) == some(?l__content_DOT_attr__val));
@@ -166,7 +166,7 @@ def test_forallAcc5(l: List[classA],) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0classA()))) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0classA()), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """

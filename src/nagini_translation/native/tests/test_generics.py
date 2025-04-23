@@ -40,12 +40,12 @@ def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         pyobj_hasval(args, PyTuple_v(cons(pair(?l__ptr, PyList_t(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))), nil))) &*&
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
         pyobj_hascontent(l__ptr, List(?l__content__ptr)) &*&
-        list_forallpredfact(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+        list_forallpred(?l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
         (map(fst, l__content) == l__content__ptr) &*&
         (some(map(snd, l__content)) == some(?l__content__val)) &*&
-        list_forallpredfact(?l__content_DOT_t_attrptr2ptr, attr_binary_pred(hasAttr("t")), and(gte(0), lt(length(l__content__val))), nil) &*&
+        list_forallpred(?l__content_DOT_t_attrptr2ptr, attr_binary_pred(hasAttr("t")), and(gte(0), lt(length(l__content__val))), nil) &*&
         (map(fst, l__content_DOT_t_attrptr2ptr) == l__content__ptr) &*&
-        list_forallpredfact(?l__content_DOT_t, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+        list_forallpred(?l__content_DOT_t, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
         (some(map(snd, l__content_DOT_t_attrptr2ptr)) == some(?l__content_DOT_t__ptr)) &*&
         (map(fst, l__content_DOT_t) == l__content_DOT_t__ptr) &*&
         (some(map(snd, l__content_DOT_t)) == some(?l__content_DOT_t__val));
@@ -55,7 +55,7 @@ def test_forallAcc1(l: List[Someclass[float, int, float]]) -> int:
         pyobj_hasval(l__ptr, PyList_v(PyClass_t(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)))) &*&
         pyobj_hasval(result, PyLong_v(?result__val)) &*&
         pyobj_hascontent(l__ptr, List(?NEW_l__content__ptr)) &*&
-        list_forallpredfact(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
+        list_forallpred(?NEW_l__content, pyobj_hasPyClassInstanceval(PyClass_module_0Someclass(PyFloat_t, PyLong_t, PyFloat_t)), True, nil) &*&
         (map(fst, NEW_l__content) == NEW_l__content__ptr) &*&
         (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val));
         """
