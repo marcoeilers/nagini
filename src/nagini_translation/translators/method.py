@@ -446,8 +446,8 @@ class MethodTranslator(CommonTranslator):
         res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
         body = []
 
-        initial_subtype_check = self.get_subtype_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
-        body.append(self.viper.Assume(initial_subtype_check, pos, info))
+        initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
+        body.append(self.viper.Assume(initial_type_check, pos, info))
 
         assume_other = self.viper.TrueLit(pos, info)
         for c in func.mentioned_classes:
@@ -540,6 +540,9 @@ class MethodTranslator(CommonTranslator):
 
         result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Ref, pos, info)
         locals.append(result_decl_in_posts)
+
+        initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
+        body.append(self.viper.Assume(initial_type_check, pos, info))
 
         # assume typeof(res) <: bool
         result_in_posts_subtype_check = self.get_subtype_check_for_custom_class(result_in_posts, 'bool', pos, info)
