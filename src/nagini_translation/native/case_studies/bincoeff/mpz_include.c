@@ -8,7 +8,7 @@ fixpoint int bin_mpz(unsigned int n, unsigned int k){
 }
 @*/
 /*@
-lemma_auto (bin_mpz(n, k)) void bin_mpz_bod(unsigned int n, unsigned int k);
+lemma_auto void bin_mpz_bod(unsigned int n, unsigned int k);
   requires n >= 0 && k >= 0 && k <= n && n <= 63;
   ensures bin_mpz(n, k) >= 0 && bin_mpz(n, k) <= ULONG_MAX;
   @*/

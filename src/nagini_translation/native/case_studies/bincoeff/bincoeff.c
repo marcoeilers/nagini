@@ -39,14 +39,14 @@ pyobj_hasval(result, PyLong_v(?result__val)) &*&
 result__val == PURE_bincoeff(n__val, k__val);
 @*/
 {
-    PyObject *obj_n = PyTuple_GetItem(args, 0);
+    
     unsigned long n, k;
     struct __mpz_struct x_s = {0, 0, NULL};
+    n = PyLong_AsUnsignedLong(PyTuple_GetItem(args, 0));
+    k = PyLong_AsUnsignedLong(PyTuple_GetItem(args, 1));
+
     mpz_t x = &x_s; // Declare the variable (not a pointer!)
     mpz_init(x);    // Initialize the variable
-    n = PyLong_AsUnsignedLong(PyTuple_GetItem(args, 0));
-    PyObject *obj_k = PyTuple_GetItem(args, 1);
-    k = PyLong_AsUnsignedLong(obj_k);
     mpz_bin_uiui(x, n, k);
     unsigned long res = mpz_get_ui(x);
     mpz_clear(x); 
