@@ -524,7 +524,7 @@ class Translator:
         }
         operator, acctype = dict[type(node.ops[0])]
         # TODO. review and fix this line
-        if (operator == vf.Eq and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
+        if (isinstance(node.ops[0], ast.Eq) and self.get_type(node.left, ctx) != self.get_type(node.comparators[0], ctx)):
             return vf.ImmLiteral(vf.Bool(False))
         operandtype = self.get_type(node.left, ctx).name
         if (operandtype in ["int", "float", "bool", "string"]):
@@ -676,6 +676,7 @@ class Translator:
 
     def is_predless(self, node: ast.AST, ctx: Context) -> bool:
         # check there is an occurence of Acc or any predicate in the node (then unpure, otherwise pure)
+
         if (isinstance(node, ast.Call)):
             # predicates are stored in ctx.module.predicates
             if (node.func.id == "Implies"):
