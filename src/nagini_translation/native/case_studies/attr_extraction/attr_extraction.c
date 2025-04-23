@@ -11,14 +11,9 @@ fixpoint PyClass PyClass_module_0A(){
     return PyClass("module_0A", PyClass_ObjectType, nil);
 }
 @*/
-/*@
-lemma_auto void nth_of_map<t, k> (fixpoint (t, k) f, list<t> l, int i);
-requires 0<=i && i<length(l);
-ensures nth(i, map(f, l)) == f(nth(i, l));
-@*/
 /*--END OF ENV--*/
 static PyObject * 
-GMPy_MPZ_Function_Bincoef(PyObject *self, PyObject *args)/*@
+Attr_extraction(PyObject *self, PyObject *args)/*@
 requires PyExc(none, none) &*&
 pyobj_hasval(args, PyTuple_v(cons(pair(?n__ptr, PyClass_t(PyClass_module_0A())), cons(pair(?i__ptr, PyLong_t), nil)))) &*&
 pyobj_hasval(n__ptr, PyClassInstance_v(PyClass_module_0A())) &*&
