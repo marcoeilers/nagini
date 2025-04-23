@@ -32,4 +32,6 @@ list_forallpred(?NEW_l__content, pyobj_hasPyLongval, True, nil) &*&
 (some(map(snd, NEW_l__content)) == some(?NEW_l__content__val)) &*&
 forall_(int i__val; (((i__val >= 0) && (i__val < length(NEW_l__content__val))) ? (nth(i__val, NEW_l__content__val) == PURE_fibo(i__val)) : true));
 @*/
-{}
+{
+    return PyTuple_GET_ITEM(args, 0);
+}

@@ -15,8 +15,8 @@ fixpoint int PURE_bincoeff(int VALUEONLY_n__val, int VALUEONLY_k__val){
 @*/
 /*--END OF ENV--*/
 /*@
-lemma_auto (bin_mpz(n, k)) void bin_mpz__2__PURE_bincoeff(unsigned int n, unsigned int k);
-  requires n >= 0 && k >= 0 && k <= n && n <= 63;
+lemma_auto void bin_mpz__2__PURE_bincoeff(unsigned int n, unsigned int k);
+  requires true;
   ensures PURE_bincoeff(n, k) == bin_mpz(n, k);
 @*/
 
