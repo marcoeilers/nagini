@@ -565,6 +565,31 @@ domain __SumHelper[T$]  {
   }
 }
 
+domain __Transitivity_Eq  {
+  
+  function eq(self: Ref, other: Ref): Bool 
+  
+  axiom {
+    (forall o1: Ref :: { eq(o1, o1) } eq(o1, o1))
+  }
+  
+  axiom {
+    (forall o1: Ref, o2: Ref, o3: Ref ::
+      { eq(o1, o2), eq(o2, o3) }
+      { eq(o1, o2), eq(o1, o3) }
+      { eq(o2, o3), eq(o1, o3) }
+      eq(o1, o2) && eq(o2, o3) ==> eq(o1, o3))
+  }
+  
+  axiom {
+    (forall o1: Ref, o2: Ref ::
+      { eq(o1, o2) }
+      eq(o1, o2) == eq(o2, o1) &&
+      ((o1 == o2 ==> eq(o1, o2)) &&
+      ((o1 == null) != (o2 == null) ==> !eq(o1, o2))))
+  }
+}
+
 domain _list_ce_helper  {
   
   function seq_ref_length(___s: Seq[Ref]): Int 
@@ -815,35 +840,48 @@ field X_i: Ref
 
 field SubX_j: Ref
 
-function _asserting(val: Ref, ass: Bool): Ref
-  requires ass
-{
-  val
-}
-
-function stateless_0(i_1: Ref): Ref
-  requires issubtype(typeof(i_1), int())
-  ensures issubtype(typeof(result), int())
-{
-  __prim__int___box__(5)
-}
-
 @opaque()
-function X___eq__(self_8: Ref, other_8: Ref): Ref
-  requires issubtype(typeof(self_8), X_0())
-  requires issubtype(typeof(other_8), object())
-  requires self_8 != null
-  requires acc(state(self_8))
-  requires !stateless(other_8) ==> acc(state(other_8))
+function X___eq__(self_7: Ref, other_7: Ref): Ref
+  requires issubtype(typeof(self_7), X_0())
+  requires issubtype(typeof(other_7), object())
+  requires self_7 != null
+  requires acc(state(self_7), write)
+  requires !stateless(other_7) ==> acc(state(other_7), write)
   ensures issubtype(typeof(result), bool())
+  ensures X_0() == typeof(other_7) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_7.X_i,
+    object___cast__(X_0(), other_7).X_i)))
+  ensures SubX() == typeof(other_7) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_7.X_i,
+    object___cast__(SubX(), other_7).X_i)))
+  ensures self_7 == other_7 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==>
+    self_7 == other_7 || issubtype(typeof(other_7), X_0()) ||
+    issubtype(typeof(other_7), SubX())
 {
-  (let cond_0 ==
-    (__prim__bool___box__(issubtype(typeof(other_8), X_0()))) in
-    (true && bool___unbox__(cond_0) ?
-      __prim__bool___box__((unfolding acc(state(self_8)) in
-        (unfolding acc(state(other_8)) in
-          object___eq___merged(self_8.X_i, other_8.X_i)))) :
-      __prim__bool___box__(false)))
+  (let cond_1 ==
+    (__prim__bool___box__(X_0() == typeof(other_7))) in
+    (let o_0 ==
+      ((true && bool___unbox__(cond_1) ?
+        object___cast__(X_0(), other_7) :
+        null)) in
+      (true && bool___unbox__(cond_1) ?
+        __prim__bool___box__((unfolding acc(state(self_7), write) in
+          (unfolding acc(state(o_0), write) in
+            object___eq___merged(self_7.X_i, o_0.X_i)))) :
+        (let cond_0_0 ==
+          ((true && !bool___unbox__(cond_1) ?
+            __prim__bool___box__(SubX() == typeof(other_7)) :
+            null)) in
+          (let o_1 ==
+            ((true && !bool___unbox__(cond_1) && bool___unbox__(cond_0_0) ?
+              object___cast__(SubX(), other_7) :
+              o_0)) in
+            (true && !bool___unbox__(cond_1) && bool___unbox__(cond_0_0) ?
+              __prim__bool___box__((unfolding acc(state(self_7), write) in
+                (unfolding acc(state(o_1), write) in
+                  object___eq___merged(self_7.X_i, o_1.X_i)))) :
+              __prim__bool___box__(false)))))))
 }
 
 function X___eq___override_check(self: Ref, other: Ref): Ref
@@ -851,179 +889,75 @@ function X___eq___override_check(self: Ref, other: Ref): Ref
   requires self != null
   requires issubtype(typeof(self), object())
   requires issubtype(typeof(other), object())
-  requires acc(state(self))
-  requires !stateless(other) ==> acc(state(other))
   requires self != null
+  requires acc(state(self), write)
+  requires !stateless(other) ==> acc(state(other), write)
   ensures issubtype(typeof(result), bool())
 {
   X___eq__(self, other)
 }
 
 @opaque()
-function SubX___eq__(self_11: Ref, other_9: Ref): Ref
-  requires issubtype(typeof(self_11), SubX())
-  requires issubtype(typeof(other_9), object())
-  requires self_11 != null
-  requires acc(state(self_11))
-  requires !stateless(other_9) ==> acc(state(other_9))
+function SubX___eq__(self_10: Ref, other_8: Ref): Ref
+  requires issubtype(typeof(self_10), SubX())
+  requires issubtype(typeof(other_8), object())
+  requires self_10 != null
+  requires acc(state(self_10), write)
+  requires !stateless(other_8) ==> acc(state(other_8), write)
   ensures issubtype(typeof(result), bool())
+  ensures X_0() == typeof(other_8) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_10.X_i,
+    object___cast__(X_0(), other_8).X_i)))
+  ensures SubX() == typeof(other_8) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_10.X_i,
+    object___cast__(X_0(), other_8).X_i) &&
+    object___eq___merged(self_10.SubX_j, object___cast__(SubX(), other_8).SubX_j)))
+  ensures self_10 == other_8 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==>
+    self_10 == other_8 || issubtype(typeof(other_8), X_0()) ||
+    issubtype(typeof(other_8), SubX())
 {
-  (let cond_1_0 ==
-    (__prim__bool___box__(issubtype(typeof(other_9), SubX()))) in
-    (true && bool___unbox__(cond_1_0) ?
-      __prim__bool___box__((unfolding acc(state(self_11)) in
-        (unfolding acc(state(other_9)) in
-          object___eq___merged(self_11.X_i, other_9.X_i) &&
-          object___eq___merged(self_11.SubX_j, other_9.SubX_j)))) :
-      __prim__bool___box__(false)))
+  (let cond_4_0 ==
+    (__prim__bool___box__(X_0() == typeof(other_8))) in
+    (true && bool___unbox__(cond_4_0) ?
+      __prim__bool___box__((unfolding acc(state(self_10), write) in
+        (unfolding acc(state(object___cast__(X_0(), other_8)), write) in
+          object___eq___merged(self_10.X_i, object___cast__(X_0(), other_8).X_i)))) :
+      (let cond_5_0 ==
+        ((true && !bool___unbox__(cond_4_0) ?
+          __prim__bool___box__(SubX() == typeof(other_8)) :
+          null)) in
+        (true && !bool___unbox__(cond_4_0) && bool___unbox__(cond_5_0) ?
+          __prim__bool___box__((unfolding acc(state(self_10), write) in
+            (unfolding acc(state(object___cast__(SubX(), other_8)), write) in
+              object___eq___merged(self_10.X_i, object___cast__(SubX(), other_8).X_i) &&
+              object___eq___merged(self_10.SubX_j, object___cast__(SubX(), other_8).SubX_j)))) :
+          __prim__bool___box__(false)))))
 }
 
-function SubX___eq___override_check(self_8: Ref, other_8: Ref): Ref
-  requires issubtype(typeof(self_8), SubX())
-  requires self_8 != null
-  requires issubtype(typeof(self_8), X_0())
-  requires issubtype(typeof(other_8), object())
-  requires self_8 != null
-  requires acc(state(self_8))
-  requires !stateless(other_8) ==> acc(state(other_8))
+function SubX___eq___override_check(self_7: Ref, other_7: Ref): Ref
+  requires issubtype(typeof(self_7), SubX())
+  requires self_7 != null
+  requires issubtype(typeof(self_7), X_0())
+  requires issubtype(typeof(other_7), object())
+  requires self_7 != null
+  requires acc(state(self_7), write)
+  requires !stateless(other_7) ==> acc(state(other_7), write)
   ensures issubtype(typeof(result), bool())
+  ensures X_0() == typeof(other_7) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_7.X_i,
+    object___cast__(X_0(), other_7).X_i)))
+  ensures SubX() == typeof(other_7) ==>
+    object___eq___merged(result, __prim__bool___box__(object___eq___merged(self_7.X_i,
+    object___cast__(SubX(), other_7).X_i)))
 {
-  SubX___eq__(self_8, other_8)
+  SubX___eq__(self_7, other_7)
 }
 
 function __file__(): Ref
 
 
 function __name__(): Ref
-
-
-function x_0(): Ref
-  ensures issubtype(typeof(result), X_0())
-
-
-function y_0(): Ref
-  ensures issubtype(typeof(result), SubX())
-
-
-function a(): Ref
-  ensures issubtype(typeof(result), bool())
-  ensures result ==
-    __prim__bool___box__(object___eq___merged(__prim__int___box__(5), __prim__int___box__(42)))
-{
-  __prim__bool___box__(object___eq___merged(__prim__int___box__(5), __prim__int___box__(42)))
-}
-
-function object___eq___merged(self: Ref, other: Ref): Bool
-  decreases _
-  requires issubtype(typeof(self), object())
-  requires issubtype(typeof(other), object())
-  requires self != null
-
-  requires issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
-      acc(state(self)) && (!stateless(other) ==> acc(state(other))) :
-      (issubtype(typeof(self), SubX()) ?
-        acc(state(self)) && (!stateless(other) ==> acc(state(other))) :
-          (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
-            acc(state(self)) && (!stateless(other) ==> acc(state(other))) :
-              (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
-                (!stateless(self) ==> acc(state(self))) && (!stateless(other) ==> acc(state(other))) :
-                (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1))) ?
-                  acc(state(self)) && (!stateless(other) ==> acc(state(other))) :
-                  (issubtype(typeof(self), X_0()) ?
-                    acc(state(self)) && (!stateless(other) ==> acc(state(other))) :
-                        (issubtype(typeof(self), object()) ?
-                          (!stateless(self) ==> acc(state(self))) &&
-                          (!stateless(other) ==> acc(state(other))) :
-                          true))))))
-
-  ensures issubtype(typeof(self), object()) ==>
-    true && (self == null ==> result == (other == null ? true : false)) &&
-    (!issubtype(typeof(self), float()) ==> self == other ==> result) &&
-    (other != null ==> result == object___eq___merged(other, self))
-  ensures issubtype(typeof(self), float()) ==>
-    true &&
-    (issubtype(typeof(other), float()) ==>
-    float___isNaN(self) || float___isNaN(other) ==> result == false)
-  ensures issubtype(typeof(self), int()) ==>
-    true &&
-    (issubtype(typeof(other), int()) ==>
-    result == (int___unbox__(self) == int___unbox__(other)))
-
-  ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1))) ==>
-    (issubtype(typeof(other), dict(dict_arg(typeof(other), 0), dict_arg(typeof(other), 1))) ==>
-    result ==
-    (unfolding acc(state(self)) in (
-      !stateless(other) ==>
-      (unfolding acc(state(other)) in (
-        dict___len__(self) == dict___len__(other) &&
-        (forall x: Ref ::
-          { dict___contains__(self, x) } { dict___getitem__(self, x) }
-          (exists y: Ref :: { dict___contains__(other, y) } { dict___getitem__(other, y) }
-            x != null && y != null &&
-            dict___contains__(self, x) && dict___contains__(other, y) ==>
-            (object___eq___merged(x, y) &&
-            (dict___getitem__(self, x) != null && dict___getitem__(other, y) != null ==>
-            object___eq___merged(dict___getitem__(self, x), dict___getitem__(other, y))))
-          )
-        )
-      ))
-    )))
-            
-  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
-    (issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-    result ==
-      (!stateless(self) ==> (unfolding acc(state(self)) in (
-        (!stateless(other) ==> (unfolding acc(state(other)) in (
-          tuple___len__(self) == tuple___len__(other) &&
-          (forall x: Int ::
-            { tuple___getitem__(self, x) }
-            { tuple___getitem__(other, x) }
-            (x >= 0 && x < tuple___len__(self)) || (x >= -tuple___len__(self) && x <= -1) ==>
-            (tuple___getitem__(self, x) != null && tuple___getitem__(other, x) != null ==>
-            object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other, x)))
-          )
-        )))
-      )))
-    )
-  ensures issubtype(typeof(self), bool()) ==> (issubtype(typeof(other), bool()) ==>
-          result == (bool___unbox__(self) == bool___unbox__(other)))
-  ensures issubtype(typeof(self), str()) ==> (issubtype(typeof(other), str()) ==>
-          result == (str___len__(self) == str___len__(other) && str___val__(self) == str___val__(other)))
-
-  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
-    (issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
-    result ==
-    (unfolding acc(state(self)) in
-      (!stateless(other) ==>
-      (unfolding acc(state(other)) in
-        set___len__(self) == set___len__(other) &&
-        ((forall x: Ref ::
-          { set___contains__(self, x) }
-          (exists y: Ref :: { set___contains__(other, y) }
-            x != null && y != null &&
-            set___contains__(self, x) &&
-            (set___contains__(other, y) ==>
-            object___eq___merged(x, y))
-          )
-        ))
-      ))
-    ))
-
-  ensures issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
-    (issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-      (unfolding acc(state(self)) in (
-        (!stateless(other) ==> (unfolding acc(state(other)) in (
-          list___len__(self) == list___len__(other) &&
-          (forall x: Int ::
-            { list___getitem___index(self, x) }
-            { list___getitem___index(other, x) }
-            (x >= 0 && x < list___len__(self)) || (x >= -list___len__(self) && x <= -1) ==>
-            (list___getitem___index(self, x) != null && list___getitem___index(other, x) != null ==>
-            object___eq___merged(list___getitem___index(self, x), list___getitem___index(other, x)))
-          )
-        )))
-      ))
-    )
 
 
 function __prim__int___box__(prim: Int): Ref
@@ -1059,8 +993,8 @@ function bool___unbox__(box: Ref): Bool
 
 
 function object___eq__(self: Ref, other: Ref): Bool
-  requires !stateless(self) ==> acc(state(self))
-  requires !stateless(other) ==> acc(state(other))
+  requires !stateless(self) ==> acc(state(self), write)
+  requires !stateless(other) ==> acc(state(other), write)
   ensures self == null ==> result == (other == null ? true : false)
   ensures !issubtype(typeof(self), float()) ==> self == other ==> result
   ensures result == object___eq__(other, self)
@@ -1080,6 +1014,14 @@ function stateless(x: Ref): Bool
   decreases _
 
 
+function object___cast__(typ: PyType, obj: Ref): Ref
+  requires @error("Cast may not succeed.")
+    (issubtype(typeof(obj), typ))
+  ensures result == obj
+  ensures issubtype(typeof(obj), typ)
+  decreases _
+
+
 function float___isNaN(f: Ref): Bool
   requires issubtype(typeof(f), float())
   ensures issubtype(typeof(f), int()) ==> result == false
@@ -1093,20 +1035,6 @@ function list___len__(self: Ref): Int
 {
   |self.list_acc|
 }
-
-function list___getitem___index(self: Ref, key: Int): Ref
-  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-  requires acc(self.list_acc, wildcard)
-  requires @error("List index may be out of bounds.")
-    ((let ln == (list___len__(self)) in key < 0 ==> key >= -ln))
-  requires @error("List index may be out of bounds.")
-    ((let ln == (list___len__(self)) in key >= 0 ==> key < ln))
-  ensures result ==
-    (key >= 0 ?
-      self.list_acc[key] :
-      self.list_acc[list___len__(self) + key])
-  ensures issubtype(typeof(result), list_arg(typeof(self), 0))
-  decreases _
 
 function list___getitem__(self: Ref, key: Ref): Ref
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -1124,6 +1052,25 @@ function list___getitem__(self: Ref, key: Ref): Ref
     (int___unbox__(key) >= 0 ?
       self.list_acc[int___unbox__(key)] :
       self.list_acc[list___len__(self) + int___unbox__(key)])
+  ensures issubtype(typeof(result), list_arg(typeof(self), 0))
+  decreases _
+
+
+function list___getitem___index(self: Ref, key: Int): Ref
+  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+  requires acc(self.list_acc, wildcard)
+  requires @error("List index may be out of bounds.")
+    ((let ln ==
+      (list___len__(self)) in
+      key < 0 ==> key >= -ln))
+  requires @error("List index may be out of bounds.")
+    ((let ln ==
+      (list___len__(self)) in
+      key >= 0 ==> key < ln))
+  ensures result ==
+    (key >= 0 ?
+      self.list_acc[key] :
+      self.list_acc[list___len__(self) + key])
   ensures issubtype(typeof(result), list_arg(typeof(self), 0))
   decreases _
 
@@ -1217,7 +1164,154 @@ function tuple___getitem__(self: Ref, key: Int): Ref
     issubtype(typeof(result), tuple_arg(typeof(self), tuple___len__(self) +
     key))
   ensures key >= 0 ==> result == tuple___val__(self)[key]
-  ensures key < 0 ==> result == tuple___val__(self)[tuple___len__(self) + key]
+  ensures key < 0 ==>
+    result == tuple___val__(self)[tuple___len__(self) + key]
+  decreases _
+
+
+function object___eq___merged(self: Ref, other: Ref): Bool
+  requires (issubtype(typeof(self), bool()) ?
+      true && issubtype(typeof(self), bool()) :
+      (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
+        true && issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
+        acc(state(self), write) &&
+        (!stateless(other) ==> acc(state(other), write)) :
+        (issubtype(typeof(self), str()) ?
+          true && issubtype(typeof(self), str()) :
+          (issubtype(typeof(self), SubX()) ?
+            true && acc(state(self), write) &&
+            (!stateless(other) ==> acc(state(other), write)) :
+            (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
+              true &&
+              issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
+              (!stateless(self) ==> acc(state(self), write)) &&
+              (!stateless(other) ==> acc(state(other), write)) :
+              (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+              1))) ?
+                true &&
+                issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+                1))) &&
+                acc(state(self), write) &&
+                (!stateless(other) ==> acc(state(other), write)) :
+                (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
+                  true &&
+                  issubtype(typeof(self), list(list_arg(typeof(self), 0))) &&
+                  acc(state(self), write) &&
+                  (!stateless(other) ==> acc(state(other), write)) :
+                  (issubtype(typeof(self), int()) ?
+                    true && issubtype(typeof(self), int()) :
+                    (issubtype(typeof(self), X_0()) ?
+                      true && acc(state(self), write) &&
+                      (!stateless(other) ==> acc(state(other), write)) :
+                      (issubtype(typeof(self), float()) ?
+                        true && issubtype(typeof(self), float()) :
+                        (issubtype(typeof(self), object()) ?
+                          true &&
+                          (!stateless(self) ==> acc(state(self), write)) &&
+                          (!stateless(other) ==> acc(state(other), write)) :
+                          true)))))))))))
+  ensures issubtype(typeof(self), object()) ==>
+    true && (self == null ==> result == (other == null ? true : false)) &&
+    (!issubtype(typeof(self), float()) ==> self == other ==> result) &&
+    result == object___eq__(other, self)
+  ensures issubtype(typeof(self), float()) ==>
+    true &&
+    (issubtype(typeof(other), float()) ==>
+    float___isNaN(self) || float___isNaN(other) ==> result == false)
+  ensures issubtype(typeof(self), X_0()) ==>
+    true &&
+    (X_0() == typeof(other) ==>
+    object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.X_i,
+    object___cast__(X_0(), other).X_i)))) &&
+    (SubX() == typeof(other) ==>
+    object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.X_i,
+    object___cast__(SubX(), other).X_i))))
+  ensures issubtype(typeof(self), int()) ==>
+    true &&
+    (issubtype(typeof(other), int()) ==>
+    result == (int___unbox__(self) == int___unbox__(other)))
+  ensures issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
+    true &&
+    (issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        list___len__(self) == list___len__(other) &&
+        (forall x: Int ::
+          { list___getitem___index(self, x) }
+          { list___getitem___index(other, x) }
+          x >= 0 && x < list___len__(self) ||
+          x >= -list___len__(self) && x <= -1 ==>
+          object___eq___merged(list___getitem___index(self, x), list___getitem___index(other,
+          x))))))
+  ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+    1))) ==>
+    true &&
+    (issubtype(typeof(other), dict(dict_arg(typeof(other), 0), dict_arg(typeof(other),
+    1))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        dict___len__(self) == dict___len__(other) &&
+        (forall x: Ref ::
+          { dict___contains__(self, x) }
+          { dict___getitem__(self, x) }
+          (exists y: Ref :: { dict___contains__(other, y) } { dict___getitem__(other,
+            y) } dict___contains__(self, x) &&
+            (dict___contains__(other, y) &&
+            (object___eq___merged(x, y) &&
+            object___eq___merged(dict___getitem__(self, x), dict___getitem__(other,
+            y)))))))))
+  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
+    true &&
+    (issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+    result ==
+    (!stateless(self) ==>
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        tuple___len__(self) == tuple___len__(other) &&
+        (forall x: Int ::
+          { tuple___getitem__(self, x) }
+          { tuple___getitem__(other, x) }
+          x >= 0 && x < tuple___len__(self) ||
+          x >= -tuple___len__(self) && x <= -1 ==>
+          object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other,
+          x)))))))
+  ensures issubtype(typeof(self), SubX()) ==>
+    true &&
+    (X_0() == typeof(other) ==>
+    object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.X_i,
+    object___cast__(X_0(), other).X_i)))) &&
+    (SubX() == typeof(other) ==>
+    object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.X_i,
+    object___cast__(X_0(), other).X_i) &&
+    object___eq___merged(self.SubX_j, object___cast__(SubX(), other).SubX_j))))
+  ensures issubtype(typeof(self), str()) ==>
+    true &&
+    (issubtype(typeof(other), str()) ==>
+    result ==
+    (str___len__(self) == str___len__(other) &&
+    str___val__(self) == str___val__(other)))
+  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
+    true &&
+    (issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        set___len__(self) == set___len__(other) &&
+        (forall x: Ref ::
+          { set___contains__(self, x) }
+          (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
+            x) &&
+            (set___contains__(other, y) && object___eq___merged(x, y)))))))
+  ensures issubtype(typeof(self), bool()) ==>
+    true &&
+    (issubtype(typeof(other), bool()) ==>
+    result == (bool___unbox__(self) == bool___unbox__(other)))
   decreases _
 
 
@@ -1233,35 +1327,11 @@ predicate state_abstract_rest(self: Ref)
 
 predicate state(self: Ref) {
   true && issubtype(typeof(self), object()) &&
-  ( 
+  ((issubtype(typeof(self), object()) ==> true) &&
   (issubtype(typeof(self), X_0()) ==>
   acc(self.X_i, 1 / 2) && issubtype(typeof(self.X_i), int())) &&
   (issubtype(typeof(self), SubX()) ==>
   acc(self.SubX_j, 1 / 2) && issubtype(typeof(self.SubX_j), int())) &&
-
-  (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
-  acc(self.list_acc) &&
-  (forall x: Ref ::
-    { (x in self.list_acc) }
-    (x in self.list_acc) && !stateless(x) ==> acc(state(x)))) &&
-  (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
-  acc(self.set_acc) &&
-  (forall x: Ref ::
-    { (x in self.set_acc) }
-    (x in self.set_acc) && !stateless(x) ==> acc(state(x)))) &&
-  (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
-  (forall x: Ref ::
-    { (x in tuple___val__(self)) }
-    (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x)))) &&
-  (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-  1))) ==>
-  acc(self.dict_acc) &&
-  (forall x: Ref ::
-    { (x in self.dict_acc) }
-    { (x in range(self.dict_acc)) }
-    ((x in self.dict_acc) || (x in range(self.dict_acc))) && !stateless(x) ==>
-    acc(state(x)))) &&
-
   (true && typeof(self) != object() && typeof(self) != X_0() &&
   typeof(self) != SubX() &&
   (typeof(self) != list(list_arg(typeof(self), 0)) &&
@@ -1269,7 +1339,29 @@ predicate state(self: Ref) {
   (typeof(self) !=
   dict(dict_arg(typeof(self), 0), dict_arg(typeof(self), 1)) &&
   typeof(self) != set(set_arg(typeof(self), 0))))) ==>
-  acc(state_abstract_rest(self))))
+  acc(state_abstract_rest(self), write))) &&
+  (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
+  acc(self.list_acc, write) &&
+  (forall x: Ref ::
+    { (x in self.list_acc) }
+    (x in self.list_acc) && !stateless(x) ==> acc(state(x), write))) &&
+  (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
+  acc(self.set_acc, write) &&
+  (forall x: Ref ::
+    { (x in self.set_acc) }
+    (x in self.set_acc) && !stateless(x) ==> acc(state(x), write))) &&
+  (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
+  (forall x: Ref ::
+    { (x in tuple___val__(self)) }
+    (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x), write))) &&
+  (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+  1))) ==>
+  acc(self.dict_acc, write) &&
+  (forall x: Ref ::
+    { (x in self.dict_acc) }
+    { (x in range(self.dict_acc)) }
+    ((x in self.dict_acc) || (x in range(self.dict_acc))) && !stateless(x) ==>
+    acc(state(x), write)))
 }
 
 predicate not_collection_type(self: Ref) {
@@ -1282,48 +1374,132 @@ predicate not_collection_type(self: Ref) {
 
 predicate list_state(self: Ref) {
   issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
-  acc(self.list_acc) &&
+  acc(self.list_acc, write) &&
   (forall x: Ref ::
     { (x in self.list_acc) }
-    (x in self.list_acc) && !stateless(x) ==> acc(state(x)))
+    (x in self.list_acc) && !stateless(x) ==> acc(state(x), write))
 }
 
 predicate set_state(self: Ref) {
   issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
-  acc(self.set_acc) &&
+  acc(self.set_acc, write) &&
   (forall x: Ref ::
     { (x in self.set_acc) }
-    (x in self.set_acc) && !stateless(x) ==> acc(state(x)))
+    (x in self.set_acc) && !stateless(x) ==> acc(state(x), write))
 }
 
 predicate dict_state(self: Ref) {
   issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
   1))) ==>
-  acc(self.dict_acc) &&
+  acc(self.dict_acc, write) &&
   (forall x: Ref ::
     { (x in self.dict_acc) }
     { (x in range(self.dict_acc)) }
     ((x in self.dict_acc) || (x in range(self.dict_acc))) && !stateless(x) ==>
-    acc(state(x)))
+    acc(state(x), write))
 }
 
 predicate tuple_state(self: Ref) {
   issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
   (forall x: Ref ::
     { (x in tuple___val__(self)) }
-    (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x)))
+    (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x), write))
+}
+
+method X___eq___check_symmetry(self_7: Ref, other_7: Ref)
+  returns (_res: Bool)
+{
+  inhale acc(state(self_7), write)
+  inhale acc(state(other_7), write)
+  assume bool___unbox__(X___eq__(self_7, other_7))
+  if (typeof(other_7) == SubX()) {
+    assert bool___unbox__(@reveal()
+      (SubX___eq__(other_7, self_7)))
+  } elseif (issubtype(typeof(other_7), SubX())) {
+    assert bool___unbox__(SubX___eq__(other_7, self_7))
+  } elseif (typeof(other_7) == X_0()) {
+    assert bool___unbox__(@reveal()
+      (X___eq__(other_7, self_7)))
+  } elseif (issubtype(typeof(other_7), X_0())) {
+    assert bool___unbox__(X___eq__(other_7, self_7))
+  } elseif (true) {
+    assert object___eq__(other_7, self_7)
+  }
+}
+
+method X___eq___check_transitivity(self_7: Ref, x_0: Ref, other_7: Ref)
+  returns (_res: Bool)
+{
+  var res: Ref
+  assume true || issubtype(typeof(x_0), X_0()) ||
+    issubtype(typeof(x_0), SubX())
+  assume true || issubtype(typeof(other_7), X_0()) ||
+    issubtype(typeof(other_7), SubX())
+  inhale acc(state(self_7), write)
+  inhale acc(state(x_0), write)
+  inhale acc(state(other_7), write)
+  assume bool___unbox__((let cond_2_0 ==
+      (__prim__bool___box__(X_0() == typeof(other_7))) in
+      (let o_2 ==
+        ((true && bool___unbox__(cond_2_0) ?
+          object___cast__(X_0(), other_7) :
+          null)) in
+        (true && bool___unbox__(cond_2_0) ?
+          (unfolding acc(state(self_7), write) in
+            (unfolding acc(state(o_2), write) in
+              __prim__bool___box__(eq(self_7.X_i, o_2.X_i)))) :
+          (let cond_3_0 ==
+            ((true && !bool___unbox__(cond_2_0) ?
+              __prim__bool___box__(SubX() == typeof(other_7)) :
+              null)) in
+            (let o_3 ==
+              ((true && !bool___unbox__(cond_2_0) &&
+              bool___unbox__(cond_3_0) ?
+                object___cast__(SubX(), other_7) :
+                o_2)) in
+              (true && !bool___unbox__(cond_2_0) &&
+              bool___unbox__(cond_3_0) ?
+                (unfolding acc(state(self_7), write) in
+                  (unfolding acc(state(o_3), write) in
+                    __prim__bool___box__(eq(self_7.X_i, o_3.X_i)))) :
+                __prim__bool___box__(false))))))))
+  if (issubtype(typeof(x_0), SubX())) {
+    assert true && acc(state(x_0), write) &&
+      (!stateless(other_7) ==> acc(state(other_7), write))
+    assume true &&
+      (X_0() == typeof(other_7) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(x_0.X_i,
+      object___cast__(X_0(), other_7).X_i)))))) &&
+      (SubX() == typeof(other_7) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(bool___unbox__(__prim__bool___box__(eq(x_0.X_i,
+      object___cast__(X_0(), other_7).X_i))) &&
+      bool___unbox__(__prim__bool___box__(eq(x_0.SubX_j, object___cast__(SubX(),
+      other_7).SubX_j))))))))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(x_0), X_0())) {
+    assert true && acc(state(self_7), write) &&
+      (!stateless(other_7) ==> acc(state(other_7), write))
+    assume true &&
+      (X_0() == typeof(other_7) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(self_7.X_i,
+      object___cast__(X_0(), other_7).X_i)))))) &&
+      (SubX() == typeof(other_7) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(self_7.X_i,
+      object___cast__(SubX(), other_7).X_i))))))
+    assert bool___unbox__(res)
+  }
 }
 
 method X___init__(_cthread_189: Ref, _caller_measures_189: Seq[Measure$], _residue_189: Perm,
-  self_9: Ref, i: Ref)
+  self_8: Ref, i: Ref)
   returns (_current_wait_level_189: Perm)
   requires _cthread_189 != null
   requires issubtype(typeof(_cthread_189), Thread_0())
-  requires self_9 != null
-  requires acc(_MaySet(self_9, 6905688))
-  requires issubtype(typeof(self_9), X_0())
+  requires self_8 != null
+  requires acc(_MaySet(self_8, 6905688), write)
+  requires issubtype(typeof(self_8), X_0())
   requires issubtype(typeof(i), int())
-  requires self_9 != null
+  requires self_8 != null
   requires [true,
     perm(MustTerminate(_cthread_189)) == none &&
     ((forperm _r_1: Ref [MustInvokeBounded(_r_1)] :: false) &&
@@ -1338,7 +1514,7 @@ method X___init__(_cthread_189: Ref, _caller_measures_189: Seq[Measure$], _resid
       _current_wait_level_189) &&
     _residue_189 <= _current_wait_level_189),
     true]
-  ensures acc(state(self_9))
+  ensures acc(state(self_8), write)
   ensures [true,
     (forperm _r_0: Ref [MustInvokeBounded(_r_0)] :: false) &&
     ((forperm _r_0: Ref [MustInvokeUnbounded(_r_0)] :: false) &&
@@ -1346,37 +1522,114 @@ method X___init__(_cthread_189: Ref, _caller_measures_189: Seq[Measure$], _resid
     (forperm _r_0: Ref [_r_0.MustReleaseUnbounded] :: false)))]
 {
   var _err: Ref
-  var self_14: Ref
-  var i_2: Ref
+  var self_13: Ref
+  var i_1: Ref
   var _cwl_189: Perm
   var _method_measures_189: Seq[Measure$]
   _method_measures_189 := Seq[Measure$]()
-  inhale typeof(self_9) == X_0()
+  inhale typeof(self_8) == X_0()
   _err := null
-  self_14 := self_9
-  i_2 := i
-  if (perm(_MaySet(self_14, 6905688)) > none) {
-    exhale acc(_MaySet(self_14, 6905688))
-    inhale acc(self_14.X_i)
+  self_13 := self_8
+  i_1 := i
+  if (perm(_MaySet(self_13, 6905688)) > none) {
+    exhale acc(_MaySet(self_13, 6905688), write)
+    inhale acc(self_13.X_i, write)
   }
-  self_14.X_i := i_2
-  fold acc(state(self_14))
+  self_13.X_i := i_1
+  fold acc(state(self_13), write)
   goto __end
   label __end
 }
 
+method SubX___eq___check_symmetry(self_10: Ref, other_8: Ref)
+  returns (_res: Bool)
+{
+  inhale acc(state(self_10), write)
+  inhale acc(state(other_8), write)
+  assume bool___unbox__(SubX___eq__(self_10, other_8))
+  if (typeof(other_8) == SubX()) {
+    assert bool___unbox__(@reveal()
+      (SubX___eq__(other_8, self_10)))
+  } elseif (issubtype(typeof(other_8), SubX())) {
+    assert bool___unbox__(SubX___eq__(other_8, self_10))
+  } elseif (typeof(other_8) == X_0()) {
+    assert bool___unbox__(@reveal()
+      (X___eq__(other_8, self_10)))
+  } elseif (issubtype(typeof(other_8), X_0())) {
+    assert bool___unbox__(X___eq__(other_8, self_10))
+  } elseif (true) {
+    assert object___eq__(other_8, self_10)
+  }
+}
+
+method SubX___eq___check_transitivity(self_10: Ref, x_1: Ref, other_8: Ref)
+  returns (_res: Bool)
+{
+  var res: Ref
+  assume true || issubtype(typeof(x_1), X_0()) ||
+    issubtype(typeof(x_1), SubX())
+  assume true || issubtype(typeof(other_8), X_0()) ||
+    issubtype(typeof(other_8), SubX())
+  inhale acc(state(self_10), write)
+  inhale acc(state(x_1), write)
+  inhale acc(state(other_8), write)
+  assume bool___unbox__((let cond_6_0 ==
+      (__prim__bool___box__(X_0() == typeof(other_8))) in
+      (true && bool___unbox__(cond_6_0) ?
+        (unfolding acc(state(self_10), write) in
+          (unfolding acc(state(object___cast__(X_0(), other_8)), write) in
+            __prim__bool___box__(eq(self_10.X_i, object___cast__(X_0(), other_8).X_i)))) :
+        (let cond_7_0 ==
+          ((true && !bool___unbox__(cond_6_0) ?
+            __prim__bool___box__(SubX() == typeof(other_8)) :
+            null)) in
+          (true && !bool___unbox__(cond_6_0) && bool___unbox__(cond_7_0) ?
+            __prim__bool___box__((unfolding acc(state(self_10), write) in
+              (unfolding acc(state(object___cast__(SubX(), other_8)), write) in
+                bool___unbox__(__prim__bool___box__(eq(self_10.X_i, object___cast__(SubX(),
+                other_8).X_i))) &&
+                bool___unbox__(__prim__bool___box__(eq(self_10.SubX_j, object___cast__(SubX(),
+                other_8).SubX_j)))))) :
+            __prim__bool___box__(false))))))
+  if (issubtype(typeof(x_1), SubX())) {
+    assert true && acc(state(self_10), write) &&
+      (!stateless(other_8) ==> acc(state(other_8), write))
+    assume true &&
+      (X_0() == typeof(other_8) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(self_10.X_i,
+      object___cast__(X_0(), other_8).X_i)))))) &&
+      (SubX() == typeof(other_8) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(bool___unbox__(__prim__bool___box__(eq(self_10.X_i,
+      object___cast__(X_0(), other_8).X_i))) &&
+      bool___unbox__(__prim__bool___box__(eq(self_10.SubX_j, object___cast__(SubX(),
+      other_8).SubX_j))))))))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(x_1), X_0())) {
+    assert true && acc(state(x_1), write) &&
+      (!stateless(other_8) ==> acc(state(other_8), write))
+    assume true &&
+      (X_0() == typeof(other_8) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(x_1.X_i,
+      object___cast__(X_0(), other_8).X_i)))))) &&
+      (SubX() == typeof(other_8) ==>
+      bool___unbox__(__prim__bool___box__(eq(res, __prim__bool___box__(eq(x_1.X_i,
+      object___cast__(SubX(), other_8).X_i))))))
+    assert bool___unbox__(res)
+  }
+}
+
 method SubX___init__(_cthread_192: Ref, _caller_measures_192: Seq[Measure$],
-  _residue_192: Perm, self_12: Ref, i_0: Ref, j: Ref)
+  _residue_192: Perm, self_11: Ref, i_0: Ref, j: Ref)
   returns (_current_wait_level_192: Perm)
   requires _cthread_192 != null
   requires issubtype(typeof(_cthread_192), Thread_0())
-  requires self_12 != null
-  requires acc(_MaySet(self_12, 116957737284947))
-  requires acc(_MaySet(self_12, 6905688))
-  requires issubtype(typeof(self_12), SubX())
+  requires self_11 != null
+  requires acc(_MaySet(self_11, 116957737284947), write)
+  requires acc(_MaySet(self_11, 6905688), write)
+  requires issubtype(typeof(self_11), SubX())
   requires issubtype(typeof(i_0), int())
   requires issubtype(typeof(j), int())
-  requires self_12 != null
+  requires self_11 != null
   requires [true,
     perm(MustTerminate(_cthread_192)) == none &&
     ((forperm _r_4: Ref [MustInvokeBounded(_r_4)] :: false) &&
@@ -1391,7 +1644,7 @@ method SubX___init__(_cthread_192: Ref, _caller_measures_192: Seq[Measure$],
       _current_wait_level_192) &&
     _residue_192 <= _current_wait_level_192),
     true]
-  ensures acc(state(self_12))
+  ensures acc(state(self_11), write)
   ensures [true,
     (forperm _r_3: Ref [MustInvokeBounded(_r_3)] :: false) &&
     ((forperm _r_3: Ref [MustInvokeUnbounded(_r_3)] :: false) &&
@@ -1399,49 +1652,49 @@ method SubX___init__(_cthread_192: Ref, _caller_measures_192: Seq[Measure$],
     (forperm _r_3: Ref [_r_3.MustReleaseUnbounded] :: false)))]
 {
   var _err: Ref
-  var self_15: Ref
-  var i_3: Ref
+  var self_14: Ref
+  var i_2: Ref
   var j_0: Ref
   var _cwl_192: Perm
   var _method_measures_192: Seq[Measure$]
   _method_measures_192 := Seq[Measure$]()
-  inhale typeof(self_12) == SubX()
+  inhale typeof(self_11) == SubX()
   _err := null
-  self_15 := self_12
-  i_3 := i_0
+  self_14 := self_11
+  i_2 := i_0
   j_0 := j
-  if (perm(_MaySet(self_15, 6905688)) > none) {
-    exhale acc(_MaySet(self_15, 6905688))
-    inhale acc(self_15.X_i)
+  if (perm(_MaySet(self_14, 6905688)) > none) {
+    exhale acc(_MaySet(self_14, 6905688), write)
+    inhale acc(self_14.X_i, write)
   }
-  self_15.X_i := i_3
-  if (perm(_MaySet(self_15, 116957737284947)) > none) {
-    exhale acc(_MaySet(self_15, 116957737284947))
-    inhale acc(self_15.SubX_j)
+  self_14.X_i := i_2
+  if (perm(_MaySet(self_14, 116957737284947)) > none) {
+    exhale acc(_MaySet(self_14, 116957737284947), write)
+    inhale acc(self_14.SubX_j, write)
   }
-  self_15.SubX_j := j_0
-  fold acc(state(self_15))
+  self_14.SubX_j := j_0
+  fold acc(state(self_14), write)
   goto __end
   label __end
 }
 
-method main(_cthread_195: Ref, _caller_measures_195: Seq[Measure$], _residue_195: Perm)
-  returns (_current_wait_level_195: Perm)
-  requires _cthread_195 != null
-  requires issubtype(typeof(_cthread_195), Thread_0())
+method main(_cthread_194: Ref, _caller_measures_194: Seq[Measure$], _residue_194: Perm)
+  returns (_current_wait_level_194: Perm)
+  requires _cthread_194 != null
+  requires issubtype(typeof(_cthread_194), Thread_0())
   requires [true,
-    perm(MustTerminate(_cthread_195)) == none &&
+    perm(MustTerminate(_cthread_194)) == none &&
     ((forperm _r_7: Ref [MustInvokeBounded(_r_7)] :: false) &&
     ((forperm _r_7: Ref [MustInvokeUnbounded(_r_7)] :: false) &&
     ((forperm _r_7: Ref [_r_7.MustReleaseBounded] :: false) &&
     (forperm _r_7: Ref [_r_7.MustReleaseUnbounded] :: false))))]
   ensures [(forperm
       _r_5: Ref [_r_5.MustReleaseBounded] :: Level(_r_5) <=
-      _current_wait_level_195) &&
+      _current_wait_level_194) &&
     ((forperm
       _r_5: Ref [_r_5.MustReleaseUnbounded] :: Level(_r_5) <=
-      _current_wait_level_195) &&
-    _residue_195 <= _current_wait_level_195),
+      _current_wait_level_194) &&
+    _residue_194 <= _current_wait_level_194),
     true]
   ensures [true,
     (forperm _r_6: Ref [MustInvokeBounded(_r_6)] :: false) &&
@@ -1449,14 +1702,11 @@ method main(_cthread_195: Ref, _caller_measures_195: Seq[Measure$], _residue_195
     ((forperm _r_6: Ref [_r_6.MustReleaseBounded] :: false) &&
     (forperm _r_6: Ref [_r_6.MustReleaseUnbounded] :: false)))]
 {
-  var X_res: Ref
-  var SubX_res: Ref
-  var expr_res: Ref
   var module_defined_0: Bool
   var module_names_0: Set[_Name]
-  var _cwl_195: Perm
-  var _method_measures_195: Seq[Measure$]
-  _method_measures_195 := Seq[Measure$]()
+  var _cwl_194: Perm
+  var _method_measures_194: Seq[Measure$]
+  _method_measures_194 := Seq[Measure$]()
   module_defined_0 := true
   module_names_0 := Set[_Name]()
   module_names_0 := (module_names_0 union
@@ -1471,6 +1721,7 @@ method main(_cthread_195: Ref, _caller_measures_195: Seq[Measure$], _residue_195
     issubtype(typeof(__name__()._val), str()) &&
     object___eq___merged(str___create__(8, Seq(95, 95, 109, 97, 105, 110, 95,
     95)), __name__()._val)
+  module_names_0 := (module_names_0 union Set(_single(1953718627)))
   module_names_0 := (module_names_0 union
     Set(_single(6872339552563453791)))
   module_names_0 := (module_names_0 union Set(_single(104863529000799)))
@@ -1480,31 +1731,6 @@ method main(_cthread_195: Ref, _caller_measures_195: Seq[Measure$], _residue_195
     Set(_single(6872339552563453791)))
   module_names_0 := (module_names_0 union Set(_single(104863529000799)))
   module_names_0 := (module_names_0 union Set(_single(1482847571)))
-  assert true && (_single(88) in module_names_0)
-  X_res := new()
-  inhale typeof(X_res) == X_0()
-  inhale acc(_MaySet(X_res, 6905688))
-  _cwl_195 := X___init__(_cthread_195, _method_measures_195, _residue_195, X_res,
-    __prim__int___box__(5))
-  inhale x_0() == X_res
-  module_names_0 := (module_names_0 union Set(_single(120)))
-  assert true && (_single(1482847571) in module_names_0)
-  SubX_res := new()
-  inhale typeof(SubX_res) == SubX()
-  inhale acc(_MaySet(SubX_res, 116957737284947))
-  inhale acc(_MaySet(SubX_res, 6905688))
-  _cwl_195 := SubX___init__(_cthread_195, _method_measures_195, _residue_195,
-    SubX_res, __prim__int___box__(3), __prim__int___box__(7))
-  inhale y_0() == SubX_res
-  module_names_0 := (module_names_0 union Set(_single(121)))
-  inhale a() ==
-    __prim__bool___box__(object___eq___merged(__prim__int___box__(5), __prim__int___box__(42)))
-  module_names_0 := (module_names_0 union Set(_single(97)))
-  module_names_0 := (module_names_0 union Set(_single(98)))
-  module_names_0 := (module_names_0 union
-    Set(_single(2129690739946607965299)))
-  expr_res := _asserting(_asserting(stateless_0(__prim__int___box__(4)), true),
-    true && (_single(2129690739946607965299) in module_names_0))
   goto __end
   label __end
 }
