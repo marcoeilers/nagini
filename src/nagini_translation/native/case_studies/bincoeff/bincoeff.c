@@ -75,9 +75,7 @@ result__val == PURE_bincoeff(n__val, k__val);
         PyErr_Clear();
         //@ assert PyExc(none, none);
         //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
-    }/*else{
-        /// leak pyobj_hasval(r, PyLong_v(res));
-    }*/
+    }
     //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
     return r;
 }
