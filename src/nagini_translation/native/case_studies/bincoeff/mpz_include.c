@@ -1,5 +1,9 @@
 //#include <gmp.h>
-
+/*@
+lemma_auto (bin_mpz(n, k)) void bin_mpz_bod(unsigned int n, unsigned int k);
+  requires n >= 0 && k >= 0 && k <= n && n <= 63;
+  ensures bin_mpz(n, k) >= 0 && bin_mpz(n, k) <= ULONG_MAX;
+  @*/
 typedef unsigned long int	mp_limb_t;
 struct __mpz_struct{
   int _mp_alloc;		/* Number of *limbs* allocated and pointed
@@ -17,6 +21,7 @@ void mpz_init(mpz_t x);
 /*@ensures is_mpz(x,_);@*/
 
 /*@
+
 fixpoint int bin_mpz(unsigned int n, unsigned int k){
   return ((k == 0) ? 1 : 
   ((n == k) ? 1 : 

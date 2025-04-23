@@ -43,18 +43,17 @@ result__val == PURE_bincoeff(n__val, k__val);
     mpz_t x = &x_s; // Declare the variable (not a pointer!)
     mpz_init(x);    // Initialize the variable
 
-    PyGILState_STATE gstate = PyGILState_Ensure();
     n = PyLong_AsUnsignedLong(PyTuple_GetItem(args, 0));
     PyObject *obj_k = PyTuple_GetItem(args, 1);
     k = PyLong_AsUnsignedLong(obj_k);
     mpz_bin_uiui(x, n, k);
     unsigned long res = mpz_get_ui(x);
-    mpz_clear(x); // Clear the variable*/
-    //@ assert PyExc(none, none);
-    // 
+    mpz_clear(x); 
     PyObject *r = NULL;
     r = PyLong_FromUnsignedLong(res);
-    while(!PyErr_Occurred())
+
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    while(PyErr_Occurred())
     //@ invariant true;
     {
         r = PyLong_FromUnsignedLong(res);
