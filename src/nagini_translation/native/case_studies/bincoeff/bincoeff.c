@@ -15,6 +15,13 @@ fixpoint int PURE_bincoeff(int VALUEONLY_n__val, int VALUEONLY_k__val){
 }
 @*/
 /*--END OF ENV--*/
+/*@
+lemma_auto (bin_mpz(n, k)) void bin_mpz__2__PURE_bincoeff(unsigned int n, unsigned int k);
+  requires n >= 0 && k >= 0 && k <= n && n <= 63;
+  ensures PURE_bincoeff(n, k) == bin_mpz(n, k);
+@*/
+
+
 static PyObject *
 GMPy_MPZ_Function_Bincoef(PyObject *self, PyObject *args)
 /*@
@@ -32,7 +39,6 @@ pyobj_hasval(k__ptr, PyLong_v(k__val)) &*&
 pyobj_hasval(result, PyLong_v(?result__val)) &*&
 result__val == PURE_bincoeff(n__val, k__val);
 @*/
-
 {
     //@ assert n__val <= 63;
     //@ assert ULONG_MAX > 63;
@@ -48,21 +54,30 @@ result__val == PURE_bincoeff(n__val, k__val);
     k = PyLong_AsUnsignedLong(obj_k);
     mpz_bin_uiui(x, n, k);
     unsigned long res = mpz_get_ui(x);
+    //@assert res == (bin_mpz(n, k));
     mpz_clear(x); 
-    PyObject *r = NULL;
-    r = PyLong_FromUnsignedLong(res);
-
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    while(PyErr_Occurred())
-    //@ invariant true;
+    //@assert PyExc(?e_1, ?t_1);
+    PyObject *r = PyLong_FromUnsignedLong(res);
+    //@ assert (r == NULL)?PyExc( some(_), some(_)):PyExc(e_1, t_1);
+    //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
+    while (r == NULL) 
+/*@
+    invariant (r == NULL)?true:pyobj_hasval(r, PyLong_v(res)) &*&
+    (r == NULL)?PyExc( some(_), some(_)):PyExc(e_1, t_1) &*&
+    pyobj_hasval(args, PyTuple_v(cons(pair(n__ptr, PyLong_t), cons(pair(k__ptr, PyLong_t), nil)))) &*&
+    pyobj_hasval(n__ptr, PyLong_v(n__val)) &*&
+    pyobj_hasval(k__ptr, PyLong_v(k__val));
+@*/
     {
-        r = PyLong_FromUnsignedLong(res);
-        if(r != NULL){
-            PyErr_Clear();
-            break;
-        }
-    } 
-    PyGILState_Release(gstate);
-    PyErr_Clear();
+        PyObject *r = PyLong_FromUnsignedLong(res);
+        //@ assert (r == NULL)?PyExc( some(_), some(_)):PyExc(e_1, t_1);
+        //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
+        PyErr_Clear();
+        //@ assert PyExc(none, none);
+        //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
+    }/*else{
+        /// leak pyobj_hasval(r, PyLong_v(res));
+    }*/
+    //@ assert (r == NULL)?true:pyobj_hasval(r, PyLong_v(res));
     return r;
 }

@@ -19,7 +19,6 @@ typedef struct __mpz_struct* mpz_t;
 void mpz_init(mpz_t x);
 /*@requires true;@*/
 /*@ensures is_mpz(x,_);@*/
-
 /*@
 
 fixpoint int bin_mpz(unsigned int n, unsigned int k){
@@ -35,7 +34,7 @@ void mpz_bin_uiui(mpz_t res, unsigned long n, unsigned long k);
 
 unsigned long mpz_get_ui(mpz_t x);
 /*@requires is_mpz(x, ?val);@*/
-/*@ensures is_mpz(x, val) &*& result == val;@*/
+/*@ensures is_mpz(x, val) &*& result == ((val <= ULONG_MAX)?val:(val & ULONG_MAX));@*/
 void mpz_clear(mpz_t x);
 /*@requires is_mpz(x, _);@*/
 /*@ensures true;@*/
