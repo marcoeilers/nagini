@@ -54,11 +54,13 @@ result__val == PURE_bincoeff(n__val, k__val);
     PyObject *r = PyLong_FromUnsignedLong(res);
     while (r == NULL) 
 /*@
-    invariant (r == NULL)?true:pyobj_hasval(r, PyLong_v(res)) &*&
-    (r == NULL)?PyExc( some(_), some(_)):PyExc(none, none) &*&
+    invariant PyExc(?e_ptr, ?t_ptr) &*&
     pyobj_hasval(args, PyTuple_v(cons(pair(n__ptr, PyLong_t), cons(pair(k__ptr, PyLong_t), nil)))) &*&
     pyobj_hasval(n__ptr, PyLong_v(n__val)) &*&
-    pyobj_hasval(k__ptr, PyLong_v(k__val));
+    pyobj_hasval(k__ptr, PyLong_v(k__val)) &*& 
+    (r == NULL)?
+        (e_ptr == some(_) &*& t_ptr == some(_)):
+        (pyobj_hasval(r, PyLong_v(res)) &*& e_ptr == none &*& t_ptr == none);
 @*/
     {
         PyObject *r = PyLong_FromUnsignedLong(res);
