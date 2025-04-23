@@ -1,0 +1,3 @@
+[submodule "src/nagini_translation/native/case_studies/vfpy"]
+	path = src/nagini_translation/native/case_studies/vfpy
+	url = https://github.com/etiennebirling/x-lang-verif
