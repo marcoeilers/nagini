@@ -264,7 +264,6 @@ class Translator:
                                         acc_content.value.value, ptr2ptr_access)) + ")",
                                     py2vf_ctx.getExpr(
                                         acc_content.value.value, CtntAccess(PtrAccess())),
-                                    # AttrAccess(acc_content.attr, CtntAccess(""))),
                                     vf.Eq
                                 )),
                                 vfpy.ForallPredFact(
