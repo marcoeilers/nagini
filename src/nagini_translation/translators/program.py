@@ -1824,12 +1824,17 @@ class ProgramTranslator(CommonTranslator):
                         eq_funcs.add(func)
 
                     if func.interface:
+                        if func.name == '__eq__' and ctx.alt_equality and func.sil_name != OBJECT_EQ:
+                            functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     merge_func = self.create_merge_function(func, ctx)
                     if merge_func:
                         functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
+                    if func.name == '__eq__' and ctx.alt_equality:
+                        functions.append(self.translate_extended_function(func, ctx))
+
                     pos = self.to_position(func.node, ctx)
                     info = self.no_info(ctx)
                     symm_check  = self.config.method_translator.encode_symmetry_check(

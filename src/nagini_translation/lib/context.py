@@ -74,6 +74,9 @@ class Context:
         self.use_domain_func_eq = False
         self.transitivity_result_var = Optional[Var]
 
+        # switch from merge function equality to alternative
+        self.alt_equality = False
+
     def get_fresh_int(self) -> int:
         """
         Returns a fresh integer value, to be used as a globally used counter

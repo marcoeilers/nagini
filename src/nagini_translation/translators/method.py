@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
+    STATELESS_FUNC,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -397,6 +398,76 @@ class MethodTranslator(CommonTranslator):
         other_decl = func.args[next(iterator)].decl
         return self_var, other_var, self_decl, other_decl
 
+    def translate_extended_function(self, func: PythonMethod,
+                                    ctx: Context) -> 'silver.ast.Function':
+        old_contract_only = func.contract_only
+        func.contract_only = True
+        self_var, other_var, self_var_decl, other_var_decl = self.get_self_other_as_var_and_decls(func)
+        pos = self.to_position(func.node, ctx)
+        info = self.no_info(ctx)
+        
+        # translate postcondition:
+        # ensures result == __prim__bool___box__(object___eq__(self, other))
+        object_eq_call = self.viper.FuncApp(
+            OBJECT_EQ, [self_var, other_var], pos, info, self.viper.Bool
+        )
+        boxed = self.viper.FuncApp(
+            '__prim__bool___box__', [object_eq_call], pos, info, self.viper.Ref
+        )
+        result = self.viper.Result(self.viper.Ref, pos, info)
+        post = self.viper.EqCmp(result, boxed, pos, info)
+
+        # translate func again and add above postcondition to it 
+        translated_func = self.translate_function(func, ctx)
+        func.contract_only = old_contract_only  # reset value
+        posts = self.viper.to_list(translated_func.posts())
+        posts.append(post)
+        fname = func.extended_name if func.extended_name else func.sil_name
+        return self.viper.Function(
+            fname, [self_var_decl, other_var_decl], self.viper.Ref, 
+            self.viper.to_list(translated_func.pres()),
+            posts, None, pos, info
+        )
+
+    def translate_extended_builtin_function(self, func: PythonMethod, sil_progs,
+                                            ctx: Context) -> 'silver.ast.Function':
+        pos = self.to_position(func.node, ctx)
+        info = self.no_info(ctx)
+
+        self_var = self.viper.LocalVar('self', self.viper.Ref, pos, info)
+        other_var = self.viper.LocalVar('other', self.viper.Ref, pos, info)
+
+        # translate postcondition:
+        # ensures result == object___eq__(self, other)
+        object_eq_call = self.viper.FuncApp(
+            OBJECT_EQ, [self_var, other_var], pos, info, self.viper.Bool
+        )
+        result = self.viper.Result(self.viper.Ref, pos, info)
+        post = self.viper.EqCmp(result, object_eq_call, pos, info)
+
+        res = sil_progs.findFunction(func.sil_name)
+        args = self.viper.to_list(res.formalArgs())
+        pres = self.viper.to_list(res.pres())
+        posts = self.viper.to_list(res.posts())
+        posts.append(post)
+
+        # add !stateless(other) ==> acc(state(other)) if primitive
+        if func.args[next(iter(func.args))].type.name in {'int', 'bool', 'str'}:
+            not_stateless = self.viper.Not(
+                self.viper.FuncApp(STATELESS_FUNC, [other_var], pos, info, self.viper.Bool),
+                pos, info
+            )
+            acc = self.viper.PredicateAccess([other_var], EQUALITY_STATE_PRED, pos, info)
+            pred_acc_pred = self.viper.PredicateAccessPredicate(acc, self.viper.FullPerm(pos, info), pos, info)
+            implies = self.viper.Implies(not_stateless, pred_acc_pred, pos, info)
+            pres.append(implies)
+
+        fname = func.extended_name if func.extended_name else func.sil_name
+        return self.viper.Function(
+            fname, args, self.viper.Bool, 
+            pres, posts, None, pos, info
+        )
+
     def get_self_other_pythonvar(self, func: PythonMethod):
         iterator = iter(func.args)
         self_var = func.args[next(iterator)]
@@ -443,7 +514,6 @@ class MethodTranslator(CommonTranslator):
 
     def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
-        res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
         body = []
 
         initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
@@ -504,7 +574,7 @@ class MethodTranslator(CommonTranslator):
 
         return self.viper.Method(
             f"{func.sil_name}_check_symmetry",
-            [self_decl, other_decl], [res_decl],
+            [self_decl, other_decl], [],
             [], [], [], block, pos, info
         )
 
@@ -523,8 +593,6 @@ class MethodTranslator(CommonTranslator):
 
     def encode_transitivity_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
-        _res_decl = self.viper.LocalVarDecl('_res', self.viper.Bool, pos, info)
-        _res = self.viper.LocalVar('_res', self.viper.Bool, pos, info)
 
         locals = []
         body = []
@@ -591,7 +659,8 @@ class MethodTranslator(CommonTranslator):
 
         ctx.current_function = old_func
 
-        body.append(self.viper.Assume(inlined_body, pos, info))
+        if inlined_body:
+            body.append(self.viper.Assume(inlined_body, pos, info))
         ctx.use_domain_func_eq = False
 
         guarded_blocks = []
@@ -665,7 +734,7 @@ class MethodTranslator(CommonTranslator):
 
         return self.viper.Method(
             f"{func.sil_name}_check_transitivity",
-            [self_decl, x_decl, other_decl], [_res_decl],
+            [self_decl, x_decl, other_decl], [],
             [], [], locals, block, pos, info
         )
 

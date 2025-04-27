@@ -1050,6 +1050,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.decreases_clauses = []
         self.merge_func_name: Optional[str] = None
         self.mentioned_classes = set()
+        
+        # used for alternative equality function call (not merge func)
+        self.extended_name = None
 
     def add_all_call_deps(self, res: Set[Tuple[ast.AST, PythonNode, PythonModule]],
                           prefix: Tuple[PythonNode, ...]=()) -> None:
@@ -1099,6 +1102,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             translator.set_required_names(self.sil_name, requires)
             if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
+            self.extended_name = self.get_fresh_name(sil_name + '_extended')
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1179,6 +1183,12 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                         if subclass.name in self.mentioned_classes_str:
                             self.mentioned_classes.add(subclass)
                         stack.extend(subclass.direct_subclasses)
+
+            # Set the extended name, it is used when calling an equality function.
+            # Used instead of the merge function.
+            # it a contract-only copy of the equality function with the postcondition added:
+            # ensures result == object___eq__(self, other)
+            self.extended_name = self.get_fresh_name(sil_name + '_extended')
 
     @property
     def nargs(self) -> int:

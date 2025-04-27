@@ -732,8 +732,23 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 else:
                     arg1 = self.to_ref(args[0], ctx)
                     arg2 = self.to_ref(args[1], ctx)
-                    return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
-                                              self.no_info(ctx), self.viper.Bool)
+
+                    t1, t2 = arg_types
+
+                    if ctx.alt_equality:
+                        to_call = t1.functions.get('__eq__')
+                        while(to_call is None):
+                            to_call = t1.superclass.functions.get('__eq__')
+                        rt = self.translate_type(to_call.type, ctx)
+                        if to_call.extended_name:
+                            return self.viper.FuncApp(to_call.extended_name, [arg1, arg2], position,
+                                                        self.no_info(ctx), rt)
+                        else:
+                            return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], position,
+                                                        self.no_info(ctx), rt)
+                    else:
+                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                                  self.no_info(ctx), self.viper.Bool)
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:
