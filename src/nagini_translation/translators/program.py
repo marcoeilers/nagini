@@ -34,6 +34,7 @@ from nagini_translation.lib.constants import (
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
     STATELESS_FUNC,
+    DEPENDENCIES,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -1826,12 +1827,14 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         if func.name == '__eq__' and ctx.alt_equality and func.sil_name != OBJECT_EQ:
                             functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
+                            self.track_dependencies(selected_names, selected, func, ctx)
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     merge_func = self.create_merge_function(func, ctx)
                     if merge_func:
                         functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
+
                     if func.name == '__eq__' and ctx.alt_equality:
                         functions.append(self.translate_extended_function(func, ctx))
 
@@ -1845,6 +1848,8 @@ class ProgramTranslator(CommonTranslator):
                     )
                     methods.append(symm_check)
                     methods.append(trans_check)
+                    self.viper.used_names.add(symm_check.name())
+                    self.viper.used_names.add(trans_check.name())
 
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
@@ -1962,11 +1967,12 @@ class ProgramTranslator(CommonTranslator):
                     all_used_names.append(superclass.sil_name)
             i += 1
 
-
+        # add some dependencies
+        all_used_names.extend(DEPENDENCIES)
+        
         # order overrides in reverse topo order in respect to the class hierarchy 
         cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
         overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
-
 
         eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
 

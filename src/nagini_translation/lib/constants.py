@@ -79,6 +79,20 @@ SINGLE_NAME = '_single'
 
 EQUALITY_STATE_PRED = 'state'
 STATELESS_FUNC = 'stateless'
+DEPENDENCIES = [
+    "tuple___val__",
+    "tuple___getitem__",
+    "tuple___len__",
+    "float___isNaN",
+    "set___len__",
+    "set___contains__",
+    "dict___len__",
+    "dict___getitem__",
+    "dict___contains__",
+    "list___len__",
+    "list___getitem__",
+    "list___getitem___index",
+]
 
 STATE_PREDS = [
     'list_state',
