@@ -442,7 +442,7 @@ class MethodTranslator(CommonTranslator):
         object_eq_call = self.viper.FuncApp(
             OBJECT_EQ, [self_var, other_var], pos, info, self.viper.Bool
         )
-        result = self.viper.Result(self.viper.Ref, pos, info)
+        result = self.viper.Result(self.viper.Bool, pos, info)
         post = self.viper.EqCmp(result, object_eq_call, pos, info)
 
         res = sil_progs.findFunction(func.sil_name)

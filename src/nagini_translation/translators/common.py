@@ -735,7 +735,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
                     t1, t2 = arg_types
 
-                    if ctx.alt_equality:
+                    if ctx.alt_equality and t1:
                         to_call = t1.functions.get('__eq__')
                         while(to_call is None):
                             to_call = t1.superclass.functions.get('__eq__')
@@ -746,9 +746,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         else:
                             return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], position,
                                                         self.no_info(ctx), rt)
-                    else:
-                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
-                                                  self.no_info(ctx), self.viper.Bool)
+                    return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                                self.no_info(ctx), self.viper.Bool)
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:
