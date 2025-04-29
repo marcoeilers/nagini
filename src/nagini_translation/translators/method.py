@@ -517,14 +517,21 @@ class MethodTranslator(CommonTranslator):
         body = []
 
         initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
-        body.append(self.viper.Assume(initial_type_check, pos, info))
+        body.append(self.viper.Inhale(initial_type_check, pos, info))
 
-        assume_other = self.viper.TrueLit(pos, info)
+        # for at least one C in M we have: type(other) <: C
+        assume_other = self.viper.FalseLit(pos, info)
         for c in func.mentioned_classes:
             subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
 
-        assume_other = self.viper.Assume(assume_other, pos, info)
+        # type(self) == type(other)
+        type_self = self.viper.DomainFuncApp('typeof', [self_var], self.pytype, pos, info, self.pytype_domain)
+        type_other = self.viper.DomainFuncApp('typeof', [other_var], self.pytype, pos, info, self.pytype_domain)
+        type_self_eq_type_other = self.viper.EqCmp(type_self, type_other, pos, info)
+
+        assume_other = self.viper.Or(assume_other, type_self_eq_type_other, pos, info)
+        assume_other = self.viper.Inhale(assume_other, pos, info)
         body.append(assume_other)
 
         # inhale state predicate access for self and other
@@ -533,15 +540,34 @@ class MethodTranslator(CommonTranslator):
             acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
-        left_eq = self.viper.FuncApp(
-            func.sil_name, [self_var, other_var], pos, info, self.viper.Ref
-        )
-        left_eq_unboxed = self.viper.FuncApp(
-            'bool___unbox__', [left_eq], pos, info, self.viper.Bool
-        )
-        assume_left = self.viper.Assume(left_eq_unboxed, pos, info)
-        body.append(assume_left)
+        ctx.use_domain_func_eq = True
 
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        # Inline body of func.___eq___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        statements = func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body = None
+        else:
+            inlined_body = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.translate_exprs(actual_body, func, ctx)],
+                pos, info, self.viper.Bool 
+            )
+
+        ctx.current_function = old_func
+
+        if inlined_body:
+            body.append(self.viper.Inhale(inlined_body, pos, info))
+        ctx.use_domain_func_eq = False
+
+        annotation = self.viper.AnnotationInfo("reveal", [])
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
             cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c.sil_name, pos, info)
@@ -553,7 +579,6 @@ class MethodTranslator(CommonTranslator):
 
             # encode symmetric __eq__ call
             # if we know the exact type, we can use the implementation
-            annotation = self.viper.AnnotationInfo("reveal", [])
             symm_call_exact_type = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, annotation, self.viper.Bool)
             symm_call_subtype = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)
             rhs_exact = self.viper.FuncApp('bool___unbox__', [symm_call_exact_type], pos, info, self.viper.Bool)
@@ -562,6 +587,12 @@ class MethodTranslator(CommonTranslator):
             assert_right_subtype = self.viper.Assert(rhs_subtype, pos, info)
             guarded_blocks.append((cond_exact_type, assert_right_exact))
             guarded_blocks.append((cond_subtype, assert_right_subtype))
+
+        # encode elseif (type(self) == type(other))
+        symm_call_exact_type = self.viper.FuncApp(func.sil_name, [other_var, self_var], pos, annotation, self.viper.Ref)
+        rhs_exact = self.viper.FuncApp('bool___unbox__', [symm_call_exact_type], pos, info, self.viper.Bool)
+        assert_right_exact = self.viper.Assert(rhs_exact, pos, info)
+        guarded_blocks.append((type_self_eq_type_other, assert_right_exact))
 
         # encode else branch as elseif(true) -> call object___eq__(other, self)
         symm_object_eq = self.viper.FuncApp(OBJECT_EQ, [other_var, self_var], pos, info, self.viper.Bool)
@@ -580,7 +611,12 @@ class MethodTranslator(CommonTranslator):
 
     def encode_modular_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
         self_var, other_var, _, _ = self.get_self_other_as_var_and_decls(func)
-        rhs = self.viper.EqCmp(self_var, other_var, pos, info)
+
+        # type(self) == type(other)
+        type_self = self.viper.DomainFuncApp('typeof', [self_var], self.pytype, pos, info, self.pytype_domain)
+        type_other = self.viper.DomainFuncApp('typeof', [other_var], self.pytype, pos, info, self.pytype_domain)
+        rhs = self.viper.EqCmp(type_self, type_other, pos, info)
+
         for c in func.mentioned_classes:
             subtype_check = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             rhs = self.viper.Or(rhs, subtype_check, pos, info)
@@ -647,8 +683,6 @@ class MethodTranslator(CommonTranslator):
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
                  isinstance(actual_body[0].value, ast.Ellipsis))):
-            
-            # TODO: fix this -> cannot be None
             inlined_body = None
         else:
             inlined_body = self.viper.FuncApp(
@@ -660,7 +694,7 @@ class MethodTranslator(CommonTranslator):
         ctx.current_function = old_func
 
         if inlined_body:
-            body.append(self.viper.Assume(inlined_body, pos, info))
+            body.append(self.viper.Inhale(inlined_body, pos, info))
         ctx.use_domain_func_eq = False
 
         guarded_blocks = []
@@ -709,7 +743,7 @@ class MethodTranslator(CommonTranslator):
                         raise InvalidProgramException(post, 'purity.violated')
                     and_posts = self.viper.And(and_posts, expr, pos, info)
 
-                stmts.append(self.viper.Assume(and_posts, pos, info))
+                stmts.append(self.viper.Inhale(and_posts, pos, info))
                 
                 # check if transitivity holds by asserting res
                 result_in_posts_unboxed = self.viper.FuncApp(
