@@ -226,7 +226,7 @@ class CallTranslator(CommonTranslator):
             else:
                 if arg_type.type.name in PRIMITIVES:
                     v_type = self.translate_type(arg_type.type, ctx)
-                    args[index] = self.to_type(translated_arg, v_type, ctx)
+                    args[index] = self.convert_to_type(translated_arg, v_type, ctx)
 
         # Translate constructor call
         cons_call = self.viper.DomainFuncApp(cons.fresh(cons.adt_prefix +
@@ -722,6 +722,8 @@ class CallTranslator(CommonTranslator):
             # constructor
             return True
         # If normal
+        if not isinstance(called_func, PythonMethod):
+            called_func = self.get_target(node.func, ctx)
         assert isinstance(called_func, PythonMethod)
         if (isinstance(node.func, ast.Attribute) and
                 get_func_name(node.func.value) == 'super'):
@@ -1696,8 +1698,8 @@ class CallTranslator(CommonTranslator):
 
         type_stmt, dynamic_type = self.translate_expr(node.func, ctx)
         assert not type_stmt
-        result_has_type = self.type_factory.dynamic_type_check(res_var.ref(),
-            dynamic_type, self.to_position(node, ctx), ctx)
+        result_has_type = self.viper.EqCmp(self.type_factory.typeof(res_var.ref(), ctx), self.to_type(dynamic_type, ctx),
+                                           self.to_position(node, ctx), self.no_info(ctx))
         # Inhale the type information about the newly created object
         # so that it's already present when calling __init__.
         type_inhale = self.viper.Inhale(result_has_type, pos,

@@ -9,7 +9,6 @@ import ast
 import inspect
 
 from nagini_translation.lib.constants import (
-    BOOL_TYPE,
     BOXED_PRIMITIVES,
     BYTES_TYPE,
     CHECK_DEFINED_FUNC,
@@ -31,6 +30,7 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     THREAD_DOMAIN,
     TUPLE_TYPE,
+    TYPE_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
@@ -743,12 +743,12 @@ class ExpressionTranslator(CommonTranslator):
             type_arg = self.type_factory.translate_type_literal(receiver,
                                                                 position, ctx)
         else:
-            if receiver.typ() != self.type_factory.type_type():
-                # Normal object, get its type.
-                type_arg = self.type_factory.typeof(receiver, ctx)
-            else:
-                # Type expression, use it directly.
-                type_arg = receiver
+            type_type = ctx.module.global_module.classes[TYPE_TYPE]
+            receiver_is_type = self.type_check(receiver, type_type, position, ctx)
+            type_arg = self.to_type(self.viper.CondExp(receiver_is_type, receiver,
+                                                       self.to_ref(self.type_factory.typeof(receiver, ctx), ctx),
+                                                       position, self.no_info(ctx)),
+                                    ctx)
         info = self.no_info(ctx)
         param = self.viper.LocalVarDecl('receiver',
                                         self.type_factory.type_type(), position,
