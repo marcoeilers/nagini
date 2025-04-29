@@ -264,7 +264,10 @@ class CallTranslator(CommonTranslator):
                                                        '_res',
                                                        target_class,
                                                        self.translator)
-        result_type = self.get_type(node, ctx)
+        if isinstance(node, ast.Call):
+            result_type = self.get_type(node, ctx)
+        else:
+            result_type = self.get_target(node, ctx)
         info = self.no_info(ctx)
 
         # Temporarily bind the type variables of the constructed class to

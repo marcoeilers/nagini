@@ -619,7 +619,7 @@ class MethodTranslator(CommonTranslator):
                                                  block.error_var.ref(), pos,
                                                  info)
         error_case.append(value_assign)
-        error_type = self.type_factory.typeof(block.error_var.ref(), ctx)
+        error_type = self.to_ref(self.type_factory.typeof(block.error_var.ref(), ctx), ctx)
         type_assign = self.viper.LocalVarAssign(type_var.ref(), error_type,
                                                 pos, info)
         error_case.append(type_assign)

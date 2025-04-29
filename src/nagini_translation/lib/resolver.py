@@ -445,6 +445,26 @@ def _get_call_type(node: ast.Call, module: PythonModule,
                     name_list = list(rectype.python_class.type_vars.keys())
                     index = name_list.index(call_target.type.name)
                     return rectype.type_args[index]
+    if (isinstance(call_target, PythonClass) and
+            call_target.type_vars):
+        # This is a call to a constructor of a generic class; it's not
+        # enough to just return the class, we need the entire type with
+        # type arguments. We only support that if we can get it directly
+        # from mypy, i.e., when the result is assigned to a variable
+        # and we can get the variable type.
+        if hasattr(node, '_parent') and node._parent and isinstance(node._parent, (ast.Assign, ast.AnnAssign)):
+            trgt = node._parent.targets[0] if isinstance(node._parent, ast.Assign) else node._parent.target
+            ann_type = get_type(trgt, containers, container)
+            if isinstance(ann_type, GenericType) and ann_type.python_class == call_target:
+                return ann_type
+        if (call_target.name in (PSEQ_TYPE, PSET_TYPE, PMSET_TYPE) and
+                isinstance(node, ast.Call) and node.args):
+            arg_types = [get_type(arg, containers, container)
+                         for arg in node.args]
+            return GenericType(call_target, [common_supertype(arg_types)])
+        else:
+            error = 'generic.constructor.without.type'
+            raise InvalidProgramException(node, error)
     if isinstance(call_target, PythonType):
         # constructor call
         return call_target
