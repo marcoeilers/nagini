@@ -735,7 +735,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
 
                     t1, t2 = arg_types
 
-                    if ctx.alt_equality and t1:
+                    if not ctx.merge and t1:
                         to_call = t1.functions.get('__eq__')
                         while(to_call is None):
                             to_call = t1.superclass.functions.get('__eq__')

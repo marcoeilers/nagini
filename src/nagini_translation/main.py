@@ -107,7 +107,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
               reload_resources: bool = False, verbose: bool = False,
               check_consistency: bool = False, float_encoding: str = None,
               counterexample: bool = False,
-              merge_equality: bool = False) -> Tuple[List['PythonModule'], Program]:
+              merge: bool = False) -> Tuple[List['PythonModule'], Program]:
     """
     Translates the Python module at the given path to a Viper program
     """
@@ -151,7 +151,7 @@ def translate(path: str, jvm: JVM, bv_size: int, selected: Set[str] = set(), bas
     modules = [main_module.global_module] + list(analyzer.modules.values())
     prog = translator.translate_program(modules, sil_programs, selected,
                                         arp=arp, ignore_global=ignore_global, sif=sif, float_encoding=float_encoding,
-                                        merge_equality=merge_equality)
+                                        merge=merge)
     if sif:
         set_all_low_methods(jvm, viper_ast.all_low_methods)
         set_preserves_low_methods(jvm, viper_ast.preserves_low_methods)
@@ -352,7 +352,7 @@ def main() -> None:
     )
     parser.add_argument(
         '--merge',
-        help='Use a merge function instead of postcondition that ensures BST.',
+        help='Use a merge function instead of a postcondition that ensures BST.',
         action='store_true',
         default=False,
     )
@@ -418,7 +418,7 @@ def translate_and_verify(python_file, jvm, args, print=print, arp=False, base_di
         modules, prog = translate(python_file, jvm, args.int_bitops_size, selected=selected, sif=args.sif, base_dir=base_dir,
                                   ignore_global=args.ignore_global, arp=arp, verbose=args.verbose,
                                   counterexample=args.counterexample, float_encoding=args.float_encoding,
-                                  merge_equality=args.merge_equality)
+                                  merge=args.merge)
         if args.print_viper:
             if args.verbose:
                 print('Result:')

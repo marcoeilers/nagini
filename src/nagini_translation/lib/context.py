@@ -75,7 +75,7 @@ class Context:
         self.transitivity_result_var = Optional[Var]
 
         # switch from extended equality to merge function
-        self.merge_equality = False
+        self.merge = False
 
     def get_fresh_int(self) -> int:
         """

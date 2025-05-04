@@ -1821,21 +1821,22 @@ class ProgramTranslator(CommonTranslator):
 
                     # add all __eq__ functions to eq_funcs
                     # to later create the merge func for object.__eq__
-                    if func.merge_func_name == OBJ___EQ__MERGED:
-                        eq_funcs.add(func)
+                    if ctx.merge and func.merge_func_name == OBJ___EQ__MERGED:
+                            eq_funcs.add(func)
 
                     if func.interface:
-                        if func.name == '__eq__' and ctx.alt_equality and func.sil_name != OBJECT_EQ:
+                        if func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ:
                             functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
                             self.track_dependencies(selected_names, selected, func, ctx)
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
-                    merge_func = self.create_merge_function(func, ctx)
-                    if merge_func:
-                        functions.append(merge_func)
+                    if ctx.merge:
+                        merge_func = self.create_merge_function(func, ctx)
+                        if merge_func:
+                            functions.append(merge_func)
                     functions.append(self.translate_function(func, ctx))
 
-                    if func.name == '__eq__' and ctx.alt_equality:
+                    if func.name == '__eq__' and not ctx.merge:
                         functions.append(self.translate_extended_function(func, ctx))
 
                     pos = self.to_position(func.node, ctx)
