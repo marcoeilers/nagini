@@ -91,7 +91,7 @@ class Translator:
                           ignore_global: bool = False,
                           arp: bool = False,
                           float_encoding : str = None,
-                          sif = False) -> 'silver.ast.Program':
+                          sif = False, merge_equality = False) -> 'silver.ast.Program':
         ctx = Context()
         ctx.sif = sif
         ctx.current_class = None
@@ -99,6 +99,7 @@ class Translator:
         ctx.module = modules[0]
         ctx.arp = arp
         ctx.float_encoding = float_encoding
+        ctx.merge_equality = merge_equality
         return self.prog_translator.translate_program(modules, sil_progs, ctx,
                                                       selected, ignore_global)
 

@@ -74,8 +74,8 @@ class Context:
         self.use_domain_func_eq = False
         self.transitivity_result_var = Optional[Var]
 
-        # switch from merge function equality to alternative
-        self.alt_equality = False
+        # switch from extended equality to merge function
+        self.merge_equality = False
 
     def get_fresh_int(self) -> int:
         """
