@@ -249,7 +249,7 @@
         "__eq__": {
             "args": ["int", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__", "float___eq__"]
+            "requires": ["__unbox__", "float___eq__", "stateless", "state"]
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
@@ -396,7 +396,7 @@
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
-            "requires": ["int___eq__", "unbox", "float___is_nan__", "float___is_inf__"]
+            "requires": ["int___eq__", "unbox", "float___is_nan__", "float___is_inf__", "object___eq__"]
         },
         "__add__": {
             "args": ["float", "float"],
@@ -495,7 +495,7 @@
         "__eq__": {
             "args": ["bool", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__"]
+            "requires": ["__unbox__", "int___eq__", "stateless", "state"]
         },
         "__and__": {
             "args": ["__prim__bool", "__prim__bool"],

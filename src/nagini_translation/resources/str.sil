@@ -27,10 +27,12 @@ function str___bool__(self: Ref) : Bool
 function str___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), str())
+    requires !stateless(other) ==> acc(state(other))
     ensures issubtype(typeof(other), str()) ==>
             (result <==>
               (str___len__(self) == str___len__(other)) && 
               (str___val__(self) == str___val__(other)))
+    ensures object___eq__(self, other)
 
 function str___add__(self: Ref, other: Ref): Ref
     decreases _

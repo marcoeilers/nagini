@@ -149,12 +149,16 @@ function bool___unbox__(box: Ref): Bool
 function int___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), int())
+    requires !stateless(other) ==> acc(state(other))
     ensures issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
+    ensures float___eq__(self, other)
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), bool())
+    requires !stateless(other) ==> acc(state(other))
     ensures issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
+    ensures int___eq__(self, other)
 
 function int___ge__(self: Ref, other: Ref): Bool
     decreases _

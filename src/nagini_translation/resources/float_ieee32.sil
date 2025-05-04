@@ -50,8 +50,10 @@ function float___lt__(self: Ref, other: Ref): Bool
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures result == ___float32_eq(float___unbox__(self), float___unbox__(other))
+    requires !stateless(other) ==> acc(state(other))
+    ensures issubtype(typeof(other), float()) ==>
+        result == ___float32_eq(float___unbox__(self), float___unbox__(other))
+    ensures object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _

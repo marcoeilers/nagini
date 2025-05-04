@@ -118,21 +118,26 @@ function float___lt__(self: Ref, other: Ref): Bool
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
-    requires issubtype(typeof(other), float())
-    ensures float___is_nan__(self) == true || float___is_nan__(other) == true ==>
+    requires !stateless(other) ==> acc(state(other))
+    ensures issubtype(typeof(other), float()) ==>
+        float___is_nan__(self) == true || float___is_nan__(other) == true ==>
         result == false
-    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
-            (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
-                result == true
-    ensures (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false) ||
-           (float___is_inf__(self, true) == true  && float___is_inf__(other, true) == false) ||
-           (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false) ||
-           (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false) ==>
-               result == false
-    ensures (float___is_nan__(self) == false && float___is_nan__(other) == false &&
+    ensures issubtype(typeof(other), float()) ==>
+        (float___is_inf__(self, false) == true && float___is_inf__(other, false) == true) ||
+        (float___is_inf__(self, true) == true && float___is_inf__(other, true) == true) ==>
+            result == true
+    ensures issubtype(typeof(other), float()) ==>
+        (float___is_inf__(self, false) == true && float___is_inf__(other, false) == false) ||
+        (float___is_inf__(self, true) == true  && float___is_inf__(other, true) == false) ||
+        (float___is_inf__(other, false) == true && float___is_inf__(self, false) == false) ||
+        (float___is_inf__(other, true) == true && float___is_inf__(self, true) == false) ==>
+            result == false
+    ensures issubtype(typeof(other), float()) ==>
+        (float___is_nan__(self) == false && float___is_nan__(other) == false &&
         float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
         float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
             result == (float___unbox__(self) == float___unbox__(other))
+    ensures object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _
