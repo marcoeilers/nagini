@@ -77,8 +77,20 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 
 SINGLE_NAME = '_single'
 
+OBJECT_EQ = 'object___eq__'
 EQUALITY_STATE_PRED = 'state'
 STATELESS_FUNC = 'stateless'
+BUILTIN___EQ___FUNCTIONS = [
+    'int___eq__',
+    'bool___eq__',
+    'str___eq__',
+    'float___eq__',
+    'list___eq__',
+    'tuple___eq__',
+    'set___eq__',
+    'dict___eq__',
+    OBJECT_EQ,
+]
 DEPENDENCIES = [
     "tuple___val__",
     "tuple___getitem__",
@@ -92,7 +104,15 @@ DEPENDENCIES = [
     "list___len__",
     "list___getitem__",
     "list___getitem___index",
-]
+    "state_abstract_rest",
+    "int___unbox__",
+    "bool___unbox__",
+    "__prim__bool___box__",
+    "__prim__int___box__",
+    STATELESS_FUNC,
+    OBJECT_EQ,
+    EQUALITY_STATE_PRED,
+] + BUILTIN___EQ___FUNCTIONS
 
 STATE_PREDS = [
     'list_state',
@@ -102,21 +122,6 @@ STATE_PREDS = [
 ]
 
 PRED_NOT_COLLECTION_TYPE = 'not_collection_type'
-
-OBJECT_EQ = 'object___eq__'
-
-BUILTIN___EQ___FUNCTIONS = [
-    'int___eq__',
-    'bool___eq__',
-    'str___eq__',
-    'float___eq__',
-    'list___eq__',
-    'tuple___eq__',
-    'set___eq__',
-    'dict___eq__',
-    OBJECT_EQ,
-]
-
 ILLEGAL_FUNC_NAMES = [
     STATELESS_FUNC
 ]

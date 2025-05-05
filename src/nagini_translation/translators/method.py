@@ -355,7 +355,6 @@ class MethodTranslator(CommonTranslator):
             check = self.type_check(result, func.type, res_type_pos, ctx)
             posts = [check] + posts
 
-        # TODO: use implementation if type is exactly the given type to avoid call to object___eq__(other, self)
         # Encode postconditions for custom __eq__ overrides
         if func.name == '__eq__':
             info = self.no_info(ctx)
@@ -399,17 +398,31 @@ class MethodTranslator(CommonTranslator):
         return self_var, other_var, self_decl, other_decl
 
     def translate_extended_function(self, func: PythonMethod,
-                                    ctx: Context) -> 'silver.ast.Function':
+                                    ctx: Context) -> Optional['silver.ast.Function']:
+        """Creates an extended function from func. It is a contract-only copy that 
+        additionally ensures that BST holds."""
+        if not func.overrides:
+            return
+
         old_contract_only = func.contract_only
         func.contract_only = True
         self_var, other_var, self_var_decl, other_var_decl = self.get_self_other_as_var_and_decls(func)
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
-        
+
+        eq_func = self.get_inherited_function(func.cls)
+        if not eq_func:
+            raise InvalidProgramException(func.node, "invalid.equality.override")
+
+        if eq_func.extended_name and eq_func.sil_name != OBJECT_EQ:
+            func_to_call = eq_func.extended_name 
+        else:
+            func_to_call = eq_func.sil_name 
+
         # translate postcondition:
-        # ensures result == __prim__bool___box__(object___eq__(self, other))
+        # ensures result == __prim__bool___box__(super___eq___extended(self, other))
         object_eq_call = self.viper.FuncApp(
-            OBJECT_EQ, [self_var, other_var], pos, info, self.viper.Bool
+            func_to_call, [self_var, other_var], pos, info, self.viper.Bool
         )
         boxed = self.viper.FuncApp(
             '__prim__bool___box__', [object_eq_call], pos, info, self.viper.Ref
@@ -437,30 +450,26 @@ class MethodTranslator(CommonTranslator):
         self_var = self.viper.LocalVar('self', self.viper.Ref, pos, info)
         other_var = self.viper.LocalVar('other', self.viper.Ref, pos, info)
 
-        # translate postcondition:
-        # ensures result == object___eq__(self, other)
-        object_eq_call = self.viper.FuncApp(
-            OBJECT_EQ, [self_var, other_var], pos, info, self.viper.Bool
-        )
-        result = self.viper.Result(self.viper.Bool, pos, info)
-        post = self.viper.EqCmp(result, object_eq_call, pos, info)
-
         res = sil_progs.findFunction(func.sil_name)
         args = self.viper.to_list(res.formalArgs())
         pres = self.viper.to_list(res.pres())
         posts = self.viper.to_list(res.posts())
-        posts.append(post)
 
-        # add !stateless(other) ==> acc(state(other)) if primitive
-        if func.args[next(iter(func.args))].type.name in {'int', 'bool', 'str'}:
-            not_stateless = self.viper.Not(
-                self.viper.FuncApp(STATELESS_FUNC, [other_var], pos, info, self.viper.Bool),
-                pos, info
-            )
-            acc = self.viper.PredicateAccess([other_var], EQUALITY_STATE_PRED, pos, info)
-            pred_acc_pred = self.viper.PredicateAccessPredicate(acc, self.viper.FullPerm(pos, info), pos, info)
-            implies = self.viper.Implies(not_stateless, pred_acc_pred, pos, info)
-            pres.append(implies)
+        # translate postcondition: ensures <super>___eq__(self, other)
+        eq_func = func.cls.superclass.functions.get('__eq__')
+        if not eq_func:
+            raise InvalidProgramException(func.node, "invalid.equality.override")
+        if eq_func.sil_name == OBJECT_EQ:
+            func_to_call = eq_func.sil_name
+        else:
+            func_to_call = eq_func.extended_name
+        
+        object_eq_call = self.viper.FuncApp(
+            func_to_call, [self_var, other_var], pos, info, self.viper.Bool
+        )
+        result = self.viper.Result(self.viper.Bool, pos, info)
+        post = self.viper.EqCmp(result, object_eq_call, pos, info)
+        posts.append(post)
 
         fname = func.extended_name if func.extended_name else func.sil_name
         return self.viper.Function(
@@ -646,23 +655,33 @@ class MethodTranslator(CommonTranslator):
         locals.append(result_decl_in_posts)
 
         initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
-        body.append(self.viper.Assume(initial_type_check, pos, info))
+        body.append(self.viper.Inhale(initial_type_check, pos, info))
 
         # assume typeof(res) <: bool
         result_in_posts_subtype_check = self.get_subtype_check_for_custom_class(result_in_posts, 'bool', pos, info)
-        body.append(self.viper.Assume(result_in_posts_subtype_check, pos, info))
+        body.append(self.viper.Inhale(result_in_posts_subtype_check, pos, info))
 
-        # assume x and other have type of one of the mentioned classes
-        assume_x = self.viper.TrueLit(pos, info)
-        assume_other = self.viper.TrueLit(pos, info)
+        # assume x and other are subtypes of one of the mentioned classes
+        assume_x = self.viper.FalseLit(pos, info)
+        assume_other = self.viper.FalseLit(pos, info)
         for c in func.mentioned_classes:
             subtype_check_x = self.get_subtype_check_for_custom_class(x, c.sil_name, pos, info)
             subtype_check_other = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             assume_x = self.viper.Or(assume_x, subtype_check_x, pos, info)
             assume_other = self.viper.Or(assume_other, subtype_check_other, pos, info)
 
-        assume_x = self.viper.Assume(assume_x, pos, info)
-        assume_other = self.viper.Assume(assume_other, pos, info)
+        # type(self) == type(other)
+        type_self = self.viper.DomainFuncApp('typeof', [self_var], self.pytype, pos, info, self.pytype_domain)
+        type_other = self.viper.DomainFuncApp('typeof', [other_var], self.pytype, pos, info, self.pytype_domain)
+        type_x = self.viper.DomainFuncApp('typeof', [x], self.pytype, pos, info, self.pytype_domain)
+        type_self_eq_type_other = self.viper.EqCmp(type_self, type_other, pos, info)
+        type_self_eq_type_x = self.viper.EqCmp(type_self, type_x, pos, info)
+
+        assume_x = self.viper.Or(assume_x, type_self_eq_type_x, pos, info)
+        assume_other = self.viper.Or(assume_other, type_self_eq_type_other, pos, info)
+
+        assume_x = self.viper.Inhale(assume_x, pos, info)
+        assume_other = self.viper.Inhale(assume_other, pos, info)
         body.extend([assume_x, assume_other])
 
         for var in [self_var, x, other_var]:
@@ -762,10 +781,11 @@ class MethodTranslator(CommonTranslator):
 
             ctx.use_domain_func_eq = False
 
-        if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
-        body.append(if_stmt)
-        block = self.translate_block(body, pos, info)
+        if guarded_blocks:
+            if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
+            body.append(if_stmt)
 
+        block = self.translate_block(body, pos, info)
         return self.viper.Method(
             f"{func.sil_name}_check_transitivity",
             [self_decl, x_decl, other_decl], [],
