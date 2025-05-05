@@ -420,15 +420,15 @@ class MethodTranslator(CommonTranslator):
             func_to_call = eq_func.sil_name 
 
         # translate postcondition:
-        # ensures result == __prim__bool___box__(super___eq___extended(self, other))
-        object_eq_call = self.viper.FuncApp(
+        # ensures result == super___eq___extended(self, other)
+        super_eq_call = self.viper.FuncApp(
             func_to_call, [self_var, other_var], pos, info, self.viper.Bool
         )
         boxed = self.viper.FuncApp(
             '__prim__bool___box__', [object_eq_call], pos, info, self.viper.Ref
         )
         result = self.viper.Result(self.viper.Ref, pos, info)
-        post = self.viper.EqCmp(result, boxed, pos, info)
+        post = self.viper.EqCmp(result, super_eq_call, pos, info)
 
         # translate func again and add above postcondition to it 
         translated_func = self.translate_function(func, ctx)
