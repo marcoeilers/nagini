@@ -48,7 +48,6 @@ function float___eq__(self: Ref, other: Ref): Bool
     requires !stateless(other) ==> acc(state(other))
     // result == false if self or other are NaN
     ensures issubtype(typeof(other), float()) ==> float___isNaN(self) || float___isNaN(other) ==> result == false
-    ensures object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _

@@ -137,7 +137,6 @@ function float___eq__(self: Ref, other: Ref): Bool
         float___is_inf__(self, false) == false && float___is_inf__(self, true) == false &&
         float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
             result == (float___unbox__(self) == float___unbox__(other))
-    ensures object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _

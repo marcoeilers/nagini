@@ -53,7 +53,6 @@ function float___eq__(self: Ref, other: Ref): Bool
     requires !stateless(other) ==> acc(state(other))
     ensures issubtype(typeof(other), float()) ==>
         result == ___float32_eq(float___unbox__(self), float___unbox__(other))
-    ensures object___eq__(self, other)
 
 function float___add__(self: Ref, other: Ref): Ref
     decreases _

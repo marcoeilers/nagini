@@ -498,6 +498,8 @@ class ProgramTranslator(CommonTranslator):
 
         last_check = None
         for cur in overrides:
+            if cur.sil_name:
+                self.viper.used_names_sets[fname].add(cur.sil_name)
 
             ctx.current_function = cur
             ctx.module = cur.module
@@ -522,13 +524,19 @@ class ProgramTranslator(CommonTranslator):
             pos = self.to_position(cur.node, ctx)
             info = self.no_info(ctx)
 
-            with ctx.additional_aliases(ctx.var_aliases):
-                self_var = cur.args[next(iter(cur.args))].ref()
+            with ctx.additional_aliases(aliases):
+                iterator = iter(cur.args)
+                self_var = cur.args[next(iterator)].ref()
+                other_var = cur.args[next(iterator)].ref()
 
                 # find self in aliases
                 if ctx.var_aliases:
+                    m_iter = iter(merge_func.args)
                     self_var = ctx.var_aliases.get(
-                        merge_func.args[next(iter(merge_func.args))].name
+                        merge_func.args[next(m_iter)].name
+                    ).ref()
+                    other_var = ctx.var_aliases.get(
+                        merge_func.args[next(m_iter)].name
                     ).ref()
 
                 and_pres = self.viper.TrueLit(pos, info)
@@ -554,7 +562,19 @@ class ProgramTranslator(CommonTranslator):
 
                 check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                 if last_check is None:
-                    last_check = self.viper.CondExp(check, and_pres, self.viper.TrueLit(pos, self.info), pos, info)
+                    object_pre = self.viper.TrueLit(pos, info)
+                    for var in [self_var, other_var]:
+                        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.FullPerm(pos, info), merge_func.node, ctx)
+                        not_stateless = self.viper.Not(
+                            self.viper.FuncApp(
+                                STATELESS_FUNC, [other_var], self.to_position(merge_func.node, ctx),
+                                self.no_info(ctx), self.viper.Bool), pos, self.info
+                        )
+                        acc_precond = self.viper.Implies(
+                            not_stateless, acc_precond, pos, self.info
+                        )
+                        object_pre = self.viper.And(object_pre, acc_precond, pos, info)
+                    last_check = self.viper.CondExp(check, and_pres, object_pre, pos, info)
                 else:
                     last_check = self.viper.CondExp(check, and_pres, last_check, pos, info)
                     
@@ -594,11 +614,6 @@ class ProgramTranslator(CommonTranslator):
         ctx.current_class = old_cls
         ctx.position.pop()
         
-        # extend the dummy merge equality function
-        viper_merge_func = sil_progs.findFunction(OBJ___EQ__MERGED)
-        viper_merge_func_pres = self.viper.to_list(viper_merge_func.pres())
-        merge_pres.extend(viper_merge_func_pres)
-
         args = self.config.method_translator._translate_params(merge_func, ctx)
         if merge_func.declared_exceptions:
             raise InvalidProgramException(merge_func.node,
