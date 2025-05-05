@@ -542,12 +542,8 @@ class ProgramTranslator(CommonTranslator):
                 and_pres = self.viper.TrueLit(pos, info)
                 for pre in pres:
                     # translate first if not already translated (i.e. custom __eq__ precondition)
-                    
                     if not cur.interface:
-                        if isinstance(pre.func, ast.Attribute) and pre.func.attr == EQUALITY_STATE_PRED:
-                            stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
-                        else:
-                            stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool)
+                        stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
                         if stmt:
                             raise InvalidProgramException(cur.node, 'purity.violated')
 
@@ -559,15 +555,15 @@ class ProgramTranslator(CommonTranslator):
                         continue
 
                     and_pres = self.viper.And(and_pres, pre, pos, info)
-
+                
                 check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                 if last_check is None:
                     object_pre = self.viper.TrueLit(pos, info)
                     for var in [self_var, other_var]:
-                        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.FullPerm(pos, info), merge_func.node, ctx)
+                        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
                         not_stateless = self.viper.Not(
                             self.viper.FuncApp(
-                                STATELESS_FUNC, [other_var], self.to_position(merge_func.node, ctx),
+                                STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
                                 self.no_info(ctx), self.viper.Bool), pos, self.info
                         )
                         acc_precond = self.viper.Implies(

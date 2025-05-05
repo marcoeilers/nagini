@@ -10,6 +10,7 @@ import ast
 
 from abc import ABCMeta
 from collections import OrderedDict
+from copy import deepcopy
 from enum import Enum
 from nagini_contracts.io_contracts import BUILTIN_IO_OPERATIONS
 from nagini_translation.lib.constants import (
@@ -647,6 +648,23 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
         for name, method in self.static_methods.items():
             method_name = self.name + '_' + name
             method.process(self.get_fresh_name(method_name), translator)
+
+        # use inherited state predicate if none is defined
+        if (not self.interface and not (self.sil_name) in map(lambda x: x + '_type', PRIMITIVES) 
+            and self.predicates.get(EQUALITY_STATE_PRED) is None):
+            super_cls = self
+            while(not super_cls.predicates.get(EQUALITY_STATE_PRED)):
+                super_cls = super_cls.superclass
+            super_pred = super_cls.predicates.get(EQUALITY_STATE_PRED)
+            pred = self.node_factory.create_python_method(
+                EQUALITY_STATE_PRED, deepcopy(super_pred.node), self, self.superscope,
+                True, False, self.node_factory, interface=True
+            )
+            pred.type = super_pred.type
+            pred.overrides = super_pred
+            pred.predicate = True
+            self.predicates[EQUALITY_STATE_PRED] = pred
+
         for name, predicate in self.predicates.items():
             pred_name = self.name + '_' + name
             predicate.process(self.get_fresh_name(pred_name), translator)

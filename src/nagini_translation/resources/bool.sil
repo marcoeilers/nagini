@@ -311,7 +311,7 @@ function stateless(x: Ref): Bool
       )
     )
 
-// dummy state function
+// object state predicate
 predicate state(self: Ref) {
     true
 }

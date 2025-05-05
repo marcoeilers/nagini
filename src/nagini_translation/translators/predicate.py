@@ -188,6 +188,7 @@ class PredicateTranslator(CommonTranslator):
                                                                      self.viper.FullPerm(root_pos_with_rule, no_info),
                                                                      root_pos_with_rule, no_info)
 
+            # add collection type checks to the implication 
             if root.sil_name == EQUALITY_STATE_PRED:
                 res = sil_progs.findPredicate(PRED_NOT_COLLECTION_TYPE)
                 pred_body_opt = res.body()
@@ -201,6 +202,7 @@ class PredicateTranslator(CommonTranslator):
         if not root.contract_only:
             body = self.viper.And(arg_types, body, root_pos, no_info)
 
+        # add all collection prediates
         if root.sil_name == EQUALITY_STATE_PRED:
             for fname in STATE_PREDS:
                 res = sil_progs.findPredicate(fname)
