@@ -546,7 +546,7 @@ class MethodTranslator(CommonTranslator):
         # inhale state predicate access for self and other
         for var in [self_var, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
-            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.WildcardPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
         ctx.use_domain_func_eq = True
@@ -686,7 +686,7 @@ class MethodTranslator(CommonTranslator):
 
         for var in [self_var, x, other_var]:
             state_pred = self.viper.PredicateAccess([var], EQUALITY_STATE_PRED, pos, info)
-            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.FullPerm(pos, info), pos, info)
+            acc_state_pred = self.viper.PredicateAccessPredicate(state_pred, self.viper.WildcardPerm(pos, info), pos, info)
             body.append(self.viper.Inhale(acc_state_pred, pos, info))
 
         ctx.use_domain_func_eq = True
