@@ -37,6 +37,8 @@ from nagini_translation.lib.constants import (
     EQUALITY_STATE_PRED,
     OBJECT_TYPE,
     OBJECT_EQ,
+    DEFAULT_STATE_PRED_PYTHON,
+    BOOL_TYPE,
 )
 from nagini_translation.lib.io_checkers import IOOperationBodyChecker
 from nagini_translation.lib.typedefs import Expr, Stmt
@@ -660,6 +662,12 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
                 EQUALITY_STATE_PRED, deepcopy(super_pred.node), self, self.superscope,
                 True, False, self.node_factory, interface=True
             )
+            pred.node = ast.parse(DEFAULT_STATE_PRED_PYTHON)
+            pred.node.lineno = 0
+            pred.node.end_lineno = 0
+            pred.node.col_offset = 0
+            pred.node.end_col_offset = 0
+            pred.node.returns = BOOL_TYPE
             pred.type = super_pred.type
             pred.overrides = super_pred
             pred.predicate = True

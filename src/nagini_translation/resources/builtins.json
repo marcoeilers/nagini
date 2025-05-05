@@ -396,7 +396,7 @@
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
-            "requires": ["int___eq__", "unbox", "float___is_nan__", "float___is_inf__", "object___eq__"]
+            "requires": ["int___eq__", "unbox", "float___isNaN", "float___is_inf__", "object___eq__"]
         },
         "__add__": {
             "args": ["float", "float"],

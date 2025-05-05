@@ -485,6 +485,10 @@ class ProgramTranslator(CommonTranslator):
         merge_func.opaque = False
         old_aliases = copy.deepcopy(ctx.var_aliases)
 
+        # add decreases precondition
+        decreases = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
+        merge_pres.append(decreases)
+
         # loop through all overriding __eq__ functions and encode
         # the preconditions as one large conditional expression of the form:
         # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
@@ -1984,10 +1988,12 @@ class ProgramTranslator(CommonTranslator):
         all_used_names.extend(DEPENDENCIES)
         
         # order overrides in reverse topo order in respect to the class hierarchy 
-        cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
-        overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
-
-        eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
+        if ctx.merge:
+            cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
+            overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
+            eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
+            if eq_merge:
+                functions.append(eq_merge)
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.
@@ -2016,10 +2022,6 @@ class ProgramTranslator(CommonTranslator):
         predicates += s_predicates
         functions += s_functions
         methods += s_methods
-
-        # add the new merge function
-        if eq_merge:
-            functions.append(eq_merge)
 
         prog = self.viper.Program(domains, fields, functions, predicates,
                                   methods, self.no_position(ctx),

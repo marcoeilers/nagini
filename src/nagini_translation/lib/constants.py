@@ -91,6 +91,9 @@ BUILTIN___EQ___FUNCTIONS = [
     'dict___eq__',
     OBJECT_EQ,
 ]
+
+DEFAULT_STATE_PRED_PYTHON = """return True"""
+
 DEPENDENCIES = [
     "tuple___val__",
     "tuple___getitem__",
