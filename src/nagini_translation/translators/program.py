@@ -1842,7 +1842,6 @@ class ProgramTranslator(CommonTranslator):
                     if func.interface:
                         if func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ:
                             functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
-                            self.track_dependencies(selected_names, selected, func, ctx)
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     if ctx.merge:
@@ -1852,7 +1851,9 @@ class ProgramTranslator(CommonTranslator):
                     functions.append(self.translate_function(func, ctx))
 
                     if func.name == '__eq__' and not ctx.merge:
-                        functions.append(self.translate_extended_function(func, ctx))
+                        extended_func = self.translate_extended_function(func, ctx)
+                        if extended_func:
+                            functions.append(extended_func)
 
                     pos = self.to_position(func.node, ctx)
                     info = self.no_info(ctx)
