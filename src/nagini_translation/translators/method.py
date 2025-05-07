@@ -424,9 +424,6 @@ class MethodTranslator(CommonTranslator):
         super_eq_call = self.viper.FuncApp(
             func_to_call, [self_var, other_var], pos, info, self.viper.Bool
         )
-        boxed = self.viper.FuncApp(
-            '__prim__bool___box__', [object_eq_call], pos, info, self.viper.Ref
-        )
         result = self.viper.Result(self.viper.Ref, pos, info)
         post = self.viper.EqCmp(result, super_eq_call, pos, info)
 
