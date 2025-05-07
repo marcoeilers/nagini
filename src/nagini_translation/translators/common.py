@@ -30,6 +30,7 @@ from nagini_translation.lib.constants import (
     SINGLE_NAME,
     UNION_TYPE,
     OBJ___EQ__MERGED,
+    EQUALITY_STATE_PRED,
 )
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
@@ -746,8 +747,9 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         else:
                             return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], position,
                                                         self.no_info(ctx), rt)
-                    return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
-                                                self.no_info(ctx), self.viper.Bool)
+                    elif ctx.merge:
+                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                                    self.no_info(ctx), self.viper.Bool)
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:
@@ -876,10 +878,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         pred_acc = self.viper.PredicateAccess(args, pred_name,
                                               self.to_position(node, ctx),
                                               self.no_info(ctx))
+        pos = self.to_position(node, ctx)
+        info = self.no_info(ctx)
         if ctx.perm_factor:
-            pos = self.to_position(node, ctx)
-            info = self.no_info(ctx)
             perm = self.viper.PermMul(perm, ctx.perm_factor, pos, info)
+        elif pred_name == EQUALITY_STATE_PRED:
+            perm = self.viper.WildcardPerm(pos, info)
         pred_acc_pred = self.viper.PredicateAccessPredicate(pred_acc, perm,
             self.to_position(node, ctx), self.no_info(ctx))
         return pred_acc_pred
