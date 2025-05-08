@@ -94,29 +94,25 @@ BUILTIN___EQ___FUNCTIONS = [
 
 DEFAULT_STATE_PRED_PYTHON = """return True"""
 
-DEPENDENCIES = [
-    "tuple___val__",
-    "tuple___getitem__",
-    "tuple___len__",
+DEPENDENCIES_MERGE_FUNC_EQUALITY = [
+    STATELESS_FUNC,
+    EQUALITY_STATE_PRED,
     "float___isNaN",
     "set___len__",
     "set___contains__",
+    "tuple___len__",
+    "tuple___getitem__",
     "dict___len__",
-    "dict___getitem__",
     "dict___contains__",
+    "dict___getitem__",
     "list___len__",
-    "list___getitem__",
     "list___getitem___index",
-    "state_abstract_rest",
-    "int___unbox__",
-    "bool___unbox__",
-    "__prim__bool___box__",
-    "__prim__int___box__",
-    STATELESS_FUNC,
-    OBJECT_EQ,
-    EQUALITY_STATE_PRED,
-] + BUILTIN___EQ___FUNCTIONS
+    "list___getitem___index",
+]
 
+DEPENDENCIES_STATELESS_FUNC = [
+    "tuple___val__",
+]
 STATE_PREDS = [
     'list_state',
     'set_state',
