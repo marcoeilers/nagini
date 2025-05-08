@@ -34,7 +34,9 @@ from nagini_translation.lib.constants import (
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
     STATELESS_FUNC,
-    DEPENDENCIES,
+    DEPENDENCIES_STATELESS_FUNC,
+    DEPENDENCIES_MERGE_FUNC_EQUALITY,
+    BUILTIN___EQ___FUNCTIONS,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -502,9 +504,6 @@ class ProgramTranslator(CommonTranslator):
 
         last_check = None
         for cur in overrides:
-            if cur.sil_name:
-                self.viper.used_names_sets[fname].add(cur.sil_name)
-
             ctx.current_function = cur
             ctx.module = cur.module
             ctx.current_class = cur.cls
@@ -1704,6 +1703,18 @@ class ProgramTranslator(CommonTranslator):
 
         return domains, functions
 
+    def add_dependency(self, fnames: list[str], to_add: str) -> None:
+        for fname in fnames:
+            s = self.required_names.get(to_add)
+            u = self.viper.used_names_sets.get(to_add)
+            if s:
+                self.required_names[to_add].add(fname)
+            elif u:
+                self.viper.used_names_sets[to_add].add(fname)
+            else:
+                self.viper.used_names_sets[to_add] = set()
+                self.viper.used_names_sets[to_add].add(fname)
+
     def translate_program(self, modules: List[PythonModule], sil_progs: Program,
                           ctx: Context, selected: Set[str] = None,
                           ignore_global: bool = False) -> Program:
@@ -1840,20 +1851,27 @@ class ProgramTranslator(CommonTranslator):
                             eq_funcs.add(func)
 
                     if func.interface:
-                        if func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ:
+                        if (func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ and 
+                            func.sil_name in BUILTIN___EQ___FUNCTIONS):
                             functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
+                            fname = func.extended_name if func.extended_name else func.sil_name
+                            self.add_dependency([fname], func.sil_name)
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     if ctx.merge:
                         merge_func = self.create_merge_function(func, ctx)
+                        if func.merge_func_name:
+                            self.add_dependency([func.merge_func_name], func.sil_name)
                         if merge_func:
                             functions.append(merge_func)
+
                     functions.append(self.translate_function(func, ctx))
 
                     if func.name == '__eq__' and not ctx.merge:
                         extended_func = self.translate_extended_function(func, ctx)
                         if extended_func:
                             functions.append(extended_func)
+                            self.add_dependency(extended_func.name(), func.sil_name)
 
                     pos = self.to_position(func.node, ctx)
                     info = self.no_info(ctx)
@@ -1865,8 +1883,8 @@ class ProgramTranslator(CommonTranslator):
                     )
                     methods.append(symm_check)
                     methods.append(trans_check)
-                    self.viper.used_names.add(symm_check.name())
-                    self.viper.used_names.add(trans_check.name())
+                    self.add_dependency([symm_check.name()], func.sil_name)
+                    self.add_dependency([trans_check.name()], func.sil_name)
 
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or
@@ -1956,6 +1974,16 @@ class ProgramTranslator(CommonTranslator):
             preds, pred_self_framing_checks = self.translate_predicate_family(root, predicate_families[root], sil_progs, ctx)
             predicates.extend(preds)
             methods.extend(pred_self_framing_checks)
+        
+        # order overrides in reverse topo order in respect to the class hierarchy 
+        if ctx.merge:
+            cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
+            overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
+            eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
+            if eq_merge:
+                functions.append(eq_merge)
+                self.add_dependency([eq_merge.name()], func.sil_name)
+                self.add_dependency(DEPENDENCIES_MERGE_FUNC_EQUALITY, func.sil_name)
 
         all_used_names = None
 
@@ -1985,15 +2013,7 @@ class ProgramTranslator(CommonTranslator):
             i += 1
 
         # add some dependencies
-        all_used_names.extend(DEPENDENCIES)
-        
-        # order overrides in reverse topo order in respect to the class hierarchy 
-        if ctx.merge:
-            cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
-            overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
-            eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
-            if eq_merge:
-                functions.append(eq_merge)
+        all_used_names.extend(DEPENDENCIES_STATELESS_FUNC)
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.
