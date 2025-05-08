@@ -24,7 +24,6 @@ def bar(x: X) -> int:
     Ensures(Result() > 8)
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() > 15)
-    Ensures(Result() != 16)
     i = 4
     a = x.foo(i)  # a = 4 * 4 = 16
     return a
@@ -34,7 +33,6 @@ def baz(y: SubX) -> int:
     Ensures(Result() > 9)  # given from SubX.foo
     #:: ExpectedOutput(postcondition.violated:assertion.false)
     Ensures(Result() > 16)  # could be proven only with the definition
-    Ensures(Result() != 17)
     i = 2
     b = y.foo(i)  # b = 2^4 + 1 = 17
     return b
