@@ -11,6 +11,6 @@ def bincoeff(VALUEONLY_n: int, VALUEONLY_k: int) -> int:
         return bincoeff(VALUEONLY_n - 1, VALUEONLY_k - 1) + bincoeff(VALUEONLY_n - 1, VALUEONLY_k)
 @ContractOnly
 @Native
-def compute_bincoeff(n: int, k: int) -> None:
+def compute_bincoeff(n: int, k: int) -> int:
     Requires(n >= 0 and k >= 0 and k <= n and n <= 63)
     Ensures(Result() == bincoeff(n, k))
