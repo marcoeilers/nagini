@@ -9,6 +9,7 @@ import ast
 from collections import OrderedDict
 from typing import List, Set, Tuple, Optional
 import copy
+import re
 
 from nagini_translation.lib.constants import (
     ARBITRARY_BOOL_FUNC,
