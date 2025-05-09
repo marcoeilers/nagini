@@ -31,6 +31,7 @@ from nagini_translation.lib.constants import (
     THREAD_DOMAIN,
     THREAD_POST_PRED,
     THREAD_START_PRED,
+    TYPE_TYPE,
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
@@ -721,8 +722,12 @@ class ProgramTranslator(CommonTranslator):
                                               ctx, inhale_exhale=False)
         elif method.method_type == MethodType.class_method:
             cls_arg = next(iter(method.overrides.args.values())).ref()
-            has_subtype = self.type_factory.subtype_check(cls_arg, method.cls,
-                                                          pos, ctx)
+            type_type = ctx.module.global_module.classes[TYPE_TYPE]
+            has_type_type = self.type_factory.type_check(cls_arg, type_type,
+                                                         pos, ctx)
+            type_has_type = self.type_factory.subtype_check(self.to_type(cls_arg, ctx), method.cls,
+                                                            pos, ctx)
+            has_subtype = self.viper.And(has_type_type, type_has_type, pos, self.no_info(ctx))
         if method.name == '__init__':
             fields = method.cls.all_fields
             pres.extend([self.get_may_set_predicate(self_arg.ref(), f, ctx)

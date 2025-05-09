@@ -23,11 +23,13 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     PRIMITIVE_BOOL_TYPE,
     PRIMITIVE_INT_TYPE,
+    PRIMITIVE_TYPE_TYPE,
     RANGE_TYPE,
     PSEQ_TYPE,
     PSET_TYPE,
     SET_TYPE,
     SINGLE_NAME,
+    TYPE_TYPE,
     UNION_TYPE,
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
@@ -105,6 +107,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             result = self.to_bool(e, ctx, node)
         elif target_type == self.viper.Int:
             result = self.to_int(e, ctx)
+        elif target_type == self.type_factory.type_type():
+            result = self.to_type(e, ctx)
         return result
 
     def _is_pure(self, e: Expr) -> bool:
@@ -112,15 +116,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if isinstance(e, (self.viper.ast.And, self.viper.ast.Or)):
             return self._is_pure(e.left()) and self._is_pure(e.right())
         return e.isPure()
-
-    def to_type(self, e: Expr, t, ctx) -> Expr:
-        if t is self.viper.Ref:
-            return self.to_ref(e, ctx)
-        if t is self.viper.Int:
-            return self.to_int(e, ctx)
-        if t is self.viper.Bool:
-            return self.to_bool(e, ctx)
-        return e
 
     def to_ref(self, e: Expr, ctx: Context) -> Expr:
         """
@@ -149,6 +144,15 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             else:
                 prim_bool = ctx.module.global_module.classes[PRIMITIVE_BOOL_TYPE]
                 result = self.get_function_call(prim_bool, '__box__',
+                                                [result], [None], None, ctx,
+                                                position=e.pos())
+        elif e.typ() == self.type_factory.type_type():
+            if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'type___unbox__'):
+                result = e.args().head()
+            else:
+                prim_type = ctx.module.global_module.classes[PRIMITIVE_TYPE_TYPE]
+                result = self.get_function_call(prim_type, '__box__',
                                                 [result], [None], None, ctx,
                                                 position=e.pos())
         return result
@@ -207,6 +211,30 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         result = e
         int_type = ctx.module.global_module.classes[INT_TYPE]
         result = self.get_function_call(int_type, '__unbox__',
+                                        [result], [None], None, ctx,
+                                        position=e.pos())
+        return result
+
+    def to_type(self, e: Expr, ctx: Context) -> Expr:
+        """
+        Converts the given expression to an expression of the Silver type PyType
+        if it isn't already, either by unboxing a reference or undoing a
+        previous boxing operation.
+        """
+        # Avoid wrapping non-pure expressions (leads to errors within Silver's
+        # Consistency object)
+        if not self._is_pure(e):
+            return e
+        if e.typ() == self.type_factory.type_type():
+            return e
+        if e.typ() != self.viper.Ref:
+            e = self.to_ref(e, ctx)
+        if (isinstance(e, self.viper.ast.FuncApp) and
+                    e.funcname() == 'PyType__box__'):
+            return e.args().head()
+        result = e
+        type_type = ctx.module.global_module.classes[TYPE_TYPE]
+        result = self.get_function_call(type_type, '__unbox__',
                                         [result], [None], None, ctx,
                                         position=e.pos())
         return result
@@ -665,10 +693,12 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         assert len(args) == len(func.get_args())
         for arg, param, type in zip(args, func.get_args(), arg_types):
             formal_args.append(param.decl)
-            if param.type.name == '__prim__bool':
+            if param.type.name == PRIMITIVE_BOOL_TYPE:
                 actual_arg = self.to_bool(arg, ctx)
-            elif param.type.name == '__prim__int':
+            elif param.type.name == PRIMITIVE_INT_TYPE:
                 actual_arg = self.to_int(arg, ctx)
+            elif param.type.name == PRIMITIVE_TYPE_TYPE:
+                actual_arg = self.to_type(arg, ctx)
             else:
                 actual_arg = self.to_ref(arg, ctx)
             actual_args.append(actual_arg)

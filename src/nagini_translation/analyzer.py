@@ -14,7 +14,12 @@ import tokenize
 
 from collections import OrderedDict
 from nagini_contracts.contracts import CONTRACT_FUNCS, CONTRACT_WRAPPER_FUNCS
-from nagini_contracts.io_contracts import IO_OPERATION_PROPERTY_FUNCS
+from nagini_contracts.io_contracts import (
+    BUILTIN_IO_OPERATIONS,
+    IO_CONTRACT_FUNCS,
+    IO_OPERATION_PROPERTY_FUNCS
+)
+from nagini_contracts.obligations import OBLIGATION_CONTRACT_FUNCS
 from nagini_translation.analyzer_io import IOOperationAnalyzer
 from nagini_translation.external.ast_util import mark_text_ranges
 from nagini_translation.lib.constants import (
@@ -101,6 +106,7 @@ class Analyzer(ast.NodeVisitor):
         self.selected = selected
         self.deferred_tasks = []
         self.has_all_low = False
+        self.enable_obligations = False
 
     def initialize_io_analyzer(self) -> None:
         self.io_operation_analyzer = IOOperationAnalyzer(
@@ -982,6 +988,8 @@ class Analyzer(ast.NodeVisitor):
             node.func.id in IO_OPERATION_PROPERTY_FUNCS):
             raise InvalidProgramException(
                 node, 'invalid.io_operation.misplaced_property')
+        if self._requires_obligations(node.func):
+            self.enable_obligations = True
         if isinstance(node.func, ast.Name) and node.func.id == 'Thread':
             return
         if isinstance(node.func, ast.Name) and node.func.id == 'getOld':
@@ -1006,6 +1014,34 @@ class Analyzer(ast.NodeVisitor):
             self.extract_mentioned_classes(node.func)
 
         self.visit_default(node)
+
+    def _requires_obligations(self, node: ast.AST) -> bool:
+        """
+        Conservatively checks if the given node, representing a called function, may require the use of obligations.
+        """
+        if isinstance(node, ast.Name):
+            return (node.id in OBLIGATION_CONTRACT_FUNCS or
+                    node.id in BUILTIN_IO_OPERATIONS or
+                    node.id in IO_CONTRACT_FUNCS)
+        elif isinstance(node, ast.Attribute):
+            try:
+                recv_type = self.typeof(node.value)
+            except:
+                # type computation is not implemented fully here, so this may fail
+                recv_type = None
+            if node.attr in ('start', 'join') and (recv_type is None or recv_type.python_class.name == 'Thread'):
+                # Thread operations interact with obligations
+                return True
+            elif node.attr in ('release', 'acquire'):
+                # Lock operations interact with obligations
+                if recv_type is None:
+                    return True
+                while recv_type is not None:
+                    if recv_type.python_class.name == 'Lock':
+                        return True
+                    recv_type = recv_type.superclass
+                return False
+        return False
 
     def visit_Compare(self, node: ast.Compare) -> None:
         if isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name):
@@ -1461,6 +1497,8 @@ class Analyzer(ast.NodeVisitor):
                     raise UnsupportedException(node)
             elif node.func.id == 'cast':
                 return self.find_or_create_target_class(node.args[0])
+            elif node.func.id == 'super':
+                return self.current_class.superclass
             else:
                 f = self.module.get_func_or_method(node.func.id)
                 if f is not None:

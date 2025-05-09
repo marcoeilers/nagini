@@ -46,6 +46,7 @@ class TypeTranslator(CommonTranslator):
                 'builtins.PSeq': self.viper.SeqType(self.viper.Ref),
                 'builtins.PSet': self.viper.SetType(self.viper.Ref),
                 'builtins.PMultiset': self.viper.MultisetType(self.viper.Ref),
+                'builtins.type': self.type_factory.type_type(),
                 }
 
     def translate_type(self, cls: PythonClass,
@@ -61,8 +62,6 @@ class TypeTranslator(CommonTranslator):
         elif cls.name in PRIMITIVES:
             cls = cls.try_box()
             return self.builtins['builtins.' + cls.name]
-        elif cls.name == 'type':
-            return self.type_factory.type_type()
         else:
             return self.viper.Ref
 
@@ -95,8 +94,11 @@ class TypeTranslator(CommonTranslator):
         if type is None:
             none_type = ctx.module.global_module.classes['NoneType']
             return self.type_factory.type_check(lhs, none_type, position, ctx)
-        elif type.name == 'type':
-            return self.viper.TrueLit(position, self.no_info(ctx))
         else:
             result = self.type_factory.type_check(lhs, type, position, ctx)
             return result
+
+    def subtype_check(self, obj: Expr, type_expr: Expr, position: 'silver.ast.Position', ctx: Context) -> Expr:
+        obj_type = self.type_factory.typeof(self.to_ref(obj, ctx), ctx)
+        rhs_type = self.to_type(type_expr, ctx)
+        return self.type_factory._issubtype(obj_type, rhs_type, ctx, position=position)

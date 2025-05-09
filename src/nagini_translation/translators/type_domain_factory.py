@@ -7,15 +7,19 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ast
 
-from nagini_translation.lib.constants import OBJECT_TYPE, TUPLE_TYPE
+from nagini_translation.lib.constants import (
+    OBJECT_TYPE,
+    TUPLE_TYPE,
+    TYPE_TYPE,
+)
 from nagini_translation.lib.program_nodes import (
     GenericType,
     OptionalType,
     PythonClass,
     PythonType,
     TypeVar,
-    UnionType,
 )
+from nagini_translation.lib.util import UnsupportedException
 from nagini_translation.lib.viper_ast import ViperAST
 from nagini_translation.translators.abstract import Context, Expr
 from typing import List, Tuple
@@ -833,7 +837,7 @@ class TypeDomainFactory:
                                   concrete=concrete)
 
     def translate_type_literal(self, type: 'PythonType', position: 'Position',
-                               ctx: Context, alias: Expr = None) -> Expr:
+                               ctx: Context, alias: Expr = None, node: ast.AST = None) -> Expr:
         """
         Translates the given type to a type literal. If the given type is
         a generic type with missing type argument information, the type
@@ -853,11 +857,14 @@ class TypeDomainFactory:
         if type is None:
             type = ctx.module.global_module.classes['NoneType']
         args = []
+        if isinstance(type, GenericType) and type.python_class.name == TYPE_TYPE and type.python_class.interface:
+            type = type.python_class
         if isinstance(type, GenericType):
             for arg in type.type_args:
                 args.append(self.translate_type_literal(arg, position, ctx))
         elif isinstance(type, PythonClass) and type.type_vars:
-            assert alias
+            if not alias:
+                raise UnsupportedException(node, "Unsupported reference to generic type without type arguments.")
             for index, arg in enumerate(type.type_vars):
                 args.append(self.get_type_arg(alias, type, index, ctx))
         if type.python_class.name == TUPLE_TYPE:

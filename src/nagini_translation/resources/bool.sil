@@ -404,6 +404,22 @@ domain __SumHelper[T$] {
     }
 }
 
+function PyType___box__(prim: PyType): Ref
+    decreases _
+    ensures typeof(result) == type()
+    ensures type___unbox__(result) == prim
+
+function type___unbox__(box: Ref): PyType
+    decreases _
+    requires issubtype(typeof(box), type())
+    ensures PyType___box__(result) == box
+
+function type___eq__(self: Ref, other: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), type())
+    requires issubtype(typeof(other), type())
+    ensures result == (type___unbox__(self) == type___unbox__(other))
+
 domain __Transitivity_Eq {
     function eq(self: Ref, other: Ref): Bool
 

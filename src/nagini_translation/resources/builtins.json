@@ -16,7 +16,7 @@
             "type": "str"
         },
         "__cast__": {
-            "args": ["type", "object"],
+            "args": ["PyType", "object"],
             "type": "object"
         }
     },
@@ -649,32 +649,32 @@
             "requires": ["__val__", "__len__"]
         },
         "__create1__": {
-            "args": ["object", "type", "__prim__int"],
+            "args": ["object", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create2__": {
-            "args": ["object", "object", "type", "type", "__prim__int"],
+            "args": ["object", "object", "PyType", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create3__": {
-            "args": ["object", "object", "object", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "PyType", "PyType", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create4__": {
-            "args": ["object", "object", "object", "object", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "PyType", "PyType", "PyType", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create5__": {
-            "args": ["object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "object", "PyType", "PyType", "PyType", "PyType", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
         "__create6__": {
-            "args": ["object", "object", "object", "object", "object", "object", "type", "type", "type", "type", "type", "type", "__prim__int"],
+            "args": ["object", "object", "object", "object", "object", "object", "PyType", "PyType", "PyType", "PyType", "PyType", "PyType", "__prim__int"],
             "type": "tuple",
             "requires": ["__len__", "__getitem__"]
         },
@@ -747,10 +747,34 @@
 "__prim__Seq": {},
 "__prim__Set": {},
 "__prim__Multiset": {},
+"PyType": {
+    "functions": {
+        "__box__": {
+            "args": ["PyType"],
+            "type": "type",
+            "requires": ["type___unbox__"]
+        }
+    }
+},
+"type": {
+    "functions": {
+        "__unbox__": {
+            "args": ["type"],
+            "type": "PyType",
+            "requires": ["PyType___box__"]
+        },
+        "__eq__": {
+            "args": ["type", "object"],
+            "type": "__prim__bool",
+            "requires": ["__unbox__"]
+        }
+    },
+    "extends": "object"
+},
 "PSeq": {
     "functions": {
         "__create__": {
-            "args": ["__prim__Seq", "type"],
+            "args": ["__prim__Seq", "PyType"],
             "type": "PSeq",
             "requires": ["__sil_seq__"]
         },
@@ -812,7 +836,7 @@
 "PSet": {
     "functions": {
         "__create__": {
-            "args": ["__prim__Set", "type"],
+            "args": ["__prim__Set", "PyType"],
             "type": "PSet",
             "requires": ["__unbox__"]
         },
@@ -858,7 +882,7 @@
 "PMultiset": {
     "functions": {
         "__create__": {
-            "args": ["__prim__Multiset", "type"],
+            "args": ["__prim__Multiset", "PyType"],
             "type": "PMultiset",
             "requires": ["__unbox__"]
         },
@@ -1013,9 +1037,6 @@
     "extends": "object"
 },
 "LevelType": {
-},
-"type": {
-    "extends": "object"
 },
 "Callable": {
     "extends": "object"
