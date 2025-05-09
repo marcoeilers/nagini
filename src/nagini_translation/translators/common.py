@@ -744,21 +744,22 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
             return chain_cond_exp(guarded_functions, self.viper, position,
                                   self.no_info(ctx), ctx)
         else:
-            if func_name == '__eq__':
+            if func_name == '__eq__' and not receiver.sil_name == TYPE_TYPE:
                 assert len(args) == 2
 
                 # Redirect call to __eq__ function to domain function eq.
                 # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
+                # type comparisons are not replaced with the domain function eq.
                 if ctx.use_domain_func_eq:
                     domain_name = 'PyType'
                     pytype = self.viper.DomainType(domain_name, {}, [])
-                    return self.viper.DomainFuncApp(
+                    return self.viper.FuncApp(
                         '__prim__bool___box__',
                         [self.viper.DomainFuncApp(
                             'eq', [args[0], args[1]], pytype, position, self.no_info(ctx),
                             '__Transitivity_Eq'
                         )],
-                        pytype, position, self.no_info(ctx), 'PyType'
+                        position, self.no_info(ctx), self.viper.Ref
                     )
                 else:
                     arg1 = self.to_ref(args[0], ctx)
@@ -780,6 +781,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     elif ctx.merge:
                         return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
                                                     self.no_info(ctx), self.viper.Bool)
+                    return self.viper.EqCmp(arg1, arg2, position, self.no_info(ctx))
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:

@@ -783,7 +783,7 @@ class ProgramTranslator(CommonTranslator):
             # create function viper AST node
             result = self.viper.Function(
                 mname, params, method_type, pres, posts,
-                body, self.no_position(ctx), self.no_info(ctx)
+                body, pos, self.no_info(ctx)
             )
 
         else:
@@ -791,7 +791,7 @@ class ProgramTranslator(CommonTranslator):
                 method, has_subtype, called_name, args, ctx)
             result = self.create_method_node(
                 ctx, mname, params, results, pres, posts, [], body,
-                self.no_position(ctx), self.no_info(ctx),
+                pos, self.no_info(ctx),
                 method=method.overrides, overriding_check=True)
 
         ctx.current_function = old_function
@@ -1854,14 +1854,15 @@ class ProgramTranslator(CommonTranslator):
                     # add all __eq__ functions to eq_funcs
                     # to later create the merge func for object.__eq__
                     if ctx.merge and func.merge_func_name == OBJ___EQ__MERGED:
-                            eq_funcs.add(func)
+                        eq_funcs.add(func)
 
                     if func.interface:
                         if (func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ and 
                             func.sil_name in BUILTIN___EQ___FUNCTIONS):
-                            functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx))
+                            functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx, self))
                             fname = func.extended_name if func.extended_name else func.sil_name
                             self.add_dependency([fname], func.sil_name)
+                            self.add_dependency([func.sil_name], fname)
                         continue
                     self.track_dependencies(selected_names, selected, func, ctx)
                     if ctx.merge:
@@ -1873,28 +1874,29 @@ class ProgramTranslator(CommonTranslator):
 
                     functions.append(self.translate_function(func, ctx))
 
-                    if func.name == '__eq__' and not ctx.merge:
+                    if not ctx.merge:
                         extended_func = self.translate_extended_function(func, ctx)
                         if extended_func:
                             functions.append(extended_func)
                             self.add_dependency(extended_func.name(), func.sil_name)
 
-                    pos = self.to_position(func.node, ctx)
-                    info = self.no_info(ctx)
-                    symm_check  = self.config.method_translator.encode_symmetry_check(
-                        func, ctx, pos, info
-                    )  
-                    trans_check = self.config.method_translator.encode_transitivity_check(
-                        func, ctx, pos, info
-                    )
-                    # do not add methods if tests are run, whose names 
-                    # do not include the substrings transitive or symmetric
-                    pattern = r'^test_(?!.*(transitive|symmetric)).*\.py$'
-                    if not re.match(pattern, module.file):
-                        methods.append(symm_check)
-                        methods.append(trans_check)
-                        self.add_dependency([symm_check.name()], func.sil_name)
-                        self.add_dependency([trans_check.name()], func.sil_name)
+                    if func.name == '__eq__':
+                        pos = self.to_position(func.node, ctx)
+                        info = self.no_info(ctx)
+                        symm_check  = self.config.method_translator.encode_symmetry_check(
+                            func, ctx, pos, info
+                        )  
+                        trans_check = self.config.method_translator.encode_transitivity_check(
+                            func, ctx, pos, info
+                        )
+                        # do not add methods if tests are run, whose names 
+                        # do not include the substrings transitive or symmetric
+                        pattern = r'^test_(?!.*(transitive|symmetric)).*\.py$'
+                        if not re.match(pattern, module.file):
+                            methods.append(symm_check)
+                            methods.append(trans_check)
+                            self.add_dependency([symm_check.name()], func.sil_name)
+                            self.add_dependency([trans_check.name()], func.sil_name)
 
                     func_constants.append(self.translate_function_constant(func, ctx))
                     if ((func_name != '__init__' or

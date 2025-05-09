@@ -138,8 +138,8 @@ function tuple___eq__(self: Ref, other: Ref): Bool
     requires issubtype(typeof(self), tuple(tuple_args(typeof(self))))
     // Permissions
     // self could be stateless if e.g. self = (1, 2)
-    requires !stateless(self) ==> acc(state(self))
-    requires !stateless(other) ==> acc(state(other))
+    requires !stateless(self) ==> acc(state(self), wildcard)
+    requires !stateless(other) ==> acc(state(other), wildcard)
 
     ensures (issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
       result ==
@@ -150,7 +150,7 @@ function tuple___eq__(self: Ref, other: Ref): Bool
               { tuple___getitem__(self, x) }
               { tuple___getitem__(other, x) }
               (x >= 0 && x < tuple___len__(self)) || (x >= -tuple___len__(self) && x <= -1) ==>
-              object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other, x))
+              object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
             )
           )))
         )))

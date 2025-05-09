@@ -77,6 +77,7 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 
 SINGLE_NAME = '_single'
 
+DOMAIN_EQ_FUNC = 'eq'
 OBJECT_EQ = 'object___eq__'
 EQUALITY_STATE_PRED = 'state'
 STATELESS_FUNC = 'stateless'

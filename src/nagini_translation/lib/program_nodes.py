@@ -1133,7 +1133,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             translator.set_required_names(self.sil_name, requires)
             if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
-            self.extended_name = self.get_fresh_name(sil_name + '_extended')
+                self.extended_name = self.get_fresh_name(sil_name + '_extended')
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:

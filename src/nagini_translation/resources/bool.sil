@@ -149,13 +149,15 @@ function bool___unbox__(box: Ref): Bool
 function int___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), int())
-    requires !stateless(other) ==> acc(state(other))
+    requires !stateless(self) ==> acc(state(self), wildcard)
+    requires !stateless(other) ==> acc(state(other), wildcard)
     ensures issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), bool())
-    requires !stateless(other) ==> acc(state(other))
+    requires !stateless(self) ==> acc(state(self), wildcard)
+    requires !stateless(other) ==> acc(state(other), wildcard)
     ensures issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
 
 function int___ge__(self: Ref, other: Ref): Bool
@@ -285,16 +287,10 @@ function int___int__(self: Ref): Ref
 
 function object___eq__(self: Ref, other: Ref): Bool
     decreases _
-    // permissions
     requires !stateless(self) ==> state(self)
     requires !stateless(other) ==> state(other)
-
-    // null
     ensures self == null ==> result == (other == null ? true : false)
-    // reflexivity
     ensures !issubtype(typeof(self), float()) ==> self == other ==> result
-    // TODO: force symmetry in overrides
-    // symmetry
     ensures result == object___eq__(other, self)
 
 function stateless(x: Ref): Bool

@@ -424,9 +424,20 @@ class MethodTranslator(CommonTranslator):
 
         # translate postcondition:
         # ensures result == super___eq___extended(self, other)
+        if func_to_call == OBJECT_EQ:
+            rt = self.viper.Bool
+        else:
+            rt = self.viper.Ref
         super_eq_call = self.viper.FuncApp(
-            func_to_call, [self_var, other_var], pos, info, self.viper.Bool
+            func_to_call, [self_var, other_var], pos, info, rt
         )
+        # object___eq__ has return type Bool
+        # all user-defined __eq__ functions have type Ref (bool Python type)
+        if func_to_call == OBJECT_EQ:
+            super_eq_call  = self.viper.FuncApp(
+                '__prim__bool___box__', [super_eq_call], pos, info, self.viper.Ref
+            )
+
         result = self.viper.Result(self.viper.Ref, pos, info)
         post = self.viper.EqCmp(result, super_eq_call, pos, info)
 

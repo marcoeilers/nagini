@@ -9,7 +9,7 @@
         "__eq__": {
             "args": ["object", "object"],
             "type": "__prim__bool",
-            "requires": ["stateless"]
+            "requires": ["stateless", "state"]
         },
         "__str__": {
             "args": ["object"],
@@ -105,7 +105,7 @@
         "__eq__": {
             "args": ["list", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless"]
+            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless", "list___len__", "list___getitem___index"]
         }
     },
     "type_vars": 1,
@@ -161,7 +161,7 @@
         "__eq__": {
             "args": ["set", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__contains__", "object___eq__", "stateless"]
+            "requires": ["__len__", "__contains__", "object___eq__", "stateless", "set___len__", "set___contains__"]
         }
     },
     "type_vars": 1,
@@ -229,7 +229,7 @@
         "__eq__": {
             "args": ["dict", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless"]
+            "requires": ["__len__", "__getitem__", "__contains__", "object___eq__", "stateless", "dict___len__", "dict___getitem__", "dict___contains__" ]
         }
     },
     "type_vars": 2,
@@ -706,7 +706,7 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__", "object___eq__", "stateless"]
+            "requires": ["__len__", "__getitem__", "object___eq__", "stateless", "tuple___getitem__", "tuple___len__"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
