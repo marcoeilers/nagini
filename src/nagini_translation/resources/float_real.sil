@@ -118,8 +118,6 @@ function float___lt__(self: Ref, other: Ref): Bool
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), float())
-    requires !stateless(self) ==> acc(state(self), wildcard)
-    requires !stateless(other) ==> acc(state(other), wildcard)
     ensures issubtype(typeof(other), float()) ==>
         float___is_nan__(self) == true || float___is_nan__(other) == true ==>
         result == false

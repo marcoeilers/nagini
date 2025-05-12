@@ -27,8 +27,6 @@ function str___bool__(self: Ref) : Bool
 function str___eq__(self: Ref, other: Ref): Bool
     decreases _
     requires issubtype(typeof(self), str())
-    requires !stateless(self) ==> acc(state(self), wildcard)
-    requires !stateless(other) ==> acc(state(other), wildcard)
     ensures issubtype(typeof(other), str()) ==>
             (result <==>
               (str___len__(self) == str___len__(other)) && 
