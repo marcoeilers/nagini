@@ -33,6 +33,7 @@ from nagini_translation.lib.constants import (
     UNION_TYPE,
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
+    DOMAIN_EQ_FUNC,
 )
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
@@ -101,7 +102,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         type is Ref, Bool or Int.
         """
         result = e
-        if target_type == self.viper.Ref:
+        # remove all unfoldings to get to eq domain func
+        e_ = e
+        while (isinstance(e_, self.viper.ast.Unfolding)):
+            e_ = e_.body()
+        if (isinstance(e_, self.viper.ast.DomainFuncApp) and e_.funcname() == DOMAIN_EQ_FUNC):
+            result = self.viper.FuncApp('__prim__bool___box__', [e], e.pos(),
+                                        self.no_info(ctx), self.viper.Ref)
+        elif target_type == self.viper.Ref:
             result = self.to_ref(e, ctx)
         elif target_type == self.viper.Bool:
             result = self.to_bool(e, ctx, node)
@@ -230,7 +238,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         if e.typ() != self.viper.Ref:
             e = self.to_ref(e, ctx)
         if (isinstance(e, self.viper.ast.FuncApp) and
-                    e.funcname() == 'PyType__box__'):
+                    e.funcname() == 'PyType___box__'):
             return e.args().head()
         result = e
         type_type = ctx.module.global_module.classes[TYPE_TYPE]
@@ -764,13 +772,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 else:
                     arg1 = self.to_ref(args[0], ctx)
                     arg2 = self.to_ref(args[1], ctx)
-
-                    t1, t2 = arg_types
-
-                    if not ctx.merge and t1:
-                        to_call = t1.functions.get('__eq__')
+                    
+                    if ctx.merge:
+                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                                                    self.no_info(ctx), self.viper.Bool)
+                    else:
+                        to_call = receiver.functions.get('__eq__')
                         while(to_call is None):
-                            to_call = t1.superclass.functions.get('__eq__')
+                            to_call = receiver.superclass.functions.get('__eq__')
                         rt = self.translate_type(to_call.type, ctx)
                         if to_call.extended_name:
                             return self.viper.FuncApp(to_call.extended_name, [arg1, arg2], position,
@@ -778,10 +787,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                         else:
                             return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], position,
                                                         self.no_info(ctx), rt)
-                    elif ctx.merge:
-                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
-                                                    self.no_info(ctx), self.viper.Bool)
-                    return self.viper.EqCmp(arg1, arg2, position, self.no_info(ctx))
 
             if receiver.python_class.name == FLOAT_TYPE:
                 if ctx.float_encoding is None:

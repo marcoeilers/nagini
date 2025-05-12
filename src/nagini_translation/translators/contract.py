@@ -29,6 +29,7 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     STATELESS_FUNC,
     EQUALITY_STATE_PRED,
+    DOMAIN_EQ_FUNC,
 )
 from nagini_translation.lib.program_nodes import (
     PythonField,
@@ -548,7 +549,9 @@ class ContractTranslator(CommonTranslator):
         expr_stmt, expr = self.translate_expr(node.args[1], ctx)
         if expr_stmt:
             raise InvalidProgramException(node, 'purity.violated')
-        expr = self.unwrap(expr)
+        # do not unwrap if it's the domain func eq
+        if not (isinstance(expr, self.viper.ast.DomainFuncApp) and expr.funcname() == DOMAIN_EQ_FUNC):
+            expr = self.unwrap(expr)
         unfold = self.viper.Unfolding(pred, expr, self.to_position(node, ctx),
                                       self.no_info(ctx))
         return expr_stmt, unfold
