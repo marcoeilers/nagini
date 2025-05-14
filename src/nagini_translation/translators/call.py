@@ -661,19 +661,30 @@ class CallTranslator(CommonTranslator):
                                  ctx: Context) -> StmtsAndExpr:
         """Translates a call to a pure method."""
 
-        super_func: PythonMethod = target
-        while(super_func.overrides):
-            super_func = super_func.overrides
-
         type = self.translate_type(target.type, ctx)
 
-        merge_func = ctx.merge_functions.get(target)
-        if merge_func:
-            call = self.viper.FuncApp(merge_func.sil_name, args, position,
-                                      self.no_info(ctx), type, formal_args)
+        if ctx.merge:
+            merge_func = ctx.merge_functions.get(target)
+            if merge_func:
+                fname = merge_func.sil_name
+            else:
+                fname = target.sil_name
+            call = self.viper.FuncApp(fname, args, position, self.no_info(ctx), self.viper.Bool)
         else:
-            call = self.viper.FuncApp(target.sil_name, args, position,
-                                      self.no_info(ctx), type, formal_args)
+            # find inherited extended function
+            to_call_name = target.extended_name
+            cur_target = target
+            superclass = target.cls.superclass
+            while(superclass and to_call_name is None):
+                to_call_name = superclass.functions.get(target.name)
+                cur_target = superclass.functions.get(target.name)
+                superclass = superclass.superclass
+            # if no inherited extended function exist -> use sil_name
+            if not to_call_name:
+                to_call_name = target.sil_name
+            rt = self.translate_type(cur_target.type, ctx)
+            call = self.viper.FuncApp(to_call_name, args, position,
+                                        self.no_info(ctx), rt)
 
         if target.module is not target.module.global_module:
             # Mark the current function as depending on the called function. If we're in

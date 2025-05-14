@@ -107,8 +107,11 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         while (isinstance(e_, self.viper.ast.Unfolding)):
             e_ = e_.body()
         if (isinstance(e_, self.viper.ast.DomainFuncApp) and e_.funcname() == DOMAIN_EQ_FUNC):
-            result = self.viper.FuncApp('__prim__bool___box__', [e], e.pos(),
-                                        self.no_info(ctx), self.viper.Ref)
+            if target_type == self.viper.Ref:
+                result = self.viper.FuncApp('__prim__bool___box__', [e], e.pos(),
+                                            self.no_info(ctx), self.viper.Ref)
+            else:
+                result = e
         elif target_type == self.viper.Ref:
             result = self.to_ref(e, ctx)
         elif target_type == self.viper.Bool:
@@ -764,8 +767,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                     return self.viper.FuncApp(
                         '__prim__bool___box__',
                         [self.viper.DomainFuncApp(
-                            'eq', [args[0], args[1]], pytype, position, self.no_info(ctx),
-                            '__Transitivity_Eq'
+                            DOMAIN_EQ_FUNC, [args[0], args[1]], pytype, position,
+                            self.no_info(ctx), '__Transitivity_Eq'
                         )],
                         position, self.no_info(ctx), self.viper.Ref
                     )
@@ -778,8 +781,6 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                                                     self.no_info(ctx), self.viper.Bool)
                     else:
                         to_call = receiver.functions.get('__eq__')
-                        while(to_call is None):
-                            to_call = receiver.superclass.functions.get('__eq__')
                         rt = self.translate_type(to_call.type, ctx)
                         if to_call.extended_name:
                             return self.viper.FuncApp(to_call.extended_name, [arg1, arg2], position,

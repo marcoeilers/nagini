@@ -1875,10 +1875,13 @@ class ProgramTranslator(CommonTranslator):
                     functions.append(self.translate_function(func, ctx))
 
                     if not ctx.merge:
-                        extended_func = self.translate_extended_function(func, ctx)
+                        extended_func, func_to_call = self.translate_extended_function(func, ctx)
                         if extended_func:
                             functions.append(extended_func)
-                            self.add_dependency(extended_func.name(), func.sil_name)
+                            self.add_dependency([extended_func.name()], func.sil_name)
+                            self.add_dependency(DEPENDENCIES, func.sil_name)
+                        if func_to_call:
+                            self.add_dependency([func_to_call], func.sil_name)
 
                     if func.name == '__eq__':
                         pos = self.to_position(func.node, ctx)

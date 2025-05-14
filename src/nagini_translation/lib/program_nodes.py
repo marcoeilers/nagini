@@ -1107,7 +1107,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
         self.threading_id = self.superscope.get_fresh_name(self.name + "_threading")
         if self.pure:
             self.func_constant = self.superscope.get_fresh_name(self.name)
-
+        self.extended_name = None
         # no fresh name for args of the __eq__ state predicate
         if self.cls and ((self.cls.name == OBJECT_TYPE and self.name == EQUALITY_STATE_PRED) or (
             sil_name == OBJECT_EQ
@@ -1218,8 +1218,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             # Set the extended name, it is used when calling an equality function.
             # Used instead of the merge function.
             # it a contract-only copy of the equality function with the postcondition added:
-            # ensures result == object___eq__(self, other)
-            self.extended_name = self.get_fresh_name(sil_name + '_extended')
+            # ensures result == super_func(self, other)
+            if self.overrides:
+                self.extended_name = self.get_fresh_name(sil_name + '_extended')
 
     @property
     def nargs(self) -> int:

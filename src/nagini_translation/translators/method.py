@@ -401,11 +401,11 @@ class MethodTranslator(CommonTranslator):
         return self_var, other_var, self_decl, other_decl
 
     def translate_extended_function(self, func: PythonMethod,
-                                    ctx: Context) -> Optional['silver.ast.Function']:
+                                    ctx: Context) -> tuple[Optional['silver.ast.Function'], str]:
         """Creates an extended function from func. It is a contract-only copy that 
         additionally ensures that BST holds."""
         if not func.overrides:
-            return
+            return (None, None)
 
         old_contract_only = func.contract_only
         func.contract_only = True
@@ -413,33 +413,33 @@ class MethodTranslator(CommonTranslator):
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
 
-        eq_func = self.get_inherited_function(func.cls)
-        if not eq_func:
+        super_func = self.get_inherited_function(func.cls, func.name)
+        if func.name == '__eq__' and not super_func:
             raise InvalidProgramException(func.node, "invalid.equality.override")
 
-        if eq_func.extended_name and eq_func.sil_name != OBJECT_EQ:
-            func_to_call = eq_func.extended_name 
+        if super_func.extended_name and super_func.sil_name != OBJECT_EQ:
+            func_to_call = super_func.extended_name 
         else:
-            func_to_call = eq_func.sil_name 
+            func_to_call = super_func.sil_name 
 
         # translate postcondition:
-        # ensures result == super___eq___extended(self, other)
+        # ensures result == super_func_extended(self, other)
         if func_to_call == OBJECT_EQ:
             rt = self.viper.Bool
         else:
-            rt = self.viper.Ref
-        super_eq_call = self.viper.FuncApp(
+            rt = self.translate_type(super_func.type, ctx)
+        super_call = self.viper.FuncApp(
             func_to_call, [self_var, other_var], pos, info, rt
         )
         # object___eq__ has return type Bool
         # all user-defined __eq__ functions have type Ref (bool Python type)
         if func_to_call == OBJECT_EQ:
-            super_eq_call  = self.viper.FuncApp(
-                '__prim__bool___box__', [super_eq_call], pos, info, self.viper.Ref
+            super_call  = self.viper.FuncApp(
+                '__prim__bool___box__', [super_call], pos, info, self.viper.Ref
             )
-
+        
         result = self.viper.Result(self.viper.Ref, pos, info)
-        post = self.viper.EqCmp(result, super_eq_call, pos, info)
+        post = self.viper.EqCmp(result, super_call, pos, info)
 
         # translate func again and add above postcondition to it 
         translated_func = self.translate_function(func, ctx)
@@ -447,11 +447,16 @@ class MethodTranslator(CommonTranslator):
         posts = self.viper.to_list(translated_func.posts())
         posts.append(post)
         fname = func.extended_name if func.extended_name else func.sil_name
-        return self.viper.Function(
-            fname, [self_var_decl, other_var_decl], self.viper.Ref, 
+
+        if func.name == '__eq__':
+            args = [self_var_decl, other_var_decl]
+        else:
+            args = self.viper.to_list(translated_func.formalArgs())
+        return (self.viper.Function(
+            fname, args, self.viper.Ref, 
             self.viper.to_list(translated_func.pres()),
             posts, None, pos, info
-        )
+        ), func_to_call)
 
     def translate_extended_builtin_function(self, func: PythonMethod, sil_progs,
                                             ctx: Context) -> 'silver.ast.Function':
@@ -524,12 +529,12 @@ class MethodTranslator(CommonTranslator):
         )
         return self.viper.Implies(comp, res_box, pos, info)
 
-    def get_inherited_function(self, c: PythonClass):
+    def get_inherited_function(self, c: PythonClass, name: str) -> Optional[PythonMethod]:
         superclass = c.superclass
-        super_func = superclass.functions.get('__eq__')
+        super_func = superclass.functions.get(name)
         while(not super_func):
             superclass = superclass.superclass
-            super_func = superclass.functions.get('__eq__')
+            super_func = superclass.functions.get(name)
         return super_func
 
     def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
@@ -595,7 +600,7 @@ class MethodTranslator(CommonTranslator):
             other_eq_func = c.functions.get('__eq__')
 
             if not other_eq_func:
-                other_eq_func = self.get_inherited_function(c)
+                other_eq_func = self.get_inherited_function(c, '__eq__')
 
             # encode symmetric __eq__ call
             # if we know the exact type, we can use the implementation
@@ -738,7 +743,7 @@ class MethodTranslator(CommonTranslator):
             ctx.use_domain_func_eq = True
 
             if not cur_eq_func:
-                cur_eq_func = self.get_inherited_function(c)
+                cur_eq_func = self.get_inherited_function(c, '__eq__')
             else:
                 old_func = ctx.current_function
                 ctx.current_function = cur_eq_func
