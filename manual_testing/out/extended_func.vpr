@@ -853,6 +853,7 @@ function _checkDefined(val: Ref, id: Int): Ref
 
 function str___eq___extended(self: Ref, other: Ref): Bool
   requires issubtype(typeof(self), str())
+  requires !stateless(other) ==> acc(state(other))
   ensures issubtype(typeof(other), str()) ==>
     result ==
     (str___len__(self) == str___len__(other) &&
@@ -1158,7 +1159,7 @@ predicate tuple_state(self: Ref) {
 }
 
 method client(x_0: Ref) returns (_res: Ref)
-  requires issubtype(typeof(x_0), SubX())
+  requires issubtype(typeof(x_0), SubSubX())
   ensures issubtype(typeof(_res), int())
 {
   var _err: Ref
@@ -1170,15 +1171,18 @@ method client(x_0: Ref) returns (_res: Ref)
   x_1 := x_0
   i_2 := __prim__int___box__(5)
   inhale _isDefined(3301225)
-  sq := SubX_foo_extended(x_1, _checkDefined(i_2, 3301225))
+  sq := SubSubX_foo_extended(x_1, _checkDefined(i_2, 3301225))
   inhale _isDefined(29043)
-
-  // Added Assertions
-  assert int___unbox__(sq) == int___unbox__(X_foo(x_1, i_2))
-  assert int___unbox__(sq) == int___unbox__(SubX_foo_extended(x_1, i_2))
-  assert int___unbox__(X_foo(x_1, i_2)) == int___unbox__(SubX_foo_extended(x_1, i_2))
-
   _res := _checkDefined(sq, 29043)
+  
+  //  assertions are verified successfully
+  assert int___unbox__(sq) == int___unbox__(SubX_foo_extended(x_1, i_2))
+  assert int___unbox__(sq) == int___unbox__(SubSubX_foo_extended(x_1, i_2))
+  assert int___unbox__(SubX_foo_extended(x_1, i_2)) == int___unbox__(SubSubX_foo_extended(x_1, i_2))
+  
+  // we cannot prove this using the contract, since it's too weak
+  assert int___unbox__(SubX_foo(x_1, i_2)) == int___unbox__(SubSubX_foo(x_1, i_2))
+
   goto __end
   goto __end
   label __end
@@ -1211,7 +1215,7 @@ method main()
   assert true && (_single(1482847571) in module_names_0)
   module_names_0 := (module_names_0 union Set(_single(7303014)))
   module_names_0 := (module_names_0 union Set(_single(24878054000194899)))
-  assert true && (_single(1482847571) in module_names_0)
+  assert true && (_single(24878054000194899) in module_names_0)
   module_names_0 := (module_names_0 union Set(_single(128017496632419)))
   goto __end
   label __end
