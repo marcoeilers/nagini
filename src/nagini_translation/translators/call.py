@@ -674,11 +674,12 @@ class CallTranslator(CommonTranslator):
             # find inherited extended function
             to_call_name = target.extended_name
             cur_target = target
-            superclass = target.cls.superclass
-            while(superclass and to_call_name is None):
-                to_call_name = superclass.functions.get(target.name)
-                cur_target = superclass.functions.get(target.name)
-                superclass = superclass.superclass
+            if target.cls:
+                superclass = target.cls.superclass
+                while(superclass and to_call_name is None):
+                    to_call_name = superclass.functions.get(target.name)
+                    cur_target = superclass.functions.get(target.name)
+                    superclass = superclass.superclass
             # if no inherited extended function exist -> use sil_name
             if not to_call_name:
                 to_call_name = target.sil_name
