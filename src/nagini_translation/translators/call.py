@@ -678,7 +678,10 @@ class CallTranslator(CommonTranslator):
                 superclass = target.cls.superclass
                 while(superclass and to_call_name is None):
                     to_call_name = superclass.functions.get(target.name)
-                    cur_target = superclass.functions.get(target.name)
+                    if superclass.sil_name != OBJECT_TYPE:
+                        cur_target = superclass.functions.get(target.name)
+                    elif superclass == OBJECT_TYPE and target.name == '__eq__':
+                        cur_target = superclass.functions.get(target.name)
                     superclass = superclass.superclass
             # if no inherited extended function exist -> use sil_name
             if not to_call_name:
