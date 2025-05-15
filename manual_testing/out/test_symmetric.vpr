@@ -114,8 +114,6 @@ domain PyType  {
   
   unique function D(): PyType 
   
-  unique function E(): PyType 
-  
   axiom issubtype_transitivity {
     (forall sub: PyType, middle: PyType, super: PyType ::
       { issubtype(sub, middle), issubtype(middle, super) }
@@ -446,10 +444,6 @@ domain PyType  {
   
   axiom subtype_D {
     extends_(D(), object()) && get_basic(D()) == D()
-  }
-  
-  axiom subtype_E {
-    extends_(E(), object()) && get_basic(E()) == E()
   }
 }
 
@@ -854,35 +848,6 @@ field MustReleaseBounded: Int
 
 field MustReleaseUnbounded: Int
 
-field E_i: Ref
-
-function int___eq___extended(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), int())
-  requires !stateless(other) ==> acc(state(other), wildcard)
-  ensures issubtype(typeof(other), int()) ==>
-    result == (int___unbox__(self) == int___unbox__(other))
-  ensures result == float___eq___extended(self, other)
-  decreases _
-
-
-function float___eq___extended(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), float())
-  requires !stateless(other) ==> acc(state(other), wildcard)
-  ensures issubtype(typeof(other), float()) ==>
-    float___isNaN(self) || float___isNaN(other) ==> result == false
-  ensures result == object___eq__(self, other)
-  decreases _
-
-
-function bool___eq___extended(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), bool())
-  requires !stateless(other) ==> acc(state(other), wildcard)
-  ensures issubtype(typeof(other), bool()) ==>
-    result == (bool___unbox__(self) == bool___unbox__(other))
-  ensures result == int___eq___extended(self, other)
-  decreases _
-
-
 function str___eq___extended(self: Ref, other: Ref): Bool
   requires issubtype(typeof(self), str())
   requires !stateless(other) ==> acc(state(other), wildcard)
@@ -908,8 +873,8 @@ function A___eq__(self_7: Ref, other_7: Ref): Ref
     bool___unbox__(result)
   ensures self_7 == other_7 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_7) == typeof(other_7) || issubtype(typeof(other_7), A()) ||
-    issubtype(typeof(other_7), B())
+    typeof(self_7) == typeof(other_7) || issubtype(typeof(other_7), B()) ||
+    issubtype(typeof(other_7), A())
 {
   (let cond_0 ==
     (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_7)), PyType___box__(A())) ||
@@ -933,8 +898,8 @@ function A___eq___extended(self_7: Ref, other_7: Ref): Ref
     bool___unbox__(result)
   ensures self_7 == other_7 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_7) == typeof(other_7) || issubtype(typeof(other_7), A()) ||
-    issubtype(typeof(other_7), B())
+    typeof(self_7) == typeof(other_7) || issubtype(typeof(other_7), B()) ||
+    issubtype(typeof(other_7), A())
   ensures result == __prim__bool___box__(object___eq__(self_7, other_7))
 
 
@@ -952,47 +917,108 @@ function A___eq___override_check(self: Ref, other: Ref): Ref
 }
 
 @opaque()
-function C___eq__(self_11: Ref, other_8: Ref): Ref
-  requires issubtype(typeof(self_11), C())
+function B___eq__(self_10: Ref, other_8: Ref): Ref
+  requires issubtype(typeof(self_10), B())
   requires issubtype(typeof(other_8), object())
-  requires self_11 != null
-  requires acc(state(self_11), wildcard)
+  requires self_10 != null
+  requires acc(state(self_10), wildcard)
   requires !stateless(other_8) ==> acc(state(other_8), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-    type(), type(), 0), PyType___box__(typeof(other_8))) ||
-    self_11 == other_8 ==>
+  ensures type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+    (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+    self_10 == other_8) ==>
     bool___unbox__(result)
-  ensures self_11 == other_8 ==> bool___unbox__(result)
+  ensures self_10 == other_8 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_11) == typeof(other_8) || issubtype(typeof(other_8), D()) ||
-    issubtype(typeof(other_8), C())
+    typeof(self_10) == typeof(other_8) || issubtype(typeof(other_8), B()) ||
+    issubtype(typeof(other_8), A())
 {
-  (let cond_3_0 ==
-    (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-    PyType___box__(D()), type(), type(), 1), PyType___box__(typeof(other_8))) ||
-    self_11 == other_8)) in
-    (true && bool___unbox__(cond_3_0) ?
+  (let cond_6_0 ==
+    (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+    (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+    self_10 == other_8))) in
+    (true && bool___unbox__(cond_6_0) ?
       __prim__bool___box__(true) :
       __prim__bool___box__(false)))
 }
 
-function C___eq___extended(self_11: Ref, other_8: Ref): Ref
-  requires issubtype(typeof(self_11), C())
+function B___eq___extended(self_10: Ref, other_8: Ref): Ref
+  requires issubtype(typeof(self_10), B())
   requires issubtype(typeof(other_8), object())
-  requires self_11 != null
-  requires acc(state(self_11), wildcard)
+  requires self_10 != null
+  requires acc(state(self_10), wildcard)
   requires !stateless(other_8) ==> acc(state(other_8), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-    type(), type(), 2), PyType___box__(typeof(other_8))) ||
-    self_11 == other_8 ==>
+  ensures type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+    (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+    self_10 == other_8) ==>
     bool___unbox__(result)
-  ensures self_11 == other_8 ==> bool___unbox__(result)
+  ensures self_10 == other_8 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_11) == typeof(other_8) || issubtype(typeof(other_8), D()) ||
-    issubtype(typeof(other_8), C())
-  ensures result == __prim__bool___box__(object___eq__(self_11, other_8))
+    typeof(self_10) == typeof(other_8) || issubtype(typeof(other_8), B()) ||
+    issubtype(typeof(other_8), A())
+  ensures result == A___eq___extended(self_10, other_8)
+
+
+function B___eq___override_check(self_7: Ref, other_7: Ref): Ref
+  requires issubtype(typeof(self_7), B())
+  requires self_7 != null
+  requires issubtype(typeof(self_7), A())
+  requires issubtype(typeof(other_7), object())
+  requires self_7 != null
+  requires acc(state(self_7), wildcard)
+  requires !stateless(other_7) ==> acc(state(other_7), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(other_7)), PyType___box__(A())) ||
+    (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(B())) ||
+    self_7 == other_7) ==>
+    bool___unbox__(result)
+{
+  B___eq__(self_7, other_7)
+}
+
+@opaque()
+function C___eq__(self_13: Ref, other_9: Ref): Ref
+  requires issubtype(typeof(self_13), C())
+  requires issubtype(typeof(other_9), object())
+  requires self_13 != null
+  requires acc(state(self_13), wildcard)
+  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+    self_13 == other_9) ==>
+    bool___unbox__(result)
+  ensures self_13 == other_9 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==>
+    typeof(self_13) == typeof(other_9) || issubtype(typeof(other_9), C()) ||
+    issubtype(typeof(other_9), D())
+{
+  (let cond_12_0 ==
+    (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+    self_13 == other_9))) in
+    (true && bool___unbox__(cond_12_0) ?
+      __prim__bool___box__(true) :
+      __prim__bool___box__(false)))
+}
+
+function C___eq___extended(self_13: Ref, other_9: Ref): Ref
+  requires issubtype(typeof(self_13), C())
+  requires issubtype(typeof(other_9), object())
+  requires self_13 != null
+  requires acc(state(self_13), wildcard)
+  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+    self_13 == other_9) ==>
+    bool___unbox__(result)
+  ensures self_13 == other_9 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==>
+    typeof(self_13) == typeof(other_9) || issubtype(typeof(other_9), C()) ||
+    issubtype(typeof(other_9), D())
+  ensures result == __prim__bool___box__(object___eq__(self_13, other_9))
 
 
 function C___eq___override_check(self: Ref, other: Ref): Ref
@@ -1009,47 +1035,47 @@ function C___eq___override_check(self: Ref, other: Ref): Ref
 }
 
 @opaque()
-function D___eq__(self_14: Ref, other_9: Ref): Ref
-  requires issubtype(typeof(self_14), D())
-  requires issubtype(typeof(other_9), object())
-  requires self_14 != null
-  requires acc(state(self_14), wildcard)
-  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+function D___eq__(self_16: Ref, other_10: Ref): Ref
+  requires issubtype(typeof(self_16), D())
+  requires issubtype(typeof(other_10), object())
+  requires self_16 != null
+  requires acc(state(self_16), wildcard)
+  requires !stateless(other_10) ==> acc(state(other_10), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-    type(), type(), 7), PyType___box__(typeof(other_9))) ||
-    self_14 == other_9 ==>
+  ensures type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+    self_16 == other_10) ==>
     bool___unbox__(result)
-  ensures self_14 == other_9 ==> bool___unbox__(result)
+  ensures self_16 == other_10 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_14) == typeof(other_9) || issubtype(typeof(other_9), D()) ||
-    issubtype(typeof(other_9), C())
+    typeof(self_16) == typeof(other_10) || issubtype(typeof(other_10), C()) ||
+    issubtype(typeof(other_10), D())
 {
-  (let cond_6_0 ==
-    (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-    PyType___box__(D()), type(), type(), 8), PyType___box__(typeof(other_9))) ||
-    self_14 == other_9)) in
-    (true && bool___unbox__(cond_6_0) ?
+  (let cond_18_0 ==
+    (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+    self_16 == other_10))) in
+    (true && bool___unbox__(cond_18_0) ?
       __prim__bool___box__(true) :
       __prim__bool___box__(false)))
 }
 
-function D___eq___extended(self_14: Ref, other_9: Ref): Ref
-  requires issubtype(typeof(self_14), D())
-  requires issubtype(typeof(other_9), object())
-  requires self_14 != null
-  requires acc(state(self_14), wildcard)
-  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+function D___eq___extended(self_16: Ref, other_10: Ref): Ref
+  requires issubtype(typeof(self_16), D())
+  requires issubtype(typeof(other_10), object())
+  requires self_16 != null
+  requires acc(state(self_16), wildcard)
+  requires !stateless(other_10) ==> acc(state(other_10), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-    type(), type(), 9), PyType___box__(typeof(other_9))) ||
-    self_14 == other_9 ==>
+  ensures type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+    (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+    self_16 == other_10) ==>
     bool___unbox__(result)
-  ensures self_14 == other_9 ==> bool___unbox__(result)
+  ensures self_16 == other_10 ==> bool___unbox__(result)
   ensures bool___unbox__(result) ==>
-    typeof(self_14) == typeof(other_9) || issubtype(typeof(other_9), D()) ||
-    issubtype(typeof(other_9), C())
-  ensures result == __prim__bool___box__(object___eq__(self_14, other_9))
+    typeof(self_16) == typeof(other_10) || issubtype(typeof(other_10), C()) ||
+    issubtype(typeof(other_10), D())
+  ensures result == __prim__bool___box__(object___eq__(self_16, other_10))
 
 
 function D___eq___override_check(self: Ref, other: Ref): Ref
@@ -1063,72 +1089,6 @@ function D___eq___override_check(self: Ref, other: Ref): Ref
   ensures issubtype(typeof(result), bool())
 {
   D___eq__(self, other)
-}
-
-@opaque()
-function E___eq__(self_17: Ref, other_10: Ref): Ref
-  requires issubtype(typeof(self_17), E())
-  requires issubtype(typeof(other_10), object())
-  requires self_17 != null
-  requires acc(state(self_17), wildcard)
-  requires !stateless(other_10) ==> acc(state(other_10), wildcard)
-  ensures issubtype(typeof(result), bool())
-  ensures self_17 == other_10 ==> bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self_17)), PyType___box__(typeof(other_10))) ==>
-    (unfolding acc(state(self_17), wildcard) in
-      !stateless(other_10) ==>
-      (unfolding acc(state(other_10), wildcard) in
-        bool___eq___extended(result, __prim__bool___box__(int___eq___extended(self_17.E_i,
-        object___cast__(E(), other_10).E_i)))))
-  ensures self_17 == other_10 ==> bool___unbox__(result)
-  ensures bool___unbox__(result) ==> typeof(self_17) == typeof(other_10)
-{
-  (let cond_9_0 ==
-    (__prim__bool___box__(self_17 == other_10)) in
-    (true && bool___unbox__(cond_9_0) ?
-      __prim__bool___box__(true) :
-      (let cond_10_0 ==
-        ((true && !bool___unbox__(cond_9_0) ?
-          __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
-          PyType___box__(typeof(other_10)))) :
-          null)) in
-        (true && !bool___unbox__(cond_9_0) && bool___unbox__(cond_10_0) ?
-          __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-            (unfolding acc(state(other_10), wildcard) in
-              int___eq___extended(self_17.E_i, object___cast__(E(), other_10).E_i)))) :
-          __prim__bool___box__(false)))))
-}
-
-function E___eq___extended(self_17: Ref, other_10: Ref): Ref
-  requires issubtype(typeof(self_17), E())
-  requires issubtype(typeof(other_10), object())
-  requires self_17 != null
-  requires acc(state(self_17), wildcard)
-  requires !stateless(other_10) ==> acc(state(other_10), wildcard)
-  ensures issubtype(typeof(result), bool())
-  ensures self_17 == other_10 ==> bool___unbox__(result)
-  ensures type___eq__(PyType___box__(typeof(self_17)), PyType___box__(typeof(other_10))) ==>
-    (unfolding acc(state(self_17), wildcard) in
-      !stateless(other_10) ==>
-      (unfolding acc(state(other_10), wildcard) in
-        bool___eq___extended(result, __prim__bool___box__(int___eq___extended(self_17.E_i,
-        object___cast__(E(), other_10).E_i)))))
-  ensures self_17 == other_10 ==> bool___unbox__(result)
-  ensures bool___unbox__(result) ==> typeof(self_17) == typeof(other_10)
-  ensures result == __prim__bool___box__(object___eq__(self_17, other_10))
-
-
-function E___eq___override_check(self: Ref, other: Ref): Ref
-  requires issubtype(typeof(self), E())
-  requires self != null
-  requires issubtype(typeof(self), object())
-  requires issubtype(typeof(other), object())
-  requires self != null
-  requires acc(state(self), wildcard)
-  requires !stateless(other) ==> acc(state(other), wildcard)
-  ensures issubtype(typeof(result), bool())
-{
-  E___eq__(self, other)
 }
 
 function __file__(): Ref
@@ -1169,20 +1129,6 @@ function bool___unbox__(box: Ref): Bool
   decreases _
 
 
-function int___eq__(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), int())
-  ensures issubtype(typeof(other), int()) ==>
-    result == (int___unbox__(self) == int___unbox__(other))
-  decreases _
-
-
-function bool___eq__(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), bool())
-  ensures issubtype(typeof(other), bool()) ==>
-    result == (bool___unbox__(self) == bool___unbox__(other))
-  decreases _
-
-
 function object___eq__(self: Ref, other: Ref): Bool
   requires !stateless(self) ==> acc(state(self), write)
   requires !stateless(other) ==> acc(state(other), write)
@@ -1205,14 +1151,6 @@ function stateless(x: Ref): Bool
   decreases _
 
 
-function object___cast__(typ: PyType, obj: Ref): Ref
-  requires @error("Cast may not succeed.")
-    (issubtype(typeof(obj), typ))
-  ensures result == obj
-  ensures issubtype(typeof(obj), typ)
-  decreases _
-
-
 function PyType___box__(prim: PyType): Ref
   ensures typeof(result) == type()
   ensures type___unbox__(result) == prim
@@ -1229,19 +1167,6 @@ function type___eq__(self: Ref, other: Ref): Bool
   requires issubtype(typeof(self), type())
   requires issubtype(typeof(other), type())
   ensures result == (type___unbox__(self) == type___unbox__(other))
-  decreases _
-
-
-function float___isNaN(f: Ref): Bool
-  requires issubtype(typeof(f), float())
-  ensures issubtype(typeof(f), int()) ==> result == false
-  decreases _
-
-
-function float___eq__(self: Ref, other: Ref): Bool
-  requires issubtype(typeof(self), float())
-  ensures issubtype(typeof(other), float()) ==>
-    float___isNaN(self) || float___isNaN(other) ==> result == false
   decreases _
 
 
@@ -1278,48 +1203,6 @@ function tuple___val__(self: Ref): Seq[Ref]
   decreases _
 
 
-function tuple___create2__(arg0: Ref, arg1: Ref, t0: PyType, t1: PyType, ctr: Int): Ref
-  requires issubtype(typeof(arg0), t0)
-  requires issubtype(typeof(arg1), t1)
-  ensures result != null
-  ensures typeof(result) == tuple(Seq(typeof(arg0), typeof(arg1)))
-  ensures issubtype(typeof(result), tuple(Seq(t0, t1)))
-  ensures tuple_args(typeof(result)) == Seq(typeof(arg0), typeof(arg1))
-  ensures tuple___val__(result) == Seq(arg0, arg1)
-  ensures tuple___len__(result) == 2 &&
-    (tuple___getitem__(result, 0) == arg0 &&
-    tuple___getitem__(result, 1) == arg1)
-  decreases _
-
-
-function tuple___len__(self: Ref): Int
-  ensures result == |tuple_args(typeof(self))|
-  ensures result == |tuple___val__(self)|
-  decreases _
-
-
-function tuple___getitem__(self: Ref, key: Int): Ref
-  requires @error("Tuple index may be out of bounds.")
-    ((let ln ==
-      (tuple___len__(self)) in
-      @error("Tuple index may be out of bounds.")
-      ((key >= 0 ==> key < ln) && (key < 0 ==> key >= -ln))))
-  ensures key >= 0 ==>
-    issubtype(typeof(result), tuple_arg(typeof(self), key))
-  ensures key < 0 ==>
-    issubtype(typeof(result), tuple_arg(typeof(self), tuple___len__(self) +
-    key))
-  ensures key >= 0 ==> result == tuple___val__(self)[key]
-  ensures key < 0 ==>
-    result == tuple___val__(self)[tuple___len__(self) + key]
-  decreases _
-
-
-function tuple___contains__(self: Ref, item: Ref): Bool
-  ensures result == (item in tuple___val__(self))
-  decreases _
-
-
 predicate MustInvokeBounded(r: Ref) 
 
 predicate MustInvokeUnbounded(r: Ref) 
@@ -1331,16 +1214,13 @@ predicate state_abstract_rest(self: Ref)
 predicate state(self: Ref) {
   true && issubtype(typeof(self), object()) &&
   ((issubtype(typeof(self), object()) ==> true) &&
-  (issubtype(typeof(self), A()) ==> true) &&
   (issubtype(typeof(self), D()) ==> true) &&
   (issubtype(typeof(self), C()) ==> true) &&
-  (issubtype(typeof(self), E()) ==>
-  acc(self.E_i, wildcard) && issubtype(typeof(self.E_i), int())) &&
+  (issubtype(typeof(self), A()) ==> true) &&
   (issubtype(typeof(self), B()) ==> true) &&
-  (true && typeof(self) != object() && typeof(self) != A() &&
-  typeof(self) != D() &&
+  (true && typeof(self) != object() && typeof(self) != D() &&
   typeof(self) != C() &&
-  typeof(self) != E() &&
+  typeof(self) != A() &&
   typeof(self) != B() &&
   (typeof(self) != list(list_arg(typeof(self), 0)) &&
   (typeof(self) != tuple(tuple_args(typeof(self))) &&
@@ -1416,9 +1296,11 @@ predicate tuple_state(self: Ref) {
 
 method A___eq___check_symmetry(self_7: Ref, other_7: Ref)
 {
+  var res: Ref
   inhale typeof(self_7) == A()
-  inhale false || issubtype(typeof(other_7), A()) ||
-    issubtype(typeof(other_7), B()) ||
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(other_7), B()) ||
+    issubtype(typeof(other_7), A()) ||
     typeof(self_7) == typeof(other_7)
   inhale acc(state(self_7), wildcard)
   inhale acc(state(other_7), wildcard)
@@ -1429,21 +1311,34 @@ method A___eq___check_symmetry(self_7: Ref, other_7: Ref)
       (true && bool___unbox__(cond_1_0) ?
         __prim__bool___box__(true) :
         __prim__bool___box__(false))))
-  if (typeof(other_7) == B()) {
-    assert bool___unbox__(@reveal()
-      (A___eq__(other_7, self_7)))
+  if (typeof(other_7) == A()) {
+    assert bool___unbox__((let cond_2_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_7)), PyType___box__(A())) ||
+        (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(B())) ||
+        other_7 == self_7))) in
+        (true && bool___unbox__(cond_2_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
   } elseif (issubtype(typeof(other_7), B())) {
-    assert bool___unbox__(A___eq__(other_7, self_7))
-  } elseif (typeof(other_7) == A()) {
-    assert bool___unbox__(@reveal()
-      (A___eq__(other_7, self_7)))
+    assert true && acc(state(other_7), wildcard) &&
+      (!stateless(self_7) ==> acc(state(self_7), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(B())) ||
+      other_7 == self_7) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
   } elseif (issubtype(typeof(other_7), A())) {
-    assert bool___unbox__(A___eq__(other_7, self_7))
-  } elseif (typeof(self_7) == typeof(other_7)) {
-    assert bool___unbox__(@reveal()
-      (A___eq__(other_7, self_7)))
+    assert true && acc(state(other_7), wildcard) &&
+      (!stateless(self_7) ==> acc(state(self_7), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(B())) ||
+      other_7 == self_7) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
   } elseif (true) {
-    assert object___eq__(other_7, self_7)
+    assert false
   }
 }
 
@@ -1452,23 +1347,46 @@ method A___eq___check_transitivity(self_7: Ref, x_0: Ref, other_7: Ref)
   var res: Ref
   inhale typeof(self_7) == A()
   inhale issubtype(typeof(res), bool())
-  inhale false || issubtype(typeof(x_0), A()) ||
-    issubtype(typeof(x_0), B()) ||
+  inhale false || issubtype(typeof(x_0), B()) ||
+    issubtype(typeof(x_0), A()) ||
     typeof(self_7) == typeof(x_0)
-  inhale false || issubtype(typeof(other_7), A()) ||
-    issubtype(typeof(other_7), B()) ||
+  inhale false || issubtype(typeof(other_7), B()) ||
+    issubtype(typeof(other_7), A()) ||
     typeof(self_7) == typeof(other_7)
   inhale acc(state(self_7), wildcard)
   inhale acc(state(x_0), wildcard)
   inhale acc(state(other_7), wildcard)
-  inhale bool___unbox__((let cond_2_0 ==
+  inhale bool___unbox__((let cond_3_0 ==
       (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_7)), PyType___box__(A())) ||
       (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(B())) ||
       self_7 == other_7))) in
-      (true && bool___unbox__(cond_2_0) ?
+      (true && bool___unbox__(cond_3_0) ?
         __prim__bool___box__(true) :
         __prim__bool___box__(false))))
-  if (issubtype(typeof(x_0), B())) {
+  inhale bool___unbox__((let cond_4_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(x_0)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(x_0)), PyType___box__(B())) ||
+      self_7 == x_0))) in
+      (true && bool___unbox__(cond_4_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  if (typeof(other_7) == A() && typeof(x_0) == A()) {
+    assert bool___unbox__((let cond_5_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_7)), PyType___box__(A())) ||
+        (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(B())) ||
+        x_0 == other_7))) in
+        (true && bool___unbox__(cond_5_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(x_0), B())) {
+    assert true && acc(state(x_0), wildcard) &&
+      (!stateless(other_7) ==> acc(state(other_7), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(B())) ||
+      x_0 == other_7) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
   } elseif (issubtype(typeof(x_0), A())) {
     assert true && acc(state(x_0), wildcard) &&
       (!stateless(other_7) ==> acc(state(other_7), wildcard))
@@ -1478,6 +1396,8 @@ method A___eq___check_transitivity(self_7: Ref, x_0: Ref, other_7: Ref)
       x_0 == other_7) ==>
       bool___unbox__(res))
     assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
   }
 }
 
@@ -1488,271 +1408,381 @@ method A___init__(self_8: Ref)
   ensures acc(state(self_8), wildcard)
 {
   var _err: Ref
-  var self_20: Ref
+  var self_19: Ref
   inhale typeof(self_8) == A()
   _err := null
-  self_20 := self_8
+  self_19 := self_8
+  fold acc(state(self_19), wildcard)
+  goto __end
+  label __end
+}
+
+method B___eq___check_symmetry(self_10: Ref, other_8: Ref)
+{
+  var res: Ref
+  inhale typeof(self_10) == B()
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(other_8), B()) ||
+    issubtype(typeof(other_8), A()) ||
+    typeof(self_10) == typeof(other_8)
+  inhale acc(state(self_10), wildcard)
+  inhale acc(state(other_8), wildcard)
+  inhale bool___unbox__((let cond_7_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+      self_10 == other_8))) in
+      (true && bool___unbox__(cond_7_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  if (typeof(other_8) == B()) {
+    assert bool___unbox__((let cond_8_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_10)), PyType___box__(A())) ||
+        (type___eq__(PyType___box__(typeof(self_10)), PyType___box__(B())) ||
+        other_8 == self_10))) in
+        (true && bool___unbox__(cond_8_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(other_8), B())) {
+    assert true && acc(state(other_8), wildcard) &&
+      (!stateless(self_10) ==> acc(state(self_10), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(self_10)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(self_10)), PyType___box__(B())) ||
+      other_8 == self_10) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(other_8), A())) {
+    assert true && acc(state(other_8), wildcard) &&
+      (!stateless(self_10) ==> acc(state(self_10), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(self_10)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(self_10)), PyType___box__(B())) ||
+      other_8 == self_10) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
+  }
+}
+
+method B___eq___check_transitivity(self_10: Ref, x_1: Ref, other_8: Ref)
+{
+  var res: Ref
+  inhale typeof(self_10) == B()
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(x_1), B()) ||
+    issubtype(typeof(x_1), A()) ||
+    typeof(self_10) == typeof(x_1)
+  inhale false || issubtype(typeof(other_8), B()) ||
+    issubtype(typeof(other_8), A()) ||
+    typeof(self_10) == typeof(other_8)
+  inhale acc(state(self_10), wildcard)
+  inhale acc(state(x_1), wildcard)
+  inhale acc(state(other_8), wildcard)
+  inhale bool___unbox__((let cond_9_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+      self_10 == other_8))) in
+      (true && bool___unbox__(cond_9_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  inhale bool___unbox__((let cond_10_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(x_1)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(x_1)), PyType___box__(B())) ||
+      self_10 == x_1))) in
+      (true && bool___unbox__(cond_10_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  if (typeof(other_8) == B() && typeof(x_1) == B()) {
+    assert bool___unbox__((let cond_11_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+        (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+        x_1 == other_8))) in
+        (true && bool___unbox__(cond_11_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(x_1), B())) {
+    assert true && acc(state(x_1), wildcard) &&
+      (!stateless(other_8) ==> acc(state(other_8), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+      x_1 == other_8) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(x_1), A())) {
+    assert true && acc(state(x_1), wildcard) &&
+      (!stateless(other_8) ==> acc(state(other_8), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(A())) ||
+      (type___eq__(PyType___box__(typeof(other_8)), PyType___box__(B())) ||
+      x_1 == other_8) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
+  }
+}
+
+method B___init__(self_11: Ref)
+  requires self_11 != null
+  requires issubtype(typeof(self_11), B())
+  requires self_11 != null
+  ensures acc(state(self_11), wildcard)
+{
+  var _err: Ref
+  var self_20: Ref
+  inhale typeof(self_11) == B()
+  _err := null
+  self_20 := self_11
   fold acc(state(self_20), wildcard)
   goto __end
   label __end
 }
 
-method C___eq___check_symmetry(self_11: Ref, other_8: Ref)
-{
-  inhale typeof(self_11) == C()
-  inhale false || issubtype(typeof(other_8), D()) ||
-    issubtype(typeof(other_8), C()) ||
-    typeof(self_11) == typeof(other_8)
-  inhale acc(state(self_11), wildcard)
-  inhale acc(state(other_8), wildcard)
-  inhale bool___unbox__((let cond_4_0 ==
-      (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-      PyType___box__(D()), type(), type(), 3), PyType___box__(typeof(other_8))) ||
-      self_11 == other_8)) in
-      (true && bool___unbox__(cond_4_0) ?
-        __prim__bool___box__(true) :
-        __prim__bool___box__(false))))
-  if (typeof(other_8) == D()) {
-    assert bool___unbox__(@reveal()
-      (D___eq__(other_8, self_11)))
-  } elseif (issubtype(typeof(other_8), D())) {
-    assert bool___unbox__(D___eq__(other_8, self_11))
-  } elseif (typeof(other_8) == C()) {
-    assert bool___unbox__(@reveal()
-      (C___eq__(other_8, self_11)))
-  } elseif (issubtype(typeof(other_8), C())) {
-    assert bool___unbox__(C___eq__(other_8, self_11))
-  } elseif (typeof(self_11) == typeof(other_8)) {
-    assert bool___unbox__(@reveal()
-      (C___eq__(other_8, self_11)))
-  } elseif (true) {
-    assert object___eq__(other_8, self_11)
-  }
-}
-
-method C___eq___check_transitivity(self_11: Ref, x_1: Ref, other_8: Ref)
+method C___eq___check_symmetry(self_13: Ref, other_9: Ref)
 {
   var res: Ref
-  inhale typeof(self_11) == C()
+  inhale typeof(self_13) == C()
   inhale issubtype(typeof(res), bool())
-  inhale false || issubtype(typeof(x_1), D()) ||
-    issubtype(typeof(x_1), C()) ||
-    typeof(self_11) == typeof(x_1)
-  inhale false || issubtype(typeof(other_8), D()) ||
-    issubtype(typeof(other_8), C()) ||
-    typeof(self_11) == typeof(other_8)
-  inhale acc(state(self_11), wildcard)
-  inhale acc(state(x_1), wildcard)
-  inhale acc(state(other_8), wildcard)
-  inhale bool___unbox__((let cond_5_0 ==
-      (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-      PyType___box__(D()), type(), type(), 4), PyType___box__(typeof(other_8))) ||
-      self_11 == other_8)) in
-      (true && bool___unbox__(cond_5_0) ?
+  inhale false || issubtype(typeof(other_9), C()) ||
+    issubtype(typeof(other_9), D()) ||
+    typeof(self_13) == typeof(other_9)
+  inhale acc(state(self_13), wildcard)
+  inhale acc(state(other_9), wildcard)
+  inhale bool___unbox__((let cond_13_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+      self_13 == other_9))) in
+      (true && bool___unbox__(cond_13_0) ?
         __prim__bool___box__(true) :
         __prim__bool___box__(false))))
-  if (issubtype(typeof(x_1), D())) {
-    assert true && acc(state(x_1), wildcard) &&
-      (!stateless(other_8) ==> acc(state(other_8), wildcard))
+  if (typeof(other_9) == C()) {
+    assert bool___unbox__((let cond_14_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_13)), PyType___box__(C())) ||
+        (type___eq__(PyType___box__(typeof(self_13)), PyType___box__(D())) ||
+        other_9 == self_13))) in
+        (true && bool___unbox__(cond_14_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(other_9), C())) {
+    assert true && acc(state(other_9), wildcard) &&
+      (!stateless(self_13) ==> acc(state(self_13), wildcard))
     inhale true &&
-      (tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-      type(), type(), 5), PyType___box__(typeof(other_8))) ||
-      x_1 == other_8 ==>
+      (type___eq__(PyType___box__(typeof(self_13)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(self_13)), PyType___box__(D())) ||
+      other_9 == self_13) ==>
       bool___unbox__(res))
     assert bool___unbox__(res)
-  } elseif (issubtype(typeof(x_1), C())) {
-    assert true && acc(state(x_1), wildcard) &&
-      (!stateless(other_8) ==> acc(state(other_8), wildcard))
+  } elseif (issubtype(typeof(other_9), D())) {
+    assert true && acc(state(other_9), wildcard) &&
+      (!stateless(self_13) ==> acc(state(self_13), wildcard))
     inhale true &&
-      (tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-      type(), type(), 6), PyType___box__(typeof(other_8))) ||
-      x_1 == other_8 ==>
+      (type___eq__(PyType___box__(typeof(self_13)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(self_13)), PyType___box__(D())) ||
+      other_9 == self_13) ==>
       bool___unbox__(res))
     assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
   }
 }
 
-method C___init__(self_12: Ref)
-  requires self_12 != null
-  requires issubtype(typeof(self_12), C())
-  requires self_12 != null
-  ensures acc(state(self_12), wildcard)
+method C___eq___check_transitivity(self_13: Ref, x_2: Ref, other_9: Ref)
+{
+  var res: Ref
+  inhale typeof(self_13) == C()
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(x_2), C()) ||
+    issubtype(typeof(x_2), D()) ||
+    typeof(self_13) == typeof(x_2)
+  inhale false || issubtype(typeof(other_9), C()) ||
+    issubtype(typeof(other_9), D()) ||
+    typeof(self_13) == typeof(other_9)
+  inhale acc(state(self_13), wildcard)
+  inhale acc(state(x_2), wildcard)
+  inhale acc(state(other_9), wildcard)
+  inhale bool___unbox__((let cond_15_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+      self_13 == other_9))) in
+      (true && bool___unbox__(cond_15_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  inhale bool___unbox__((let cond_16_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(x_2)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(x_2)), PyType___box__(D())) ||
+      self_13 == x_2))) in
+      (true && bool___unbox__(cond_16_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  if (typeof(other_9) == C() && typeof(x_2) == C()) {
+    assert bool___unbox__((let cond_17_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+        (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+        x_2 == other_9))) in
+        (true && bool___unbox__(cond_17_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(x_2), C())) {
+    assert true && acc(state(x_2), wildcard) &&
+      (!stateless(other_9) ==> acc(state(other_9), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+      x_2 == other_9) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(x_2), D())) {
+    assert true && acc(state(x_2), wildcard) &&
+      (!stateless(other_9) ==> acc(state(other_9), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_9)), PyType___box__(D())) ||
+      x_2 == other_9) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
+  }
+}
+
+method C___init__(self_14: Ref)
+  requires self_14 != null
+  requires issubtype(typeof(self_14), C())
+  requires self_14 != null
+  ensures acc(state(self_14), wildcard)
 {
   var _err: Ref
   var self_21: Ref
-  inhale typeof(self_12) == C()
+  inhale typeof(self_14) == C()
   _err := null
-  self_21 := self_12
+  self_21 := self_14
   fold acc(state(self_21), wildcard)
   goto __end
   label __end
 }
 
-method D___eq___check_symmetry(self_14: Ref, other_9: Ref)
-{
-  inhale typeof(self_14) == D()
-  inhale false || issubtype(typeof(other_9), D()) ||
-    issubtype(typeof(other_9), C()) ||
-    typeof(self_14) == typeof(other_9)
-  inhale acc(state(self_14), wildcard)
-  inhale acc(state(other_9), wildcard)
-  inhale bool___unbox__((let cond_7_0 ==
-      (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-      PyType___box__(D()), type(), type(), 10), PyType___box__(typeof(other_9))) ||
-      self_14 == other_9)) in
-      (true && bool___unbox__(cond_7_0) ?
-        __prim__bool___box__(true) :
-        __prim__bool___box__(false))))
-  if (typeof(other_9) == D()) {
-    assert bool___unbox__(@reveal()
-      (D___eq__(other_9, self_14)))
-  } elseif (issubtype(typeof(other_9), D())) {
-    assert bool___unbox__(D___eq__(other_9, self_14))
-  } elseif (typeof(other_9) == C()) {
-    assert bool___unbox__(@reveal()
-      (C___eq__(other_9, self_14)))
-  } elseif (issubtype(typeof(other_9), C())) {
-    assert bool___unbox__(C___eq__(other_9, self_14))
-  } elseif (typeof(self_14) == typeof(other_9)) {
-    assert bool___unbox__(@reveal()
-      (D___eq__(other_9, self_14)))
-  } elseif (true) {
-    assert object___eq__(other_9, self_14)
-  }
-}
-
-method D___eq___check_transitivity(self_14: Ref, x_2: Ref, other_9: Ref)
+method D___eq___check_symmetry(self_16: Ref, other_10: Ref)
 {
   var res: Ref
-  inhale typeof(self_14) == D()
+  inhale typeof(self_16) == D()
   inhale issubtype(typeof(res), bool())
-  inhale false || issubtype(typeof(x_2), D()) ||
-    issubtype(typeof(x_2), C()) ||
-    typeof(self_14) == typeof(x_2)
-  inhale false || issubtype(typeof(other_9), D()) ||
-    issubtype(typeof(other_9), C()) ||
-    typeof(self_14) == typeof(other_9)
-  inhale acc(state(self_14), wildcard)
-  inhale acc(state(x_2), wildcard)
-  inhale acc(state(other_9), wildcard)
-  inhale bool___unbox__((let cond_8_0 ==
-      (__prim__bool___box__(tuple___contains__(tuple___create2__(PyType___box__(C()),
-      PyType___box__(D()), type(), type(), 11), PyType___box__(typeof(other_9))) ||
-      self_14 == other_9)) in
-      (true && bool___unbox__(cond_8_0) ?
+  inhale false || issubtype(typeof(other_10), C()) ||
+    issubtype(typeof(other_10), D()) ||
+    typeof(self_16) == typeof(other_10)
+  inhale acc(state(self_16), wildcard)
+  inhale acc(state(other_10), wildcard)
+  inhale bool___unbox__((let cond_19_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+      self_16 == other_10))) in
+      (true && bool___unbox__(cond_19_0) ?
         __prim__bool___box__(true) :
         __prim__bool___box__(false))))
-  if (issubtype(typeof(x_2), D())) {
-    assert true && acc(state(x_2), wildcard) &&
-      (!stateless(other_9) ==> acc(state(other_9), wildcard))
+  if (typeof(other_10) == D()) {
+    assert bool___unbox__((let cond_20_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_16)), PyType___box__(C())) ||
+        (type___eq__(PyType___box__(typeof(self_16)), PyType___box__(D())) ||
+        other_10 == self_16))) in
+        (true && bool___unbox__(cond_20_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(other_10), C())) {
+    assert true && acc(state(other_10), wildcard) &&
+      (!stateless(self_16) ==> acc(state(self_16), wildcard))
     inhale true &&
-      (tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-      type(), type(), 12), PyType___box__(typeof(other_9))) ||
-      x_2 == other_9 ==>
+      (type___eq__(PyType___box__(typeof(self_16)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(self_16)), PyType___box__(D())) ||
+      other_10 == self_16) ==>
       bool___unbox__(res))
     assert bool___unbox__(res)
-  } elseif (issubtype(typeof(x_2), C())) {
-    assert true && acc(state(x_2), wildcard) &&
-      (!stateless(other_9) ==> acc(state(other_9), wildcard))
+  } elseif (issubtype(typeof(other_10), D())) {
+    assert true && acc(state(other_10), wildcard) &&
+      (!stateless(self_16) ==> acc(state(self_16), wildcard))
     inhale true &&
-      (tuple___contains__(tuple___create2__(PyType___box__(C()), PyType___box__(D()),
-      type(), type(), 13), PyType___box__(typeof(other_9))) ||
-      x_2 == other_9 ==>
+      (type___eq__(PyType___box__(typeof(self_16)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(self_16)), PyType___box__(D())) ||
+      other_10 == self_16) ==>
       bool___unbox__(res))
     assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
   }
 }
 
-method D___init__(self_15: Ref)
-  requires self_15 != null
-  requires issubtype(typeof(self_15), D())
-  requires self_15 != null
-  ensures acc(state(self_15), wildcard)
+method D___eq___check_transitivity(self_16: Ref, x_3: Ref, other_10: Ref)
+{
+  var res: Ref
+  inhale typeof(self_16) == D()
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(x_3), C()) ||
+    issubtype(typeof(x_3), D()) ||
+    typeof(self_16) == typeof(x_3)
+  inhale false || issubtype(typeof(other_10), C()) ||
+    issubtype(typeof(other_10), D()) ||
+    typeof(self_16) == typeof(other_10)
+  inhale acc(state(self_16), wildcard)
+  inhale acc(state(x_3), wildcard)
+  inhale acc(state(other_10), wildcard)
+  inhale bool___unbox__((let cond_21_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+      self_16 == other_10))) in
+      (true && bool___unbox__(cond_21_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  inhale bool___unbox__((let cond_22_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(x_3)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(x_3)), PyType___box__(D())) ||
+      self_16 == x_3))) in
+      (true && bool___unbox__(cond_22_0) ?
+        __prim__bool___box__(true) :
+        __prim__bool___box__(false))))
+  if (typeof(other_10) == D() && typeof(x_3) == D()) {
+    assert bool___unbox__((let cond_23_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_10)),
+        PyType___box__(C())) ||
+        (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+        x_3 == other_10))) in
+        (true && bool___unbox__(cond_23_0) ?
+          __prim__bool___box__(true) :
+          __prim__bool___box__(false))))
+  } elseif (issubtype(typeof(x_3), C())) {
+    assert true && acc(state(x_3), wildcard) &&
+      (!stateless(other_10) ==> acc(state(other_10), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+      x_3 == other_10) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (issubtype(typeof(x_3), D())) {
+    assert true && acc(state(x_3), wildcard) &&
+      (!stateless(other_10) ==> acc(state(other_10), wildcard))
+    inhale true &&
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(C())) ||
+      (type___eq__(PyType___box__(typeof(other_10)), PyType___box__(D())) ||
+      x_3 == other_10) ==>
+      bool___unbox__(res))
+    assert bool___unbox__(res)
+  } elseif (true) {
+    assert false
+  }
+}
+
+method D___init__(self_17: Ref)
+  requires self_17 != null
+  requires issubtype(typeof(self_17), D())
+  requires self_17 != null
+  ensures acc(state(self_17), wildcard)
 {
   var _err: Ref
   var self_22: Ref
-  inhale typeof(self_15) == D()
+  inhale typeof(self_17) == D()
   _err := null
-  self_22 := self_15
+  self_22 := self_17
   fold acc(state(self_22), wildcard)
-  goto __end
-  label __end
-}
-
-method E___eq___check_symmetry(self_17: Ref, other_10: Ref)
-{
-  inhale typeof(self_17) == E()
-  inhale false || typeof(self_17) == typeof(other_10)
-  inhale acc(state(self_17), wildcard)
-  inhale acc(state(other_10), wildcard)
-  inhale bool___unbox__((let cond_11_0 ==
-      (__prim__bool___box__(self_17 == other_10)) in
-      (true && bool___unbox__(cond_11_0) ?
-        __prim__bool___box__(true) :
-        (let cond_12_0 ==
-          ((true && !bool___unbox__(cond_11_0) ?
-            __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
-            PyType___box__(typeof(other_10)))) :
-            null)) in
-          (true && !bool___unbox__(cond_11_0) && bool___unbox__(cond_12_0) ?
-            __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-              (unfolding acc(state(other_10), wildcard) in
-                eq(self_17.E_i, object___cast__(E(), other_10).E_i)))) :
-            __prim__bool___box__(false))))))
-  if (typeof(self_17) == typeof(other_10)) {
-    assert bool___unbox__(@reveal()
-      (E___eq__(other_10, self_17)))
-  } elseif (true) {
-    assert object___eq__(other_10, self_17)
-  }
-}
-
-method E___eq___check_transitivity(self_17: Ref, x_3: Ref, other_10: Ref)
-{
-  var res: Ref
-  inhale typeof(self_17) == E()
-  inhale issubtype(typeof(res), bool())
-  inhale false || typeof(self_17) == typeof(x_3)
-  inhale false || typeof(self_17) == typeof(other_10)
-  inhale acc(state(self_17), wildcard)
-  inhale acc(state(x_3), wildcard)
-  inhale acc(state(other_10), wildcard)
-  inhale bool___unbox__((let cond_13_0 ==
-      (__prim__bool___box__(self_17 == other_10)) in
-      (true && bool___unbox__(cond_13_0) ?
-        __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-          eq(self_17.E_i, object___cast__(E(), other_10).E_i))) :
-        (let cond_14_0 ==
-          ((true && !bool___unbox__(cond_13_0) ?
-            __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
-            PyType___box__(typeof(other_10)))) :
-            null)) in
-          (true && !bool___unbox__(cond_13_0) && bool___unbox__(cond_14_0) ?
-            __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-              (unfolding acc(state(other_10), wildcard) in
-                eq(self_17.E_i, object___cast__(E(), other_10).E_i)))) :
-            __prim__bool___box__(false))))))
-}
-
-method E___init__(self_18: Ref, i: Ref)
-  requires self_18 != null
-  requires acc(_MaySet(self_18, 6905669), write)
-  requires issubtype(typeof(self_18), E())
-  requires issubtype(typeof(i), int())
-  requires self_18 != null
-{
-  var _err: Ref
-  var self_23: Ref
-  var i_0: Ref
-  inhale typeof(self_18) == E()
-  _err := null
-  self_23 := self_18
-  i_0 := i
-  if (perm(_MaySet(self_23, 6905669)) > none) {
-    exhale acc(_MaySet(self_23, 6905669), write)
-    inhale acc(self_23.E_i, write)
-  }
-  self_23.E_i := i_0
   goto __end
   label __end
 }
@@ -1781,6 +1811,9 @@ method main()
   module_names_0 := (module_names_0 union Set(_single(104863529000799)))
   module_names_0 := (module_names_0 union Set(_single(65)))
   assert true && (_single(65) in module_names_0)
+  module_names_0 := (module_names_0 union
+    Set(_single(6872339552563453791)))
+  module_names_0 := (module_names_0 union Set(_single(104863529000799)))
   module_names_0 := (module_names_0 union Set(_single(66)))
   module_names_0 := (module_names_0 union
     Set(_single(6872339552563453791)))
@@ -1790,10 +1823,6 @@ method main()
     Set(_single(6872339552563453791)))
   module_names_0 := (module_names_0 union Set(_single(104863529000799)))
   module_names_0 := (module_names_0 union Set(_single(68)))
-  module_names_0 := (module_names_0 union
-    Set(_single(6872339552563453791)))
-  module_names_0 := (module_names_0 union Set(_single(104863529000799)))
-  module_names_0 := (module_names_0 union Set(_single(69)))
   goto __end
   label __end
 }

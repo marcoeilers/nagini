@@ -21,6 +21,7 @@ manual_testing/*
 !manual_testing/out/
 manual_testing/out/*
 !manual_testing/out/eq_example_predicate_family.vpr
+!manual_testing/out/test_symmetric.vpr
 
 
 
