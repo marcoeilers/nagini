@@ -1073,10 +1073,7 @@ function E___eq__(self_17: Ref, other_10: Ref): Ref
   requires acc(state(self_17), wildcard)
   requires !stateless(other_10) ==> acc(state(other_10), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures self_17 == other_10 ==>
-    (unfolding acc(state(self_17), wildcard) in
-      bool___eq___extended(result, __prim__bool___box__(int___eq___extended(self_17.E_i,
-      object___cast__(E(), other_10).E_i))))
+  ensures self_17 == other_10 ==> bool___unbox__(result)
   ensures type___eq__(PyType___box__(typeof(self_17)), PyType___box__(typeof(other_10))) ==>
     (unfolding acc(state(self_17), wildcard) in
       !stateless(other_10) ==>
@@ -1089,8 +1086,7 @@ function E___eq__(self_17: Ref, other_10: Ref): Ref
   (let cond_9_0 ==
     (__prim__bool___box__(self_17 == other_10)) in
     (true && bool___unbox__(cond_9_0) ?
-      __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-        int___eq___extended(self_17.E_i, object___cast__(E(), other_10).E_i))) :
+      __prim__bool___box__(true) :
       (let cond_10_0 ==
         ((true && !bool___unbox__(cond_9_0) ?
           __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
@@ -1110,10 +1106,7 @@ function E___eq___extended(self_17: Ref, other_10: Ref): Ref
   requires acc(state(self_17), wildcard)
   requires !stateless(other_10) ==> acc(state(other_10), wildcard)
   ensures issubtype(typeof(result), bool())
-  ensures self_17 == other_10 ==>
-    (unfolding acc(state(self_17), wildcard) in
-      bool___eq___extended(result, __prim__bool___box__(int___eq___extended(self_17.E_i,
-      object___cast__(E(), other_10).E_i))))
+  ensures self_17 == other_10 ==> bool___unbox__(result)
   ensures type___eq__(PyType___box__(typeof(self_17)), PyType___box__(typeof(other_10))) ==>
     (unfolding acc(state(self_17), wildcard) in
       !stateless(other_10) ==>
@@ -1695,8 +1688,7 @@ method E___eq___check_symmetry(self_17: Ref, other_10: Ref)
   inhale bool___unbox__((let cond_11_0 ==
       (__prim__bool___box__(self_17 == other_10)) in
       (true && bool___unbox__(cond_11_0) ?
-        __prim__bool___box__((unfolding acc(state(self_17), wildcard) in
-          eq(self_17.E_i, object___cast__(E(), other_10).E_i))) :
+        __prim__bool___box__(true) :
         (let cond_12_0 ==
           ((true && !bool___unbox__(cond_11_0) ?
             __prim__bool___box__(type___eq__(PyType___box__(typeof(self_17)),
