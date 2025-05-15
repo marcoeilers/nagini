@@ -107,8 +107,8 @@ class AbstractTranslator(metaclass=ABCMeta):
         return self.config.perm_translator.get_arp_for_context(node, ctx)
 
     def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx: Context) -> Expr:
-        return self.config.pure_translator.translate_exprs(nodes, function, ctx)
+                        function: PythonMethod, ctx: Context, aliases: dict = {}) -> Expr:
+        return self.config.pure_translator.translate_exprs(nodes, function, ctx, aliases)
 
     def get_type(self, node: ast.AST, ctx: Context) -> PythonClass:
         return self.config.type_translator.get_type(node, ctx)

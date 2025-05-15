@@ -284,7 +284,8 @@ class PureTranslator(CommonTranslator):
         return cls
 
     def translate_exprs(self, nodes: List[ast.AST],
-                        function: PythonMethod, ctx: Context) -> Expr:
+                        function: PythonMethod, ctx: Context,
+                        aliases: dict = {}) -> Expr:
         """
         Translates a list of nodes to a single (let-)expression if the nodes
         are only returns, assignments and if-blocks. First translates them to
@@ -299,11 +300,13 @@ class PureTranslator(CommonTranslator):
         # Second walk through wrappers, starting at the end. Translate all of
         # them into one big expression. Assigns become a let, returns just the
         # returned value, and if something happens in an if block, we put it
-        assert not ctx.var_aliases
+        if not ctx.use_domain_func_eq and function.name == '__eq__':
+            assert not ctx.var_aliases
         previous = None
         for wrapper in reversed(wrappers):
             ctx.var_aliases = wrapper.names.copy()
-            previous = self._translate_wrapper(wrapper, previous, function, ctx)
+            with ctx.additional_aliases(aliases):
+                previous = self._translate_wrapper(wrapper, previous, function, ctx)
 
         ctx.var_aliases = {}
         return previous
