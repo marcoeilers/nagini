@@ -81,6 +81,7 @@ DOMAIN_EQ_FUNC = 'eq'
 OBJECT_EQ = 'object___eq__'
 EQUALITY_STATE_PRED = 'state'
 STATELESS_FUNC = 'stateless'
+STATE_ABSTRACT_REST = "state_abstract_rest"
 BUILTIN___EQ___FUNCTIONS = [
     'int___eq__',
     'bool___eq__',
@@ -111,8 +112,13 @@ DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     "list___getitem___index",
 ]
 
-DEPENDENCIES_STATELESS_FUNC = [
+DEPENDENCIES = [
     "tuple___val__",
+    OBJECT_EQ,
+    STATELESS_FUNC,
+    EQUALITY_STATE_PRED,
+    STATE_ABSTRACT_REST,
+    
 ]
 STATE_PREDS = [
     'list_state',

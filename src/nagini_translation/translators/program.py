@@ -1853,7 +1853,7 @@ class ProgramTranslator(CommonTranslator):
 
                     # add all __eq__ functions to eq_funcs
                     # to later create the merge func for object.__eq__
-                    if ctx.merge and func.merge_func_name == OBJ___EQ__MERGED:
+                    if func.merge_func_name == OBJ___EQ__MERGED:
                         eq_funcs.add(func)
 
                     if func.interface:
@@ -1887,7 +1887,7 @@ class ProgramTranslator(CommonTranslator):
                         pos = self.to_position(func.node, ctx)
                         info = self.no_info(ctx)
                         symm_check  = self.config.method_translator.encode_symmetry_check(
-                            func, ctx, pos, info
+                            func, ctx, pos, info, sil_progs
                         )  
                         trans_check = self.config.method_translator.encode_transitivity_check(
                             func, ctx, pos, info
@@ -2028,7 +2028,7 @@ class ProgramTranslator(CommonTranslator):
             i += 1
 
         # add some dependencies
-        all_used_names.extend(DEPENDENCIES_STATELESS_FUNC)
+        all_used_names.extend(DEPENDENCIES)
 
         all_used_names = set(all_used_names)
         # Filter out anything the selected part does not depend on.
