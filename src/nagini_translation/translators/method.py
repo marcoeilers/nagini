@@ -33,6 +33,7 @@ from nagini_translation.lib.program_nodes import (
     PythonClass,
     toposort_classes,
     chain_if_stmts,
+    ProgramNodeFactory,
 )
 from nagini_translation.lib.typedefs import (
     DomainFuncApp,
@@ -782,9 +783,24 @@ class MethodTranslator(CommonTranslator):
             self_pyvar = func.args[next(iterator)]
             other_pyvar = func.args[next(iterator)]
             aliases = {}
+
+            # copy other_pyvar.type
+            node_factory = ProgramNodeFactory()
+            t = other_pyvar.type
+            t_self = self_pyvar.type
+            old_type: PythonClass = node_factory.create_python_class(
+                t.name, t.superscope, node_factory, t.node, t.superclass, t.interface
+            )
+            for k, v in t.__dict__.items():
+                old_type.__setattr__(k, v)
+
+            other_pyvar.type = t_self
+
             aliases[self_pyvar.name] = other_pyvar
             aliases[other_pyvar.name] = self_pyvar
             inlined_body = self.translate_exprs(actual_body, func, ctx, aliases=aliases)
+
+            other_pyvar.type = old_type
 
             inlined_body = self.viper.FuncApp(
                 'bool___unbox__',

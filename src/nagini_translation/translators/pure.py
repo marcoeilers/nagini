@@ -302,6 +302,7 @@ class PureTranslator(CommonTranslator):
         # returned value, and if something happens in an if block, we put it
         if not ctx.use_domain_func_eq and function.name == '__eq__':
             assert not ctx.var_aliases
+            assert not aliases
         previous = None
         for wrapper in reversed(wrappers):
             ctx.var_aliases = wrapper.names.copy()
