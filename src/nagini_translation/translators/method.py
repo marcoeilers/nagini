@@ -551,12 +551,94 @@ class MethodTranslator(CommonTranslator):
             super_func = superclass.functions.get(name)
         return super_func
 
-    def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info) -> Method:
+    def _assume_postconditions_with_substitutions(self, c: PythonClass, sil_progs, aliases: dict, res: Var,
+                                                  ctx: Context, pos, info) -> list[Stmt]:
+        stmts = []
+        other_eq_func = c.functions.get('__eq__')
+
+        # Use the domain function eq instead of the __eq__ merge function
+        # for the transitivity assumption.
+        ctx.use_domain_func_eq = True
+
+        if not other_eq_func:
+            other_eq_func = self.get_inherited_function(c, '__eq__')
+
+        else:
+            old_func = ctx.current_function
+            ctx.current_function = other_eq_func
+            old_class = ctx.current_class
+            ctx.current_class = other_eq_func.cls
+
+            if c.sil_name == OBJECT_TYPE:
+                other_eq_func = sil_progs.findFunction(OBJECT_EQ)
+                pres = self.viper.to_list(other_eq_func.pres())
+                posts = self.viper.to_list(other_eq_func.posts())
+            else:
+                pres = list(map(lambda x: x[0], other_eq_func.precondition))
+                posts = list(map(lambda x: x[0], other_eq_func.postcondition))
+
+            and_pres = self.viper.TrueLit(pos, info)
+            for pre in pres:
+                if isinstance(other_eq_func, PythonMethod):
+                    with ctx.additional_aliases(aliases):
+                        stmt, pre = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
+                    if stmt:
+                        raise InvalidProgramException(pre, 'purity.violated')
+                # do not add decreases
+                if not type(pre) in (
+                    self.jvm.viper.silver.plugin.standard.termination.DecreasesTuple,
+                    self.jvm.viper.silver.plugin.standard.termination.DecreasesWildcard
+                ):
+                    and_pres = self.viper.And(and_pres, pre, pos, info)
+            stmts.append(self.viper.Assert(and_pres, pos, info))
+
+            # we substitute result in the postconditions with res
+            ctx.transitivity_result_var = res
+
+            and_posts = self.viper.TrueLit(pos, info)
+            for post in posts:
+                if isinstance(other_eq_func, PythonMethod):
+                    with ctx.additional_aliases(aliases):
+                        stmt, post = self.translate_expr(post, ctx, self.viper.Bool)
+                    if stmt:
+                        raise InvalidProgramException(post, 'purity.violated')
+                and_posts = self.viper.And(and_posts, post, pos, info)
+
+            stmts.append(self.viper.Inhale(and_posts, pos, info))
+            
+            # check if transitivity holds by asserting res
+            result_in_posts_unboxed = self.viper.FuncApp(
+                'bool___unbox__',
+                [res],
+                pos, info, self.viper.Bool 
+            )
+            stmts.append(self.viper.Assert(result_in_posts_unboxed, pos, info))
+
+            ctx.current_function = old_func
+            ctx.current_class = old_class
+
+        ctx.use_domain_func_eq = False
+        return stmts
+
+    def encode_symmetry_check(self, func: PythonMethod, ctx: Context, pos, info, sil_progs) -> Method:
         self_var, other_var, self_decl, other_decl = self.get_self_other_as_var_and_decls(func)
         body = []
+        locals = []
+
+        self_pyvar = func.args[list(func.args.keys())[0]]
+        other_pyvar = func.args[list(func.args.keys())[1]]
 
         initial_type_check = self.get_typeof_check_for_custom_class(self_var, func.cls.sil_name, pos, info)
         body.append(self.viper.Inhale(initial_type_check, pos, info))
+
+        result_in_posts = self.viper.LocalVar('res', self.viper.Ref, pos, info)
+
+        result_decl_in_posts = self.viper.LocalVarDecl('res', self.viper.Ref, pos, info)
+        locals.append(result_decl_in_posts)
+
+        # assume typeof(res) <: bool
+        result_in_posts_subtype_check = self.get_subtype_check_for_custom_class(result_in_posts, 'bool', pos, info)
+        body.append(self.viper.Inhale(result_in_posts_subtype_check, pos, info))
 
         # for at least one C in M we have: type(other) <: C
         assume_other = self.viper.FalseLit(pos, info)
@@ -609,43 +691,134 @@ class MethodTranslator(CommonTranslator):
         annotation = self.viper.AnnotationInfo("reveal", [])
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
+            stmts = []
             cond_exact_type = self.get_typeof_check_for_custom_class(other_var, c.sil_name, pos, info)
             cond_subtype = self.get_subtype_check_for_custom_class(other_var, c.sil_name, pos, info)
             other_eq_func = c.functions.get('__eq__')
 
+            # Use the domain function eq instead of the __eq__ merge function
+            # for the transitivity assumption.
+            ctx.use_domain_func_eq = True
+
             if not other_eq_func:
                 other_eq_func = self.get_inherited_function(c, '__eq__')
 
-            # encode symmetric __eq__ call
-            # if we know the exact type, we can use the implementation
-            symm_call_exact_type = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, annotation, self.viper.Bool)
-            symm_call_subtype = self.viper.FuncApp(other_eq_func.sil_name, [other_var, self_var], pos, info, self.viper.Bool)
-            rhs_exact = self.viper.FuncApp('bool___unbox__', [symm_call_exact_type], pos, info, self.viper.Bool)
-            rhs_subtype = self.viper.FuncApp('bool___unbox__', [symm_call_subtype], pos, info, self.viper.Bool)
-            assert_right_exact = self.viper.Assert(rhs_exact, pos, info)
-            assert_right_subtype = self.viper.Assert(rhs_subtype, pos, info)
-            guarded_blocks.append((cond_exact_type, assert_right_exact))
-            guarded_blocks.append((cond_subtype, assert_right_subtype))
+            else:
+                old_func = ctx.current_function
+                ctx.current_function = other_eq_func
+                old_class = ctx.current_class
+                ctx.current_class = other_eq_func.cls
 
+                and_pres = self.viper.TrueLit(pos, info)
+
+                iterator = iter(other_eq_func.args)
+                cur_self_pyvar = other_eq_func.args[next(iterator)]
+                cur_other_pyvar = other_eq_func.args[next(iterator)]
+                aliases = {}
+                aliases[cur_self_pyvar.name] = other_pyvar
+                aliases[cur_other_pyvar.name] = self_pyvar
+
+                for pre, _ in other_eq_func.precondition:
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
+                    if stmt:
+                        raise InvalidProgramException(pre, 'purity.violated')
+                    and_pres = self.viper.And(and_pres, expr, pos, info)
+                stmts.append(self.viper.Assert(and_pres, pos, info))
+
+                # we substitute result in the postconditions with res
+                ctx.transitivity_result_var = result_in_posts
+
+                and_posts = self.viper.TrueLit(pos, info)
+                for post, _ in other_eq_func.postcondition:
+                    with ctx.additional_aliases(aliases):
+                        stmt, expr = self.translate_expr(post, ctx, self.viper.Bool)
+                    if stmt:
+                        raise InvalidProgramException(post, 'purity.violated')
+                    and_posts = self.viper.And(and_posts, expr, pos, info)
+
+                stmts.append(self.viper.Inhale(and_posts, pos, info))
+                
+                # check if transitivity holds by asserting res
+                result_in_posts_unboxed = self.viper.FuncApp(
+                    'bool___unbox__',
+                    [result_in_posts],
+                    pos, info, self.viper.Bool 
+                )
+                stmts.append(self.viper.Assert(result_in_posts_unboxed, pos, info))
+
+                ctx.current_function = old_func
+                ctx.current_class = old_class
+
+            guarded_blocks.append(
+                (cond_subtype, self.translate_block(stmts, pos, info))
+            )
+
+            ctx.use_domain_func_eq = False
+ 
         # encode elseif (type(self) == type(other))
-        symm_call_exact_type = self.viper.FuncApp(func.sil_name, [other_var, self_var], pos, annotation, self.viper.Ref)
-        rhs_exact = self.viper.FuncApp('bool___unbox__', [symm_call_exact_type], pos, info, self.viper.Bool)
-        assert_right_exact = self.viper.Assert(rhs_exact, pos, info)
-        guarded_blocks.append((type_self_eq_type_other, assert_right_exact))
+        # inline body in with self and other flipped
+        ctx.use_domain_func_eq = True
+
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        # Inline body of func.___eq___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        cond_exact_type = self.get_typeof_check_for_custom_class(other_var, func.cls.sil_name, pos, info)
+        statements = func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body = None
+        else:
+            iterator = iter(func.args)
+            self_pyvar = func.args[next(iterator)]
+            other_pyvar = func.args[next(iterator)]
+            aliases = {}
+            aliases[self_pyvar.name] = other_pyvar
+            aliases[other_pyvar.name] = self_pyvar
+            inlined_body = self.translate_exprs(actual_body, func, ctx, aliases=aliases)
+
+            inlined_body = self.viper.FuncApp(
+                'bool___unbox__',
+                [inlined_body],
+                pos, info, self.viper.Bool 
+            )
+
+        ctx.current_function = old_func
+
+        if inlined_body:
+            guarded_blocks.insert(0, (cond_exact_type, self.viper.Assert(inlined_body, pos, info)))
+        ctx.use_domain_func_eq = False
 
         # encode else branch as elseif(true) -> call object___eq__(other, self)
-        symm_object_eq = self.viper.FuncApp(OBJECT_EQ, [other_var, self_var], pos, info, self.viper.Bool)
-        assert_obj_eq = self.viper.Assert(symm_object_eq, pos, info)
-        guarded_blocks.append((self.viper.TrueLit(pos, info), assert_obj_eq))
+        assert_obj_eq = self.viper.Assert(self.viper.FalseLit(pos, info), pos, info)
 
-        if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
-        body.append(if_stmt)
-        block = self.translate_block(body, pos, info)
+        guarded_blocks.append(
+            (self.viper.TrueLit(pos, info), assert_obj_eq)
+        )
+        # TODO: use object___eq__ contract?
+        # super_class = func.cls
+        # while(super_class.superclass):
+        #     super_class = super_class.superclass
+
+        # aliases = {}
+        # aliases[self_pyvar.name] = other_pyvar
+        # aliases[other_pyvar.name] = self_pyvar
+        # object_stmts = self._assume_postconditions_with_substitutions(super_class, sil_progs, aliases, result_in_posts, ctx, pos, info)
+
+        if guarded_blocks:
+            if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
+            body.append(if_stmt)
+            block = self.translate_block(body, pos, info)
 
         return self.viper.Method(
             f"{func.sil_name}_check_symmetry",
             [self_decl, other_decl], [],
-            [], [], [], block, pos, info
+            [], [], locals, block, pos, info
         )
 
     def encode_modular_post(self, func: PythonMethod, ctx: Context, pos, info) -> Expr:
