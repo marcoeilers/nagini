@@ -459,7 +459,7 @@ class MethodTranslator(CommonTranslator):
         ), func_to_call)
 
     def translate_extended_builtin_function(self, func: PythonMethod, sil_progs,
-                                            ctx: Context) -> 'silver.ast.Function':
+                                            ctx: Context, program_translator) -> 'silver.ast.Function':
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
 
@@ -477,8 +477,10 @@ class MethodTranslator(CommonTranslator):
             raise InvalidProgramException(func.node, "invalid.equality.override")
         if eq_func.sil_name == OBJECT_EQ:
             func_to_call = eq_func.sil_name
+            program_translator.add_dependency([func_to_call], func.sil_name)
         else:
             func_to_call = eq_func.extended_name
+            program_translator.add_dependency([func_to_call], func.extended_name)
         
         object_eq_call = self.viper.FuncApp(
             func_to_call, [self_var, other_var], pos, info, self.viper.Bool
