@@ -616,6 +616,7 @@ class MethodTranslator(CommonTranslator):
 
             ctx.current_function = old_func
             ctx.current_class = old_class
+            ctx.transitivity_result_var = None
 
         ctx.use_domain_func_eq = False
         return stmts
@@ -749,6 +750,7 @@ class MethodTranslator(CommonTranslator):
 
                 ctx.current_function = old_func
                 ctx.current_class = old_class
+                ctx.transitivity_result_var = None
 
             guarded_blocks.append(
                 (cond_subtype, self.translate_block(stmts, pos, info))
@@ -794,9 +796,8 @@ class MethodTranslator(CommonTranslator):
             guarded_blocks.insert(0, (cond_exact_type, self.viper.Assert(inlined_body, pos, info)))
         ctx.use_domain_func_eq = False
 
-        # encode else branch as elseif(true) -> call object___eq__(other, self)
+        # encode else branch as elseif(true) -> assume posts of object___eq__
         assert_obj_eq = self.viper.Assert(self.viper.FalseLit(pos, info), pos, info)
-
         guarded_blocks.append(
             (self.viper.TrueLit(pos, info), assert_obj_eq)
         )
@@ -905,18 +906,27 @@ class MethodTranslator(CommonTranslator):
         if (func.contract_only or
                 (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
                  isinstance(actual_body[0].value, ast.Ellipsis))):
-            inlined_body = None
+            inlined_body_self_other = None
         else:
-            inlined_body = self.viper.FuncApp(
+            inlined_body_self_other = self.viper.FuncApp(
                 'bool___unbox__',
                 [self.translate_exprs(actual_body, func, ctx)],
+                pos, info, self.viper.Bool 
+            )
+            aliases = {}
+            aliases[other_pyvar.name] = x_py
+            inlined_body_self_x = self.viper.FuncApp(
+                'bool___unbox__',
+                [self.translate_exprs(actual_body, func, ctx, aliases=aliases)],
                 pos, info, self.viper.Bool 
             )
 
         ctx.current_function = old_func
 
-        if inlined_body:
-            body.append(self.viper.Inhale(inlined_body, pos, info))
+        if inlined_body_self_other:
+            body.append(self.viper.Inhale(inlined_body_self_other, pos, info))
+        if inlined_body_self_x:
+            body.append(self.viper.Inhale(inlined_body_self_x, pos, info))
         ctx.use_domain_func_eq = False
 
         guarded_blocks = []
@@ -983,6 +993,54 @@ class MethodTranslator(CommonTranslator):
             )
 
             ctx.use_domain_func_eq = False
+
+        # encode elseif (type(self) == type(other))
+        # inline body in with self and other flipped
+        ctx.use_domain_func_eq = True
+
+        old_func = ctx.current_function
+        ctx.current_function = func
+
+        # we substitute result in the postconditions with res
+        ctx.transitivity_result_var = result_in_posts
+
+        # Inline body of func.___eq___ and assume the body.
+        # Calls to the merge function are redirected to the eq domain function
+        cond_exact_type_other = self.get_typeof_check_for_custom_class(other_var, func.cls.sil_name, pos, info)
+        cond_exact_type_x = self.get_typeof_check_for_custom_class(x, func.cls.sil_name, pos, info)
+        cond_exact = self.viper.And(cond_exact_type_other, cond_exact_type_x, pos, info)
+        statements = func.node.body
+        start, end = get_body_indices(statements)
+        actual_body = statements[start:end]
+        if (func.contract_only or
+                (len(actual_body) == 1 and isinstance(actual_body[0], ast.Expr) and
+                 isinstance(actual_body[0].value, ast.Ellipsis))):
+            inlined_body_self_other = None
+        else:
+            # define aliases
+            iterator = iter(func.args)
+            self_pyvar = func.args[next(iterator)]
+            aliases = {}
+            aliases[self_pyvar.name] = x_py
+            inlined_body_self_other = self.translate_exprs(actual_body, func, ctx, aliases=aliases)
+            inlined_body_self_other = self.viper.FuncApp(
+                'bool___unbox__',
+                [inlined_body_self_other],
+                pos, info, self.viper.Bool 
+            )
+
+        ctx.current_function = old_func
+        ctx.transitivity_result_var = None
+
+        if inlined_body_self_other:
+            guarded_blocks.insert(0, (cond_exact, self.viper.Assert(inlined_body_self_other, pos, info)))
+        ctx.use_domain_func_eq = False
+
+        # encode else branch as elseif(true) -> assume posts of object___eq__
+        assert_obj_eq = self.viper.Assert(self.viper.FalseLit(pos, info), pos, info)
+        guarded_blocks.append(
+            (self.viper.TrueLit(pos, info), assert_obj_eq)
+        )
 
         if guarded_blocks:
             if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
