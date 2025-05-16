@@ -673,7 +673,10 @@ class PythonClass(PythonType, PythonNode, PythonScope, ContainerInterface):
             pred.overrides = super_pred
             pred.predicate = True
             var_node = ast.arg('self', lineno=0, col_offset=0, end_lineno=0, end_col_offset=0)
-            pred.args['self'] = self.node_factory.create_python_var('self', var_node, self)
+            res = self.node_factory.create_python_var('self', var_node, self)
+            res.process('self', translator)
+            pred.args['self'] = res
+
             self.predicates[EQUALITY_STATE_PRED] = pred
 
         for name, predicate in self.predicates.items():

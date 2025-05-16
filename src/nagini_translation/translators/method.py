@@ -693,7 +693,6 @@ class MethodTranslator(CommonTranslator):
             body.append(self.viper.Inhale(inlined_body, pos, info))
         ctx.use_domain_func_eq = False
 
-        annotation = self.viper.AnnotationInfo("reveal", [])
         guarded_blocks = []
         for c in toposort_classes(set(func.mentioned_classes)):
             stmts = []
@@ -723,6 +722,17 @@ class MethodTranslator(CommonTranslator):
                 aliases[cur_self_pyvar.name] = other_pyvar
                 aliases[cur_other_pyvar.name] = self_pyvar
 
+                # cast other to type c
+                node_factory = ProgramNodeFactory()
+                t = other_pyvar.type
+                t_self = self_pyvar.type
+                old_type: PythonClass = node_factory.create_python_class(
+                    t.name, t.superscope, node_factory, t.node, t.superclass, t.interface
+                )
+                for k, v in t.__dict__.items():
+                    old_type.__setattr__(k, v)
+                other_pyvar.type = c
+
                 for pre, _ in other_eq_func.precondition:
                     with ctx.additional_aliases(aliases):
                         stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
@@ -730,6 +740,7 @@ class MethodTranslator(CommonTranslator):
                         raise InvalidProgramException(pre, 'purity.violated')
                     and_pres = self.viper.And(and_pres, expr, pos, info)
                 stmts.append(self.viper.Assert(and_pres, pos, info))
+
 
                 # we substitute result in the postconditions with res
                 ctx.transitivity_result_var = result_in_posts
@@ -743,6 +754,9 @@ class MethodTranslator(CommonTranslator):
                     and_posts = self.viper.And(and_posts, expr, pos, info)
 
                 stmts.append(self.viper.Inhale(and_posts, pos, info))
+                
+                # reset type to be object again
+                other_pyvar.type = old_type
                 
                 # check if transitivity holds by asserting res
                 result_in_posts_unboxed = self.viper.FuncApp(
@@ -785,7 +799,7 @@ class MethodTranslator(CommonTranslator):
             other_pyvar = func.args[next(iterator)]
             aliases = {}
 
-            # copy other_pyvar.type
+            # cast other to the same type as self
             node_factory = ProgramNodeFactory()
             t = other_pyvar.type
             t_self = self_pyvar.type
@@ -794,7 +808,6 @@ class MethodTranslator(CommonTranslator):
             )
             for k, v in t.__dict__.items():
                 old_type.__setattr__(k, v)
-
             other_pyvar.type = t_self
 
             aliases[self_pyvar.name] = other_pyvar
@@ -806,6 +819,7 @@ class MethodTranslator(CommonTranslator):
                 pos, info, self.viper.Bool 
             )
 
+            # reset to old type, i.e., object
             other_pyvar.type = old_type
 
         ctx.current_function = old_func
@@ -974,6 +988,16 @@ class MethodTranslator(CommonTranslator):
                 aliases[cur_self_pyvar.name] = x_py
                 aliases[cur_other_pyvar.name] = other_pyvar
 
+                # cast x_py to type c
+                node_factory = ProgramNodeFactory()
+                t_x = x_py.type
+                old_type_x: PythonClass = node_factory.create_python_class(
+                    t_x.name, t_x.superscope, node_factory, t_x.node, t_x.superclass, t_x.interface
+                )
+                for k, v in t_x.__dict__.items():
+                    old_type_x.__setattr__(k, v)
+                x_py.type = c
+
                 for pre, _ in cur_eq_func.precondition:
                     with ctx.additional_aliases(aliases):
                         stmt, expr = self.translate_expr(pre, ctx, self.viper.Bool, impure=True)
@@ -994,7 +1018,10 @@ class MethodTranslator(CommonTranslator):
                     and_posts = self.viper.And(and_posts, expr, pos, info)
 
                 stmts.append(self.viper.Inhale(and_posts, pos, info))
-                
+
+                # reset type of x
+                x_py.type = old_type_x
+
                 # check if transitivity holds by asserting res
                 result_in_posts_unboxed = self.viper.FuncApp(
                     'bool___unbox__',
@@ -1038,14 +1065,37 @@ class MethodTranslator(CommonTranslator):
             # define aliases
             iterator = iter(func.args)
             self_pyvar = func.args[next(iterator)]
+            other_pyvar = func.args[next(iterator)]
             aliases = {}
             aliases[self_pyvar.name] = x_py
+
+            # cast x to type of self and other to type of self
+            node_factory = ProgramNodeFactory()
+            t_x = x_py.type
+            t_other = other_pyvar.type
+            old_type_x: PythonClass = node_factory.create_python_class(
+                t_x.name, t_x.superscope, node_factory, t_x.node, t_x.superclass, t_x.interface
+            )
+            old_type_other: PythonClass = node_factory.create_python_class(
+                t_other.name, t_other.superscope, node_factory, t_other.node, t_other.superclass, t_other.interface
+            )
+            for k, v in t_x.__dict__.items():
+                old_type_x.__setattr__(k, v)
+            for k, v in t_other.__dict__.items():
+                old_type_other.__setattr__(k, v)
+            x_py.type = self_pyvar.type
+            other_pyvar.type = self_pyvar.type
+
             inlined_body_self_other = self.translate_exprs(actual_body, func, ctx, aliases=aliases)
             inlined_body_self_other = self.viper.FuncApp(
                 'bool___unbox__',
                 [inlined_body_self_other],
                 pos, info, self.viper.Bool 
             )
+
+            # reset x and other types
+            x_py.type = old_type_x
+            other_pyvar.type = old_type_other
 
         ctx.current_function = old_func
         ctx.transitivity_result_var = None
