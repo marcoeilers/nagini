@@ -22,11 +22,24 @@ class A:
             return True
         return False
 
-# inherited from A
+# same as A
 class B(A):
-    pass
+    def __init__(self) -> None:
+        Fold(state_pred(self))
+        Ensures(state_pred(self))
 
-# mutual recursion with tuples
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(
+            Implies(type(other) == A or type(other) == B or self is other, Result())
+        )
+        if type(other) == A or type(other) == B or self is other:
+            return True
+        return False
+
+# mutual recursion
 class C:
     def __init__(self) -> None:
         Fold(state_pred(self))
@@ -37,9 +50,9 @@ class C:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
         Ensures(
-            Implies(type(other) in (C, D) or self is other, Result())
+            Implies(type(other) == C or type(other) == D or self is other, Result())
         )
-        if type(other) in (C, D) or self is other:
+        if type(other) == C or type(other) == D or self is other:
             return True
         return False
 
@@ -53,14 +66,15 @@ class D:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
         Ensures(
-            Implies(type(other) in (C, D) or self is other, Result())
+            Implies(type(other) == C or type(other) == D or self is other, Result())
         )
-        if type(other) in (C, D) or self is other:
+        if type(other) == C or type(other) == D or self is other:
             return True
         return False
 
+
 # symmetry with fields
-# not subtypes
+# True iff also instance of E with same fields
 class E:
     def __init__(self, i: int) -> None:
         self.i: int = i
@@ -69,21 +83,13 @@ class E:
     def __eq__(self, other: object) -> bool:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(
-            Implies(
-                self is other, Unfolding(
-                    self.state(), 
-                    Result() == (self.i == cast(E, other).i)
-                )
-            )
-        )
+        Ensures(Implies(self is other, Result()))
         Ensures(
             Implies(
                 type(self) == type(other), Unfolding(
                     self.state(),
                     Implies(
-                        not Stateless(other),
-                        Unfolding(
+                        not Stateless(other), Unfolding(
                             state_pred(other),
                             Result() == (self.i == cast(E, other).i)
                         )
@@ -91,39 +97,8 @@ class E:
                 )
             )
         )
-        # Ensures(
-        #     Implies(
-        #         type(other) == E or self is other, 
-        #         Result() == (
-        #             Unfolding(
-        #                 self.state(),
-        #                 Implies(not Stateless(other), Unfolding(
-        #                     state_pred(other),
-        #                     self.i == cast(E, other).i
-        #                 ))
-        #             )
-        #         )
-        #     )
-        # )
-        # Ensures(
-        #     Implies(
-        #         type(other) == F,
-        #         Result() == (
-        #             Unfolding(
-        #                 self.state(),
-        #                 Implies(not Stateless(other), Unfolding(
-        #                     state_pred(other),
-        #                     self.i == cast(F, other).j
-        #                 ))
-        #             )
-        #         )
-        #     )
-        # )
         if self is other:
-            return Unfolding(
-                self.state(),
-                self.i == cast(E, other).i
-            )
+            return True
         elif type(self) == type(other):
             return Unfolding(
                 self.state(),
@@ -132,79 +107,11 @@ class E:
                     self.i == cast(E, other).i
                 )
             )
-        #elif type(other) == F:
-        #    return Unfolding(
-        #        self.state(),
-        #        Unfolding(
-        #            state_pred(other),
-        #            self.i == cast(F, other).j
-        #        )
-        #    )
         return False
 
     @Predicate
     def state(self) -> bool:
         return Wildcard(self.i)
-
-# class F:
-#     def __init__(self, j: int) -> None:
-#         self.j: int = j
-#         Fold(state_pred(self))
-#         Ensures(state_pred(self))
-# 
-#     @Pure
-#     def __eq__(self, other: object) -> bool:
-#         Requires(state_pred(self))
-#         Requires(Implies(not Stateless(other), state_pred(other)))
-#         Ensures(
-#             Implies(
-#                 type(other) == E,
-#                 Result() == (
-#                     Unfolding(
-#                         self.state(),
-#                         Implies(not Stateless(other), Unfolding(
-#                             state_pred(other),
-#                             self.j == cast(E, other).i
-#                         ))
-#                     )
-#                 )
-#             )
-#         )
-#         Ensures(
-#             Implies(
-#                 type(other) == F or self is other,
-#                 Result() == (
-#                     Unfolding(
-#                         self.state(),
-#                         Implies(not Stateless(other), Unfolding(
-#                             state_pred(other),
-#                             self.j == cast(F, other).j
-#                         ))
-#                     )
-#                 )
-#             )
-#         )
-#         if type(other) == E:
-#             return Unfolding(
-#                 self.state(),
-#                 Unfolding(
-#                     state_pred(other),
-#                     self.j == cast(E, other).i
-#                 )
-#             )
-#         elif type(other) == F or self is other:
-#             return Unfolding(
-#                 self.state(),
-#                 Unfolding(
-#                     state_pred(other),
-#                     self.j == cast(F, other).j
-#                 )
-#             )
-#         return False
-# 
-#     @Predicate
-#     def state(self) -> bool:
-#         return Wildcard(self.j)
 
 
 # TODO: caller learn symmetry
