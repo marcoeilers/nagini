@@ -118,7 +118,8 @@ DEPENDENCIES = [
     STATELESS_FUNC,
     EQUALITY_STATE_PRED,
     STATE_ABSTRACT_REST,
-    
+    DOMAIN_EQ_FUNC,
+    '__Transitivity_Eq',
 ]
 STATE_PREDS = [
     'list_state',

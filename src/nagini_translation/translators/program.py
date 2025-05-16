@@ -324,9 +324,8 @@ class ProgramTranslator(CommonTranslator):
             f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
             node_factory, f.interface, f.interface_dict, f.method_type, opaque=False
         )
-        for k,v in merge_func.__dict__.items():
-            if not v and f.__getattribute__(k):
-                merge_func.__setattr__(k, f.__getattribute__(k))
+        for k in merge_func.__dict__.keys():
+            merge_func.__setattr__(k, f.__getattribute__(k))
 
         old_function = ctx.current_function
         old_module = ctx.module

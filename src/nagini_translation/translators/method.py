@@ -21,6 +21,7 @@ from nagini_translation.lib.constants import (
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
     STATELESS_FUNC,
+    DOMAIN_EQ_FUNC,
 )
 from nagini_translation.lib.program_nodes import (
     GenericType,
@@ -528,7 +529,7 @@ class MethodTranslator(CommonTranslator):
     
     def get_eq_domain_app(self, self_var: Var, other_var: Var, pos, info):
         return self.viper.DomainFuncApp(
-            'eq', [self_var, other_var], self.pytype, pos, info,
+            DOMAIN_EQ_FUNC, [self_var, other_var], self.viper.Bool, pos, info,
             '__Transitivity_Eq'
         )
     
@@ -799,14 +800,13 @@ class MethodTranslator(CommonTranslator):
             aliases[self_pyvar.name] = other_pyvar
             aliases[other_pyvar.name] = self_pyvar
             inlined_body = self.translate_exprs(actual_body, func, ctx, aliases=aliases)
-
-            other_pyvar.type = old_type
-
             inlined_body = self.viper.FuncApp(
                 'bool___unbox__',
                 [inlined_body],
                 pos, info, self.viper.Bool 
             )
+
+            other_pyvar.type = old_type
 
         ctx.current_function = old_func
 

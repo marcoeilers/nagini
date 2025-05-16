@@ -762,15 +762,10 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
                 # type comparisons are not replaced with the domain function eq.
                 if ctx.use_domain_func_eq:
-                    domain_name = 'PyType'
-                    pytype = self.viper.DomainType(domain_name, {}, [])
-                    return self.viper.FuncApp(
-                        '__prim__bool___box__',
-                        [self.viper.DomainFuncApp(
-                            DOMAIN_EQ_FUNC, [args[0], args[1]], pytype, position,
-                            self.no_info(ctx), '__Transitivity_Eq'
-                        )],
-                        position, self.no_info(ctx), self.viper.Ref
+                    domain_name = '__Transitivity_Eq'
+                    return self.viper.DomainFuncApp(
+                        DOMAIN_EQ_FUNC, [args[0], args[1]], self.viper.Bool, position,
+                        self.no_info(ctx), domain_name
                     )
                 else:
                     arg1 = self.to_ref(args[0], ctx)
