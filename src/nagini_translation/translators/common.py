@@ -34,6 +34,7 @@ from nagini_translation.lib.constants import (
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
     DOMAIN_EQ_FUNC,
+    SYMM_TRANS_RES_VAR,
 )
 from nagini_translation.lib.context import Context
 from nagini_translation.lib.errors import rules
@@ -761,7 +762,14 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 # Redirect call to __eq__ function to domain function eq.
                 # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
                 # type comparisons are not replaced with the domain function eq.
-                if ctx.use_domain_func_eq:
+                
+                # do not replace res == ...
+                res_in_args = list(filter(
+                    lambda a: (isinstance(a, self.viper.ast.LocalVar) 
+                               and a.name() == SYMM_TRANS_RES_VAR),
+                    args
+                ))
+                if not res_in_args and ctx.use_domain_func_eq:
                     domain_name = '__Transitivity_Eq'
                     return self.viper.DomainFuncApp(
                         DOMAIN_EQ_FUNC, [args[0], args[1]], self.viper.Bool, position,

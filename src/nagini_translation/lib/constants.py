@@ -133,6 +133,8 @@ ILLEGAL_FUNC_NAMES = [
     STATELESS_FUNC
 ]
 
+SYMM_TRANS_RES_VAR = 'res'
+
 OBJ___EQ__MERGED = 'object___eq___merged'
 
 INTERNAL_NAMES = [
@@ -199,6 +201,7 @@ INTERNAL_NAMES = [
     'key',
     'guard',
     'value',
+    SYMM_TRANS_RES_VAR,
 ] + STATE_PREDS
 
 VIPER_KEYWORDS = [
