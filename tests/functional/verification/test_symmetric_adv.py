@@ -65,7 +65,7 @@ class A:
 
     @Predicate
     def state(self) -> bool:
-        return Wildcard(self.j)
+        return Acc(self.j)
 
 class B:
     def __init__(self, i: int) -> None:
@@ -124,7 +124,7 @@ class B:
 
     @Predicate
     def state(self) -> bool:
-        return Wildcard(self.i)
+        return Acc(self.i) and 
 
 
 # TODO: caller learn symmetry
