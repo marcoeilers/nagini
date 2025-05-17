@@ -4,6 +4,8 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# TODO: add tests, which should fail
+
 # compare A and B with fields
 class A:
     def __init__(self, j: int) -> None:
