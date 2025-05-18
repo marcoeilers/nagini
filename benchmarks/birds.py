@@ -4,6 +4,11 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# Usability:
+# All LOC: 99
+# Without state/folding LOC: 83
+# Factor: 1.1927710843373494
+
 # A real word example with a reflexive, symmetric and transitive
 # equality function
 
@@ -44,8 +49,8 @@ class Animal:
         self.habitat: Habitat = habitat
         self.age: int = age
         self.name: str = name
-        Fold(self.state())
-        Ensures(self.state())
+        # Fold(self.state())
+        # Ensures(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -84,8 +89,8 @@ class Bird(Animal):
     def __init__(self, habitat: Habitat, age: int, name: str, wing_size: int):
         super().__init__(habitat, age, name)
         self.wing_size: int = wing_size
-        Fold(self.state())
-        Ensures(self.state())
+        # Fold(self.state())
+        # Ensures(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:

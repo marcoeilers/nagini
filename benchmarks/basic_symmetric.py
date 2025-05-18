@@ -4,6 +4,11 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# Usability:
+# All LOC: 193
+# Without state/folding LOC: 160
+# Factor: 1.20625
+
 
 # mutual recursion with B <: A
 class A:

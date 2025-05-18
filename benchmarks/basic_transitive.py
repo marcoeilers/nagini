@@ -4,6 +4,11 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# Usability:
+# All LOC: 249
+# Without state/folding LOC: 204
+# Factor: 1.2205882352941178
+
 
 # transitivity with no fields
 class A:

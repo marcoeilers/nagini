@@ -4,11 +4,15 @@
 from nagini_contracts.contracts import *
 from typing import cast, List
 
+# Usability:
+# All LOC: 61
+# Without state/folding LOC: 49
+# Factor: 1.2448979591836735
 
 class A:
     def __init__(self) -> None:
-        Fold(state_pred(self))
-        Ensures(state_pred(self))
+        # Fold(state_pred(self))
+        # Ensures(state_pred(self))
 
     @Pure
     def __eq__(self, other: object) -> bool:
