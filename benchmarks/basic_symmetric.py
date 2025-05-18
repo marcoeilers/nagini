@@ -113,6 +113,115 @@ class E:
     def state(self) -> bool:
         return Wildcard(self.i)
 
+# symmetry with multiple fields; two classes mutually naming each other
+class G:
+    def __init__(self, i: int, s: str, b: bool) -> None:
+        self.i: int = i
+        self.s: str = s
+        self.b: bool = b
+        Fold(state_pred(self))
+        Ensures(state_pred(self))
+
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(
+            type(self) == type(other),
+            Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    Result() == (self.i == cast(G, other).i and 
+                                 self.s == cast(G, other).s and 
+                                 self.b == cast(G, other).b)
+                )
+            )
+        ))
+        Ensures(Implies(
+            type(other) == H,
+            Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    Result() == (self.i == cast(H, other).i and 
+                                 self.s == cast(H, other).s and 
+                                 self.b == cast(H, other).b)
+                )
+            )
+        ))
+        if type(self) == type(other):
+            return Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    self.i == cast(G, other).i and 
+                    self.s == cast(G, other).s and 
+                    self.b == cast(G, other).b
+                )
+            )
+        elif type(other) == H:
+            return Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    self.i == cast(H, other).i and 
+                    self.s == cast(H, other).s and 
+                    self.b == cast(H, other).b
+                )
+            )
+        return False
+
+    @Predicate
+    def state(self) -> bool:
+        return Acc(self.i) and Acc(self.s) and Acc(self.b)
+
+class H:
+    def __init__(self, i: int, s: str, b: bool) -> None:
+        self.i: int = i
+        self.s: str = s
+        self.b: bool = b
+        Fold(state_pred(self))
+        Ensures(state_pred(self))
+
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(
+            type(self) == type(other),
+            Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    Result() == (self.i == cast(H, other).i and 
+                                 self.s == cast(H, other).s and 
+                                 self.b == cast(H, other).b)
+                )
+            )
+        ))
+        Ensures(Implies(
+            type(other) == G,
+            Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    Result() == (self.i == cast(G, other).i and 
+                                 self.s == cast(G, other).s and 
+                                 self.b == cast(G, other).b)
+                )
+            )
+        ))
+        if type(self) == type(other):
+            return Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    self.i == cast(H, other).i and 
+                    self.s == cast(H, other).s and 
+                    self.b == cast(H, other).b
+                )
+            )
+        elif type(other) == G:
+            return Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    self.i == cast(G, other).i and 
+                    self.s == cast(G, other).s and 
+                    self.b == cast(G, other).b
+                )
+            )
+        return False
+
+    @Predicate
+    def state(self) -> bool:
+        return Acc(self.i) and Acc(self.s) and Acc(self.b)
+
 
 # TODO: caller learn symmetry
 

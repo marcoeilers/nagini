@@ -41,6 +41,41 @@ class F:
             return True
         return False
 
+class H:
+    def __init__(self, i: int, s: str, b: bool) -> None:
+        self.i: int = i
+        self.s: str = s
+        self.b: bool = b
+        Fold(state_pred(self))
+        Ensures(state_pred(self))
+
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(
+            type(self) == type(other),
+            Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    Result() == (self.i == cast(H, other).i and 
+                                 self.s == cast(H, other).s and 
+                                 self.b == cast(H, other).b)
+                )
+            )
+        ))
+        if type(self) == type(other):
+            return Unfolding(self.state(),
+                Unfolding(state_pred(other),
+                    self.i == cast(H, other).i and 
+                    self.s == cast(H, other).s and 
+                    self.b == cast(H, other).b
+                )
+            )
+        return False
+
+    @Predicate
+    def state(self) -> bool:
+        return Acc(self.i) and Acc(self.s) and Acc(self.b)
 
 # TODO: fix -> what is missing?
 # class G:
