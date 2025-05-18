@@ -120,6 +120,9 @@ DEPENDENCIES = [
     STATE_ABSTRACT_REST,
     DOMAIN_EQ_FUNC,
     '__Transitivity_Eq',
+    "type___eq__",
+    "PyType___box__",
+    "type___unbox__",
 ]
 STATE_PREDS = [
     'list_state',
