@@ -110,6 +110,8 @@ domain PyType  {
   
   unique function Animal(): PyType 
   
+  unique function Bird(): PyType 
+  
   axiom issubtype_transitivity {
     (forall sub: PyType, middle: PyType, super: PyType ::
       { issubtype(sub, middle), issubtype(middle, super) }
@@ -432,6 +434,10 @@ domain PyType  {
   
   axiom subtype_Animal {
     extends_(Animal(), object()) && get_basic(Animal()) == Animal()
+  }
+  
+  axiom subtype_Bird {
+    extends_(Bird(), Animal()) && get_basic(Bird()) == Bird()
   }
 }
 
@@ -844,6 +850,8 @@ field Animal_age: Ref
 
 field Animal_name: Ref
 
+field Bird_wing_size: Ref
+
 function int___eq___extended(self: Ref, other: Ref): Bool
   requires issubtype(typeof(self), int())
   requires !stateless(other) ==> acc(state(other), wildcard)
@@ -1008,6 +1016,86 @@ function Animal___eq___override_check(self: Ref, other: Ref): Ref
   Animal___eq__(self, other)
 }
 
+@opaque()
+function Bird___eq__(self_13: Ref, other_9: Ref): Ref
+  requires issubtype(typeof(self_13), Bird())
+  requires issubtype(typeof(other_9), object())
+  requires self_13 != null
+  requires acc(state(self_13), wildcard)
+  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(other_9))) ||
+    self_13 == other_9 ==>
+    (unfolding acc(state(self_13), wildcard) in
+      (unfolding acc(state(other_9), wildcard) in
+        bool___eq___extended(result, __prim__bool___box__(bool___unbox__(Habitat___eq___extended(self_13.Animal_habitat,
+        object___cast__(Bird(), other_9).Animal_habitat)) &&
+        (int___eq___extended(self_13.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+        (str___eq___extended(self_13.Animal_name, object___cast__(Bird(), other_9).Animal_name) &&
+        int___eq___extended(self_13.Bird_wing_size, object___cast__(Bird(),
+        other_9).Bird_wing_size)))))))
+  ensures self_13 == other_9 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==> typeof(self_13) == typeof(other_9)
+{
+  (let cond_12_0 ==
+    (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(other_9))) ||
+    self_13 == other_9)) in
+    (true && bool___unbox__(cond_12_0) ?
+      __prim__bool___box__((unfolding acc(state(self_13), wildcard) in
+        (unfolding acc(state(other_9), wildcard) in
+          bool___unbox__(Habitat___eq___extended(self_13.Animal_habitat, object___cast__(Bird(),
+          other_9).Animal_habitat)) &&
+          (int___eq___extended(self_13.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+          (str___eq___extended(self_13.Animal_name, object___cast__(Bird(),
+          other_9).Animal_name) &&
+          int___eq___extended(self_13.Bird_wing_size, object___cast__(Bird(),
+          other_9).Bird_wing_size)))))) :
+      __prim__bool___box__(false)))
+}
+
+function Bird___eq___extended(self_13: Ref, other_9: Ref): Ref
+  requires issubtype(typeof(self_13), Bird())
+  requires issubtype(typeof(other_9), object())
+  requires self_13 != null
+  requires acc(state(self_13), wildcard)
+  requires !stateless(other_9) ==> acc(state(other_9), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(other_9))) ||
+    self_13 == other_9 ==>
+    (unfolding acc(state(self_13), wildcard) in
+      (unfolding acc(state(other_9), wildcard) in
+        bool___eq___extended(result, __prim__bool___box__(bool___unbox__(Habitat___eq___extended(self_13.Animal_habitat,
+        object___cast__(Bird(), other_9).Animal_habitat)) &&
+        (int___eq___extended(self_13.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+        (str___eq___extended(self_13.Animal_name, object___cast__(Bird(), other_9).Animal_name) &&
+        int___eq___extended(self_13.Bird_wing_size, object___cast__(Bird(),
+        other_9).Bird_wing_size)))))))
+  ensures self_13 == other_9 ==> bool___unbox__(result)
+  ensures bool___unbox__(result) ==> typeof(self_13) == typeof(other_9)
+  ensures result == Animal___eq___extended(self_13, other_9)
+
+
+function Bird___eq___override_check(self_10: Ref, other_8: Ref): Ref
+  requires issubtype(typeof(self_10), Bird())
+  requires self_10 != null
+  requires issubtype(typeof(self_10), Animal())
+  requires issubtype(typeof(other_8), object())
+  requires self_10 != null
+  requires acc(state(self_10), wildcard)
+  requires !stateless(other_8) ==> acc(state(other_8), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures type___eq__(PyType___box__(typeof(self_10)), PyType___box__(typeof(other_8))) ||
+    self_10 == other_8 ==>
+    (unfolding acc(state(self_10), wildcard) in
+      (unfolding acc(state(other_8), wildcard) in
+        bool___eq___extended(result, __prim__bool___box__(bool___unbox__(Habitat___eq___extended(self_10.Animal_habitat,
+        object___cast__(Animal(), other_8).Animal_habitat)) &&
+        (int___eq___extended(self_10.Animal_age, object___cast__(Animal(), other_8).Animal_age) &&
+        str___eq___extended(self_10.Animal_name, object___cast__(Animal(), other_8).Animal_name))))))
+{
+  Bird___eq__(self_10, other_8)
+}
+
 function __file__(): Ref
 
 
@@ -1166,17 +1254,22 @@ predicate state_abstract_rest(self: Ref)
 predicate state(self: Ref) {
   true && issubtype(typeof(self), object()) &&
   ((issubtype(typeof(self), object()) ==> true) &&
+  (issubtype(typeof(self), Habitat()) ==>
+  acc(self.Habitat_location, wildcard) &&
+  issubtype(typeof(self.Habitat_location), str())) &&
   (issubtype(typeof(self), Animal()) ==>
   acc(self.Animal_habitat, write) &&
   issubtype(typeof(self.Animal_habitat), Habitat()) &&
   (acc(self.Animal_age, write) && issubtype(typeof(self.Animal_age), int()) &&
   (acc(self.Animal_name, write) &&
-  issubtype(typeof(self.Animal_name), str())))) &&
-  (issubtype(typeof(self), Habitat()) ==>
-  acc(self.Habitat_location, wildcard) &&
-  issubtype(typeof(self.Habitat_location), str())) &&
-  (true && typeof(self) != object() && typeof(self) != Animal() &&
-  typeof(self) != Habitat() &&
+  issubtype(typeof(self.Animal_name), str()) &&
+  acc(state(self.Animal_habitat), wildcard)))) &&
+  (issubtype(typeof(self), Bird()) ==>
+  acc(self.Bird_wing_size, write) &&
+  issubtype(typeof(self.Bird_wing_size), int())) &&
+  (true && typeof(self) != object() && typeof(self) != Habitat() &&
+  typeof(self) != Animal() &&
+  typeof(self) != Bird() &&
   (typeof(self) != list(list_arg(typeof(self), 0)) &&
   (typeof(self) != tuple(tuple_args(typeof(self))) &&
   (typeof(self) !=
@@ -1324,19 +1417,19 @@ method Habitat___init__(self_8: Ref, location: Ref)
   ensures acc(state(self_8), wildcard)
 {
   var _err: Ref
-  var self_13: Ref
+  var self_16: Ref
   var location_0: Ref
   inhale typeof(self_8) == Habitat()
   _err := null
-  self_13 := self_8
+  self_16 := self_8
   location_0 := location
-  if (perm(_MaySet(self_13, 146793563361253602756861845165228319048)) >
+  if (perm(_MaySet(self_16, 146793563361253602756861845165228319048)) >
   none) {
-    exhale acc(_MaySet(self_13, 146793563361253602756861845165228319048), write)
-    inhale acc(self_13.Habitat_location, write)
+    exhale acc(_MaySet(self_16, 146793563361253602756861845165228319048), write)
+    inhale acc(self_16.Habitat_location, write)
   }
-  self_13.Habitat_location := location_0
-  fold acc(state(self_13), wildcard)
+  self_16.Habitat_location := location_0
+  fold acc(state(self_16), wildcard)
   goto __end
   label __end
 }
@@ -1427,35 +1520,179 @@ method Animal___init__(self_11: Ref, habitat: Ref, age: Ref, name: Ref)
   requires issubtype(typeof(age), int())
   requires issubtype(typeof(name), str())
   requires self_11 != null
-  ensures acc(state(self_11), wildcard)
 {
   var _err: Ref
-  var self_14: Ref
-  var habitat_0: Ref
-  var age_0: Ref
-  var name_0: Ref
+  var self_17: Ref
+  var habitat_1: Ref
+  var age_1: Ref
+  var name_1: Ref
   inhale typeof(self_11) == Animal()
   _err := null
-  self_14 := self_11
-  habitat_0 := habitat
-  age_0 := age
-  name_0 := name
-  if (perm(_MaySet(self_14, 2360480673450416515833933823831617)) > none) {
-    exhale acc(_MaySet(self_14, 2360480673450416515833933823831617), write)
-    inhale acc(self_14.Animal_habitat, write)
+  self_17 := self_11
+  habitat_1 := habitat
+  age_1 := age
+  name_1 := name
+  if (perm(_MaySet(self_17, 2360480673450416515833933823831617)) > none) {
+    exhale acc(_MaySet(self_17, 2360480673450416515833933823831617), write)
+    inhale acc(self_17.Animal_habitat, write)
   }
-  self_14.Animal_habitat := habitat_0
-  if (perm(_MaySet(self_14, 478866045855336420175425)) > none) {
-    exhale acc(_MaySet(self_14, 478866045855336420175425), write)
-    inhale acc(self_14.Animal_age, write)
+  self_17.Animal_habitat := habitat_1
+  if (perm(_MaySet(self_17, 478866045855336420175425)) > none) {
+    exhale acc(_MaySet(self_17, 478866045855336420175425), write)
+    inhale acc(self_17.Animal_age, write)
   }
-  self_14.Animal_age := age_0
-  if (perm(_MaySet(self_14, 122618043015080120462962241)) > none) {
-    exhale acc(_MaySet(self_14, 122618043015080120462962241), write)
-    inhale acc(self_14.Animal_name, write)
+  self_17.Animal_age := age_1
+  if (perm(_MaySet(self_17, 122618043015080120462962241)) > none) {
+    exhale acc(_MaySet(self_17, 122618043015080120462962241), write)
+    inhale acc(self_17.Animal_name, write)
   }
-  self_14.Animal_name := name_0
-  fold acc(state(self_14), wildcard)
+  self_17.Animal_name := name_1
+  goto __end
+  label __end
+}
+
+method Bird___eq___check_symmetry(self_13: Ref, other_9: Ref)
+{
+  var res: Ref
+  inhale typeof(self_13) == Bird()
+  inhale issubtype(typeof(res), bool())
+  inhale false || typeof(self_13) == typeof(other_9)
+  inhale acc(state(self_13), wildcard)
+  inhale acc(state(other_9), wildcard)
+  inhale bool___unbox__((let cond_13_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(other_9))) ||
+      self_13 == other_9)) in
+      (true && bool___unbox__(cond_13_0) ?
+        __prim__bool___box__((unfolding acc(state(self_13), wildcard) in
+          (unfolding acc(state(other_9), wildcard) in
+            eq(self_13.Animal_habitat, object___cast__(Bird(), other_9).Animal_habitat) &&
+            (eq(self_13.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+            (eq(self_13.Animal_name, object___cast__(Bird(), other_9).Animal_name) &&
+            eq(self_13.Bird_wing_size, object___cast__(Bird(), other_9).Bird_wing_size)))))) :
+        __prim__bool___box__(false))))
+  if (typeof(other_9) == Bird()) {
+    assert bool___unbox__((let cond_14_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(other_9)), PyType___box__(typeof(self_13))) ||
+        other_9 == self_13)) in
+        (true && bool___unbox__(cond_14_0) ?
+          __prim__bool___box__((unfolding acc(state(other_9), wildcard) in
+            (unfolding acc(state(self_13), wildcard) in
+              eq(other_9.Animal_habitat, object___cast__(Bird(), self_13).Animal_habitat) &&
+              (eq(other_9.Animal_age, object___cast__(Bird(), self_13).Animal_age) &&
+              (eq(other_9.Animal_name, object___cast__(Bird(), self_13).Animal_name) &&
+              eq(other_9.Bird_wing_size, object___cast__(Bird(), self_13).Bird_wing_size)))))) :
+          __prim__bool___box__(false))))
+  }
+}
+
+method Bird___eq___check_transitivity(self_13: Ref, x_2: Ref, other_9: Ref)
+{
+  var res: Ref
+  inhale typeof(self_13) == Bird()
+  inhale issubtype(typeof(res), bool())
+  inhale false || typeof(self_13) == typeof(x_2)
+  inhale false || typeof(self_13) == typeof(other_9)
+  inhale acc(state(self_13), wildcard)
+  inhale acc(state(x_2), wildcard)
+  inhale acc(state(other_9), wildcard)
+  inhale bool___unbox__((let cond_15_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(other_9))) ||
+      self_13 == other_9)) in
+      (true && bool___unbox__(cond_15_0) ?
+        __prim__bool___box__((unfolding acc(state(self_13), wildcard) in
+          (unfolding acc(state(other_9), wildcard) in
+            eq(self_13.Animal_habitat, object___cast__(Bird(), other_9).Animal_habitat) &&
+            (eq(self_13.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+            (eq(self_13.Animal_name, object___cast__(Bird(), other_9).Animal_name) &&
+            eq(self_13.Bird_wing_size, object___cast__(Bird(), other_9).Bird_wing_size)))))) :
+        __prim__bool___box__(false))))
+  inhale bool___unbox__((let cond_16_0 ==
+      (__prim__bool___box__(type___eq__(PyType___box__(typeof(self_13)), PyType___box__(typeof(x_2))) ||
+      self_13 == x_2)) in
+      (true && bool___unbox__(cond_16_0) ?
+        __prim__bool___box__((unfolding acc(state(self_13), wildcard) in
+          (unfolding acc(state(x_2), wildcard) in
+            eq(self_13.Animal_habitat, object___cast__(Bird(), x_2).Animal_habitat) &&
+            (eq(self_13.Animal_age, object___cast__(Bird(), x_2).Animal_age) &&
+            (eq(self_13.Animal_name, object___cast__(Bird(), x_2).Animal_name) &&
+            eq(self_13.Bird_wing_size, object___cast__(Bird(), x_2).Bird_wing_size)))))) :
+        __prim__bool___box__(false))))
+  if (typeof(other_9) == Bird() && typeof(x_2) == Bird()) {
+    assert bool___unbox__((let cond_17_0 ==
+        (__prim__bool___box__(type___eq__(PyType___box__(typeof(x_2)), PyType___box__(typeof(other_9))) ||
+        x_2 == other_9)) in
+        (true && bool___unbox__(cond_17_0) ?
+          __prim__bool___box__((unfolding acc(state(x_2), wildcard) in
+            (unfolding acc(state(other_9), wildcard) in
+              eq(x_2.Animal_habitat, object___cast__(Bird(), other_9).Animal_habitat) &&
+              (eq(x_2.Animal_age, object___cast__(Bird(), other_9).Animal_age) &&
+              (eq(x_2.Animal_name, object___cast__(Bird(), other_9).Animal_name) &&
+              eq(x_2.Bird_wing_size, object___cast__(Bird(), other_9).Bird_wing_size)))))) :
+          __prim__bool___box__(false))))
+  }
+}
+
+method Bird___init__(self_14: Ref, habitat_0: Ref, age_0: Ref, name_0: Ref,
+  wing_size: Ref)
+  requires self_14 != null
+  requires acc(_MaySet(self_14, 2058221841198592245453332631677250), write)
+  requires acc(_MaySet(self_14, 2360480673450416515833933823831617), write)
+  requires acc(_MaySet(self_14, 478866045855336420175425), write)
+  requires acc(_MaySet(self_14, 122618043015080120462962241), write)
+  requires issubtype(typeof(self_14), Bird())
+  requires issubtype(typeof(habitat_0), Habitat())
+  requires issubtype(typeof(age_0), int())
+  requires issubtype(typeof(name_0), str())
+  requires issubtype(typeof(wing_size), int())
+  requires self_14 != null
+{
+  var _err: Ref
+  var self_18: Ref
+  var habitat_2: Ref
+  var age_2: Ref
+  var name_2: Ref
+  var wing_size_0: Ref
+  var arg: Ref
+  var arg_13: Ref
+  var arg_14: Ref
+  var arg_15: Ref
+  var error: Ref
+  var self_17_0: Ref
+  var habitat_1_0: Ref
+  var age_1_0: Ref
+  var name_1_0: Ref
+  inhale typeof(self_14) == Bird()
+  _err := null
+  self_18 := self_14
+  habitat_2 := habitat_0
+  age_2 := age_0
+  name_2 := name_0
+  wing_size_0 := wing_size
+  arg := self_18
+  arg_13 := habitat_2
+  arg_14 := age_2
+  arg_15 := name_2
+  if (perm(_MaySet(arg, 2360480673450416515833933823831617)) > none) {
+    exhale acc(_MaySet(arg, 2360480673450416515833933823831617), write)
+    inhale acc(arg.Animal_habitat, write)
+  }
+  arg.Animal_habitat := arg_13
+  if (perm(_MaySet(arg, 478866045855336420175425)) > none) {
+    exhale acc(_MaySet(arg, 478866045855336420175425), write)
+    inhale acc(arg.Animal_age, write)
+  }
+  arg.Animal_age := arg_14
+  if (perm(_MaySet(arg, 122618043015080120462962241)) > none) {
+    exhale acc(_MaySet(arg, 122618043015080120462962241), write)
+    inhale acc(arg.Animal_name, write)
+  }
+  arg.Animal_name := arg_15
+  label __end_0
+  if (perm(_MaySet(self_18, 2058221841198592245453332631677250)) > none) {
+    exhale acc(_MaySet(self_18, 2058221841198592245453332631677250), write)
+    inhale acc(self_18.Bird_wing_size, write)
+  }
+  self_18.Bird_wing_size := wing_size_0
   goto __end
   label __end
 }
@@ -1488,6 +1725,12 @@ method main()
     Set(_single(6872339552563453791)))
   module_names_0 := (module_names_0 union Set(_single(104863529000799)))
   module_names_0 := (module_names_0 union Set(_single(119165703253569)))
+  assert true && (_single(32758249910591816) in module_names_0)
+  assert true && (_single(119165703253569) in module_names_0)
+  module_names_0 := (module_names_0 union
+    Set(_single(6872339552563453791)))
+  module_names_0 := (module_names_0 union Set(_single(104863529000799)))
+  module_names_0 := (module_names_0 union Set(_single(1685219650)))
   goto __end
   label __end
 }
