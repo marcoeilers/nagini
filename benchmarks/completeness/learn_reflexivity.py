@@ -16,8 +16,7 @@ class A:
     def __eq__(self, other: object) -> bool:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
-        # TODO: fix: should not be added manually
-        # Ensures(Implies(Result(), self is other))
+        Ensures(Implies(Result(), self is other))
         if self is other:
             return True
         return False
@@ -26,8 +25,6 @@ class A:
     def state(self) -> bool:
         return Acc(self.i) and Acc(self.s) and Acc(self.b)
 
-# TODO: fix
-# caller should learn symmetry
 def foo(a: A, b: A) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
@@ -40,6 +37,7 @@ def foo(a: A, b: A) -> int:
     ))
     Ensures(state_pred(a))
     Ensures(state_pred(b))
+    # learn reflexivity from call: a == b
     Ensures(a is b)
     return 0
 
