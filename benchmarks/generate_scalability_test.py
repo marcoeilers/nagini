@@ -59,7 +59,7 @@
 #     return 0\n""")
 
 
-for cls in "BCDEFGH":
+for cls in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     print(f"""class {cls}:
     def __init__(self, i: int, s: str, b: bool) -> None:
         self.i: int = i
@@ -71,7 +71,7 @@ for cls in "BCDEFGH":
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
         Ensures(Implies(
-            type(self) == type(other),
+            isinstance(other, {cls}),
             Unfolding(self.state(),
                 Unfolding(state_pred(other),
                     Result() == (self.i == cast({cls}, other).i and 
@@ -80,7 +80,7 @@ for cls in "BCDEFGH":
                 )
             )
         ))
-        if type(self) == type(other):
+        if isinstance(other, {cls}):
             return Unfolding(self.state(),
                 Unfolding(state_pred(other),
                     self.i == cast({cls}, other).i and 
@@ -92,12 +92,16 @@ for cls in "BCDEFGH":
 
     @Predicate
     def state(self) -> bool:
-        return {cls}cc(self.i) and {cls}cc(self.s) and {cls}cc(self.b)
+        return Acc(self.i) and Acc(self.s) and Acc(self.b)
     
 def foo{cls}(a: {cls}, b: {cls}) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
+    Unfold(a.state())
+    Unfold(b.state())
     res = a == b
     if res:
         assert cast({cls}, a).i == cast({cls}, b).i
+    Fold(a.state())
+    Fold(b.state())
     return 0""")
