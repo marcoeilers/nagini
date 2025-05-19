@@ -284,7 +284,7 @@ class G:
     def state(self) -> bool:
         return Wildcard(self.i)
     
-def foo(o1: object, o2: object) -> int:
+def fooA(o1: object, o2: object) -> int:
     Requires(isinstance(o1, A))
     Requires(isinstance(o2, A))
     Requires(state_pred(o1))
@@ -293,6 +293,113 @@ def foo(o1: object, o2: object) -> int:
         Unfolding(state_pred(o1),
             Unfolding(state_pred(o2),
                 cast(A, o1).i == cast(A, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+def fooB(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, B))
+    Requires(isinstance(o2, B))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(B, o1).i == cast(B, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+
+def fooC(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, C))
+    Requires(isinstance(o2, C))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(C, o1).i == cast(C, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+
+def fooD(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, D))
+    Requires(isinstance(o2, D))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(D, o1).i == cast(D, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+
+def fooE(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, E))
+    Requires(isinstance(o2, E))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(E, o1).i == cast(E, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+
+def fooF(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, F))
+    Requires(isinstance(o2, F))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(F, o1).i == cast(F, o2).i
+            )
+        )
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
+    assert o1 == o2
+    return 0
+
+
+def fooG(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, G))
+    Requires(isinstance(o2, G))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(G, o1).i == cast(G, o2).i
             )
         )
     )
