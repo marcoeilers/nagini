@@ -21,7 +21,6 @@ class A:
         if self is other:
             return True
         return False
-        
 
 # clearly reflexive
 class D:
