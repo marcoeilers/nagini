@@ -844,205 +844,205 @@ class U:
     def state(self) -> bool:
         return Wildcard(self.i)
 
-class V:
-    def __init__(self, i: int) -> None:
-        self.i: int = i
-        Fold(self.state())
-        Ensures(self.state())
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        Ensures(
-            Implies(
-                isinstance(other, V), Unfolding(
-                    self.state(),
-                    Implies(
-                        not Stateless(other), Unfolding(
-                            state_pred(other),
-                            Result() == (self.i == cast(V, other).i)
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif isinstance(other, V):
-            return Unfolding(
-                self.state(),
-                Unfolding(
-                    state_pred(other),
-                    self.i == cast(V, other).i
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Wildcard(self.i)
-
-class W:
-    def __init__(self, i: int) -> None:
-        self.i: int = i
-        Fold(self.state())
-        Ensures(self.state())
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        Ensures(
-            Implies(
-                isinstance(other, W), Unfolding(
-                    self.state(),
-                    Implies(
-                        not Stateless(other), Unfolding(
-                            state_pred(other),
-                            Result() == (self.i == cast(W, other).i)
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif isinstance(other, W):
-            return Unfolding(
-                self.state(),
-                Unfolding(
-                    state_pred(other),
-                    self.i == cast(W, other).i
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Wildcard(self.i)
-
-class X:
-    def __init__(self, i: int) -> None:
-        self.i: int = i
-        Fold(self.state())
-        Ensures(self.state())
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        Ensures(
-            Implies(
-                isinstance(other, X), Unfolding(
-                    self.state(),
-                    Implies(
-                        not Stateless(other), Unfolding(
-                            state_pred(other),
-                            Result() == (self.i == cast(X, other).i)
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif isinstance(other, X):
-            return Unfolding(
-                self.state(),
-                Unfolding(
-                    state_pred(other),
-                    self.i == cast(X, other).i
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Wildcard(self.i)
-
-class Y:
-    def __init__(self, i: int) -> None:
-        self.i: int = i
-        Fold(self.state())
-        Ensures(self.state())
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        Ensures(
-            Implies(
-                isinstance(other, Y), Unfolding(
-                    self.state(),
-                    Implies(
-                        not Stateless(other), Unfolding(
-                            state_pred(other),
-                            Result() == (self.i == cast(Y, other).i)
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif isinstance(other, Y):
-            return Unfolding(
-                self.state(),
-                Unfolding(
-                    state_pred(other),
-                    self.i == cast(Y, other).i
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Wildcard(self.i)
-
-class Z:
-    def __init__(self, i: int) -> None:
-        self.i: int = i
-        Fold(self.state())
-        Ensures(self.state())
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        Ensures(
-            Implies(
-                isinstance(other, Z), Unfolding(
-                    self.state(),
-                    Implies(
-                        not Stateless(other), Unfolding(
-                            state_pred(other),
-                            Result() == (self.i == cast(Z, other).i)
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif isinstance(other, Z):
-            return Unfolding(
-                self.state(),
-                Unfolding(
-                    state_pred(other),
-                    self.i == cast(Z, other).i
-                )
-            )
-        return False
-
-    @Predicate
-    def state(self) -> bool:
-        return Wildcard(self.i)
+# class V:
+#     def __init__(self, i: int) -> None:
+#         self.i: int = i
+#         Fold(self.state())
+#         Ensures(self.state())
+# 
+#     @Pure
+#     def __eq__(self, other: object) -> bool:
+#         Requires(state_pred(self))
+#         Requires(Implies(not Stateless(other), state_pred(other)))
+#         Ensures(Implies(self is other, Result()))
+#         Ensures(
+#             Implies(
+#                 isinstance(other, V), Unfolding(
+#                     self.state(),
+#                     Implies(
+#                         not Stateless(other), Unfolding(
+#                             state_pred(other),
+#                             Result() == (self.i == cast(V, other).i)
+#                         )
+#                     )
+#                 )
+#             )
+#         )
+#         if self is other:
+#             return True
+#         elif isinstance(other, V):
+#             return Unfolding(
+#                 self.state(),
+#                 Unfolding(
+#                     state_pred(other),
+#                     self.i == cast(V, other).i
+#                 )
+#             )
+#         return False
+# 
+#     @Predicate
+#     def state(self) -> bool:
+#         return Wildcard(self.i)
+# 
+# class W:
+#     def __init__(self, i: int) -> None:
+#         self.i: int = i
+#         Fold(self.state())
+#         Ensures(self.state())
+# 
+#     @Pure
+#     def __eq__(self, other: object) -> bool:
+#         Requires(state_pred(self))
+#         Requires(Implies(not Stateless(other), state_pred(other)))
+#         Ensures(Implies(self is other, Result()))
+#         Ensures(
+#             Implies(
+#                 isinstance(other, W), Unfolding(
+#                     self.state(),
+#                     Implies(
+#                         not Stateless(other), Unfolding(
+#                             state_pred(other),
+#                             Result() == (self.i == cast(W, other).i)
+#                         )
+#                     )
+#                 )
+#             )
+#         )
+#         if self is other:
+#             return True
+#         elif isinstance(other, W):
+#             return Unfolding(
+#                 self.state(),
+#                 Unfolding(
+#                     state_pred(other),
+#                     self.i == cast(W, other).i
+#                 )
+#             )
+#         return False
+# 
+#     @Predicate
+#     def state(self) -> bool:
+#         return Wildcard(self.i)
+# 
+# class X:
+#     def __init__(self, i: int) -> None:
+#         self.i: int = i
+#         Fold(self.state())
+#         Ensures(self.state())
+# 
+#     @Pure
+#     def __eq__(self, other: object) -> bool:
+#         Requires(state_pred(self))
+#         Requires(Implies(not Stateless(other), state_pred(other)))
+#         Ensures(Implies(self is other, Result()))
+#         Ensures(
+#             Implies(
+#                 isinstance(other, X), Unfolding(
+#                     self.state(),
+#                     Implies(
+#                         not Stateless(other), Unfolding(
+#                             state_pred(other),
+#                             Result() == (self.i == cast(X, other).i)
+#                         )
+#                     )
+#                 )
+#             )
+#         )
+#         if self is other:
+#             return True
+#         elif isinstance(other, X):
+#             return Unfolding(
+#                 self.state(),
+#                 Unfolding(
+#                     state_pred(other),
+#                     self.i == cast(X, other).i
+#                 )
+#             )
+#         return False
+# 
+#     @Predicate
+#     def state(self) -> bool:
+#         return Wildcard(self.i)
+# 
+# class Y:
+#     def __init__(self, i: int) -> None:
+#         self.i: int = i
+#         Fold(self.state())
+#         Ensures(self.state())
+# 
+#     @Pure
+#     def __eq__(self, other: object) -> bool:
+#         Requires(state_pred(self))
+#         Requires(Implies(not Stateless(other), state_pred(other)))
+#         Ensures(Implies(self is other, Result()))
+#         Ensures(
+#             Implies(
+#                 isinstance(other, Y), Unfolding(
+#                     self.state(),
+#                     Implies(
+#                         not Stateless(other), Unfolding(
+#                             state_pred(other),
+#                             Result() == (self.i == cast(Y, other).i)
+#                         )
+#                     )
+#                 )
+#             )
+#         )
+#         if self is other:
+#             return True
+#         elif isinstance(other, Y):
+#             return Unfolding(
+#                 self.state(),
+#                 Unfolding(
+#                     state_pred(other),
+#                     self.i == cast(Y, other).i
+#                 )
+#             )
+#         return False
+# 
+#     @Predicate
+#     def state(self) -> bool:
+#         return Wildcard(self.i)
+# 
+# class Z:
+#     def __init__(self, i: int) -> None:
+#         self.i: int = i
+#         Fold(self.state())
+#         Ensures(self.state())
+# 
+#     @Pure
+#     def __eq__(self, other: object) -> bool:
+#         Requires(state_pred(self))
+#         Requires(Implies(not Stateless(other), state_pred(other)))
+#         Ensures(Implies(self is other, Result()))
+#         Ensures(
+#             Implies(
+#                 isinstance(other, Z), Unfolding(
+#                     self.state(),
+#                     Implies(
+#                         not Stateless(other), Unfolding(
+#                             state_pred(other),
+#                             Result() == (self.i == cast(Z, other).i)
+#                         )
+#                     )
+#                 )
+#             )
+#         )
+#         if self is other:
+#             return True
+#         elif isinstance(other, Z):
+#             return Unfolding(
+#                 self.state(),
+#                 Unfolding(
+#                     state_pred(other),
+#                     self.i == cast(Z, other).i
+#                 )
+#             )
+#         return False
+# 
+#     @Predicate
+#     def state(self) -> bool:
+#         return Wildcard(self.i)
     
 def fooA(o1: object, o2: object) -> int:
     Requires(isinstance(o1, A))
@@ -1406,87 +1406,87 @@ def fooU(o1: object, o2: object) -> int:
     assert o1 == o2
     return 0
 
-def fooV(o1: object, o2: object) -> int:
-    Requires(isinstance(o1, V))
-    Requires(isinstance(o2, V))
-    Requires(state_pred(o1))
-    Requires(state_pred(o2))
-    Requires(
-        Unfolding(state_pred(o1),
-            Unfolding(state_pred(o2),
-                cast(V, o1).i == cast(V, o2).i
-            )
-        )
-    )
-    Ensures(state_pred(o1))
-    Ensures(state_pred(o2))
-    assert o1 == o2
-    return 0
-
-def fooW(o1: object, o2: object) -> int:
-    Requires(isinstance(o1, W))
-    Requires(isinstance(o2, W))
-    Requires(state_pred(o1))
-    Requires(state_pred(o2))
-    Requires(
-        Unfolding(state_pred(o1),
-            Unfolding(state_pred(o2),
-                cast(W, o1).i == cast(W, o2).i
-            )
-        )
-    )
-    Ensures(state_pred(o1))
-    Ensures(state_pred(o2))
-    assert o1 == o2
-    return 0
-
-def fooX(o1: object, o2: object) -> int:
-    Requires(isinstance(o1, X))
-    Requires(isinstance(o2, X))
-    Requires(state_pred(o1))
-    Requires(state_pred(o2))
-    Requires(
-        Unfolding(state_pred(o1),
-            Unfolding(state_pred(o2),
-                cast(X, o1).i == cast(X, o2).i
-            )
-        )
-    )
-    Ensures(state_pred(o1))
-    Ensures(state_pred(o2))
-    assert o1 == o2
-    return 0
-
-def fooY(o1: object, o2: object) -> int:
-    Requires(isinstance(o1, Y))
-    Requires(isinstance(o2, Y))
-    Requires(state_pred(o1))
-    Requires(state_pred(o2))
-    Requires(
-        Unfolding(state_pred(o1),
-            Unfolding(state_pred(o2),
-                cast(Y, o1).i == cast(Y, o2).i
-            )
-        )
-    )
-    Ensures(state_pred(o1))
-    Ensures(state_pred(o2))
-    assert o1 == o2
-    return 0
-
-def fooZ(o1: object, o2: object) -> int:
-    Requires(isinstance(o1, Z))
-    Requires(isinstance(o2, Z))
-    Requires(state_pred(o1))
-    Requires(state_pred(o2))
-    Requires(
-        Unfolding(state_pred(o1),
-            Unfolding(state_pred(o2),
-                cast(Z, o1).i == cast(Z, o2).i
-            )
-        )
-    )
-    Ensures(state_pred(o1))
-    Ensures(state_pred(o2))
-    assert o1 == o2
-    return 0
+# def fooV(o1: object, o2: object) -> int:
+#     Requires(isinstance(o1, V))
+#     Requires(isinstance(o2, V))
+#     Requires(state_pred(o1))
+#     Requires(state_pred(o2))
+#     Requires(
+#         Unfolding(state_pred(o1),
+#             Unfolding(state_pred(o2),
+#                 cast(V, o1).i == cast(V, o2).i
+#             )
+#         )
+#     )
+#     Ensures(state_pred(o1))
+#     Ensures(state_pred(o2))
+#     assert o1 == o2
+#     return 0
+# 
+# def fooW(o1: object, o2: object) -> int:
+#     Requires(isinstance(o1, W))
+#     Requires(isinstance(o2, W))
+#     Requires(state_pred(o1))
+#     Requires(state_pred(o2))
+#     Requires(
+#         Unfolding(state_pred(o1),
+#             Unfolding(state_pred(o2),
+#                 cast(W, o1).i == cast(W, o2).i
+#             )
+#         )
+#     )
+#     Ensures(state_pred(o1))
+#     Ensures(state_pred(o2))
+#     assert o1 == o2
+#     return 0
+# 
+# def fooX(o1: object, o2: object) -> int:
+#     Requires(isinstance(o1, X))
+#     Requires(isinstance(o2, X))
+#     Requires(state_pred(o1))
+#     Requires(state_pred(o2))
+#     Requires(
+#         Unfolding(state_pred(o1),
+#             Unfolding(state_pred(o2),
+#                 cast(X, o1).i == cast(X, o2).i
+#             )
+#         )
+#     )
+#     Ensures(state_pred(o1))
+#     Ensures(state_pred(o2))
+#     assert o1 == o2
+#     return 0
+# 
+# def fooY(o1: object, o2: object) -> int:
+#     Requires(isinstance(o1, Y))
+#     Requires(isinstance(o2, Y))
+#     Requires(state_pred(o1))
+#     Requires(state_pred(o2))
+#     Requires(
+#         Unfolding(state_pred(o1),
+#             Unfolding(state_pred(o2),
+#                 cast(Y, o1).i == cast(Y, o2).i
+#             )
+#         )
+#     )
+#     Ensures(state_pred(o1))
+#     Ensures(state_pred(o2))
+#     assert o1 == o2
+#     return 0
+# 
+# def fooZ(o1: object, o2: object) -> int:
+#     Requires(isinstance(o1, Z))
+#     Requires(isinstance(o2, Z))
+#     Requires(state_pred(o1))
+#     Requires(state_pred(o2))
+#     Requires(
+#         Unfolding(state_pred(o1),
+#             Unfolding(state_pred(o2),
+#                 cast(Z, o1).i == cast(Z, o2).i
+#             )
+#         )
+#     )
+#     Ensures(state_pred(o1))
+#     Ensures(state_pred(o2))
+#     assert o1 == o2
+#     return 0
