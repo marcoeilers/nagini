@@ -33,23 +33,23 @@ class A:
 def foo(a: A, b: A) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
-    Requires(Unfolding(
-        state_pred(a),
-        Unfolding(
-            state_pred(b),
-            a == b
-        )
-    ))
     Ensures(state_pred(a))
     Ensures(state_pred(b))
+
+    Unfold(state_pred(a))
+    Unfold(state_pred(b))
+    res: bool = a == b
     # learn reflexivity from call: a == b
-    Ensures(a is b)
+    if res:
+        assert a is b
+    Fold(state_pred(a))
+    Fold(state_pred(b))
     return 0
 
-a = A(42, "python", True)
-a_ = a
-Unfold(state_pred(a))
-Unfold(state_pred(a_))
-foo(a, a_)
-Fold(state_pred(a))
-Fold(state_pred(a_))
+# a = A(42, "python", True)
+# a_ = a
+# Unfold(state_pred(a))
+# Unfold(state_pred(a_))
+# foo(a, a_)
+# Fold(state_pred(a))
+# Fold(state_pred(a_))
