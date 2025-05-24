@@ -24,9 +24,9 @@ def count_loc_without_folds_etc(file_path):
            stripped.startswith('import') or stripped.startswith('from '):
             continue
 
-        if (stripped.startswith('Requires(state_pred') or
-            stripped.startswith('Requires(self.state')):
-            loc -= 1 
+        if ('state_pred' in stripped or
+            'self.state' in stripped):
+            continue
         elif stripped.startswith('Unfold') or stripped.startswith('Fold'):
             continue
         else:

@@ -4,14 +4,27 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
-# Usability:
-# All LOC: 249
-# Without state/folding LOC: 204
-# Factor: 1.2205882352941178
+# D <-> E
+# D <-> F
+# NOT: E <-> F
+class D:
+    def __init__(self) -> None:
+        Fold(state_pred(self))
+        Ensures(state_pred(self))
 
+    @Pure
+    #:: ExpectedOutput(assert.failed:assertion.false)|ExpectedOutput(assert.failed:assertion.false)
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(
+            Implies(type(self) == type(other) or type(other) == E or type(other) == F or self is other, Result())
+        )
+        if type(self) == type(other) or type(other) == E or type(other) == F or self is other:
+            return True
+        return False
 
-# transitivity with no fields
-class A:
+class E:
     def __init__(self) -> None:
         Fold(state_pred(self))
         Ensures(state_pred(self))
@@ -21,13 +34,13 @@ class A:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
         Ensures(
-            Implies(type(self) == type(other) or type(other) == B or type(other) == C or self is other, Result())
+            Implies(type(self) == type(other) or type(other) == D or self is other, Result())
         )
-        if type(self) == type(other) or type(other) == B or type(other) == C or self is other:
+        if type(self) == type(other) or type(other) == D or self is other:
             return True
         return False
 
-class B:
+class F:
     def __init__(self) -> None:
         Fold(state_pred(self))
         Ensures(state_pred(self))
@@ -37,28 +50,12 @@ class B:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
         Ensures(
-            Implies(type(self) == type(other) or type(other) == A or type(other) == C or self is other, Result())
+            Implies(type(self) == type(other) or type(other) == D or self is other, Result())
         )
-        if type(self) == type(other) or type(other) == A or type(other) == C or self is other:
+        if type(self) == type(other) or type(other) == D or self is other:
             return True
         return False
 
-class C:
-    def __init__(self) -> None:
-        Fold(state_pred(self))
-        Ensures(state_pred(self))
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(
-            Implies(type(self) == type(other) or type(other) == A or type(other) == B or self is other, Result())
-        )
-        if type(self) == type(other) or type(other) == A or type(other) == B or self is other:
-            return True
-        return False
- 
 # transitivity with multiple fields
 class G:
     def __init__(self, i: int, s: str, b: bool) -> None:
@@ -82,48 +79,12 @@ class G:
                 )
             )
         ))
-        Ensures(Implies(
-            type(other) == H,
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(H, other).i and 
-                                 self.s == cast(H, other).s and 
-                                 self.b == cast(H, other).b)
-                )
-            )
-        ))
-        Ensures(Implies(
-            type(other) == I,
-            Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    Result() == (self.i == cast(I, other).i and 
-                                 self.s == cast(I, other).s and 
-                                 self.b == cast(I, other).b)
-                )
-            )
-        ))
         if type(self) == type(other):
             return Unfolding(self.state(),
                 Unfolding(state_pred(other),
                     self.i == cast(G, other).i and 
                     self.s == cast(G, other).s and 
                     self.b == cast(G, other).b
-                )
-            )
-        elif type(other) == H:
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(H, other).i and 
-                    self.s == cast(H, other).s and 
-                    self.b == cast(H, other).b
-                )
-            )
-        elif type(other) == I:
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(I, other).i and 
-                    self.s == cast(I, other).s and 
-                    self.b == cast(I, other).b
                 )
             )
         return False
@@ -276,28 +237,3 @@ class I:
     @Predicate
     def state(self) -> bool:
         return Acc(self.i) and Acc(self.s) and Acc(self.b)
-
-
-# # # TODO: caller learn symmetry
-# # 
-# # 
-# # 
-# # # def foo(a: A, b: A) -> int:
-# # #     Requires(state_pred(a))
-# # #     Requires(state_pred(b))
-# # #     Requires(Unfolding(
-# # #         state_pred(a),
-# # #         a == b
-# # #     ))
-# # #     Ensures(state_pred(a))
-# # #     Ensures(state_pred(b))
-# # #     return 0
-# # # 
-# # # a = A()
-# # # a_ = a
-# # # Unfold(state_pred(a))
-# # # Unfold(state_pred(a_))
-# # # foo(a, a_)
-# # # Fold(state_pred(a))
-# # # Fold(state_pred(a_))
-# # 

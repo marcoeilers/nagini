@@ -58,9 +58,15 @@
 #     assert o1 == o2
 #     return 0\n""")
 
+classes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'] + [
+    'A1', 'A2', 'A3', 'A4', 'A5',
+    'B1', 'B2', 'B3', 'B4', 'B5',
+    'C1', 'C2', 'C3', 'C4', 'C5',
+]
 
-for cls in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-    print(f"""class {cls}:
+with open('benchmarks/out.py', "w") as f:
+    for cls in classes: 
+        c = f"""class {cls}:
     def __init__(self, i: int, s: str, b: bool) -> None:
         self.i: int = i
         self.s: str = s
@@ -75,8 +81,8 @@ for cls in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             Unfolding(self.state(),
                 Unfolding(state_pred(other),
                     Result() == (self.i == cast({cls}, other).i and 
-                                 self.s == cast({cls}, other).s and 
-                                 self.b == cast({cls}, other).b)
+                                self.s == cast({cls}, other).s and 
+                                self.b == cast({cls}, other).b)
                 )
             )
         ))
@@ -93,7 +99,7 @@ for cls in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     @Predicate
     def state(self) -> bool:
         return Acc(self.i) and Acc(self.s) and Acc(self.b)
-    
+        
 def foo{cls}(a: {cls}, b: {cls}) -> int:
     Requires(state_pred(a))
     Requires(state_pred(b))
@@ -104,4 +110,7 @@ def foo{cls}(a: {cls}, b: {cls}) -> int:
         assert cast({cls}, a).i == cast({cls}, b).i
     Fold(a.state())
     Fold(b.state())
-    return 0""")
+    return 0
+    
+"""
+        f.write(c)

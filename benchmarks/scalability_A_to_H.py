@@ -4,6 +4,11 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
+# Usability:
+# All LOC: 336
+# Without state/folding LOC: 240
+# Factor: 1.4
+
 class A:
     def __init__(self, i: int, s: str, b: bool) -> None:
         self.i: int = i

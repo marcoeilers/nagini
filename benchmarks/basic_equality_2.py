@@ -4,13 +4,9 @@
 from nagini_contracts.contracts import *
 from typing import cast
 
-# Usability:
-# All LOC: 193
-# Without state/folding LOC: 160
-# Factor: 1.20625
+# compares two classes each
 
-
-# mutual recursion with B <: A
+# B <: A
 class A:
     def __init__(self) -> None:
         Fold(state_pred(self))
@@ -79,7 +75,6 @@ class D:
 
 
 # symmetry with fields
-# True iff also instance of E with same fields
 class E:
     def __init__(self, i: int) -> None:
         self.i: int = i
@@ -102,9 +97,89 @@ class E:
                 )
             )
         )
+        Ensures(
+            Implies(
+                type(other) == F, Unfolding(
+                    self.state(),
+                    Implies(
+                        not Stateless(other), Unfolding(
+                            state_pred(other),
+                            Result() == (self.i == cast(F, other).i)
+                        )
+                    )
+                )
+            )
+        )
         if self is other:
             return True
         elif type(self) == type(other):
+            return Unfolding(
+                self.state(),
+                Unfolding(
+                    state_pred(other),
+                    self.i == cast(E, other).i
+                )
+            )
+        elif type(other) == F:
+            return Unfolding(
+                self.state(),
+                Unfolding(
+                    state_pred(other),
+                    self.i == cast(F, other).i
+                )
+            )
+        return False
+
+    @Predicate
+    def state(self) -> bool:
+        return Wildcard(self.i)
+
+class F:
+    def __init__(self, i: int) -> None:
+        self.i: int = i
+
+    @Pure
+    def __eq__(self, other: object) -> bool:
+        Requires(state_pred(self))
+        Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(self is other, Result()))
+        Ensures(
+            Implies(
+                type(self) == type(other), Unfolding(
+                    self.state(),
+                    Implies(
+                        not Stateless(other), Unfolding(
+                            state_pred(other),
+                            Result() == (self.i == cast(F, other).i)
+                        )
+                    )
+                )
+            )
+        )
+        Ensures(
+            Implies(
+                type(other) == E, Unfolding(
+                    self.state(),
+                    Implies(
+                        not Stateless(other), Unfolding(
+                            state_pred(other),
+                            Result() == (self.i == cast(E, other).i)
+                        )
+                    )
+                )
+            )
+        )
+        if self is other:
+            return True
+        elif type(self) == type(other):
+            return Unfolding(
+                self.state(),
+                Unfolding(
+                    state_pred(other),
+                    self.i == cast(F, other).i
+                )
+            )
+        elif type(other) == E:
             return Unfolding(
                 self.state(),
                 Unfolding(
@@ -117,6 +192,7 @@ class E:
     @Predicate
     def state(self) -> bool:
         return Wildcard(self.i)
+
 
 # symmetry with multiple fields; two classes mutually naming each other
 class G:

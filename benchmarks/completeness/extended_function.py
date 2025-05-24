@@ -7,20 +7,21 @@ from typing import cast
 class A:
     def __init__(self, i: int) -> None:
         self.i: int = i
+        Fold(self.state())
+        Ensures(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
+        Ensures(Implies(self is other, Result()))
         Ensures(
             Implies(
-                isinstance(other, A),
-                Unfolding(self.state(),
-                    Unfolding(state_pred(other),
-                        Implies(
-                            Result(),
-                            self.i == cast(A, other).i
-                        )
+                isinstance(other, A), Unfolding(
+                    self.state(),
+                    Unfolding(
+                        state_pred(other),
+                        Result() == (self.i == cast(A, other).i)
                     )
                 )
             )
@@ -28,8 +29,10 @@ class A:
         if self is other:
             return True
         elif isinstance(other, A):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
+            return Unfolding(
+                self.state(),
+                Unfolding(
+                    state_pred(other),
                     self.i == cast(A, other).i
                 )
             )
@@ -37,79 +40,26 @@ class A:
 
     @Predicate
     def state(self) -> bool:
-        return Acc(self.i)
+        return Wildcard(self.i)
 
-class B(A):
-    def __init__(self, i: int, j: int) -> None:
-        self.i: int = i
-        self.j: int = j
-
-    @Pure
-    def __eq__(self, other: object) -> bool:
-        Requires(state_pred(self))
-        Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(
-            Implies(
-                isinstance(other, A),
-                Unfolding(self.state(),
-                    Unfolding(state_pred(other),
-                        Implies(
-                            Result(),
-                            self.i == cast(A, other).i
-                        )
-                    )
-                )
+def fooA(o1: object, o2: object) -> int:
+    Requires(isinstance(o1, A))
+    Requires(isinstance(o2, A))
+    Requires(state_pred(o1))
+    Requires(state_pred(o2))
+    Requires(
+        Unfolding(state_pred(o1),
+            Unfolding(state_pred(o2),
+                cast(A, o1).i == cast(A, o2).i
             )
         )
-        Ensures(
-            Implies(
-                type(other) == B,
-                Unfolding(self.state(),
-                    Unfolding(state_pred(other),
-                        Implies(
-                            Result(),
-                            self.i == cast(B, other).i and self.j == cast(B, other).j
-                        )
-                    )
-                )
-            )
-        )
-        if self is other:
-            return True
-        elif type(other) == B:
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(B, other).i and self.j == cast(B, other).j
-                )
-            )
-        elif isinstance(other, A):
-            return Unfolding(self.state(),
-                Unfolding(state_pred(other),
-                    self.i == cast(A, other).i
-                )
-            )
-        return False
+    )
+    Ensures(state_pred(o1))
+    Ensures(state_pred(o2))
 
-    @Predicate
-    def state(self) -> bool:
-        return Acc(self.j)
-
-# dynamic type is B for b1 and b2
-def client(b1: B, b2: A) -> int:
-    Requires(state_pred(b1))
-    Requires(state_pred(b2))
-    Ensures(state_pred(b1))
-    Ensures(state_pred(b2))
-
-    # with the extended function we only learn much about 
-    # b1, which has static type B
-    Unfold(state_pred(b1))
-    Unfold(state_pred(b2))
-    res: bool = (b1 == b2)
-    if res and type(b2) == B:
-        assert b1.i == b2.i
-        assert b1.j == cast(B, b2).j  # not provable by the extended function
-
-    Fold(state_pred(b1))
-    Fold(state_pred(b2))
+    Unfold(state_pred(o1))
+    Unfold(state_pred(o2))
+    assert o1 == o2
+    Fold(state_pred(o1))
+    Fold(state_pred(o2))
     return 0
