@@ -686,7 +686,10 @@ class CallTranslator(CommonTranslator):
             # if no inherited extended function exist -> use sil_name
             if not to_call_name:
                 to_call_name = target.sil_name
-            rt = self.translate_type(cur_target.type, ctx)
+            if not cur_target:
+                rt = self.translate_type(target.type, ctx)
+            else:
+                rt = self.translate_type(cur_target.type, ctx)
             call = self.viper.FuncApp(to_call_name, args, position,
                                         self.no_info(ctx), rt)
 
