@@ -39,6 +39,7 @@ from nagini_translation.lib.constants import (
     DEPENDENCIES,
     DEPENDENCIES_MERGE_FUNC_EQUALITY,
     BUILTIN___EQ___FUNCTIONS,
+    NO_TRANS_SYMM,
 )
 from nagini_translation.lib.jvmaccess import getobject
 from nagini_translation.lib.program_nodes import (
@@ -359,18 +360,16 @@ class ProgramTranslator(CommonTranslator):
         # ensures issubtype(self, Y) ==> <Post of Y>
         last_check = None
         for cur in overrides:
-
             ctx.current_function = cur
             ctx.module = cur.module
             ctx.current_class = cur.cls
 
-            if cur.overrides:
-                for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
-                    root_var = merge_func.args[merge_name]
-                    if merge_name == next(iter(f.args.keys())):
-                        root_var = copy.copy(root_var)
-                        root_var.type = cur.cls
-                    ctx.set_alias(cur_name, root_var)
+            for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
+                root_var = merge_func.args[merge_name]
+                if merge_name == next(iter(f.args.keys())):
+                    root_var = copy.copy(root_var)
+                    root_var.type = cur.cls
+                ctx.set_alias(cur_name, root_var)
 
             pos = self.to_position(cur.node, ctx)
             info = self.no_info(ctx)
@@ -453,7 +452,6 @@ class ProgramTranslator(CommonTranslator):
         """
         # no other function overrides object___eq__
         if len(overrides) == 1:
-            ctx.var_aliases = {}
             return None
         
         eq: PythonMethod = overrides[-1]
@@ -509,12 +507,13 @@ class ProgramTranslator(CommonTranslator):
             ctx.module = cur.module
             ctx.current_class = cur.cls
 
+            aliases = {}
             for merge_name, cur_name in zip(merge_func.args.keys(), cur.args.keys()):
                 root_var = merge_func.args[merge_name]
                 if merge_name == next(iter(merge_func.args.keys())):
                     root_var = copy.copy(root_var)
                     root_var.type = cur.cls
-                ctx.set_alias(cur_name, root_var)
+                aliases[cur_name] = root_var
 
             # find pre- and postconditions from sil_progs
             if cur.interface:
@@ -604,9 +603,19 @@ class ProgramTranslator(CommonTranslator):
         if last_check:
             merge_pres.append(last_check)
 
-        while(ctx.var_aliases):
-            for alias in list(ctx.var_aliases.keys()):
-                ctx.remove_alias(alias)
+        # TODO: fix
+        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
+        not_stateless = self.viper.Not(
+            self.viper.FuncApp(
+                STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
+                self.no_info(ctx), self.viper.Bool), pos, self.info
+        )
+        acc_precond = self.viper.Implies(
+            not_stateless, acc_precond, pos, self.info
+        )
+        merge_pres.append(acc_precond)
+        
+
         ctx.var_aliases = old_aliases
 
         ctx.current_function = old_function
@@ -1882,7 +1891,7 @@ class ProgramTranslator(CommonTranslator):
                         if func_to_call:
                             self.add_dependency([func_to_call], func.sil_name)
 
-                    if func.name == '__eq__':
+                    if func.name == '__eq__' and not module.file in NO_TRANS_SYMM:
                         pos = self.to_position(func.node, ctx)
                         info = self.no_info(ctx)
                         symm_check  = self.config.method_translator.encode_symmetry_check(

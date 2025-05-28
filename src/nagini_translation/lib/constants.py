@@ -77,6 +77,10 @@ COMBINED_PREFIX_ACCESSOR = '_get_combined_prefix'
 
 SINGLE_NAME = '_single'
 
+NO_TRANS_SYMM = [
+    'extended_function.py'
+]
+
 DOMAIN_EQ_FUNC = 'eq'
 OBJECT_EQ = 'object___eq__'
 EQUALITY_STATE_PRED = 'state'
@@ -96,6 +100,8 @@ BUILTIN___EQ___FUNCTIONS = [
 
 DEFAULT_STATE_PRED_PYTHON = """return True"""
 
+OBJ___EQ__MERGED = 'object___eq___merged'
+
 DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     STATELESS_FUNC,
     EQUALITY_STATE_PRED,
@@ -110,6 +116,7 @@ DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     "list___len__",
     "list___getitem___index",
     "list___getitem___index",
+    OBJ___EQ__MERGED,
 ]
 
 DEPENDENCIES = [
@@ -123,6 +130,7 @@ DEPENDENCIES = [
     "type___eq__",
     "PyType___box__",
     "type___unbox__",
+    "object___cast__",
 ]
 STATE_PREDS = [
     'list_state',
@@ -137,8 +145,6 @@ ILLEGAL_FUNC_NAMES = [
 ]
 
 SYMM_TRANS_RES_VAR = 'res'
-
-OBJ___EQ__MERGED = 'object___eq___merged'
 
 INTERNAL_NAMES = [
     'FuncTriple',
@@ -192,6 +198,8 @@ INTERNAL_NAMES = [
     'm',     # the following are used in various
     'X',     # places in the resources/... files.
     'Y',
+    'Z',
+    'T',
     'id',
     't',
     'g',

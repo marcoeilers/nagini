@@ -12,19 +12,6 @@ class E:
     def __eq__(self, other: object) -> bool:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        # Ensures(
-        #     Implies(
-        #         Result() and isinstance(other, F),
-        #         other == self
-        #     )
-        # )
-        # Ensures(
-        #     Implies(
-        #         Result() and type(self) == type(other),
-        #         other == self
-        #     )
-        # )
         Ensures(
             Implies(
                 type(self) == type(other), Unfolding(
@@ -83,19 +70,6 @@ class F:
     def __eq__(self, other: object) -> bool:
         Requires(state_pred(self))
         Requires(Implies(not Stateless(other), state_pred(other)))
-        Ensures(Implies(self is other, Result()))
-        # Ensures(
-        #     Implies(
-        #         Result() and isinstance(other, F),
-        #         other == self
-        #     )
-        # )
-        # Ensures(
-        #     Implies(
-        #         Result() and type(self) == type(other),
-        #         other == self
-        #     )
-        # )
         Ensures(
             Implies(
                 type(self) == type(other), Unfolding(

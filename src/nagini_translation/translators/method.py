@@ -830,9 +830,10 @@ class MethodTranslator(CommonTranslator):
 
         # encode else branch as elseif(true) -> assume posts of object___eq__
         assert_obj_eq = self.viper.Assert(self.viper.FalseLit(pos, info), pos, info)
-        guarded_blocks.append(
-            (self.viper.TrueLit(pos, info), assert_obj_eq)
-        )
+        # guarded_blocks.append(
+        #     (self.viper.TrueLit(pos, info), assert_obj_eq)
+        # )
+
         # TODO: use object___eq__ contract?
         # super_class = func.cls
         # while(super_class.superclass):
@@ -1106,9 +1107,9 @@ class MethodTranslator(CommonTranslator):
 
         # encode else branch as elseif(true) -> assume posts of object___eq__
         assert_obj_eq = self.viper.Assert(self.viper.FalseLit(pos, info), pos, info)
-        guarded_blocks.append(
-            (self.viper.TrueLit(pos, info), assert_obj_eq)
-        )
+        # guarded_blocks.append(
+        #     (self.viper.TrueLit(pos, info), assert_obj_eq)
+        # )
 
         if guarded_blocks:
             if_stmt = chain_if_stmts(guarded_blocks, self.viper, pos, info, ctx)
