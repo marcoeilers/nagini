@@ -52,6 +52,7 @@ from nagini_translation.lib.program_nodes import (
     PythonVar,
     toposort_classes,
     UnionType,
+    GenericType,
 )
 from nagini_translation.lib.resolver import get_target as do_get_target
 from nagini_translation.lib.typedefs import (
@@ -758,6 +759,8 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
         else:
             if func_name == '__eq__' and not receiver.sil_name == TYPE_TYPE:
                 assert len(args) == 2
+                if isinstance(receiver, GenericType):
+                    receiver = receiver.cls
 
                 # Redirect call to __eq__ function to domain function eq.
                 # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
