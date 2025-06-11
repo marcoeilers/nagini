@@ -180,10 +180,8 @@ predicate list_state(self: Ref) {
 
 function list___eq__(self: Ref, other: Ref): Bool
     decreases _
-    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
     // Permissions
     // acquire permissions for all references in both lists (self and other)
-    
     requires acc(state(self), wildcard)
     requires !stateless(other) ==> acc(state(other), wildcard)
 

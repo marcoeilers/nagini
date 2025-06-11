@@ -97,8 +97,6 @@ predicate set_state(self: Ref) {
 function set___eq__(self: Ref, other: Ref): Bool
     decreases _
     // permissions
-    requires issubtype(typeof(self), set(set_arg(typeof(self), 0)))
-
     requires acc(state(self), wildcard)
     requires !stateless(other) ==> acc(state(other), wildcard)
 
