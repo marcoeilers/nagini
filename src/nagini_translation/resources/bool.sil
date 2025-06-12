@@ -130,10 +130,9 @@ function __prim__int___box__(prim: Int): Ref
 
 function int___unbox__(box: Ref): Int
     decreases _
-    requires issubtype(typeof(box), int())
     ensures !issubtype(typeof(box), bool()) ==> __prim__int___box__(result) == box
     ensures issubtype(typeof(box), bool()) ==> __prim__bool___box__(result != 0) == box
-    ensures forall i: Ref :: {object___eq__(box, i), int___unbox__(i)} (issubtype(typeof(i), int()) && object___eq__(box, i)) ==> int___unbox__(i) == result
+    ensures issubtype(typeof(box), int()) ==> forall i: Ref :: {object___eq__(box, i), int___unbox__(i)} (issubtype(typeof(i), int()) && object___eq__(box, i)) ==> int___unbox__(i) == result
 
 function __prim__bool___box__(prim: Bool): Ref
     decreases _
@@ -148,11 +147,11 @@ function bool___unbox__(box: Ref): Bool
 
 function int___eq__(self: Ref, other: Ref): Bool
     decreases _
-    ensures issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
+    ensures issubtype(typeof(self), int()) && issubtype(typeof(other), int()) ==> result == (int___unbox__(self) == int___unbox__(other))
 
 function bool___eq__(self: Ref, other: Ref): Bool
     decreases _
-    ensures issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
+    ensures issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==> result == bool___unbox__(self) == bool___unbox__(other)
 
 function int___ge__(self: Ref, other: Ref): Bool
     decreases _

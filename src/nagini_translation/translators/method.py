@@ -405,7 +405,7 @@ class MethodTranslator(CommonTranslator):
     def translate_extended_function(self, func: PythonMethod,
                                     ctx: Context) -> tuple[Optional['silver.ast.Function'], str]:
         """Creates an extended function from func. It is a contract-only copy that 
-        additionally ensures that BST holds."""
+        additionally ensures result == super___eq__(self, other) ."""
         if not func.overrides:
             return (None, None)
 
@@ -491,19 +491,20 @@ class MethodTranslator(CommonTranslator):
         eq_call = self.viper.EqCmp(result, object_eq_call, pos, info)
         posts.append(eq_call)
 
-        # add state precondition for other to make sure
-        # the addition postcondition has permissions to access state(other) if 
-        # other is stateful
-        pred_acc = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.WildcardPerm(pos, info), func.node, ctx)
-        not_stateless = self.viper.Not(
-            self.viper.FuncApp(
-                STATELESS_FUNC, [other_var], self.to_position(func.node, ctx),
-                self.no_info(ctx), self.viper.Bool), pos, info
-        )
-        implies = self.viper.Implies(
-            not_stateless, pred_acc, pos, info
-        )
-        pres.append(implies)
+        # add state precondition for self and other to make sure
+        # the addition postcondition has permissions to access state(self) if 
+        # self is stateful (same goes for other)
+        for var in [self_var, other_var]:
+            pred_acc = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), func.node, ctx)
+            not_stateless = self.viper.Not(
+                self.viper.FuncApp(
+                    STATELESS_FUNC, [var], self.to_position(func.node, ctx),
+                    self.no_info(ctx), self.viper.Bool), pos, info
+            )
+            implies = self.viper.Implies(
+                not_stateless, pred_acc, pos, info
+            )
+            pres.append(implies)
 
         fname = func.extended_name if func.extended_name else func.sil_name
         return self.viper.Function(
