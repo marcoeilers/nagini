@@ -148,7 +148,7 @@ function tuple___eq__(self: Ref, other: Ref): Bool
             (forall x: Int ::
               { tuple___getitem__(self, x) }
               { tuple___getitem__(other, x) }
-              (x >= 0 && x < tuple___len__(self)) || (x >= -tuple___len__(self) && x <= -1) ==>
+              x >= 0 && x < tuple___len__(self) ==>
               object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
             )
           )))

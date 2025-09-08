@@ -193,8 +193,7 @@ function list___eq__(self: Ref, other: Ref): Bool
             (forall x: Int ::
               { list___getitem___index(self, x) }
               { list___getitem___index(other, x) }
-              (x >= 0 && x < list___len__(self)) || (x >= -list___len__(self) && x <= -1) ==>
-              object___eq__(list___getitem___index(self, x), list___getitem___index(other, x))
+              x >= 0 && x < list___len__(self)  ==>
             )
           )))
         ))
