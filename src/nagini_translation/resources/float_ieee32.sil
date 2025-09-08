@@ -49,8 +49,7 @@ function float___lt__(self: Ref, other: Ref): Bool
 
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
-    requires issubtype(typeof(self), float())
-    ensures issubtype(typeof(other), float()) ==>
+    ensures issubtype(typeof(self), float()) && issubtype(typeof(other), float()) ==>
         result == ___float32_eq(float___unbox__(self), float___unbox__(other))
 
 function float___add__(self: Ref, other: Ref): Ref

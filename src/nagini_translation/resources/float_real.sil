@@ -117,8 +117,7 @@ function float___lt__(self: Ref, other: Ref): Bool
 
 function float___eq__(self: Ref, other: Ref): Bool
     decreases _
-    requires issubtype(typeof(self), float())
-    ensures issubtype(typeof(other), float()) ==>
+    ensures issubtype(typeof(self), float()) && issubtype(typeof(other), float()) ==>
         float___is_nan__(self) == true || float___is_nan__(other) == true ==>
         result == false
     ensures issubtype(typeof(other), float()) ==>
