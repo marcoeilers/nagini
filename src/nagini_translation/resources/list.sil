@@ -32,8 +32,16 @@ method list___init__() returns (res: Ref)
 function list___contains__(self: Ref, item: Ref): Bool
     decreases _
     requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-    requires acc(self.list_acc, wildcard)
-    ensures result == (item in self.list_acc)
+    requires issubtype(typeof(item), list_arg(typeof(self), 0))
+    requires acc(state(self))
+    requires !stateless(item) ==> acc(state(item))
+    ensures result == (unfolding state(self) in (
+        !stateless(item) ? unfolding state(item) in (
+            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq___merged(item, o)
+        ) : (
+            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq___merged(item, o)
+        )
+    ))
 
 function list___bool__(self: Ref) : Bool
     decreases _
