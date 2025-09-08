@@ -32,6 +32,7 @@ from nagini_translation.lib.constants import (
     OBJECT_TYPE,
     TUPLE_TYPE,
     BUILTIN___EQ___FUNCTIONS,
+    BUILTIN___HASH___FUNCTIONS,
     BUILTIN_TYPES,
     BUILTIN_PREDICATES,
     BUILTINS,
@@ -335,10 +336,10 @@ class Analyzer(ast.NodeVisitor):
         ctr = 0
         for arg_type in if_method['args']:
 
-            # rename arg_0, arg_1 to self, other if it's an __eq__ function
+            # rename arg_0, arg_1 to self, other if it's an __eq__ or __hash__ function
             if pure and cls and cls.name:
                 sil_name = f"{cls.name}_{method_name}"
-                if sil_name in BUILTIN___EQ___FUNCTIONS + ['object_state'] and ctr in [0, 1]:
+                if sil_name in BUILTIN___EQ___FUNCTIONS + BUILTIN___HASH___FUNCTIONS + ['object_state'] and ctr in [0, 1]:
                     if ctr == 0:
                         name = 'self'
                     elif ctr == 1:
