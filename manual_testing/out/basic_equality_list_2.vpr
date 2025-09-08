@@ -998,27 +998,27 @@ function two(): Ref
 
 
 function object___eq___merged(self: Ref, other: Ref): Bool
-  requires (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
+  requires (issubtype(typeof(self), E()) ?
       true && acc(state(self), wildcard) &&
       (!stateless(other) ==> acc(state(other), wildcard)) :
-      (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
-        true && acc(state(self), wildcard) &&
-        (!stateless(other) ==> acc(state(other), wildcard)) :
-        (issubtype(typeof(self), bool()) ?
-          true :
-          (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
-            true && (!stateless(self) ==> acc(state(self), wildcard)) &&
+      (issubtype(typeof(self), str()) ?
+        true :
+        (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
+          true && (!stateless(self) ==> acc(state(self), wildcard)) &&
+          (!stateless(other) ==> acc(state(other), wildcard)) :
+          (issubtype(typeof(self), F()) ?
+            true && acc(state(self), wildcard) &&
             (!stateless(other) ==> acc(state(other), wildcard)) :
-            (issubtype(typeof(self), str()) ?
+            (issubtype(typeof(self), bool()) ?
               true :
-              (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-              1))) ?
+              (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
                 true && acc(state(self), wildcard) &&
                 (!stateless(other) ==> acc(state(other), wildcard)) :
-                (issubtype(typeof(self), F()) ?
+                (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
                   true && acc(state(self), wildcard) &&
                   (!stateless(other) ==> acc(state(other), wildcard)) :
-                  (issubtype(typeof(self), E()) ?
+                  (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+                  1))) ?
                     true && acc(state(self), wildcard) &&
                     (!stateless(other) ==> acc(state(other), wildcard)) :
                     (issubtype(typeof(self), int()) ?
@@ -1046,34 +1046,6 @@ function object___eq___merged(self: Ref, other: Ref): Bool
     true &&
     (issubtype(typeof(self), int()) && issubtype(typeof(other), int()) ==>
     result == (int___unbox__(self) == int___unbox__(other)))
-  ensures issubtype(typeof(self), E()) ==>
-    true && (self == other ==> result) &&
-    (type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
-    (unfolding acc(state(self), wildcard) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), wildcard) in
-        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.E_l,
-        object___cast__(E(), other).E_l)))))) &&
-    (type___eq__(PyType___box__(typeof(other)), PyType___box__(F())) ==>
-    (unfolding acc(state(self), wildcard) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), wildcard) in
-        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.E_l,
-        object___cast__(F(), other).F_l))))))
-  ensures issubtype(typeof(self), F()) ==>
-    true && (self == other ==> result) &&
-    (type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
-    (unfolding acc(state(self), wildcard) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), wildcard) in
-        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.F_l,
-        object___cast__(F(), other).F_l)))))) &&
-    (type___eq__(PyType___box__(typeof(other)), PyType___box__(E())) ==>
-    (unfolding acc(state(self), wildcard) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), wildcard) in
-        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.F_l,
-        object___cast__(E(), other).E_l))))))
   ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
     1))) ==>
     true &&
@@ -1095,48 +1067,6 @@ function object___eq___merged(self: Ref, other: Ref): Bool
             (object___eq___merged(x, y) &&
             object___eq___merged(dict___getitem__(self, x), dict___getitem__(other,
             y)))))))))
-  ensures issubtype(typeof(self), str()) ==>
-    true &&
-    (issubtype(typeof(self), str()) && issubtype(typeof(other), str()) ==>
-    result ==
-    (str___len__(self) == str___len__(other) &&
-    str___val__(self) == str___val__(other)))
-  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
-    true &&
-    (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
-    issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-    result ==
-    (!stateless(self) ==>
-    (unfolding acc(state(self), write) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), write) in
-        tuple___len__(self) == tuple___len__(other) &&
-        (forall x: Int ::
-          { tuple___getitem__(self, x) }
-          { tuple___getitem__(other, x) }
-          x >= 0 && x < tuple___len__(self) ||
-          x >= -tuple___len__(self) && x <= -1 ==>
-          object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other,
-          x)))))))
-  ensures issubtype(typeof(self), bool()) ==>
-    true &&
-    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
-    result == (bool___unbox__(self) == bool___unbox__(other)))
-  ensures issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
-    true &&
-    (issubtype(typeof(self), list(list_arg(typeof(self), 0))) &&
-    issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
-    result ==
-    (unfolding acc(state(self), write) in
-      (unfolding acc(state(other), write) in
-        list___len__(self) == list___len__(other) &&
-        (forall x: Int ::
-          { list___getitem___index(self, x) }
-          { list___getitem___index(other, x) }
-          x >= 0 && x < list___len__(self) ||
-          x >= -list___len__(self) && x <= -1 ==>
-          object___eq___merged(list___getitem___index(self, x), list___getitem___index(other,
-          x))))))
   ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
     true &&
     (issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
@@ -1151,6 +1081,75 @@ function object___eq___merged(self: Ref, other: Ref): Bool
           (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
             x) &&
             (set___contains__(other, y) && object___eq___merged(x, y)))))))
+  ensures issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
+    true &&
+    (issubtype(typeof(self), list(list_arg(typeof(self), 0))) &&
+    issubtype(typeof(other), list(list_arg(typeof(other), 0))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        list___len__(self) == list___len__(other) &&
+        (forall x: Int ::
+          { list___getitem___index(self, x) }
+          { list___getitem___index(other, x) }
+          x >= 0 && x < list___len__(self) ==>
+          object___eq___merged(list___getitem___index(self, x), list___getitem___index(other,
+          x))))))
+  ensures issubtype(typeof(self), bool()) ==>
+    true &&
+    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
+    result == (bool___unbox__(self) == bool___unbox__(other)))
+  ensures issubtype(typeof(self), F()) ==>
+    true && (self == other ==> result) &&
+    (type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
+    (unfolding acc(state(self), wildcard) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), wildcard) in
+        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.F_l,
+        object___cast__(F(), other).F_l)))))) &&
+    (type___eq__(PyType___box__(typeof(other)), PyType___box__(E())) ==>
+    (unfolding acc(state(self), wildcard) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), wildcard) in
+        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.F_l,
+        object___cast__(E(), other).E_l))))))
+  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
+    true &&
+    (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
+    issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+    result ==
+    (!stateless(self) ==>
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        tuple___len__(self) == tuple___len__(other) &&
+        (forall x: Int ::
+          { tuple___getitem__(self, x) }
+          { tuple___getitem__(other, x) }
+          x >= 0 && x < tuple___len__(self) ==>
+          object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other,
+          x)))))))
+  ensures issubtype(typeof(self), str()) ==>
+    true &&
+    (issubtype(typeof(self), str()) && issubtype(typeof(other), str()) ==>
+    result ==
+    (str___len__(self) == str___len__(other) &&
+    str___val__(self) == str___val__(other)))
+  ensures issubtype(typeof(self), E()) ==>
+    true && (self == other ==> result) &&
+    (type___eq__(PyType___box__(typeof(self)), PyType___box__(typeof(other))) ==>
+    (unfolding acc(state(self), wildcard) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), wildcard) in
+        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.E_l,
+        object___cast__(E(), other).E_l)))))) &&
+    (type___eq__(PyType___box__(typeof(other)), PyType___box__(F())) ==>
+    (unfolding acc(state(self), wildcard) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), wildcard) in
+        object___eq___merged(__prim__bool___box__(result), __prim__bool___box__(object___eq___merged(self.E_l,
+        object___cast__(F(), other).F_l))))))
   decreases _
 
 
@@ -1650,7 +1649,7 @@ method E___init__(self_8: Ref, l: Ref)
   requires acc(state(l), wildcard)
   ensures acc(state(self_8), wildcard)
   ensures (unfolding acc(state(self_8), wildcard) in
-      self_8.E_l ==  l)
+      self_8.E_l == l)
 {
   var _err: Ref
   var self_13: Ref
@@ -1969,6 +1968,10 @@ method main()
   assert object___eq___merged(_asserting(_asserting(one(), true), true &&
     (_single(6647407) in module_names_0)), _asserting(_asserting(two(), true),
     true && (_single(7305076) in module_names_0)))
+
+  assert list___contains__(one().E_l, __prim__int___box__(42))
+  assert list___contains__(two().F_l, __prim__int___box__(3))
+
   goto __end
   label __end
 }
@@ -1981,3 +1984,17 @@ method list___init__() returns (res: Ref)
 {
   inhale false
 }
+
+function list___contains__(self: Ref, item: Ref): Bool
+    decreases _
+    requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
+    // requires acc(self.list_acc, wildcard)
+    requires acc(state(self))
+    requires !stateless(item) ==> acc(state(item))
+    ensures result == (unfolding state(self) in (
+        !stateless(item) ? unfolding state(item) in (
+            exists o: Ref :: { object___eq___merged(item, o) } o in self.list_acc && object___eq___merged(item, o)
+        ) : (
+            exists o: Ref :: { object___eq___merged(item, o) } o in self.list_acc && object___eq___merged(item, o)
+        )
+    ))
