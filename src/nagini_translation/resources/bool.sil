@@ -297,7 +297,7 @@ function stateless(x: Ref): Bool
       issubtype(typeof(x), str()) || issubtype(typeof(x), float()) ||
       (issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
         (forall y: Ref :: { y in tuple___val__(x) }
-        (y in tuple___val__(x)) && stateless(y))
+        (y in tuple___val__(x)) ==> stateless(y))
       )
     )
 
