@@ -9,7 +9,7 @@
         "__eq__": {
             "args": ["object", "object"],
             "type": "__prim__bool",
-            "requires": ["stateless", "state"]
+            "requires": ["stateless", "state", "__hash__"]
         },
         "__str__": {
             "args": ["object"],
@@ -18,6 +18,11 @@
         "__cast__": {
             "args": ["PyType", "object"],
             "type": "object"
+        },
+        "__hash__": {
+            "args": ["object"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         }
     },
     "predicates": {
@@ -249,7 +254,12 @@
         "__eq__": {
             "args": ["int", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__", "float___eq__", "stateless", "state"]
+            "requires": ["__unbox__", "float___eq__", "stateless", "state", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["int"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
@@ -396,7 +406,12 @@
         "__eq__": {
             "args": ["float", "object"],
             "type": "__prim__bool",
-            "requires": ["int___eq__", "unbox", "float___isNaN", "float___is_inf__", "object___eq__"]
+            "requires": ["int___eq__", "unbox", "float___isNaN", "float___is_inf__", "object___eq__", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["float"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__add__": {
             "args": ["float", "float"],
@@ -495,7 +510,12 @@
         "__eq__": {
             "args": ["bool", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__", "int___eq__", "stateless", "state"]
+            "requires": ["__unbox__", "int___eq__", "stateless", "state", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["bool"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__and__": {
             "args": ["__prim__bool", "__prim__bool"],
@@ -543,7 +563,13 @@
         },
         "__eq__": {
             "args": ["str", "object"],
-            "type": "__prim__bool"
+            "type": "__prim__bool",
+            "requires": ["__hash__"]
+        },
+        "__hash__": {
+            "args": ["str"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__add__": {
             "args": ["str", "str"],
@@ -591,7 +617,12 @@
         "__eq__": {
             "args": ["bytes", "object"],
             "type": "__prim__bool",
-            "requires": ["__val__", "__len__"]
+            "requires": ["__val__", "__len__", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["bytes"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__add__": {
             "args": ["bytes", "bytes"],
@@ -706,7 +737,12 @@
         "__eq__": {
             "args": ["tuple", "object"],
             "type": "__prim__bool",
-            "requires": ["__len__", "__getitem__", "object___eq__", "stateless", "tuple___getitem__", "tuple___len__"]
+            "requires": ["__len__", "__getitem__", "object___eq__", "stateless", "tuple___getitem__", "tuple___len__", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["tuple"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
@@ -766,7 +802,12 @@
         "__eq__": {
             "args": ["type", "object"],
             "type": "__prim__bool",
-            "requires": ["__unbox__"]
+            "requires": ["__unbox__", "__hash__"]
+        },
+        "__hash__": {
+            "args": ["type"],
+            "type": "__prim__int",
+            "requires": ["hash"]
         }
     },
     "extends": "object"
@@ -1070,6 +1111,11 @@
             "args": ["list"],
             "type": "__prim__int",
             "requires": ["__seq_ref_to_seq_int", "int___unbox__", "__prim__int___box__", "list___getitem__"]
+        },
+        "hash": {
+            "args": ["object"],
+            "type": "__prim__int",
+            "requires": []
         }
     },
     "methods": {

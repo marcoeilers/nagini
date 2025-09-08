@@ -83,6 +83,7 @@ NO_TRANS_SYMM = [
 
 DOMAIN_EQ_FUNC = 'eq'
 OBJECT_EQ = 'object___eq__'
+OBJECT_HASH = 'object___hash__'
 EQUALITY_STATE_PRED = 'state'
 STATELESS_FUNC = 'stateless'
 STATE_ABSTRACT_REST = "state_abstract_rest"
@@ -96,6 +97,13 @@ BUILTIN___EQ___FUNCTIONS = [
     'set___eq__',
     'dict___eq__',
     OBJECT_EQ,
+]
+BUILTIN___HASH___FUNCTIONS = [
+    'int___hash__',
+    'bool___hash__',
+    'str___hash__',
+    'float___hash__',
+    OBJECT_HASH,
 ]
 
 DEFAULT_STATE_PRED_PYTHON = """return True"""
@@ -131,6 +139,7 @@ DEPENDENCIES = [
     "PyType___box__",
     "type___unbox__",
     "object___cast__",
+    "hash"
 ]
 STATE_PREDS = [
     'list_state',
@@ -285,6 +294,7 @@ VIPER_KEYWORDS = [
 
 LEGAL_MAGIC_METHODS = {
     '__eq__',
+    '__hash__',
     '__ne__',
     '__gt__',
     '__ge__',
