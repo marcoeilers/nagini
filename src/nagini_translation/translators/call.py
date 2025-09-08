@@ -669,7 +669,7 @@ class CallTranslator(CommonTranslator):
                 fname = merge_func.sil_name
             else:
                 fname = target.sil_name
-            call = self.viper.FuncApp(fname, args, position, self.no_info(ctx), self.viper.Bool)
+            call = self.viper.FuncApp(fname, args, position, self.no_info(ctx), type)
         else:
             # find inherited extended function
             to_call_name = target.extended_name
