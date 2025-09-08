@@ -35,6 +35,7 @@ from nagini_translation.lib.constants import (
     OBJ___EQ__MERGED,
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
+    OBJECT_HASH,
     STATELESS_FUNC,
     DEPENDENCIES,
     DEPENDENCIES_MERGE_FUNC_EQUALITY,
@@ -674,17 +675,17 @@ class ProgramTranslator(CommonTranslator):
             if len(method.node.args.args) != 2:
                 raise InvalidProgramException(method.node, 'invalid.num.args.call')
 
-            old_aliases = copy.deepcopy(ctx.var_aliases)
-
             # aliasing
+            aliases_eq = {}
             for obj_eq, cur_name in zip(method.overrides.args.keys(), method.args.keys()):
                 root_var = method.overrides.args[obj_eq]
                 if obj_eq == cur_name:
                     root_var = copy.copy(root_var)
                     root_var.type = method.cls
                 ctx.set_alias(cur_name, root_var)
+                aliases_eq[cur_name] = root_var
 
-            with ctx.additional_aliases(ctx.var_aliases):
+            with ctx.additional_aliases(aliases_eq):
                 iterator = iter(method.args)
                 super_iter = iter(method.overrides.args)
                 if ctx.var_aliases:
@@ -712,7 +713,32 @@ class ProgramTranslator(CommonTranslator):
                             not_stateless, acc_precond, pos, self.info
                         )
                     pres.append(acc_precond)
-            ctx.var_aliases = old_aliases
+
+        elif method.overrides.sil_name == OBJECT_HASH:
+            perm = self.viper.FullPerm(self.no_position(ctx), self.no_info(ctx))
+            if len(method.node.args.args) != 1:
+                raise InvalidProgramException(method.node, 'invalid.num.args.call')
+
+            # aliasing
+            aliases_hash = {}
+            for obj_hash, cur_name in zip(method.overrides.args.keys(), method.args.keys()):
+                root_var = method.overrides.args[obj_hash]
+                if obj_hash == cur_name:
+                    root_var = copy.copy(root_var)
+                    root_var.type = method.cls
+                aliases_hash[cur_name] = root_var
+
+            with ctx.additional_aliases(aliases_hash):
+                iterator = iter(method.args)
+                super_iter = iter(method.overrides.args)
+                if ctx.var_aliases:
+                    self_var = ctx.var_aliases.get(
+                        method.overrides.args[next(super_iter)].name
+                    ).ref()
+                else:
+                    self_var = method.args[next(iterator)].ref()
+            acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [self_var], perm, method.node, ctx)
+            pres.append(acc_precond)
 
         self_arg = None
         has_subtype = None
