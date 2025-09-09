@@ -8,6 +8,7 @@ from typing import cast
 
 class E:
     def __init__(self, i: int) -> None:
+        Ensures(Acc(self.i))
         self.i: int = i
 
     @Pure
