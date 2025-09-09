@@ -1133,7 +1133,7 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             for requirement in self.requires:
                 requires.add(requirement)
             translator.set_required_names(self.sil_name, requires)
-            if self.sil_name in BUILTIN___EQ___FUNCTIONS and self.sil_name != OBJECT_EQ:
+            if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
                 self.extended_name = self.get_fresh_name(sil_name + '_extended')
             return
