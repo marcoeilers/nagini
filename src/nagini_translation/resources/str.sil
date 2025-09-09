@@ -31,6 +31,15 @@ function str___eq__(self: Ref, other: Ref): Bool
               (str___len__(self) == str___len__(other)) && 
               (str___val__(self) == str___val__(other)))
 
+
+domain HashStr {
+    function abstract_hash_str(self: Ref): Int
+}
+
+function str___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), str()) ==> result == abstract_hash_str(self)
+
 function str___add__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), str())

@@ -35,6 +35,11 @@ function bytes___eq__(self: Ref, other: Ref): Bool
     ensures result ==> (issubtype(typeof(other), bytes()) && bytes___len__(self) == bytes___len__(other))
     ensures result == object___eq__(self, other)
 
+// same hash function as strings
+function bytes___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), bytes()) ==> result == abstract_hash_str(self)
+
 function bytes___sil_seq__(self: Ref) : Seq[Ref]
     decreases _
 {

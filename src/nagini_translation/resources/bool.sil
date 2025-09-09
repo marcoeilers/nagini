@@ -280,6 +280,16 @@ function int___int__(self: Ref): Ref
 
 function object___hash__(self: Ref): Int
     decreases _
+    requires !stateless(self) ==> state(self)
+
+// defined as identity for all integers except for -1, which is mapped to -2 (-1 signals an error)
+function int___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), int()) ==> result == (int___unbox__(self) == (-1) ? (-2) : int___unbox__(self))
+
+function bool___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), bool()) ==> result == (bool___unbox__(self) ? 1 : 0)
 
 // temporary for benchmarking
 function object___eq___merged(self: Ref, other: Ref): Bool
@@ -345,9 +355,6 @@ function min(a: Ref, b: Ref): Int
 function abs(a: Int): Int
     decreases _
     ensures result == (a >= 0 ? a : -a)
-
-function hash(x: Ref): Int
-    decreases _
 
 method print(r: Ref)
     requires Low(r)

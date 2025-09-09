@@ -25,7 +25,8 @@ BUILTINS = ['cast',
             'range',
             'type',
             'list',
-            'enumerate']
+            'enumerate',
+            'hash']
 
 THREADING = ['Thread']
 
@@ -103,12 +104,18 @@ BUILTIN___HASH___FUNCTIONS = [
     'bool___hash__',
     'str___hash__',
     'float___hash__',
+    'bytes___hash__',
     OBJECT_HASH,
 ]
 
 DEFAULT_STATE_PRED_PYTHON = """return True"""
 
 OBJ___EQ__MERGED = 'object___eq___merged'
+OBJ___HASH__MERGED = 'object___hash___merged'
+
+DEPENDENCIES_MERGE_FUNC_HASH = [
+
+]
 
 DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     STATELESS_FUNC,
@@ -139,7 +146,7 @@ DEPENDENCIES = [
     "PyType___box__",
     "type___unbox__",
     "object___cast__",
-    "hash"
+    OBJECT_HASH,
 ]
 STATE_PREDS = [
     'list_state',

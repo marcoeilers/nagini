@@ -33,12 +33,14 @@ from nagini_translation.lib.constants import (
     THREAD_START_PRED,
     TYPE_TYPE,
     OBJ___EQ__MERGED,
+    OBJ___HASH__MERGED,
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
     OBJECT_HASH,
     STATELESS_FUNC,
     DEPENDENCIES,
     DEPENDENCIES_MERGE_FUNC_EQUALITY,
+    DEPENDENCIES_MERGE_FUNC_HASH,
     BUILTIN___EQ___FUNCTIONS,
     NO_TRANS_SYMM,
 )
@@ -445,31 +447,32 @@ class ProgramTranslator(CommonTranslator):
         return f.sil_name == 'object___eq__'
 
     
-    def create_object_equality_merge_function(self, sil_progs: Program, functions,
-                                              overrides: list[PythonMethod], ctx: Context) -> Optional['silver.ast.Callable']:
+    def create_object_equality_or_hash_merge_function(self, sil_progs: Program, functions,
+                                              overrides: list[PythonMethod], ctx: Context, eq_or_hash: str) -> Optional['silver.ast.Callable']:
         """
-        Creates a Viper function that contains all pre-/postconditions for object.__eq__
+        Creates a Viper function that contains all pre-/postconditions for object.__eq__ or object.__hash__
         and of all the overriding function in subclasses called the merge function.
         """
-        # no other function overrides object___eq__
+        # no other function overrides object___eq__ / object___hash__
         if len(overrides) == 1:
             return None
         
-        eq: PythonMethod = overrides[-1]
+        f: PythonMethod = overrides[-1]
+        assert f.sil_name in (OBJECT_EQ, OBJECT_HASH)
 
-        pos = self.viper.to_position(eq.node, ctx.position, py_node=eq)
+        pos = self.viper.to_position(f.node, ctx.position, py_node=f)
         ctx.position.append(('override', pos))
-        self.info = self.viper.SimpleInfo(['merge.function.object___eq__'])
+        self.info = self.viper.SimpleInfo(['merge.function.object___eq__/object___hash__'])
 
         # make a deepcopy of f (not possible with deepcopy)
         node_factory = ProgramNodeFactory()
         merge_func: PythonMethod = node_factory.create_python_method(
-            eq.name, eq.node, eq.cls, eq.superscope, eq.pure, eq.contract_only,
-            node_factory, eq.interface, eq.interface_dict, eq.method_type, opaque=False
+            f.name, f.node, f.cls, f.superscope, f.pure, f.contract_only,
+            node_factory, f.interface, f.interface_dict, f.method_type, opaque=False
         )
         for k,v in merge_func.__dict__.items():
-            if not v and eq.__getattribute__(k):
-                merge_func.__setattr__(k, eq.__getattribute__(k))
+            if not v and f.__getattribute__(k):
+                merge_func.__setattr__(k, f.__getattribute__(k))
 
         old_function = ctx.current_function
         old_module = ctx.module
@@ -480,7 +483,7 @@ class ProgramTranslator(CommonTranslator):
         merge_pres = []
         merge_posts = []
 
-        fname = OBJ___EQ__MERGED
+        fname = OBJ___EQ__MERGED if eq_or_hash == OBJECT_EQ else OBJ___HASH__MERGED
         merge_func.sil_name = fname
         merge_func.name = fname
         merge_func.contract_only = True
@@ -491,7 +494,7 @@ class ProgramTranslator(CommonTranslator):
         decreases = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
         merge_pres.append(decreases)
 
-        # loop through all overriding __eq__ functions and encode
+        # loop through all overriding __eq__ or __hash__ functions and encode
         # the preconditions as one large conditional expression of the form:
         # requires issubtype(typeof(self), SuperX) ? <Pre of SuperX> :
         #          issubtype(typeof(self), X) ? <Pre of X> :
@@ -531,7 +534,8 @@ class ProgramTranslator(CommonTranslator):
             with ctx.additional_aliases(aliases):
                 iterator = iter(cur.args)
                 self_var = cur.args[next(iterator)].ref()
-                other_var = cur.args[next(iterator)].ref()
+                if eq_or_hash == OBJECT_EQ:
+                    other_var = cur.args[next(iterator)].ref()
 
                 # find self in aliases
                 if ctx.var_aliases:
@@ -539,10 +543,12 @@ class ProgramTranslator(CommonTranslator):
                     self_var = ctx.var_aliases.get(
                         merge_func.args[next(m_iter)].name
                     ).ref()
-                    other_var = ctx.var_aliases.get(
-                        merge_func.args[next(m_iter)].name
-                    ).ref()
+                    if eq_or_hash == OBJECT_EQ:
+                        other_var = ctx.var_aliases.get(
+                            merge_func.args[next(m_iter)].name
+                        ).ref()
 
+                # TODO: skip 2nd subtype check
                 and_pres = self.viper.TrueLit(pos, info)
                 for pre in pres:
                     # translate first if not already translated (i.e. custom __eq__ precondition)
@@ -563,7 +569,8 @@ class ProgramTranslator(CommonTranslator):
                 check = self.type_check(self_var, cur.cls, pos, ctx, inhale_exhale=False)
                 if last_check is None:
                     object_pre = self.viper.TrueLit(pos, info)
-                    for var in [self_var, other_var]:
+                    vars = [self_var, other_var] if eq_or_hash == OBJECT_EQ else [self_var]
+                    for var in vars:
                         acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
                         not_stateless = self.viper.Not(
                             self.viper.FuncApp(
@@ -605,16 +612,17 @@ class ProgramTranslator(CommonTranslator):
             merge_pres.append(last_check)
 
         # TODO: fix
-        acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
-        not_stateless = self.viper.Not(
-            self.viper.FuncApp(
-                STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
-                self.no_info(ctx), self.viper.Bool), pos, self.info
-        )
-        acc_precond = self.viper.Implies(
-            not_stateless, acc_precond, pos, self.info
-        )
-        merge_pres.append(acc_precond)
+        if eq_or_hash == OBJECT_EQ:
+            acc_precond = self.create_predicate_access(EQUALITY_STATE_PRED, [other_var], self.viper.WildcardPerm(pos, info), merge_func.node, ctx)
+            not_stateless = self.viper.Not(
+                self.viper.FuncApp(
+                    STATELESS_FUNC, [var], self.to_position(merge_func.node, ctx),
+                    self.no_info(ctx), self.viper.Bool), pos, self.info
+            )
+            acc_precond = self.viper.Implies(
+                not_stateless, acc_precond, pos, self.info
+            )
+            merge_pres.append(acc_precond)
         
 
         ctx.var_aliases = old_aliases
@@ -629,7 +637,8 @@ class ProgramTranslator(CommonTranslator):
             raise InvalidProgramException(merge_func.node,
                                           'function.throws.exception')
 
-        return self.viper.Function(merge_func.sil_name, args, self.viper.Bool,
+        ret_type = self.viper.Bool if eq_or_hash == OBJECT_EQ else self.viper.Int
+        return self.viper.Function(merge_func.sil_name, args, ret_type,
                                    merge_pres, merge_posts, None, pos, self.no_info(ctx))
 
 
@@ -682,7 +691,6 @@ class ProgramTranslator(CommonTranslator):
                 if obj_eq == cur_name:
                     root_var = copy.copy(root_var)
                     root_var.type = method.cls
-                ctx.set_alias(cur_name, root_var)
                 aliases_eq[cur_name] = root_var
 
             with ctx.additional_aliases(aliases_eq):
@@ -1798,6 +1806,7 @@ class ProgramTranslator(CommonTranslator):
 
         # used when creating merge function for object.__eq__
         eq_funcs = set()
+        hash_funcs = set()
 
         # First iteration over all modules: translate global variables, static
         # fields, and default arguments.
@@ -1889,6 +1898,8 @@ class ProgramTranslator(CommonTranslator):
                     # to later create the merge func for object.__eq__
                     if func.merge_func_name == OBJ___EQ__MERGED:
                         eq_funcs.add(func)
+                    if func.merge_func_name == OBJ___HASH__MERGED:
+                        hash_funcs.add(func)
 
                     if func.interface:
                         if (func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ and 
@@ -2024,15 +2035,24 @@ class ProgramTranslator(CommonTranslator):
             predicates.extend(preds)
             methods.extend(pred_self_framing_checks)
         
-        # order overrides in reverse topo order in respect to the class hierarchy 
+        # order overrides in reverse topo order with respect to the class hierarchy 
         if ctx.merge:
-            cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
-            overrides = list(map(lambda f: f.functions.get('__eq__'), cls_sorted))
-            eq_merge = self.create_object_equality_merge_function(sil_progs, functions, overrides, ctx)
+            eq_cls_sorted = toposort_classes(set(map(lambda f: f.cls, eq_funcs)))
+            eq_overrides = list(map(lambda f: f.functions.get('__eq__'), eq_cls_sorted))
+            eq_merge = self.create_object_equality_or_hash_merge_function(sil_progs, functions, eq_overrides, ctx, OBJECT_EQ)
+
             if eq_merge:
                 functions.append(eq_merge)
                 self.add_dependency([eq_merge.name()], func.sil_name)
                 self.add_dependency(DEPENDENCIES_MERGE_FUNC_EQUALITY, func.sil_name)
+
+            hash_cls_sorted = toposort_classes(set(map(lambda f: f.cls, hash_funcs)))
+            hash_overrides = list(map(lambda f: f.functions.get('__hash__'), hash_cls_sorted))
+            hash_merge = self.create_object_equality_or_hash_merge_function(sil_progs, functions, hash_overrides, ctx, OBJECT_HASH)
+            if hash_merge:
+                functions.append(hash_merge)
+                self.add_dependency([hash_merge.name()], func.sil_name)
+                self.add_dependency(DEPENDENCIES_MERGE_FUNC_HASH, func.sil_name)
 
         all_used_names = None
 

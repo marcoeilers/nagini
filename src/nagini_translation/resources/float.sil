@@ -47,6 +47,14 @@ function float___eq__(self: Ref, other: Ref): Bool
     // result == false if self or other are NaN
     ensures issubtype(typeof(self), float()) && issubtype(typeof(other), float()) ==> float___isNaN(self) || float___isNaN(other) ==> result == false
 
+domain HashFloat {
+    function abstract_hash_float(self: Ref): Int
+}
+
+function float___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), float()) ==> result == (float___isNaN(self) ? 0 : abstract_hash_float(self))
+
 function float___add__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())

@@ -33,11 +33,14 @@ from nagini_translation.lib.constants import (
     STRING_TYPE,
     VIPER_KEYWORDS,
     BUILTIN___EQ___FUNCTIONS,
+    BUILTIN___HASH___FUNCTIONS,
     OBJ___EQ__MERGED,
+    OBJ___HASH__MERGED,
     ILLEGAL_FUNC_NAMES,
     EQUALITY_STATE_PRED,
     OBJECT_TYPE,
     OBJECT_EQ,
+    OBJECT_HASH,
     DEFAULT_STATE_PRED_PYTHON,
     BOOL_TYPE,
 )
@@ -1136,6 +1139,9 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             if self.sil_name in BUILTIN___EQ___FUNCTIONS:
                 self.merge_func_name = OBJ___EQ__MERGED
                 self.extended_name = self.get_fresh_name(sil_name + '_extended')
+            if self.sil_name in BUILTIN___HASH___FUNCTIONS:
+                self.merge_func_name = OBJ___HASH__MERGED
+                self.extended_name = self.get_fresh_name(sil_name + '_extended')
             return
         func_type = self.module.types.get_func_type(self.scope_prefix)
         if self.type is not None:
@@ -1188,15 +1194,18 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
                 if (super_func):
                     super_func.opaque = True
 
-            if super_func.sil_name == OBJECT_EQ and not super_func.merge_func_name:
-                super_func.merge_func_name = OBJ___EQ__MERGED
+            if not super_func.merge_func_name: 
+                if super_func.sil_name == OBJECT_EQ:
+                    super_func.merge_func_name = OBJ___EQ__MERGED
+                if super_func.sil_name == OBJECT_HASH:
+                    super_func.merge_func_name = OBJ___HASH__MERGED
 
             # if self is a custom __eq__ function, 
             # i.e., (in)directly overrides object___eq__
-            if super_func.merge_func_name == OBJ___EQ__MERGED:
+            if super_func.merge_func_name in (OBJ___EQ__MERGED, OBJ___HASH__MERGED):
                 self.merge_func_name = super_func.merge_func_name
                 if not [a for a, _ in self.args.items()] == [a for a, _ in super_func.args.items()]:
-                    msg = "Any override of __eq__ must have only have the following two parameters: self, other."
+                    msg = "Any override of __hash__/__eq__ must have only have the following one/two parameter(s): self / self, other."
                     raise InvalidProgramException(self.node, "invalid.parameter.name", msg)
                     
             # find a new name for a merge_function

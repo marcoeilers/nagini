@@ -151,6 +151,15 @@ class CallTranslator(CommonTranslator):
                                         node, ctx)
         return stmt, result
 
+    def _translate_hash_func(self, node: ast.Call,
+                             ctx: Context) -> StmtsAndExpr:
+        assert len(node.args) == 1
+        stmt, target = self.translate_expr(node.args[0], ctx)
+        arg_type = self.get_type(node.args[0], ctx)
+        hash_stmt, hash_val = self.get_func_or_method_call(arg_type, '__hash__', [target],
+                                                         [None], node, ctx)
+        return stmt + hash_stmt, hash_val
+
     def _translate_len(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
         assert len(node.args) == 1
         stmt, target = self.translate_expr(node.args[0], ctx)
@@ -559,6 +568,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_type_func(node, ctx)
         elif func_name == 'cast':
             return self._translate_cast_func(node, ctx)
+        elif func_name == 'hash':
+            return self._translate_hash_func(node, ctx)
         else:
             raise UnsupportedException(node)
 

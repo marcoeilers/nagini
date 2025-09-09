@@ -136,6 +136,18 @@ function float___eq__(self: Ref, other: Ref): Bool
         float___is_inf__(other, false) == false && float___is_inf__(other, true) == false) ==>
             result == (float___unbox__(self) == float___unbox__(other))
 
+domain HashFloatReal {
+    function abstract_hash_float_real(self: Ref): Int
+}
+
+function float___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), float()) ==> result == 
+        (float___isNaN(self) ? 0 : 
+        (float___is_inf__(self, false) ? 314159 :
+        (float___is_inf__(self, true) ? (-314159) :
+        abstract_hash_float_real(self))))
+
 function float___add__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())
