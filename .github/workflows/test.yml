@@ -8,7 +8,7 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   build:
 
-    runs-on: ubuntu-23.04
+    runs-on: ubuntu-latest
     env:
       BOOGIE_EXE: "/home/runner/.dotnet/tools/boogie"
     steps:
