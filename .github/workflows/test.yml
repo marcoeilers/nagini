@@ -17,6 +17,9 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.9
+    - name: Install dotnet
+      run: |
+        sudo apt install dotnet-sdk-6.0
     - name: Install Boogie
       run: |
         dotnet tool install --global Boogie --version 2.15.9
