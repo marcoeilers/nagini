@@ -291,7 +291,10 @@ function bool___hash__(self: Ref): Int
     decreases _
     ensures issubtype(typeof(self), bool()) ==> result == (bool___unbox__(self) ? 1 : 0)
 
-// temporary for benchmarking
+// this is a dummy function, but since it's referenced in e.g. list.sil it must
+// exist; it is removed at the end of program.py. It's a workaround for the
+// problem of switching between merge function and extended function (how to
+// redefine the contracts, as extended approach does not call merge function)
 function object___eq___merged(self: Ref, other: Ref): Bool
     decreases _
 

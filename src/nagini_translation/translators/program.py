@@ -1101,12 +1101,12 @@ class ProgramTranslator(CommonTranslator):
             domain for domain in self.viper.to_list(sil_progs.domains())
             if domain.name() not in excluded_domains]
 
-        # remove dummy __eq__ merge function
+        # remove dummy __eq__ merge function (since the actual merge function exists by now)
         functions += [
             function
             for function in self.viper.to_list(sil_progs.functions())
             if function.name() in used_names and function.name() != OBJ___EQ__MERGED]
- 
+
         # remove dummy state __eq__ predicate
         predicates += [
             pred for pred in self.viper.to_list(sil_progs.predicates())
