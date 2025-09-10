@@ -132,6 +132,8 @@ DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     "list___len__",
     "list___getitem___index",
     "list___getitem___index",
+    "bytes___val__",
+    "bytes___len__",
     OBJ___EQ__MERGED,
 ]
 
