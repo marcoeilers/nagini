@@ -311,6 +311,7 @@ function stateless(x: Ref): Bool
     ensures result == (
       issubtype(typeof(x), bool()) || issubtype(typeof(x), int()) ||
       issubtype(typeof(x), str()) || issubtype(typeof(x), float()) ||
+      issubtype(typeof(x), bytes()) ||
       (issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
         (forall y: Ref :: { y in tuple___val__(x) }
         (y in tuple___val__(x)) ==> stateless(y))
