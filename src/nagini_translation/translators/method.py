@@ -461,40 +461,45 @@ class MethodTranslator(CommonTranslator):
         ), func_to_call)
 
     def translate_extended_builtin_function(self, func: PythonMethod, sil_progs,
-                                            ctx: Context, program_translator) -> 'silver.ast.Function':
+                                            ctx: Context, program_translator, eq_or_hash: str) -> 'silver.ast.Function':
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
 
         self_var = self.viper.LocalVar('self', self.viper.Ref, pos, info)
-        other_var = self.viper.LocalVar('other', self.viper.Ref, pos, info)
+        vars = [self_var]
+        if eq_or_hash == OBJECT_EQ:
+            other_var = self.viper.LocalVar('other', self.viper.Ref, pos, info)
+            vars.append(other_var)
 
         res = sil_progs.findFunction(func.sil_name)
         args = self.viper.to_list(res.formalArgs())
         pres = self.viper.to_list(res.pres())
         posts = self.viper.to_list(res.posts())
 
-        # translate postcondition: ensures result == <super>___eq__(self, other)
-        eq_func = func.cls.superclass.functions.get('__eq__')
-        if not eq_func:
-            raise InvalidProgramException(func.node, "invalid.equality.override")
-        if eq_func.sil_name == OBJECT_EQ:
-            func_to_call = eq_func.sil_name
+        # translate postcondition: ensures result == <super>___eq__/__hash__(self, other)
+        name = '__eq__' if eq_or_hash == OBJECT_EQ else '__hash__'
+        super_func = func.cls.superclass.functions.get(name)
+        if not super_func:
+            raise InvalidProgramException(func.node, "invalid.equality/hash.override")
+        if super_func.sil_name in (OBJECT_EQ, OBJECT_HASH):
+            func_to_call = super_func.sil_name
             program_translator.add_dependency([func_to_call], func.sil_name)
         else:
-            func_to_call = eq_func.extended_name
+            func_to_call = super_func.extended_name
             program_translator.add_dependency([func_to_call], func.extended_name)
         
-        object_eq_call = self.viper.FuncApp(
-            func_to_call, [self_var, other_var], pos, info, self.viper.Bool
+        rt = self.viper.Bool if eq_or_hash == OBJECT_EQ else self.viper.Int
+        super_call = self.viper.FuncApp(
+            func_to_call, vars, pos, info, rt
         )
-        result = self.viper.Result(self.viper.Bool, pos, info)
-        eq_call = self.viper.EqCmp(result, object_eq_call, pos, info)
-        posts.append(eq_call)
+        result = self.viper.Result(rt, pos, info)
+        cmp = self.viper.EqCmp(result, super_call, pos, info)
+        posts.append(cmp)
 
         # add state precondition for self and other to make sure
         # the addition postcondition has permissions to access state(self) if 
         # self is stateful (same goes for other)
-        for var in [self_var, other_var]:
+        for var in vars:
             pred_acc = self.create_predicate_access(EQUALITY_STATE_PRED, [var], self.viper.WildcardPerm(pos, info), func.node, ctx)
             not_stateless = self.viper.Not(
                 self.viper.FuncApp(
@@ -508,7 +513,7 @@ class MethodTranslator(CommonTranslator):
 
         fname = func.extended_name if func.extended_name else func.sil_name
         return self.viper.Function(
-            fname, args, self.viper.Bool, 
+            fname, args, rt, 
             pres, posts, None, pos, info
         )
 

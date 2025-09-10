@@ -169,8 +169,8 @@ class AbstractTranslator(metaclass=ABCMeta):
     def translate_extended_function(self, func: PythonMethod, ctx: Context) -> 'silver.ast.Function':
         return self.config.method_translator.translate_extended_function(func, ctx)
 
-    def translate_extended_builtin_function(self, func: PythonMethod, sil_progs, ctx: Context, prog_translator) -> 'silver.ast.Function':
-        return self.config.method_translator.translate_extended_builtin_function(func, sil_progs, ctx, prog_translator)
+    def translate_extended_builtin_function(self, func: PythonMethod, sil_progs, ctx: Context, prog_translator, eq_or_hash) -> 'silver.ast.Function':
+        return self.config.method_translator.translate_extended_builtin_function(func, sil_progs, ctx, prog_translator, eq_or_hash)
 
     def translate_predicate_family(self, root: PythonMethod,
             preds: List[PythonMethod], sil_progs: Program,

@@ -42,6 +42,7 @@ from nagini_translation.lib.constants import (
     DEPENDENCIES_MERGE_FUNC_EQUALITY,
     DEPENDENCIES_MERGE_FUNC_HASH,
     BUILTIN___EQ___FUNCTIONS,
+    BUILTIN___HASH___FUNCTIONS,
     NO_TRANS_SYMM,
 )
 from nagini_translation.lib.jvmaccess import getobject
@@ -1916,9 +1917,10 @@ class ProgramTranslator(CommonTranslator):
 
                     if func.interface:
                         # encode extended functions for builtins e.g. int___eq___extended
-                        if (func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ and 
-                            func.sil_name in BUILTIN___EQ___FUNCTIONS):
-                            functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx, self))
+                        if (func.name in ('__eq__', '__hash__') and not ctx.merge and not (func.sil_name in (OBJECT_EQ, OBJECT_HASH)) and 
+                            func.sil_name in BUILTIN___EQ___FUNCTIONS + BUILTIN___HASH___FUNCTIONS):
+                            eq_or_hash = OBJECT_EQ if func.name == '__eq__' else OBJECT_HASH
+                            functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx, self, eq_or_hash))
                             fname = func.extended_name if func.extended_name else func.sil_name
                             self.add_dependency([fname], func.sil_name)
                             self.add_dependency([func.sil_name], fname)
@@ -1933,6 +1935,7 @@ class ProgramTranslator(CommonTranslator):
 
                     functions.append(self.translate_function(func, ctx))
 
+                    # encode extended functions (hash, equality or other)
                     if not ctx.merge:
                         extended_func, func_to_call = self.translate_extended_function(func, ctx)
                         if extended_func:
