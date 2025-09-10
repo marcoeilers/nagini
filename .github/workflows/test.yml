@@ -20,6 +20,7 @@ jobs:
     - name: Install dotnet
       run: |
         sudo apt install dotnet-runtime-6.0
+        dotnet --list-runtimes
     - name: Install Boogie
       run: |
         dotnet tool install --global Boogie --version 2.15.9
