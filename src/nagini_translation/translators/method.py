@@ -20,6 +20,7 @@ from nagini_translation.lib.constants import (
     TYPE_TYPE,
     EQUALITY_STATE_PRED,
     OBJECT_EQ,
+    OBJECT_HASH,
     STATELESS_FUNC,
     DOMAIN_EQ_FUNC,
 )
@@ -392,26 +393,27 @@ class MethodTranslator(CommonTranslator):
         return self.viper.Function(name, args, type, pres, posts, body,
                                    pos, annotation)
 
-    def get_self_other_as_var_and_decls(self, func: PythonMethod):
-        iterator = iter(func.args)
-        self_var = func.args[next(iterator)].ref()
-        other_var = func.args[next(iterator)].ref()
-
-        iterator = iter(func.args)
-        self_decl = func.args[next(iterator)].decl
-        other_decl = func.args[next(iterator)].decl
-        return self_var, other_var, self_decl, other_decl
+    def get_self_other_as_var_and_decls(self, func: PythonMethod, eq_or_hash: str = OBJECT_EQ):
+        it = iter(func.args.values())
+        self_var_all = next(it)
+        self_var = self_var_all.ref()
+        self_decl = self_var_all.decl
+        if eq_or_hash == OBJECT_EQ:
+            other_var_all = next(it)
+            other_var = other_var_all.ref()
+            other_decl = other_var_all.decl
+            return self_var, other_var, self_decl, other_decl
+        return self_var, None, self_decl, None
 
     def translate_extended_function(self, func: PythonMethod,
                                     ctx: Context) -> tuple[Optional['silver.ast.Function'], str]:
         """Creates an extended function from func. It is a contract-only copy that 
-        additionally ensures result == super___eq__(self, other) ."""
+        additionally ensures result == super_func(self, other)."""
         if not func.overrides:
             return (None, None)
 
         old_contract_only = func.contract_only
         func.contract_only = True
-        self_var, other_var, self_var_decl, other_var_decl = self.get_self_other_as_var_and_decls(func)
         pos = self.to_position(func.node, ctx)
         info = self.no_info(ctx)
 
@@ -419,27 +421,28 @@ class MethodTranslator(CommonTranslator):
         if func.name == '__eq__' and not super_func:
             raise InvalidProgramException(func.node, "invalid.equality.override")
 
-        if super_func.extended_name and super_func.sil_name != OBJECT_EQ:
+        # no object equality and hash extended functions (are the original functions)
+        if super_func.extended_name and not (super_func.sil_name in (OBJECT_EQ, OBJECT_HASH)):
             func_to_call = super_func.extended_name 
         else:
             func_to_call = super_func.sil_name 
 
         # translate postcondition:
         # ensures result == super_func_extended(self, other)
-        if func_to_call == OBJECT_EQ:
-            rt = self.viper.Bool
-        else:
-            rt = self.translate_type(super_func.type, ctx)
+        rt = self.translate_type(super_func.type, ctx)
+        args = [arg.ref() for arg in func.args.values()]
         super_call = self.viper.FuncApp(
-            func_to_call, [self_var, other_var], pos, info, rt
+            func_to_call, args, pos, info, rt
         )
+
         # object___eq__ has return type Bool
         # all user-defined __eq__ functions have type Ref (bool Python type)
-        if func_to_call == OBJECT_EQ:
+        if func_to_call in (OBJECT_EQ, OBJECT_HASH):
+            box_name = '__prim__bool___box__' if func_to_call == OBJECT_EQ else '__prim__int___box__'
             super_call  = self.viper.FuncApp(
-                '__prim__bool___box__', [super_call], pos, info, self.viper.Ref
+                box_name, [super_call], pos, info, self.viper.Ref
             )
-        
+
         result = self.viper.Result(self.viper.Ref, pos, info)
         post = self.viper.EqCmp(result, super_call, pos, info)
 
@@ -450,10 +453,7 @@ class MethodTranslator(CommonTranslator):
         posts.append(post)
         fname = func.extended_name if func.extended_name else func.sil_name
 
-        if func.name == '__eq__':
-            args = [self_var_decl, other_var_decl]
-        else:
-            args = self.viper.to_list(translated_func.formalArgs())
+        args = self.viper.to_list(translated_func.formalArgs())
         return (self.viper.Function(
             fname, args, self.viper.Ref, 
             self.viper.to_list(translated_func.pres()),
