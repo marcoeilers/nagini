@@ -29,11 +29,10 @@ function bytes___bool__(self: Ref) : Bool
 	ensures self != null ==> result == (bytes___len__(self) != 0)
 
 function bytes___eq__(self: Ref, other: Ref): Bool
-    decreases _
-    requires issubtype(typeof(self), bytes())
-    ensures (bytes___val__(self) == bytes___val__(other)) == result
-    ensures result ==> (issubtype(typeof(other), bytes()) && bytes___len__(self) == bytes___len__(other))
-    ensures result == object___eq__(self, other)
+    decreases _ 
+    ensures issubtype(typeof(self), bytes()) && issubtype(typeof(other), bytes()) ==>
+        (result == (bytes___len__(self) == bytes___len__(other)) &&
+                   (bytes___val__(self) == bytes___val__(other)))
 
 // same hash function as strings
 function bytes___hash__(self: Ref): Int
