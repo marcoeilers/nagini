@@ -22,7 +22,7 @@
         "__hash__": {
             "args": ["object"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["state", "stateless"]
         }
     },
     "predicates": {
@@ -259,7 +259,7 @@
         "__hash__": {
             "args": ["int"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["float___hash__", "int___unbox__"]
         },
         "__add__": {
             "args": ["__prim__int", "__prim__int"],
@@ -411,7 +411,7 @@
         "__hash__": {
             "args": ["float"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["object___hash__", "abstract_hash_float", "float___isNaN", "abstract_hash_float_real", "float___is_inf__"]
         },
         "__add__": {
             "args": ["float", "float"],
@@ -515,7 +515,7 @@
         "__hash__": {
             "args": ["bool"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["int___hash__", "bool___unbox__"]
         },
         "__and__": {
             "args": ["__prim__bool", "__prim__bool"],
@@ -569,7 +569,7 @@
         "__hash__": {
             "args": ["str"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["object___hash__", "abstract_hash_str"]
         },
         "__add__": {
             "args": ["str", "str"],
@@ -622,7 +622,7 @@
         "__hash__": {
             "args": ["bytes"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["object___hash__", "abstract_hash_str"]
         },
         "__add__": {
             "args": ["bytes", "bytes"],
@@ -742,7 +742,7 @@
         "__hash__": {
             "args": ["tuple"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["object___hash__", "abstract_hash_tuple"]
         },
         "__sil_seq__": {
             "args": ["tuple"],
@@ -807,7 +807,7 @@
         "__hash__": {
             "args": ["type"],
             "type": "__prim__int",
-            "requires": ["hash"]
+            "requires": ["object___hash__"]
         }
     },
     "extends": "object"
@@ -1111,11 +1111,6 @@
             "args": ["list"],
             "type": "__prim__int",
             "requires": ["__seq_ref_to_seq_int", "int___unbox__", "__prim__int___box__", "list___getitem__"]
-        },
-        "hash": {
-            "args": ["object"],
-            "type": "__prim__int",
-            "requires": []
         }
     },
     "methods": {

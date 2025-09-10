@@ -8,8 +8,10 @@ from typing import cast
 
 class E:
     def __init__(self, i: int) -> None:
-        Ensures(Acc(self.i))
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i))
         self.i: int = i
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -69,11 +71,14 @@ class E:
 
     @Predicate
     def state(self) -> bool:
-        return Wildcard(self.i)
+        return Acc(self.i)
 
 class F:
     def __init__(self, i: int) -> None:
+        Ensures(self.state())
+        Ensures(Unfolding(self.state(), self.i is i))
         self.i: int = i
+        Fold(self.state())
 
     @Pure
     def __eq__(self, other: object) -> bool:
@@ -133,4 +138,9 @@ class F:
 
     @Predicate
     def state(self) -> bool:
-        return Wildcard(self.i)
+        return Acc(self.i)
+
+e1: E = E(42)
+e2: F = F(42)
+assert e1 == e2
+assert hash(e1) == hash(e2)
