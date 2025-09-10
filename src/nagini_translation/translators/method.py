@@ -473,7 +473,7 @@ class MethodTranslator(CommonTranslator):
         pres = self.viper.to_list(res.pres())
         posts = self.viper.to_list(res.posts())
 
-        # translate postcondition: ensures <super>___eq__(self, other)
+        # translate postcondition: ensures result == <super>___eq__(self, other)
         eq_func = func.cls.superclass.functions.get('__eq__')
         if not eq_func:
             raise InvalidProgramException(func.node, "invalid.equality.override")

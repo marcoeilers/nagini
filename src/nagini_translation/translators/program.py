@@ -1902,6 +1902,7 @@ class ProgramTranslator(CommonTranslator):
                         hash_funcs.add(func)
 
                     if func.interface:
+                        # encode extended functions for builtins e.g. int___eq___extended
                         if (func.name == '__eq__' and not ctx.merge and func.sil_name != OBJECT_EQ and 
                             func.sil_name in BUILTIN___EQ___FUNCTIONS):
                             functions.append(self.translate_extended_builtin_function(func, sil_progs, ctx, self))
