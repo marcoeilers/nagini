@@ -25,6 +25,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest
         pip install .
+    - name: Debug0
+      run: |
+        echo "procedure main(b: bool) { assert b; }" > umm.bpl
+        boogie umm.bpl
     - name: Debug
       run: |
         nagini --verifier=carbon tests/functional/verification/examples/cav_example.py
