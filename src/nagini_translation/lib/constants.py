@@ -93,6 +93,7 @@ BUILTIN___EQ___FUNCTIONS = [
     'bool___eq__',
     'str___eq__',
     'float___eq__',
+    'bytes___eq__',
     'list___eq__',
     'tuple___eq__',
     'set___eq__',
