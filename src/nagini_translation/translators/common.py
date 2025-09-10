@@ -32,6 +32,7 @@ from nagini_translation.lib.constants import (
     TYPE_TYPE,
     UNION_TYPE,
     OBJ___EQ__MERGED,
+    OBJ___HASH__MERGED,
     EQUALITY_STATE_PRED,
     DOMAIN_EQ_FUNC,
     SYMM_TRANS_RES_VAR,
@@ -761,6 +762,7 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 assert len(args) == 2
                 if isinstance(receiver, GenericType):
                     receiver = receiver.cls
+                pos = self.to_position(receiver.node, ctx)
 
                 # Redirect call to __eq__ function to domain function eq.
                 # Wrapped in box since custom __eq__ functions return Ref instead of Bool.
@@ -775,24 +777,42 @@ class CommonTranslator(AbstractTranslator, metaclass=ABCMeta):
                 if not res_in_args and ctx.use_domain_func_eq:
                     domain_name = '__Transitivity_Eq'
                     return self.viper.DomainFuncApp(
-                        DOMAIN_EQ_FUNC, [args[0], args[1]], self.viper.Bool, position,
+                        DOMAIN_EQ_FUNC, [args[0], args[1]], self.viper.Bool, pos,
                         self.no_info(ctx), domain_name
                     )
                 else:
                     arg1 = self.to_ref(args[0], ctx)
                     arg2 = self.to_ref(args[1], ctx)
-                    
                     if ctx.merge:
-                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], position,
+                        return self.viper.FuncApp(OBJ___EQ__MERGED , [arg1, arg2], pos,
                                                     self.no_info(ctx), self.viper.Bool)
                     else:
                         to_call = receiver.functions.get('__eq__')
                         rt = self.translate_type(to_call.type, ctx)
                         if to_call.extended_name:
-                            return self.viper.FuncApp(to_call.extended_name, [arg1, arg2], position,
+                            return self.viper.FuncApp(to_call.extended_name, [arg1, arg2], pos,
                                                         self.no_info(ctx), rt)
                         else:
-                            return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], position,
+                            return self.viper.FuncApp(to_call.sil_name, [arg1, arg2], pos,
+                                                        self.no_info(ctx), rt)
+
+            if func_name == '__hash__':
+                assert len(args) == 1
+                if isinstance(receiver, GenericType):
+                    receiver = receiver.cls
+                pos = self.to_position(receiver.node, ctx)
+                arg1 = self.to_ref(args[0], ctx)
+                if ctx.merge:
+                    return self.viper.FuncApp(OBJ___HASH__MERGED , [arg1], pos,
+                                                self.no_info(ctx), self.viper.Int)
+                else:
+                    to_call = receiver.functions.get('__hash__')
+                    rt = self.translate_type(to_call.type, ctx)
+                    if to_call.extended_name:
+                        return self.viper.FuncApp(to_call.extended_name, [arg1], pos,
+                                                    self.no_info(ctx), rt)
+                    else:
+                        return self.viper.FuncApp(to_call.sil_name, [arg1], pos,
                                                         self.no_info(ctx), rt)
 
             if receiver.python_class.name == FLOAT_TYPE:

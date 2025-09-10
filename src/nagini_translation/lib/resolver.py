@@ -552,6 +552,11 @@ def _get_call_type(node: ast.Call, module: PythonModule,
             elif node.func.id == 'cast':
                 return get_target(node.args[0],
                                   containers, container)
+            elif node.func.id == 'hash':
+                res = get_target(node.args[0], containers, container)
+                if hasattr(res, "type"):
+                    return res.type
+                return res
             else:
                 raise UnsupportedException(node)
         if node.func.id in module.classes:

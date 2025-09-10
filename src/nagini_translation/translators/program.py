@@ -488,7 +488,23 @@ class ProgramTranslator(CommonTranslator):
         merge_func.name = fname
         merge_func.contract_only = True
         merge_func.opaque = False
-        old_aliases = copy.deepcopy(ctx.var_aliases)
+
+        # add postcondition to merge equality function: 
+        # ensures result ==> object___hash___merged(self) == object___hash___merged(other)
+        if eq_or_hash == OBJECT_EQ:
+            it = iter(merge_func.args.values())
+            left_hash = self.viper.FuncApp(
+                OBJ___HASH__MERGED, [next(it).ref()], pos,
+                self.info, self.viper.Int)
+            right_hash = self.viper.FuncApp(
+                OBJ___HASH__MERGED, [next(it).ref()], pos,
+                self.info, self.viper.Int)
+            impl = self.viper.Implies(
+                self.viper.Result(self.viper.Bool, pos, self.info),
+                self.viper.EqCmp(left_hash, right_hash, pos, self.info),
+                pos, self.info
+            )
+            merge_posts.append(impl)
 
         # add decreases precondition
         decreases = self.viper.DecreasesWildcard(None, pos, self.no_info(ctx))
@@ -623,9 +639,6 @@ class ProgramTranslator(CommonTranslator):
                 not_stateless, acc_precond, pos, self.info
             )
             merge_pres.append(acc_precond)
-        
-
-        ctx.var_aliases = old_aliases
 
         ctx.current_function = old_function
         ctx.module = old_module
