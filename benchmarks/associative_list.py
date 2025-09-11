@@ -76,12 +76,13 @@ class Map:
         Requires(Acc(self.state()))
         Requires(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), len(self.keys) == len(self.values)))))
         Ensures(Acc(self.state()))
+        Ensures(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), len(self.keys) == len(self.values)))))
         Ensures(Unfolding(self.state(), 
             Unfolding(state_pred(self.keys),
                 Unfolding(state_pred(self.values),
                     Implies(
                         key in self.keys,
-                        Exists(int, lambda i: (i >= 0 and i < len(self.keys) and len(self.keys) == len(self.values)) and
+                        Exists(int, lambda i: (i >= 0 and i < len(self.keys)) and
                                self.keys[i] == key and
                                Result() is self.values[i]
                         )
@@ -96,11 +97,14 @@ class Map:
         res: Optional[object] = None
         i: int = 0
         while i < len(self.keys):
-            Invariant(Acc(state_pred(self.keys)) and Acc(state_pred(self.values)))
+            # I need wildcard accesses here
+            Invariant(Acc(self.keys) and Acc(self.values))
+            Invariant(Acc(list_pred(self.keys)) and Acc(list_pred(self.values)))
+
             Invariant(0 <= i and i <= len(self.keys))
             Invariant(len(self.keys) == len(self.values))
             Invariant(res is None or Exists(
-                int, lambda j: 0 <= j and j < i and self.keys[j] == key and res is self.values[j]
+                int, lambda j: 0 <= j and j < len(self.keys) and self.keys[j] == key and res is self.values[j]
             ))
             if self.keys[i] == key:
                 res = self.values[i]
