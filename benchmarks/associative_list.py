@@ -57,6 +57,7 @@ class Map:
         Requires(state_pred(values))
         Ensures(self.state())
         Ensures(Unfolding(self.state(), self.keys is keys and self.values is values))
+        
         self.keys: List[int] = keys
         self.values: List[object] = values
         Fold(self.state())
@@ -73,6 +74,7 @@ class Map:
     
     def lookup(self, key: int) -> Optional[object]:
         Requires(Acc(self.state()))
+        Requires(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), len(self.keys) == len(self.values)))))
         Ensures(Acc(self.state()))
         Ensures(Unfolding(self.state(), 
             Unfolding(state_pred(self.keys),
@@ -80,6 +82,7 @@ class Map:
                     Implies(
                         key in self.keys,
                         Exists(int, lambda i: (i >= 0 and i < len(self.keys) and len(self.keys) == len(self.values)) and
+                               self.keys[i] == key and
                                Result() is self.values[i]
                         )
                     )
@@ -92,11 +95,17 @@ class Map:
         Unfold(state_pred(self.values))
         res: Optional[object] = None
         i: int = 0
-        for i, k in enumerate(self.keys):
-            Invariant(0 <= i and i <= len(self.keys) and i <= len(self.values) and len(self.keys) == len(self.values))
-            if k == key:
+        while i < len(self.keys):
+            Invariant(Acc(state_pred(self.keys)) and Acc(state_pred(self.values)))
+            Invariant(0 <= i and i <= len(self.keys))
+            Invariant(len(self.keys) == len(self.values))
+            Invariant(res is None or Exists(
+                int, lambda j: 0 <= j and j < i and self.keys[j] == key and res is self.values[j]
+            ))
+            if self.keys[i] == key:
                 res = self.values[i]
                 break
+            i += 1
         Fold(state_pred(self.values))
         Fold(state_pred(self.keys))
         Fold(self.state())
