@@ -584,6 +584,11 @@ domain __Transitivity_Eq  {
   }
 }
 
+domain HashFloat  {
+  
+  function abstract_hash_float(self: Ref): Int 
+}
+
 domain _list_ce_helper  {
   
   function seq_ref_length(___s: Seq[Ref]): Int 
@@ -656,6 +661,16 @@ domain __MSHelper[T$]  {
       { (__toMS(__ss1): Multiset[T$]) }
       |(__toMS(__ss1): Multiset[T$])| == |__ss1|)
   }
+}
+
+domain HashStr  {
+  
+  function abstract_hash_str(self: Ref): Int 
+}
+
+domain HashTuple  {
+  
+  function abstract_hash_tuple(self: Ref): Int 
 }
 
 domain tuple_types  {
@@ -832,13 +847,20 @@ field MustReleaseUnbounded: Int
 
 field Map_m: Ref
 
-function _isDefined(id: Int): Bool
-
-
-function _checkDefined(val: Ref, id: Int): Ref
-  requires _isDefined(id)
+@opaque()
+function Map___contains__(self_14: Ref, key_0: Ref): Ref
+  requires issubtype(typeof(self_14), Map_0())
+  requires issubtype(typeof(key_0), int())
+  requires self_14 != null
+  requires acc(state(self_14), wildcard)
+  ensures issubtype(typeof(result), bool())
+  ensures (unfolding acc(state(self_14), wildcard) in
+      list___contains__(self_14.Map_m, key_0) ==> bool___unbox__(result))
+  ensures (unfolding acc(state(self_14), wildcard) in
+      !list___contains__(self_14.Map_m, key_0) ==> !bool___unbox__(result))
 {
-  val
+  __prim__bool___box__((unfolding acc(state(self_14), wildcard) in
+    list___contains__(self_14.Map_m, key_0)))
 }
 
 function __file__(): Ref
@@ -848,39 +870,44 @@ function __name__(): Ref
 
 
 function object___eq___merged(self: Ref, other: Ref): Bool
-  requires (issubtype(typeof(self), bool()) ?
-      true :
+  requires (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
+      true && acc(state(self), wildcard) &&
+      (!stateless(other) ==> acc(state(other), wildcard)) :
       (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
         true && acc(state(self), wildcard) &&
         (!stateless(other) ==> acc(state(other), wildcard)) :
-        (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
-          true && acc(state(self), wildcard) &&
-          (!stateless(other) ==> acc(state(other), wildcard)) :
-          (issubtype(typeof(self), str()) ?
-            true :
-            (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
-              true && (!stateless(self) ==> acc(state(self), wildcard)) &&
-              (!stateless(other) ==> acc(state(other), wildcard)) :
-              (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-              1))) ?
-                true && acc(state(self), wildcard) &&
-                (!stateless(other) ==> acc(state(other), wildcard)) :
-                (issubtype(typeof(self), int()) ?
-                  true :
-                  (issubtype(typeof(self), float()) ?
+        (issubtype(typeof(self), str()) ?
+          true :
+          (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
+            true && (!stateless(self) ==> acc(state(self), wildcard)) &&
+            (!stateless(other) ==> acc(state(other), wildcard)) :
+            (issubtype(typeof(self), bytes()) ?
+              true :
+              (issubtype(typeof(self), bool()) ?
+                true :
+                (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+                1))) ?
+                  true && acc(state(self), wildcard) &&
+                  (!stateless(other) ==> acc(state(other), wildcard)) :
+                  (issubtype(typeof(self), int()) ?
                     true :
-                    (issubtype(typeof(self), object()) ?
-                      true &&
-                      (!stateless(self) ==> acc(state(self), write)) &&
-                      (!stateless(other) ==> acc(state(other), write)) :
-                      true &&
-                      (!stateless(self) ==> acc(state(self), wildcard)) &&
-                      (!stateless(other) ==> acc(state(other), wildcard)))))))))))
+                    (issubtype(typeof(self), float()) ?
+                      true :
+                      (issubtype(typeof(self), object()) ?
+                        true &&
+                        (!stateless(self) ==> acc(state(self), write)) &&
+                        (!stateless(other) ==> acc(state(other), write)) :
+                        true &&
+                        (!stateless(self) ==> acc(state(self), wildcard)) &&
+                        (!stateless(other) ==> acc(state(other), wildcard))))))))))))
   requires !stateless(other) ==> acc(state(other), wildcard)
+  ensures result ==>
+    object___hash___merged(self) == object___hash___merged(other)
   ensures issubtype(typeof(self), object()) ==>
     true && (self == null ==> result == (other == null ? true : false)) &&
     (!issubtype(typeof(self), float()) ==> self == other ==> result) &&
-    result == object___eq__(other, self)
+    result == object___eq__(other, self) &&
+    (result ==> object___hash__(self) == object___hash__(other))
   ensures issubtype(typeof(self), float()) ==>
     true &&
     (issubtype(typeof(self), float()) && issubtype(typeof(other), float()) ==>
@@ -910,16 +937,25 @@ function object___eq___merged(self: Ref, other: Ref): Bool
             (object___eq___merged(x, y) &&
             object___eq___merged(dict___getitem__(self, x), dict___getitem__(other,
             y)))))))))
+  ensures issubtype(typeof(self), bool()) ==>
+    true &&
+    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
+    result == (bool___unbox__(self) == bool___unbox__(other)))
+  ensures issubtype(typeof(self), bytes()) ==>
+    true &&
+    (issubtype(typeof(self), bytes()) && issubtype(typeof(other), bytes()) ==>
+    result == (bytes___len__(self) == bytes___len__(other)) &&
+    bytes___val__(self) == bytes___val__(other))
   ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
     true &&
     (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
     issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-    result ==
-    (!stateless(self) ==>
+    !stateless(self) ==>
     (unfolding acc(state(self), write) in
       !stateless(other) ==>
       (unfolding acc(state(other), write) in
-        tuple___len__(self) == tuple___len__(other) &&
+        result ==
+        (tuple___len__(self) == tuple___len__(other) &&
         (forall x: Int ::
           { tuple___getitem__(self, x) }
           { tuple___getitem__(other, x) }
@@ -932,20 +968,6 @@ function object___eq___merged(self: Ref, other: Ref): Bool
     result ==
     (str___len__(self) == str___len__(other) &&
     str___val__(self) == str___val__(other)))
-  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
-    true &&
-    (issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
-    issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
-    result ==
-    (unfolding acc(state(self), write) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), write) in
-        set___len__(self) == set___len__(other) &&
-        (forall x: Ref ::
-          { set___contains__(self, x) }
-          (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
-            x) &&
-            (set___contains__(other, y) && object___eq___merged(x, y)))))))
   ensures issubtype(typeof(self), list(list_arg(typeof(self), 0))) ==>
     true &&
     (issubtype(typeof(self), list(list_arg(typeof(self), 0))) &&
@@ -961,10 +983,56 @@ function object___eq___merged(self: Ref, other: Ref): Bool
           x >= 0 && x < list___len__(self) ==>
           object___eq___merged(list___getitem___index(self, x), list___getitem___index(other,
           x))))))
+  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
+    true &&
+    (issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
+    issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        set___len__(self) == set___len__(other) &&
+        (forall x: Ref ::
+          { set___contains__(self, x) }
+          (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
+            x) &&
+            (set___contains__(other, y) && object___eq___merged(x, y)))))))
+  decreases _
+
+
+function object___hash___merged(self: Ref): Int
+  requires (issubtype(typeof(self), bool()) ?
+      true :
+      (issubtype(typeof(self), str()) ?
+        true :
+        (issubtype(typeof(self), bytes()) ?
+          true :
+          (issubtype(typeof(self), int()) ?
+            true :
+            (issubtype(typeof(self), float()) ?
+              true :
+              (issubtype(typeof(self), object()) ?
+                true && (!stateless(self) ==> acc(state(self), write)) :
+                true && (!stateless(self) ==> acc(state(self), wildcard))))))))
+  ensures issubtype(typeof(self), object()) ==> true
+  ensures issubtype(typeof(self), float()) ==>
+    true &&
+    (issubtype(typeof(self), float()) ==>
+    result == (float___isNaN(self) ? 0 : abstract_hash_float(self)))
+  ensures issubtype(typeof(self), int()) ==>
+    true &&
+    (issubtype(typeof(self), int()) ==>
+    result == (int___unbox__(self) == -1 ? -2 : int___unbox__(self)))
+  ensures issubtype(typeof(self), bytes()) ==>
+    true &&
+    (issubtype(typeof(self), bytes()) ==> result == abstract_hash_str(self))
+  ensures issubtype(typeof(self), str()) ==>
+    true &&
+    (issubtype(typeof(self), str()) ==> result == abstract_hash_str(self))
   ensures issubtype(typeof(self), bool()) ==>
     true &&
-    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
-    result == (bool___unbox__(self) == bool___unbox__(other)))
+    (issubtype(typeof(self), bool()) ==>
+    result == (bool___unbox__(self) ? 1 : 0))
   decreases _
 
 
@@ -1001,6 +1069,7 @@ function bool___unbox__(box: Ref): Bool
 
 
 function object___hash__(self: Ref): Int
+  requires !stateless(self) ==> acc(state(self), write)
   decreases _
 
 
@@ -1010,6 +1079,7 @@ function object___eq__(self: Ref, other: Ref): Bool
   ensures self == null ==> result == (other == null ? true : false)
   ensures !issubtype(typeof(self), float()) ==> self == other ==> result
   ensures result == object___eq__(other, self)
+  ensures result ==> object___hash__(self) == object___hash__(other)
   decreases _
 
 
@@ -1019,10 +1089,11 @@ function stateless(x: Ref): Bool
     (issubtype(typeof(x), int()) ||
     (issubtype(typeof(x), str()) ||
     (issubtype(typeof(x), float()) ||
+    (issubtype(typeof(x), bytes()) ||
     issubtype(typeof(x), tuple(tuple_args(typeof(x)))) &&
     (forall y: Ref ::
       { (y in tuple___val__(x)) }
-      (y in tuple___val__(x)) ==> stateless(y))))))
+      (y in tuple___val__(x)) ==> stateless(y)))))))
   decreases _
 
 
@@ -1059,15 +1130,27 @@ function float___isNaN(f: Ref): Bool
   decreases _
 
 
+function bytes___len__(self: Ref): Int
+  requires issubtype(typeof(self), bytes())
+  ensures result >= 0
+  decreases _
+{
+  |bytes___val__(self)|
+}
+
+function bytes___val__(self: Ref): Seq[Ref]
+  decreases _
+
+
 function list___contains__(self: Ref, item: Ref): Bool
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
   requires issubtype(typeof(item), list_arg(typeof(self), 0))
-  requires acc(state(self), wildcard)
-  requires !stateless(item) ==> acc(state(item), wildcard)
+  requires acc(state(self), write)
+  requires !stateless(item) ==> acc(state(item), write)
   ensures result ==
-    (unfolding acc(state(self), wildcard) in
+    (unfolding acc(state(self), write) in
       (!stateless(item) ?
-        (unfolding acc(state(item), wildcard) in
+        (unfolding acc(state(item), write) in
           (exists o: Ref :: { (o in self.list_acc) } (o in self.list_acc) &&
             object___eq___merged(item, o))) :
         (exists o: Ref :: { (o in self.list_acc) } (o in self.list_acc) &&
@@ -1082,26 +1165,6 @@ function list___len__(self: Ref): Int
 {
   |self.list_acc|
 }
-
-function list___getitem__(self: Ref, key: Ref): Ref
-  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-  requires issubtype(typeof(key), int())
-  requires acc(self.list_acc, wildcard)
-  requires @error("List index may be out of bounds.")
-    ((let ln ==
-      (list___len__(self)) in
-      int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln))
-  requires @error("List index may be out of bounds.")
-    ((let ln ==
-      (list___len__(self)) in
-      int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
-  ensures result ==
-    (int___unbox__(key) >= 0 ?
-      self.list_acc[int___unbox__(key)] :
-      self.list_acc[list___len__(self) + int___unbox__(key)])
-  ensures issubtype(typeof(result), list_arg(typeof(self), 0))
-  decreases _
-
 
 function list___getitem___index(self: Ref, key: Int): Ref
   requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
@@ -1298,131 +1361,29 @@ predicate tuple_state(self: Ref) {
     (x in tuple___val__(self)) && !stateless(x) ==> acc(state(x), write))
 }
 
-method Map___init__(self_13: Ref, l: Ref)
-  requires self_13 != null
-  requires acc(_MaySet(self_13, 469752635725), write)
-  requires issubtype(typeof(self_13), Map_0())
+method Map___init__(self_15: Ref, l: Ref)
+  requires self_15 != null
+  requires acc(_MaySet(self_15, 469752635725), write)
+  requires issubtype(typeof(self_15), Map_0())
   requires issubtype(typeof(l), list(tuple(Seq(int(), object()))))
-  requires self_13 != null
+  requires self_15 != null
   requires acc(state(l), wildcard)
-  ensures acc(state(self_13), wildcard)
-  ensures (unfolding acc(state(self_13), wildcard) in self_13.Map_m == l)
+  ensures acc(state(self_15), wildcard)
+  ensures (unfolding acc(state(self_15), wildcard) in self_15.Map_m == l)
 {
   var _err: Ref
-  var self_16: Ref
-  var l_0: Ref
-  inhale typeof(self_13) == Map_0()
-  _err := null
-  self_16 := self_13
-  l_0 := l
-  if (perm(_MaySet(self_16, 469752635725)) > none) {
-    exhale acc(_MaySet(self_16, 469752635725), write)
-    inhale acc(self_16.Map_m, write)
-  }
-  self_16.Map_m := l_0
-  fold acc(state(self_16), wildcard)
-  goto __end
-  label __end
-}
-
-method Map_lookup(self_14: Ref, key_0: Ref) returns (_res: Ref)
-  requires issubtype(typeof(self_14), Map_0())
-  requires issubtype(typeof(key_0), int())
-  requires self_14 != null
-  requires acc(state(self_14), wildcard)
-  ensures _res == null || issubtype(typeof(_res), object())
-  ensures unfolding acc(state(self_14), wildcard) in (list___contains__(self_14.Map_m, key_0) ==>
-    object___eq___merged(_res, list___getitem__(self_14.Map_m, key_0)))
-  ensures !list___contains__(self_14.Map_m, key_0) ==>
-    object___eq___merged(_res, null)
-  ensures acc(state(self_14), wildcard)
-{
-  var _err: Ref
-  var res_0: Ref
-  var k: Ref
-  var v: Ref
   var self_17: Ref
-  var key_1: Ref
-  var iterable: Ref
-  var iter: Ref
-  var loop_target: Ref
-  var iter_err: Ref
-  var seqtmp: Seq[Ref]
-  var _loop_check_before: Bool
-  var _loop_termination_flag: Bool
-  var _loop_original_must_terminate: Perm
-  var _residue_202: Perm
-  inhale typeof(self_14) == Map_0()
-  _res := null
+  var l_0: Ref
+  inhale typeof(self_15) == Map_0()
   _err := null
-  self_17 := self_14
-  key_1 := key_0
-  unfold acc(state(self_17), wildcard)
-  res_0 := null
-  inhale _isDefined(207759828338)
-  iterable := self_17.Map_m
-  iter := list___iter__(iterable)
-  loop_target, iter_err := Iterator___next__(iter)
-  if (iter_err == null) {
-    assert 2 == tuple___len__(loop_target)
-    k := tuple___getitem__(loop_target, 0)
-    inhale _isDefined(107)
-    v := tuple___getitem__(loop_target, 1)
-    inhale _isDefined(118)
+  self_17 := self_15
+  l_0 := l
+  if (perm(_MaySet(self_17, 469752635725)) > none) {
+    exhale acc(_MaySet(self_17, 469752635725), write)
+    inhale acc(self_17.Map_m, write)
   }
-  seqtmp := iterable.list_acc
-  while (iter_err == null)
-    invariant acc(iterable.list_acc, 1 / 20)
-    invariant acc(iter.list_acc, 1 / 20)
-    invariant iter.list_acc == iterable.list_acc
-    invariant seqtmp == iterable.list_acc
-    invariant acc(iter.__iter_index, write)
-    invariant acc(iter.__previous, write)
-    invariant iter_err == null ==>
-      iter.__iter_index - 1 == |iter.__previous|
-    invariant iter_err != null ==> iter.__iter_index == |iter.__previous|
-    invariant iter_err == null ==> |iter.list_acc| > 0
-    invariant iter.__iter_index >= 0 &&
-      iter.__iter_index <= |iter.list_acc|
-    invariant |iter.list_acc| > 0 ==> iter.__iter_index > 0
-    invariant |iter.list_acc| > 0 ==>
-      loop_target == iter.list_acc[iter.__iter_index - 1]
-    invariant |iter.list_acc| > 0 ==> (loop_target in iter.list_acc)
-    invariant iter_err == null ==>
-      iter.__previous == iter.list_acc[..iter.__iter_index - 1]
-    invariant |iter.list_acc| > 0 ==>
-      issubtype(typeof(loop_target), tuple(Seq(int(), object())))
-    invariant |iter.list_acc| > 0 ==>
-      k == tuple___getitem__(loop_target, 0) && _isDefined(107)
-    invariant |iter.list_acc| > 0 ==>
-      v == tuple___getitem__(loop_target, 1) && _isDefined(118)
-    invariant iter_err != null ==> iter.__previous == iter.list_acc
-    invariant |iter.list_acc| == 0 ==> iter_err != null
-    invariant true
-    invariant issubtype(typeof(res_0), object()) 
-  {
-    if (object___eq___merged(_checkDefined(k, 107), key_1)) {
-      res_0 := _checkDefined(v, 118)
-      inhale _isDefined(207759828338)
-      goto post_loop
-    }
-    label loop_end
-    loop_target, iter_err := Iterator___next__(iter)
-    if (iter_err == null) {
-      assert 2 == tuple___len__(loop_target)
-      k := tuple___getitem__(loop_target, 0)
-      inhale _isDefined(107)
-      v := tuple___getitem__(loop_target, 1)
-      inhale _isDefined(118)
-    }
-  }
-  Iterator___del__(iter)
-  _res := null
-  label post_loop
-  _res := null
+  self_17.Map_m := l_0
   fold acc(state(self_17), wildcard)
-  _res := _checkDefined(res_0, 207759828338)
-  goto __end
   goto __end
   label __end
 }
@@ -1454,72 +1415,9 @@ method main()
     Set(_single(7809644653626814543)))
   module_names_0 := (module_names_0 union
     Set(_single(6872339552563453791)))
-  module_names_0 := (module_names_0 union Set(_single(123649615949676)))
+  module_names_0 := (module_names_0 union
+    Set(_single(29516468994772027882088914783)))
   module_names_0 := (module_names_0 union Set(_single(7364941)))
   goto __end
   label __end
-}
-
-method Iterator___next__(self: Ref) returns (_res: Ref, _err: Ref)
-  requires acc(self.list_acc, 1 / 40)
-  requires acc(self.__iter_index, write)
-  requires acc(self.__previous, write)
-  ensures acc(self.list_acc, 1 / 40) && self.list_acc == old(self.list_acc)
-  ensures acc(self.__iter_index, write)
-  ensures self.__iter_index <= |self.list_acc| + 1
-  ensures old(self.__iter_index == |self.list_acc|) == (_err != null)
-  ensures acc(self.__previous, write)
-  ensures _err == null ==> self.__iter_index == old(self.__iter_index) + 1
-  ensures _err == null ==> self.__iter_index > 0
-  ensures _err == null ==>
-    self.__previous == self.list_acc[..self.__iter_index - 1]
-  ensures |self.list_acc| > 0 ==> self.__iter_index > 0
-  ensures _err != null ==> self.__previous == self.list_acc
-  ensures _err != null ==> self.__iter_index == |self.list_acc|
-  ensures |self.list_acc| > 0 ==>
-    _res == self.list_acc[self.__iter_index - 1] && (_res in self.list_acc)
-  ensures |self.list_acc| > 0 ==>
-    issubtype(typeof(_res), Iterator_arg(typeof(self), 0))
-  ensures (forall r: Ref ::
-      { (r in self.__previous) }
-      (r in self.__previous) ==
-      ((r in old(self.__previous)) ||
-      (self.__iter_index > 1 &&
-      (r == self.list_acc[self.__iter_index - 2] && _err == null) ||
-      self.__iter_index > 0 &&
-      (_err != null && r == self.list_acc[self.__iter_index - 1]))))
-{
-  inhale false
-}
-
-method Iterator___del__(self: Ref)
-  requires acc(self.list_acc, 1 / 20)
-  requires acc(self.__container, 1 / 20)
-  ensures acc(self.__container, 1 / 20)
-  ensures issubtype(typeof(self.__container), list(list_arg(typeof(self.__container),
-    0))) ==>
-    acc(self.__container.list_acc, 1 / 20)
-  ensures issubtype(typeof(self.__container), dict(dict_arg(typeof(self.__container),
-    0), dict_arg(typeof(self.__container), 1))) ==>
-    acc(self.__container.dict_acc, 1 / 20)
-  ensures issubtype(typeof(self.__container), set(set_arg(typeof(self.__container),
-    0))) ==>
-    acc(self.__container.set_acc, 1 / 20)
-{
-  inhale false
-}
-
-method list___iter__(self: Ref) returns (_res: Ref)
-  requires issubtype(typeof(self), list(list_arg(typeof(self), 0)))
-  requires acc(self.list_acc, 1 / 10)
-  ensures _res != self
-  ensures acc(_res.list_acc, 1 / 20)
-  ensures acc(self.list_acc, 1 / 20)
-  ensures _res.list_acc == self.list_acc
-  ensures acc(_res.__container, write) && _res.__container == self
-  ensures acc(_res.__iter_index, write) && _res.__iter_index == 0
-  ensures acc(_res.__previous, write) && _res.__previous == Seq[Ref]()
-  ensures issubtype(typeof(_res), Iterator(list_arg(typeof(self), 0)))
-{
-  inhale false
 }
