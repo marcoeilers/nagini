@@ -882,25 +882,25 @@ function __name__(): Ref
 
 
 function object___eq___merged(self: Ref, other: Ref): Bool
-  requires (issubtype(typeof(self), bool()) ?
-      true :
+  requires (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
+      true && acc(state(self), wildcard) &&
+      (!stateless(other) ==> acc(state(other), wildcard)) :
       (issubtype(typeof(self), bytes()) ?
         true :
-        (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
+        (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+        1))) ?
           true && acc(state(self), wildcard) &&
           (!stateless(other) ==> acc(state(other), wildcard)) :
-          (issubtype(typeof(self), str()) ?
-            true :
-            (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
-              true && (!stateless(self) ==> acc(state(self), wildcard)) &&
+          (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ?
+            true && (!stateless(self) ==> acc(state(self), wildcard)) &&
+            (!stateless(other) ==> acc(state(other), wildcard)) :
+            (issubtype(typeof(self), list(list_arg(typeof(self), 0))) ?
+              true && acc(state(self), wildcard) &&
               (!stateless(other) ==> acc(state(other), wildcard)) :
-              (issubtype(typeof(self), set(set_arg(typeof(self), 0))) ?
-                true && acc(state(self), wildcard) &&
-                (!stateless(other) ==> acc(state(other), wildcard)) :
-                (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-                1))) ?
-                  true && acc(state(self), wildcard) &&
-                  (!stateless(other) ==> acc(state(other), wildcard)) :
+              (issubtype(typeof(self), str()) ?
+                true :
+                (issubtype(typeof(self), bool()) ?
+                  true :
                   (issubtype(typeof(self), int()) ?
                     true :
                     (issubtype(typeof(self), float()) ?
@@ -928,57 +928,10 @@ function object___eq___merged(self: Ref, other: Ref): Bool
     true &&
     (issubtype(typeof(self), int()) && issubtype(typeof(other), int()) ==>
     result == (int___unbox__(self) == int___unbox__(other)))
-  ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-    1))) ==>
+  ensures issubtype(typeof(self), bool()) ==>
     true &&
-    (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
-    1))) &&
-    issubtype(typeof(other), dict(dict_arg(typeof(other), 0), dict_arg(typeof(other),
-    1))) ==>
-    result ==
-    (unfolding acc(state(self), write) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), write) in
-        dict___len__(self) == dict___len__(other) &&
-        (forall x: Ref ::
-          { dict___contains__(self, x) }
-          { dict___getitem__(self, x) }
-          (exists y: Ref :: { dict___contains__(other, y) } { dict___getitem__(other,
-            y) } dict___contains__(self, x) &&
-            (dict___contains__(other, y) &&
-            (object___eq___merged(x, y) &&
-            object___eq___merged(dict___getitem__(self, x), dict___getitem__(other,
-            y)))))))))
-  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
-    true &&
-    (issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
-    issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
-    result ==
-    (unfolding acc(state(self), write) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), write) in
-        set___len__(self) == set___len__(other) &&
-        (forall x: Ref ::
-          { set___contains__(self, x) }
-          (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
-            x) &&
-            (set___contains__(other, y) && object___eq___merged(x, y)))))))
-  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
-    true &&
-    (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
-    issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
-    !stateless(self) ==>
-    (unfolding acc(state(self), write) in
-      !stateless(other) ==>
-      (unfolding acc(state(other), write) in
-        result ==
-        (tuple___len__(self) == tuple___len__(other) &&
-        (forall x: Int ::
-          { tuple___getitem__(self, x) }
-          { tuple___getitem__(other, x) }
-          x >= 0 && x < tuple___len__(self) ==>
-          object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other,
-          x)))))))
+    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
+    result == (bool___unbox__(self) == bool___unbox__(other)))
   ensures issubtype(typeof(self), str()) ==>
     true &&
     (issubtype(typeof(self), str()) && issubtype(typeof(other), str()) ==>
@@ -1000,24 +953,71 @@ function object___eq___merged(self: Ref, other: Ref): Bool
           x >= 0 && x < list___len__(self) ==>
           object___eq___merged(list___getitem___index(self, x), list___getitem___index(other,
           x))))))
+  ensures issubtype(typeof(self), tuple(tuple_args(typeof(self)))) ==>
+    true &&
+    (issubtype(typeof(self), tuple(tuple_args(typeof(self)))) &&
+    issubtype(typeof(other), tuple(tuple_args(typeof(other)))) ==>
+    !stateless(self) ==>
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        result ==
+        (tuple___len__(self) == tuple___len__(other) &&
+        (forall x: Int ::
+          { tuple___getitem__(self, x) }
+          { tuple___getitem__(other, x) }
+          x >= 0 && x < tuple___len__(self) ==>
+          object___eq___merged(tuple___getitem__(self, x), tuple___getitem__(other,
+          x)))))))
+  ensures issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+    1))) ==>
+    true &&
+    (issubtype(typeof(self), dict(dict_arg(typeof(self), 0), dict_arg(typeof(self),
+    1))) &&
+    issubtype(typeof(other), dict(dict_arg(typeof(other), 0), dict_arg(typeof(other),
+    1))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        dict___len__(self) == dict___len__(other) &&
+        (forall x: Ref ::
+          { dict___contains__(self, x) }
+          { dict___getitem__(self, x) }
+          (exists y: Ref :: { dict___contains__(other, y) } { dict___getitem__(other,
+            y) } dict___contains__(self, x) &&
+            (dict___contains__(other, y) &&
+            (object___eq___merged(x, y) &&
+            object___eq___merged(dict___getitem__(self, x), dict___getitem__(other,
+            y)))))))))
   ensures issubtype(typeof(self), bytes()) ==>
     true &&
     (issubtype(typeof(self), bytes()) && issubtype(typeof(other), bytes()) ==>
     result == (bytes___len__(self) == bytes___len__(other)) &&
     bytes___val__(self) == bytes___val__(other))
-  ensures issubtype(typeof(self), bool()) ==>
+  ensures issubtype(typeof(self), set(set_arg(typeof(self), 0))) ==>
     true &&
-    (issubtype(typeof(self), bool()) && issubtype(typeof(other), bool()) ==>
-    result == (bool___unbox__(self) == bool___unbox__(other)))
+    (issubtype(typeof(self), set(set_arg(typeof(self), 0))) &&
+    issubtype(typeof(other), set(set_arg(typeof(other), 0))) ==>
+    result ==
+    (unfolding acc(state(self), write) in
+      !stateless(other) ==>
+      (unfolding acc(state(other), write) in
+        set___len__(self) == set___len__(other) &&
+        (forall x: Ref ::
+          { set___contains__(self, x) }
+          (exists y: Ref :: { set___contains__(other, y) } set___contains__(self,
+            x) &&
+            (set___contains__(other, y) && object___eq___merged(x, y)))))))
   decreases _
 
 
 function object___hash___merged(self: Ref): Int
-  requires (issubtype(typeof(self), bytes()) ?
+  requires (issubtype(typeof(self), str()) ?
       true :
-      (issubtype(typeof(self), bool()) ?
+      (issubtype(typeof(self), bytes()) ?
         true :
-        (issubtype(typeof(self), str()) ?
+        (issubtype(typeof(self), bool()) ?
           true :
           (issubtype(typeof(self), int()) ?
             true :
@@ -1035,9 +1035,6 @@ function object___hash___merged(self: Ref): Int
     true &&
     (issubtype(typeof(self), int()) ==>
     result == (int___unbox__(self) == -1 ? -2 : int___unbox__(self)))
-  ensures issubtype(typeof(self), str()) ==>
-    true &&
-    (issubtype(typeof(self), str()) ==> result == abstract_hash_str(self))
   ensures issubtype(typeof(self), bool()) ==>
     true &&
     (issubtype(typeof(self), bool()) ==>
@@ -1045,6 +1042,9 @@ function object___hash___merged(self: Ref): Int
   ensures issubtype(typeof(self), bytes()) ==>
     true &&
     (issubtype(typeof(self), bytes()) ==> result == abstract_hash_str(self))
+  ensures issubtype(typeof(self), str()) ==>
+    true &&
+    (issubtype(typeof(self), str()) ==> result == abstract_hash_str(self))
   decreases _
 
 
@@ -1510,13 +1510,17 @@ method Map_lookup(self_16: Ref, key_1: Ref) returns (_res: Ref)
   ensures _res == null || issubtype(typeof(_res), object())
   ensures acc(state(self_16), wildcard)
   ensures (unfolding acc(state(self_16), wildcard) in
-      list___contains__(self_16.Map_keys, key_1) ==>
-      (exists lambda81_28$i: Ref :: { issubtype(typeof(lambda81_28$i), int()) } issubtype(typeof(lambda81_28$i),
-        int()) &&
-        (issubtype(typeof(lambda81_28$i), int()) &&
-        (int___ge__(lambda81_28$i, __prim__int___box__(0)) &&
-        int___lt__(lambda81_28$i, __prim__int___box__(list___len__(self_16.Map_keys))) &&
-        object___eq___merged(_res, list___getitem__(self_16.Map_values, lambda81_28$i))))))
+      (unfolding acc(state(self_16.Map_keys), wildcard) in
+        (unfolding acc(state(self_16.Map_values), wildcard) in
+          list___contains__(self_16.Map_keys, key_1) ==>
+          (exists lambda83_36$i: Ref :: { issubtype(typeof(lambda83_36$i), int()) } issubtype(typeof(lambda83_36$i),
+            int()) &&
+            (issubtype(typeof(lambda83_36$i), int()) &&
+            (int___ge__(lambda83_36$i, __prim__int___box__(0)) &&
+            (int___lt__(lambda83_36$i, __prim__int___box__(list___len__(self_16.Map_keys))) &&
+            object___eq___merged(__prim__int___box__(list___len__(self_16.Map_keys)),
+            __prim__int___box__(list___len__(self_16.Map_values)))) &&
+            _res == list___getitem__(self_16.Map_values, lambda83_36$i)))))))
   ensures (unfolding acc(state(self_16), wildcard) in
       !list___contains__(self_16.Map_keys, key_1) ==> _res == null)
 {
@@ -1542,6 +1546,8 @@ method Map_lookup(self_16: Ref, key_1: Ref) returns (_res: Ref)
   self_19 := self_16
   key_2 := key_1
   unfold acc(state(self_19), wildcard)
+  unfold acc(state(self_19.Map_keys), wildcard)
+  unfold acc(state(self_19.Map_values), wildcard)
   res_0 := null
   inhale _isDefined(207759828338)
   i := __prim__int___box__(0)
@@ -1621,6 +1627,8 @@ method Map_lookup(self_16: Ref, key_1: Ref) returns (_res: Ref)
   _res := null
   label post_loop
   _res := null
+  fold acc(state(self_19.Map_values), wildcard)
+  fold acc(state(self_19.Map_keys), wildcard)
   fold acc(state(self_19), wildcard)
   _res := _checkDefined(res_0, 207759828338)
   goto __end
