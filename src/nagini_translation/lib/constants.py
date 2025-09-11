@@ -303,6 +303,8 @@ STRING_TYPE = 'str'
 
 BYTES_TYPE = 'bytes'
 
+BYTEARRAY_TYPE = 'bytearray'
+
 INT_TYPE = 'int'
 
 PERM_TYPE = 'perm'

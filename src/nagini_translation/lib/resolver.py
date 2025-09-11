@@ -12,6 +12,7 @@ from nagini_translation.lib.constants import (
     BOOL_TYPE,
     BUILTINS,
     BYTES_TYPE,
+    BYTEARRAY_TYPE,
     DICT_TYPE,
     FLOAT_TYPE,
     INT_TYPE,
@@ -434,6 +435,9 @@ def _get_call_type(node: ast.Call, module: PythonModule,
         return module.global_module.classes[INT_TYPE]
     if func_name in ('token', 'ctoken', 'MustTerminate', 'MustRelease'):
         return module.global_module.classes[BOOL_TYPE]
+    # if func_name == BYTEARRAY_TYPE:
+    #     return _get_collection_literal_type(node, ['args'], BYTEARRAY_TYPE, module,
+    #                                         containers, container)
     if func_name == PSEQ_TYPE:
         return _get_collection_literal_type(node, ['args'], PSEQ_TYPE, module,
                                             containers, container)

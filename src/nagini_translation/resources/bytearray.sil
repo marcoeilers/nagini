@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) 2025 ETH Zurich
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+field bytearray_acc : Seq[Ref]
+
+method bytearray___init__() returns (res: Ref)
+    ensures acc(res.bytearray_acc)
+    ensures res.bytearray_acc == Seq[Ref]()
+    ensures typeof(res) == bytearray()
+    ensures Low(res)
+{
+    assume false
+}
+
+function bytearray___val__(self: Ref) : Seq[Ref]
+    decreases _
+    requires issubtype(typeof(self), bytearray())
+    requires acc(self.bytearray_acc, wildcard)
+{
+    self.bytearray_acc
+}
+
+function bytearray___len__(self: Ref) : Int
+    decreases _
+    requires issubtype(typeof(self), bytearray())
+    requires acc(self.bytearray_acc, wildcard)
+    ensures result >= 0
+{
+    |self.bytearray_acc|
+}
+
+function bytearray___create__(value: Seq[Ref], ctr: Int) : Ref
+    decreases _
+    ensures typeof(result) == bytearray()
+	ensures bytearray___len__(result) == |value|
+	ensures bytearray___val__(result) == value
+
+// function bytearray___getitem__(self: Ref, key: Ref): Ref
+//     decreases _
+//     requires issubtype(typeof(self), bytearray())
+//     requires issubtype(typeof(key), int())
+//     requires acc(self.bytearray_acc, wildcard)
+//     requires @error("Bytearray index may be out of bounds.")(let ln == (bytearray___len__(self)) in (int___unbox__(key) < 0 ==> int___unbox__(key) >= -ln))
+//     requires @error("Bytearray index may be out of bounds.")(let ln == (bytearray___len__(self)) in (int___unbox__(key) >= 0 ==> int___unbox__(key) < ln))
+//     ensures result == (int___unbox__(key) >= 0 ? self.bytearray_acc[int___unbox__(key)] : self.bytearray_acc[bytearray___len__(self) + int___unbox__(key)])
+//     ensures issubtype(typeof(result), int())
+
+// method bytearray___setitem__(self: Ref, key: Int, item: Ref) returns ()
+//     requires issubtype(typeof(self), bytearray())
+//     requires acc(self.bytearray_acc)
+//     requires @error("Bytearray index may be negative.")(key >= 0)
+//     requires @error("Bytearray index may be out of bounds.")(key < bytearray___len__(self))
+//     requires issubtype(typeof(item), int())
+//     ensures acc(self.bytearray_acc)
+//     ensures self.bytearray_acc == old(self.bytearray_acc)[key := item]
+//     ensures (Low(key) && Low(item)) ==> (forall i: Ref :: {bytearray___getitem__(self, i)} ((issubtype(typeof(i), int()) && int___unbox__(i) >= 0 && int___unbox__(i) < bytearray___len__(self) && Low(old(bytearray___getitem__(self, i)))) ==> Low(bytearray___getitem__(self, i))))
+// {
+//     assume false
+// }
+
+// method bytearray_append(self: Ref, item: Ref) returns ()
+//     requires issubtype(typeof(self), bytearray())
+//     requires acc(self.bytearray_acc)
+//     requires issubtype(typeof(item), int())
+//     ensures acc(self.bytearray_acc)
+//     ensures self.bytearray_acc == old(self.bytearray_acc) ++ Seq(item)
+// {
+//     assume false
+// }
+
+// method list_extend(self: Ref, other: Ref) returns ()
+//     requires issubtype(typeof(self), bytearray())
+//     requires issubtype(typeof(other), bytearray())
+//     requires acc(self.bytearray_acc)
+//     requires acc(other.bytearray_acc, 1/100)
+//     ensures acc(self.bytearray_acc)
+//     ensures acc(other.bytearray_acc, 1/100)
+//     ensures self.bytearray_acc == old(self.bytearray_acc) ++ other.bytearray_acc

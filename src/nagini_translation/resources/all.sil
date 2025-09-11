@@ -23,6 +23,7 @@ domain SIFDomain[T] {
 import "bool.sil"
 import "float.sil"
 import "references.sil"
+import "bytearray.sil"
 import "bytes.sil"
 import "iterator.sil"
 import "list.sil"
