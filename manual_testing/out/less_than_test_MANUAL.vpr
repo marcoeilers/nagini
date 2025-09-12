@@ -565,6 +565,28 @@ domain __SumHelper[T$]  {
   }
 }
 
+domain __LessThan {
+  function lt(self: Ref, other: Ref): Bool 
+  axiom {
+    (forall o1: Ref :: { lt(o1, o1) } !lt(o1, o1))
+  }
+
+  axiom {
+    (forall o1: Ref, o2: Ref ::
+      { lt(o1, o2) }
+      { lt(o2, o1) }
+      lt(o1, o2) ==> !lt(o2, o1))
+  }
+  
+  axiom {
+    (forall o1: Ref, o2: Ref, o3: Ref ::
+      { lt(o1, o2), eq(o2, o3) }
+      { lt(o1, o2), eq(o1, o3) }
+      { lt(o2, o3), eq(o1, o3) }
+      lt(o1, o2) && lt(o2, o3) ==> eq(o1, o3))
+  }
+}
+
 domain __Transitivity_Eq  {
   
   function eq(self: Ref, other: Ref): Bool 
@@ -1511,6 +1533,86 @@ method E___init__(self_15: Ref, i: Ref)
   label __end
 }
 
+method E___lt___check_asymmetry(self_7: Ref, other_7: Ref)
+{
+  var res: Ref
+  inhale typeof(self_7) == E()
+  inhale issubtype(typeof(res), bool())
+  inhale false || issubtype(typeof(other_7), F()) ||
+    typeof(self_7) == typeof(other_7)
+  inhale acc(state(self_7), wildcard)
+  inhale acc(state(other_7), wildcard)
+
+  inhale bool___unbox__(let cond_2 ==
+    (__prim__bool___box__(self_7 == other_7)) in
+    (true && bool___unbox__(cond_2) ?
+      __prim__bool___box__(false) :
+      (let cond_0_0 ==
+        ((true && !bool___unbox__(cond_2) ?
+          __prim__bool___box__(type___eq__(PyType___box__(typeof(self_7)),
+          PyType___box__(typeof(other_7)))) :
+          null)) in
+        (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+          __prim__bool___box__((unfolding acc(state(self_7), wildcard) in
+            (unfolding acc(state(other_7), wildcard) in
+              lt(self_7.E_i, object___cast__(E(), other_7).E_i)))) :
+          (let cond_1_0 ==
+            ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+              __prim__bool___box__(type___eq__(PyType___box__(typeof(other_7)),
+              PyType___box__(F()))) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+            bool___unbox__(cond_1_0) ?
+              __prim__bool___box__((unfolding acc(state(self_7), wildcard) in
+                (unfolding acc(state(other_7), wildcard) in
+                  lt(self_7.E_i, object___cast__(F(), other_7).F_i)))) :
+              __prim__bool___box__(false)))))))
+
+  if (typeof(other_7) == E()) {
+    assert bool___unbox__(let cond_2 ==
+    (__prim__bool___box__(other_7 == self_7)) in
+    (true && bool___unbox__(cond_2) ?
+      __prim__bool___box__(false) :
+      (let cond_0_0 ==
+        ((true && !bool___unbox__(cond_2) ?
+          __prim__bool___box__(type___eq__(PyType___box__(typeof(other_7)),
+          PyType___box__(typeof(self_7)))) :
+          null)) in
+        (true && !bool___unbox__(cond_2) && bool___unbox__(cond_0_0) ?
+          __prim__bool___box__((unfolding acc(state(other_7), wildcard) in
+            (unfolding acc(state(self_7), wildcard) in
+              lt(other_7.E_i, object___cast__(E(), self_7).E_i)))) :
+          (let cond_1_0 ==
+            ((true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) ?
+              __prim__bool___box__(type___eq__(PyType___box__(typeof(self_7)),
+              PyType___box__(F()))) :
+              null)) in
+            (true && !bool___unbox__(cond_2) && !bool___unbox__(cond_0_0) &&
+            bool___unbox__(cond_1_0) ?
+              __prim__bool___box__((unfolding acc(state(other_7), wildcard) in
+                (unfolding acc(state(self_7), wildcard) in
+                  lt(other_7.E_i, object___cast__(F(), self_7).F_i)))) :
+              __prim__bool___box__(false)))))))
+
+  } elseif (issubtype(typeof(other_7), F())) {
+  inhale (issubtype(typeof(res), bool()) &&
+  (other_7 == self_7 ==> !bool___unbox__(res)) &&
+  (type___eq__(PyType___box__(typeof(other_7)), PyType___box__(typeof(self_7))) ==>
+    (unfolding acc(state(other_7), wildcard) in
+      !stateless(self_7) ==>
+      (unfolding acc(state(self_7), wildcard) in
+        object___eq___merged(res, __prim__bool___box__(lt(other_7.F_i,
+        object___cast__(F(), self_7).F_i)))))) &&
+  (type___eq__(PyType___box__(typeof(self_7)), PyType___box__(E())) ==>
+    (unfolding acc(state(other_7), wildcard) in
+      !stateless(self_7) ==>
+      (unfolding acc(state(self_7), wildcard) in
+        object___eq___merged(res, __prim__bool___box__(lt(other_7.F_i,
+        object___cast__(E(), self_7).E_i)))))))
+    assert bool___unbox__(res)
+  }
+}
+
 method F___init__(self_18: Ref, i_0: Ref)
   requires self_18 != null
   requires acc(_MaySet(self_18, 6905670), write)
@@ -1589,9 +1691,19 @@ method main()
   fold acc(state(ee()), wildcard)
 
 
+  // ee < ff
   assert object___lt___merged(_asserting(_asserting(ee(), true), true &&
     (_single(25957) in module_names_0)), _asserting(_asserting(ff(), true),
     true && (_single(26214) in module_names_0)))
+
+  // irreflexivity
+  assert !object___lt___merged(ee(), ee())
+  assert !object___lt___merged(ff(), ff())
+
+  // asymmetry
+  // ee < ff ==> ff !< ee
+  assert !object___lt___merged(ff(), ee())
+
   goto __end
   label __end
 }
