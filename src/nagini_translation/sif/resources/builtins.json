@@ -633,15 +633,19 @@
         }
     },
     "functions": {
+        "__create__": {
+            "args": ["__prim__Seq", "__prim__int"],
+            "type": "bytearray",
+            "requires": ["__val__"]
+        },
+        "__val__": {
+            "args": ["bytearray"],
+            "type": "__prim__Seq"
+        },
         "__len__": {
             "args": ["bytearray"],
             "type": "__prim__int",
             "requires": ["__val__"]
-        },
-        "__create__": {
-            "args": ["__prim__Seq", "__prim__int"],
-            "type": "bytearray",
-            "requires": ["__len__", "__val__"]
         },
         "__getitem__": {
             "args": ["bytearray", "__prim__int"],

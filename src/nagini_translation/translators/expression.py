@@ -141,6 +141,7 @@ class ExpressionTranslator(CommonTranslator):
         type in any way.
         """
         method = 'translate_' + node.__class__.__name__
+        print("Translation method " + method)
         visitor = getattr(self, method, self.translate_generic)
         if method in TAKES_IMPURE_ARGS:
             impure_arg = TAKES_IMPURE_ARGS[method]

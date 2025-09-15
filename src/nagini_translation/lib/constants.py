@@ -25,7 +25,8 @@ BUILTINS = ['cast',
             'range',
             'type',
             'list',
-            'enumerate']
+            'enumerate',
+            'bytearray']
 
 THREADING = ['Thread']
 

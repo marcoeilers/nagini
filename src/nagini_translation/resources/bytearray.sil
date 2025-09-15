@@ -33,11 +33,10 @@ function bytearray___len__(self: Ref) : Int
     |self.bytearray_acc|
 }
 
-function bytearray___create__(value: Seq[Ref], ctr: Int) : Ref
+function bytearray___create__(values: Seq[Ref], ctr: Int) : Ref
     decreases _
     ensures typeof(result) == bytearray()
-	ensures bytearray___len__(result) == |value|
-	ensures bytearray___val__(result) == value
+	ensures bytearray___val__(result) == values
 
 // function bytearray___getitem__(self: Ref, key: Ref): Ref
 //     decreases _

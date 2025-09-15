@@ -42,6 +42,7 @@ from nagini_translation.lib.constants import (
     THREAD_POST_PRED,
     THREAD_START_PRED,
     TUPLE_TYPE,
+    BYTEARRAY_TYPE,
 )
 from nagini_translation.lib.errors import rules
 from nagini_translation.lib.program_nodes import (
@@ -492,6 +493,25 @@ class CallTranslator(CommonTranslator):
         return arg_stmt + [new_stmt, type_inhale, contents_inhale], new_list.ref(node,
                                                                                  ctx)
 
+    def _translate_bytearray(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
+        elems = []
+        for c in node.s:
+            lit = self.viper.IntLit(c, self.to_position(node, ctx),
+                                    self.no_info(ctx))
+            elems.append(self.to_ref(lit, ctx))
+        if elems:
+            seq = self.viper.ExplicitSeq(elems, self.to_position(node, ctx),
+                                         self.no_info(ctx))
+        else:
+            seq = self.viper.EmptySeq(self.viper.Ref,
+                                      self.to_position(node, ctx),
+                                      self.no_info(ctx))
+        bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
+        args = [seq, self.get_fresh_int_lit(ctx)]
+        result = self.get_function_call(bytearray_class, '__create__', args,
+                                        [None, None], node, ctx)
+        return [], result
+
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
         """
@@ -524,6 +544,8 @@ class CallTranslator(CommonTranslator):
             return self._translate_type_func(node, ctx)
         elif func_name == 'cast':
             return self._translate_cast_func(node, ctx)
+        elif func_name == 'bytearray':
+            return self._translate_bytearray(node, ctx)
         else:
             raise UnsupportedException(node)
 
