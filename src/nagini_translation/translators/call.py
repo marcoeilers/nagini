@@ -783,11 +783,11 @@ class CallTranslator(CommonTranslator):
             # are just set to null.
             if keywords:
                 raise UnsupportedException(node, desc='Keyword arguments in call to '
-                                                      'builtin function.')
+                                                      'builtin function: ' + target.name)
             diff = target.nargs - len(unpacked_args)
             if diff < 0:
                 raise UnsupportedException(node, 'Unsupported version of builtin '
-                                                 'function.')
+                                                 'function: ' + target.name)
             if diff > 0:
                 null = self.viper.NullLit(self.no_position(ctx), self.no_info(ctx))
                 unpacked_args += [null] * diff
