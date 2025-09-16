@@ -1233,6 +1233,8 @@ class PythonMethod(PythonNode, PythonScope, ContainerInterface, PythonStatementC
             # Used instead of the merge function.
             # it a contract-only copy of the equality function with the postcondition added:
             # ensures result == super_func(self, other)
+            
+            # TODO: fix -> set if inherited?
             if self.overrides:
                 self.extended_name = self.get_fresh_name(sil_name + '_extended')
 

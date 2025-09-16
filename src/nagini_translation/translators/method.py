@@ -405,6 +405,7 @@ class MethodTranslator(CommonTranslator):
             return self_var, other_var, self_decl, other_decl
         return self_var, None, self_decl, None
 
+    # TODO: fix bug (see x_inherit_subx_override.py)
     def translate_extended_function(self, func: PythonMethod,
                                     ctx: Context) -> tuple[Optional['silver.ast.Function'], str]:
         """Creates an extended function from func. It is a contract-only copy that 

@@ -305,6 +305,7 @@ function object___eq__(self: Ref, other: Ref): Bool
     ensures self == null ==> result == (other == null ? true : false)
     ensures !issubtype(typeof(self), float()) ==> self == other ==> result
     ensures result == object___eq__(other, self)
+    ensures result ==> object___hash__(self) == object___hash__(other)
 
 function stateless(x: Ref): Bool
     decreases _

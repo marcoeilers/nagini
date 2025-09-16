@@ -448,6 +448,8 @@ class ProgramTranslator(CommonTranslator):
         return f.sil_name == 'object___eq__'
 
     
+    # TODO: replace object___eq__ with merge function dynamically (easier switching)
+    # not really possible as viper functions must be newly created, cannot be edited...?
     def create_object_equality_or_hash_merge_function(self, sil_progs: Program, functions,
                                               overrides: list[PythonMethod], ctx: Context, eq_or_hash: str) -> Optional['silver.ast.Callable']:
         """
