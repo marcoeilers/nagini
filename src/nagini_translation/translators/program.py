@@ -2070,6 +2070,8 @@ class ProgramTranslator(CommonTranslator):
                 functions.append(hash_merge)
                 self.add_dependency([hash_merge.name()], func.sil_name)
                 self.add_dependency(DEPENDENCIES_MERGE_FUNC_HASH, func.sil_name)
+                if eq_merge:
+                    self.add_dependency([hash_merge.name()], eq_merge.name())
 
         all_used_names = None
 
@@ -2106,6 +2108,9 @@ class ProgramTranslator(CommonTranslator):
         predicates = [p for p in predicates if p.name() in all_used_names]
         functions = [f for f in functions if f.name() in all_used_names]
         methods = [m for m in methods if m.name() in all_used_names]
+
+        # temporary fix: make sure equality merge func dependencies are here
+        all_used_names = all_used_names.union(DEPENDENCIES_MERGE_FUNC_EQUALITY)
 
         ctx.current_function = None
 

@@ -144,12 +144,13 @@ function tuple___eq__(self: Ref, other: Ref): Bool
       result ==
         (!stateless(self) ==> (unfolding acc(state(self)) in (
           (!stateless(other) ==> (unfolding acc(state(other)) in (
-            tuple___len__(self) == tuple___len__(other) &&
-            (forall x: Int ::
-              { tuple___getitem__(self, x) }
-              { tuple___getitem__(other, x) }
-              x >= 0 && x < tuple___len__(self) ==>
-              object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
+            result == (
+              tuple___len__(self) == tuple___len__(other) &&
+              (forall x: Int ::
+                { tuple___getitem__(self, x) }
+                { tuple___getitem__(other, x) }
+                x >= 0 && x < tuple___len__(self) ==>
+                object___eq__(tuple___getitem__(self, x), tuple___getitem__(other, x))
             )
           )))
         )))

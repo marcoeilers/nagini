@@ -37,9 +37,9 @@ function list___contains__(self: Ref, item: Ref): Bool
     requires !stateless(item) ==> acc(state(item))
     ensures result == (unfolding state(self) in (
         !stateless(item) ? unfolding state(item) in (
-            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq___merged(item, o)
+            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq__(item, o)
         ) : (
-            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq___merged(item, o)
+            exists o: Ref :: { o in self.list_acc } o in self.list_acc && object___eq__(item, o)
         )
     ))
 
@@ -202,6 +202,7 @@ function list___eq__(self: Ref, other: Ref): Bool
               { list___getitem___index(self, x) }
               { list___getitem___index(other, x) }
               x >= 0 && x < list___len__(self)  ==>
+               object___eq__(list___getitem___index(self, x), list___getitem___index(other, x))
             )
           )))
         ))

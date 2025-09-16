@@ -5,7 +5,6 @@ from nagini_contracts.contracts import *
 from typing import cast
 
 # compares two classes each
-
 class E:
     def __init__(self, i: int) -> None:
         Ensures(self.state())

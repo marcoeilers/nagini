@@ -134,6 +134,7 @@ DEPENDENCIES_MERGE_FUNC_EQUALITY = [
     "list___getitem___index",
     "bytes___val__",
     "bytes___len__",
+    "list___contains__",
     OBJ___EQ__MERGED,
 ]
 
@@ -304,6 +305,7 @@ VIPER_KEYWORDS = [
 
 LEGAL_MAGIC_METHODS = {
     '__eq__',
+    '__contains__',
     '__hash__',
     '__ne__',
     '__gt__',
