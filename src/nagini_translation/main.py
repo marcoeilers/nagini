@@ -361,7 +361,7 @@ def main() -> None:
     )
     parser.add_argument(
         '--merge',
-        help='Use a merge function instead of a postcondition that ensures BST.',
+        help='Use a merge function instead of a postcondition that ensures same result.',
         action='store_true',
         default=False,
     )
