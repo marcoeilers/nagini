@@ -494,23 +494,30 @@ class CallTranslator(CommonTranslator):
                                                                                  ctx)
 
     def _translate_bytearray(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        elems = []
-        for c in node.s:
-            lit = self.viper.IntLit(c, self.to_position(node, ctx),
-                                    self.no_info(ctx))
-            elems.append(self.to_ref(lit, ctx))
-        if elems:
-            seq = self.viper.ExplicitSeq(elems, self.to_position(node, ctx),
-                                         self.no_info(ctx))
-        else:
-            seq = self.viper.EmptySeq(self.viper.Ref,
-                                      self.to_position(node, ctx),
-                                      self.no_info(ctx))
+        print("Translating bytearray")
+        stmts = []
+        
         bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
-        args = [seq, self.get_fresh_int_lit(ctx)]
-        result = self.get_function_call(bytearray_class, '__create__', args,
-                                        [None, None], node, ctx)
-        return [], result
+        res_var = ctx.current_function.create_variable('bytearray', bytearray_class, self.translator)
+        targets = [res_var.ref()]
+        
+        if len(node.args) == 0:
+            call = self.get_method_call(bytearray_class, '__init__', [], [], targets, node, ctx)
+            stmts.extend(call)
+            
+        elif len(node.args) == 1:
+            print(node.args[0])
+            
+            arg_type = self.get_type(node.args[0], ctx)
+            print("bytearray arg type: ", arg_type)
+            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
+            stmts.extend(arg_stmt)
+            contents = arg_val
+        else:
+            raise UnsupportedException(node, 'bytearray() is currently only supported with at most one args.')
+            
+        result_var = res_var.ref(node, ctx)
+        return stmts, result_var
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:

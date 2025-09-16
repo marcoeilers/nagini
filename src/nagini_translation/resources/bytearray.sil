@@ -5,18 +5,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-field bytearray_acc : Seq[Ref]
+field bytearray_acc : Seq[Int] // TODO change type to Int
 
 method bytearray___init__() returns (res: Ref)
     ensures acc(res.bytearray_acc)
-    ensures res.bytearray_acc == Seq[Ref]()
+    ensures res.bytearray_acc == Seq[Int]()
     ensures typeof(res) == bytearray()
     ensures Low(res)
 {
     assume false
 }
 
-function bytearray___val__(self: Ref) : Seq[Ref]
+function bytearray___val__(self: Ref) : Seq[Int]
     decreases _
     requires issubtype(typeof(self), bytearray())
     requires acc(self.bytearray_acc, wildcard)
@@ -33,7 +33,7 @@ function bytearray___len__(self: Ref) : Int
     |self.bytearray_acc|
 }
 
-function bytearray___create__(values: Seq[Ref], ctr: Int) : Ref
+function bytearray___initInts__(values: Seq[Int], ctr: Int) : Ref
     decreases _
     ensures typeof(result) == bytearray()
 	ensures bytearray___val__(result) == values
