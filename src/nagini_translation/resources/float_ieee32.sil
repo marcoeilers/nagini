@@ -52,6 +52,14 @@ function float___eq__(self: Ref, other: Ref): Bool
     ensures issubtype(typeof(self), float()) && issubtype(typeof(other), float()) ==>
         result == ___float32_eq(float___unbox__(self), float___unbox__(other))
 
+domain HashFloatIEEE {
+    function abstract_hash_float_ieee(self: Ref): Int
+}
+
+function float___hash__(self: Ref): Int
+    decreases _
+    ensures issubtype(typeof(self), float()) ==> result == (float___isNaN(self) ? 0 : abstract_hash_float_ieee(self))
+
 function float___add__(self: Ref, other: Ref): Ref
     decreases _
     requires issubtype(typeof(self), float())

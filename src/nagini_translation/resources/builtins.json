@@ -411,7 +411,7 @@
         "__hash__": {
             "args": ["float"],
             "type": "__prim__int",
-            "requires": ["object___hash__", "abstract_hash_float", "float___isNaN", "abstract_hash_float_real", "float___is_inf__"]
+            "requires": ["object___hash__", "abstract_hash_float", "float___isNaN", "abstract_hash_float_real", "float___is_inf__", "abstract_hash_float_ieee"]
         },
         "__add__": {
             "args": ["float", "float"],
