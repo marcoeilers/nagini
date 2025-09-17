@@ -620,10 +620,19 @@
             "type": null,
             "MustTerminate": true
         },
-        "append": {
-            "args": ["bytearray", "int"],
+        "__initFromList__": {
+            "args": ["__prim__Seq"],
             "type": null,
-            "requires": ["__sil_seq__"],
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "append": {
+            "args": ["bytearray", "__prim__int"],
+            "type": null,
             "MustTerminate": true
         },
         "extend": {
@@ -639,11 +648,6 @@
         }
     },
     "functions": {
-        "__create__": {
-            "args": ["__prim__Seq", "__prim__int"],
-            "type": "bytearray",
-            "requires": ["__val__"]
-        },
         "__val__": {
             "args": ["bytearray"],
             "type": "__prim__Seq"

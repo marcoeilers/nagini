@@ -5,11 +5,32 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-field bytearray_acc : Seq[Int] // TODO change type to Int
+field bytearray_acc : Seq[Int]
 
 method bytearray___init__() returns (res: Ref)
     ensures acc(res.bytearray_acc)
     ensures res.bytearray_acc == Seq[Int]()
+    ensures typeof(res) == bytearray()
+    ensures Low(res)
+{
+    assume false
+}
+
+method bytearray___initFromBytearray__(other: Ref) returns (res: Ref)
+    requires issubtype(typeof(other), bytearray())
+    requires acc(other.bytearray_acc, 1/100)
+    ensures acc(other.bytearray_acc, 1/100)
+    ensures acc(res.bytearray_acc)
+    ensures res.bytearray_acc == other.bytearray_acc
+    ensures typeof(res) == bytearray()
+    ensures Low(res)
+{
+    assume false
+}
+
+method bytearray___initFromList__(values: Seq[Int]) returns (res: Ref)
+    ensures acc(res.bytearray_acc)
+    ensures res.bytearray_acc == values
     ensures typeof(res) == bytearray()
     ensures Low(res)
 {
@@ -33,10 +54,14 @@ function bytearray___len__(self: Ref) : Int
     |self.bytearray_acc|
 }
 
-function bytearray___initInts__(values: Seq[Int], ctr: Int) : Ref
-    decreases _
-    ensures typeof(result) == bytearray()
-	ensures bytearray___val__(result) == values
+method bytearray_append(self: Ref, item: Int) returns ()
+    requires issubtype(typeof(self), bytearray())
+    requires acc(self.bytearray_acc)
+    ensures acc(self.bytearray_acc)
+    ensures self.bytearray_acc == old(self.bytearray_acc) ++ Seq(item)
+{
+    assume false
+}    
 
 // function bytearray___getitem__(self: Ref, key: Ref): Ref
 //     decreases _

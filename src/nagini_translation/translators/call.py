@@ -494,30 +494,52 @@ class CallTranslator(CommonTranslator):
                                                                                  ctx)
 
     def _translate_bytearray(self, node: ast.Call, ctx: Context) -> StmtsAndExpr:
-        print("Translating bytearray")
-        stmts = []
-        
+        """
+        Translates a call to bytearray()
+        """
         bytearray_class = ctx.module.global_module.classes[BYTEARRAY_TYPE]
         res_var = ctx.current_function.create_variable('bytearray', bytearray_class, self.translator)
         targets = [res_var.ref()]
-        
+
+        position = self.to_position(node, ctx)
+        info = self.no_info(ctx)
+        result_var = res_var.ref(node, ctx)
+
         if len(node.args) == 0:
             call = self.get_method_call(bytearray_class, '__init__', [], [], targets, node, ctx)
-            stmts.extend(call)
-            
+            return call, result_var
+
         elif len(node.args) == 1:
-            print(node.args[0])
-            
             arg_type = self.get_type(node.args[0], ctx)
-            print("bytearray arg type: ", arg_type)
-            arg_stmt, arg_val = self.translate_expr(node.args[0], ctx)
-            stmts.extend(arg_stmt)
-            contents = arg_val
-        else:
-            raise UnsupportedException(node, 'bytearray() is currently only supported with at most one args.')
+
+            if arg_type.name == BYTEARRAY_TYPE:
+                method_name = '__initFromBytearray__'
+
+            if arg_type.name == LIST_TYPE:
+                method_name = '__initFromList__'
+
+            #     sil_ref_seq = self.viper.SeqType(self.viper.Int)
+            #     ref_seq = SilverType(sil_ref_seq, ctx.module)
+            #     havoc_var = ctx.current_function.create_variable('havoc_seq', ref_seq,
+            #                                                     self.translator)
+            #     seq_field = self.viper.Field('bytearray_acc', sil_ref_seq, position, info)
+            #     content_field = self.viper.FieldAccess(result_var, seq_field, position, info)
+            #     stmts.append(self.viper.FieldAssign(content_field, havoc_var.ref(), position,
+            #                                         info))
+            #     arg_seq = self.get_sequence(arg_type, arg_val, None, node, ctx, position)
+            #     res_seq = self.get_sequence(None, result_var, None, node, ctx, position)
+            #     seq_equal = self.viper.EqCmp(arg_seq, res_seq, position, info)
+            #     stmts.append(self.viper.Inhale(seq_equal, position, info))
             
-        result_var = res_var.ref(node, ctx)
-        return stmts, result_var
+        if method_name:
+            print("Calling method " + method_name)
+            target_method = bytearray_class.get_method(method_name)
+            arg_stmts, arg_vals, arg_types = self.translate_args(target_method, node.args, node.keywords, node, ctx)
+            constr_call = self.get_method_call(bytearray_class, method_name, arg_vals, arg_types, targets, node, ctx)
+            return arg_stmts + constr_call, res_var.ref(node, ctx)
+
+        raise UnsupportedException(node, 'Unsupported variant of bytearray().')
+
 
     def _translate_builtin_func(self, node: ast.Call,
                                 ctx: Context) -> StmtsAndExpr:
