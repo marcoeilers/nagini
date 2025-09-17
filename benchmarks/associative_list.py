@@ -32,38 +32,53 @@ class Map:
         Requires(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), len(self.keys) == len(self.values)))))
         Ensures(Acc(self.state()))
         Ensures(Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values), len(self.keys) == len(self.values)))))
-        Ensures(Unfolding(self.state(), 
-            Unfolding(state_pred(self.keys),
-                Unfolding(state_pred(self.values),
+        Ensures(
+            Unfolding(self.state(), Unfolding(state_pred(self.keys), Unfolding(state_pred(self.values),
+                Exists(int, lambda j:
                     Implies(
-                        key in self.keys,
-                        Exists(int, lambda i: (i >= 0 and i < len(self.keys)) and
-                               self.keys[i] == key and
-                               Result() is self.values[i]
-                        )
+                        0 <= j and j < len(self.keys) and self.keys[j] == key,
+                        Result() is self.values[j]
                     )
                 )
-            )
-        ))
-        Ensures(Unfolding(self.state(), Implies(not (key in self.keys), Result() is None)))
+            )))
+        )
+        Ensures(
+            Unfolding(self.state(), Unfolding(state_pred(self.keys),
+                Implies(
+                    Forall(int, lambda j:
+                        Implies(0 <= j and j < len(self.keys), self.keys[j] != key)
+                    ),
+                    Result() is None
+                )
+            ))
+        )
+
         Unfold(self.state())
         Unfold(state_pred(self.keys))
         Unfold(state_pred(self.values))
-        if self.keys == []:
-            return None
         res: Optional[object] = None
         i: int = 0
         while i < len(self.keys):
+            # permission to access both lists and their elements (read-only)
+            Invariant(Acc(self.keys, 1/2) and Acc(self.values, 1/2))
+            Invariant(Acc(list_pred(self.keys), 1/2) and Acc(list_pred(self.values), 1/2))
+            Invariant(Forall(self.values, lambda item: Implies(not Stateless(item), Acc(state_pred(item), 1/2))))
+            Invariant(Forall(self.keys, lambda item: Implies(not Stateless(item), Acc(state_pred(item), 1/2))))
 
-            # need wildcard accesses here: how? cannot use Wildcard(...)
-            Invariant(Acc(self.keys) and Acc(self.values))
-            Invariant(Acc(list_pred(self.keys)) and Acc(list_pred(self.values)))
-
-            Invariant(0 <= i and i < len(self.keys))
+            Invariant(0 <= i and i <= len(self.keys))
             Invariant(len(self.keys) == len(self.values))
-            Invariant(res is None or Exists(
-                int, lambda j: 0 <= j and j < len(self.keys) and self.keys[j] == key and res is self.values[j]
-            ))
+            Invariant(
+                Forall(int, lambda j:
+                    Implies(0 <= j and j < i, self.keys[j] != key)
+                )
+            )
+            Invariant(
+                Implies(res is not None,
+                    Exists(int, lambda j:
+                        0 <= j and j < i and self.keys[j] == key and res is self.values[j]
+                    )
+                )
+            )
             if self.keys[i] == key:
                 res = self.values[i]
                 break
