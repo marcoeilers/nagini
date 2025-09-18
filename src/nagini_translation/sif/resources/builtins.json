@@ -614,43 +614,66 @@
             "type": null,
             "MustTerminate": true
         },
+        "__initFromList__": {
+            "args": ["__prim__Seq"],
+            "type": null,
+            "MustTerminate": true
+        },
+        "__initFromBytearray__": {
+            "args": ["bytearray"],
+            "type": null,
+            "MustTerminate": true
+        },
         "append": {
             "args": ["bytearray", "int"],
             "type": null,
-            "requires": ["__sil_seq__"],
-            "MustTerminate": true
+            "MustTerminate": true,
+            "requires": ["int___unbox__"]
         },
         "extend": {
             "args": ["bytearray", "bytearray"],
             "type": null,
             "MustTerminate": true
         },
-        "__setitem__": {
-            "args": ["bytearray", "__prim__int", "int"],
+        "reverse": {
+            "args": ["bytearray"],
             "type": null,
             "MustTerminate": true,
-            "requires": ["__len__", "__getitem__"]
+            "requires": ["__len__"]
+        },
+        "__setitem__": {
+            "args": ["bytearray", "int", "int"],
+            "type": null,
+            "MustTerminate": true,
+            "requires": ["__len__", "__getitem__", "int___unbox__"]
+        },
+        "__iter__": {
+            "args": ["bytearray"],
+            "type": "Iterator",
+            "MustTerminate": true
+        },
+        "__getitem_slice__": {
+            "args": ["bytearray", "slice"],
+            "type": "bytearray",
+            "display_name": "__getitem__",
+            "requires": ["__len__", "slice___start__", "slice___stop__"],
+            "MustTerminate": true
         }
     },
     "functions": {
-        "__create__": {
-            "args": ["__prim__Seq", "__prim__int"],
-            "type": "bytearray",
-            "requires": ["__val__"]
-        },
-        "__val__": {
-            "args": ["bytearray"],
-            "type": "__prim__Seq"
-        },
         "__len__": {
             "args": ["bytearray"],
             "type": "__prim__int",
             "requires": ["__val__"]
         },
         "__getitem__": {
-            "args": ["bytearray", "__prim__int"],
-            "type": "int",
-            "requires": ["__len__", "__val__"]
+            "args": ["bytearray", "int"],
+            "type": "__prim__int",
+            "requires": ["__len__", "int___unbox__"]
+        },
+        "__sil_seq__": {
+            "args": ["bytearray"],
+            "type": "__prim__Seq"
         }
     },
     "extends": "object"
